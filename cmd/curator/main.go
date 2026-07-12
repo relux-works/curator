@@ -2,6 +2,8 @@
 package main
 
 import (
+	tea "github.com/charmbracelet/bubbletea"
+
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -20,6 +22,7 @@ import (
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/shell"
 	"github.com/relux-works/curator/internal/skillcheck"
+	"github.com/relux-works/curator/internal/ui"
 	"github.com/relux-works/curator/internal/version"
 )
 
@@ -50,6 +53,7 @@ Commands:
   audit ...                --allow <hash> --reason <text> | --publish <record> --registry <url>
   gc                       remove unreferenced runtime entries
   shell-init <shell>       print the shell hook (zsh, bash, powershell; --no-global)
+  ui                       terminal view over installed state
   config show              print the effective configuration
   --version                print the curator version
 `
@@ -100,6 +104,8 @@ func run(args []string) int {
 		return cmdGC()
 	case "shell-init":
 		return cmdShellInit(args[1:])
+	case "ui":
+		return cmdUI()
 	case "config":
 		if len(args) >= 2 && args[1] == "show" {
 			return cmdConfigShow()
@@ -705,4 +711,17 @@ func pluralY(n int) string {
 		return "y"
 	}
 	return "ies"
+}
+
+func cmdUI() int {
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	program := tea.NewProgram(ui.NewModel(ui.LoadState(cfg)))
+	if _, err := program.Run(); err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	return exitOK
 }
