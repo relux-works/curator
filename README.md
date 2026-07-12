@@ -6,7 +6,7 @@ Curator is implemented in Go and follows a published protocol specification for 
 
 ## Status
 
-Early development. The implementation plan lives in [docs/implementation-plan.md](docs/implementation-plan.md). Work is tracked on the in-repo task board under [.task-board/](.task-board/).
+v0.1 development complete: all twelve phases of [docs/implementation-plan.md](docs/implementation-plan.md) are done, including the interoperability golden gate (byte-equality against fixtures produced by an independent conforming implementation). CI runs tests on ubuntu, macos, and windows plus lint, a naming gate, and the interop gate. Work is tracked on the in-repo task board under [.task-board/](.task-board/).
 
 ## What Curator manages
 
