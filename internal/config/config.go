@@ -130,20 +130,20 @@ var BuiltinRegistries = []Registry{}
 
 // UserPath resolves the user config path, honoring the env override.
 func UserPath() string {
-	if override := os.Getenv("CSK_CONFIG"); override != "" {
+	if override := os.Getenv("CURATOR_CONFIG"); override != "" {
 		return expandHome(override)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "."
 	}
-	return filepath.Join(home, ".cocoaskills", "config.json")
+	return filepath.Join(home, ".curator", "config.json")
 }
 
 // SystemPath resolves the enforced system config path, honoring the env
 // override; returns "" when no system config exists.
 func SystemPath() string {
-	if override := os.Getenv("CSK_SYSTEM_CONFIG"); override != "" {
+	if override := os.Getenv("CURATOR_SYSTEM_CONFIG"); override != "" {
 		return expandHome(override)
 	}
 	var candidate string
@@ -152,9 +152,9 @@ func SystemPath() string {
 		if programData == "" {
 			programData = `C:\ProgramData`
 		}
-		candidate = filepath.Join(programData, "cocoaskills", "config.json")
+		candidate = filepath.Join(programData, "curator", "config.json")
 	} else {
-		candidate = "/etc/cocoaskills/config.json"
+		candidate = "/etc/curator/config.json"
 	}
 	if _, err := os.Stat(candidate); err == nil {
 		return candidate

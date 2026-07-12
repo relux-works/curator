@@ -30,6 +30,7 @@ Out of scope for v0.1: publisher-side artifact signing, version ranges, lockfile
 | Testing | stdlib `testing`, table-driven; golden fixtures under `testdata/` | Deterministic, reviewable |
 | Lint/CI | `gofmt`, `go vet`, `golangci-lint`, GitHub Actions matrix (ubuntu, macos, windows) | Windows is first class |
 | Layout | `cmd/curator/` (main), `internal/<domain>/` packages mirroring protocol domains | Spec-traceable package boundaries |
+| Machine home | `~/.curator/` (env `CURATOR_CONFIG`, `CURATOR_SYSTEM_CONFIG`; system config `/etc/curator/config.json`, `%ProgramData%\curator`) | The machine home is tool-specific state (config, caches, runtime store), not a wire format; two managers on one machine must not share it. Shared wire formats stay exactly as specified: `Skillfile.json`, `csk-skill.json`, markers, adapter ledgers |
 
 Package sketch: `internal/skillspec`, `internal/manifest`, `internal/devsub`, `internal/config`, `internal/identity`, `internal/gitops`, `internal/snapshot`, `internal/hashing`, `internal/closure`, `internal/whitelist`, `internal/locale`, `internal/marker`, `internal/runtimestore`, `internal/shims`, `internal/adapters`, `internal/mcp`, `internal/scopes` (global, hybrid, consumers, gc), `internal/registry`, `internal/audit`, `internal/shell`, `internal/cli`.
 

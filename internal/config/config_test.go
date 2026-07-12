@@ -105,7 +105,7 @@ func TestSystemConfigLockedKeys(t *testing.T) {
 		"allowed_sources": ["org.example.com/skills"],
 		"preferred_locale": "ru"
 	}`)
-	t.Setenv("CSK_SYSTEM_CONFIG", systemPath)
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
 
 	var warnings []string
 	cfg, err := Load(userPath, func(message string) { warnings = append(warnings, message) })
@@ -129,7 +129,7 @@ func TestSystemConfigUnlockedDefaultApplies(t *testing.T) {
 	dir := t.TempDir()
 	userPath := writeConfig(t, dir, "config.json", minimal)
 	systemPath := writeConfig(t, dir, "system.json", `{"locked": [], "preferred_locale": "ru"}`)
-	t.Setenv("CSK_SYSTEM_CONFIG", systemPath)
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
 	cfg, err := Load(userPath, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +143,7 @@ func TestSystemConfigLockedButUnsetFails(t *testing.T) {
 	dir := t.TempDir()
 	userPath := writeConfig(t, dir, "config.json", minimal)
 	systemPath := writeConfig(t, dir, "system.json", `{"locked": ["audit"]}`)
-	t.Setenv("CSK_SYSTEM_CONFIG", systemPath)
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
 	if _, err := Load(userPath, nil); err == nil || !strings.Contains(err.Error(), "locks") {
 		t.Fatalf("err = %v, want locked-but-unset error", err)
 	}
