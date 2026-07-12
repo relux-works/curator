@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/adapters"
+	"github.com/relux-works/curator/internal/audit"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
@@ -248,14 +249,31 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		}
 	}
 
-	// 13. Audit gate hook (plan phase P8).
-	if opts.AuditGate != nil {
-		warnings, errs := opts.AuditGate(nodes)
-		result.Messages = append(result.Messages, warnings...)
-		if len(errs) > 0 {
-			result.failf("%s", strings.Join(errs, "; "))
-			return result
+	// 13. Audit gate (Spec §12); Options.AuditGate overrides for tests.
+	auditGate := opts.AuditGate
+	if auditGate == nil {
+		auditGate = func(nodes []*closure.Node) ([]string, []string) {
+			subjects := make([]audit.Subject, 0, len(nodes))
+			for _, node := range nodes {
+				subjects = append(subjects, audit.Subject{
+					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+				})
+			}
+			warnings, errs := audit.Gate(cfg, subjects)
+			prefixed := make([]string, 0, len(warnings))
+			for _, warning := range warnings {
+				prefixed = append(prefixed, alias+": "+warning)
+			}
+			return prefixed, errs
 		}
+	}
+	auditWarnings, auditErrs := auditGate(nodes)
+	result.Messages = append(result.Messages, auditWarnings...)
+	if len(auditErrs) > 0 {
+		result.failf("%s", strings.Join(auditErrs, "; "))
+		return result
 	}
 
 	// 14. Registry resolution (Spec §13); Options.ResolveAttest overrides.
