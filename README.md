@@ -8,6 +8,29 @@ Curator is implemented in Go and follows a published protocol specification for 
 
 v0.1 development complete: all twelve phases of [docs/implementation-plan.md](docs/implementation-plan.md) are done, including the interoperability golden gate (byte-equality against fixtures produced by an independent conforming implementation). CI runs tests on ubuntu, macos, and windows plus lint, a naming gate, and the interop gate. Work is tracked on the in-repo task board under [.task-board/](.task-board/).
 
+## Install
+
+```bash
+# Homebrew (macOS, Linux)
+brew install relux-works/tap/curator
+
+# installer script (macOS, Linux)
+curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | sh
+
+# Scoop (Windows)
+scoop bucket add relux-works https://github.com/relux-works/scoop-bucket
+scoop install curator
+
+# Go toolchain
+go install github.com/relux-works/curator/cmd/curator@latest
+```
+
+Debian and RPM packages ship with every [release](https://github.com/relux-works/curator/releases), together with SBOMs and cosign signatures. macOS binaries are Developer ID signed (Relux Works, LLC). Verify any downloaded artifact:
+
+```bash
+gh attestation verify <artifact> --owner relux-works
+```
+
 ## What Curator manages
 
 - **Skill packages**: `SKILL.md` plus context directories, with a machine manifest (`csk-skill.json`, schemas 1 through 5) declaring commands, runtime layout, capabilities, and dependencies.

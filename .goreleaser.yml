@@ -1,0 +1,113 @@
+version: 2
+
+project_name: curator
+
+builds:
+  - id: curator
+    main: ./cmd/curator
+    binary: curator
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/relux-works/curator/internal/version.value=v{{ .Version }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [LICENSE, NOTICE, README.md]
+
+checksum:
+  name_template: checksums.txt
+
+sboms:
+  - artifacts: archive
+
+# macOS Developer ID signing (Relux Works, LLC). Notarization submission
+# activates once the App Store Connect API key secrets are present.
+notarize:
+  macos:
+    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      ids: [curator]
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_P12_PASSWORD }}"
+      # Notarization submission needs an App Store Connect API key. Add the
+      # ASC_ISSUER_ID, ASC_KEY_ID, and ASC_KEY_P8 repository secrets, restore
+      # them in .github/workflows/release.yml, and uncomment:
+      # notarize:
+      #   issuer_id: "{{ .Env.ASC_ISSUER_ID }}"
+      #   key_id: "{{ .Env.ASC_KEY_ID }}"
+      #   key: "{{ .Env.ASC_KEY_P8 }}"
+      #   wait: true
+      #   timeout: 20m
+
+# Keyless cosign signatures over the checksums file: verifying it transitively
+# verifies every artifact hash.
+signs:
+  - cmd: cosign
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
+nfpms:
+  - id: packages
+    package_name: curator
+    vendor: Relux Works, LLC
+    homepage: https://github.com/relux-works/curator
+    maintainer: Ivan Oparin <oparin@me.com>
+    description: Agent environment manager
+    license: Apache-2.0
+    formats: [deb, rpm]
+    bindir: /usr/bin
+
+homebrew_casks:
+  - name: curator
+    repository:
+      owner: relux-works
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: https://github.com/relux-works/curator
+    description: Agent environment manager
+    license: Apache-2.0
+
+scoops:
+  - name: curator
+    repository:
+      owner: relux-works
+      name: scoop-bucket
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: bucket
+    homepage: https://github.com/relux-works/curator
+    description: Agent environment manager
+    license: Apache-2.0
+
+release:
+  github:
+    owner: relux-works
+    name: curator
+  draft: false
+  footer: |
+    ## Verify what you downloaded
+
+    ```bash
+    gh attestation verify <artifact> --owner relux-works
+    cosign verify-blob \
+      --certificate checksums.txt.pem --signature checksums.txt.sig \
+      --certificate-identity-regexp 'github.com/relux-works/curator' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      checksums.txt
+    ```
+
+changelog:
+  use: github
