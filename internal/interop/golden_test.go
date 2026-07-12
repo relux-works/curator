@@ -9,10 +9,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/whitelist"
@@ -26,6 +28,43 @@ func repoRoot(t *testing.T) string {
 	}
 	// internal/interop -> repo root
 	return filepath.Dir(filepath.Dir(wd))
+}
+
+func TestGoldenMarkerObject(t *testing.T) {
+	dir := t.TempDir()
+	wantContextHash := readGolden(t, "expected/context_sha256.txt")
+	wantFiles := []string{".skill_triggers/en.md", "SKILL.md", "references/notes.md"}
+	generated := &marker.Marker{
+		Name: "golden-skill", Source: "golden-skill",
+		RefKind: "revision", Ref: "0123456789abcdef0123456789abcdef01234567",
+		Commit: "0123456789abcdef0123456789abcdef01234567", ContentSHA256: wantContextHash,
+		Agents: []string{"codex_cli"}, Commands: []string{"golden-tool"},
+		SkillSchemaVersion: 5, RuntimeRoots: []string{"scripts"},
+		InstalledAt: "2000-01-01T00:00:00Z", Files: wantFiles,
+		Activation: &marker.Activation{Context: true, Commands: []string{"golden-tool"}},
+		Requirers:  []string{"<project>"},
+	}
+	if err := marker.Write(dir, generated); err != nil {
+		t.Fatal(err)
+	}
+	actualPayload, err := os.ReadFile(filepath.Join(dir, marker.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPayload, err := os.ReadFile(golden(t, "expected/marker.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var actual, want any
+	if err := json.Unmarshal(actualPayload, &actual); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(wantPayload, &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(actual, want) {
+		t.Fatalf("marker object diverges from golden:\n got %s\nwant %s", actualPayload, wantPayload)
+	}
 }
 
 func golden(t *testing.T, rel string) string {
