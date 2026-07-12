@@ -259,7 +259,7 @@ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
 	s := newSigner(t)
 	calls := 0
 	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		if calls > 1 {
 			// simulate outage after the first response
@@ -320,7 +320,7 @@ func TestPublish(t *testing.T) {
 	if _, err := Publish(server.URL, "t", []byte("{broken")); err == nil {
 		t.Fatal("invalid JSON must fail before the network")
 	}
-	reject := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	reject := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "invalid auditor token", http.StatusUnauthorized)
 	}))
 	defer reject.Close()
