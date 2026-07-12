@@ -1,11 +1,11 @@
 ## Status
-in-progress
+review
 
 ## Assigned To
 codex
 
 ## Created
-2026-07-13T02:47:28Z
+2026-07-13T03:14:10Z
 
 ## Last Update
 2026-07-13T00:00:00Z
@@ -19,7 +19,9 @@ codex
 ## Checklist
 - [x] Compare implementation with Spec §17.1
 - [x] Run baseline verification
-- [ ] Add regression tests and fixes
-- [ ] Record final evidence
+- [x] Add regression tests and fixes
+- [x] Record final evidence
 
 ## Notes
+
+- Awaiting remote CI on Linux, macOS, and Windows before moving to done.

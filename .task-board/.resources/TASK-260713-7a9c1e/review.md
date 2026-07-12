@@ -89,3 +89,41 @@ Required correction: keep this review task authoritative for corrective work and
 
 - Snapshot objects are described with six required fields in Spec §13.4, but both implementations accept a correctly signed object that omits fields other than `version` and `created_at`. This needs a specification decision before changing compatibility behavior.
 - PowerShell hook prose says activation runs on every prompt, while the observable implementation only invokes activation when the hook is loaded. This also needs a specification decision.
+
+## Resolution evidence
+
+| Finding | Status | Evidence |
+|---|---|---|
+| F-001 | corrected | `validateNodes` runs before phase 9; `TestRuntimeOnlyProviderStillRequiresSkillMd` proves runtime-only rejection before writes |
+| F-002 | corrected | marker serialization normalizes mandatory arrays and nullable locale; marker unit test and `TestGoldenMarkerObject` prove the parsed wire object |
+| F-003 | corrected | `parseInterspersed` supports flags around positional arguments; CLI parser tests cover trailing and optional audit flags |
+| F-004 | corrected | bootstrap, project, alias, all-project, global, hybrid, standalone audit, and scope status paths are dispatched and covered by CLI/config tests |
+| F-005 | corrected | status recomputes the marker content hash; CLI e2e proves clean success and tamper failure |
+| F-006 | corrected | global install applies manifest locale, full validation, legacy dependency checks, audit, and scope-correct moved-tag detection |
+| F-007 | corrected | registry snapshot and record fetches reject non-2xx responses; offline cache fallback has a regression test |
+| F-008 | corrected | `marker.json` and the standalone `testdata/golden/regenerate` generator now complete the P10 artifact set |
+| F-009 | corrected prospectively | this review and every corrective change are tracked by TASK-260713-7a9c1e; no historical records were fabricated |
+
+## Spec §17.1 audit evidence
+
+1. Package formats, whitelist, localization, schemas 1 through 5, and rejection rules are covered by `internal/skillspec`, `internal/whitelist`, `internal/locale`, `internal/skillcheck`, and their tests.
+2. Skillfile schema 1 and development substitutions are covered by `internal/manifest`, `internal/devsub`, and their tests.
+3. Canonical allowlist identities, closure unification, conflicts, cycles, ordering, and activation are covered by `internal/identity`, `internal/closure`, and graph tests.
+4. Marker objects, byte-exact hashes, runtime layout, shims, adapters, tamper detection, and end-to-end install are covered by install tests and the independent golden gate.
+5. Installation invokes only the fixed git executable and filesystem operations. No skill-provided command is launched during install.
+6. MCP configuration surfaces and any/all read-only checks are covered by `internal/mcp` tests and install gating tests.
+7. Registry canonical bytes, Ed25519, matching, deny-wins, snapshot monotonicity and staleness, TTL, offline grace, install policy, marker attestation, publication, and enforced configuration are covered by registry, install, config, and golden tests.
+8. Curator does not provide a registry service, so the conditional service requirement does not apply.
+
+Audit decision semantics and canary blocking are covered by `internal/audit` decision-table, cache, revocation, pin, and canary tests.
+
+## Local verification
+
+- `go test ./... -count=1`
+- `go test -race ./... -count=1`
+- `go vet ./...`
+- `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run`
+- `go run ./testdata/golden/regenerate -root .` followed by a clean fixture diff
+- Linux and Windows test-binary compilation through `go test -exec=true ./...`
+- Naming gate over tracked source and commit messages
+- `git verify-commit` for every corrective commit

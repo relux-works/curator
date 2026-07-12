@@ -1,5 +1,5 @@
 ## Status
-in-progress
+review
 
 ## Assigned To
 codex
@@ -8,7 +8,7 @@ codex
 2026-07-12T00:00:00Z
 
 ## Last Update
-2026-07-13T02:47:28Z
+2026-07-13T03:14:10Z
 
 ## Blocked By
 - (see dependency order in docs/implementation-plan.md section 5)
@@ -22,3 +22,4 @@ codex
 ## Notes
 
 - Reopened for the v0.1 conformance review in STORY-260713-d0d4e8.
+- Corrective implementation and local verification are complete. Remote CI review is pending.
