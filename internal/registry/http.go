@@ -26,7 +26,12 @@ var httpClient = &http.Client{Timeout: 10 * time.Second}
 // HTTPGetSnapshot fetches GET <url>/v1/snapshot.
 func HTTPGetSnapshot(baseURL string) (map[string]any, error) {
 	endpoint := strings.TrimRight(baseURL, "/") + "/v1/snapshot"
-	response, err := httpClient.Get(endpoint) // #nosec G107 -- registry URL comes from pinned machine config
+	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Accept", "application/json")
+	response, err := httpClient.Do(request) // #nosec G107 -- registry URL comes from pinned machine config
 	if err != nil {
 		return nil, err
 	}
@@ -34,6 +39,9 @@ func HTTPGetSnapshot(baseURL string) (map[string]any, error) {
 	payload, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
 	if err != nil {
 		return nil, err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("registry snapshot request failed (%d): %s", response.StatusCode, strings.TrimSpace(string(payload)))
 	}
 	var data map[string]any
 	if err := json.Unmarshal(payload, &data); err != nil {
@@ -81,7 +89,12 @@ func NewHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Tim
 }
 
 func httpGetRecords(endpoint string) ([]map[string]any, error) {
-	response, err := httpClient.Get(endpoint) // #nosec G107 -- registry URL comes from pinned machine config
+	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Accept", "application/json")
+	response, err := httpClient.Do(request) // #nosec G107 -- registry URL comes from pinned machine config
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +102,9 @@ func httpGetRecords(endpoint string) ([]map[string]any, error) {
 	payload, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
 	if err != nil {
 		return nil, err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("registry records request failed (%d): %s", response.StatusCode, strings.TrimSpace(string(payload)))
 	}
 	var data struct {
 		Records []map[string]any `json:"records"`

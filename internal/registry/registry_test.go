@@ -296,6 +296,41 @@ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
 	}
 }
 
+func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
+	s := newSigner(t)
+	failed := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if failed {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"records":[]}`))
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/v1/snapshot") {
+			_ = json.NewEncoder(w).Encode(s.sign(snapshotBody(1, time.Now())))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}})
+	}))
+	defer server.Close()
+
+	current := time.Now()
+	fetch := NewHTTPFetch(t.TempDir(), time.Minute, time.Hour, func() time.Time { return current })
+	first, err := fetch(server.URL, "id", "commit", "hash")
+	if err != nil || len(first) != 1 {
+		t.Fatalf("initial records fetch: records=%v err=%v", first, err)
+	}
+	failed = true
+	current = current.Add(2 * time.Minute)
+	cached, err := fetch(server.URL, "id", "commit", "hash")
+	if err != nil || len(cached) != 1 {
+		t.Fatalf("HTTP 503 must use offline cache: records=%v err=%v", cached, err)
+	}
+	if _, err := HTTPGetSnapshot(server.URL); err == nil || !strings.Contains(err.Error(), "503") {
+		t.Fatalf("snapshot HTTP failure = %v, want 503 error", err)
+	}
+}
+
 func TestPublish(t *testing.T) {
 	var gotAuth string
 	var gotBody []byte
