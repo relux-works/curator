@@ -25,8 +25,10 @@ import (
 	"github.com/relux-works/curator/internal/locale"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/mcp"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/whitelist"
 )
 
@@ -200,16 +202,37 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		return result
 	}
 
-	// 11. MCP verification hook (plan phase P6).
-	mcpFound := map[string]map[string][]string{}
-	if opts.VerifyMcp != nil {
-		found, warnings, err := opts.VerifyMcp(nodes)
-		result.Messages = append(result.Messages, warnings...)
-		if err != nil {
-			result.failf("%v", err)
-			return result
+	// 11. MCP verification (Spec §11); Options.VerifyMcp overrides for tests.
+	verifyMcp := opts.VerifyMcp
+	if verifyMcp == nil {
+		verifyMcp = func(nodes []*closure.Node) (map[string]map[string][]string, []string, error) {
+			userHome, err := os.UserHomeDir()
+			if err != nil {
+				userHome = ""
+			}
+			requirements := map[string]map[string]skillspec.McpServer{}
+			for _, node := range nodes {
+				if len(node.Spec.McpServers) > 0 {
+					requirements[node.Name] = node.Spec.McpServers
+				}
+			}
+			findings, warnings, err := mcp.Verify(mcp.Env{ProjectRoot: projectRoot, UserHome: userHome}, agents, requirements)
+			found := map[string]map[string][]string{}
+			for name, finding := range findings {
+				found[name] = finding.FoundIn
+			}
+			prefixed := make([]string, 0, len(warnings))
+			for _, warning := range warnings {
+				prefixed = append(prefixed, alias+": "+warning)
+			}
+			return found, prefixed, err
 		}
-		mcpFound = found
+	}
+	mcpFound, mcpWarnings, mcpErr := verifyMcp(nodes)
+	result.Messages = append(result.Messages, mcpWarnings...)
+	if mcpErr != nil {
+		result.failf("%v", mcpErr)
+		return result
 	}
 
 	// 12. Migration warnings.

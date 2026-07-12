@@ -440,3 +440,29 @@ func TestGlobalInstall(t *testing.T) {
 func manifestAddGlobal(e *env, name string) error {
 	return manifestpkg.AddDecl(GlobalRoot(e.home), name, "tag", "v1", "", "")
 }
+
+func TestMcpRequirementGatesInstall(t *testing.T) {
+	e := newEnv(t)
+	name := "skill-mcp"
+	dir := filepath.Join(e.skillsRoot, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.git(dir, "init", "-q", "-b", "main")
+	e.write(dir, "SKILL.md", "# s")
+	spec := `{"schema_version": 5, "capabilities": {}, "dependencies": {"mcp_servers": {
+		"sheets": {"hint": "connect the sheets server"}}}}`
+	e.write(dir, "csk-skill.json", spec)
+	e.git(dir, "add", ".")
+	e.git(dir, "commit", "-qm", "init")
+	e.git(dir, "tag", "v1")
+	e.declare(name)
+
+	// no server configured anywhere: any-semantics failure with the hint
+	userHome := t.TempDir()
+	e2 := e.install(Options{VerifyMcp: nil, Platform: "unix"})
+	_ = userHome
+	if e2.Status != "failed" || !strings.Contains(strings.Join(e2.Errors, "\n"), "connect the sheets server") {
+		t.Fatalf("mcp gate: %+v", e2)
+	}
+}
