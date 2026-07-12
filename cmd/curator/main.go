@@ -4,20 +4,26 @@ package main
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/audit"
+	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/gitignore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/shell"
@@ -39,6 +45,7 @@ Usage:
   curator <command> [arguments]
 
 Commands:
+  bootstrap [flags]         create the machine configuration
   init [path]              create Skillfile.json and the managed gitignore block
   add <name> ...           add or replace a skill declaration, then install
   remove <name>            remove a skill declaration
@@ -47,10 +54,11 @@ Commands:
   upgrade [path]           update, then install
   status [path] [flags]    manifest vs installed state (--check, --json, --attest)
   list                     configured projects and declared skills
+  project <subcommand>     add | resolve
   skill check <dir>        validate one skill package (--locale, --json)
-  global <subcommand>      init | add | remove | list | install
-  hybrid <subcommand>      add | remove | list
-  audit ...                --allow <hash> --reason <text> | --publish <record> --registry <url>
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
   gc                       remove unreferenced runtime entries
   shell-init <shell>       print the shell hook (zsh, bash, powershell; --no-global)
   ui                       terminal view over installed state
@@ -73,6 +81,8 @@ func run(args []string) int {
 		return exitOK
 	case "init":
 		return cmdInit(args[1:])
+	case "bootstrap":
+		return cmdBootstrap(args[1:])
 	case "add":
 		return cmdAdd(args[1:])
 	case "remove":
@@ -90,6 +100,8 @@ func run(args []string) int {
 		return cmdStatus(args[1:])
 	case "list":
 		return cmdList()
+	case "project":
+		return cmdProject(args[1:])
 	case "skill":
 		if len(args) >= 2 && args[1] == "check" {
 			return cmdSkillCheck(args[2:])
@@ -145,6 +157,77 @@ func projectRootArg(args []string) string {
 	return wd
 }
 
+// parseInterspersed lets commands accept flags before or after positional
+// arguments. The standard flag package stops at the first positional token,
+// while the informative CLI surface documents forms such as
+// `install <path> --dry-run` and `add <name> --tag <ref>` (Spec §15).
+func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
+	var flagArgs, positional []string
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		if arg == "--" {
+			for trailing := index + 1; trailing < len(args); trailing++ {
+				positional = append(positional, args[trailing])
+			}
+			break
+		}
+		if arg == "-" || !strings.HasPrefix(arg, "-") {
+			positional = append(positional, arg)
+			continue
+		}
+
+		flagArgs = append(flagArgs, arg)
+		nameValue := strings.TrimLeft(arg, "-")
+		name, _, hasEquals := strings.Cut(nameValue, "=")
+		definition := flags.Lookup(name)
+		if definition == nil || hasEquals {
+			continue
+		}
+		if optional, ok := definition.Value.(interface{ AcceptsOptionalValue(string) bool }); ok &&
+			index+1 < len(args) && optional.AcceptsOptionalValue(args[index+1]) {
+			index++
+			flagArgs[len(flagArgs)-1] = arg + "=" + args[index]
+			continue
+		}
+		boolean, isBoolean := definition.Value.(interface{ IsBoolFlag() bool })
+		if isBoolean && boolean.IsBoolFlag() {
+			continue
+		}
+		if index+1 >= len(args) {
+			return nil, fmt.Errorf("flag needs an argument: %s", arg)
+		}
+		index++
+		flagArgs = append(flagArgs, args[index])
+	}
+	if err := flags.Parse(flagArgs); err != nil {
+		return nil, err
+	}
+	return positional, nil
+}
+
+type auditModeValue struct {
+	value string
+}
+
+func (value *auditModeValue) String() string { return value.value }
+
+func (value *auditModeValue) Set(raw string) error {
+	if raw == "true" {
+		raw = "advisory"
+	}
+	if raw != "advisory" && raw != "strict" {
+		return fmt.Errorf("audit mode must be advisory or strict")
+	}
+	value.value = raw
+	return nil
+}
+
+func (*auditModeValue) IsBoolFlag() bool { return true }
+
+func (*auditModeValue) AcceptsOptionalValue(raw string) bool {
+	return raw == "advisory" || raw == "strict"
+}
+
 func aliasFor(cfg *config.Config, projectRoot string) string {
 	for alias, project := range cfg.Projects {
 		if project.Path == projectRoot {
@@ -152,6 +235,103 @@ func aliasFor(cfg *config.Config, projectRoot string) string {
 		}
 	}
 	return filepath.Base(projectRoot)
+}
+
+type projectTarget struct {
+	Alias string
+	Root  string
+}
+
+func selectProjectTargets(cfg *config.Config, positional []string, all bool) ([]projectTarget, error) {
+	if all {
+		if len(positional) > 0 {
+			return nil, fmt.Errorf("--all cannot be combined with a project target")
+		}
+		aliases := make([]string, 0, len(cfg.Projects))
+		for alias := range cfg.Projects {
+			aliases = append(aliases, alias)
+		}
+		sort.Strings(aliases)
+		targets := make([]projectTarget, 0, len(aliases))
+		for _, alias := range aliases {
+			targets = append(targets, projectTarget{Alias: alias, Root: cfg.Projects[alias].Path})
+		}
+		if len(targets) == 0 {
+			return nil, fmt.Errorf("--all requested but no projects are configured")
+		}
+		return targets, nil
+	}
+	if len(positional) > 1 {
+		return nil, fmt.Errorf("expected at most one project target")
+	}
+	if len(positional) == 1 {
+		if project, present := cfg.Projects[positional[0]]; present {
+			return []projectTarget{{Alias: positional[0], Root: project.Path}}, nil
+		}
+	}
+	root := projectRootArg(positional)
+	root = nearestProjectRoot(root)
+	return []projectTarget{{Alias: aliasFor(cfg, root), Root: root}}, nil
+}
+
+func nearestProjectRoot(start string) string {
+	original := projectRootArg([]string{start})
+	root := original
+	if info, err := os.Stat(root); err == nil && !info.IsDir() {
+		root = filepath.Dir(root)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(root, manifest.Name)); err == nil {
+			return root
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			return original
+		}
+		root = parent
+	}
+}
+
+func cmdBootstrap(args []string) int {
+	flags := flag.NewFlagSet("bootstrap", flag.ContinueOnError)
+	skillsRoot := flags.String("skills-root", "", "directory containing skill repositories")
+	preferredLocale := flags.String("preferred-locale", "", "preferred locale")
+	defaultAgents := flags.String("default-agents", "codex_cli", "comma-separated default agents")
+	force := flags.Bool("force", false, "overwrite an existing configuration")
+	nonInteractive := flags.Bool("non-interactive", false, "fail instead of prompting for missing values")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil || len(positional) > 0 {
+		return exitUsage
+	}
+	if *skillsRoot == "" && !*nonInteractive {
+		fmt.Fprint(os.Stderr, "skills_root: ")
+		reader := bufio.NewReader(os.Stdin)
+		value, readErr := reader.ReadString('\n')
+		if readErr == nil {
+			*skillsRoot = strings.TrimSpace(value)
+		}
+	}
+	if *skillsRoot == "" {
+		fmt.Fprintln(os.Stderr, "curator: bootstrap requires --skills-root")
+		return exitUsage
+	}
+	path := config.UserPath()
+	if err := config.Bootstrap(path, *skillsRoot, *preferredLocale, splitNonEmpty(*defaultAgents), *force); err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	fmt.Println("wrote", path)
+	return exitOK
+}
+
+func splitNonEmpty(value string) []string {
+	var result []string
+	for _, item := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 func cmdInit(args []string) int {
@@ -177,6 +357,7 @@ func sortedKnownAgents() []string {
 	for agent := range known {
 		agents = append(agents, agent)
 	}
+	sort.Strings(agents)
 	return agents
 }
 
@@ -187,14 +368,16 @@ func cmdAdd(args []string) int {
 	tag := flags.String("tag", "", "git tag")
 	branch := flags.String("branch", "", "git branch")
 	revision := flags.String("revision", "", "git revision")
-	if err := flags.Parse(args); err != nil {
+	project := flags.String("project", "", "project alias or path")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
 		return exitUsage
 	}
-	if flags.NArg() < 1 {
+	if len(positional) < 1 {
 		fmt.Fprintln(os.Stderr, "curator: add requires a skill name")
 		return exitUsage
 	}
-	name := flags.Arg(0)
+	name := positional[0]
 	refKind, refValue := "", ""
 	for kind, value := range map[string]string{"tag": *tag, "branch": *branch, "revision": *revision} {
 		if value != "" {
@@ -209,7 +392,20 @@ func cmdAdd(args []string) int {
 		fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
 		return exitUsage
 	}
-	root := projectRootArg(flags.Args()[1:])
+	rootArgs := positional[1:]
+	if *project != "" {
+		rootArgs = []string{*project}
+	}
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	targets, targetErr := selectProjectTargets(cfg, rootArgs, false)
+	if targetErr != nil {
+		fmt.Fprintln(os.Stderr, "curator:", targetErr)
+		return exitUsage
+	}
+	root := targets[0].Root
 	if err := manifest.AddDecl(root, name, refKind, refValue, *git, *source); err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
 		return exitFail
@@ -218,50 +414,84 @@ func cmdAdd(args []string) int {
 }
 
 func cmdRemove(args []string) int {
-	if len(args) < 1 {
+	flags := flag.NewFlagSet("remove", flag.ContinueOnError)
+	project := flags.String("project", "", "project alias or path")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil || len(positional) < 1 {
 		fmt.Fprintln(os.Stderr, "curator: remove requires a skill name")
-		return exitUsage
-	}
-	root := projectRootArg(args[1:])
-	if err := manifest.RemoveDecl(root, args[0]); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
-		return exitFail
-	}
-	fmt.Println("removed", args[0])
-	return exitOK
-}
-
-func installFlags(args []string) (install.Options, []string, error) {
-	flags := flag.NewFlagSet("install", flag.ContinueOnError)
-	dryRun := flags.Bool("dry-run", false, "plan work without modifying files")
-	fixGitignore := flags.Bool("fix-gitignore", false, "append missing managed gitignore entries")
-	strictTags := flags.Bool("strict-tags", false, "fail if an installed tag moved to another commit")
-	verbose := flags.Bool("verbose", false, "print detailed progress")
-	if err := flags.Parse(args); err != nil {
-		return install.Options{}, nil, err
-	}
-	return install.Options{
-		DryRun: *dryRun, FixGitignore: *fixGitignore,
-		StrictTags: *strictTags, Verbose: *verbose,
-	}, flags.Args(), nil
-}
-
-func cmdInstall(args []string) int {
-	opts, rest, err := installFlags(args)
-	if err != nil {
 		return exitUsage
 	}
 	cfg, code := loadConfig()
 	if code != exitOK {
 		return code
 	}
-	root := projectRootArg(rest)
-	result := install.Project(cfg, root, aliasFor(cfg, root), opts)
-	printResult(result)
-	if result.Status == "failed" {
+	rootArgs := positional[1:]
+	if *project != "" {
+		rootArgs = []string{*project}
+	}
+	targets, targetErr := selectProjectTargets(cfg, rootArgs, false)
+	if targetErr != nil {
+		fmt.Fprintln(os.Stderr, "curator:", targetErr)
+		return exitUsage
+	}
+	if err := manifest.RemoveDecl(targets[0].Root, positional[0]); err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
 		return exitFail
 	}
+	fmt.Println("removed", positional[0])
 	return exitOK
+}
+
+func installFlags(args []string) (install.Options, []string, bool, string, error) {
+	flags := flag.NewFlagSet("install", flag.ContinueOnError)
+	all := flags.Bool("all", false, "operate on all configured projects")
+	dryRun := flags.Bool("dry-run", false, "plan work without modifying files")
+	fixGitignore := flags.Bool("fix-gitignore", false, "append missing managed gitignore entries")
+	strictTags := flags.Bool("strict-tags", false, "fail if an installed tag moved to another commit")
+	verbose := flags.Bool("verbose", false, "print detailed progress")
+	var auditMode auditModeValue
+	flags.Var(&auditMode, "audit", "run the audit gate in advisory or strict mode")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
+		return install.Options{}, nil, false, "", err
+	}
+	return install.Options{
+		DryRun: *dryRun, FixGitignore: *fixGitignore,
+		StrictTags: *strictTags, Verbose: *verbose,
+	}, positional, *all, auditMode.value, nil
+}
+
+func cmdInstall(args []string) int {
+	opts, rest, all, auditMode, err := installFlags(args)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitUsage
+	}
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	if auditMode != "" {
+		cfgCopy := *cfg
+		cfgCopy.Audit = cfg.Audit
+		cfgCopy.Audit.Enabled = true
+		cfgCopy.Audit.Mode = auditMode
+		cfg = &cfgCopy
+	}
+	targets, targetErr := selectProjectTargets(cfg, rest, all)
+	if targetErr != nil {
+		fmt.Fprintln(os.Stderr, "curator:", targetErr)
+		return exitUsage
+	}
+	exitCode := exitOK
+	for _, target := range targets {
+		result := install.Project(cfg, target.Root, target.Alias, opts)
+		printResult(result)
+		if result.Status == "failed" {
+			exitCode = exitFail
+		}
+	}
+	return exitCode
 }
 
 func printResult(result install.Result) {
@@ -307,59 +537,109 @@ func cmdUpdate() int {
 
 func cmdStatus(args []string) int {
 	flags := flag.NewFlagSet("status", flag.ContinueOnError)
+	all := flags.Bool("all", false, "operate on all configured projects")
 	check := flags.Bool("check", false, "exit non-zero unless every skill is up to date")
 	jsonOut := flags.Bool("json", false, "machine-readable output")
 	attest := flags.Bool("attest", false, "re-check installed skills against trusted registries")
-	if err := flags.Parse(args); err != nil {
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
 		return exitUsage
 	}
 	cfg, code := loadConfig()
 	if code != exitOK {
 		return code
 	}
-	root := projectRootArg(flags.Args())
-	alias := aliasFor(cfg, root)
-
+	targets, targetErr := selectProjectTargets(cfg, positional, *all)
+	if targetErr != nil {
+		fmt.Fprintln(os.Stderr, "curator:", targetErr)
+		return exitUsage
+	}
 	if *attest {
-		return cmdStatusAttest(cfg, root, alias, *jsonOut)
+		exitCode := exitOK
+		for _, target := range targets {
+			if code := cmdStatusAttest(cfg, target.Root, target.Alias, *jsonOut); code != exitOK {
+				exitCode = code
+			}
+		}
+		return exitCode
 	}
 
-	result := install.Project(cfg, root, alias, install.Options{DryRun: true})
-	if result.Status == "failed" {
-		printResult(result)
-		return exitFail
-	}
-	drift := statusDrift(cfg, root)
-	if *jsonOut {
-		payload, _ := json.MarshalIndent(map[string]any{"alias": alias, "skills": drift}, "", "  ")
-		fmt.Println(string(payload))
-	} else {
-		for name, state := range drift {
-			fmt.Printf("%s: %s %s\n", alias, name, state)
+	exitCode := exitOK
+	jsonResults := make([]map[string]any, 0, len(targets))
+	for _, target := range targets {
+		result := install.Project(cfg, target.Root, target.Alias, install.Options{DryRun: true})
+		if result.Status == "failed" {
+			printResult(result)
+			exitCode = exitFail
+			continue
 		}
-	}
-	if *check {
-		for _, state := range drift {
-			if state != "up-to-date" {
-				return exitFail
+		if result.Status == "skipped" {
+			printResult(result)
+			if *check {
+				exitCode = exitFail
+			}
+			continue
+		}
+		drift := statusDrift(cfg, target.Root)
+		jsonResults = append(jsonResults, map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift})
+		if !*jsonOut {
+			names := make([]string, 0, len(drift))
+			for name := range drift {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			for _, name := range names {
+				fmt.Printf("%s: %s %s\n", target.Alias, name, drift[name])
+			}
+		}
+		if *check {
+			for _, state := range drift {
+				if state != "up-to-date" {
+					exitCode = exitFail
+				}
 			}
 		}
 	}
-	return exitOK
+	if *jsonOut {
+		var output any = jsonResults
+		if len(jsonResults) == 1 {
+			output = jsonResults[0]
+		}
+		payload, _ := json.MarshalIndent(output, "", "  ")
+		fmt.Println(string(payload))
+	}
+	return exitCode
 }
 
 // statusDrift compares declared skills with installed markers.
 func statusDrift(cfg *config.Config, projectRoot string) map[string]string {
+	return scopeStatusDrift(cfg, projectRoot, filepath.Join(projectRoot, ".agents", "skills"))
+}
+
+func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[string]string {
 	drift := map[string]string{}
-	projectManifest, err := manifest.Load(projectRoot)
+	projectManifest, err := manifest.Load(manifestRoot)
 	if err != nil || projectManifest == nil {
 		return drift
 	}
-	skillsDir := filepath.Join(projectRoot, ".agents", "skills")
 	for _, decl := range projectManifest.Skills {
 		installed := filepath.Join(skillsDir, decl.Name)
 		if _, err := os.Stat(installed); err != nil {
 			drift[decl.Name] = "not-installed"
+			continue
+		}
+		recorded := marker.Read(installed)
+		if recorded == nil {
+			drift[decl.Name] = "invalid-marker"
+			continue
+		}
+		if recorded.SchemaVersion != marker.SchemaVersion {
+			drift[decl.Name] = "unsupported-marker"
+			continue
+		}
+		actualHash, err := hashing.ContentSHA256(installed, nil)
+		if err != nil || actualHash != recorded.ContentSHA256 {
+			drift[decl.Name] = "content-drift"
 			continue
 		}
 		repo := filepath.Join(cfg.SkillsRoot, filepath.FromSlash(decl.Source))
@@ -368,26 +648,13 @@ func statusDrift(cfg *config.Config, projectRoot string) map[string]string {
 			drift[decl.Name] = "unresolvable"
 			continue
 		}
-		recorded := readMarkerCommit(installed)
-		if recorded == resolved.Commit {
+		if recorded.RefKind == decl.Ref.Kind && recorded.Ref == decl.Ref.Value && recorded.Commit == resolved.Commit {
 			drift[decl.Name] = "up-to-date"
 		} else {
 			drift[decl.Name] = "needs-install"
 		}
 	}
 	return drift
-}
-
-func readMarkerCommit(installedDir string) string {
-	payload, err := os.ReadFile(filepath.Join(installedDir, ".csk-install.json")) // #nosec G304
-	if err != nil {
-		return ""
-	}
-	var data struct {
-		Commit string `json:"commit"`
-	}
-	_ = json.Unmarshal(payload, &data)
-	return data.Commit
 }
 
 func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool) int {
@@ -424,7 +691,13 @@ func cmdList() int {
 	if code != exitOK {
 		return code
 	}
-	for alias, project := range cfg.Projects {
+	aliases := make([]string, 0, len(cfg.Projects))
+	for alias := range cfg.Projects {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		project := cfg.Projects[alias]
 		fmt.Printf("%s\t%s\n", alias, project.Path)
 		if projectManifest, err := manifest.Load(project.Path); err == nil && projectManifest != nil {
 			for _, decl := range projectManifest.Skills {
@@ -435,14 +708,81 @@ func cmdList() int {
 	return exitOK
 }
 
+func cmdProject(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "curator: project requires a subcommand: add, resolve")
+		return exitUsage
+	}
+	switch args[0] {
+	case "add":
+		flags := flag.NewFlagSet("project add", flag.ContinueOnError)
+		agentsRaw := flags.String("agents", "", "comma-separated target agents")
+		positional, err := parseInterspersed(flags, args[1:])
+		if err != nil || len(positional) != 2 {
+			fmt.Fprintln(os.Stderr, "curator: project add requires <alias> <path>")
+			return exitUsage
+		}
+		cfg, code := loadConfig()
+		if code != exitOK {
+			return code
+		}
+		agents := splitNonEmpty(*agentsRaw)
+		if len(agents) == 0 {
+			agents = cfg.DefaultAgents
+		}
+		if err := config.AddProject(cfg.Path, positional[0], positional[1], agents); err != nil {
+			fmt.Fprintln(os.Stderr, "curator:", err)
+			return exitFail
+		}
+		root, _ := filepath.Abs(positional[1])
+		if _, err := manifest.EnsureEmpty(root); err != nil {
+			fmt.Fprintln(os.Stderr, "curator:", err)
+			return exitFail
+		}
+		entries := append(adapters.RequiredGitignoreEntries(agents), "Skillfile.dev.json")
+		if err := gitignore.Append(filepath.Join(root, ".gitignore"), entries); err != nil {
+			fmt.Fprintln(os.Stderr, "curator:", err)
+			return exitFail
+		}
+		fmt.Printf("added project %s: %s\n", positional[0], root)
+		return exitOK
+	case "resolve":
+		cfg, code := loadConfig()
+		if code != exitOK {
+			return code
+		}
+		positional := args[1:]
+		if len(positional) == 0 {
+			positional = []string{"."}
+		}
+		targets, err := selectProjectTargets(cfg, positional, false)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "curator:", err)
+			return exitUsage
+		}
+		target := targets[0]
+		if _, err := os.Stat(filepath.Join(target.Root, manifest.Name)); err != nil {
+			fmt.Fprintln(os.Stderr, "curator: Skillfile.json not found at or above", target.Root)
+			return exitFail
+		}
+		fmt.Printf("alias: %s\npath: %s\nskillfile: %s\n", target.Alias, target.Root, filepath.Join(target.Root, manifest.Name))
+		fmt.Printf("skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
+		return exitOK
+	default:
+		fmt.Fprintf(os.Stderr, "curator: unknown project subcommand %q\n", args[0])
+		return exitUsage
+	}
+}
+
 func cmdSkillCheck(args []string) int {
 	flags := flag.NewFlagSet("skill check", flag.ContinueOnError)
 	localeValue := flags.String("locale", "", "validate against a locale")
 	jsonOut := flags.Bool("json", false, "machine-readable output")
-	if err := flags.Parse(args); err != nil {
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
 		return exitUsage
 	}
-	dir := projectRootArg(flags.Args())
+	dir := projectRootArg(positional)
 	issues := skillcheck.Validate(dir, *localeValue)
 	if *jsonOut {
 		payload, _ := json.MarshalIndent(issues, "", "  ")
@@ -463,7 +803,7 @@ func cmdSkillCheck(args []string) int {
 
 func cmdGlobal(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "curator: global requires a subcommand: init, add, remove, list, install")
+		fmt.Fprintln(os.Stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, update, upgrade")
 		return exitUsage
 	}
 	cfg, code := loadConfig()
@@ -485,7 +825,9 @@ func cmdGlobal(args []string) int {
 		tag := flags.String("tag", "", "git tag")
 		revision := flags.String("revision", "", "git revision")
 		branch := flags.String("branch", "", "git branch")
-		if err := flags.Parse(args[1:]); err != nil || flags.NArg() < 1 {
+		source := flags.String("source", "", "source directory under skills_root")
+		positional, err := parseInterspersed(flags, args[1:])
+		if err != nil || len(positional) < 1 {
 			return exitUsage
 		}
 		refKind, refValue := pickRef(*tag, *branch, *revision)
@@ -493,23 +835,13 @@ func cmdGlobal(args []string) int {
 			fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
 			return exitUsage
 		}
-		if err := manifest.AddDecl(install.GlobalRoot(cfg.Home()), flags.Arg(0), refKind, refValue, *git, ""); err != nil {
+		if err := manifest.AddDecl(install.GlobalRoot(cfg.Home()), positional[0], refKind, refValue, *git, *source); err != nil {
 			fmt.Fprintln(os.Stderr, "curator:", err)
 			return exitFail
 		}
-		fallthrough
+		return runGlobalInstall(cfg, nil)
 	case "install":
-		userHome, err := os.UserHomeDir()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
-			return exitFail
-		}
-		result := install.Global(cfg, userHome, install.Options{})
-		printResult(result)
-		if result.Status == "failed" {
-			return exitFail
-		}
-		return exitOK
+		return runGlobalInstall(cfg, args[1:])
 	case "remove":
 		if len(args) < 2 {
 			return exitUsage
@@ -529,9 +861,56 @@ func cmdGlobal(args []string) int {
 			fmt.Printf("%s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
 		}
 		return exitOK
+	case "status":
+		drift := scopeStatusDrift(cfg, install.GlobalRoot(cfg.Home()), filepath.Join(install.GlobalRoot(cfg.Home()), "skills"))
+		names := make([]string, 0, len(drift))
+		for name := range drift {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Printf("global: %s %s\n", name, drift[name])
+		}
+		return exitOK
+	case "update":
+		return cmdUpdate()
+	case "upgrade":
+		if code := cmdUpdate(); code != exitOK {
+			return code
+		}
+		return runGlobalInstall(cfg, args[1:])
 	}
 	fmt.Fprintf(os.Stderr, "curator: unknown global subcommand %q\n", args[0])
 	return exitUsage
+}
+
+func runGlobalInstall(cfg *config.Config, args []string) int {
+	opts, positional, all, auditMode, err := installFlags(args)
+	if err != nil || len(positional) != 0 || all {
+		if err == nil {
+			err = fmt.Errorf("global install accepts flags only")
+		}
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitUsage
+	}
+	if auditMode != "" {
+		cfgCopy := *cfg
+		cfgCopy.Audit = cfg.Audit
+		cfgCopy.Audit.Enabled = true
+		cfgCopy.Audit.Mode = auditMode
+		cfg = &cfgCopy
+	}
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	result := install.Global(cfg, userHome, opts)
+	printResult(result)
+	if result.Status == "failed" {
+		return exitFail
+	}
+	return exitOK
 }
 
 func cmdHybrid(args []string) int {
@@ -551,8 +930,10 @@ func cmdHybrid(args []string) int {
 		revision := flags.String("revision", "", "git revision")
 		branch := flags.String("branch", "", "git branch")
 		targets := flags.String("targets", "", "comma-separated targets (alias, absolute path, or glob)")
-		if err := flags.Parse(args[1:]); err != nil || flags.NArg() < 1 || *targets == "" {
-			fmt.Fprintln(os.Stderr, "curator: hybrid add requires a name and --targets")
+		target := flags.String("target", "", "target alias, absolute path, or glob")
+		positional, err := parseInterspersed(flags, args[1:])
+		if err != nil || len(positional) < 1 || (*targets == "" && *target == "") {
+			fmt.Fprintln(os.Stderr, "curator: hybrid add requires a name and --target or --targets")
 			return exitUsage
 		}
 		refKind, refValue := pickRef(*tag, *branch, *revision)
@@ -560,7 +941,11 @@ func cmdHybrid(args []string) int {
 			fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
 			return exitUsage
 		}
-		if err := scopes.AddHybridDecl(cfg.Home(), flags.Arg(0), refKind, refValue, *git, strings.Split(*targets, ",")); err != nil {
+		targetValues := []string{*target}
+		if *targets != "" {
+			targetValues = strings.Split(*targets, ",")
+		}
+		if err := scopes.AddHybridDecl(cfg.Home(), positional[0], refKind, refValue, *git, targetValues); err != nil {
 			fmt.Fprintln(os.Stderr, "curator:", err)
 			return exitFail
 		}
@@ -584,6 +969,27 @@ func cmdHybrid(args []string) int {
 			fmt.Printf("%s %s %s targets=%s\n", decl.Decl.Name, decl.Decl.Ref.Kind, decl.Decl.Ref.Value, strings.Join(decl.Targets, ","))
 		}
 		return exitOK
+	case "status":
+		decls, err := scopes.LoadHybridDecls(cfg.Home())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "curator:", err)
+			return exitFail
+		}
+		store := scopes.HybridSkillsRoot(cfg.Home())
+		for _, entry := range decls {
+			state := "not-installed"
+			installed := filepath.Join(store, entry.Decl.Name)
+			if recorded := marker.Read(installed); recorded != nil {
+				actual, hashErr := hashing.ContentSHA256(installed, nil)
+				if hashErr != nil || actual != recorded.ContentSHA256 {
+					state = "content-drift"
+				} else {
+					state = "installed"
+				}
+			}
+			fmt.Printf("%s %s targets=%s\n", entry.Decl.Name, state, strings.Join(entry.Targets, ","))
+		}
+		return exitOK
 	}
 	fmt.Fprintf(os.Stderr, "curator: unknown hybrid subcommand %q\n", args[0])
 	return exitUsage
@@ -591,12 +997,16 @@ func cmdHybrid(args []string) int {
 
 func cmdAudit(args []string) int {
 	flags := flag.NewFlagSet("audit", flag.ContinueOnError)
+	all := flags.Bool("all", false, "audit all configured projects and global skills")
+	global := flags.Bool("global", false, "audit global skills")
+	jsonOut := flags.Bool("json", false, "machine-readable output")
 	allow := flags.String("allow", "", "pin trust for a content hash")
 	reason := flags.String("reason", "", "reason for --allow")
 	publish := flags.String("publish", "", "signed audit record (JSON file) to submit")
 	registryURL := flags.String("registry", "", "registry base URL for --publish")
 	token := flags.String("token", "", "auditor token for --publish (or CURATOR_REGISTRY_TOKEN)")
-	if err := flags.Parse(args); err != nil {
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
 		return exitUsage
 	}
 	cfg, code := loadConfig()
@@ -642,8 +1052,99 @@ func cmdAudit(args []string) int {
 		fmt.Println(response)
 		return exitOK
 	}
-	fmt.Fprintln(os.Stderr, "curator: audit requires --allow or --publish")
-	return exitUsage
+
+	cfgCopy := *cfg
+	cfgCopy.Audit = cfg.Audit
+	cfgCopy.Audit.Enabled = true
+	cfg = &cfgCopy
+	var targets []projectTarget
+	if *all {
+		if len(positional) > 0 || *global {
+			fmt.Fprintln(os.Stderr, "curator: --all cannot be combined with a target or --global")
+			return exitUsage
+		}
+		targets, err = selectProjectTargets(cfg, nil, true)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "curator:", err)
+			return exitUsage
+		}
+		targets = append(targets, projectTarget{Alias: "global", Root: install.GlobalRoot(cfg.Home())})
+	} else if *global {
+		if len(positional) > 0 {
+			fmt.Fprintln(os.Stderr, "curator: --global cannot be combined with a project target")
+			return exitUsage
+		}
+		targets = []projectTarget{{Alias: "global", Root: install.GlobalRoot(cfg.Home())}}
+	} else {
+		targets, err = selectProjectTargets(cfg, positional, false)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "curator:", err)
+			return exitUsage
+		}
+	}
+
+	type auditOutput struct {
+		Scope    string   `json:"scope"`
+		Warnings []string `json:"warnings"`
+		Errors   []string `json:"errors"`
+	}
+	outputs := make([]auditOutput, 0, len(targets))
+	exitCode := exitOK
+	for _, target := range targets {
+		warnings, errors := auditTarget(cfg, target)
+		outputs = append(outputs, auditOutput{Scope: target.Alias, Warnings: warnings, Errors: errors})
+		if len(errors) > 0 {
+			exitCode = exitFail
+		}
+		if !*jsonOut {
+			for _, warning := range warnings {
+				fmt.Printf("%s: %s\n", target.Alias, warning)
+			}
+			for _, message := range errors {
+				fmt.Fprintf(os.Stderr, "%s: %s\n", target.Alias, message)
+			}
+			if len(warnings) == 0 && len(errors) == 0 {
+				fmt.Printf("%s: audit clean\n", target.Alias)
+			}
+		}
+	}
+	if *jsonOut {
+		payload, _ := json.MarshalIndent(outputs, "", "  ")
+		fmt.Println(string(payload))
+	}
+	return exitCode
+}
+
+func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string) {
+	projectManifest, err := manifest.Load(target.Root)
+	if err != nil {
+		return nil, []string{err.Error()}
+	}
+	if projectManifest == nil {
+		return nil, []string{"Skillfile.json not found"}
+	}
+	substitutions := map[string]devsub.Substitution{}
+	if target.Alias != "global" {
+		substitutions, err = devsub.Load(target.Root)
+		if err != nil {
+			return nil, []string{err.Error()}
+		}
+	}
+	nodes, err := closure.Build(closure.Options{
+		SkillsRoot: cfg.SkillsRoot, Home: cfg.Home(), AllowedSources: cfg.AllowedSources,
+	}, projectManifest, substitutions)
+	if err != nil {
+		return nil, []string{err.Error()}
+	}
+	subjects := make([]audit.Subject, 0, len(nodes))
+	for _, node := range nodes {
+		subjects = append(subjects, audit.Subject{
+			Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+			Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+			SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+		})
+	}
+	return audit.Gate(cfg, subjects)
 }
 
 func cmdGC() int {
@@ -666,11 +1167,12 @@ func cmdGC() int {
 func cmdShellInit(args []string) int {
 	flags := flag.NewFlagSet("shell-init", flag.ContinueOnError)
 	noGlobal := flags.Bool("no-global", false, "skip global env sourcing")
-	if err := flags.Parse(args); err != nil || flags.NArg() < 1 {
+	positional, err := parseInterspersed(flags, args)
+	if err != nil || len(positional) < 1 {
 		fmt.Fprintln(os.Stderr, "curator: shell-init requires a shell: zsh, bash, powershell")
 		return exitUsage
 	}
-	hook, err := shell.Hook(flags.Arg(0), !*noGlobal)
+	hook, err := shell.Hook(positional[0], !*noGlobal)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
 		return exitUsage
