@@ -1,6 +1,6 @@
 # Curator implementation plan
 
-This is the working plan for building Curator, an agent environment manager (AEM) in Go. Iterations consult this document and the task board; the plan is updated as decisions land. Protocol sections are cited as `Spec §N.M` against the 1.0.0-draft specification in the Relux Works organization.
+This is the working plan for building Curator, an agent environment manager (AEM) in Go. Iterations consult this document and the task board; the plan is updated as decisions land. Protocol sections are cited as `Spec §N.M` against the 1.0.0-draft [Curator Specification](https://github.com/relux-works/curator-spec).
 
 ## 1. Goal and definition of done
 
@@ -38,7 +38,7 @@ Package sketch: `internal/skillspec`, `internal/manifest`, `internal/devsub`, `i
 
 - Tasks live on the in-repo board `.task-board/` (epics, stories, tasks as directories with `README.md` and `progress.md`; artifacts in `.task-board/.resources/<ID>/`). Every change starts from a task; progress and status are updated as work proceeds.
 - Commits are discrete and meaningful: one logical step per commit, imperative subject, body explaining what and why. Signed (SSH key, verified on GitHub) as Ivan Oparin <oparin@me.com>.
-- The brand name of the reference implementation does not appear anywhere in this repository (code, docs, comments, fixtures, commit messages); a CI check greps for it case-insensitively. The protocol is cited as `Spec §N.M`; protocol file names (`Skillfile.json`, `csk-skill.json`, `.csk-install.json`, `.csk-managed.json`) are part of the wire format and are used as-is.
+- The name of the alternative protocol implementation appears exactly once: the README open-protocol section. A CI check greps case-insensitively (zero matches outside README.md, exactly one inside). The protocol is cited as `Spec §N.M` against [curator-spec](https://github.com/relux-works/curator-spec); protocol file names (`Skillfile.json`, `csk-skill.json`, `.csk-install.json`, `.csk-managed.json`) are part of the wire format and are used as-is.
 - Spec first: when implementation and spec disagree, stop and resolve the spec question before coding around it.
 - Every error message that the spec words normatively (allowlist refusal, MCP hint, conflicts with chains) keeps the same information content, not necessarily the same string.
 - Style for prose (docs, board cards): plain technical English, no em dashes, no guillemets.

@@ -2,7 +2,7 @@
 
 Curator is an agent environment manager (AEM): a single tool that manages what an AI coding agent gets in a project. Skills and their transitive dependencies, executable commands, MCP server requirements, per-agent delivery, and the security gates around all of it. Declarative, reproducible, verifiable.
 
-Curator is implemented in Go and follows a published protocol specification for skill packages, project manifests, installation semantics, and the audit registry, so environments it manages interoperate with other conforming tools. The specification lives in the Relux Works organization; sections are cited across this repository as `Spec §N.M`.
+Curator is implemented in Go and follows the [Curator Specification](https://github.com/relux-works/curator-spec), an open protocol for skill packages, project manifests, installation semantics, and the audit registry; sections are cited across this repository as `Spec §N.M`.
 
 ## Status
 
@@ -40,6 +40,17 @@ gh attestation verify <artifact> --owner relux-works
 - **Scopes**: project, global, and hybrid (machine-stored, per-project activation).
 - **MCP requirements**: read-only verification of declared MCP servers against agent configuration surfaces.
 - **Security**: source allowlists, declared capabilities, no code execution at install time, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
+
+## An open protocol
+
+The specification is an open protocol, not an internal contract: any manager
+built from it interoperates with the same skills, the same project manifests,
+and the same audit registries. That matters when internal security policies
+rule out adopting an external binary and require an in-house implementation
+instead. One such independent implementation of the protocol is
+[cocoaskills](https://github.com/ivanopcode/cocoaskills) (Python); Curator's
+conformance against the shared wire formats is enforced by the golden
+interoperability gate in CI.
 
 ## Development
 

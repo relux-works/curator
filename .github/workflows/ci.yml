@@ -80,14 +80,20 @@ jobs:
         with:
           submodules: true
 
-      - name: Forbidden brand grep
+      - name: Alternative implementation name gate
         run: |
-          # The reference implementation's brand must not appear in this
-          # repository. The pattern is assembled from parts so this file
-          # does not trip the gate itself.
+          # The alternative protocol implementation is referenced exactly
+          # once: the README open-protocol section (one line carrying the
+          # link). Zero matches anywhere else. The pattern is assembled from
+          # parts so this file does not trip the gate itself.
           pattern="$(printf '%s%s' co coa)skill"
-          if grep -riIn --exclude-dir=.git --exclude-dir=agents "$pattern" .; then
-            echo "naming gate: forbidden brand found (pattern: $pattern)"
+          if grep -riIn --exclude-dir=.git --exclude-dir=agents --exclude=README.md "$pattern" .; then
+            echo "naming gate: name found outside README.md"
             exit 1
           fi
-          echo "naming gate: clean"
+          lines=$(grep -ci "$pattern" README.md || true)
+          if [ "$lines" != "1" ]; then
+            echo "naming gate: README.md must mention the name on exactly one line, found $lines"
+            exit 1
+          fi
+          echo "naming gate: clean (one README line)"

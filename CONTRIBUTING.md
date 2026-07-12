@@ -22,7 +22,7 @@ Curator follows a small set of working agreements. They are binding for every ch
 
 ## Naming
 
-- The brand name of the reference implementation does not appear anywhere in this repository. CI enforces this with a case-insensitive grep. Protocol file names (`Skillfile.json`, `csk-skill.json`, `.csk-install.json`, `.csk-managed.json`) are part of the wire format and are used as-is.
+- The name of the alternative protocol implementation appears exactly once in this repository: the README section about the open protocol. CI enforces this with a case-insensitive grep (zero matches outside README.md, exactly one inside). Protocol file names (`Skillfile.json`, `csk-skill.json`, `.csk-install.json`, `.csk-managed.json`) are part of the wire format and are used as-is.
 
 ## Prose
 
