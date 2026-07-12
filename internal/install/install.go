@@ -26,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/whitelist"
 )
 
@@ -125,7 +126,43 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		}
 	}
 
-	// 5. Hybrid scope joins here (plan phase P5).
+	// 5. Hybrid scope: applicable machine-level declarations join the
+	// manifest; a project declaration of the same name shadows the hybrid
+	// entry (Spec §9.3).
+	hybridDecls, err := scopes.LoadHybridDecls(cfg.Home())
+	if err != nil {
+		result.failf("%v", err)
+		return result
+	}
+	projectDeclared := map[string]bool{}
+	for _, decl := range projectManifest.Skills {
+		projectDeclared[decl.Name] = true
+	}
+	aliases := []string{alias}
+	if project, known := cfg.Projects[alias]; known {
+		aliases = append(aliases, project.ProjectAlias)
+	}
+	if projectManifest.ProjectAlias != "" {
+		aliases = append(aliases, projectManifest.ProjectAlias)
+	}
+	var hybridDirect []manifest.Decl
+	for _, hd := range hybridDecls {
+		if !scopes.AppliesToProject(hd, aliases, projectRoot) {
+			continue
+		}
+		if projectDeclared[hd.Decl.Name] {
+			result.Messages = append(result.Messages, fmt.Sprintf(
+				"%s: hybrid skill %s is shadowed by the project declaration", alias, hd.Decl.Name))
+			continue
+		}
+		hybridDirect = append(hybridDirect, hd.Decl)
+	}
+	effectiveManifest := projectManifest
+	if len(hybridDirect) > 0 {
+		merged := *projectManifest
+		merged.Skills = append(append([]manifest.Decl{}, projectManifest.Skills...), hybridDirect...)
+		effectiveManifest = &merged
+	}
 
 	// 6. Effective locale.
 	effectiveLocale := projectManifest.Locale
@@ -138,7 +175,7 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		SkillsRoot:     cfg.SkillsRoot,
 		Home:           cfg.Home(),
 		AllowedSources: cfg.AllowedSources,
-	}, projectManifest, substitutions)
+	}, effectiveManifest, substitutions)
 	if err != nil {
 		result.failf("%v", err)
 		return result
@@ -230,16 +267,25 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		return result
 	}
 
-	// 17. Consumer registry (plan phase P5 wires machine-level GC).
+	// 17. Record the checkout as a runtime consumer for GC (Spec §8.7).
+	if err := scopes.RecordConsumer(cfg.Home(), projectRoot); err != nil {
+		result.failf("%v", err)
+		return result
+	}
 
 	// 18. Materialize every node in provider-first order.
 	skillsDir := filepath.Join(projectRoot, ".agents", "skills")
 	binDir := filepath.Join(projectRoot, ".agents", "bin")
+	hybridStore := scopes.HybridSkillsRoot(cfg.Home())
+	hybridNames := hybridStoreNames(nodes, projectDeclared)
 	expectedCommands := map[string]bool{}
 	var contextNames []string
+	var hybridContextNames []string
 	expectedSkills := map[string]bool{}
 	for _, node := range nodes {
-		expectedSkills[node.Name] = true
+		if !hybridNames[node.Name] {
+			expectedSkills[node.Name] = true
+		}
 		active := node.ActiveCommands()
 		var activeSorted []string
 		for name := range active {
@@ -258,20 +304,39 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 			}
 		}
 
-		expected := buildMarker(node, effectiveLocale, agents, activeSorted, mcpFound[node.Name], attestations[node.Name])
+		isHybrid := hybridNames[node.Name]
+		targetDir := skillsDir
+		nodeLocale := effectiveLocale
+		nodeAgents := agents
+		if isHybrid {
+			// Hybrid context renders once per machine with the machine locale;
+			// per-project variance stays out of the shared marker (Spec §9.3).
+			targetDir = hybridStore
+			nodeLocale = cfg.PreferredLocale
+			nodeAgents = []string{}
+		}
+		expected := buildMarker(node, nodeLocale, nodeAgents, activeSorted, mcpFound[node.Name], attestations[node.Name])
 		var status string
 		var installErr error
 		if node.ContextActive() {
-			status, installErr = installContext(skillsDir, node, effectiveLocale, expected, &result, alias)
-			contextNames = append(contextNames, node.Name)
+			status, installErr = installContext(targetDir, node, nodeLocale, expected, &result, alias)
+			if isHybrid {
+				hybridContextNames = append(hybridContextNames, node.Name)
+			} else {
+				contextNames = append(contextNames, node.Name)
+			}
 		} else {
-			status, installErr = installMarkerOnly(skillsDir, node, expected)
+			status, installErr = installMarkerOnly(targetDir, node, expected)
 		}
 		if installErr != nil {
 			result.failf("%s: %v", node.Name, installErr)
 			return result
 		}
-		result.Messages = append(result.Messages, fmt.Sprintf("%s: %s %s", alias, nodeSummary(node), status))
+		suffix := ""
+		if isHybrid {
+			suffix = " (hybrid)"
+		}
+		result.Messages = append(result.Messages, fmt.Sprintf("%s: %s%s %s", alias, nodeSummary(node), suffix, status))
 		if opts.Verbose {
 			result.Messages = append(result.Messages, fmt.Sprintf("%s: %s commit %s", alias, node.Name, node.Resolved.Commit))
 		}
@@ -291,13 +356,57 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		return result
 	}
 	sort.Strings(contextNames)
+	sort.Strings(hybridContextNames)
 	if err := adapters.RefreshProject(projectRoot, agents, []adapters.Group{
 		{Root: skillsDir, Skills: contextNames},
+		{Root: hybridStore, Skills: hybridContextNames},
 	}, cfg.AdapterMode); err != nil {
 		result.failf("%v", err)
 		return result
 	}
+
+	// 20. Garbage-collect unreferenced runtime entries (Spec §8.7).
+	if _, err := scopes.CollectRuntime(cfg.Home()); err != nil {
+		result.failf("%v", err)
+		return result
+	}
 	return result
+}
+
+// hybridStoreNames returns nodes unreachable from project declarations: they
+// materialize in the machine-level hybrid store (Spec §9.3).
+func hybridStoreNames(nodes []*closure.Node, projectDeclared map[string]bool) map[string]bool {
+	byName := map[string]*closure.Node{}
+	for _, node := range nodes {
+		byName[node.Name] = node
+	}
+	reachable := map[string]bool{}
+	var stack []string
+	for name := range projectDeclared {
+		if _, present := byName[name]; present {
+			stack = append(stack, name)
+		}
+	}
+	for len(stack) > 0 {
+		current := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if reachable[current] {
+			continue
+		}
+		reachable[current] = true
+		for name := range byName[current].Spec.Requirements {
+			if _, present := byName[name]; present && !reachable[name] {
+				stack = append(stack, name)
+			}
+		}
+	}
+	hybrid := map[string]bool{}
+	for name := range byName {
+		if !reachable[name] {
+			hybrid[name] = true
+		}
+	}
+	return hybrid
 }
 
 func installRuntime(home, binDir string, node *closure.Node, active map[string]bool, platform string) (map[string]bool, error) {

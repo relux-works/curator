@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	manifestpkg "github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 )
 
@@ -86,7 +87,7 @@ func (e *env) skill(name string) {
 
 func (e *env) declare(names ...string) {
 	e.t.Helper()
-	var skills []map[string]any
+	skills := []map[string]any{}
 	for _, name := range names {
 		skills = append(skills, map[string]any{"name": name, "tag": "v1"})
 	}
@@ -343,4 +344,99 @@ func TestRuntimeOnlyProviderGetsMarkerNoAdapter(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", "provider-tool")); err != nil {
 		t.Fatal("provider command shim missing")
 	}
+}
+
+func TestHybridSkillActivatesWithoutTouchingProjectStore(t *testing.T) {
+	e := newEnv(t)
+	e.skill("skill-h")
+	e.declare() // empty project manifest
+
+	// hybrid declaration targeting the project by alias
+	if err := os.MkdirAll(filepath.Join(e.home, "hybrid"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hybrid := `{"schema_version": 1, "skills": [
+		{"name": "skill-h", "tag": "v1", "targets": ["test"]}]}`
+	e.write(e.home, "hybrid/Skillfile.json", hybrid)
+
+	result := e.install(Options{})
+	if result.Status != "ok" {
+		t.Fatalf("install: %+v", result)
+	}
+	joined := strings.Join(result.Messages, "\n")
+	if !strings.Contains(joined, "(hybrid)") {
+		t.Fatalf("hybrid suffix missing:\n%s", joined)
+	}
+	// context lives in the machine store, not the project store
+	if _, err := os.Stat(filepath.Join(e.home, "hybrid", "skills", "skill-h", "SKILL.md")); err != nil {
+		t.Fatal("hybrid store context missing")
+	}
+	if _, err := os.Stat(filepath.Join(e.project, ".agents", "skills", "skill-h")); err == nil {
+		t.Fatal("hybrid skill leaked into the project store")
+	}
+	// but adapters mirror it into the project, and its command is live
+	if _, err := os.Stat(filepath.Join(e.project, ".claude", "skills", "skill-h", "SKILL.md")); err != nil {
+		t.Fatal("adapter must mirror the hybrid store")
+	}
+	if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", "skill-h-tool")); err != nil {
+		t.Fatal("hybrid command shim missing")
+	}
+}
+
+func TestHybridShadowedByProjectDeclaration(t *testing.T) {
+	e := newEnv(t)
+	e.skill("skill-a")
+	e.declare("skill-a")
+	if err := os.MkdirAll(filepath.Join(e.home, "hybrid"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.write(e.home, "hybrid/Skillfile.json", `{"schema_version": 1, "skills": [
+		{"name": "skill-a", "tag": "v1", "targets": ["test"]}]}`)
+	result := e.install(Options{})
+	if result.Status != "ok" {
+		t.Fatalf("install: %+v", result)
+	}
+	joined := strings.Join(result.Messages, "\n")
+	if !strings.Contains(joined, "shadowed by the project declaration") {
+		t.Fatalf("shadow message missing:\n%s", joined)
+	}
+	// installed in the project store, not the hybrid store
+	if _, err := os.Stat(filepath.Join(e.project, ".agents", "skills", "skill-a", "SKILL.md")); err != nil {
+		t.Fatal("project store install missing")
+	}
+	if _, err := os.Stat(filepath.Join(e.home, "hybrid", "skills", "skill-a")); err == nil {
+		t.Fatal("shadowed hybrid skill materialized in the hybrid store")
+	}
+}
+
+func TestGlobalInstall(t *testing.T) {
+	e := newEnv(t)
+	e.skill("skill-g")
+	if _, err := GlobalInit(e.home); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestAddGlobal(e, "skill-g"); err != nil {
+		t.Fatal(err)
+	}
+	userHome := t.TempDir()
+	result := Global(e.cfg, userHome, Options{Platform: "unix"})
+	if result.Status != "ok" {
+		t.Fatalf("global install: %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(e.home, "global", "skills", "skill-g", "SKILL.md")); err != nil {
+		t.Fatal("global context missing")
+	}
+	if _, err := os.Lstat(filepath.Join(e.home, "global", "bin", "skill-g-tool")); err != nil {
+		t.Fatal("global shim missing")
+	}
+	if _, err := os.Stat(filepath.Join(userHome, ".claude", "skills", "skill-g", "SKILL.md")); err != nil {
+		t.Fatal("home adapter mirror missing")
+	}
+	if _, err := os.Stat(filepath.Join(e.home, "global", "env.sh")); err != nil {
+		t.Fatal("global env missing")
+	}
+}
+
+func manifestAddGlobal(e *env, name string) error {
+	return manifestpkg.AddDecl(GlobalRoot(e.home), name, "tag", "v1", "", "")
 }
