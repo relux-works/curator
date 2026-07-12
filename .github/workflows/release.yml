@@ -37,10 +37,9 @@ jobs:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
           MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
           MACOS_SIGN_P12_PASSWORD: ${{ secrets.MACOS_SIGN_P12_PASSWORD }}
-          # Notarization (uncomment together with the notarize block in .goreleaser.yml):
-          # ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          # ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          # ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2
