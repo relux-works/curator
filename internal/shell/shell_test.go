@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -11,6 +12,9 @@ import (
 )
 
 func TestPosixHookEntersNestedSwitchesAndLeavesProjects(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Git Bash rewrites Win32 paths; POSIX behavior runs on Linux and macOS")
+	}
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		t.Skip("bash is unavailable")
