@@ -1,8 +1,8 @@
 ## Status
-todo
+in-progress
 
 ## Assigned To
-(unassigned)
+claude
 
 ## Created
 2026-07-12T00:00:00Z
