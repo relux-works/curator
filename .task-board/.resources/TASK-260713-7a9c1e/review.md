@@ -127,3 +127,10 @@ Audit decision semantics and canary blocking are covered by `internal/audit` dec
 - Linux and Windows test-binary compilation through `go test -exec=true ./...`
 - Naming gate over tracked source and commit messages
 - `git verify-commit` for every corrective commit
+
+## Remote verification
+
+- Draft PR: <https://github.com/relux-works/curator/pull/1>
+- GitHub Actions run: <https://github.com/relux-works/curator/actions/runs/29213237436>
+- All six required checks pass: interoperability golden gate, lint, naming, Ubuntu, macOS, and Windows.
+- Corrective implementation head `294aa8725cb6a3a9f3102896bfa3f418c7408e3e` has a valid GitHub-verified signature.

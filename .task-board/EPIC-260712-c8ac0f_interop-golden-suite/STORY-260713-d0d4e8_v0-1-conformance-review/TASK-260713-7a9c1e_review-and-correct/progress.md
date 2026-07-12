@@ -1,5 +1,5 @@
 ## Status
-review
+done
 
 ## Assigned To
 codex
@@ -8,7 +8,7 @@ codex
 2026-07-13T03:14:10Z
 
 ## Last Update
-2026-07-13T00:00:00Z
+2026-07-13T03:22:59Z
 
 ## Blocked By
 - (none)
@@ -24,4 +24,4 @@ codex
 
 ## Notes
 
-- Awaiting remote CI on Linux, macOS, and Windows before moving to done.
+- PR #1 run 29213237436 confirms the interoperability, lint, naming, Linux, macOS, and Windows gates are green.
