@@ -149,7 +149,7 @@ func bytesNoEscape(_ []byte, value string) []byte {
 			buffer.WriteString(`\t`)
 		default:
 			if r < 0x20 {
-				buffer.WriteString(fmt.Sprintf(`\u%04x`, r))
+				fmt.Fprintf(&buffer, `\u%04x`, r)
 			} else {
 				buffer.WriteRune(r)
 			}

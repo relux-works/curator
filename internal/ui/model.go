@@ -105,8 +105,8 @@ func (m Model) skillsView() string {
 		if len(skill.Commands) > 0 {
 			commands = " commands:" + strings.Join(skill.Commands, ",")
 		}
-		b.WriteString(fmt.Sprintf("%s%s  %s %s  %s%s%s\n",
-			marker, skill.Name, skill.Ref, skill.Commit, context, commands, suffix))
+		fmt.Fprintf(&b, "%s%s  %s %s  %s%s%s\n",
+			marker, skill.Name, skill.Ref, skill.Commit, context, commands, suffix)
 	}
 	b.WriteString("\n" + dimStyle.Render("j/k move · esc back · q quit") + "\n")
 	return b.String()
