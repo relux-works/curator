@@ -87,7 +87,7 @@ func Write(dir string, m *Marker) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, Name), append(payload, '\n'), 0o644) // #nosec G306 -- marker is not a secret
+	return os.WriteFile(filepath.Join(dir, Name), append(payload, '\n'), 0o644)
 }
 
 // Current reports whether the installed directory is up to date for the

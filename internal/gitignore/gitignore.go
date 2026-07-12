@@ -78,5 +78,5 @@ func Append(path string, entries []string) error {
 		prefix = "\n"
 	}
 	block := prefix + BlockComment + "\n" + strings.Join(toAdd, "\n") + "\n"
-	return os.WriteFile(path, []byte(existing+block), 0o644) // #nosec G306 -- .gitignore is not a secret
+	return os.WriteFile(path, []byte(existing+block), 0o644)
 }

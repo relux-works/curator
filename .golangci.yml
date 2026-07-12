@@ -1,6 +1,15 @@
 run:
   timeout: 5m
 
+linters-settings:
+  gosec:
+    excludes:
+      # G306 wants 0600 on written files. Everything Curator writes is a
+      # deliberately shareable artifact (context files, markers, ledgers,
+      # shims, env helpers); none carries secrets, and several must be
+      # world-readable or executable to serve their purpose.
+      - G306
+
 linters:
   enable:
     - govet

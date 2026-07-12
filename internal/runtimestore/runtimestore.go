@@ -123,7 +123,7 @@ func WriteBinShim(binDir, commandName, runtimePath, platform string) (string, er
 	if platform == "windows" {
 		shim := filepath.Join(binDir, commandName+".cmd")
 		content := "@echo off\r\n\"" + runtimePath + "\" %*\r\n"
-		if err := os.WriteFile(shim, []byte(content), 0o755); err != nil { // #nosec G306 -- shims are executable by design
+		if err := os.WriteFile(shim, []byte(content), 0o755); err != nil {
 			return "", err
 		}
 		return shim, nil

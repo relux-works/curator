@@ -234,7 +234,7 @@ func rewriteFrontmatter(skillPath, description string, triggers []string) error 
 	}
 	rendered = append(rendered, "---")
 	rendered = append(rendered, lines[end+1:]...)
-	return os.WriteFile(skillPath, []byte(strings.Join(rendered, "\n")+"\n"), 0o644) // #nosec G306 -- context file
+	return os.WriteFile(skillPath, []byte(strings.Join(rendered, "\n")+"\n"), 0o644)
 }
 
 func rewriteOpenAI(path string, data map[string]any) error {
@@ -248,7 +248,7 @@ func rewriteOpenAI(path string, data map[string]any) error {
 		"  display_name: " + quote(displayName) + "\n" +
 		"  short_description: " + quote(shortDescription) + "\n" +
 		"  default_prompt: " + quote(defaultPrompt) + "\n"
-	return os.WriteFile(path, []byte(content), 0o644) // #nosec G306 -- context file
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 func quote(value string) string {

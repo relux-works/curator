@@ -301,5 +301,5 @@ func writeJSON(filePath string, payload any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filePath, append(data, '\n'), 0o644) // #nosec G306 -- project manifest is not a secret
+	return os.WriteFile(filePath, append(data, '\n'), 0o644)
 }

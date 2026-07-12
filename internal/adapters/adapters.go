@@ -270,7 +270,7 @@ func writeLedger(adapterRoot string, entries map[string]bool) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(adapterRoot, LedgerName), append(payload, '\n'), 0o644) // #nosec G306 -- ledger is not a secret
+	return os.WriteFile(filepath.Join(adapterRoot, LedgerName), append(payload, '\n'), 0o644)
 }
 
 func removePath(path string) error {
