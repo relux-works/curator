@@ -21,6 +21,9 @@ import (
 // operation.
 const AllowedProtocols = "file:git:http:https:ssh"
 
+// maxSnapshotFileBytes bounds one extracted file (decompression bomb guard).
+const maxSnapshotFileBytes = 512 << 20
+
 // ResolvedRef is a reference resolved to a commit.
 type ResolvedRef struct {
 	Kind   string
@@ -183,9 +186,16 @@ func extractTar(payload io.Reader, destination string) error {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(file, reader); err != nil { // #nosec G110 -- snapshot content is bounded by the repository
+			// Bound each extracted file to keep a hostile archive from
+			// exhausting the disk.
+			written, err := io.CopyN(file, reader, maxSnapshotFileBytes+1)
+			if err != nil && err != io.EOF {
 				_ = file.Close()
 				return err
+			}
+			if written > maxSnapshotFileBytes {
+				_ = file.Close()
+				return fmt.Errorf("file too large in git archive: %q", name)
 			}
 			if err := file.Close(); err != nil {
 				return err
