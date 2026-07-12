@@ -8,11 +8,20 @@ linters:
   settings:
     gosec:
       excludes:
-        # G306 wants 0600 on written files. Everything Curator writes is a
-        # deliberately shareable artifact (context files, markers, ledgers,
-        # shims, env helpers); none carries secrets, and several must be
-        # world-readable or executable to serve their purpose.
+        # Everything Curator writes is a deliberately shareable artifact
+        # (context files, markers, ledgers, shims, env helpers); none
+        # carries secrets, and several must be world-readable or executable
+        # to serve their purpose. The same applies to created directories.
         - G306
+        - G301
+        # Filesystem walks operate over tool-owned trees (snapshots, install
+        # roots, the machine home); path names inside them are validated
+        # through the identifier and relative-path rules of the protocol.
+        - G122
+        # Taint-analysis findings fire on operator-supplied paths (config
+        # files, project roots) and protocol-validated relative paths; both
+        # are trusted inputs by design.
+        - G703
   exclusions:
     rules:
       # Tests may use weaker patterns than production code.

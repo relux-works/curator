@@ -34,6 +34,7 @@ type ProjectRow struct {
 // Screen identifies the visible screen.
 type Screen int
 
+// Screens.
 const (
 	ScreenProjects Screen = iota
 	ScreenSkills
@@ -51,6 +52,7 @@ type State struct {
 // Action is a reducer input.
 type Action int
 
+// Actions.
 const (
 	ActionUp Action = iota
 	ActionDown
