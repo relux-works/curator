@@ -26,6 +26,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/mcp"
+	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/skillspec"
@@ -257,16 +258,18 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		}
 	}
 
-	// 14. Registry resolution hook (plan phase P7).
-	attestations := map[string]*marker.Attestation{}
-	if opts.ResolveAttest != nil {
-		resolved, warnings, err := opts.ResolveAttest(nodes)
-		result.Messages = append(result.Messages, warnings...)
-		if err != nil {
-			result.failf("%v", err)
-			return result
+	// 14. Registry resolution (Spec §13); Options.ResolveAttest overrides.
+	resolveAttest := opts.ResolveAttest
+	if resolveAttest == nil {
+		resolveAttest = func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error) {
+			return resolveRegistries(cfg, nodes, alias)
 		}
-		attestations = resolved
+	}
+	attestations, regWarnings, regErr := resolveAttest(nodes)
+	result.Messages = append(result.Messages, regWarnings...)
+	if regErr != nil {
+		result.failf("%v", regErr)
+		return result
 	}
 
 	// 15. Moved tags.
@@ -735,4 +738,77 @@ func shortCommit(commit string) string {
 		return commit[:7]
 	}
 	return commit
+}
+
+// resolveRegistries applies the audit registry gate (Spec §13.3, §13.4):
+// snapshot verification excludes tampered registries (all tampered fails),
+// a verified revocation denies, strict policy fails unknown artifacts, and
+// the authorizing attestation lands in the marker.
+func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string) (map[string]*marker.Attestation, []string, error) {
+	trusted := cfg.TrustedRegistries()
+	if len(trusted) == 0 {
+		return map[string]*marker.Attestation{}, nil, nil
+	}
+	registries := make([]registry.Registry, 0, len(trusted))
+	for _, entry := range trusted {
+		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
+	}
+	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
+	var warnings []string
+	tampered, snapshotWarnings := registry.CheckSnapshots(registries, cacheDir, registry.HTTPGetSnapshot, time.Now(), 0)
+	for _, warning := range snapshotWarnings {
+		warnings = append(warnings, alias+": registry: "+warning)
+	}
+	var usable []registry.Registry
+	for _, reg := range registries {
+		if !tampered[reg.URL] {
+			usable = append(usable, reg)
+		}
+	}
+	if len(usable) == 0 {
+		return nil, warnings, fmt.Errorf("every trusted audit registry served a tampered snapshot")
+	}
+	fetch := registry.NewHTTPFetch(cacheDir, 0, 0, nil)
+	strict := cfg.Audit.RegistryPolicy == "strict"
+	attestations := map[string]*marker.Attestation{}
+	var problems []string
+	for _, node := range nodes {
+		if node.Identity == "" {
+			continue
+		}
+		contentHash, err := hashing.ContentSHA256(node.Snapshot, nil)
+		if err != nil {
+			return nil, warnings, err
+		}
+		resolution := registry.Resolve(usable, node.Identity, node.Resolved.Commit, contentHash, fetch)
+		for _, warning := range resolution.Warnings {
+			warnings = append(warnings, alias+": registry: "+warning)
+		}
+		switch resolution.Result {
+		case registry.ResultRevoked:
+			name := "a trusted registry"
+			if resolution.Attestation != nil {
+				name = resolution.Attestation.Registry
+			}
+			problems = append(problems, fmt.Sprintf("%s is revoked by %s", node.Name, name))
+		case registry.ResultDeprecated:
+			warnings = append(warnings, fmt.Sprintf("%s: registry: %s is marked deprecated", alias, node.Name))
+		case registry.ResultUnknown:
+			if strict {
+				problems = append(problems, fmt.Sprintf(
+					"%s is not audited by any trusted registry (registry_policy is strict)", node.Name))
+			}
+		}
+		if resolution.Attestation != nil && resolution.Result != registry.ResultRevoked {
+			attestations[node.Name] = &marker.Attestation{
+				Registry: resolution.Attestation.Registry,
+				Status:   resolution.Attestation.Status,
+				KeyID:    resolution.Attestation.KeyID,
+			}
+		}
+	}
+	if len(problems) > 0 {
+		return nil, warnings, fmt.Errorf("%s", strings.Join(problems, "; "))
+	}
+	return attestations, warnings, nil
 }
