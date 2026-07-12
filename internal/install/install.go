@@ -30,6 +30,7 @@ import (
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/skillcheck"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/whitelist"
 )
@@ -185,8 +186,12 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		return result
 	}
 
-	// 8. Skill validation happens during closure manifest parsing; locale
-	// analysis warnings surface per node during materialization.
+	// 8. Validate every node with the same rules as `skill check`. Manifest
+	// parsing alone is insufficient because runtime-only nodes still require
+	// SKILL.md and must pass locale consistency checks (Spec §4, §8.1).
+	if !validateNodes(nodes, effectiveLocale, alias, &result) {
+		return result
+	}
 
 	// 9. Active command collisions.
 	if err := closure.DetectActiveCommandCollisions(nodes); err != nil {
@@ -363,7 +368,7 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		var status string
 		var installErr error
 		if node.ContextActive() {
-			status, installErr = installContext(targetDir, node, nodeLocale, expected, &result, alias)
+			status, installErr = installContext(targetDir, node, nodeLocale, expected)
 			if isHybrid {
 				hybridContextNames = append(hybridContextNames, node.Name)
 			} else {
@@ -488,19 +493,8 @@ func installRuntime(home, binDir string, node *closure.Node, active map[string]b
 	return installed, nil
 }
 
-func installContext(skillsDir string, node *closure.Node, effectiveLocale string, expected *marker.Marker, result *Result, alias string) (string, error) {
+func installContext(skillsDir string, node *closure.Node, effectiveLocale string, expected *marker.Marker) (string, error) {
 	target := filepath.Join(skillsDir, node.Name)
-
-	// Locale warnings must surface even for up-to-date installs.
-	analysis := locale.Analyze(node.Snapshot, effectiveLocale)
-	for _, issue := range analysis.Issues {
-		if issue.Severity == "warning" {
-			result.Messages = append(result.Messages, fmt.Sprintf("%s: %s: %s: %s", alias, node.Name, issue.Code, issue.Message))
-		}
-	}
-	if analysis.Failed() {
-		return "", fmt.Errorf("%s", analysis.Issues[0].Message)
-	}
 
 	current, err := marker.Current(target, expected)
 	if err != nil {
@@ -541,6 +535,22 @@ func installContext(skillsDir string, node *closure.Node, effectiveLocale string
 		return "", err
 	}
 	return "installed", nil
+}
+
+func validateNodes(nodes []*closure.Node, localeValue, alias string, result *Result) bool {
+	valid := true
+	for _, node := range nodes {
+		for _, issue := range skillcheck.Validate(node.Snapshot, localeValue) {
+			message := fmt.Sprintf("%s: %s: %s", alias, node.Name, skillcheck.Format(issue))
+			if issue.Severity == "error" {
+				result.failf("%s", message)
+				valid = false
+			} else {
+				result.Messages = append(result.Messages, message)
+			}
+		}
+	}
+	return valid
 }
 
 func installMarkerOnly(skillsDir string, node *closure.Node, expected *marker.Marker) (string, error) {
@@ -689,8 +699,11 @@ func checkLegacySkillDependencies(nodes []*closure.Node) error {
 }
 
 func detectMovedTags(projectRoot string, nodes []*closure.Node) []string {
+	return detectMovedTagsIn(filepath.Join(projectRoot, ".agents", "skills"), nodes)
+}
+
+func detectMovedTagsIn(skillsDir string, nodes []*closure.Node) []string {
 	var warnings []string
-	skillsDir := filepath.Join(projectRoot, ".agents", "skills")
 	for _, node := range nodes {
 		if node.Resolved.Kind != "tag" {
 			continue

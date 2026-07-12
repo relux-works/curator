@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	manifestpkg "github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
@@ -346,6 +347,39 @@ func TestRuntimeOnlyProviderGetsMarkerNoAdapter(t *testing.T) {
 	}
 }
 
+func TestRuntimeOnlyProviderStillRequiresSkillMd(t *testing.T) {
+	e := newEnv(t)
+	e.skill("provider")
+	provider := filepath.Join(e.skillsRoot, "provider")
+	if err := os.Remove(filepath.Join(provider, "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+	e.git(provider, "add", "-u")
+	e.git(provider, "commit", "-qm", "remove required skill file")
+	e.git(provider, "tag", "-f", "v1")
+
+	consumer := filepath.Join(e.skillsRoot, "consumer")
+	if err := os.MkdirAll(consumer, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.git(consumer, "init", "-q", "-b", "main")
+	e.write(consumer, "SKILL.md", "# consumer")
+	e.write(consumer, "csk-skill.json", `{"schema_version": 4, "capabilities": {}, "dependencies": {"skills": {
+		"provider": {"git": "./provider", "ref": {"kind": "tag", "value": "v1"}, "mode": "runtime"}}}}`)
+	e.git(consumer, "add", ".")
+	e.git(consumer, "commit", "-qm", "init")
+	e.git(consumer, "tag", "v1")
+	e.declare("consumer")
+
+	result := e.install(Options{})
+	if result.Status != "failed" || !strings.Contains(strings.Join(result.Errors, "\n"), "required SKILL.md not found") {
+		t.Fatalf("runtime-only provider without SKILL.md must fail: %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(e.project, ".agents")); !os.IsNotExist(err) {
+		t.Fatalf("validation failure must precede materialization: %v", err)
+	}
+}
+
 func TestHybridSkillActivatesWithoutTouchingProjectStore(t *testing.T) {
 	e := newEnv(t)
 	e.skill("skill-h")
@@ -434,6 +468,63 @@ func TestGlobalInstall(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(e.home, "global", "env.sh")); err != nil {
 		t.Fatal("global env missing")
+	}
+}
+
+func TestGlobalInstallUsesManifestLocaleAndAuditGate(t *testing.T) {
+	e := newEnv(t)
+	e.skill("skill-g")
+	if err := os.MkdirAll(GlobalRoot(e.home), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.write(GlobalRoot(e.home), "Skillfile.json", `{
+		"schema_version": 1, "locale": "fr", "agents": ["claude_code"],
+		"skills": [{"name": "skill-g", "tag": "v1"}]}`)
+
+	blocked := Global(e.cfg, t.TempDir(), Options{
+		Platform: "unix",
+		AuditGate: func(_ []*closure.Node) ([]string, []string) {
+			return nil, []string{"blocked by review gate"}
+		},
+	})
+	if blocked.Status != "failed" || !strings.Contains(strings.Join(blocked.Errors, "\n"), "blocked by review gate") {
+		t.Fatalf("global audit gate must block: %+v", blocked)
+	}
+	if _, err := os.Stat(filepath.Join(e.home, "global", "skills")); !os.IsNotExist(err) {
+		t.Fatalf("audit block must precede global materialization: %v", err)
+	}
+
+	result := Global(e.cfg, t.TempDir(), Options{Platform: "unix"})
+	if result.Status != "ok" {
+		t.Fatalf("global install: %+v", result)
+	}
+	recorded := marker.Read(filepath.Join(e.home, "global", "skills", "skill-g"))
+	if recorded == nil || recorded.Locale != "fr" {
+		t.Fatalf("global marker locale = %+v, want fr", recorded)
+	}
+}
+
+func TestGlobalStrictTagsDetectMovedTag(t *testing.T) {
+	e := newEnv(t)
+	e.skill("skill-g")
+	if _, err := GlobalInit(e.home); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestAddGlobal(e, "skill-g"); err != nil {
+		t.Fatal(err)
+	}
+	userHome := t.TempDir()
+	if result := Global(e.cfg, userHome, Options{Platform: "unix"}); result.Status != "ok" {
+		t.Fatalf("initial global install: %+v", result)
+	}
+	repo := filepath.Join(e.skillsRoot, "skill-g")
+	e.write(repo, "SKILL.md", "# moved\n")
+	e.git(repo, "add", ".")
+	e.git(repo, "commit", "-qm", "move tag")
+	e.git(repo, "tag", "-f", "v1")
+	strict := Global(e.cfg, userHome, Options{Platform: "unix", StrictTags: true})
+	if strict.Status != "failed" || !strings.Contains(strings.Join(strict.Errors, "\n"), "moved tag") {
+		t.Fatalf("strict global tags must fail: %+v", strict)
 	}
 }
 

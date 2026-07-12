@@ -1,12 +1,38 @@
 package marker
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/relux-works/curator/internal/hashing"
 )
+
+func TestWriteUsesWireCompatibleEmptyValues(t *testing.T) {
+	dir := t.TempDir()
+	m := &Marker{Name: "skill-a", Source: "skill-a", RefKind: "tag", Ref: "v1", Commit: "abc"}
+	if err := Write(dir, m); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := os.ReadFile(filepath.Join(dir, Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var object map[string]any
+	if err := json.Unmarshal(payload, &object); err != nil {
+		t.Fatal(err)
+	}
+	if localeValue, present := object["locale"]; !present || localeValue != nil {
+		t.Fatalf("locale = %#v, present=%v; want explicit null", localeValue, present)
+	}
+	for _, field := range []string{"agents", "commands", "dependencies", "runtime_roots", "files"} {
+		value, ok := object[field].([]any)
+		if !ok || len(value) != 0 {
+			t.Fatalf("%s = %#v; want []", field, object[field])
+		}
+	}
+}
 
 func install(t *testing.T) (string, *Marker) {
 	t.Helper()

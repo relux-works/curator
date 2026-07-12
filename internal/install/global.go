@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/relux-works/curator/internal/adapters"
+	"github.com/relux-works/curator/internal/audit"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
@@ -45,6 +47,14 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 	if len(agents) == 0 {
 		agents = cfg.DefaultAgents
 	}
+	if unknown := adapters.UnknownAgents(agents); len(unknown) > 0 {
+		result.Messages = append(result.Messages, fmt.Sprintf(
+			"global: warning: unknown agent(s) ignored: %s", strings.Join(unknown, ", ")))
+	}
+	effectiveLocale := globalManifest.Locale
+	if effectiveLocale == "" {
+		effectiveLocale = cfg.PreferredLocale
+	}
 
 	nodes, err := closure.Build(closure.Options{
 		SkillsRoot:     cfg.SkillsRoot,
@@ -55,6 +65,9 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 		result.failf("%v", err)
 		return result
 	}
+	if !validateNodes(nodes, effectiveLocale, "global", &result) {
+		return result
+	}
 	if err := closure.DetectActiveCommandCollisions(nodes); err != nil {
 		result.failf("%v", err)
 		return result
@@ -62,6 +75,56 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 	if err := checkSystemCommands(nodes); err != nil {
 		result.failf("%v", err)
 		return result
+	}
+	if err := checkLegacySkillDependencies(nodes); err != nil {
+		result.failf("%v", err)
+		return result
+	}
+	for _, node := range nodes {
+		for _, dependency := range node.Spec.Dependencies {
+			if dependency.Type == "skill" {
+				result.Messages = append(result.Messages, fmt.Sprintf(
+					"global: %s uses dependencies.commands with type 'skill'; migrate to csk-skill.json schema v4 dependencies.skills",
+					node.Name))
+				break
+			}
+		}
+	}
+
+	auditGate := opts.AuditGate
+	if auditGate == nil {
+		auditGate = func(nodes []*closure.Node) ([]string, []string) {
+			subjects := make([]audit.Subject, 0, len(nodes))
+			for _, node := range nodes {
+				subjects = append(subjects, audit.Subject{
+					Name: node.Name, Source: node.Decl.Source, Git: node.Decl.Git,
+					Commit: node.Resolved.Commit, Snapshot: node.Snapshot,
+					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
+				})
+			}
+			warnings, errs := audit.Gate(cfg, subjects)
+			for index := range warnings {
+				warnings[index] = "global: " + warnings[index]
+			}
+			return warnings, errs
+		}
+	}
+	warnings, auditErrors := auditGate(nodes)
+	result.Messages = append(result.Messages, warnings...)
+	if len(auditErrors) > 0 {
+		result.failf("%s", strings.Join(auditErrors, "; "))
+		return result
+	}
+
+	movedTags := detectMovedTagsIn(filepath.Join(GlobalRoot(home), "skills"), nodes)
+	if len(movedTags) > 0 {
+		if opts.StrictTags {
+			result.failf("%s", strings.Join(movedTags, "; "))
+			return result
+		}
+		for _, warning := range movedTags {
+			result.Messages = append(result.Messages, "global: "+warning)
+		}
 	}
 
 	if opts.DryRun {
@@ -95,11 +158,11 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 				expectedCommands[name] = true
 			}
 		}
-		expected := buildMarker(node, cfg.PreferredLocale, agents, activeSorted, nil, nil)
+		expected := buildMarker(node, effectiveLocale, agents, activeSorted, nil, nil)
 		var status string
 		var installErr error
 		if node.ContextActive() {
-			status, installErr = installContext(skillsDir, node, cfg.PreferredLocale, expected, &result, "global")
+			status, installErr = installContext(skillsDir, node, effectiveLocale, expected)
 			contextNames = append(contextNames, node.Name)
 		} else {
 			status, installErr = installMarkerOnly(skillsDir, node, expected)

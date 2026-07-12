@@ -58,6 +58,25 @@ type Marker struct {
 	Substituted        string              `json:"substituted,omitempty"`
 }
 
+// MarshalJSON keeps the marker object compatible with the protocol wire
+// shape. The independent implementation writes an unselected locale as JSON
+// null, while mandatory list fields are always arrays rather than null.
+func (m Marker) MarshalJSON() ([]byte, error) {
+	type plain Marker
+	payload, err := json.Marshal(plain(m))
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]any
+	if err := json.Unmarshal(payload, &object); err != nil {
+		return nil, err
+	}
+	if m.Locale == "" {
+		object["locale"] = nil
+	}
+	return json.Marshal(object)
+}
+
 // Read loads the marker of an installed directory; nil when absent or
 // unreadable (an unreadable marker simply means "not current").
 func Read(installedDir string) *Marker {
@@ -75,6 +94,11 @@ func Read(installedDir string) *Marker {
 // Write stores the marker inside dir with sorted keys and a trailing newline.
 func Write(dir string, m *Marker) error {
 	m.SchemaVersion = SchemaVersion
+	m.Agents = nonNilStrings(m.Agents)
+	m.Commands = nonNilStrings(m.Commands)
+	m.Dependencies = nonNilStrings(m.Dependencies)
+	m.RuntimeRoots = nonNilStrings(m.RuntimeRoots)
+	m.Files = nonNilStrings(m.Files)
 	sort.Strings(m.Commands)
 	sort.Strings(m.Dependencies)
 	if m.Requirements != nil {
@@ -83,11 +107,22 @@ func Write(dir string, m *Marker) error {
 	for name := range m.McpServers {
 		sort.Strings(m.McpServers[name])
 	}
+	if m.Activation != nil {
+		m.Activation.Commands = nonNilStrings(m.Activation.Commands)
+		sort.Strings(m.Activation.Commands)
+	}
 	payload, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, Name), append(payload, '\n'), 0o644)
+}
+
+func nonNilStrings(values []string) []string {
+	if values == nil {
+		return []string{}
+	}
+	return values
 }
 
 // Current reports whether the installed directory is up to date for the
