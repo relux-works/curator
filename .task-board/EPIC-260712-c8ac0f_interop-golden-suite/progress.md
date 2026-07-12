@@ -1,14 +1,14 @@
 ## Status
-done
+in-progress
 
 ## Assigned To
-claude
+codex
 
 ## Created
 2026-07-12T00:00:00Z
 
 ## Last Update
-2026-07-13T02:40:00Z
+2026-07-13T02:47:28Z
 
 ## Blocked By
 - (see dependency order in docs/implementation-plan.md section 5)
@@ -21,3 +21,4 @@ claude
 
 ## Notes
 
+- Reopened for the v0.1 conformance review in STORY-260713-d0d4e8.
