@@ -382,6 +382,10 @@ func TestFetchExistingIsScopedToReachedClosureAndDeduplicated(t *testing.T) {
 func TestScratchResolutionLeavesPersistentRootsAbsent(t *testing.T) {
 	remoteHarness := newHarness(t)
 	remote := remoteHarness.skill("remote", nil, nil)
+	remoteURL := "file://" + filepath.ToSlash(remote)
+	if filepath.VolumeName(remote) != "" {
+		remoteURL = "file:///" + filepath.ToSlash(remote)
+	}
 	root := t.TempDir()
 	skillsRoot := filepath.Join(root, "missing-skills")
 	home := filepath.Join(root, "missing-home")
@@ -392,7 +396,7 @@ func TestScratchResolutionLeavesPersistentRootsAbsent(t *testing.T) {
 		Home:        home,
 		ScratchRoot: scratch,
 	}, &manifest.Manifest{Skills: []manifest.Decl{{
-		Name: "remote", Source: "remote", Git: remote,
+		Name: "remote", Source: "remote", Git: remoteURL,
 		Ref: manifest.Ref{Kind: "tag", Value: "v1"},
 	}}}, nil)
 	if err != nil {
