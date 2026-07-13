@@ -25,6 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: relux-works/curator-spec
+          ref: 6c9b1cfbfc20c3637793a44e591f5215e16914fc
           path: protocol-spec
 
       - uses: actions/setup-go@v5
@@ -77,6 +78,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: relux-works/curator-spec
+          ref: 6c9b1cfbfc20c3637793a44e591f5215e16914fc
           path: protocol-spec
 
       - uses: actions/setup-go@v5
