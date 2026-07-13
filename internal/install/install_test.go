@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -142,6 +143,9 @@ func TestEndToEndInstall(t *testing.T) {
 	shim := filepath.Join(e.project, ".agents", "bin", "skill-a-tool")
 	if _, err := os.Lstat(shim); err != nil {
 		t.Fatal("shim missing")
+	}
+	if !strings.Contains(strings.Join(result.Messages, "\n"), "curator shell-init --install") {
+		t.Fatalf("install did not explain shell-neutral command access: %v", result.Messages)
 	}
 	// env files
 	if _, err := os.Stat(filepath.Join(e.project, ".agents", "env.sh")); err != nil {
@@ -453,6 +457,13 @@ func TestGlobalInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	userHome := t.TempDir()
+	userBin := filepath.Join(userHome, ".local", "bin")
+	if runtime.GOOS != "windows" {
+		if err := os.MkdirAll(userBin, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PATH", userBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	}
 	result := Global(e.cfg, userHome, Options{Platform: "unix"})
 	if result.Status != "ok" {
 		t.Fatalf("global install: %+v", result)
@@ -468,6 +479,11 @@ func TestGlobalInstall(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(e.home, "global", "env.sh")); err != nil {
 		t.Fatal("global env missing")
+	}
+	if runtime.GOOS != "windows" {
+		if _, err := os.Lstat(filepath.Join(userBin, "skill-g-tool")); err != nil {
+			t.Fatal("PATH-visible global forwarding shim missing")
+		}
 	}
 }
 

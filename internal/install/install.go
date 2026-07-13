@@ -413,6 +413,12 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		result.failf("%v", err)
 		return result
 	}
+	if len(expectedCommands) > 0 && !directoryOnPath(binDir, os.Getenv("PATH"), platform) {
+		result.Messages = append(result.Messages, fmt.Sprintf(
+			"%s: commands are installed in %s; agent skills can invoke that directory explicitly (.cmd on Windows). Optional bare commands for interactive use: curator shell-init --install",
+			alias, binDir,
+		))
+	}
 
 	// 20. Garbage-collect unreferenced runtime entries (Spec §8.7).
 	if _, err := scopes.CollectRuntime(cfg.Home()); err != nil {
@@ -491,6 +497,36 @@ func installRuntime(home, binDir string, node *closure.Node, active map[string]b
 		installed[name] = true
 	}
 	return installed, nil
+}
+
+func directoryOnPath(directory, pathValue, platform string) bool {
+	separator := string(os.PathListSeparator)
+	if platform == "windows" {
+		separator = ";"
+	}
+	for _, entry := range strings.Split(pathValue, separator) {
+		if entry == "" {
+			continue
+		}
+		if left, leftErr := os.Stat(directory); leftErr == nil {
+			if right, rightErr := os.Stat(entry); rightErr == nil && os.SameFile(left, right) {
+				return true
+			}
+		}
+		expected, expectedErr := filepath.Abs(directory)
+		actual, actualErr := filepath.Abs(entry)
+		if expectedErr != nil || actualErr != nil {
+			continue
+		}
+		if platform == "windows" {
+			if strings.EqualFold(filepath.Clean(expected), filepath.Clean(actual)) {
+				return true
+			}
+		} else if filepath.Clean(expected) == filepath.Clean(actual) {
+			return true
+		}
+	}
+	return false
 }
 
 func installContext(skillsDir string, node *closure.Node, effectiveLocale string, expected *marker.Marker) (string, error) {
