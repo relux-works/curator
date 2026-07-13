@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/protocoljson"
 )
 
 // Issue is one localization finding.
@@ -149,6 +152,9 @@ func readLocales(metadataPath string) (map[string]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil, fmt.Errorf("malformed locale metadata %s: %v", metadataPath, err)
+	}
 	var raw struct {
 		Locales map[string]any `json:"locales"`
 	}
@@ -160,9 +166,11 @@ func readLocales(metadataPath string) (map[string]map[string]any, error) {
 	}
 	locales := map[string]map[string]any{}
 	for code, value := range raw.Locales {
-		if entry, ok := value.(map[string]any); ok {
-			locales[code] = entry
+		entry, ok := value.(map[string]any)
+		if !identifiers.ValidLocale(code) || !ok {
+			return nil, fmt.Errorf("locale metadata %s has invalid locale entry %q", metadataPath, code)
 		}
+		locales[code] = entry
 	}
 	return locales, nil
 }

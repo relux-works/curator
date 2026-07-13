@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/verr"
 )
 
@@ -38,6 +39,9 @@ func LoadHybridDecls(home string) ([]HybridDecl, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil, fmt.Errorf("malformed JSON in %s: %w", path, err)
+	}
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", path, err)
@@ -46,7 +50,7 @@ func LoadHybridDecls(home string) ([]HybridDecl, error) {
 	if !ok {
 		return nil, fmt.Errorf("%s must contain a JSON object", path)
 	}
-	parsed, err := manifest.Parse(obj, path)
+	parsed, err := manifest.Parse(withoutHybridTargets(obj), path)
 	if err != nil {
 		return nil, err
 	}
@@ -128,6 +132,9 @@ func AddHybridDecl(home, name, refKind, refValue, git string, targets []string) 
 	path := HybridManifestPath(home)
 	obj := map[string]any{"schema_version": float64(manifest.SchemaVersion), "skills": []any{}}
 	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- machine home
+		if err := protocoljson.Validate(payload); err != nil {
+			return fmt.Errorf("malformed JSON in %s: %w", path, err)
+		}
 		var raw any
 		if err := json.Unmarshal(payload, &raw); err != nil {
 			return fmt.Errorf("malformed JSON in %s: %w", path, err)
@@ -153,7 +160,7 @@ func AddHybridDecl(home, name, refKind, refValue, git string, targets []string) 
 		skills = append(skills, entry)
 	}
 	obj["skills"] = skills
-	if _, err := manifest.Parse(obj, path); err != nil {
+	if _, err := manifest.Parse(withoutHybridTargets(obj), path); err != nil {
 		return err
 	}
 	if _, err := hybridTargets(obj); err != nil {
@@ -169,12 +176,41 @@ func AddHybridDecl(home, name, refKind, refValue, git string, targets []string) 
 	return os.WriteFile(path, append(payload, '\n'), 0o644)
 }
 
+func withoutHybridTargets(object map[string]any) map[string]any {
+	copyObject := make(map[string]any, len(object))
+	for key, value := range object {
+		copyObject[key] = value
+	}
+	if rawSkills, ok := object["skills"].([]any); ok {
+		skills := make([]any, 0, len(rawSkills))
+		for _, rawEntry := range rawSkills {
+			entry, ok := rawEntry.(map[string]any)
+			if !ok {
+				skills = append(skills, rawEntry)
+				continue
+			}
+			copyEntry := make(map[string]any, len(entry))
+			for key, value := range entry {
+				if key != "targets" {
+					copyEntry[key] = value
+				}
+			}
+			skills = append(skills, copyEntry)
+		}
+		copyObject["skills"] = skills
+	}
+	return copyObject
+}
+
 // RemoveHybridDecl removes a hybrid declaration by name.
 func RemoveHybridDecl(home, name string) error {
 	path := HybridManifestPath(home)
 	payload, err := os.ReadFile(path) // #nosec G304 -- machine home
 	if err != nil {
 		return fmt.Errorf("skill not declared in hybrid Skillfile: %s", name)
+	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return fmt.Errorf("malformed JSON in %s: %w", path, err)
 	}
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {

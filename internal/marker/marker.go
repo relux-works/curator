@@ -3,14 +3,20 @@
 package marker
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
+	"time"
+	"unicode/utf8"
 
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/protocoljson"
 )
 
 // Name is the marker file name inside an installed skill directory.
@@ -18,6 +24,12 @@ const Name = ".csk-install.json"
 
 // SchemaVersion is the supported marker schema.
 const SchemaVersion = 1
+
+var (
+	markerCommitRE = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
+	markerSHA256RE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	markerKeyIDRE  = regexp.MustCompile(`^[0-9a-f]{16}$`)
+)
 
 // Activation records how the node was activated.
 type Activation struct {
@@ -84,11 +96,161 @@ func Read(installedDir string) *Marker {
 	if err != nil {
 		return nil
 	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		return nil
+	}
 	var m Marker
-	if err := json.Unmarshal(payload, &m); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&m); err != nil || !validMarker(&m, raw) {
 		return nil
 	}
 	return &m
+}
+
+func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
+	required := []string{
+		"schema_version", "name", "source", "ref_kind", "ref", "commit", "content_sha256", "locale",
+		"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots", "installed_at", "files",
+	}
+	for _, field := range required {
+		if _, present := raw[field]; !present {
+			return false
+		}
+	}
+	if m.SchemaVersion != SchemaVersion || !identifiers.Valid(m.Name) || !identifiers.PortablePath(m.Source) ||
+		(m.RefKind != "tag" && m.RefKind != "branch" && m.RefKind != "revision") ||
+		m.Ref == "" || utf8.RuneCountInString(m.Ref) > 8192 || !markerCommitRE.MatchString(m.Commit) ||
+		!markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 || m.SkillSchemaVersion > 5 {
+		return false
+	}
+	if !validNullableLocale(raw["locale"], m.Locale) || !validTimestamp(m.InstalledAt) ||
+		!validIdentifierSet(m.Agents) || !validIdentifierSet(m.Commands) || !validIdentifierSet(m.Dependencies) ||
+		!validPathSet(m.RuntimeRoots) || !validPathSet(m.Files) {
+		return false
+	}
+	if !validOptionalNonEmptyString(raw, "git", m.Git) || !validOptionalNonEmptyString(raw, "substituted", m.Substituted) {
+		return false
+	}
+	if _, present := raw["requirements"]; present && !validIdentifierSet(m.Requirements) {
+		return false
+	}
+	if _, present := raw["requirers"]; present && !validStringSet(m.Requirers) {
+		return false
+	}
+	if _, present := raw["mcp_servers"]; present {
+		if m.McpServers == nil {
+			return false
+		}
+		for name, consumers := range m.McpServers {
+			if !identifiers.Valid(name) || !validIdentifierSet(consumers) {
+				return false
+			}
+		}
+	}
+	if attestationRaw, present := raw["attestation"]; present {
+		object, ok := rawObject(attestationRaw)
+		if !ok || m.Attestation == nil || object["registry"] == nil || object["status"] == nil ||
+			m.Attestation.Registry == "" || utf8.RuneCountInString(m.Attestation.Registry) > 8192 ||
+			(m.Attestation.Status != "audited" && m.Attestation.Status != "deprecated") {
+			return false
+		}
+		if keyRaw, present := object["key_id"]; present {
+			var keyID string
+			if json.Unmarshal(keyRaw, &keyID) != nil || !markerKeyIDRE.MatchString(keyID) {
+				return false
+			}
+		}
+	}
+	if activationRaw, present := raw["activation"]; present {
+		object, ok := rawObject(activationRaw)
+		if !ok || m.Activation == nil || object["context"] == nil || object["commands"] == nil ||
+			!validBooleanRaw(object["context"]) || !validIdentifierSet(m.Activation.Commands) {
+			return false
+		}
+	}
+	return true
+}
+
+func validNullableLocale(raw json.RawMessage, decoded string) bool {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return true
+	}
+	var value string
+	return json.Unmarshal(raw, &value) == nil && value == decoded && value != "" && utf8.RuneCountInString(value) <= 64
+}
+
+func validOptionalNonEmptyString(raw map[string]json.RawMessage, field, decoded string) bool {
+	value, present := raw[field]
+	if !present {
+		return true
+	}
+	var text string
+	return json.Unmarshal(value, &text) == nil && text == decoded && text != "" && utf8.RuneCountInString(text) <= 8192
+}
+
+func validTimestamp(value string) bool {
+	parsed, err := time.Parse(time.RFC3339, value)
+	return err == nil && parsed.UTC().Format("2006-01-02T15:04:05Z") == value
+}
+
+func validIdentifierSet(values []string) bool {
+	if values == nil {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, value := range values {
+		if !identifiers.Valid(value) || seen[value] {
+			return false
+		}
+		seen[value] = true
+	}
+	return true
+}
+
+func validPathSet(values []string) bool {
+	if values == nil {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, value := range values {
+		if !identifiers.PortablePath(value) || seen[value] {
+			return false
+		}
+		seen[value] = true
+	}
+	return true
+}
+
+func validStringSet(values []string) bool {
+	if values == nil {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, value := range values {
+		if seen[value] {
+			return false
+		}
+		seen[value] = true
+	}
+	return true
+}
+
+func validBooleanRaw(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return bytes.Equal(trimmed, []byte("true")) || bytes.Equal(trimmed, []byte("false"))
+}
+
+func rawObject(raw json.RawMessage) (map[string]json.RawMessage, bool) {
+	var object map[string]json.RawMessage
+	if json.Unmarshal(raw, &object) != nil || object == nil {
+		return nil, false
+	}
+	return object, true
 }
 
 // Write stores the marker inside dir with sorted keys and a trailing newline.
@@ -137,6 +299,9 @@ func nonNilStrings(values []string) []string {
 // the content hash recomputed from disk must equal the recorded one. An
 // unsupported marker schema is an error.
 func Current(installedDir string, expected *Marker) (bool, error) {
+	if version, ok := markerSchemaVersion(installedDir); ok && version != SchemaVersion {
+		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
+	}
 	recorded := Read(installedDir)
 	if recorded == nil {
 		return false, nil
@@ -170,6 +335,22 @@ func Current(installedDir string, expected *Marker) (bool, error) {
 		return false, err
 	}
 	return recorded.ContentSHA256 == actual, nil
+}
+
+func markerSchemaVersion(installedDir string) (int, bool) {
+	payload, err := os.ReadFile(filepath.Join(installedDir, Name)) // #nosec G304 -- path derives from the install root
+	if err != nil || protocoljson.Validate(payload) != nil {
+		return 0, false
+	}
+	var object map[string]json.RawMessage
+	if json.Unmarshal(payload, &object) != nil {
+		return 0, false
+	}
+	var version int
+	if json.Unmarshal(object["schema_version"], &version) != nil {
+		return 0, false
+	}
+	return version, true
 }
 
 // ReplaceDir atomically swaps newDir into target: back up, rename, roll back

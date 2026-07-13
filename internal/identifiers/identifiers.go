@@ -10,9 +10,12 @@ package identifiers
 import (
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 var identifierRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+var localeRE = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?$`)
 
 // Rule is the human-readable identifier rule, phrased once for reuse in
 // error messages.
@@ -26,11 +29,23 @@ func Valid(value string) bool {
 	return len(value) <= 128 && identifierRE.MatchString(value) && PortableComponent(value)
 }
 
+// ValidLocale reports whether value is the protocol's safe BCP 47-compatible
+// locale selector surface.
+func ValidLocale(value string) bool {
+	return utf8.RuneCountInString(value) <= 64 && localeRE.MatchString(value)
+}
+
 // PortableComponent applies cross-platform filename restrictions, including
 // Windows device names, trailing spaces/dots, and stream separators.
 func PortableComponent(value string) bool {
-	if value == "" || strings.HasSuffix(value, ".") || strings.HasSuffix(value, " ") || strings.Contains(value, ":") {
+	if value == "" || !utf8.ValidString(value) || value == "." || value == ".." ||
+		strings.HasSuffix(value, ".") || strings.HasSuffix(value, " ") || strings.ContainsAny(value, `:/\`) {
 		return false
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return false
+		}
 	}
 	base := strings.ToUpper(strings.SplitN(value, ".", 2)[0])
 	if base == "CON" || base == "PRN" || base == "AUX" || base == "NUL" {
@@ -38,6 +53,21 @@ func PortableComponent(value string) bool {
 	}
 	if len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '1' && base[3] <= '9' {
 		return false
+	}
+	return true
+}
+
+// PortablePath validates a protocol relative path without Unicode
+// normalization. Components may contain Unicode but must be safe on every
+// supported filesystem.
+func PortablePath(value string) bool {
+	if value == "" || !utf8.ValidString(value) || utf8.RuneCountInString(value) > 4096 || strings.HasPrefix(value, "/") || strings.Contains(value, `\`) {
+		return false
+	}
+	for _, component := range strings.Split(value, "/") {
+		if !PortableComponent(component) {
+			return false
+		}
 	}
 	return true
 }

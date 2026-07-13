@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/verr"
 )
 
@@ -49,6 +50,9 @@ func Load(projectRoot string) (map[string]Substitution, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
 	}
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {

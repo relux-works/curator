@@ -13,6 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/protocoljson"
 )
 
 // Cache lifetimes (Spec §13.5).
@@ -66,6 +69,16 @@ func NewHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Tim
 	if grace == 0 {
 		grace = DefaultOfflineGrace
 	}
+	return newHTTPFetch(cacheDir, ttl, grace, now)
+}
+
+// NewHTTPFetchWithPolicy is the manager-config form. Unlike NewHTTPFetch,
+// zero is literal and disables fresh-cache or stale-fallback use respectively.
+func NewHTTPFetchWithPolicy(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
+	return newHTTPFetch(cacheDir, ttl, grace, now)
+}
+
+func newHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
 	if now == nil {
 		now = time.Now
 	}
@@ -155,6 +168,9 @@ func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
 	if err := decodeJSON(payload, &data); err != nil {
 		return nil, "", fmt.Errorf("registry returned invalid JSON: %v", err)
 	}
+	if unknown := unknownKeys(data, "records", "next_cursor"); len(unknown) > 0 || len(data) != 2 {
+		return nil, "", fmt.Errorf("registry records response has unknown or missing fields")
+	}
 	rawRecords, ok := data["records"].([]any)
 	if !ok {
 		return nil, "", fmt.Errorf("registry records response field 'records' must be an array")
@@ -178,7 +194,7 @@ func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
 	if nextRaw != nil {
 		var ok bool
 		next, ok = nextRaw.(string)
-		if !ok || next == "" {
+		if !ok || next == "" || utf8.RuneCountInString(next) > 4096 {
 			return nil, "", fmt.Errorf("registry records response has invalid 'next_cursor'")
 		}
 	}
@@ -210,7 +226,22 @@ func writeRecordCache(path string, fetchedAt time.Time, records []map[string]any
 	if err != nil {
 		return
 	}
-	_ = os.WriteFile(path, payload, 0o644)
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".records-*.tmp")
+	if err != nil {
+		return
+	}
+	temporaryPath := temporary.Name()
+	defer func() { _ = os.Remove(temporaryPath) }()
+	if _, err := temporary.Write(payload); err != nil || temporary.Chmod(0o600) != nil || temporary.Close() != nil {
+		_ = temporary.Close()
+		return
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
+			return
+		}
+		_ = os.Rename(temporaryPath, path)
+	}
 }
 
 // Publish submits a signed record file to POST <url>/v1/records with a
@@ -219,6 +250,9 @@ func Publish(baseURL, token string, recordJSON []byte) (string, error) {
 	var probe map[string]any
 	if err := decodeJSON(recordJSON, &probe); err != nil {
 		return "", fmt.Errorf("record is not valid JSON: %v", err)
+	}
+	if _, err := ParseRecord(probe); err != nil {
+		return "", fmt.Errorf("record does not conform to audit-record-v1: %v", err)
 	}
 	canonical, err := CanonicalBytesChecked(probe)
 	if err != nil {
@@ -250,6 +284,18 @@ func Publish(baseURL, token string, recordJSON []byte) (string, error) {
 	if !isJSONResponse(response.Header.Get("Content-Type")) {
 		return "", fmt.Errorf("registry submission response has unsupported content type %q", response.Header.Get("Content-Type"))
 	}
+	var result map[string]any
+	if err := decodeJSON(body, &result); err != nil {
+		return "", fmt.Errorf("registry returned an invalid submission response: %v", err)
+	}
+	if unknown := unknownKeys(result, "seq", "entry_hash"); len(unknown) > 0 || len(result) != 2 {
+		return "", fmt.Errorf("registry returned a malformed submission response")
+	}
+	sequence, ok := nonNegativeSafeInteger(result["seq"])
+	entryHash, hashOK := result["entry_hash"].(string)
+	if !ok || sequence < 1 || !hashOK || !hex256RE.MatchString(entryHash) {
+		return "", fmt.Errorf("registry returned a malformed submission response")
+	}
 	return strings.TrimSpace(string(body)), nil
 }
 
@@ -270,6 +316,9 @@ func isJSONResponse(contentType string) bool {
 }
 
 func decodeJSON(payload []byte, target any) error {
+	if err := protocoljson.Validate(payload); err != nil {
+		return err
+	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	if err := decoder.Decode(target); err != nil {
