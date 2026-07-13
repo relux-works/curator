@@ -58,6 +58,7 @@ Publication retries the exact body only with its deterministic
 `Idempotency-Key`; other client errors and unsafe requests are never retried.
 Redirects are rejected so a registry cannot move a request or bearer token to
 another endpoint.
+
 ## Commands without profile setup
 
 Shell profile changes are not required. After `curator install`, agents can
