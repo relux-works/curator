@@ -617,7 +617,7 @@ func TestRegistryClientPaginationRejectionVectors(t *testing.T) {
 	for _, testCase := range vector.PaginationRejections {
 		t.Run(testCase.Name, func(t *testing.T) {
 			calls := 0
-			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
 				calls++
 				response.Header().Set("Content-Type", "application/json")
 				switch testCase.Error {

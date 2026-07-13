@@ -77,7 +77,7 @@ func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 		}
 		return tampered, warnings
 	}
-	_ = os.Chmod(cacheDir, 0o700)
+	_ = os.Chmod(cacheDir, 0o700) // #nosec G302 -- owner-only directory access requires traversal bits
 	knownStates, err := loadSnapshotStateCatalog(cacheDir)
 	if err != nil {
 		for _, reg := range registries {
@@ -165,7 +165,7 @@ func MigrateSnapshotStates(legacyDir, stateDir string) error {
 	if err := os.MkdirAll(stateDir, 0o700); err != nil {
 		return err
 	}
-	_ = os.Chmod(stateDir, 0o700)
+	_ = os.Chmod(stateDir, 0o700) // #nosec G302 -- owner-only directory access requires traversal bits
 	entries, err := os.ReadDir(legacyDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -389,7 +389,7 @@ func syncDirectory(path string) error {
 	if runtime.GOOS == "windows" {
 		return nil
 	}
-	directory, err := os.Open(path)
+	directory, err := os.Open(path) // #nosec G304 -- path is a tool-managed protected state directory
 	if err != nil {
 		return err
 	}
