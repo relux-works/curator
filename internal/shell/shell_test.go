@@ -139,9 +139,20 @@ Write-Output ("left={0}:{1}:{2}" -f $active, $restored, $secondPrompt)
 		t.Fatalf("PowerShell hook execution: %v\n%s", err, output)
 	}
 	text := string(output)
-	for _, expected := range []string{"first=" + project + ":ORIGINAL>", "left=unset:restored:ORIGINAL>"} {
-		if !strings.Contains(text, expected) {
-			t.Fatalf("PowerShell hook output lacks %q:\n%s", expected, text)
+	firstLine := ""
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "first=") {
+			firstLine = strings.TrimSpace(line)
+			break
 		}
+	}
+	activeRoot := strings.TrimSuffix(strings.TrimPrefix(firstLine, "first="), ":ORIGINAL>")
+	projectInfo, projectErr := os.Stat(project)
+	activeInfo, activeErr := os.Stat(activeRoot)
+	if projectErr != nil || activeErr != nil || !os.SameFile(projectInfo, activeInfo) {
+		t.Fatalf("PowerShell hook activated %q instead of %q:\n%s", activeRoot, project, text)
+	}
+	if !strings.Contains(text, "left=unset:restored:ORIGINAL>") {
+		t.Fatalf("PowerShell hook did not restore the original environment and prompt:\n%s", text)
 	}
 }

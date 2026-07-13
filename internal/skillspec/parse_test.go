@@ -106,7 +106,7 @@ func TestRuntimeRoots(t *testing.T) {
 	mustFail(t, writeSkill(t, `{"schema_version": 2, "runtime_roots": ["../out"]}`, files), "runtime_roots[0]")
 	mustFail(t, writeSkill(t, `{"schema_version": 2, "runtime_roots": ["a//b"]}`, files), "runtime_roots[0]")
 	mustFail(t, writeSkill(t, `{"schema_version": 2, "runtime_roots": ["./scripts"]}`, files), "runtime_roots[0]")
-	mustFail(t, writeSkill(t, `{"schema_version": 2, "runtime_roots": ["NUL"]}`, map[string]string{"NUL/file": ""}), "runtime_roots[0]")
+	mustFail(t, writeSkill(t, `{"schema_version": 2, "runtime_roots": ["NUL"]}`, nil), "runtime_roots[0]")
 	// nested roots are not disjoint
 	nested := map[string]string{"scripts/tool": "", "scripts/inner/x": ""}
 	mustFail(t, writeSkill(t, `{"schema_version": 2, "runtime_roots": ["scripts", "scripts/inner"]}`, nested), "runtime_roots")

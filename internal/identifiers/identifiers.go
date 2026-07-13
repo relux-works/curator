@@ -36,7 +36,10 @@ func PortableComponent(value string) bool {
 	if base == "CON" || base == "PRN" || base == "AUX" || base == "NUL" {
 		return false
 	}
-	return !(len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '1' && base[3] <= '9')
+	if len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '1' && base[3] <= '9' {
+		return false
+	}
+	return true
 }
 
 // ValidSourcePath reports whether value is a POSIX-style relative path whose
