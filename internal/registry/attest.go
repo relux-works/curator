@@ -42,8 +42,8 @@ func AttestRoot(scope, skillsRoot string, registries []Registry, fetch FetchFn) 
 			results = append(results, AttestResult{Scope: scope, Skill: recorded.Name, Result: "unattestable", Detail: "marker lacks commit or hash"})
 			continue
 		}
-		id := identity.Canonical(recorded.Git)
-		if id == "" {
+		id, identityErr := identity.Parse(recorded.Git)
+		if identityErr != nil || id == "" {
 			results = append(results, AttestResult{Scope: scope, Skill: recorded.Name, Result: "unattestable", Detail: "no canonical source identity"})
 			continue
 		}

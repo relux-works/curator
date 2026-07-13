@@ -21,6 +21,12 @@ jobs:
         with:
           submodules: true
 
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          path: protocol-spec
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -39,6 +45,8 @@ jobs:
         run: go vet ./...
 
       - name: go test
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
         run: go test ./...
 
   lint:
@@ -58,18 +66,26 @@ jobs:
           version: latest
 
   interop:
-    name: Interop golden gate
+    name: Interop conformance gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
 
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          path: protocol-spec
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      - name: Golden byte-equality
+      - name: Shared protocol suite
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
         run: go test ./internal/interop/ -v
 
   naming-gate:

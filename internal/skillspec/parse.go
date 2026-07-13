@@ -546,11 +546,20 @@ func validateRelativePath(value, field string, strictPosix bool) (string, error)
 		return "", verr.New(field, "must be a relative path inside the skill repository")
 	}
 	for _, part := range strings.Split(clean, "/") {
-		if part == ".." {
-			return "", verr.New(field, "must be a relative path inside the skill repository")
+		if part == ".." || !identifiers.PortableComponent(part) || containsControl(part) {
+			return "", verr.New(field, "must be a portable relative path inside the skill repository")
 		}
 	}
 	return clean, nil
+}
+
+func containsControl(value string) bool {
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			return true
+		}
+	}
+	return false
 }
 
 func pathContains(root, rel string) bool {

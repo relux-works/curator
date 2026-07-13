@@ -7,12 +7,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"time"
 )
 
 // DefaultSnapshotMaxAge is the staleness bound: an older reachable snapshot
 // counts as a frozen view (Spec §13.4).
 const DefaultSnapshotMaxAge = 7 * 24 * time.Hour
+
+// DefaultSnapshotClockSkew is the maximum accepted future timestamp.
+const DefaultSnapshotClockSkew = 5 * time.Minute
+
+var hex256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+type snapshotState struct {
+	HighestVersion int    `json:"highest_version"`
+	Head           string `json:"head,omitempty"`
+	MerkleRoot     string `json:"merkle_root,omitempty"`
+	LogSize        int    `json:"log_size,omitempty"`
+}
 
 // SnapshotFetchFn returns the signed snapshot object of a registry.
 type SnapshotFetchFn func(url string) (map[string]any, error)
@@ -34,7 +48,7 @@ func CheckSnapshots(registries []Registry, cacheDir string, fetch SnapshotFetchF
 			continue
 		}
 		stateFile := filepath.Join(cacheDir, "snapshot-"+urlDigest(reg.URL)+".json")
-		highest := readHighestVersion(stateFile)
+		state := readSnapshotState(stateFile)
 		snapshot, err := fetch(reg.URL)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("registry %s snapshot unavailable: %v", reg.Name, err))
@@ -45,19 +59,41 @@ func CheckSnapshots(registries []Registry, cacheDir string, fetch SnapshotFetchF
 			tampered[reg.URL] = true
 			continue
 		}
-		version, ok := intValue(snapshot["version"])
-		if !ok || version < highest {
+		schema, schemaOK := intValue(snapshot["schema_version"])
+		version, versionOK := intValue(snapshot["version"])
+		logSize, logSizeOK := intValue(snapshot["log_size"])
+		head, headOK := snapshot["head"].(string)
+		merkleRoot, rootOK := snapshot["merkle_root"].(string)
+		if !schemaOK || schema != 1 || !versionOK || !logSizeOK || version < 0 || logSize < 0 || version < logSize ||
+			!headOK || !rootOK || !hex256RE.MatchString(head) || !hex256RE.MatchString(merkleRoot) {
+			warnings = append(warnings, fmt.Sprintf("registry %s snapshot is malformed", reg.Name))
+			tampered[reg.URL] = true
+			continue
+		}
+		if version < state.HighestVersion {
 			warnings = append(warnings, fmt.Sprintf("registry %s snapshot version moved backward; possible rollback", reg.Name))
 			tampered[reg.URL] = true
 			continue
 		}
+		if version == state.HighestVersion && state.Head != "" &&
+			(state.Head != head || state.MerkleRoot != merkleRoot || state.LogSize != logSize) {
+			warnings = append(warnings, fmt.Sprintf("registry %s snapshot changed without advancing version; possible equivocation", reg.Name))
+			tampered[reg.URL] = true
+			continue
+		}
 		created, ok := parseISO8601(snapshot["created_at"])
-		if !ok || now.Sub(created) > maxAge {
+		createdText, _ := snapshot["created_at"].(string)
+		if !ok || created.UTC().Format(time.RFC3339) != createdText || now.Sub(created) > maxAge {
 			warnings = append(warnings, fmt.Sprintf("registry %s snapshot is stale", reg.Name))
 			tampered[reg.URL] = true
 			continue
 		}
-		writeHighestVersion(stateFile, version)
+		if created.After(now.Add(DefaultSnapshotClockSkew)) {
+			warnings = append(warnings, fmt.Sprintf("registry %s snapshot timestamp is too far in the future", reg.Name))
+			tampered[reg.URL] = true
+			continue
+		}
+		writeSnapshotState(stateFile, snapshotState{HighestVersion: version, Head: head, MerkleRoot: merkleRoot, LogSize: logSize})
 	}
 	return tampered, warnings
 }
@@ -67,23 +103,24 @@ func urlDigest(url string) string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
-func readHighestVersion(path string) int {
+func readSnapshotState(path string) snapshotState {
 	payload, err := os.ReadFile(path) // #nosec G304 -- cache state under the machine home
 	if err != nil {
-		return 0
+		return snapshotState{}
 	}
-	var data struct {
-		HighestVersion int `json:"highest_version"`
-	}
+	var data snapshotState
 	if err := json.Unmarshal(payload, &data); err != nil {
-		return 0
+		return snapshotState{}
 	}
-	return data.HighestVersion
+	return data
 }
 
-func writeHighestVersion(path string, version int) {
-	payload, _ := json.Marshal(map[string]int{"highest_version": version})
-	_ = os.WriteFile(path, payload, 0o644)
+func writeSnapshotState(path string, state snapshotState) {
+	payload, _ := json.Marshal(state)
+	temporary := path + ".tmp"
+	if err := os.WriteFile(temporary, payload, 0o600); err == nil {
+		_ = os.Rename(temporary, path)
+	}
 }
 
 func intValue(raw any) (int, bool) {
@@ -94,6 +131,15 @@ func intValue(raw any) (int, bool) {
 		}
 	case int:
 		return value, true
+	case int64:
+		if value >= 0 && value <= 9007199254740991 {
+			return int(value), true
+		}
+	case json.Number:
+		parsed, err := strconv.ParseInt(string(value), 10, 64)
+		if err == nil && parsed >= 0 && parsed <= 9007199254740991 {
+			return int(parsed), true
+		}
 	}
 	return 0, false
 }

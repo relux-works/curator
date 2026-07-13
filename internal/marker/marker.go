@@ -99,8 +99,11 @@ func Write(dir string, m *Marker) error {
 	m.Dependencies = nonNilStrings(m.Dependencies)
 	m.RuntimeRoots = nonNilStrings(m.RuntimeRoots)
 	m.Files = nonNilStrings(m.Files)
+	sort.Strings(m.Agents)
 	sort.Strings(m.Commands)
 	sort.Strings(m.Dependencies)
+	sort.Strings(m.RuntimeRoots)
+	sort.Strings(m.Files)
 	if m.Requirements != nil {
 		sort.Strings(m.Requirements)
 	}
@@ -110,6 +113,9 @@ func Write(dir string, m *Marker) error {
 	if m.Activation != nil {
 		m.Activation.Commands = nonNilStrings(m.Activation.Commands)
 		sort.Strings(m.Activation.Commands)
+	}
+	if m.Requirers != nil {
+		sort.Strings(m.Requirers)
 	}
 	payload, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
