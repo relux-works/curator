@@ -1,6 +1,6 @@
 # Curator implementation plan
 
-This is the working plan for building Curator, an agent environment manager (AEM) in Go. Iterations consult this document and the task board; the plan is updated as decisions land. Protocol sections are cited as `Spec §N.M` against the 1.0.0-draft [Curator Specification](https://github.com/relux-works/curator-spec).
+This is the working plan for building Curator, an agent environment manager (AEM) in Go. Iterations consult this document and the task board; the plan is updated as decisions land. Protocol sections are cited as `Spec §N.M` against the 1.0.0-rc.2 [Curator Specification](https://github.com/relux-works/curator-spec).
 
 ## 1. Goal and definition of done
 
@@ -100,9 +100,9 @@ Global scope under the machine home (§9.2) with home-level adapters; hybrid sco
 
 ### Phase 7: registry client (EPIC registry-client)
 
-`internal/registry`: canonical bytes, record parsing and statuses, pinned key parsing, Ed25519 verification, artifact matching, deny-wins resolution with the warning taxonomy (§13.1 through §13.3); snapshot verification with persisted monotonic version and staleness bound (§13.4); record cache TTL and offline grace (§13.5); install wiring (revoked fails, strict policy fails unknown, attestation into marker, all-tampered fails); `status --attest` re-check from markers; `audit --publish` submission (§13.10).
+`internal/registry`: canonical bytes, record parsing and statuses, pinned key parsing, Ed25519 verification, artifact matching, deny-wins resolution with the warning taxonomy (§13.1 through §13.3); snapshot verification with protected durable high-water state, fail-closed legacy migration, equal-version equivocation detection, and staleness bounds (§13.4); record cache TTL, offline grace, snapshot-bound pagination limits, bounded retries, and total deadlines (§13.5 and §13.9); install wiring (revoked fails, strict policy fails unknown, attestation into marker, all-tampered fails); `status --attest` re-check from markers; idempotent `audit --publish` submission (§13.10).
 
-Test strategy: a local httptest registry serving signed fixtures; keys generated in tests; rollback, freeze, tamper, offline scenarios.
+Test strategy: a local httptest registry serving signed fixtures; keys generated in tests; rollback, key rotation, equal-version equivocation, freeze, tamper, offline, retry safety, cursor cycles, and resource-limit scenarios. The authoritative registry-client vectors execute in the external conformance gate.
 
 ### Phase 8: audit gate (EPIC audit-gate)
 

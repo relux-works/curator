@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,12 +23,20 @@ const DefaultSnapshotMaxAge = 7 * 24 * time.Hour
 const DefaultSnapshotClockSkew = 5 * time.Minute
 
 var hex256RE = regexp.MustCompile(`^[0-9a-f]{64}$`)
+var snapshotStateNameRE = regexp.MustCompile(`^snapshot-[0-9a-f]{16}\.json$`)
+
+const snapshotStateCatalogName = "known-registries.json"
 
 type snapshotState struct {
 	HighestVersion int    `json:"highest_version"`
 	Head           string `json:"head,omitempty"`
 	MerkleRoot     string `json:"merkle_root,omitempty"`
 	LogSize        int    `json:"log_size,omitempty"`
+}
+
+type snapshotStateCatalog struct {
+	SchemaVersion int      `json:"schema_version"`
+	States        []string `json:"states"`
 }
 
 type parsedSnapshot struct {
@@ -56,15 +66,45 @@ func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 	if maxAge == 0 {
 		maxAge = DefaultSnapshotMaxAge
 	}
-	_ = os.MkdirAll(cacheDir, 0o755)
 	tampered := map[string]bool{}
 	var warnings []string
+	if err := os.MkdirAll(cacheDir, 0o700); err != nil {
+		for _, reg := range registries {
+			if len(reg.PublicKeys) > 0 {
+				tampered[reg.URL] = true
+				warnings = append(warnings, fmt.Sprintf("registry %s rollback state directory is unavailable: %v", reg.Name, err))
+			}
+		}
+		return tampered, warnings
+	}
+	_ = os.Chmod(cacheDir, 0o700)
+	knownStates, err := loadSnapshotStateCatalog(cacheDir)
+	if err != nil {
+		for _, reg := range registries {
+			if len(reg.PublicKeys) > 0 {
+				tampered[reg.URL] = true
+				warnings = append(warnings, fmt.Sprintf("registry %s rollback state catalog is unavailable: %v", reg.Name, err))
+			}
+		}
+		return tampered, warnings
+	}
 	for _, reg := range registries {
 		if len(reg.PublicKeys) == 0 {
 			continue
 		}
-		stateFile := filepath.Join(cacheDir, "snapshot-"+urlDigest(reg.URL)+".json")
-		state := readSnapshotState(stateFile)
+		stateName := "snapshot-" + urlDigest(reg.URL) + ".json"
+		stateFile := filepath.Join(cacheDir, stateName)
+		state, stateExists, err := readSnapshotState(stateFile)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("registry %s rollback state is unreadable: %v", reg.Name, err))
+			tampered[reg.URL] = true
+			continue
+		}
+		if !stateExists && knownStates[stateName] {
+			warnings = append(warnings, fmt.Sprintf("registry %s rollback state is missing after prior use", reg.Name))
+			tampered[reg.URL] = true
+			continue
+		}
 		snapshot, err := fetch(reg.URL)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("registry %s snapshot unavailable: %v", reg.Name, err))
@@ -102,9 +142,85 @@ func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 			tampered[reg.URL] = true
 			continue
 		}
-		writeSnapshotState(stateFile, snapshotState{HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot, LogSize: parsed.LogSize})
+		if err := writeSnapshotState(stateFile, snapshotState{HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot, LogSize: parsed.LogSize}); err != nil {
+			warnings = append(warnings, fmt.Sprintf("registry %s rollback state could not be persisted: %v", reg.Name, err))
+			tampered[reg.URL] = true
+			continue
+		}
+		if !knownStates[stateName] {
+			knownStates[stateName] = true
+			if err := writeSnapshotStateCatalog(cacheDir, knownStates); err != nil {
+				warnings = append(warnings, fmt.Sprintf("registry %s rollback state catalog could not be persisted: %v", reg.Name, err))
+				tampered[reg.URL] = true
+			}
+		}
 	}
 	return tampered, warnings
+}
+
+// MigrateSnapshotStates moves legacy rollback state out of the disposable
+// record cache. It refuses malformed or conflicting state so an upgrade cannot
+// silently reset the highest accepted registry snapshot.
+func MigrateSnapshotStates(legacyDir, stateDir string) error {
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return err
+	}
+	_ = os.Chmod(stateDir, 0o700)
+	entries, err := os.ReadDir(legacyDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return rebuildSnapshotStateCatalog(stateDir)
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !snapshotStateNameRE.MatchString(entry.Name()) {
+			continue
+		}
+		legacyPath := filepath.Join(legacyDir, entry.Name())
+		legacyState, legacyExists, err := readSnapshotState(legacyPath)
+		if err != nil {
+			return fmt.Errorf("legacy rollback state %s is unreadable: %w", entry.Name(), err)
+		}
+		if !legacyExists {
+			return fmt.Errorf("legacy rollback state %s disappeared during migration", entry.Name())
+		}
+		targetPath := filepath.Join(stateDir, entry.Name())
+		targetState, targetExists, targetErr := readSnapshotState(targetPath)
+		if targetErr != nil {
+			return fmt.Errorf("rollback state %s is unreadable: %w", entry.Name(), targetErr)
+		}
+		if targetExists {
+			if targetState.HighestVersion < legacyState.HighestVersion ||
+				(targetState.HighestVersion == legacyState.HighestVersion && statesConflict(targetState, legacyState)) {
+				return fmt.Errorf("rollback state %s conflicts with legacy state", entry.Name())
+			}
+			if err := os.Remove(legacyPath); err != nil {
+				return err
+			}
+			if err := syncDirectory(legacyDir); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := os.Chmod(legacyPath, 0o600); err != nil {
+			return err
+		}
+		if err := os.Rename(legacyPath, targetPath); err != nil {
+			return err
+		}
+		if err := syncDirectory(stateDir); err != nil {
+			return err
+		}
+		if err := syncDirectory(legacyDir); err != nil {
+			return err
+		}
+	}
+	return rebuildSnapshotStateCatalog(stateDir)
+}
+
+func statesConflict(left, right snapshotState) bool {
+	return left.Head != right.Head || left.MerkleRoot != right.MerkleRoot || left.LogSize != right.LogSize
 }
 
 func urlDigest(url string) string {
@@ -112,24 +228,173 @@ func urlDigest(url string) string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
-func readSnapshotState(path string) snapshotState {
-	payload, err := os.ReadFile(path) // #nosec G304 -- cache state under the machine home
+func readSnapshotState(path string) (snapshotState, bool, error) {
+	payload, exists, err := readProtectedStateFile(path)
 	if err != nil {
-		return snapshotState{}
+		return snapshotState{}, exists, err
+	}
+	if !exists {
+		return snapshotState{}, false, nil
 	}
 	var data snapshotState
-	if err := json.Unmarshal(payload, &data); err != nil {
-		return snapshotState{}
+	if err := decodeJSON(payload, &data); err != nil {
+		return snapshotState{}, true, err
 	}
-	return data
+	if data.HighestVersion < 0 || data.LogSize < 0 || data.LogSize > data.HighestVersion {
+		return snapshotState{}, true, fmt.Errorf("state has invalid version or log size")
+	}
+	if !hex256RE.MatchString(data.Head) || !hex256RE.MatchString(data.MerkleRoot) {
+		return snapshotState{}, true, fmt.Errorf("state has invalid head or Merkle root")
+	}
+	return data, true, nil
 }
 
-func writeSnapshotState(path string, state snapshotState) {
-	payload, _ := json.Marshal(state)
-	temporary := path + ".tmp"
-	if err := os.WriteFile(temporary, payload, 0o600); err == nil {
-		_ = os.Rename(temporary, path)
+func writeSnapshotState(path string, state snapshotState) error {
+	payload, err := json.Marshal(state)
+	if err != nil {
+		return err
 	}
+	return writeProtectedStateFile(path, payload)
+}
+
+func loadSnapshotStateCatalog(stateDir string) (map[string]bool, error) {
+	path := filepath.Join(stateDir, snapshotStateCatalogName)
+	payload, exists, err := readProtectedStateFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		entries, readErr := os.ReadDir(stateDir)
+		if readErr != nil {
+			return nil, readErr
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() && snapshotStateNameRE.MatchString(entry.Name()) {
+				return nil, fmt.Errorf("catalog is missing while rollback state exists")
+			}
+		}
+		empty := map[string]bool{}
+		if err := writeSnapshotStateCatalog(stateDir, empty); err != nil {
+			return nil, err
+		}
+		return empty, nil
+	}
+	var catalog snapshotStateCatalog
+	if err := decodeJSON(payload, &catalog); err != nil {
+		return nil, err
+	}
+	if catalog.SchemaVersion != 1 || catalog.States == nil {
+		return nil, fmt.Errorf("unsupported rollback state catalog schema")
+	}
+	known := make(map[string]bool, len(catalog.States))
+	for _, name := range catalog.States {
+		if !snapshotStateNameRE.MatchString(name) || known[name] {
+			return nil, fmt.Errorf("rollback state catalog contains an invalid entry")
+		}
+		known[name] = true
+	}
+	return known, nil
+}
+
+func rebuildSnapshotStateCatalog(stateDir string) error {
+	known := map[string]bool{}
+	path := filepath.Join(stateDir, snapshotStateCatalogName)
+	if _, exists, err := readProtectedStateFile(path); err != nil {
+		return err
+	} else if exists {
+		loaded, err := loadSnapshotStateCatalog(stateDir)
+		if err != nil {
+			return err
+		}
+		known = loaded
+	}
+	entries, err := os.ReadDir(stateDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !snapshotStateNameRE.MatchString(entry.Name()) {
+			continue
+		}
+		if _, exists, err := readSnapshotState(filepath.Join(stateDir, entry.Name())); err != nil {
+			return fmt.Errorf("rollback state %s is unreadable: %w", entry.Name(), err)
+		} else if !exists {
+			return fmt.Errorf("rollback state %s disappeared during migration", entry.Name())
+		}
+		known[entry.Name()] = true
+	}
+	return writeSnapshotStateCatalog(stateDir, known)
+}
+
+func writeSnapshotStateCatalog(stateDir string, known map[string]bool) error {
+	names := make([]string, 0, len(known))
+	for name := range known {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	payload, err := json.Marshal(snapshotStateCatalog{SchemaVersion: 1, States: names})
+	if err != nil {
+		return err
+	}
+	return writeProtectedStateFile(filepath.Join(stateDir, snapshotStateCatalogName), payload)
+}
+
+func readProtectedStateFile(path string) ([]byte, bool, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, true, fmt.Errorf("security state is not a regular file")
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		return nil, true, fmt.Errorf("security state permissions are too broad")
+	}
+	payload, err := os.ReadFile(path) // #nosec G304 -- protected state under the machine home
+	return payload, true, err
+}
+
+func writeProtectedStateFile(path string, payload []byte) error {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".registry-state-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer func() { _ = os.Remove(temporaryPath) }()
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(payload); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return err
+	}
+	return syncDirectory(filepath.Dir(path))
+}
+
+func syncDirectory(path string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	directory, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = directory.Close() }()
+	return directory.Sync()
 }
 
 func parseSnapshot(snapshot map[string]any) (parsedSnapshot, error) {

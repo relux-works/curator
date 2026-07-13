@@ -41,6 +41,24 @@ gh attestation verify <artifact> --owner relux-works
 - **MCP requirements**: read-only verification of declared MCP servers against agent configuration surfaces.
 - **Security**: source allowlists, declared capabilities, no code execution at install time, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
 
+## Registry client guarantees
+
+Curator binds persisted rollback and equivocation state to the canonical
+registry URL, so signing-key rotation never resets the highest accepted
+snapshot. This durable state lives under the Curator home `state/registry`
+directory, outside the disposable `cache/registry` responses; upgrades migrate
+legacy state without lowering it, and corruption or write failure is
+fail-closed. A protected catalog distinguishes first use from deletion of a
+previously accepted registry state. Record pagination rejects repeated or oversized cursors, more than
+10,000 records per artifact query, and responses larger than 16 MiB.
+
+Registry requests use bounded per-attempt and total deadlines. GET requests
+retry network failures, `429`, and `503` at most twice after the first attempt.
+Publication retries the exact body only with its deterministic
+`Idempotency-Key`; other client errors and unsafe requests are never retried.
+Redirects are rejected so a registry cannot move a request or bearer token to
+another endpoint.
+
 ## An open protocol
 
 The specification is an open protocol, not an internal contract: any manager
@@ -52,6 +70,11 @@ instead. One such independent implementation of the protocol is
 conformance against the shared wire formats is enforced directly from the
 versioned protocol suite in CI; this repository carries no private copy of the
 expected protocol values.
+
+The registry-service profile is implemented by
+[Curator Skill Registry](https://github.com/relux-works/curator-skill-registry),
+which serves signed audit and revocation records plus a verifiable transparency
+log for any conforming Curator manager.
 
 ## Development
 
