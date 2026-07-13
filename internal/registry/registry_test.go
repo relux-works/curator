@@ -62,14 +62,17 @@ func record(status string) map[string]any {
 func TestCanonicalBytes(t *testing.T) {
 	payload := map[string]any{
 		"b":   "два",
-		"a":   1.0,
+		"a":   1,
 		"sig": map[string]any{"signature": "x"},
-		"z":   map[string]any{"y": []any{"м", 2.0}, "x": true},
+		"z":   map[string]any{"y": []any{"м", 2, "\b\f<>/&"}, "x": true},
 	}
 	got := string(CanonicalBytes(payload))
-	want := `{"a":1,"b":"два","z":{"x":true,"y":["м",2]}}`
+	want := `{"a":1,"b":"два","z":{"x":true,"y":["м",2,"\b\f<>/&"]}}`
 	if got != want {
 		t.Fatalf("canonical bytes:\n got %s\nwant %s", got, want)
+	}
+	if _, err := CanonicalBytesChecked(map[string]any{"fraction": 1.5}); err == nil {
+		t.Fatal("CCJ-1 must reject non-integer numbers")
 	}
 }
 
@@ -94,6 +97,15 @@ func TestVerifySigned(t *testing.T) {
 	fresh := s.sign(record(StatusAudited))
 	if !VerifySigned(fresh, []string{bare}) {
 		t.Fatal("bare base64 pinned key must verify")
+	}
+	fresh["sig"].(map[string]any)["key_id"] = "0000000000000000"
+	if VerifySigned(fresh, []string{s.pinned}) {
+		t.Fatal("signature key id must bind the verifying key")
+	}
+	fresh = s.sign(record(StatusAudited))
+	fresh["sig"].(map[string]any)["algorithm"] = "rsa"
+	if VerifySigned(fresh, []string{s.pinned}) {
+		t.Fatal("unsupported signature algorithm must fail")
 	}
 }
 
@@ -207,8 +219,8 @@ func TestResolveDeprecatedAndUnknown(t *testing.T) {
 
 func snapshotBody(version int, createdAt time.Time) map[string]any {
 	return map[string]any{
-		"schema_version": 1, "merkle_root": "r", "log_size": version,
-		"head": "h", "version": version, "created_at": createdAt.UTC().Format(time.RFC3339),
+		"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": version,
+		"head": strings.Repeat("b", 64), "version": version, "created_at": createdAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -255,6 +267,43 @@ func TestSnapshotVerification(t *testing.T) {
 	}
 }
 
+func TestSnapshotRequiresCompleteShapeAndRejectsEquivocation(t *testing.T) {
+	s := newSigner(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	cacheDir := t.TempDir()
+	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+
+	valid := snapshotBody(5, now)
+	fetch := func(string) (map[string]any, error) { return s.sign(valid), nil }
+	tampered, _ := CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+	if len(tampered) != 0 {
+		t.Fatal("valid snapshot rejected")
+	}
+
+	equivocated := snapshotBody(5, now)
+	equivocated["head"] = strings.Repeat("c", 64)
+	fetch = func(string) (map[string]any, error) { return s.sign(equivocated), nil }
+	tampered, warnings := CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "equivocation") {
+		t.Fatalf("equivocation not detected: %v %v", tampered, warnings)
+	}
+
+	incomplete := snapshotBody(6, now)
+	delete(incomplete, "merkle_root")
+	fetch = func(string) (map[string]any, error) { return s.sign(incomplete), nil }
+	tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "malformed") {
+		t.Fatalf("incomplete snapshot not rejected: %v %v", tampered, warnings)
+	}
+
+	future := snapshotBody(7, now.Add(DefaultSnapshotClockSkew+time.Second))
+	fetch = func(string) (map[string]any, error) { return s.sign(future), nil }
+	tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "future") {
+		t.Fatalf("future snapshot not rejected: %v %v", tampered, warnings)
+	}
+}
+
 func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
 	s := newSigner(t)
 	calls := 0
@@ -266,7 +315,8 @@ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
 			server.CloseClientConnections()
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}})
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil})
 	}))
 	defer server.Close()
 
@@ -300,8 +350,8 @@ func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
 	s := newSigner(t)
 	failed := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		if failed {
-			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = w.Write([]byte(`{"records":[]}`))
 			return
@@ -310,7 +360,7 @@ func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(s.sign(snapshotBody(1, time.Now())))
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": nil})
 	}))
 	defer server.Close()
 
@@ -331,13 +381,43 @@ func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
 	}
 }
 
+func TestHTTPFetchFollowsBoundedPagination(t *testing.T) {
+	s := newSigner(t)
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("limit") != "1000" {
+			t.Errorf("limit = %q", r.URL.Query().Get("limit"))
+		}
+		if r.URL.Query().Get("cursor") == "" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusAudited))}, "next_cursor": "page-2"})
+			return
+		}
+		if r.URL.Query().Get("cursor") != "page-2" {
+			t.Errorf("cursor = %q", r.URL.Query().Get("cursor"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{s.sign(record(StatusDeprecated))}, "next_cursor": nil})
+	}))
+	defer server.Close()
+	fetch := NewHTTPFetch(t.TempDir(), time.Minute, time.Hour, time.Now)
+	records, err := fetch(server.URL, "id", "commit", "hash")
+	if err != nil || len(records) != 2 || calls != 2 {
+		t.Fatalf("records=%d calls=%d err=%v", len(records), calls, err)
+	}
+}
+
 func TestPublish(t *testing.T) {
 	var gotAuth string
+	var gotIdempotency string
 	var gotBody []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
+		gotIdempotency = r.Header.Get("Idempotency-Key")
 		gotBody, _ = json.Marshal(map[string]any{"seq": 1, "entry_hash": "abc"})
 		payload, _ := json.Marshal(map[string]any{"seq": 1, "entry_hash": "abc"})
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write(payload)
 	}))
 	defer server.Close()
@@ -348,6 +428,9 @@ func TestPublish(t *testing.T) {
 	_ = gotBody
 	if gotAuth != "Bearer secret-token" {
 		t.Fatalf("auth header: %q", gotAuth)
+	}
+	if len(gotIdempotency) != 64 {
+		t.Fatalf("idempotency header: %q", gotIdempotency)
 	}
 	if !strings.Contains(response, "entry_hash") {
 		t.Fatalf("response: %s", response)

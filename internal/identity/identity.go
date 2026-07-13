@@ -8,6 +8,7 @@
 package identity
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
@@ -19,41 +20,92 @@ var urlSchemes = map[string]bool{"ssh": true, "git": true, "http": true, "https"
 // like a hostname, which keeps Windows drive paths (C:\x) and plain local
 // paths out.
 var scpRE = regexp.MustCompile(`^(?:[^@/\s]+@)?([A-Za-z0-9][A-Za-z0-9.-]*):([^\\]+)$`)
+var hostRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]*$`)
 
 // Canonical returns the canonical "host/path" identity, or "" for local
 // sources and unrecognized forms.
 func Canonical(rawURL string) string {
+	identity, _ := Parse(rawURL)
+	return identity
+}
+
+// Parse returns the canonical identity, an empty identity for a local source,
+// or an error for a malformed network source. Invalid network forms must not
+// silently bypass the network allowlist as if they were local.
+func Parse(rawURL string) (string, error) {
 	value := strings.TrimSpace(rawURL)
 	if value == "" {
-		return ""
+		return "", nil
+	}
+	if strings.Contains(value, "%") {
+		return "", fmt.Errorf("network source must not contain percent escapes")
+	}
+	if parsed, err := url.Parse(value); err == nil && parsed.Scheme != "" &&
+		!urlSchemes[strings.ToLower(parsed.Scheme)] && strings.Contains(value, "://") {
+		if strings.EqualFold(parsed.Scheme, "file") {
+			return "", nil
+		}
+		return "", fmt.Errorf("unsupported network source scheme %q", parsed.Scheme)
 	}
 	var host, repoPath string
 	if parsed, err := url.Parse(value); err == nil && urlSchemes[strings.ToLower(parsed.Scheme)] && parsed.Host != "" {
+		if parsed.Port() != "" {
+			return "", fmt.Errorf("network source must not contain an explicit port")
+		}
+		if parsed.RawQuery != "" || parsed.Fragment != "" {
+			return "", fmt.Errorf("network source must not contain a query or fragment")
+		}
+		if parsed.User != nil {
+			if _, hasPassword := parsed.User.Password(); hasPassword {
+				return "", fmt.Errorf("network source must not contain a password")
+			}
+		}
 		host = strings.ToLower(parsed.Hostname())
 		repoPath = parsed.Path
 	} else if strings.HasPrefix(strings.ToLower(value), "file:") ||
 		strings.HasPrefix(value, "/") || strings.HasPrefix(value, "./") ||
 		strings.HasPrefix(value, "../") || strings.HasPrefix(value, "~") {
-		return ""
+		return "", nil
 	} else {
 		match := scpRE.FindStringSubmatch(value)
 		if match == nil {
-			return ""
+			if strings.Contains(value, "://") || strings.Contains(value, "@") || strings.Contains(value, ":") {
+				return "", fmt.Errorf("malformed or unsupported network source")
+			}
+			return "", nil
 		}
 		host = strings.ToLower(match[1])
 		repoPath = match[2]
 		if len(host) == 1 {
 			// A single-letter host is a Windows drive, not a hostname.
-			return ""
+			return "", nil
 		}
+	}
+	if !hostRE.MatchString(host) {
+		return "", fmt.Errorf("network source host is not portable ASCII")
 	}
 	repoPath = strings.Trim(repoPath, "/")
 	repoPath = strings.TrimSuffix(repoPath, ".git")
 	repoPath = strings.TrimRight(repoPath, "/")
-	if host == "" || repoPath == "" {
-		return ""
+	if host == "" || repoPath == "" || !portableRepositoryPath(repoPath) {
+		return "", fmt.Errorf("network source repository path is not portable")
 	}
-	return host + "/" + repoPath
+	return host + "/" + repoPath, nil
+}
+
+func portableRepositoryPath(value string) bool {
+	for _, segment := range strings.Split(value, "/") {
+		if segment == "" || segment == "." || segment == ".." || strings.ContainsAny(segment, `\:`) ||
+			strings.HasSuffix(segment, ".") || strings.HasSuffix(segment, " ") {
+			return false
+		}
+		base := strings.ToUpper(strings.SplitN(segment, ".", 2)[0])
+		if base == "CON" || base == "PRN" || base == "AUX" || base == "NUL" ||
+			(len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '1' && base[3] <= '9') {
+			return false
+		}
+	}
+	return true
 }
 
 // MatchesPrefix reports a segment-aware prefix match: "h/skills" matches

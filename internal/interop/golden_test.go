@@ -1,11 +1,9 @@
-// Package interop is the conformance gate: Curator must reproduce the
-// golden fixtures byte for byte. The expectations under
-// testdata/golden/expected were produced once by an independent conforming
-// implementation of the protocol; regenerating them is a deliberate act
-// (see testdata/golden/README.md).
+// Package interop consumes the authoritative external Curator Protocol suite.
+// It contains no implementation-owned expected values.
 package interop
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -14,20 +12,27 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/whitelist"
 )
 
-func repoRoot(t *testing.T) string {
+func suiteRoot(t *testing.T) string {
 	t.Helper()
-	wd, err := os.Getwd()
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	if root == "" {
+		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
+	}
+	absolute, err := filepath.Abs(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// internal/interop -> repo root
-	return filepath.Dir(filepath.Dir(wd))
+	if _, err := os.Stat(filepath.Join(absolute, "manifest.json")); err != nil {
+		t.Fatalf("invalid CURATOR_CONFORMANCE_ROOT: %v", err)
+	}
+	return absolute
 }
 
 func TestGoldenMarkerObject(t *testing.T) {
@@ -69,7 +74,7 @@ func TestGoldenMarkerObject(t *testing.T) {
 
 func golden(t *testing.T, rel string) string {
 	t.Helper()
-	return filepath.Join(repoRoot(t), "testdata", "golden", filepath.FromSlash(rel))
+	return filepath.Join(suiteRoot(t), filepath.FromSlash(rel))
 }
 
 func readGolden(t *testing.T, rel string) string {
@@ -82,7 +87,7 @@ func readGolden(t *testing.T, rel string) string {
 }
 
 func TestGoldenSnapshotHash(t *testing.T) {
-	got, err := hashing.ContentSHA256(golden(t, "skill-fixture"), nil)
+	got, err := hashing.ContentSHA256(golden(t, "fixtures/skill"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +98,7 @@ func TestGoldenSnapshotHash(t *testing.T) {
 }
 
 func TestGoldenContextCopy(t *testing.T) {
-	fixture := golden(t, "skill-fixture")
+	fixture := golden(t, "fixtures/skill")
 	spec, err := skillspec.Load(fixture)
 	if err != nil {
 		t.Fatal(err)
@@ -128,7 +133,9 @@ func TestGoldenContextCopy(t *testing.T) {
 func readSigned(t *testing.T, rel string) map[string]any {
 	t.Helper()
 	var payload map[string]any
-	if err := json.Unmarshal([]byte(readGolden(t, rel)), &payload); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader([]byte(readGolden(t, rel))))
+	decoder.UseNumber()
+	if err := decoder.Decode(&payload); err != nil {
 		t.Fatal(err)
 	}
 	return payload
@@ -150,6 +157,10 @@ func TestGoldenRegistryObjects(t *testing.T) {
 	if registry.VerifySigned(forged, keys) {
 		t.Fatal("forged record must not verify")
 	}
+	wrongKeyID := readSigned(t, "expected/registry/record_wrong_key_id.json")
+	if registry.VerifySigned(wrongKeyID, keys) {
+		t.Fatal("record with a wrong key id must not verify")
+	}
 	snapshot := readSigned(t, "expected/registry/snapshot.json")
 	if !registry.VerifySigned(snapshot, keys) {
 		t.Fatal("golden snapshot must verify")
@@ -159,6 +170,67 @@ func TestGoldenRegistryObjects(t *testing.T) {
 	other := "ed25519:" + strings.Repeat("A", 43) + "="
 	if registry.VerifySigned(audited, []string{other}) {
 		t.Fatal("wrong key must not verify")
+	}
+}
+
+func TestCanonicalJSONVectors(t *testing.T) {
+	payload, err := os.ReadFile(golden(t, "vectors/canonical-valid.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.UseNumber()
+	var cases []struct {
+		Name      string         `json:"name"`
+		Input     map[string]any `json:"input"`
+		Canonical string         `json:"canonical_utf8"`
+	}
+	if err := decoder.Decode(&cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range cases {
+		got, err := registry.CanonicalBytesChecked(testCase.Input)
+		if err != nil {
+			t.Fatalf("%s: %v", testCase.Name, err)
+		}
+		if string(got) != testCase.Canonical {
+			t.Fatalf("%s canonical bytes:\n got %s\nwant %s", testCase.Name, got, testCase.Canonical)
+		}
+	}
+}
+
+func TestSourceIdentityVectors(t *testing.T) {
+	payload, err := os.ReadFile(golden(t, "vectors/source-identities.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Input    string  `json:"input"`
+		Identity *string `json:"identity"`
+		Error    string  `json:"error"`
+	}
+	if err := json.Unmarshal(payload, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range cases {
+		got, err := identity.Parse(testCase.Input)
+		if testCase.Error != "" {
+			if err == nil {
+				t.Errorf("Parse(%q) = %q, want error %s", testCase.Input, got, testCase.Error)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("Parse(%q): %v", testCase.Input, err)
+			continue
+		}
+		want := ""
+		if testCase.Identity != nil {
+			want = *testCase.Identity
+		}
+		if got != want {
+			t.Errorf("Parse(%q) = %q, want %q", testCase.Input, got, want)
+		}
 	}
 }
 

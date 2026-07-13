@@ -6,7 +6,7 @@ Curator is implemented in Go and follows the [Curator Specification](https://git
 
 ## Status
 
-v0.1 development complete: all twelve phases of [docs/implementation-plan.md](docs/implementation-plan.md) are done, including the interoperability golden gate (byte-equality against fixtures produced by an independent conforming implementation). CI runs tests on ubuntu, macos, and windows plus lint, a naming gate, and the interop gate. Work is tracked on the in-repo task board under [.task-board/](.task-board/).
+v0.1 development complete: all twelve phases of [docs/implementation-plan.md](docs/implementation-plan.md) are done. CI consumes the authoritative schemas and conformance vectors from `curator-spec` on ubuntu, macos, and windows, plus lint and the naming gate. Work is tracked on the in-repo task board under [.task-board/](.task-board/).
 
 ## Install
 
@@ -49,8 +49,9 @@ and the same audit registries. That matters when internal security policies
 rule out adopting an external binary and require an in-house implementation
 instead. One such independent implementation of the protocol is
 [cocoaskills](https://github.com/ivanopcode/cocoaskills) (Python); Curator's
-conformance against the shared wire formats is enforced by the golden
-interoperability gate in CI.
+conformance against the shared wire formats is enforced directly from the
+versioned protocol suite in CI; this repository carries no private copy of the
+expected protocol values.
 
 ## Development
 

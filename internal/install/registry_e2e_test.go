@@ -36,10 +36,11 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 		return body
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/v1/snapshot"):
 			_ = json.NewEncoder(w).Encode(sign(map[string]any{
-				"schema_version": 1, "merkle_root": "r", "log_size": 1, "head": "h",
+				"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1, "head": strings.Repeat("b", 64),
 				"version": 1, "created_at": time.Now().UTC().Format(time.RFC3339),
 			}))
 		case strings.HasSuffix(r.URL.Path, "/v1/records"):
@@ -47,7 +48,7 @@ func fakeRegistry(t *testing.T, status, sourceIdentity, commit, contentHash stri
 				"name": "skill-a", "source_identity": sourceIdentity,
 				"commit": commit, "content_sha256": contentHash, "status": status,
 			})
-			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{record}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{record}, "next_cursor": nil})
 		default:
 			http.NotFound(w, r)
 		}

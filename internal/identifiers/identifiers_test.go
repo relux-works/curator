@@ -21,6 +21,11 @@ func TestValid(t *testing.T) {
 		{`back\slash`, false},
 		{"..", false},
 		{"semi;colon", false},
+		{"CON", false},
+		{"nul.txt", false},
+		{"COM1", false},
+		{"Lpt9.log", false},
+		{"trailing.", false},
 	}
 	for _, tc := range cases {
 		if got := Valid(tc.value); got != tc.want {
@@ -43,6 +48,7 @@ func TestValidSourcePath(t *testing.T) {
 		{"has/../dotdot", false},
 		{"-option/like", false},
 		{`win\path`, false},
+		{"dir/NUL.txt", false},
 	}
 	for _, tc := range cases {
 		if got := ValidSourcePath(tc.value); got != tc.want {

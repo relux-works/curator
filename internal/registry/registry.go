@@ -12,8 +12,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Record statuses (Spec §13.1).
@@ -79,8 +81,17 @@ type Resolution struct {
 type FetchFn func(url, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error)
 
 // CanonicalBytes is the signed form of any registry object: compact sorted
-// JSON of every field except "sig", UTF-8, non-ASCII preserved (Spec §13.2).
+// CCJ-1 JSON of every field except the top-level "sig" (Spec Registry §1).
+// Invalid CCJ-1 input returns nil; verification uses CanonicalBytesChecked so
+// malformed signed objects cannot be mistaken for valid bytes.
 func CanonicalBytes(record map[string]any) []byte {
+	payload, _ := CanonicalBytesChecked(record)
+	return payload
+}
+
+// CanonicalBytesChecked validates the CCJ-1 value domain and returns the
+// canonical signed bytes.
+func CanonicalBytesChecked(record map[string]any) ([]byte, error) {
 	body := map[string]any{}
 	for key, value := range record {
 		if key != "sig" {
@@ -90,7 +101,7 @@ func CanonicalBytes(record map[string]any) []byte {
 	return compactSortedJSON(body)
 }
 
-func compactSortedJSON(value any) []byte {
+func compactSortedJSON(value any) ([]byte, error) {
 	switch typed := value.(type) {
 	case map[string]any:
 		keys := make([]string, 0, len(typed))
@@ -104,13 +115,20 @@ func compactSortedJSON(value any) []byte {
 			if index > 0 {
 				buffer.WriteByte(',')
 			}
-			keyJSON, _ := json.Marshal(key)
-			buffer.Write(bytesNoEscape(keyJSON, key))
+			keyJSON, err := bytesNoEscape(key)
+			if err != nil {
+				return nil, err
+			}
+			buffer.Write(keyJSON)
 			buffer.WriteByte(':')
-			buffer.Write(compactSortedJSON(typed[key]))
+			item, err := compactSortedJSON(typed[key])
+			if err != nil {
+				return nil, err
+			}
+			buffer.Write(item)
 		}
 		buffer.WriteByte('}')
-		return []byte(buffer.String())
+		return []byte(buffer.String()), nil
 	case []any:
 		var buffer strings.Builder
 		buffer.WriteByte('[')
@@ -118,21 +136,51 @@ func compactSortedJSON(value any) []byte {
 			if index > 0 {
 				buffer.WriteByte(',')
 			}
-			buffer.Write(compactSortedJSON(item))
+			encoded, err := compactSortedJSON(item)
+			if err != nil {
+				return nil, err
+			}
+			buffer.Write(encoded)
 		}
 		buffer.WriteByte(']')
-		return []byte(buffer.String())
+		return []byte(buffer.String()), nil
 	case string:
-		return bytesNoEscape(nil, typed)
+		return bytesNoEscape(typed)
+	case nil:
+		return []byte("null"), nil
+	case bool:
+		if typed {
+			return []byte("true"), nil
+		}
+		return []byte("false"), nil
+	case int:
+		return safeInteger(int64(typed))
+	case int64:
+		return safeInteger(typed)
+	case json.Number:
+		value, err := strconv.ParseInt(string(typed), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("CCJ-1 numbers must be base-10 integers: %q", typed)
+		}
+		return safeInteger(value)
 	default:
-		payload, _ := json.Marshal(typed)
-		return payload
+		return nil, fmt.Errorf("CCJ-1 does not support %T", value)
 	}
 }
 
-// bytesNoEscape marshals a string without HTML escaping and without escaping
-// non-ASCII (ensure_ascii=False equivalent).
-func bytesNoEscape(_ []byte, value string) []byte {
+func safeInteger(value int64) ([]byte, error) {
+	const maximum = int64(9007199254740991)
+	if value < -maximum || value > maximum {
+		return nil, fmt.Errorf("CCJ-1 integer outside safe range: %d", value)
+	}
+	return []byte(strconv.FormatInt(value, 10)), nil
+}
+
+// bytesNoEscape implements the CCJ-1 minimal string escaping rules.
+func bytesNoEscape(value string) ([]byte, error) {
+	if !utf8.ValidString(value) {
+		return nil, fmt.Errorf("CCJ-1 string is not valid UTF-8")
+	}
 	var buffer strings.Builder
 	buffer.WriteByte('"')
 	for _, r := range value {
@@ -141,6 +189,10 @@ func bytesNoEscape(_ []byte, value string) []byte {
 			buffer.WriteString(`\"`)
 		case '\\':
 			buffer.WriteString(`\\`)
+		case '\b':
+			buffer.WriteString(`\b`)
+		case '\f':
+			buffer.WriteString(`\f`)
 		case '\n':
 			buffer.WriteString(`\n`)
 		case '\r':
@@ -156,7 +208,7 @@ func bytesNoEscape(_ []byte, value string) []byte {
 		}
 	}
 	buffer.WriteByte('"')
-	return []byte(buffer.String())
+	return []byte(buffer.String()), nil
 }
 
 // ParsePublicKey decodes a pinned key "ed25519:<base64>" (prefix optional)
@@ -214,18 +266,26 @@ func ParseRecord(payload map[string]any) (Record, error) {
 // any pinned key.
 func VerifySigned(payload map[string]any, pinnedKeys []string) bool {
 	sig, _ := payload["sig"].(map[string]any)
+	algorithm, _ := sig["algorithm"].(string)
+	keyID, _ := sig["key_id"].(string)
 	signatureB64, _ := sig["signature"].(string)
-	if signatureB64 == "" {
+	if algorithm != "ed25519" || keyID == "" || signatureB64 == "" {
 		return false
 	}
 	signature, err := base64.StdEncoding.DecodeString(signatureB64)
+	if err != nil || len(signature) != ed25519.SignatureSize {
+		return false
+	}
+	message, err := CanonicalBytesChecked(payload)
 	if err != nil {
 		return false
 	}
-	message := CanonicalBytes(payload)
 	for _, pinned := range pinnedKeys {
 		publicKey, err := ParsePublicKey(pinned)
 		if err != nil {
+			continue
+		}
+		if KeyID(publicKey) != keyID {
 			continue
 		}
 		if ed25519.Verify(publicKey, message, signature) {

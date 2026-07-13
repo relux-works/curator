@@ -203,7 +203,10 @@ func unify(node *Node, item pending) error {
 		return nil
 	}
 	if item.git != "" {
-		id := identity.Canonical(item.git)
+		id, err := identity.Parse(item.git)
+		if err != nil {
+			return fmt.Errorf("invalid source for %s (via %s): %w", item.name, item.chain, err)
+		}
 		if id != "" {
 			if node.Identity == "" {
 				node.Identity = id
@@ -289,7 +292,10 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
 
 	id := ""
 	if item.git != "" {
-		id = identity.Canonical(item.git)
+		id, err = identity.Parse(item.git)
+		if err != nil {
+			return nil, fmt.Errorf("invalid source for %s (via %s): %w", item.name, item.chain, err)
+		}
 	}
 	return &Node{
 		Name:        item.name,
@@ -344,10 +350,10 @@ func ensureDevRepo(opts Options, name, gitURL string) (string, error) {
 // gateSource applies the machine allowlist before any network clone
 // (Spec §8.2).
 func gateSource(opts Options, name, gitURL, chain string) error {
-	if len(opts.AllowedSources) == 0 {
-		return nil
+	id, err := identity.Parse(gitURL)
+	if err != nil {
+		return fmt.Errorf("invalid source for %s: %s; %v; required via %s", name, gitURL, err, chain)
 	}
-	id := identity.Canonical(gitURL)
 	if identity.Allowed(id, opts.AllowedSources) {
 		return nil
 	}

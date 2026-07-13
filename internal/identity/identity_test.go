@@ -54,6 +54,23 @@ func TestMatchesPrefix(t *testing.T) {
 	}
 }
 
+func TestParseRejectsAmbiguousNetworkForms(t *testing.T) {
+	for _, source := range []string{
+		"https://git.example.com:8443/skills/a",
+		"https://git.example.com/skills%2Fa",
+		"https://git.example.com/skills/a?q=1",
+		"ftp://git.example.com/skills/a",
+		"git@example.com:CON/repo",
+	} {
+		if _, err := Parse(source); err == nil {
+			t.Errorf("Parse(%q) must fail", source)
+		}
+	}
+	if identity, err := Parse("file:///tmp/repo"); err != nil || identity != "" {
+		t.Fatalf("local source = %q, %v", identity, err)
+	}
+}
+
 func TestAllowed(t *testing.T) {
 	allowlist := []string{"git.example.com/skills"}
 	if !Allowed("git.example.com/skills/skill-a", allowlist) {
