@@ -114,15 +114,16 @@ func RuntimeCommandPath(home, skillName, commit string, command skillspec.Comman
 	return runtimePath, nil
 }
 
-// WriteBinShim writes the project or global shim for a command: a relative
-// symlink on unix, a .cmd wrapper on windows.
-func WriteBinShim(binDir, commandName, runtimePath, platform string) (string, error) {
+// WriteBinShim writes the project or global launcher for a command. When
+// pathEntries is non-empty, the launcher carries the runtime environment and
+// does not depend on shell activation or a user profile.
+func WriteBinShim(binDir, commandName, runtimePath, platform string, pathEntries []string) (string, error) {
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return "", err
 	}
 	if platform == "windows" {
 		shim := filepath.Join(binDir, commandName+".cmd")
-		content := "@echo off\r\n\"" + runtimePath + "\" %*\r\n"
+		content := WindowsShimContent(runtimePath, pathEntries)
 		if err := os.WriteFile(shim, []byte(content), 0o755); err != nil {
 			return "", err
 		}
@@ -134,6 +135,24 @@ func WriteBinShim(binDir, commandName, runtimePath, platform string) (string, er
 			return "", err
 		}
 	}
+	if len(pathEntries) > 0 {
+		prefix := strings.Join(pathEntries, ":")
+		content := "#!/bin/sh\n" +
+			"if [ -n \"${PATH:-}\" ]; then\n" +
+			"  PATH=" + shellQuote(prefix) + ":\"$PATH\"\n" +
+			"else\n" +
+			"  PATH=" + shellQuote(prefix) + "\n" +
+			"fi\n" +
+			"export PATH\n" +
+			"exec " + shellQuote(runtimePath) + " \"$@\"\n"
+		if err := os.WriteFile(shim, []byte(content), 0o755); err != nil {
+			return "", err
+		}
+		if err := makeExecutable(shim); err != nil {
+			return "", err
+		}
+		return shim, nil
+	}
 	rel, err := filepath.Rel(binDir, runtimePath)
 	if err != nil {
 		rel = runtimePath
@@ -142,6 +161,33 @@ func WriteBinShim(binDir, commandName, runtimePath, platform string) (string, er
 		return "", err
 	}
 	return shim, nil
+}
+
+// WindowsShimContent returns the exact managed Windows launcher bytes. It is
+// shared with forwarding-shim ownership checks.
+func WindowsShimContent(runtimePath string, pathEntries []string) string {
+	content := "@echo off\r\nsetlocal DisableDelayedExpansion\r\n"
+	if len(pathEntries) > 0 {
+		escaped := make([]string, 0, len(pathEntries))
+		for _, entry := range pathEntries {
+			escaped = append(escaped, escapeCMDValue(entry))
+		}
+		content += "set \"PATH=" + strings.Join(escaped, ";") + ";%PATH%\"\r\n"
+	}
+	content += "call \"" + escapeCMDValue(runtimePath) + "\" %*\r\n"
+	content += "exit /b %ERRORLEVEL%\r\n"
+	return content
+}
+
+func shellQuote(value string) string {
+	if value == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
+func escapeCMDValue(value string) string {
+	return strings.ReplaceAll(value, "%", "%%")
 }
 
 // RemoveStaleShims deletes shims whose command is no longer expected.

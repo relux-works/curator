@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strings"
 
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/gitops"
@@ -106,6 +108,15 @@ type Options struct {
 	SkillsRoot     string
 	Home           string // machine home for caches
 	AllowedSources []string
+	// FetchExisting updates only repositories reached while building this
+	// closure. FetchedRepos deduplicates work across several selected scopes.
+	FetchExisting bool
+	FetchedRepos  map[string]bool
+	// FetchRepo is injectable for deterministic lifecycle tests. Nil uses git.
+	FetchRepo func(string) error
+	// ScratchRoot makes missing clones and snapshots ephemeral. Existing source
+	// checkouts remain read-only and the persistent cache is not used.
+	ScratchRoot string
 	// DevRoot is where git substitutions clone (outside SkillsRoot so a
 	// substitution never shadows the declared source repository).
 	DevRoot string
@@ -278,7 +289,7 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
 		resolved = ref
 	}
 
-	snap, err := snapshot.Get(opts.Home, item.source, repo, resolved.Commit)
+	snap, err := snapshotFor(opts, item.source, repo, resolved.Commit)
 	if err != nil {
 		return nil, err
 	}
@@ -315,6 +326,16 @@ func ensureRepo(opts Options, item pending) (string, error) {
 		if err := gitops.EnsureRepo(repo); err != nil {
 			return "", fmt.Errorf("local skill path exists but is not a git repository: %s", repo)
 		}
+		if opts.FetchExisting && !alreadyFetched(opts, repo) {
+			fetch := opts.FetchRepo
+			if fetch == nil {
+				fetch = gitops.Fetch
+			}
+			if err := fetch(repo); err != nil {
+				return "", fmt.Errorf("failed to fetch %s at %s (via %s): %w", item.name, repo, item.chain, err)
+			}
+			markFetched(opts, repo)
+		}
 		return repo, nil
 	}
 	if item.git == "" {
@@ -323,28 +344,92 @@ func ensureRepo(opts Options, item pending) (string, error) {
 	if err := gateSource(opts, item.name, item.git, item.chain); err != nil {
 		return "", err
 	}
-	if err := gitops.Clone(item.git, repo); err != nil {
+	destination := repo
+	if opts.ScratchRoot != "" {
+		destination = filepath.Join(opts.ScratchRoot, "repos", filepath.FromSlash(item.source))
+	}
+	if err := gitops.Clone(item.git, destination); err != nil {
 		return "", fmt.Errorf("failed to clone %s from %s: %w", item.name, item.git, err)
 	}
-	return repo, nil
+	if opts.FetchExisting && opts.ScratchRoot == "" {
+		markFetched(opts, destination)
+	}
+	return destination, nil
 }
 
 func ensureDevRepo(opts Options, name, gitURL string) (string, error) {
+	if opts.ScratchRoot != "" {
+		repo := filepath.Join(opts.ScratchRoot, "dev", name)
+		if err := gitops.Clone(gitURL, repo); err != nil {
+			return "", err
+		}
+		return repo, nil
+	}
 	root := opts.DevRoot
 	if root == "" {
 		root = filepath.Join(opts.Home, "dev")
 	}
 	repo := filepath.Join(root, name)
 	if _, err := os.Stat(filepath.Join(repo, ".git")); err == nil {
-		if err := gitops.Fetch(repo); err != nil {
-			return "", err
+		if !alreadyFetched(opts, repo) {
+			fetch := opts.FetchRepo
+			if fetch == nil {
+				fetch = gitops.Fetch
+			}
+			if err := fetch(repo); err != nil {
+				return "", err
+			}
+			markFetched(opts, repo)
 		}
 		return repo, nil
 	}
 	if err := gitops.Clone(gitURL, repo); err != nil {
 		return "", err
 	}
+	markFetched(opts, repo)
 	return repo, nil
+}
+
+func snapshotFor(opts Options, source, repo, commit string) (string, error) {
+	if opts.ScratchRoot == "" {
+		return snapshot.Get(opts.Home, source, repo, commit)
+	}
+	target := filepath.Join(opts.ScratchRoot, "snapshots", filepath.FromSlash(source), commit)
+	if _, err := os.Stat(target); err == nil {
+		return target, nil
+	}
+	if err := gitops.Archive(repo, commit, target); err != nil {
+		return "", err
+	}
+	return target, nil
+}
+
+func alreadyFetched(opts Options, repo string) bool {
+	if opts.FetchedRepos == nil {
+		return false
+	}
+	return opts.FetchedRepos[repoKey(repo)]
+}
+
+func markFetched(opts Options, repo string) {
+	if opts.FetchedRepos != nil {
+		opts.FetchedRepos[repoKey(repo)] = true
+	}
+}
+
+func repoKey(repo string) string {
+	key := ""
+	if resolved, err := filepath.EvalSymlinks(repo); err == nil {
+		key = filepath.Clean(resolved)
+	} else if absolute, err := filepath.Abs(repo); err == nil {
+		key = filepath.Clean(absolute)
+	} else {
+		key = filepath.Clean(repo)
+	}
+	if runtime.GOOS == "windows" {
+		key = strings.ToLower(key)
+	}
+	return key
 }
 
 // gateSource applies the machine allowlist before any network clone

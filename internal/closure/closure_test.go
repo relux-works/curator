@@ -343,3 +343,72 @@ func TestMissingRepoWithoutGitFails(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestFetchExistingIsScopedToReachedClosureAndDeduplicated(t *testing.T) {
+	h := newHarness(t)
+	h.skill("provider", []string{"provider-tool"}, nil)
+	h.skill("consumer", nil, map[string]map[string]any{
+		"provider": requirement("provider", "runtime", "provider-tool"),
+	})
+	h.skill("unrelated", nil, nil)
+
+	fetched := map[string]bool{}
+	var calls []string
+	opts := Options{
+		SkillsRoot:    h.skillsRoot,
+		Home:          h.home,
+		FetchExisting: true,
+		FetchedRepos:  fetched,
+		FetchRepo: func(repo string) error {
+			calls = append(calls, filepath.Base(repo))
+			return nil
+		},
+	}
+	manifestValue := &manifest.Manifest{Skills: []manifest.Decl{decl("consumer")}}
+	if _, err := Build(opts, manifestValue, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(calls, ","); got != "consumer,provider" {
+		t.Fatalf("fetched repositories = %s, want consumer,provider", got)
+	}
+	if _, err := Build(opts, manifestValue, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("shared closure repositories fetched again: %v", calls)
+	}
+}
+
+func TestScratchResolutionLeavesPersistentRootsAbsent(t *testing.T) {
+	remoteHarness := newHarness(t)
+	remote := remoteHarness.skill("remote", nil, nil)
+	remoteURL := "file://" + filepath.ToSlash(remote)
+	if filepath.VolumeName(remote) != "" {
+		remoteURL = "file:///" + filepath.ToSlash(remote)
+	}
+	root := t.TempDir()
+	skillsRoot := filepath.Join(root, "missing-skills")
+	home := filepath.Join(root, "missing-home")
+	scratch := t.TempDir()
+
+	nodes, err := Build(Options{
+		SkillsRoot:  skillsRoot,
+		Home:        home,
+		ScratchRoot: scratch,
+	}, &manifest.Manifest{Skills: []manifest.Decl{{
+		Name: "remote", Source: "remote", Git: remoteURL,
+		Ref: manifest.Ref{Kind: "tag", Value: "v1"},
+	}}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 1 || !strings.HasPrefix(nodes[0].Repo, scratch) || !strings.HasPrefix(nodes[0].Snapshot, scratch) {
+		t.Fatalf("scratch resolution escaped workspace: %+v", nodes)
+	}
+	if _, err := os.Stat(skillsRoot); !os.IsNotExist(err) {
+		t.Fatalf("dry-run created skills root: %v", err)
+	}
+	if _, err := os.Stat(home); !os.IsNotExist(err) {
+		t.Fatalf("dry-run created manager home: %v", err)
+	}
+}

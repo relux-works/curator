@@ -66,7 +66,21 @@ invoke project commands through `.agents/bin/<command>` on Unix and
 `.agents\bin\<command>.cmd` on Windows. Global installation publishes
 non-destructive forwarding shims to a safe user directory already on `PATH`
 when one is available; otherwise Curator reports the canonical global bin
-location.
+location. Installed launchers carry the project command directory and resolved
+system dependency directories themselves, preserve the inherited `PATH`, and
+return the child command status.
+
+Repository bootstrap can remain idempotent and non-interactive:
+
+```bash
+curator bootstrap --if-missing --non-interactive --skills-root "$HOME/src/skills"
+curator upgrade .
+```
+
+`upgrade` fetches only the selected project's direct and transitive dependency
+closure. `upgrade --dry-run` plans with temporary sources and snapshots without
+changing source checkouts, caches, security state, runtime state, or project
+artifacts.
 
 Interactive users who want bare command names and automatic project switching
 can cache the optional hook once:

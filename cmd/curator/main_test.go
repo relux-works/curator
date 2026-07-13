@@ -185,6 +185,99 @@ func TestBootstrapAndProjectCommands(t *testing.T) {
 	}
 }
 
+func TestBootstrapIfMissingKeepsExistingConfigWithoutParsing(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	original := []byte("this is intentionally not valid JSON\n")
+	if err := os.WriteFile(configPath, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_CONFIG", configPath)
+
+	if code := run([]string{"bootstrap", "--if-missing", "--non-interactive"}); code != exitOK {
+		t.Fatalf("bootstrap --if-missing = %d", code)
+	}
+	payload, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(payload) != string(original) {
+		t.Fatalf("existing config changed:\n%s", payload)
+	}
+}
+
+func TestBootstrapIfMissingCreatesAbsentConfig(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "home", "config.json")
+	t.Setenv("CURATOR_CONFIG", configPath)
+	skillsRoot := filepath.Join(t.TempDir(), "skills")
+
+	if code := run([]string{"bootstrap", "--if-missing", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
+		t.Fatalf("bootstrap --if-missing = %d", code)
+	}
+	loaded, err := config.Load(configPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.SkillsRoot != skillsRoot {
+		t.Fatalf("skills_root = %q, want %q", loaded.SkillsRoot, skillsRoot)
+	}
+}
+
+func TestBootstrapIfMissingRejectsForce(t *testing.T) {
+	t.Setenv("CURATOR_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	if code := run([]string{"bootstrap", "--if-missing", "--force"}); code != exitUsage {
+		t.Fatalf("bootstrap --if-missing --force = %d, want %d", code, exitUsage)
+	}
+}
+
+func TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "home", "config.json")
+	skillsRoot := filepath.Join(root, "missing-skills")
+	project := filepath.Join(root, "project")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, manifest.Name), []byte(`{"schema_version":1,"agents":["codex_cli"],"skills":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, ".gitignore"), []byte(".agents/\n.codex/skills/\nSkillfile.dev.json\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_CONFIG", configPath)
+
+	if code := run([]string{"upgrade", "app", "--dry-run"}); code != exitOK {
+		t.Fatalf("upgrade --dry-run = %d", code)
+	}
+	if _, err := os.Stat(skillsRoot); !os.IsNotExist(err) {
+		t.Fatalf("upgrade --dry-run created skills root: %v", err)
+	}
+}
+
+func TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "home", "config.json")
+	skillsRoot := filepath.Join(root, "missing-skills")
+	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_CONFIG", configPath)
+	if code := run([]string{"global", "init"}); code != exitOK {
+		t.Fatalf("global init = %d", code)
+	}
+	if code := run([]string{"global", "upgrade", "--dry-run"}); code != exitOK {
+		t.Fatalf("global upgrade --dry-run = %d", code)
+	}
+	if _, err := os.Stat(skillsRoot); !os.IsNotExist(err) {
+		t.Fatalf("global upgrade --dry-run created skills root: %v", err)
+	}
+}
+
 func TestCLIEndToEndInstallStatusAndTamperCheck(t *testing.T) {
 	root := t.TempDir()
 	configPath := filepath.Join(root, "home", "config.json")

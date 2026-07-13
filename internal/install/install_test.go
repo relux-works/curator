@@ -153,6 +153,97 @@ func TestEndToEndInstall(t *testing.T) {
 	}
 }
 
+func TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("executes POSIX skill commands")
+	}
+	e := newEnv(t)
+	e.skill("provider")
+	e.skill("consumer")
+	consumerDir := filepath.Join(e.skillsRoot, "consumer")
+	e.write(consumerDir, "scripts/consumer-tool", "#!/bin/sh\nprovider-tool\n")
+	spec := map[string]any{
+		"schema_version": 4,
+		"capabilities":   map[string]any{},
+		"runtime_roots":  []string{"scripts"},
+		"commands": map[string]any{
+			"consumer-tool": map[string]any{"type": "script", "unix_path": "scripts/consumer-tool"},
+		},
+		"dependencies": map[string]any{
+			"skills": map[string]any{
+				"provider": map[string]any{
+					"git":  filepath.Join(e.skillsRoot, "provider"),
+					"ref":  map[string]any{"kind": "tag", "value": "v1"},
+					"mode": "runtime", "commands": []string{"provider-tool"},
+				},
+			},
+		},
+	}
+	payload, _ := json.MarshalIndent(spec, "", "  ")
+	e.write(consumerDir, "csk-skill.json", string(payload))
+	e.git(consumerDir, "commit", "-qam", "call provider")
+	e.git(consumerDir, "tag", "-f", "v1")
+	e.declare("consumer")
+
+	result := e.install(Options{})
+	if result.Status != "ok" {
+		t.Fatalf("install failed: %+v", result)
+	}
+	command := exec.Command(filepath.Join(e.project, ".agents", "bin", "consumer-tool"))
+	command.Env = []string{"PATH=/usr/bin:/bin"}
+	output, err := command.CombinedOutput()
+	if err != nil || strings.TrimSpace(string(output)) != "provider" {
+		t.Fatalf("consumer command: %v\n%s", err, output)
+	}
+}
+
+func TestRuntimeLauncherCapturesDeclaredSystemDependency(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("executes POSIX skill commands")
+	}
+	e := newEnv(t)
+	e.skill("consumer")
+	helperBin := filepath.Join(t.TempDir(), "helper bin")
+	if err := os.MkdirAll(helperBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(helperBin, "declared-helper"), []byte("#!/bin/sh\necho system-resolved\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", helperBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	consumerDir := filepath.Join(e.skillsRoot, "consumer")
+	e.write(consumerDir, "scripts/consumer-tool", "#!/bin/sh\ndeclared-helper\n")
+	spec := map[string]any{
+		"schema_version": 4,
+		"capabilities":   map[string]any{},
+		"runtime_roots":  []string{"scripts"},
+		"commands": map[string]any{
+			"consumer-tool": map[string]any{"type": "script", "unix_path": "scripts/consumer-tool"},
+		},
+		"dependencies": map[string]any{
+			"commands": map[string]any{
+				"declared-helper": map[string]any{"type": "system", "command": "declared-helper"},
+			},
+		},
+	}
+	payload, _ := json.MarshalIndent(spec, "", "  ")
+	e.write(consumerDir, "csk-skill.json", string(payload))
+	e.git(consumerDir, "commit", "-qam", "declare helper")
+	e.git(consumerDir, "tag", "-f", "v1")
+	e.declare("consumer")
+
+	result := e.install(Options{})
+	if result.Status != "ok" {
+		t.Fatalf("install failed: %+v", result)
+	}
+	command := exec.Command(filepath.Join(e.project, ".agents", "bin", "consumer-tool"))
+	command.Env = []string{"PATH=/usr/bin:/bin"}
+	output, err := command.CombinedOutput()
+	if err != nil || strings.TrimSpace(string(output)) != "system-resolved" {
+		t.Fatalf("consumer command: %v\n%s", err, output)
+	}
+}
+
 func TestSecondInstallIsUpToDate(t *testing.T) {
 	e := newEnv(t)
 	e.skill("skill-a")
@@ -219,12 +310,26 @@ func TestDryRunTouchesNothing(t *testing.T) {
 	e := newEnv(t)
 	e.skill("skill-a")
 	e.declare("skill-a")
-	result := e.install(Options{DryRun: true})
+	skillRepo := filepath.Join(e.skillsRoot, "skill-a")
+	e.git(skillRepo, "remote", "add", "origin", "https://example.invalid/skill-a.git")
+	e.cfg.Audit.Enabled = true
+	result := e.install(Options{DryRun: true, Fetch: true})
 	if result.Status != "ok" {
 		t.Fatalf("dry-run: %+v", result)
 	}
 	if _, err := os.Stat(filepath.Join(e.project, ".agents", "skills")); err == nil {
 		t.Fatal("dry-run wrote files")
+	}
+	for _, path := range []string{
+		filepath.Join(e.home, "cache"),
+		filepath.Join(e.home, "audit"),
+		filepath.Join(e.home, "state"),
+		filepath.Join(e.home, "runtime"),
+		filepath.Join(skillRepo, ".git", "FETCH_HEAD"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("dry-run changed persistent state at %s: %v", path, err)
+		}
 	}
 	joined := strings.Join(result.Messages, "\n")
 	if !strings.Contains(joined, "(planned)") || !strings.Contains(joined, "dry-run") {
@@ -483,6 +588,38 @@ func TestGlobalInstall(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		if _, err := os.Lstat(filepath.Join(userBin, "skill-g-tool")); err != nil {
 			t.Fatal("PATH-visible global forwarding shim missing")
+		}
+	}
+}
+
+func TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged(t *testing.T) {
+	e := newEnv(t)
+	e.skill("skill-g")
+	if _, err := GlobalInit(e.home); err != nil {
+		t.Fatal(err)
+	}
+	if err := manifestAddGlobal(e, "skill-g"); err != nil {
+		t.Fatal(err)
+	}
+	repo := filepath.Join(e.skillsRoot, "skill-g")
+	e.git(repo, "remote", "add", "origin", "https://example.invalid/skill-g.git")
+	e.cfg.Audit.Enabled = true
+
+	result := Global(e.cfg, t.TempDir(), Options{Platform: "unix", DryRun: true, Fetch: true})
+	if result.Status != "ok" {
+		t.Fatalf("global dry-run: %+v", result)
+	}
+	for _, path := range []string{
+		filepath.Join(e.home, "cache"),
+		filepath.Join(e.home, "audit"),
+		filepath.Join(e.home, "state"),
+		filepath.Join(e.home, "runtime"),
+		filepath.Join(e.home, "global", "skills"),
+		filepath.Join(e.home, "global", "bin"),
+		filepath.Join(repo, ".git", "FETCH_HEAD"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("global dry-run changed persistent state at %s: %v", path, err)
 		}
 	}
 }

@@ -418,6 +418,70 @@ func TestHTTPFetchCacheAndOfflineGrace(t *testing.T) {
 	}
 }
 
+func TestReadOnlyHTTPFetchDoesNotCreateCache(t *testing.T) {
+	root := t.TempDir()
+	cacheDir := filepath.Join(root, "missing-cache")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil})
+	}))
+	defer server.Close()
+
+	fetch := NewHTTPFetchWithPolicyReadOnly(cacheDir, 0, 0, time.Now)
+	if _, err := fetch(server.URL, "identity", testCommit, testContentSHA256); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(cacheDir); !os.IsNotExist(err) {
+		t.Fatalf("read-only fetch created cache: %v", err)
+	}
+}
+
+func TestReadOnlySnapshotCheckDoesNotCreateOrAdvanceState(t *testing.T) {
+	s := newSigner(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	stateDir := filepath.Join(t.TempDir(), "missing-state")
+	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+	fetch := func(string) (map[string]any, error) { return s.sign(snapshotBody(5, now)), nil }
+
+	tampered, warnings := CheckSnapshotsWithPolicyReadOnly(
+		[]Registry{reg}, stateDir, fetch, now, DefaultSnapshotMaxAge, DefaultSnapshotClockSkew,
+	)
+	if len(tampered) != 0 || len(warnings) != 0 {
+		t.Fatalf("valid read-only snapshot rejected: %v %v", tampered, warnings)
+	}
+	if _, err := os.Stat(stateDir); !os.IsNotExist(err) {
+		t.Fatalf("read-only snapshot check created state: %v", err)
+	}
+
+	persistentState := t.TempDir()
+	if tampered, warnings := CheckSnapshotsWithPolicy(
+		[]Registry{reg}, persistentState, fetch, now, DefaultSnapshotMaxAge, DefaultSnapshotClockSkew,
+	); len(tampered) != 0 || len(warnings) != 0 {
+		t.Fatalf("state setup failed: %v %v", tampered, warnings)
+	}
+	stateFiles, err := filepath.Glob(filepath.Join(persistentState, "snapshot-*.json"))
+	if err != nil || len(stateFiles) != 1 {
+		t.Fatalf("state files = %v, %v", stateFiles, err)
+	}
+	before, err := os.ReadFile(stateFiles[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanced := func(string) (map[string]any, error) { return s.sign(snapshotBody(6, now)), nil }
+	if tampered, warnings := CheckSnapshotsWithPolicyReadOnly(
+		[]Registry{reg}, persistentState, advanced, now, DefaultSnapshotMaxAge, DefaultSnapshotClockSkew,
+	); len(tampered) != 0 || len(warnings) != 0 {
+		t.Fatalf("read-only advance rejected: %v %v", tampered, warnings)
+	}
+	after, err := os.ReadFile(stateFiles[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatalf("read-only snapshot check advanced protected state:\nbefore %s\nafter %s", before, after)
+	}
+}
+
 func TestHTTPFailuresUseOfflineCacheAndRejectSnapshots(t *testing.T) {
 	s := newSigner(t)
 	failed := false
