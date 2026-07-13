@@ -58,6 +58,28 @@ Publication retries the exact body only with its deterministic
 `Idempotency-Key`; other client errors and unsafe requests are never retried.
 Redirects are rejected so a registry cannot move a request or bearer token to
 another endpoint.
+## Commands without profile setup
+
+Shell profile changes are not required. After `curator install`, agents can
+invoke project commands through `.agents/bin/<command>` on Unix and
+`.agents\bin\<command>.cmd` on Windows. Global installation publishes
+non-destructive forwarding shims to a safe user directory already on `PATH`
+when one is available; otherwise Curator reports the canonical global bin
+location.
+
+Interactive users who want bare command names and automatic project switching
+can cache the optional hook once:
+
+```bash
+curator shell-init --install
+# Add the source command printed above to .zshrc or .bashrc.
+```
+
+Automatic detection selects zsh or bash from `SHELL`, preserves Git Bash on
+Windows, and otherwise selects PowerShell on Windows. The cached hook does not
+start Curator during later shell launches. Curator never edits a profile
+automatically. Set `CURATOR_AUTO_ENV=0` to retain global activation while
+disabling project-directory scans.
 
 ## An open protocol
 
