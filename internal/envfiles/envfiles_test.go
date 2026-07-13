@@ -68,7 +68,30 @@ func TestWriteGlobal(t *testing.T) {
 	if !strings.Contains(string(sh), "CSK_GLOBAL_ROOT") {
 		t.Fatalf("global env.sh:\n%s", sh)
 	}
+	if !strings.Contains(string(sh), "BASH_SOURCE") || !strings.Contains(string(sh), "ZSH_VERSION") {
+		t.Fatalf("global env.sh does not locate itself:\n%s", sh)
+	}
 	if _, err := os.Stat(filepath.Join(home, "global", "bin")); err != nil {
 		t.Fatal("global bin dir missing")
+	}
+	if runtime.GOOS != "windows" {
+		bash, err := exec.LookPath("bash")
+		if err != nil {
+			t.Skip("no bash")
+		}
+		cmd := exec.Command(bash, "-c", ". '"+filepath.Join(home, "global", "env.sh")+"'; printf '%s\n%s' \"$CSK_GLOBAL_ROOT\" \"$PATH\"")
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines := strings.SplitN(string(out), "\n", 2)
+		expectedInfo, expectedErr := os.Stat(filepath.Join(home, "global"))
+		actualInfo, actualErr := os.Stat(lines[0])
+		if expectedErr != nil || actualErr != nil || !os.SameFile(expectedInfo, actualInfo) {
+			t.Fatalf("CSK_GLOBAL_ROOT = %q, want %q", lines[0], filepath.Join(home, "global"))
+		}
+		if !strings.HasPrefix(lines[1], lines[0]+"/bin:") {
+			t.Fatalf("global PATH not prepended: %q", lines[1])
+		}
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/envfiles"
+	"github.com/relux-works/curator/internal/globalbins"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
@@ -182,6 +183,7 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 		result.failf("%v", err)
 		return result
 	}
+	result.Messages = append(result.Messages, globalbins.Refresh(home, expectedCommands, platform, nil, userHome)...)
 	if err := envfiles.WriteGlobal(home); err != nil {
 		result.failf("%v", err)
 		return result

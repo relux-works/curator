@@ -44,13 +44,36 @@ func TestRunUnknownCommand(t *testing.T) {
 }
 
 func TestShellInitPrintsHooks(t *testing.T) {
-	for _, shellName := range []string{"zsh", "bash", "powershell"} {
+	for _, shellName := range []string{"auto", "zsh", "bash", "powershell"} {
 		if code := run([]string{"shell-init", shellName}); code != 0 {
 			t.Fatalf("shell-init %s = %d", shellName, code)
 		}
 	}
+	if code := run([]string{"shell-init"}); code != 0 {
+		t.Fatalf("auto shell-init = %d", code)
+	}
 	if code := run([]string{"shell-init", "fish"}); code != 2 {
 		t.Fatalf("unsupported shell must be usage error")
+	}
+	if code := run([]string{"shell-init", "fish", "--install"}); code != 2 {
+		t.Fatalf("unsupported installed shell must be usage error")
+	}
+}
+
+func TestShellInitInstallCachesHookWithoutConfig(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "manager home", "config.json")
+	t.Setenv("CURATOR_CONFIG", configPath)
+	t.Setenv("SHELL", "/bin/bash")
+	if code := run([]string{"shell-init", "--install", "--no-global"}); code != exitOK {
+		t.Fatalf("shell-init --install = %d", code)
+	}
+	hookPath := filepath.Join(filepath.Dir(configPath), "hooks", "curator.bash")
+	payload, err := os.ReadFile(hookPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(payload), "_curator_global_env_file") {
+		t.Fatalf("--no-global cached a global hook:\n%s", payload)
 	}
 }
 

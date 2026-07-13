@@ -41,6 +41,29 @@ gh attestation verify <artifact> --owner relux-works
 - **MCP requirements**: read-only verification of declared MCP servers against agent configuration surfaces.
 - **Security**: source allowlists, declared capabilities, no code execution at install time, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
 
+## Commands without profile setup
+
+Shell profile changes are not required. After `curator install`, agents can
+invoke project commands through `.agents/bin/<command>` on Unix and
+`.agents\bin\<command>.cmd` on Windows. Global installation publishes
+non-destructive forwarding shims to a safe user directory already on `PATH`
+when one is available; otherwise Curator reports the canonical global bin
+location.
+
+Interactive users who want bare command names and automatic project switching
+can cache the optional hook once:
+
+```bash
+curator shell-init --install
+# Add the source command printed above to .zshrc or .bashrc.
+```
+
+Automatic detection selects zsh or bash from `SHELL`, preserves Git Bash on
+Windows, and otherwise selects PowerShell on Windows. The cached hook does not
+start Curator during later shell launches. Curator never edits a profile
+automatically. Set `CURATOR_AUTO_ENV=0` to retain global activation while
+disabling project-directory scans.
+
 ## An open protocol
 
 The specification is an open protocol, not an internal contract: any manager
