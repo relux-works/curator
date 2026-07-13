@@ -53,6 +53,11 @@ conformance against the shared wire formats is enforced directly from the
 versioned protocol suite in CI; this repository carries no private copy of the
 expected protocol values.
 
+The registry-service profile is implemented by
+[Curator Skill Registry](https://github.com/relux-works/curator-skill-registry),
+which serves signed audit and revocation records plus a verifiable transparency
+log for any conforming Curator manager.
+
 ## Development
 
 The repository uses an in-repo task board (`.task-board/`, epics, stories, and tasks as files) and the agent tooling connected under `agents/`. Go testing follows the closed-loop tooling of `skill-go-testing-tools` (including `tuitestkit` for terminal UI phases).
