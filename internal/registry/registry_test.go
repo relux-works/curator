@@ -17,6 +17,11 @@ type signer struct {
 	pinned  string
 }
 
+var (
+	testCommit        = strings.Repeat("a", 40)
+	testContentSHA256 = "sha256:" + strings.Repeat("d", 64)
+)
+
 func newSigner(t *testing.T) *signer {
 	t.Helper()
 	public, private, err := ed25519.GenerateKey(nil)
@@ -50,8 +55,8 @@ func record(status string) map[string]any {
 	return map[string]any{
 		"name":            "skill-a",
 		"source_identity": "git.example.com/skills/skill-a",
-		"commit":          "abc123",
-		"content_sha256":  "sha256:deadbeef",
+		"commit":          testCommit,
+		"content_sha256":  testContentSHA256,
 		"status":          status,
 		"audit":           map[string]any{"auditor": "team"},
 	}
@@ -110,26 +115,44 @@ func TestVerifySigned(t *testing.T) {
 }
 
 func TestParseRecordValidation(t *testing.T) {
-	if _, err := ParseRecord(record(StatusAudited)); err != nil {
+	s := newSigner(t)
+	if _, err := ParseRecord(s.sign(record(StatusAudited))); err != nil {
 		t.Fatal(err)
 	}
-	bad := record("blessed")
+	bad := s.sign(record("blessed"))
 	if _, err := ParseRecord(bad); err == nil {
 		t.Fatal("unknown status must fail")
 	}
-	missing := record(StatusAudited)
+	missing := s.sign(record(StatusAudited))
 	delete(missing, "commit")
 	if _, err := ParseRecord(missing); err == nil {
 		t.Fatal("missing field must fail")
 	}
+	for name, mutate := range map[string]func(map[string]any){
+		"unknown field": func(value map[string]any) { value["extension"] = true },
+		"short commit":  func(value map[string]any) { value["commit"] = "abc123" },
+		"bad hash":      func(value map[string]any) { value["content_sha256"] = "sha256:deadbeef" },
+		"spaced identity": func(value map[string]any) {
+			value["source_identity"] = "git.example.com/skills/a b"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			value := s.sign(record(StatusAudited))
+			mutate(value)
+			if _, err := ParseRecord(value); err == nil {
+				t.Fatal("malformed record must fail")
+			}
+		})
+	}
 }
 
 func TestMatches(t *testing.T) {
-	parsed, _ := ParseRecord(record(StatusAudited))
-	if !Matches(parsed, "git.example.com/skills/skill-a", "abc123", "sha256:other") {
+	s := newSigner(t)
+	parsed, _ := ParseRecord(s.sign(record(StatusAudited)))
+	if !Matches(parsed, "git.example.com/skills/skill-a", testCommit, "sha256:other") {
 		t.Fatal("identity+commit must match")
 	}
-	if !Matches(parsed, "other/repo", "zzz", "sha256:deadbeef") {
+	if !Matches(parsed, "other/repo", "zzz", testContentSHA256) {
 		t.Fatal("content hash must match")
 	}
 	if Matches(parsed, "other/repo", "zzz", "sha256:other") {
@@ -157,7 +180,7 @@ func TestResolveDenyWins(t *testing.T) {
 		"https://one": {good.sign(record(StatusAudited))},
 		"https://two": {evil.sign(record(StatusRevoked))},
 	}, nil)
-	resolution := Resolve(registries, "git.example.com/skills/skill-a", "abc123", "sha256:deadbeef", fetch)
+	resolution := Resolve(registries, "git.example.com/skills/skill-a", testCommit, testContentSHA256, fetch)
 	if resolution.Result != ResultRevoked {
 		t.Fatalf("deny must win: %+v", resolution)
 	}
@@ -176,13 +199,17 @@ func TestResolveWarningTaxonomy(t *testing.T) {
 		{Name: "good", URL: "https://good", PublicKeys: []string{s.pinned}},
 	}
 	forged := record(StatusAudited)
-	forged["sig"] = map[string]any{"signature": base64.StdEncoding.EncodeToString(make([]byte, 64))}
+	publicKey, _ := ParsePublicKey(s.pinned)
+	forged["sig"] = map[string]any{
+		"algorithm": "ed25519", "key_id": KeyID(publicKey),
+		"signature": base64.StdEncoding.EncodeToString(make([]byte, 64)),
+	}
 	fetch := staticFetch(map[string][]map[string]any{
 		"https://forged": {forged},
 		"https://broken": {{"name": "skill-a"}},
 		"https://good":   {s.sign(record(StatusAudited))},
 	}, map[string]error{"https://down": errFake})
-	resolution := Resolve(registries, "git.example.com/skills/skill-a", "abc123", "sha256:deadbeef", fetch)
+	resolution := Resolve(registries, "git.example.com/skills/skill-a", testCommit, testContentSHA256, fetch)
 	if resolution.Result != ResultAudited || resolution.Attestation.Registry != "good" {
 		t.Fatalf("resolution: %+v", resolution)
 	}
@@ -206,7 +233,7 @@ func TestResolveDeprecatedAndUnknown(t *testing.T) {
 	fetch := staticFetch(map[string][]map[string]any{
 		"https://one": {s.sign(record(StatusDeprecated))},
 	}, nil)
-	resolution := Resolve(registries, "git.example.com/skills/skill-a", "abc123", "sha256:deadbeef", fetch)
+	resolution := Resolve(registries, "git.example.com/skills/skill-a", testCommit, testContentSHA256, fetch)
 	if resolution.Result != ResultDeprecated {
 		t.Fatalf("resolution: %+v", resolution)
 	}
@@ -294,6 +321,14 @@ func TestSnapshotRequiresCompleteShapeAndRejectsEquivocation(t *testing.T) {
 	tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
 	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "malformed") {
 		t.Fatalf("incomplete snapshot not rejected: %v %v", tampered, warnings)
+	}
+
+	unknown := snapshotBody(6, now)
+	unknown["extension"] = true
+	fetch = func(string) (map[string]any, error) { return s.sign(unknown), nil }
+	tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
+	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "malformed") {
+		t.Fatalf("snapshot unknown field not rejected: %v %v", tampered, warnings)
 	}
 
 	future := snapshotBody(7, now.Add(DefaultSnapshotClockSkew+time.Second))
@@ -408,24 +443,27 @@ func TestHTTPFetchFollowsBoundedPagination(t *testing.T) {
 }
 
 func TestPublish(t *testing.T) {
+	s := newSigner(t)
+	recordPayload, err := json.Marshal(s.sign(record(StatusAudited)))
+	if err != nil {
+		t.Fatal(err)
+	}
 	var gotAuth string
 	var gotIdempotency string
-	var gotBody []byte
+	entryHash := strings.Repeat("a", 64)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		gotIdempotency = r.Header.Get("Idempotency-Key")
-		gotBody, _ = json.Marshal(map[string]any{"seq": 1, "entry_hash": "abc"})
-		payload, _ := json.Marshal(map[string]any{"seq": 1, "entry_hash": "abc"})
+		payload, _ := json.Marshal(map[string]any{"seq": 1, "entry_hash": entryHash})
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write(payload)
 	}))
 	defer server.Close()
-	response, err := Publish(server.URL, "secret-token", []byte(`{"name": "skill-a"}`))
+	response, err := Publish(server.URL, "secret-token", recordPayload)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = gotBody
 	if gotAuth != "Bearer secret-token" {
 		t.Fatalf("auth header: %q", gotAuth)
 	}
@@ -442,7 +480,7 @@ func TestPublish(t *testing.T) {
 		http.Error(w, "invalid auditor token", http.StatusUnauthorized)
 	}))
 	defer reject.Close()
-	if _, err := Publish(reject.URL, "bad", []byte(`{}`)); err == nil || !strings.Contains(err.Error(), "401") {
+	if _, err := Publish(reject.URL, "bad", recordPayload); err == nil || !strings.Contains(err.Error(), "401") {
 		t.Fatalf("err = %v, want rejection with status", err)
 	}
 }

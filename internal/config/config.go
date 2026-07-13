@@ -5,13 +5,19 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/verr"
 )
 
@@ -20,6 +26,17 @@ const SchemaVersion = 1
 
 // DefaultWorktreeAliasPattern extracts checkout aliases for git worktrees.
 const DefaultWorktreeAliasPattern = `[A-Z]+-[0-9]+`
+
+// Protocol defaults for audit requests, registry snapshots, and record cache.
+const (
+	DefaultMaxRequestBytes          = 1_048_576
+	MaximumMaxRequestBytes          = 10_485_760
+	DefaultSnapshotMaxAgeSeconds    = 604_800
+	DefaultSnapshotClockSkewSeconds = 300
+	DefaultCacheTTLSeconds          = 3_600
+	DefaultOfflineGraceSeconds      = 604_800
+	maximumDurationSeconds          = 2_147_483_647
+)
 
 // DefaultAgents applies when a project declares no agents anywhere.
 var DefaultAgents = []string{"codex_cli"}
@@ -33,7 +50,18 @@ var LockableKeys = map[string]bool{
 	"audit":                      true,
 }
 
-var revocationHashRE = regexp.MustCompile(`^(?:sha256:)?[A-Fa-f0-9]{64}$`)
+var (
+	revocationHashRE = regexp.MustCompile(`^(?:sha256:)?[A-Fa-f0-9]{64}$`)
+	registryHostRE   = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$`)
+	pinnedKeyRE      = regexp.MustCompile(`^(?:ed25519:)?[A-Za-z0-9+/]{43}=$`)
+)
+
+var managerKeys = map[string]bool{
+	"schema_version": true, "skills_root": true, "default_agents": true,
+	"preferred_locale": true, "adapter_mode": true, "worktree_alias_pattern": true,
+	"projects": true, "allowed_sources": true, "audit": true,
+	"audit_registries": true, "disable_builtin_registries": true,
+}
 
 // Project is a registered project entry.
 type Project struct {
@@ -62,18 +90,23 @@ type SourcePolicyRule struct {
 // validation lives with the audit gate; this layer keeps the raw backends
 // object.
 type Audit struct {
-	Enabled           bool
-	Mode              string // advisory | strict
-	FailOn            string // off | low | medium | high | critical
-	Backend           string
-	Model             string
-	AllowCloud        bool
-	Backends          map[string]any
-	Grants            []map[string]any
-	Revocations       []string
-	SourcePolicyClass string // default_class
-	SourcePolicyRules []SourcePolicyRule
-	RegistryPolicy    string // advisory | strict
+	Enabled                  bool
+	Mode                     string // advisory | strict
+	FailOn                   string // off | low | medium | high | critical
+	Backend                  string
+	Model                    string
+	AllowCloud               bool
+	Backends                 map[string]any
+	Grants                   []map[string]any
+	Revocations              []string
+	SourcePolicyClass        string // default_class
+	SourcePolicyRules        []SourcePolicyRule
+	RegistryPolicy           string // advisory | strict
+	MaxRequestBytes          int
+	SnapshotMaxAgeSeconds    int
+	SnapshotClockSkewSeconds int
+	CacheTTLSeconds          int
+	OfflineGraceSeconds      int
 }
 
 // Config is the effective machine configuration.
@@ -189,6 +222,14 @@ func Load(path string, warn func(string)) (*Config, error) {
 // the user value with a warning; unlocked keys act as defaults; a locked but
 // unset key is a configuration error.
 func applySystem(systemData, userData map[string]any, systemPath string, warn func(string)) (map[string]any, error) {
+	if schema, ok := integerValue(systemData["schema_version"]); !ok || schema != SchemaVersion {
+		return nil, verr.New("schema_version", "system config %s requires schema_version 1", systemPath)
+	}
+	for key := range systemData {
+		if key != "locked" && !managerKeys[key] {
+			return nil, verr.New(key, "system config %s has unsupported field", systemPath)
+		}
+	}
 	rawLocked, _ := systemData["locked"].([]any)
 	if systemData["locked"] != nil && rawLocked == nil {
 		return nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
@@ -198,6 +239,12 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 		key, ok := item.(string)
 		if !ok {
 			return nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
+		}
+		if !LockableKeys[key] {
+			return nil, verr.New("locked", "system config %s cannot lock %q", systemPath, key)
+		}
+		if locked[key] {
+			return nil, verr.New("locked", "system config %s lists %q more than once", systemPath, key)
 		}
 		locked[key] = true
 	}
@@ -228,22 +275,27 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 
 // Parse validates a raw config object (Spec §7.1).
 func Parse(data map[string]any, path string) (*Config, error) {
-	schema, ok := data["schema_version"].(float64)
-	if !ok || schema != float64(int(schema)) {
+	for key := range data {
+		if !managerKeys[key] {
+			return nil, verr.New(key, "unsupported top-level configuration field")
+		}
+	}
+	schema, ok := integerValue(data["schema_version"])
+	if !ok {
 		return nil, verr.New("schema_version", "must be an integer")
 	}
-	if int(schema) != SchemaVersion {
-		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", int(schema))
+	if schema != SchemaVersion {
+		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
 	}
 
 	skillsRoot, ok := data["skills_root"].(string)
-	if !ok || skillsRoot == "" {
+	if !ok || skillsRoot == "" || utf8.RuneCountInString(skillsRoot) > 4096 {
 		return nil, verr.New("skills_root", "requires a non-empty string")
 	}
 
 	defaultAgents := append([]string(nil), DefaultAgents...)
 	if raw, present := data["default_agents"]; present {
-		list, err := stringList(raw, "default_agents")
+		list, err := identifierSet(raw, "default_agents")
 		if err != nil {
 			return nil, err
 		}
@@ -253,8 +305,8 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	preferredLocale := ""
 	if raw, present := data["preferred_locale"]; present && raw != nil {
 		preferredLocale, ok = raw.(string)
-		if !ok {
-			return nil, verr.New("preferred_locale", "must be a string when present")
+		if !ok || !identifiers.ValidLocale(preferredLocale) {
+			return nil, verr.New("preferred_locale", "must be null or a 1-64 character ASCII locale selector")
 		}
 	}
 
@@ -269,7 +321,7 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	worktreePattern := DefaultWorktreeAliasPattern
 	if raw, present := data["worktree_alias_pattern"]; present {
 		worktreePattern, ok = raw.(string)
-		if !ok || worktreePattern == "" {
+		if !ok || worktreePattern == "" || utf8.RuneCountInString(worktreePattern) > 1024 {
 			return nil, verr.New("worktree_alias_pattern", "must be a non-empty string")
 		}
 		if _, err := regexp.Compile(worktreePattern); err != nil {
@@ -288,10 +340,12 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		seen := map[string]bool{}
 		for _, item := range allowedSources {
-			if strings.TrimSpace(item) == "" {
+			if strings.TrimSpace(item) == "" || utf8.RuneCountInString(item) > 4096 || seen[item] {
 				return nil, verr.New("allowed_sources", "must be a list of non-empty strings")
 			}
+			seen[item] = true
 		}
 	}
 
@@ -319,20 +373,25 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	projects := map[string]Project{}
 	for alias, rawEntry := range projectsObj {
 		label := "projects." + alias
-		if alias == "" {
-			return nil, verr.New("projects", "project alias must be a non-empty string")
+		if !identifiers.Valid(alias) {
+			return nil, verr.New("projects", "project alias %q %s", alias, identifiers.Rule)
 		}
 		entry, ok := rawEntry.(map[string]any)
 		if !ok {
 			return nil, verr.New(label, "must be an object")
 		}
+		for key := range entry {
+			if key != "path" && key != "agents" && key != "project_alias" && key != "checkout_alias" {
+				return nil, verr.New(label, "has unsupported field %q", key)
+			}
+		}
 		projectPath, ok := entry["path"].(string)
-		if !ok || projectPath == "" {
+		if !ok || projectPath == "" || utf8.RuneCountInString(projectPath) > 4096 {
 			return nil, verr.New(label+".path", "requires a non-empty string")
 		}
 		var agents []string
 		if raw, present := entry["agents"]; present {
-			agents, err = stringList(raw, label+".agents")
+			agents, err = identifierSet(raw, label+".agents")
 			if err != nil {
 				return nil, err
 			}
@@ -340,15 +399,15 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		projectAlias := alias
 		if raw, present := entry["project_alias"]; present && raw != nil {
 			projectAlias, ok = raw.(string)
-			if !ok || projectAlias == "" {
-				return nil, verr.New(label+".project_alias", "must be a non-empty string when present")
+			if !ok || !identifiers.Valid(projectAlias) {
+				return nil, verr.New(label+".project_alias", "%s when present", identifiers.Rule)
 			}
 		}
 		checkoutAlias := alias
 		if raw, present := entry["checkout_alias"]; present && raw != nil {
 			checkoutAlias, ok = raw.(string)
-			if !ok || checkoutAlias == "" {
-				return nil, verr.New(label+".checkout_alias", "must be a non-empty string when present")
+			if !ok || !identifiers.Valid(checkoutAlias) {
+				return nil, verr.New(label+".checkout_alias", "%s when present", identifiers.Rule)
 			}
 		}
 		projects[alias] = Project{
@@ -376,7 +435,13 @@ func Parse(data map[string]any, path string) (*Config, error) {
 }
 
 func parseAudit(raw any) (Audit, error) {
-	audit := Audit{Mode: "advisory", FailOn: "high", Backend: "null", RegistryPolicy: "advisory", SourcePolicyClass: "internal"}
+	audit := Audit{
+		Mode: "advisory", FailOn: "high", Backend: "null", RegistryPolicy: "advisory",
+		SourcePolicyClass: "internal", MaxRequestBytes: DefaultMaxRequestBytes,
+		SnapshotMaxAgeSeconds:    DefaultSnapshotMaxAgeSeconds,
+		SnapshotClockSkewSeconds: DefaultSnapshotClockSkewSeconds,
+		CacheTTLSeconds:          DefaultCacheTTLSeconds, OfflineGraceSeconds: DefaultOfflineGraceSeconds,
+	}
 	if raw == nil {
 		return audit, nil
 	}
@@ -388,6 +453,8 @@ func parseAudit(raw any) (Audit, error) {
 		"enabled": true, "mode": true, "fail_on": true, "backend": true, "model": true,
 		"allow_cloud": true, "max_request_bytes": true, "backends": true, "grants": true,
 		"revocations": true, "source_policy": true, "registry_policy": true,
+		"snapshot_max_age_seconds": true, "snapshot_clock_skew_seconds": true,
+		"cache_ttl_seconds": true, "offline_grace_seconds": true,
 	}
 	var unknown []string
 	for key := range obj {
@@ -422,13 +489,13 @@ func parseAudit(raw any) (Audit, error) {
 	}
 	if raw, present := obj["backend"]; present {
 		audit.Backend, _ = raw.(string)
-		if audit.Backend == "" {
+		if audit.Backend == "" || utf8.RuneCountInString(audit.Backend) > 128 {
 			return Audit{}, verr.New("audit.backend", "must be a non-empty string")
 		}
 	}
 	if raw, present := obj["model"]; present && raw != nil {
 		audit.Model, ok = raw.(string)
-		if !ok || audit.Model == "" {
+		if !ok || audit.Model == "" || utf8.RuneCountInString(audit.Model) > 1024 {
 			return Audit{}, verr.New("audit.model", "must be a non-empty string when present")
 		}
 	}
@@ -436,6 +503,32 @@ func parseAudit(raw any) (Audit, error) {
 		audit.AllowCloud, ok = raw.(bool)
 		if !ok {
 			return Audit{}, verr.New("audit.allow_cloud", "must be a boolean")
+		}
+	}
+	var settingErr error
+	if raw, present := obj["max_request_bytes"]; present {
+		audit.MaxRequestBytes, settingErr = boundedInteger(raw, 1, MaximumMaxRequestBytes)
+		if settingErr != nil {
+			return Audit{}, verr.New("audit.max_request_bytes", "must be an integer between 1 and %d", MaximumMaxRequestBytes)
+		}
+	}
+	for key, target := range map[string]*int{
+		"snapshot_max_age_seconds":    &audit.SnapshotMaxAgeSeconds,
+		"snapshot_clock_skew_seconds": &audit.SnapshotClockSkewSeconds,
+		"cache_ttl_seconds":           &audit.CacheTTLSeconds,
+		"offline_grace_seconds":       &audit.OfflineGraceSeconds,
+	} {
+		raw, present := obj[key]
+		if !present {
+			continue
+		}
+		minimum := 0
+		if key == "snapshot_max_age_seconds" {
+			minimum = 1
+		}
+		*target, settingErr = boundedInteger(raw, minimum, maximumDurationSeconds)
+		if settingErr != nil {
+			return Audit{}, verr.New("audit."+key, "must be an integer between %d and %d", minimum, maximumDurationSeconds)
 		}
 	}
 	if raw, present := obj["backends"]; present {
@@ -478,6 +571,11 @@ func parseAudit(raw any) (Audit, error) {
 		if !ok {
 			return Audit{}, verr.New("audit.source_policy", "must be an object")
 		}
+		for key := range policy {
+			if key != "default_class" && key != "rules" {
+				return Audit{}, verr.New("audit.source_policy", "has unsupported field %q", key)
+			}
+		}
 		if rawClass, present := policy["default_class"]; present {
 			audit.SourcePolicyClass, _ = rawClass.(string)
 			if audit.SourcePolicyClass != "internal" && audit.SourcePolicyClass != "public" {
@@ -494,9 +592,14 @@ func parseAudit(raw any) (Audit, error) {
 				if !ok {
 					return Audit{}, verr.New(fmt.Sprintf("audit.source_policy.rules[%d]", index), "must be an object")
 				}
+				for key := range rule {
+					if key != "pattern" && key != "class" {
+						return Audit{}, verr.New(fmt.Sprintf("audit.source_policy.rules[%d]", index), "has unsupported field %q", key)
+					}
+				}
 				pattern, _ := rule["pattern"].(string)
 				class, _ := rule["class"].(string)
-				if pattern == "" || (class != "internal" && class != "public") {
+				if pattern == "" || utf8.RuneCountInString(pattern) > 4096 || (class != "internal" && class != "public") {
 					return Audit{}, verr.New(fmt.Sprintf("audit.source_policy.rules[%d]", index), "requires 'pattern' and 'class' of internal or public")
 				}
 				audit.SourcePolicyRules = append(audit.SourcePolicyRules, SourcePolicyRule{Pattern: pattern, Class: class})
@@ -528,18 +631,24 @@ func parseRegistries(raw any) ([]Registry, error) {
 		if !ok {
 			return nil, verr.New(label, "must be an object")
 		}
+		for key := range entry {
+			if key != "name" && key != "url" && key != "public_keys" && key != "enabled" {
+				return nil, verr.New(label, "has unsupported field %q", key)
+			}
+		}
 		name, _ := entry["name"].(string)
-		if name == "" {
-			return nil, verr.New(label, "requires a non-empty string 'name'")
+		if !identifiers.Valid(name) {
+			return nil, verr.New(label+".name", "%s", identifiers.Rule)
 		}
-		url, _ := entry["url"].(string)
-		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-			return nil, verr.New(label, "requires an http(s) 'url'")
+		rawURL, _ := entry["url"].(string)
+		registryURL, err := canonicalRegistryURL(rawURL)
+		if err != nil {
+			return nil, verr.New(label+".url", "%v", err)
 		}
-		if seen[url] {
-			return nil, verr.New(label, "duplicates url %q", url)
+		if seen[registryURL] {
+			return nil, verr.New(label, "duplicates url %q", registryURL)
 		}
-		seen[url] = true
+		seen[registryURL] = true
 		var keys []string
 		if rawKeys, present := entry["public_keys"]; present {
 			var err error
@@ -547,10 +656,12 @@ func parseRegistries(raw any) ([]Registry, error) {
 			if err != nil {
 				return nil, err
 			}
+			seenKeys := map[string]bool{}
 			for _, key := range keys {
-				if strings.TrimSpace(key) == "" {
-					return nil, verr.New(label+".public_keys", "must be a list of non-empty strings")
+				if !pinnedKeyRE.MatchString(key) || seenKeys[key] {
+					return nil, verr.New(label+".public_keys", "must contain unique canonical Ed25519 public keys")
 				}
+				seenKeys[key] = true
 			}
 		}
 		enabled := true
@@ -560,9 +671,69 @@ func parseRegistries(raw any) ([]Registry, error) {
 				return nil, verr.New(label+".enabled", "must be a boolean")
 			}
 		}
-		registries = append(registries, Registry{Name: name, URL: url, PublicKeys: keys, Enabled: enabled})
+		registries = append(registries, Registry{Name: name, URL: registryURL, PublicKeys: keys, Enabled: enabled})
 	}
 	return registries, nil
+}
+
+func canonicalRegistryURL(value string) (string, error) {
+	if value == "" || utf8.RuneCountInString(value) > 4096 {
+		return "", fmt.Errorf("must contain at most 4096 characters")
+	}
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return "", fmt.Errorf("requires an http(s) URL with a host")
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if parsed.Hostname() == "" || (scheme != "http" && scheme != "https") {
+		return "", fmt.Errorf("requires an http(s) URL with a host")
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || strings.Contains(value, "%") {
+		return "", fmt.Errorf("must not contain credentials, a query, a fragment, or percent escapes")
+	}
+	host := strings.ToLower(parsed.Hostname())
+	address := net.ParseIP(host)
+	if address == nil && (len(host) > 253 || !registryHostRE.MatchString(host)) {
+		return "", fmt.Errorf("requires a portable ASCII DNS host or IP literal")
+	}
+	if address != nil {
+		host = address.String()
+	}
+	if scheme == "http" {
+		if host != "localhost" && (address == nil || !address.IsLoopback()) {
+			return "", fmt.Errorf("plain HTTP is permitted only for an explicitly configured loopback host")
+		}
+	}
+	if strings.Contains(parsed.Path, "//") || strings.Contains(parsed.Path, `\`) {
+		return "", fmt.Errorf("path must not contain doubled separators or backslashes")
+	}
+	path := strings.TrimRight(parsed.Path, "/")
+	for _, character := range path {
+		if character > unicode.MaxASCII || unicode.IsSpace(character) || unicode.IsControl(character) {
+			return "", fmt.Errorf("path must contain only printable non-space ASCII characters")
+		}
+	}
+	for _, component := range strings.Split(strings.Trim(path, "/"), "/") {
+		if component == "." || component == ".." {
+			return "", fmt.Errorf("path must not contain dot segments")
+		}
+	}
+	port := parsed.Port()
+	if (scheme == "https" && port == "443") || (scheme == "http" && port == "80") {
+		port = ""
+	}
+	authority := host
+	if strings.Contains(host, ":") {
+		authority = "[" + host + "]"
+	}
+	if port != "" {
+		authority = net.JoinHostPort(host, port)
+	}
+	canonical := (&url.URL{Scheme: scheme, Host: authority, Path: path}).String()
+	if utf8.RuneCountInString(canonical) > 4096 {
+		return "", fmt.Errorf("canonical URL exceeds 4096 characters")
+	}
+	return canonical, nil
 }
 
 func readObject(path string) (map[string]any, error) {
@@ -572,6 +743,9 @@ func readObject(path string) (map[string]any, error) {
 			return nil, fmt.Errorf("global config not found: %s", path)
 		}
 		return nil, err
+	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil, fmt.Errorf("malformed JSON in config %s: %w", path, err)
 	}
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {
@@ -598,6 +772,54 @@ func stringList(raw any, field string) ([]string, error) {
 		values = append(values, text)
 	}
 	return values, nil
+}
+
+func identifierSet(raw any, field string) ([]string, error) {
+	values, err := stringList(raw, field)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	for _, value := range values {
+		if !identifiers.Valid(value) || seen[value] {
+			return nil, verr.New(field, "must contain unique portable identifiers")
+		}
+		seen[value] = true
+	}
+	return values, nil
+}
+
+func integerValue(raw any) (int, bool) {
+	switch value := raw.(type) {
+	case int:
+		return value, true
+	case int64:
+		if int64(int(value)) != value {
+			return 0, false
+		}
+		return int(value), true
+	case float64:
+		if value != float64(int(value)) {
+			return 0, false
+		}
+		return int(value), true
+	case json.Number:
+		parsed, err := value.Int64()
+		if err != nil || int64(int(parsed)) != parsed {
+			return 0, false
+		}
+		return int(parsed), true
+	default:
+		return 0, false
+	}
+}
+
+func boundedInteger(raw any, minimum, maximum int) (int, error) {
+	value, ok := integerValue(raw)
+	if !ok || value < minimum || value > maximum {
+		return 0, fmt.Errorf("outside range")
+	}
+	return value, nil
 }
 
 func jsonEqual(a, b any) bool {

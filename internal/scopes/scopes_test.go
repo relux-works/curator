@@ -3,6 +3,7 @@ package scopes
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/hashing"
@@ -38,6 +39,7 @@ func installMarker(t *testing.T, skillsDir, name, commit string) {
 		Name: name, Source: name, RefKind: "tag", Ref: "v1",
 		Commit: commit, ContentSHA256: hash,
 		Agents: []string{}, Commands: []string{}, Dependencies: []string{},
+		InstalledAt: "2026-07-13T00:00:00Z",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -46,14 +48,18 @@ func installMarker(t *testing.T, skillsDir, name, commit string) {
 func TestGcKeepsReferencedRuntime(t *testing.T) {
 	home := t.TempDir()
 	project := t.TempDir()
-	installMarker(t, filepath.Join(project, ".agents", "skills"), "skill-a", "c1")
+	commit1 := strings.Repeat("1", 40)
+	commit2 := strings.Repeat("2", 40)
+	commit3 := strings.Repeat("3", 40)
+	commit9 := strings.Repeat("9", 40)
+	installMarker(t, filepath.Join(project, ".agents", "skills"), "skill-a", commit1)
 	if err := RecordConsumer(home, project); err != nil {
 		t.Fatal(err)
 	}
 	// hybrid store reference
-	installMarker(t, HybridSkillsRoot(home), "skill-h", "c9")
+	installMarker(t, HybridSkillsRoot(home), "skill-h", commit9)
 
-	for _, entry := range []string{"skill-a/c1", "skill-a/c2", "skill-h/c9", "skill-x/c3"} {
+	for _, entry := range []string{"skill-a/" + commit1, "skill-a/" + commit2, "skill-h/" + commit9, "skill-x/" + commit3} {
 		if err := os.MkdirAll(filepath.Join(home, "runtime", filepath.FromSlash(entry)), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -65,13 +71,13 @@ func TestGcKeepsReferencedRuntime(t *testing.T) {
 	if len(removed) != 2 {
 		t.Fatalf("removed: %v", removed)
 	}
-	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-a", "c1")); err != nil {
+	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-a", commit1)); err != nil {
 		t.Fatal("referenced runtime removed")
 	}
-	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-h", "c9")); err != nil {
+	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-h", commit9)); err != nil {
 		t.Fatal("hybrid-referenced runtime removed")
 	}
-	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-a", "c2")); err == nil {
+	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-a", commit2)); err == nil {
 		t.Fatal("unreferenced commit survived")
 	}
 	if _, err := os.Stat(filepath.Join(home, "runtime", "skill-x")); err == nil {
@@ -86,7 +92,7 @@ func TestGcPrunesDeadConsumers(t *testing.T) {
 		t.Fatal(err)
 	}
 	live := t.TempDir()
-	installMarker(t, filepath.Join(live, ".agents", "skills"), "skill-a", "c1")
+	installMarker(t, filepath.Join(live, ".agents", "skills"), "skill-a", strings.Repeat("1", 40))
 	if err := RecordConsumer(home, live); err != nil {
 		t.Fatal(err)
 	}

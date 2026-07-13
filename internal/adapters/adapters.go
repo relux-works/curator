@@ -3,11 +3,15 @@
 package adapters
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/protocoljson"
 )
 
 // AgentPaths maps agent identifiers to their project-relative adapter
@@ -240,15 +244,23 @@ func readLedger(adapterRoot string) map[string]bool {
 	if err != nil {
 		return map[string]bool{}
 	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return map[string]bool{}
+	}
 	var data struct {
 		SchemaVersion int      `json:"schema_version"`
 		Entries       []string `json:"entries"`
 	}
-	if err := json.Unmarshal(payload, &data); err != nil || data.SchemaVersion != LedgerSchemaVersion {
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&data); err != nil || data.SchemaVersion != LedgerSchemaVersion || data.Entries == nil {
 		return map[string]bool{}
 	}
 	entries := map[string]bool{}
 	for _, entry := range data.Entries {
+		if !identifiers.Valid(entry) || entries[entry] {
+			return map[string]bool{}
+		}
 		entries[entry] = true
 	}
 	return entries

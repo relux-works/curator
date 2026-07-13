@@ -11,9 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/whitelist"
@@ -197,6 +200,33 @@ func TestCanonicalJSONVectors(t *testing.T) {
 			t.Fatalf("%s canonical bytes:\n got %s\nwant %s", testCase.Name, got, testCase.Canonical)
 		}
 	}
+
+	invalidPayload, err := os.ReadFile(golden(t, "vectors/canonical-invalid.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var invalidCases []struct {
+		Name      string `json:"name"`
+		InputText string `json:"input_text"`
+	}
+	if err := json.Unmarshal(invalidPayload, &invalidCases); err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range invalidCases {
+		raw := []byte(testCase.InputText)
+		if err := protocoljson.Validate(raw); err != nil {
+			continue
+		}
+		var input map[string]any
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.UseNumber()
+		if err := decoder.Decode(&input); err != nil {
+			continue
+		}
+		if _, err := registry.CanonicalBytesChecked(input); err == nil {
+			t.Errorf("%s CCJ-1 input was accepted, want rejection", testCase.Name)
+		}
+	}
 }
 
 func TestSourceIdentityVectors(t *testing.T) {
@@ -231,6 +261,111 @@ func TestSourceIdentityVectors(t *testing.T) {
 		if got != want {
 			t.Errorf("Parse(%q) = %q, want %q", testCase.Input, got, want)
 		}
+	}
+}
+
+func TestIdentifierVectors(t *testing.T) {
+	payload, err := os.ReadFile(golden(t, "vectors/identifiers.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Input string `json:"input"`
+		Valid bool   `json:"valid"`
+	}
+	if err := json.Unmarshal(payload, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range cases {
+		if got := identifiers.Valid(testCase.Input); got != testCase.Valid {
+			t.Errorf("identifier %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
+		}
+	}
+}
+
+func TestLocaleSelectorVectors(t *testing.T) {
+	payload, err := os.ReadFile(golden(t, "vectors/locale-selectors.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Input string `json:"input"`
+		Valid bool   `json:"valid"`
+	}
+	if err := json.Unmarshal(payload, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range cases {
+		if got := identifiers.ValidLocale(testCase.Input); got != testCase.Valid {
+			t.Errorf("locale selector %q valid=%v, want %v", testCase.Input, got, testCase.Valid)
+		}
+	}
+}
+
+func TestManagerConfigVectors(t *testing.T) {
+	payload, err := os.ReadFile(golden(t, "vectors/manager-config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Name     string         `json:"name"`
+		Input    map[string]any `json:"input"`
+		Valid    bool           `json:"valid"`
+		Expected struct {
+			DefaultAgents            []string `json:"default_agents"`
+			AdapterMode              string   `json:"adapter_mode"`
+			ProjectAlias             string   `json:"project_alias"`
+			CheckoutAlias            string   `json:"checkout_alias"`
+			RegistryURLs             []string `json:"registry_urls"`
+			SnapshotMaxAgeSeconds    int      `json:"snapshot_max_age_seconds"`
+			SnapshotClockSkewSeconds int      `json:"snapshot_clock_skew_seconds"`
+			CacheTTLSeconds          int      `json:"cache_ttl_seconds"`
+			OfflineGraceSeconds      int      `json:"offline_grace_seconds"`
+			MaxRequestBytes          int      `json:"max_request_bytes"`
+		} `json:"expected"`
+	}
+	if err := json.Unmarshal(payload, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			parsed, err := config.Parse(testCase.Input, "config.json")
+			if !testCase.Valid {
+				if err == nil {
+					t.Fatal("manager config was accepted, want rejection")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(parsed.DefaultAgents, testCase.Expected.DefaultAgents) || parsed.AdapterMode != testCase.Expected.AdapterMode {
+				t.Fatalf("defaults diverge: %+v", parsed)
+			}
+			var urls []string
+			for _, item := range parsed.AuditRegistries {
+				urls = append(urls, item.URL)
+			}
+			if urls == nil {
+				urls = []string{}
+			}
+			if !reflect.DeepEqual(urls, testCase.Expected.RegistryURLs) {
+				t.Fatalf("registry URLs = %v, want %v", urls, testCase.Expected.RegistryURLs)
+			}
+			if testCase.Expected.ProjectAlias != "" {
+				project := parsed.Projects["app"]
+				if project.ProjectAlias != testCase.Expected.ProjectAlias || project.CheckoutAlias != testCase.Expected.CheckoutAlias {
+					t.Fatalf("project aliases = %+v", project)
+				}
+			}
+			if parsed.Audit.SnapshotMaxAgeSeconds != testCase.Expected.SnapshotMaxAgeSeconds ||
+				parsed.Audit.SnapshotClockSkewSeconds != testCase.Expected.SnapshotClockSkewSeconds ||
+				parsed.Audit.CacheTTLSeconds != testCase.Expected.CacheTTLSeconds ||
+				parsed.Audit.OfflineGraceSeconds != testCase.Expected.OfflineGraceSeconds ||
+				parsed.Audit.MaxRequestBytes != testCase.Expected.MaxRequestBytes {
+				t.Fatalf("audit defaults = %+v, want %+v", parsed.Audit, testCase.Expected)
+			}
+		})
 	}
 }
 

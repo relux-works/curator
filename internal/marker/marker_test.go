@@ -46,10 +46,11 @@ func install(t *testing.T) (string, *Marker) {
 	}
 	m := &Marker{
 		Name: "skill-a", Source: "skill-a",
-		RefKind: "tag", Ref: "v1", Commit: "abc",
+		RefKind: "tag", Ref: "v1", Commit: "0123456789abcdef0123456789abcdef01234567",
 		ContentSHA256: hash, Locale: "ru",
-		Agents:     []string{"claude_code"},
-		Activation: &Activation{Context: true, Commands: []string{"x"}},
+		Agents:      []string{"claude_code"},
+		InstalledAt: "2026-07-13T00:00:00Z",
+		Activation:  &Activation{Context: true, Commands: []string{"x"}},
 	}
 	if err := Write(dir, m); err != nil {
 		t.Fatal(err)
@@ -170,5 +171,38 @@ func TestReadAbsentAndCorrupt(t *testing.T) {
 	}
 	if Read(dir) != nil {
 		t.Fatal("corrupt marker must read nil")
+	}
+}
+
+func TestReadRejectsSchemaViolations(t *testing.T) {
+	dir, _ := install(t)
+	payload, err := os.ReadFile(filepath.Join(dir, Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var baseline map[string]any
+	if err := json.Unmarshal(payload, &baseline); err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]func(map[string]any){
+		"unknown":          func(value map[string]any) { value["extension"] = true },
+		"missing locale":   func(value map[string]any) { delete(value, "locale") },
+		"duplicate agents": func(value map[string]any) { value["agents"] = []any{"codex_cli", "codex_cli"} },
+		"bad timestamp":    func(value map[string]any) { value["installed_at"] = "2026-07-13T00:00:00+00:00" },
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			encoded, _ := json.Marshal(baseline)
+			var value map[string]any
+			_ = json.Unmarshal(encoded, &value)
+			mutate(value)
+			encoded, _ = json.Marshal(value)
+			if err := os.WriteFile(filepath.Join(dir, Name), encoded, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if Read(dir) != nil {
+				t.Fatal("schema-invalid marker was accepted")
+			}
+		})
 	}
 }

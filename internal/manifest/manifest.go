@@ -7,8 +7,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/verr"
 )
 
@@ -58,6 +63,9 @@ func Load(projectRoot string) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
+	}
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
@@ -71,6 +79,9 @@ func Load(projectRoot string) (*Manifest, error) {
 
 // Parse validates a raw manifest object (Spec §6.1).
 func Parse(obj map[string]any, filePath string) (*Manifest, error) {
+	if unknown := unknownFields(obj, "schema_version", "project", "agents", "locale", "skills"); len(unknown) > 0 {
+		return nil, verr.New("Skillfile", "unsupported field(s): %s", strings.Join(unknown, ", "))
+	}
 	schema, present := obj["schema_version"]
 	if !present {
 		return nil, verr.New("schema_version", "missing required field")
@@ -92,12 +103,19 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
+	seenAgents := map[string]bool{}
+	for _, agent := range agents {
+		if !identifiers.Valid(agent) || seenAgents[agent] {
+			return nil, verr.New("agents", "must contain unique portable identifiers")
+		}
+		seenAgents[agent] = true
+	}
 
 	locale := ""
 	if rawLocale, present := obj["locale"]; present && rawLocale != nil {
 		locale, ok = rawLocale.(string)
-		if !ok {
-			return nil, verr.New("locale", "must be a string when present")
+		if !ok || !identifiers.ValidLocale(locale) {
+			return nil, verr.New("locale", "must be a 1-64 character ASCII locale selector")
 		}
 	}
 
@@ -113,6 +131,9 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 		entry, ok := rawEntry.(map[string]any)
 		if !ok {
 			return nil, verr.New(label, "must be an object")
+		}
+		if unknown := unknownFields(entry, "name", "source", "git", "tag", "branch", "revision"); len(unknown) > 0 {
+			return nil, verr.New(label, "unsupported field(s): %s", strings.Join(unknown, ", "))
 		}
 		name, _ := entry["name"].(string)
 		if name == "" {
@@ -132,8 +153,8 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
 			if !ok || source == "" {
 				return nil, verr.New(label+".source", "must be a non-empty string")
 			}
-			if !identifiers.ValidSourcePath(source) {
-				return nil, verr.New(label+".source", "%s", identifiers.SourceRule)
+			if !identifiers.PortablePath(source) {
+				return nil, verr.New(label+".source", "must be a portable relative path")
 			}
 		}
 
@@ -174,13 +195,16 @@ func parseProjectAlias(obj map[string]any) (string, error) {
 	if !ok {
 		return "", verr.New("project", "must be an object when present")
 	}
+	if unknown := unknownFields(project, "alias"); len(unknown) > 0 {
+		return "", verr.New("project", "unsupported field(s): %s", strings.Join(unknown, ", "))
+	}
 	rawAlias, present := project["alias"]
 	if !present || rawAlias == nil {
 		return "", nil
 	}
 	alias, ok := rawAlias.(string)
-	if !ok || alias == "" {
-		return "", verr.New("project.alias", "must be a non-empty string when present")
+	if !ok || alias == "" || utf8.RuneCountInString(alias) > 128 || containsControl(alias) {
+		return "", verr.New("project.alias", "must be a non-empty control-free string of at most 128 characters")
 	}
 	return alias, nil
 }
@@ -285,6 +309,9 @@ func readObject(filePath string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
+	}
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
@@ -294,6 +321,30 @@ func readObject(filePath string) (map[string]any, error) {
 		return nil, fmt.Errorf("%s must contain a JSON object", filePath)
 	}
 	return obj, nil
+}
+
+func unknownFields(object map[string]any, allowed ...string) []string {
+	set := map[string]bool{}
+	for _, field := range allowed {
+		set[field] = true
+	}
+	var unknown []string
+	for field := range object {
+		if !set[field] {
+			unknown = append(unknown, field)
+		}
+	}
+	sort.Strings(unknown)
+	return unknown
+}
+
+func containsControl(value string) bool {
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return true
+		}
+	}
+	return false
 }
 
 func writeJSON(filePath string, payload any) error {

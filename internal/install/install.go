@@ -786,7 +786,11 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string) 
 	}
 	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
 	var warnings []string
-	tampered, snapshotWarnings := registry.CheckSnapshots(registries, cacheDir, registry.HTTPGetSnapshot, time.Now(), 0)
+	tampered, snapshotWarnings := registry.CheckSnapshotsWithPolicy(
+		registries, cacheDir, registry.HTTPGetSnapshot, time.Now(),
+		time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
+		time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
+	)
 	for _, warning := range snapshotWarnings {
 		warnings = append(warnings, alias+": registry: "+warning)
 	}
@@ -799,7 +803,12 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string) 
 	if len(usable) == 0 {
 		return nil, warnings, fmt.Errorf("every trusted audit registry served a tampered snapshot")
 	}
-	fetch := registry.NewHTTPFetch(cacheDir, 0, 0, nil)
+	fetch := registry.NewHTTPFetchWithPolicy(
+		cacheDir,
+		time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
+		time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
+		nil,
+	)
 	strict := cfg.Audit.RegistryPolicy == "strict"
 	attestations := map[string]*marker.Attestation{}
 	var problems []string

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/audit"
@@ -663,7 +664,12 @@ func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool
 	for _, entry := range trusted {
 		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
 	}
-	fetch := registry.NewHTTPFetch(filepath.Join(cfg.Home(), "cache", "registry"), 0, 0, nil)
+	fetch := registry.NewHTTPFetchWithPolicy(
+		filepath.Join(cfg.Home(), "cache", "registry"),
+		time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
+		time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
+		nil,
+	)
 	results := registry.AttestRoot(alias, filepath.Join(projectRoot, ".agents", "skills"), registries, fetch)
 	if jsonOut {
 		payload, _ := json.MarshalIndent(results, "", "  ")

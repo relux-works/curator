@@ -61,6 +61,8 @@ func TestParseRejectsAmbiguousNetworkForms(t *testing.T) {
 		"https://git.example.com/skills/a?q=1",
 		"ftp://git.example.com/skills/a",
 		"git@example.com:CON/repo",
+		"git@git.example.com:skills/a b",
+		"git@git.example.com:skills/a#fragment",
 	} {
 		if _, err := Parse(source); err == nil {
 			t.Errorf("Parse(%q) must fail", source)
@@ -68,6 +70,25 @@ func TestParseRejectsAmbiguousNetworkForms(t *testing.T) {
 	}
 	if identity, err := Parse("file:///tmp/repo"); err != nil || identity != "" {
 		t.Fatalf("local source = %q, %v", identity, err)
+	}
+}
+
+func TestValidCanonical(t *testing.T) {
+	for _, identity := range []string{"git.example.com/skills/a", "git.example.com/Skills/文書"} {
+		if !ValidCanonical(identity) {
+			t.Errorf("ValidCanonical(%q) = false", identity)
+		}
+	}
+	for _, identity := range []string{
+		"GIT.example.com/skills/a",
+		"git.example.com/skills/a b",
+		"git.example.com/skills/a#fragment",
+		"git.example.com/CON/a",
+		"git.example.com/skills/",
+	} {
+		if ValidCanonical(identity) {
+			t.Errorf("ValidCanonical(%q) = true", identity)
+		}
 	}
 }
 

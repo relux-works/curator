@@ -12,6 +12,10 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/identifiers"
 )
 
 var urlSchemes = map[string]bool{"ssh": true, "git": true, "http": true, "https": true}
@@ -87,21 +91,29 @@ func Parse(rawURL string) (string, error) {
 	repoPath = strings.Trim(repoPath, "/")
 	repoPath = strings.TrimSuffix(repoPath, ".git")
 	repoPath = strings.TrimRight(repoPath, "/")
-	if host == "" || repoPath == "" || !portableRepositoryPath(repoPath) {
+	if host == "" || repoPath == "" || !canonicalRepositoryPath(repoPath) {
 		return "", fmt.Errorf("network source repository path is not portable")
 	}
-	return host + "/" + repoPath, nil
+	canonical := host + "/" + repoPath
+	if utf8.RuneCountInString(canonical) > 4096 {
+		return "", fmt.Errorf("canonical network source identity exceeds 4096 characters")
+	}
+	return canonical, nil
 }
 
-func portableRepositoryPath(value string) bool {
-	for _, segment := range strings.Split(value, "/") {
-		if segment == "" || segment == "." || segment == ".." || strings.ContainsAny(segment, `\:`) ||
-			strings.HasSuffix(segment, ".") || strings.HasSuffix(segment, " ") {
-			return false
-		}
-		base := strings.ToUpper(strings.SplitN(segment, ".", 2)[0])
-		if base == "CON" || base == "PRN" || base == "AUX" || base == "NUL" ||
-			(len(base) == 4 && (strings.HasPrefix(base, "COM") || strings.HasPrefix(base, "LPT")) && base[3] >= '1' && base[3] <= '9') {
+// ValidCanonical reports whether an already canonical host/path source
+// identity has the protocol shape accepted in signed registry records.
+func ValidCanonical(value string) bool {
+	host, repoPath, present := strings.Cut(value, "/")
+	return present && host == strings.ToLower(host) && hostRE.MatchString(host) && canonicalRepositoryPath(repoPath)
+}
+
+func canonicalRepositoryPath(value string) bool {
+	if !identifiers.PortablePath(value) || strings.ContainsAny(value, "%?#") {
+		return false
+	}
+	for _, character := range value {
+		if unicode.IsSpace(character) {
 			return false
 		}
 	}

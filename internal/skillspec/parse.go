@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/verr"
 )
 
@@ -527,39 +527,13 @@ func validateRelativePath(value, field string, strictPosix bool) (string, error)
 	if value == "" {
 		return "", verr.New(field, "must be a non-empty string")
 	}
-	normalized := strings.TrimRight(value, "/")
-	if normalized == "" {
-		return "", verr.New(field, "must be a non-empty string")
-	}
-	if strictPosix {
-		if strings.Contains(normalized, `\`) || strings.Contains(normalized, "//") {
+	if !identifiers.PortablePath(value) {
+		if strictPosix && (strings.Contains(value, `\`) || strings.Contains(value, "//")) {
 			return "", verr.New(field, "must be a POSIX-style relative path inside the skill repository")
 		}
-		for _, part := range strings.Split(normalized, "/") {
-			if part == "" || part == "." {
-				return "", verr.New(field, "must be a POSIX-style relative path inside the skill repository")
-			}
-		}
+		return "", verr.New(field, "must be a portable relative path inside the skill repository")
 	}
-	clean := path.Clean(normalized)
-	if path.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, "../") || clean == "." {
-		return "", verr.New(field, "must be a relative path inside the skill repository")
-	}
-	for _, part := range strings.Split(clean, "/") {
-		if part == ".." || !identifiers.PortableComponent(part) || containsControl(part) {
-			return "", verr.New(field, "must be a portable relative path inside the skill repository")
-		}
-	}
-	return clean, nil
-}
-
-func containsControl(value string) bool {
-	for _, r := range value {
-		if r < 0x20 || r == 0x7f {
-			return true
-		}
-	}
-	return false
+	return value, nil
 }
 
 func pathContains(root, rel string) bool {
@@ -580,6 +554,9 @@ func decodeObject(filePath string) (map[string]any, error) {
 	payload, err := os.ReadFile(filePath) // #nosec G304 -- manifest path is derived from the snapshot directory
 	if err != nil {
 		return nil, err
+	}
+	if err := protocoljson.Validate(payload); err != nil {
+		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
 	}
 	var raw any
 	if err := json.Unmarshal(payload, &raw); err != nil {

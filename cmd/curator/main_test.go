@@ -124,7 +124,9 @@ func TestStatusDriftDetectsContentTampering(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := marker.Write(installed, &marker.Marker{
-		Name: "skill-a", Source: "skill-a", RefKind: "tag", Ref: "v1", Commit: "abc", ContentSHA256: hash,
+		Name: "skill-a", Source: "skill-a", RefKind: "tag", Ref: "v1",
+		Commit: "0123456789abcdef0123456789abcdef01234567", ContentSHA256: hash,
+		InstalledAt: "2026-07-13T00:00:00Z",
 	}); err != nil {
 		t.Fatal(err)
 	}

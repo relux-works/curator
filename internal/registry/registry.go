@@ -11,11 +11,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/identity"
 )
 
 // Record statuses (Spec §13.1).
@@ -29,6 +33,12 @@ const (
 var knownStatuses = map[string]bool{
 	StatusAudited: true, StatusRevoked: true, StatusDeprecated: true, StatusPending: true,
 }
+
+var (
+	commitRE = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
+	sha256RE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	keyIDRE  = regexp.MustCompile(`^[0-9a-f]{16}$`)
+)
 
 // Federation results (Spec §13.3).
 const (
@@ -159,7 +169,7 @@ func compactSortedJSON(value any) ([]byte, error) {
 		return safeInteger(typed)
 	case json.Number:
 		value, err := strconv.ParseInt(string(typed), 10, 64)
-		if err != nil {
+		if err != nil || strconv.FormatInt(value, 10) != string(typed) {
 			return nil, fmt.Errorf("CCJ-1 numbers must be base-10 integers: %q", typed)
 		}
 		return safeInteger(value)
@@ -234,6 +244,12 @@ func KeyID(publicKey ed25519.PublicKey) string {
 
 // ParseRecord validates a raw record payload (Spec §13.1).
 func ParseRecord(payload map[string]any) (Record, error) {
+	if unknown := unknownKeys(payload, "schema_version", "name", "source_identity", "commit", "content_sha256", "status", "audit", "endorsements", "sig"); len(unknown) > 0 {
+		return Record{}, fmt.Errorf("audit record has unknown fields: %s", strings.Join(unknown, ", "))
+	}
+	if schema, present := payload["schema_version"]; present && !integerEquals(schema, 1) {
+		return Record{}, fmt.Errorf("audit record schema_version must be 1")
+	}
 	record := Record{Raw: payload}
 	for _, field := range []struct {
 		key string
@@ -251,6 +267,18 @@ func ParseRecord(payload map[string]any) (Record, error) {
 		}
 		*field.dst = value
 	}
+	if !identifiers.Valid(record.Name) {
+		return Record{}, fmt.Errorf("audit record name is not a portable identifier")
+	}
+	if utf8.RuneCountInString(record.SourceIdentity) > 4096 || !identity.ValidCanonical(record.SourceIdentity) {
+		return Record{}, fmt.Errorf("audit record source_identity is not canonical")
+	}
+	if !commitRE.MatchString(record.Commit) {
+		return Record{}, fmt.Errorf("audit record commit must be a full lowercase object id")
+	}
+	if !sha256RE.MatchString(record.ContentSHA256) {
+		return Record{}, fmt.Errorf("audit record content_sha256 is malformed")
+	}
 	if !knownStatuses[record.Status] {
 		return Record{}, fmt.Errorf("audit record status %q is not recognized", record.Status)
 	}
@@ -259,12 +287,40 @@ func ParseRecord(payload map[string]any) (Record, error) {
 			return Record{}, fmt.Errorf("audit record field 'audit' must be an object")
 		}
 	}
+	if err := validateSignatureEnvelope(payload["sig"]); err != nil {
+		return Record{}, fmt.Errorf("audit record signature: %w", err)
+	}
+	if rawEndorsements, present := payload["endorsements"]; present {
+		endorsements, ok := rawEndorsements.([]any)
+		if !ok {
+			return Record{}, fmt.Errorf("audit record endorsements must be an array")
+		}
+		for index, rawEndorsement := range endorsements {
+			endorsement, ok := rawEndorsement.(map[string]any)
+			if !ok || len(unknownKeys(endorsement, "endorser", "sig")) > 0 || len(endorsement) != 2 {
+				return Record{}, fmt.Errorf("audit record endorsement %d is malformed", index)
+			}
+			endorser, _ := endorsement["endorser"].(string)
+			if endorser == "" || utf8.RuneCountInString(endorser) > 8192 {
+				return Record{}, fmt.Errorf("audit record endorsement %d has an invalid endorser", index)
+			}
+			if err := validateSignatureEnvelope(endorsement["sig"]); err != nil {
+				return Record{}, fmt.Errorf("audit record endorsement %d signature: %w", index, err)
+			}
+		}
+	}
+	if _, err := CanonicalBytesChecked(payload); err != nil {
+		return Record{}, fmt.Errorf("audit record is not valid CCJ-1: %w", err)
+	}
 	return record, nil
 }
 
 // VerifySigned checks the signature of a record or snapshot object against
 // any pinned key.
 func VerifySigned(payload map[string]any, pinnedKeys []string) bool {
+	if err := validateSignatureEnvelope(payload["sig"]); err != nil {
+		return false
+	}
 	sig, _ := payload["sig"].(map[string]any)
 	algorithm, _ := sig["algorithm"].(string)
 	keyID, _ := sig["key_id"].(string)
@@ -293,6 +349,56 @@ func VerifySigned(payload map[string]any, pinnedKeys []string) bool {
 		}
 	}
 	return false
+}
+
+func validateSignatureEnvelope(raw any) error {
+	envelope, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be an object")
+	}
+	if unknown := unknownKeys(envelope, "algorithm", "key_id", "signature"); len(unknown) > 0 || len(envelope) != 3 {
+		return fmt.Errorf("must contain exactly algorithm, key_id, and signature")
+	}
+	algorithm, _ := envelope["algorithm"].(string)
+	keyID, _ := envelope["key_id"].(string)
+	signatureText, _ := envelope["signature"].(string)
+	if algorithm != "ed25519" || !keyIDRE.MatchString(keyID) {
+		return fmt.Errorf("has an unsupported algorithm or malformed key id")
+	}
+	signature, err := base64.StdEncoding.DecodeString(signatureText)
+	if err != nil || len(signature) != ed25519.SignatureSize || base64.StdEncoding.EncodeToString(signature) != signatureText {
+		return fmt.Errorf("has a malformed Ed25519 signature")
+	}
+	return nil
+}
+
+func unknownKeys(object map[string]any, allowed ...string) []string {
+	known := make(map[string]bool, len(allowed))
+	for _, field := range allowed {
+		known[field] = true
+	}
+	var unknown []string
+	for field := range object {
+		if !known[field] {
+			unknown = append(unknown, field)
+		}
+	}
+	sort.Strings(unknown)
+	return unknown
+}
+
+func integerEquals(raw any, expected int64) bool {
+	switch value := raw.(type) {
+	case int:
+		return int64(value) == expected
+	case int64:
+		return value == expected
+	case json.Number:
+		parsed, err := strconv.ParseInt(string(value), 10, 64)
+		return err == nil && strconv.FormatInt(parsed, 10) == string(value) && parsed == expected
+	default:
+		return false
+	}
 }
 
 // Matches reports whether a record names the artifact: equal content hash,
