@@ -83,7 +83,7 @@ Test strategy: graph fixtures (diamonds, cycles, cross-version, cross-source, na
 - `internal/whitelist`: context copy rules (§4.2) incl. scripts-for-commandless rule and runtime_roots exclusion; atomic staging.
 - `internal/locale`: consistency, fallback warning, frontmatter and `agents/openai.yaml` rendering (§4.3), applied only under a selected locale.
 - `internal/marker`: marker payload, up-to-date checks incl. content re-hash tamper detection, atomic directory replacement (§8.5).
-- `internal/runtimestore` and `internal/shims`: commit-keyed runtime store, Unix symlink and Windows `.cmd` shims, stale shim removal (§8.6).
+- `internal/runtimestore` and `internal/shims`: commit-keyed runtime store, self-contained Unix and Windows command launchers, stale shim removal (§8.6).
 - `internal/adapters`: managed ledger `.csk-managed.json`, symlink/copy/auto, unmanaged-conflict refusal, native-discovery agents (§10).
 - gitignore gate (§6.3), env files (§14.2), phase order orchestration (§8.1) with dry run.
 - Gates wiring: system command PATH checks, migration warnings, moved-tag detection (warning and strict modes).

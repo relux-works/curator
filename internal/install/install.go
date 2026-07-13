@@ -38,10 +38,14 @@ import (
 // Options control one installation run.
 type Options struct {
 	DryRun       bool
+	Fetch        bool
 	FixGitignore bool
 	StrictTags   bool
 	Verbose      bool
 	Platform     string // "" resolves to the current platform
+	// FetchedRepos deduplicates closure-scoped upgrades across selected
+	// projects. Callers may leave it nil for a single installation.
+	FetchedRepos map[string]bool
 	// Hooks for later phases. Each may be nil.
 	VerifyMcp     func(nodes []*closure.Node) (map[string]map[string][]string, []string, error)
 	AuditGate     func(nodes []*closure.Node) (warnings []string, errs []string)
@@ -176,14 +180,33 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 	}
 
 	// 7. Closure resolution.
+	scratchRoot := ""
+	if opts.DryRun {
+		scratchRoot, err = os.MkdirTemp("", "curator-dry-run-")
+		if err != nil {
+			result.failf("could not create temporary dry-run workspace: %v", err)
+			return result
+		}
+		defer func() { _ = os.RemoveAll(scratchRoot) }()
+	}
+	if opts.FetchedRepos == nil {
+		opts.FetchedRepos = map[string]bool{}
+	}
+	fetchedBefore := copySet(opts.FetchedRepos)
 	nodes, err := closure.Build(closure.Options{
 		SkillsRoot:     cfg.SkillsRoot,
 		Home:           cfg.Home(),
 		AllowedSources: cfg.AllowedSources,
+		FetchExisting:  opts.Fetch && !opts.DryRun,
+		FetchedRepos:   opts.FetchedRepos,
+		ScratchRoot:    scratchRoot,
 	}, effectiveManifest, substitutions)
 	if err != nil {
 		result.failf("%v", err)
 		return result
+	}
+	for _, repo := range newSetEntries(fetchedBefore, opts.FetchedRepos) {
+		result.Messages = append(result.Messages, fmt.Sprintf("%s: fetched %s", alias, filepath.Base(repo)))
 	}
 
 	// 8. Validate every node with the same rules as `skill check`. Manifest
@@ -266,7 +289,12 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
 				})
 			}
-			warnings, errs := audit.Gate(cfg, subjects)
+			var warnings, errs []string
+			if opts.DryRun {
+				warnings, errs = audit.GateReadOnly(cfg, subjects)
+			} else {
+				warnings, errs = audit.Gate(cfg, subjects)
+			}
 			prefixed := make([]string, 0, len(warnings))
 			for _, warning := range warnings {
 				prefixed = append(prefixed, alias+": "+warning)
@@ -285,7 +313,7 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 	resolveAttest := opts.ResolveAttest
 	if resolveAttest == nil {
 		resolveAttest = func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error) {
-			return resolveRegistries(cfg, nodes, alias)
+			return resolveRegistries(cfg, nodes, alias, !opts.DryRun)
 		}
 	}
 	attestations, regWarnings, regErr := resolveAttest(nodes)
@@ -466,6 +494,10 @@ func hybridStoreNames(nodes []*closure.Node, projectDeclared map[string]bool) ma
 
 func installRuntime(home, binDir string, node *closure.Node, active map[string]bool, platform string) (map[string]bool, error) {
 	installed := map[string]bool{}
+	pathEntries, err := runtimePathEntries(node, binDir, platform)
+	if err != nil {
+		return nil, err
+	}
 	if len(node.Spec.RuntimeRoots) > 0 {
 		if _, err := runtimestore.InstallRuntimeRoots(home, node.Name, node.Resolved.Commit, node.Snapshot, node.Spec.RuntimeRoots); err != nil {
 			return nil, err
@@ -491,12 +523,80 @@ func installRuntime(home, binDir string, node *closure.Node, active map[string]b
 		if err != nil {
 			return nil, err
 		}
-		if _, err := runtimestore.WriteBinShim(binDir, name, runtimePath, platform); err != nil {
+		if _, err := runtimestore.WriteBinShim(binDir, name, runtimePath, platform, pathEntries); err != nil {
 			return nil, err
 		}
 		installed[name] = true
 	}
 	return installed, nil
+}
+
+func runtimePathEntries(node *closure.Node, binDir, platform string) ([]string, error) {
+	absoluteBin, err := filepath.Abs(binDir)
+	if err != nil {
+		return nil, err
+	}
+	candidates := []string{absoluteBin}
+	type systemCommand struct{ name, binary string }
+	var commands []systemCommand
+	for _, command := range node.Spec.Commands {
+		if command.Type == "system" {
+			commands = append(commands, systemCommand{command.Name, command.Command})
+		}
+	}
+	for _, dependency := range node.Spec.Dependencies {
+		if dependency.Type == "system" {
+			commands = append(commands, systemCommand{dependency.Name, dependency.Command})
+		}
+	}
+	sort.Slice(commands, func(i, j int) bool { return commands[i].name < commands[j].name })
+	for _, command := range commands {
+		resolved, lookErr := exec.LookPath(command.binary)
+		if lookErr != nil {
+			return nil, fmt.Errorf("missing system command %q for %s", command.binary, node.Name)
+		}
+		if absolute, absErr := filepath.Abs(resolved); absErr == nil {
+			resolved = absolute
+		}
+		if evaluated, evalErr := filepath.EvalSymlinks(resolved); evalErr == nil {
+			resolved = evaluated
+		}
+		candidates = append(candidates, filepath.Dir(resolved))
+	}
+	seen := map[string]bool{}
+	entries := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		key := filepath.Clean(candidate)
+		if platform == "windows" {
+			key = strings.ToLower(key)
+		}
+		if !seen[key] {
+			seen[key] = true
+			entries = append(entries, candidate)
+		}
+	}
+	return entries, nil
+}
+
+func copySet(values map[string]bool) map[string]bool {
+	cloned := make(map[string]bool, len(values))
+	for value, present := range values {
+		if present {
+			cloned[value] = true
+		}
+	}
+	return cloned
+}
+
+func newSetEntries(before, after map[string]bool) []string {
+	var entries []string
+	for value, present := range after {
+		if present && !before[value] {
+			entries = append(entries, value)
+		}
+	}
+	sort.Strings(entries)
+	return entries
 }
 
 func directoryOnPath(directory, pathValue, platform string) bool {
@@ -811,7 +911,7 @@ func shortCommit(commit string) string {
 // snapshot verification excludes tampered registries (all tampered fails),
 // a verified revocation denies, strict policy fails unknown artifacts, and
 // the authorizing attestation lands in the marker.
-func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string) (map[string]*marker.Attestation, []string, error) {
+func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string, persist bool) (map[string]*marker.Attestation, []string, error) {
 	trusted := cfg.TrustedRegistries()
 	if len(trusted) == 0 {
 		return map[string]*marker.Attestation{}, nil, nil
@@ -822,15 +922,34 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string) 
 	}
 	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
 	stateDir := filepath.Join(cfg.Home(), "state", "registry")
-	if err := registry.MigrateSnapshotStates(cacheDir, stateDir); err != nil {
-		return nil, nil, fmt.Errorf("audit registry rollback state migration failed: %w", err)
+	snapshotStateDir := stateDir
+	if persist {
+		if err := registry.MigrateSnapshotStates(cacheDir, stateDir); err != nil {
+			return nil, nil, fmt.Errorf("audit registry rollback state migration failed: %w", err)
+		}
+	} else if _, err := os.Stat(stateDir); os.IsNotExist(err) {
+		// A pre-migration installation may still hold protected snapshot state in
+		// the legacy cache. Reading it is safer than treating the registry as a
+		// first use, and the read-only checker will fail closed if its catalog is
+		// incomplete.
+		snapshotStateDir = cacheDir
 	}
 	var warnings []string
-	tampered, snapshotWarnings := registry.CheckSnapshotsWithPolicy(
-		registries, stateDir, registry.HTTPGetSnapshot, time.Now(),
-		time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
-		time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
-	)
+	var tampered map[string]bool
+	var snapshotWarnings []string
+	if persist {
+		tampered, snapshotWarnings = registry.CheckSnapshotsWithPolicy(
+			registries, snapshotStateDir, registry.HTTPGetSnapshot, time.Now(),
+			time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
+			time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
+		)
+	} else {
+		tampered, snapshotWarnings = registry.CheckSnapshotsWithPolicyReadOnly(
+			registries, snapshotStateDir, registry.HTTPGetSnapshot, time.Now(),
+			time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
+			time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
+		)
+	}
 	for _, warning := range snapshotWarnings {
 		warnings = append(warnings, alias+": registry: "+warning)
 	}
@@ -843,12 +962,22 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string) 
 	if len(usable) == 0 {
 		return nil, warnings, fmt.Errorf("every trusted audit registry served a tampered snapshot")
 	}
-	fetch := registry.NewHTTPFetchWithPolicy(
-		cacheDir,
-		time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
-		time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
-		nil,
-	)
+	var fetch registry.FetchFn
+	if persist {
+		fetch = registry.NewHTTPFetchWithPolicy(
+			cacheDir,
+			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
+			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
+			nil,
+		)
+	} else {
+		fetch = registry.NewHTTPFetchWithPolicyReadOnly(
+			cacheDir,
+			time.Duration(cfg.Audit.CacheTTLSeconds)*time.Second,
+			time.Duration(cfg.Audit.OfflineGraceSeconds)*time.Second,
+			nil,
+		)
+	}
 	strict := cfg.Audit.RegistryPolicy == "strict"
 	attestations := map[string]*marker.Attestation{}
 	var problems []string

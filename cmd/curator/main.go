@@ -52,7 +52,7 @@ Commands:
   remove <name>            remove a skill declaration
   install [path] [flags]   apply Skillfile.json (see install -h)
   update                   fetch all source repositories under skills_root
-  upgrade [path]           update, then install
+  upgrade [path]           fetch the selected dependency closure, then install
   status [path] [flags]    manifest vs installed state (--check, --json, --attest)
   list                     configured projects and declared skills
   project <subcommand>     add | resolve
@@ -93,10 +93,7 @@ func run(args []string) int {
 	case "update":
 		return cmdUpdate()
 	case "upgrade":
-		if code := cmdUpdate(); code != exitOK {
-			return code
-		}
-		return cmdInstall(args[1:])
+		return cmdInstallMode(args[1:], true)
 	case "status":
 		return cmdStatus(args[1:])
 	case "list":
@@ -299,10 +296,25 @@ func cmdBootstrap(args []string) int {
 	preferredLocale := flags.String("preferred-locale", "", "preferred locale")
 	defaultAgents := flags.String("default-agents", "codex_cli", "comma-separated default agents")
 	force := flags.Bool("force", false, "overwrite an existing configuration")
+	ifMissing := flags.Bool("if-missing", false, "create configuration only when absent")
 	nonInteractive := flags.Bool("non-interactive", false, "fail instead of prompting for missing values")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) > 0 {
 		return exitUsage
+	}
+	if *force && *ifMissing {
+		fmt.Fprintln(os.Stderr, "curator: bootstrap --if-missing and --force are mutually exclusive")
+		return exitUsage
+	}
+	path := config.UserPath()
+	if *ifMissing {
+		if _, statErr := os.Stat(path); statErr == nil {
+			fmt.Println("kept existing config:", path)
+			return exitOK
+		} else if !os.IsNotExist(statErr) {
+			fmt.Fprintln(os.Stderr, "curator:", statErr)
+			return exitFail
+		}
 	}
 	if *skillsRoot == "" && !*nonInteractive {
 		fmt.Fprint(os.Stderr, "skills_root: ")
@@ -316,7 +328,6 @@ func cmdBootstrap(args []string) int {
 		fmt.Fprintln(os.Stderr, "curator: bootstrap requires --skills-root")
 		return exitUsage
 	}
-	path := config.UserPath()
 	if err := config.Bootstrap(path, *skillsRoot, *preferredLocale, splitNonEmpty(*defaultAgents), *force); err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
 		return exitFail
@@ -465,6 +476,10 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
 }
 
 func cmdInstall(args []string) int {
+	return cmdInstallMode(args, false)
+}
+
+func cmdInstallMode(args []string, fetch bool) int {
 	opts, rest, all, auditMode, err := installFlags(args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
@@ -486,6 +501,8 @@ func cmdInstall(args []string) int {
 		fmt.Fprintln(os.Stderr, "curator:", targetErr)
 		return exitUsage
 	}
+	opts.Fetch = fetch && !opts.DryRun
+	opts.FetchedRepos = map[string]bool{}
 	exitCode := exitOK
 	for _, target := range targets {
 		result := install.Project(cfg, target.Root, target.Alias, opts)
@@ -883,16 +900,17 @@ func cmdGlobal(args []string) int {
 	case "update":
 		return cmdUpdate()
 	case "upgrade":
-		if code := cmdUpdate(); code != exitOK {
-			return code
-		}
-		return runGlobalInstall(cfg, args[1:])
+		return runGlobalInstallMode(cfg, args[1:], true)
 	}
 	fmt.Fprintf(os.Stderr, "curator: unknown global subcommand %q\n", args[0])
 	return exitUsage
 }
 
 func runGlobalInstall(cfg *config.Config, args []string) int {
+	return runGlobalInstallMode(cfg, args, false)
+}
+
+func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	opts, positional, all, auditMode, err := installFlags(args)
 	if err != nil || len(positional) != 0 || all {
 		if err == nil {
@@ -908,6 +926,8 @@ func runGlobalInstall(cfg *config.Config, args []string) int {
 		cfgCopy.Audit.Mode = auditMode
 		cfg = &cfgCopy
 	}
+	opts.Fetch = fetch && !opts.DryRun
+	opts.FetchedRepos = map[string]bool{}
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)

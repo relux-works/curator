@@ -95,7 +95,7 @@ func Refresh(home string, expected map[string]bool, platform string, environment
 			))
 			continue
 		}
-		if _, err := runtimestore.WriteBinShim(target, name, canonical, platform); err != nil {
+		if _, err := runtimestore.WriteBinShim(target, name, canonical, platform, nil); err != nil {
 			messages = append(messages, fmt.Sprintf("global: command %q could not be published to %s: %v", name, target, err))
 			continue
 		}
@@ -345,7 +345,7 @@ func ownedTarget(path, canonical, platform string) bool {
 		if err != nil {
 			return false
 		}
-		expected := "@echo off\r\n\"" + canonical + "\" %*\r\n"
+		expected := runtimestore.WindowsShimContent(canonical, nil)
 		return string(payload) == expected
 	}
 	info, err := os.Lstat(path)

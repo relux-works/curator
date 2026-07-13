@@ -105,20 +105,28 @@ func NewHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Tim
 	if grace == 0 {
 		grace = DefaultOfflineGrace
 	}
-	return newHTTPFetch(cacheDir, ttl, grace, now)
+	return newHTTPFetch(cacheDir, ttl, grace, now, true)
 }
 
 // NewHTTPFetchWithPolicy is the manager-config form. Unlike NewHTTPFetch,
 // zero is literal and disables fresh-cache or stale-fallback use respectively.
 func NewHTTPFetchWithPolicy(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
-	return newHTTPFetch(cacheDir, ttl, grace, now)
+	return newHTTPFetch(cacheDir, ttl, grace, now, true)
 }
 
-func newHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
+// NewHTTPFetchWithPolicyReadOnly reads existing cache entries and may use the
+// network, but never creates or updates the persistent response cache.
+func NewHTTPFetchWithPolicyReadOnly(cacheDir string, ttl, grace time.Duration, now func() time.Time) FetchFn {
+	return newHTTPFetch(cacheDir, ttl, grace, now, false)
+}
+
+func newHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Time, persist bool) FetchFn {
 	if now == nil {
 		now = time.Now
 	}
-	_ = os.MkdirAll(cacheDir, 0o755)
+	if persist {
+		_ = os.MkdirAll(cacheDir, 0o755)
+	}
 	return func(baseURL, sourceIdentity, commit, contentSHA256 string) ([]map[string]any, error) {
 		query := url.Values{}
 		query.Set("source_identity", sourceIdentity)
@@ -139,7 +147,9 @@ func newHTTPFetch(cacheDir string, ttl, grace time.Duration, now func() time.Tim
 			}
 			return nil, err
 		}
-		writeRecordCache(cacheFile, now(), records)
+		if persist {
+			writeRecordCache(cacheFile, now(), records)
+		}
 		return records, nil
 	}
 }

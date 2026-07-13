@@ -57,14 +57,33 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 		effectiveLocale = cfg.PreferredLocale
 	}
 
+	scratchRoot := ""
+	if opts.DryRun {
+		scratchRoot, err = os.MkdirTemp("", "curator-global-dry-run-")
+		if err != nil {
+			result.failf("could not create temporary dry-run workspace: %v", err)
+			return result
+		}
+		defer func() { _ = os.RemoveAll(scratchRoot) }()
+	}
+	if opts.FetchedRepos == nil {
+		opts.FetchedRepos = map[string]bool{}
+	}
+	fetchedBefore := copySet(opts.FetchedRepos)
 	nodes, err := closure.Build(closure.Options{
 		SkillsRoot:     cfg.SkillsRoot,
 		Home:           home,
 		AllowedSources: cfg.AllowedSources,
+		FetchExisting:  opts.Fetch && !opts.DryRun,
+		FetchedRepos:   opts.FetchedRepos,
+		ScratchRoot:    scratchRoot,
 	}, globalManifest, map[string]devsub.Substitution{})
 	if err != nil {
 		result.failf("%v", err)
 		return result
+	}
+	for _, repo := range newSetEntries(fetchedBefore, opts.FetchedRepos) {
+		result.Messages = append(result.Messages, "global: fetched "+filepath.Base(repo))
 	}
 	if !validateNodes(nodes, effectiveLocale, "global", &result) {
 		return result
@@ -103,7 +122,12 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 					SchemaVersion: node.Spec.SchemaVersion, Capabilities: node.Spec.Capabilities,
 				})
 			}
-			warnings, errs := audit.Gate(cfg, subjects)
+			var warnings, errs []string
+			if opts.DryRun {
+				warnings, errs = audit.GateReadOnly(cfg, subjects)
+			} else {
+				warnings, errs = audit.Gate(cfg, subjects)
+			}
 			for index := range warnings {
 				warnings[index] = "global: " + warnings[index]
 			}

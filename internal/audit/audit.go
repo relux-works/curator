@@ -99,6 +99,16 @@ func Decide(findings []Finding, mode, failOn string) string {
 // Gate audits every subject and returns warnings and blocking errors per the
 // gate behavior of Spec §12.2. It is a no-op when audit is disabled.
 func Gate(cfg *config.Config, subjects []Subject) (warnings []string, errs []string) {
+	return gate(cfg, subjects, true)
+}
+
+// GateReadOnly applies the same decisions while leaving the verdict cache and
+// trust state unchanged. It is used for dry-run planning.
+func GateReadOnly(cfg *config.Config, subjects []Subject) (warnings []string, errs []string) {
+	return gate(cfg, subjects, false)
+}
+
+func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []string, errs []string) {
 	if !cfg.Audit.Enabled {
 		return nil, nil
 	}
@@ -106,7 +116,7 @@ func Gate(cfg *config.Config, subjects []Subject) (warnings []string, errs []str
 		return nil, []string{"audit blocked: audit canary failed: detectors are not producing expected findings"}
 	}
 	for _, subject := range subjects {
-		report, err := auditSubject(cfg, subject)
+		report, err := auditSubject(cfg, subject, persist)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("audit blocked: %s: %v", subject.Name, err))
 			continue
@@ -135,7 +145,7 @@ func Gate(cfg *config.Config, subjects []Subject) (warnings []string, errs []str
 }
 
 // auditSubject runs the pipeline of Spec §12.1 for one subject.
-func auditSubject(cfg *config.Config, subject Subject) (Report, error) {
+func auditSubject(cfg *config.Config, subject Subject, persist bool) (Report, error) {
 	contentHash, err := hashing.ContentSHA256(subject.Snapshot, nil)
 	if err != nil {
 		return Report{}, err
@@ -160,7 +170,9 @@ func auditSubject(cfg *config.Config, subject Subject) (Report, error) {
 	}
 
 	findings := detect(subject.Snapshot, subject.Capabilities)
-	storeCachedFindings(cfg, contentHash, subject, findings)
+	if persist {
+		storeCachedFindings(cfg, contentHash, subject, findings)
+	}
 	report.Findings = findings
 	report.Decision = decideWithPins(cfg, subject, contentHash, findings)
 	return report, nil

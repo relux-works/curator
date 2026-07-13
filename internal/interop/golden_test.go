@@ -376,6 +376,69 @@ func TestManagerConfigVectors(t *testing.T) {
 	}
 }
 
+func TestManagerLifecycleVectors(t *testing.T) {
+	payload, err := os.ReadFile(golden(t, "vectors/manager-lifecycle.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vector struct {
+		LauncherCases []struct {
+			Name                  string   `json:"name"`
+			Platforms             []string `json:"platforms"`
+			RequiredPathRoles     []string `json:"required_path_roles"`
+			PreserveInheritedPath bool     `json:"preserve_inherited_path"`
+			ForwardArguments      bool     `json:"forward_arguments"`
+			PreserveExitStatus    bool     `json:"preserve_exit_status"`
+		} `json:"launcher_cases"`
+		BootstrapCases []struct {
+			Name    string `json:"name"`
+			Outcome string `json:"outcome"`
+		} `json:"bootstrap_cases"`
+		UpgradeCases []struct {
+			Name        string `json:"name"`
+			Deduplicate bool   `json:"deduplicate"`
+		} `json:"upgrade_cases"`
+		DryRunCases []struct {
+			Name                       string   `json:"name"`
+			ForbiddenPersistentEffects []string `json:"forbidden_persistent_effects"`
+		} `json:"dry_run_cases"`
+	}
+	if err := json.Unmarshal(payload, &vector); err != nil {
+		t.Fatal(err)
+	}
+	if len(vector.LauncherCases) != 2 || len(vector.BootstrapCases) != 3 || len(vector.UpgradeCases) != 3 || len(vector.DryRunCases) != 2 {
+		t.Fatalf("manager lifecycle vector is incomplete: %+v", vector)
+	}
+	for _, testCase := range vector.LauncherCases {
+		if !reflect.DeepEqual(testCase.Platforms, []string{"unix", "windows"}) ||
+			len(testCase.RequiredPathRoles) != 3 || !testCase.PreserveInheritedPath ||
+			!testCase.ForwardArguments || !testCase.PreserveExitStatus {
+			t.Fatalf("launcher case %s is incomplete: %+v", testCase.Name, testCase)
+		}
+	}
+	outcomes := map[string]string{}
+	for _, testCase := range vector.BootstrapCases {
+		outcomes[testCase.Name] = testCase.Outcome
+	}
+	if outcomes["existing-config-if-missing"] != "unchanged-success" || outcomes["if-missing-with-force"] != "usage-error" {
+		t.Fatalf("bootstrap outcomes: %v", outcomes)
+	}
+	deduplicated := false
+	for _, testCase := range vector.UpgradeCases {
+		if testCase.Name == "all-projects-deduplicate" {
+			deduplicated = testCase.Deduplicate
+		}
+	}
+	if !deduplicated {
+		t.Fatal("manager lifecycle vector does not require cross-project fetch deduplication")
+	}
+	for _, testCase := range vector.DryRunCases {
+		if len(testCase.ForbiddenPersistentEffects) < 8 {
+			t.Fatalf("dry-run case %s omits persistent surfaces: %v", testCase.Name, testCase.ForbiddenPersistentEffects)
+		}
+	}
+}
+
 func TestGoldenFederationSemantics(t *testing.T) {
 	pinned := readGolden(t, "expected/registry/pinned_key.txt")
 	audited := readSigned(t, "expected/registry/record_audited.json")

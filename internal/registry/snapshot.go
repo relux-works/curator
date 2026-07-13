@@ -56,29 +56,47 @@ type SnapshotFetchFn func(url string) (map[string]any, error)
 // persisted highest accepted version, or it is stale. An unreachable
 // snapshot warns but does not exclude.
 func CheckSnapshots(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge time.Duration) (map[string]bool, []string) {
-	return CheckSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, DefaultSnapshotClockSkew)
+	return checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, DefaultSnapshotClockSkew, true)
 }
 
 // CheckSnapshotsWithPolicy applies explicit manager-config age and clock-skew
 // bounds. A zero clock skew is literal; a zero max age retains the historical
 // default for callers of CheckSnapshots.
 func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) (map[string]bool, []string) {
+	return checkSnapshotsWithPolicy(registries, cacheDir, fetch, now, maxAge, clockSkew, true)
+}
+
+// CheckSnapshotsWithPolicyReadOnly verifies candidates against existing
+// rollback state without creating or advancing protected state.
+func CheckSnapshotsWithPolicyReadOnly(registries []Registry, stateDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration) (map[string]bool, []string) {
+	return checkSnapshotsWithPolicy(registries, stateDir, fetch, now, maxAge, clockSkew, false)
+}
+
+func checkSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch SnapshotFetchFn, now time.Time, maxAge, clockSkew time.Duration, persist bool) (map[string]bool, []string) {
 	if maxAge == 0 {
 		maxAge = DefaultSnapshotMaxAge
 	}
 	tampered := map[string]bool{}
 	var warnings []string
-	if err := os.MkdirAll(cacheDir, 0o700); err != nil {
-		for _, reg := range registries {
-			if len(reg.PublicKeys) > 0 {
-				tampered[reg.URL] = true
-				warnings = append(warnings, fmt.Sprintf("registry %s rollback state directory is unavailable: %v", reg.Name, err))
+	if persist {
+		if err := os.MkdirAll(cacheDir, 0o700); err != nil {
+			for _, reg := range registries {
+				if len(reg.PublicKeys) > 0 {
+					tampered[reg.URL] = true
+					warnings = append(warnings, fmt.Sprintf("registry %s rollback state directory is unavailable: %v", reg.Name, err))
+				}
 			}
+			return tampered, warnings
 		}
-		return tampered, warnings
+		_ = os.Chmod(cacheDir, 0o700) // #nosec G302 -- owner-only directory access requires traversal bits
 	}
-	_ = os.Chmod(cacheDir, 0o700) // #nosec G302 -- owner-only directory access requires traversal bits
-	knownStates, err := loadSnapshotStateCatalog(cacheDir)
+	var knownStates map[string]bool
+	var err error
+	if persist {
+		knownStates, err = loadSnapshotStateCatalog(cacheDir)
+	} else {
+		knownStates, err = loadSnapshotStateCatalogReadOnly(cacheDir)
+	}
 	if err != nil {
 		for _, reg := range registries {
 			if len(reg.PublicKeys) > 0 {
@@ -142,16 +160,18 @@ func CheckSnapshotsWithPolicy(registries []Registry, cacheDir string, fetch Snap
 			tampered[reg.URL] = true
 			continue
 		}
-		if err := writeSnapshotState(stateFile, snapshotState{HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot, LogSize: parsed.LogSize}); err != nil {
-			warnings = append(warnings, fmt.Sprintf("registry %s rollback state could not be persisted: %v", reg.Name, err))
-			tampered[reg.URL] = true
-			continue
-		}
-		if !knownStates[stateName] {
-			knownStates[stateName] = true
-			if err := writeSnapshotStateCatalog(cacheDir, knownStates); err != nil {
-				warnings = append(warnings, fmt.Sprintf("registry %s rollback state catalog could not be persisted: %v", reg.Name, err))
+		if persist {
+			if err := writeSnapshotState(stateFile, snapshotState{HighestVersion: parsed.Version, Head: parsed.Head, MerkleRoot: parsed.MerkleRoot, LogSize: parsed.LogSize}); err != nil {
+				warnings = append(warnings, fmt.Sprintf("registry %s rollback state could not be persisted: %v", reg.Name, err))
 				tampered[reg.URL] = true
+				continue
+			}
+			if !knownStates[stateName] {
+				knownStates[stateName] = true
+				if err := writeSnapshotStateCatalog(cacheDir, knownStates); err != nil {
+					warnings = append(warnings, fmt.Sprintf("registry %s rollback state catalog could not be persisted: %v", reg.Name, err))
+					tampered[reg.URL] = true
+				}
 			}
 		}
 	}
@@ -278,6 +298,44 @@ func loadSnapshotStateCatalog(stateDir string) (map[string]bool, error) {
 			return nil, err
 		}
 		return empty, nil
+	}
+	var catalog snapshotStateCatalog
+	if err := decodeJSON(payload, &catalog); err != nil {
+		return nil, err
+	}
+	if catalog.SchemaVersion != 1 || catalog.States == nil {
+		return nil, fmt.Errorf("unsupported rollback state catalog schema")
+	}
+	known := make(map[string]bool, len(catalog.States))
+	for _, name := range catalog.States {
+		if !snapshotStateNameRE.MatchString(name) || known[name] {
+			return nil, fmt.Errorf("rollback state catalog contains an invalid entry")
+		}
+		known[name] = true
+	}
+	return known, nil
+}
+
+func loadSnapshotStateCatalogReadOnly(stateDir string) (map[string]bool, error) {
+	path := filepath.Join(stateDir, snapshotStateCatalogName)
+	payload, exists, err := readProtectedStateFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		entries, readErr := os.ReadDir(stateDir)
+		if os.IsNotExist(readErr) {
+			return map[string]bool{}, nil
+		}
+		if readErr != nil {
+			return nil, readErr
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() && snapshotStateNameRE.MatchString(entry.Name()) {
+				return nil, fmt.Errorf("catalog is missing while rollback state exists")
+			}
+		}
+		return map[string]bool{}, nil
 	}
 	var catalog snapshotStateCatalog
 	if err := decodeJSON(payload, &catalog); err != nil {
