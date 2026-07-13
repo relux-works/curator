@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -336,6 +338,41 @@ func TestSnapshotRequiresCompleteShapeAndRejectsEquivocation(t *testing.T) {
 	tampered, warnings = CheckSnapshots([]Registry{reg}, cacheDir, fetch, now, 0)
 	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "future") {
 		t.Fatalf("future snapshot not rejected: %v %v", tampered, warnings)
+	}
+}
+
+func TestSnapshotRollbackStateCorruptionFailsClosedAndMigrates(t *testing.T) {
+	s := newSigner(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	legacyDir := t.TempDir()
+	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+	fetch := func(string) (map[string]any, error) { return s.sign(snapshotBody(5, now)), nil }
+	tampered, warnings := CheckSnapshots([]Registry{reg}, legacyDir, fetch, now, 0)
+	if len(tampered) != 0 || len(warnings) != 0 {
+		t.Fatalf("valid state setup failed: %v %v", tampered, warnings)
+	}
+	stateFiles, err := filepath.Glob(filepath.Join(legacyDir, "snapshot-*.json"))
+	if err != nil || len(stateFiles) != 1 {
+		t.Fatalf("state files=%v err=%v", stateFiles, err)
+	}
+	stateDir := filepath.Join(t.TempDir(), "state")
+	if err := MigrateSnapshotStates(legacyDir, stateDir); err != nil {
+		t.Fatal(err)
+	}
+	migrated := filepath.Join(stateDir, filepath.Base(stateFiles[0]))
+	if _, err := os.Stat(migrated); err != nil {
+		t.Fatalf("migrated state: %v", err)
+	}
+	if _, err := os.Stat(stateFiles[0]); !os.IsNotExist(err) {
+		t.Fatalf("legacy state still exists: %v", err)
+	}
+	if err := os.WriteFile(migrated, []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fetch = func(string) (map[string]any, error) { return s.sign(snapshotBody(6, now)), nil }
+	tampered, warnings = CheckSnapshots([]Registry{reg}, stateDir, fetch, now, 0)
+	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "rollback state is unreadable") {
+		t.Fatalf("corrupt state did not fail closed: %v %v", tampered, warnings)
 	}
 }
 

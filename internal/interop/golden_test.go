@@ -4,12 +4,19 @@ package interop
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/hashing"
@@ -391,5 +398,318 @@ func TestGoldenFederationSemantics(t *testing.T) {
 		snapHash, fetch)
 	if resolution.Result != registry.ResultRevoked {
 		t.Fatalf("deny-wins over golden records: %+v", resolution)
+	}
+}
+
+type registryClientVector struct {
+	StateKey               string `json:"state_key"`
+	KeyRotationResetsState bool   `json:"key_rotation_resets_state"`
+	RetryCases             []struct {
+		Name           string `json:"name"`
+		Method         string `json:"method"`
+		Outcome        string `json:"outcome"`
+		IdempotencyKey bool   `json:"idempotency_key"`
+		RetryPermitted bool   `json:"retry_permitted"`
+	} `json:"retry_cases"`
+	RetryPolicy struct {
+		MaxAttempts              int  `json:"max_attempts"`
+		GetTotalDeadlineSeconds  int  `json:"get_total_deadline_seconds"`
+		PostTotalDeadlineSeconds int  `json:"post_total_deadline_seconds"`
+		FollowRedirects          bool `json:"follow_redirects"`
+	} `json:"retry_policy"`
+	SnapshotTransitions []struct {
+		Name             string `json:"name"`
+		StoredVersion    int    `json:"stored_version"`
+		CandidateVersion int    `json:"candidate_version"`
+		SameBody         bool   `json:"same_body"`
+		Accepted         bool   `json:"accepted"`
+	} `json:"snapshot_transitions"`
+	PaginationRejections []struct {
+		Name       string `json:"name"`
+		Error      string `json:"error"`
+		Characters int    `json:"characters"`
+		Records    int    `json:"records"`
+		Bytes      int    `json:"bytes"`
+	} `json:"pagination_rejections"`
+	RollbackStateCases []struct {
+		Name     string `json:"name"`
+		State    string `json:"state"`
+		Accepted bool   `json:"accepted"`
+	} `json:"rollback_state_cases"`
+}
+
+func loadRegistryClientVector(t *testing.T) registryClientVector {
+	t.Helper()
+	payload, err := os.ReadFile(golden(t, "vectors/registry-client.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vector registryClientVector
+	if err := json.Unmarshal(payload, &vector); err != nil {
+		t.Fatal(err)
+	}
+	return vector
+}
+
+func TestRegistryClientRetryVectors(t *testing.T) {
+	vector := loadRegistryClientVector(t)
+	for _, testCase := range vector.RetryCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			got := registry.RetryPermitted(testCase.Method, testCase.Outcome, testCase.IdempotencyKey)
+			if got != testCase.RetryPermitted {
+				t.Fatalf("RetryPermitted(%q, %q, %v) = %v, want %v", testCase.Method, testCase.Outcome, testCase.IdempotencyKey, got, testCase.RetryPermitted)
+			}
+		})
+	}
+}
+
+func TestRegistryClientRetryExecutionPolicy(t *testing.T) {
+	vector := loadRegistryClientVector(t)
+	policy := vector.RetryPolicy
+	if registry.RegistryMaxAttempts != policy.MaxAttempts ||
+		registry.RegistryGetTotalDeadline != time.Duration(policy.GetTotalDeadlineSeconds)*time.Second ||
+		registry.RegistryPostTotalDeadline != time.Duration(policy.PostTotalDeadlineSeconds)*time.Second {
+		t.Fatalf("registry retry policy does not match vectors: %+v", policy)
+	}
+
+	getCalls := 0
+	getServer := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		getCalls++
+		response.Header().Set("Content-Type", "application/json")
+		response.Header().Set("Retry-After", "0")
+		response.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = response.Write([]byte(`{"error":{"code":"unavailable","message":"retry"}}`))
+	}))
+	defer getServer.Close()
+	if _, err := registry.HTTPGetSnapshot(getServer.URL); err == nil {
+		t.Fatal("repeated 503 response was accepted")
+	}
+	if getCalls != policy.MaxAttempts {
+		t.Fatalf("GET attempts=%d, want %d", getCalls, policy.MaxAttempts)
+	}
+
+	targetCalls := 0
+	target := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		targetCalls++
+	}))
+	defer target.Close()
+	redirect := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		http.Redirect(response, request, target.URL+"/v1/snapshot", http.StatusTemporaryRedirect)
+	}))
+	defer redirect.Close()
+	if _, err := registry.HTTPGetSnapshot(redirect.URL); err == nil {
+		t.Fatal("registry redirect was accepted")
+	}
+	if policy.FollowRedirects || targetCalls != 0 {
+		t.Fatalf("redirect target calls=%d, follow_redirects=%v", targetCalls, policy.FollowRedirects)
+	}
+
+	record, err := os.ReadFile(golden(t, "expected/registry/record_audited.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var postBodies [][]byte
+	var idempotencyKeys []string
+	postServer := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		body, readErr := io.ReadAll(request.Body)
+		if readErr != nil {
+			t.Error(readErr)
+		}
+		postBodies = append(postBodies, body)
+		idempotencyKeys = append(idempotencyKeys, request.Header.Get("Idempotency-Key"))
+		response.Header().Set("Content-Type", "application/json")
+		response.Header().Set("Retry-After", "0")
+		response.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = response.Write([]byte(`{"error":{"code":"unavailable","message":"retry"}}`))
+	}))
+	defer postServer.Close()
+	if _, err := registry.Publish(postServer.URL, "secret-token", record); err == nil {
+		t.Fatal("repeated POST 503 response was accepted")
+	}
+	if len(postBodies) != policy.MaxAttempts {
+		t.Fatalf("POST attempts=%d, want %d", len(postBodies), policy.MaxAttempts)
+	}
+	for index := range postBodies {
+		if !bytes.Equal(postBodies[index], record) || idempotencyKeys[index] == "" ||
+			idempotencyKeys[index] != idempotencyKeys[0] {
+			t.Fatalf("POST attempt %d changed body or idempotency identity", index+1)
+		}
+	}
+}
+
+func TestRegistryClientSnapshotTransitionVectors(t *testing.T) {
+	vector := loadRegistryClientVector(t)
+	if vector.StateKey != "canonical_registry_url" || vector.KeyRotationResetsState {
+		t.Fatalf("unsupported snapshot state policy: key=%q reset=%v", vector.StateKey, vector.KeyRotationResetsState)
+	}
+	oldPublic, oldPrivate, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newPublic, newPrivate, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pins := []string{
+		"ed25519:" + base64.StdEncoding.EncodeToString(oldPublic),
+		"ed25519:" + base64.StdEncoding.EncodeToString(newPublic),
+	}
+	createdAt := time.Date(2026, 7, 13, 0, 0, 0, 0, time.UTC)
+	now := createdAt.Add(time.Hour)
+	for _, testCase := range vector.SnapshotTransitions {
+		t.Run(testCase.Name, func(t *testing.T) {
+			cacheDir := t.TempDir()
+			registryURL := "https://registry.example/curator"
+			storedBody := interopSnapshotBody(testCase.StoredVersion, strings.Repeat("a", 64), createdAt)
+			stored := signInteropSnapshot(oldPrivate, oldPublic, storedBody)
+			initial := registry.Registry{Name: "before-rotation", URL: registryURL, PublicKeys: pins}
+			tampered, warnings := registry.CheckSnapshots([]registry.Registry{initial}, cacheDir, func(string) (map[string]any, error) {
+				return stored, nil
+			}, now, 0)
+			if len(tampered) != 0 || len(warnings) != 0 {
+				t.Fatalf("could not establish stored state: tampered=%v warnings=%v", tampered, warnings)
+			}
+
+			candidateBody := interopSnapshotBody(testCase.CandidateVersion, strings.Repeat("a", 64), createdAt)
+			if !testCase.SameBody && testCase.CandidateVersion == testCase.StoredVersion {
+				candidateBody["head"] = strings.Repeat("c", 64)
+			}
+			candidate := signInteropSnapshot(newPrivate, newPublic, candidateBody)
+			rotated := registry.Registry{Name: "after-rotation", URL: registryURL, PublicKeys: pins}
+			tampered, _ = registry.CheckSnapshots([]registry.Registry{rotated}, cacheDir, func(string) (map[string]any, error) {
+				return candidate, nil
+			}, now, 0)
+			accepted := !tampered[registryURL]
+			if accepted != testCase.Accepted {
+				t.Fatalf("accepted=%v, want %v", accepted, testCase.Accepted)
+			}
+		})
+	}
+}
+
+func interopSnapshotBody(version int, head string, createdAt time.Time) map[string]any {
+	return map[string]any{
+		"schema_version": 1,
+		"merkle_root":    strings.Repeat("b", 64),
+		"log_size":       version,
+		"head":           head,
+		"version":        version,
+		"created_at":     createdAt.Format(time.RFC3339),
+	}
+}
+
+func signInteropSnapshot(private ed25519.PrivateKey, public ed25519.PublicKey, body map[string]any) map[string]any {
+	signed := make(map[string]any, len(body)+1)
+	for key, value := range body {
+		signed[key] = value
+	}
+	signature := ed25519.Sign(private, registry.CanonicalBytes(signed))
+	signed["sig"] = map[string]any{
+		"key_id":    registry.KeyID(public),
+		"algorithm": "ed25519",
+		"signature": base64.StdEncoding.EncodeToString(signature),
+	}
+	return signed
+}
+
+func TestRegistryClientPaginationRejectionVectors(t *testing.T) {
+	vector := loadRegistryClientVector(t)
+	for _, testCase := range vector.PaginationRejections {
+		t.Run(testCase.Name, func(t *testing.T) {
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+				calls++
+				response.Header().Set("Content-Type", "application/json")
+				switch testCase.Error {
+				case "pagination_cycle":
+					_ = json.NewEncoder(response).Encode(map[string]any{"records": []any{}, "next_cursor": "same"})
+				case "invalid_cursor":
+					_ = json.NewEncoder(response).Encode(map[string]any{"records": []any{}, "next_cursor": strings.Repeat("x", testCase.Characters)})
+				case "record_limit":
+					remaining := testCase.Records - (calls-1)*1000
+					pageSize := 1000
+					if remaining < pageSize {
+						pageSize = remaining
+					}
+					page := make([]any, pageSize)
+					for index := range page {
+						page[index] = map[string]any{}
+					}
+					var next any
+					if remaining > pageSize {
+						next = fmt.Sprintf("page-%d", calls+1)
+					}
+					_ = json.NewEncoder(response).Encode(map[string]any{"records": page, "next_cursor": next})
+				case "body_limit":
+					_, _ = response.Write(make([]byte, testCase.Bytes))
+				default:
+					t.Fatalf("unknown pagination vector error %q", testCase.Error)
+				}
+			}))
+			defer server.Close()
+			fetch := registry.NewHTTPFetchWithPolicy(t.TempDir(), 0, 0, time.Now)
+			_, err := fetch(server.URL, "git.example/skill", strings.Repeat("a", 40), "sha256:"+strings.Repeat("b", 64))
+			if err == nil {
+				t.Fatal("response was accepted, want rejection")
+			}
+			want := map[string]string{
+				"pagination_cycle": "repeated pagination cursor",
+				"invalid_cursor":   "invalid 'next_cursor'",
+				"record_limit":     "more than 10000 records",
+				"body_limit":       "exceeds 16777216 bytes",
+			}[testCase.Error]
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("error %q does not contain %q", err, want)
+			}
+		})
+	}
+}
+
+func TestRegistryClientRollbackStateVectors(t *testing.T) {
+	vector := loadRegistryClientVector(t)
+	public, private, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := "ed25519:" + base64.StdEncoding.EncodeToString(public)
+	createdAt := time.Date(2026, 7, 13, 0, 0, 0, 0, time.UTC)
+	snapshot := signInteropSnapshot(private, public, interopSnapshotBody(8, strings.Repeat("a", 64), createdAt))
+	reg := registry.Registry{Name: "state-case", URL: "https://registry.example/state", PublicKeys: []string{pin}}
+	for _, testCase := range vector.RollbackStateCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			root := t.TempDir()
+			stateDir := filepath.Join(root, "state")
+			if testCase.State == "unavailable" {
+				if err := os.WriteFile(stateDir, []byte("not a directory"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if testCase.State == "malformed" || testCase.State == "deleted" {
+				tampered, warnings := registry.CheckSnapshots([]registry.Registry{reg}, stateDir, func(string) (map[string]any, error) {
+					return snapshot, nil
+				}, createdAt.Add(time.Hour), 0)
+				if len(tampered) != 0 || len(warnings) != 0 {
+					t.Fatalf("could not establish rollback state: %v %v", tampered, warnings)
+				}
+				paths, err := filepath.Glob(filepath.Join(stateDir, "snapshot-*.json"))
+				if err != nil || len(paths) != 1 {
+					t.Fatalf("snapshot state paths=%v err=%v", paths, err)
+				}
+				if testCase.State == "malformed" {
+					if err := os.WriteFile(paths[0], []byte("{broken"), 0o600); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := os.Remove(paths[0]); err != nil {
+					t.Fatal(err)
+				}
+			}
+			tampered, _ := registry.CheckSnapshots([]registry.Registry{reg}, stateDir, func(string) (map[string]any, error) {
+				return snapshot, nil
+			}, createdAt.Add(time.Hour), 0)
+			accepted := !tampered[reg.URL]
+			if accepted != testCase.Accepted {
+				t.Fatalf("accepted=%v, want %v", accepted, testCase.Accepted)
+			}
+		})
 	}
 }

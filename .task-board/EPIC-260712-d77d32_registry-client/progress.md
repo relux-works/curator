@@ -1,5 +1,5 @@
 ## Status
-done
+in-progress
 
 ## Assigned To
 claude
@@ -8,7 +8,7 @@ claude
 2026-07-12T00:00:00Z
 
 ## Last Update
-2026-07-13T00:30:00Z
+2026-07-13T00:00:00Z
 
 ## Blocked By
 - (see dependency order in docs/implementation-plan.md section 5)
@@ -17,7 +17,6 @@ claude
 - (none)
 
 ## Checklist
-(empty)
+- [ ] Complete STORY-260713-72b914 production profile conformance
 
 ## Notes
-

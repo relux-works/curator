@@ -821,9 +821,13 @@ func resolveRegistries(cfg *config.Config, nodes []*closure.Node, alias string) 
 		registries = append(registries, registry.Registry{Name: entry.Name, URL: entry.URL, PublicKeys: entry.PublicKeys})
 	}
 	cacheDir := filepath.Join(cfg.Home(), "cache", "registry")
+	stateDir := filepath.Join(cfg.Home(), "state", "registry")
+	if err := registry.MigrateSnapshotStates(cacheDir, stateDir); err != nil {
+		return nil, nil, fmt.Errorf("audit registry rollback state migration failed: %w", err)
+	}
 	var warnings []string
 	tampered, snapshotWarnings := registry.CheckSnapshotsWithPolicy(
-		registries, cacheDir, registry.HTTPGetSnapshot, time.Now(),
+		registries, stateDir, registry.HTTPGetSnapshot, time.Now(),
 		time.Duration(cfg.Audit.SnapshotMaxAgeSeconds)*time.Second,
 		time.Duration(cfg.Audit.SnapshotClockSkewSeconds)*time.Second,
 	)

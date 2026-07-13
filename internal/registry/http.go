@@ -2,15 +2,18 @@ package registry
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -25,9 +28,47 @@ const (
 	maxResponseBytes    = 16 << 20
 	maxRecordsPerQuery  = 10000
 	maxPageSize         = 1000
+	// RegistryMaxAttempts bounds one logical registry request, including its first attempt.
+	RegistryMaxAttempts = 3
+	// RegistryGetTotalDeadline bounds all GET attempts and retry delays.
+	RegistryGetTotalDeadline = 30 * time.Second
+	// RegistryPostTotalDeadline bounds all idempotent POST attempts and retry delays.
+	RegistryPostTotalDeadline = 45 * time.Second
 )
 
-var httpClient = &http.Client{Timeout: 10 * time.Second}
+var httpClient = &http.Client{
+	Timeout:       10 * time.Second,
+	CheckRedirect: rejectRegistryRedirect,
+}
+
+var errRegistryResponseLimit = errors.New("registry response limit exceeded")
+
+type registryHTTPResult struct {
+	status int
+	header http.Header
+	body   []byte
+}
+
+// RetryPermitted implements the protocol retry safety classification. Actual
+// retries remain finite, preserve the exact request, and use the same
+// idempotency key and body for publication requests.
+func RetryPermitted(method, outcome string, hasIdempotencyKey bool) bool {
+	if outcome != "network_error" && outcome != "429" && outcome != "503" {
+		return false
+	}
+	switch method {
+	case http.MethodGet:
+		return true
+	case http.MethodPost:
+		return hasIdempotencyKey
+	default:
+		return false
+	}
+}
+
+func rejectRegistryRedirect(_ *http.Request, _ []*http.Request) error {
+	return http.ErrUseLastResponse
+}
 
 // HTTPGetSnapshot fetches GET <url>/v1/snapshot.
 func HTTPGetSnapshot(baseURL string) (map[string]any, error) {
@@ -37,23 +78,18 @@ func HTTPGetSnapshot(baseURL string) (map[string]any, error) {
 		return nil, err
 	}
 	request.Header.Set("Accept", "application/json")
-	response, err := httpClient.Do(request) // #nosec G107 -- registry URL comes from pinned machine config
+	result, err := doRegistryRequest(httpClient, request, maxResponseBytes, RegistryGetTotalDeadline)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = response.Body.Close() }()
-	payload, err := readBounded(response.Body, maxResponseBytes)
-	if err != nil {
-		return nil, err
+	if result.status < 200 || result.status >= 300 {
+		return nil, registryStatusError("snapshot request", result)
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("registry snapshot request failed (%d): %s", response.StatusCode, strings.TrimSpace(string(payload)))
-	}
-	if !isJSONResponse(response.Header.Get("Content-Type")) {
-		return nil, fmt.Errorf("registry snapshot response has unsupported content type %q", response.Header.Get("Content-Type"))
+	if !isJSONResponse(result.header.Get("Content-Type")) {
+		return nil, fmt.Errorf("registry snapshot response has unsupported content type %q", result.header.Get("Content-Type"))
 	}
 	var data map[string]any
-	if err := decodeJSON(payload, &data); err != nil {
+	if err := decodeJSON(result.body, &data); err != nil {
 		return nil, fmt.Errorf("registry returned invalid JSON: %v", err)
 	}
 	return data, nil
@@ -149,23 +185,18 @@ func httpGetRecordsPage(endpoint string) ([]map[string]any, string, error) {
 		return nil, "", err
 	}
 	request.Header.Set("Accept", "application/json")
-	response, err := httpClient.Do(request) // #nosec G107 -- registry URL comes from pinned machine config
+	result, err := doRegistryRequest(httpClient, request, maxResponseBytes, RegistryGetTotalDeadline)
 	if err != nil {
 		return nil, "", err
 	}
-	defer func() { _ = response.Body.Close() }()
-	payload, err := readBounded(response.Body, maxResponseBytes)
-	if err != nil {
-		return nil, "", err
+	if result.status < 200 || result.status >= 300 {
+		return nil, "", registryStatusError("records request", result)
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, "", fmt.Errorf("registry records request failed (%d): %s", response.StatusCode, strings.TrimSpace(string(payload)))
-	}
-	if !isJSONResponse(response.Header.Get("Content-Type")) {
-		return nil, "", fmt.Errorf("registry records response has unsupported content type %q", response.Header.Get("Content-Type"))
+	if !isJSONResponse(result.header.Get("Content-Type")) {
+		return nil, "", fmt.Errorf("registry records response has unsupported content type %q", result.header.Get("Content-Type"))
 	}
 	var data map[string]any
-	if err := decodeJSON(payload, &data); err != nil {
+	if err := decodeJSON(result.body, &data); err != nil {
 		return nil, "", fmt.Errorf("registry returned invalid JSON: %v", err)
 	}
 	if unknown := unknownKeys(data, "records", "next_cursor"); len(unknown) > 0 || len(data) != 2 {
@@ -268,24 +299,19 @@ func Publish(baseURL, token string, recordJSON []byte) (string, error) {
 	request.Header.Set("Authorization", "Bearer "+token)
 	idempotency := sha256.Sum256(canonical)
 	request.Header.Set("Idempotency-Key", hex.EncodeToString(idempotency[:]))
-	client := &http.Client{Timeout: 15 * time.Second}
-	response, err := client.Do(request)
+	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: rejectRegistryRedirect}
+	httpResult, err := doRegistryRequest(client, request, 1<<20, RegistryPostTotalDeadline)
 	if err != nil {
 		return "", fmt.Errorf("could not reach registry %s: %v", baseURL, err)
 	}
-	defer func() { _ = response.Body.Close() }()
-	body, err := readBounded(response.Body, 1<<20)
-	if err != nil {
-		return "", err
+	if httpResult.status >= 300 {
+		return "", registryStatusError("record submission", httpResult)
 	}
-	if response.StatusCode >= 300 {
-		return "", fmt.Errorf("registry rejected the record (%d): %s", response.StatusCode, strings.TrimSpace(string(body)))
-	}
-	if !isJSONResponse(response.Header.Get("Content-Type")) {
-		return "", fmt.Errorf("registry submission response has unsupported content type %q", response.Header.Get("Content-Type"))
+	if !isJSONResponse(httpResult.header.Get("Content-Type")) {
+		return "", fmt.Errorf("registry submission response has unsupported content type %q", httpResult.header.Get("Content-Type"))
 	}
 	var result map[string]any
-	if err := decodeJSON(body, &result); err != nil {
+	if err := decodeJSON(httpResult.body, &result); err != nil {
 		return "", fmt.Errorf("registry returned an invalid submission response: %v", err)
 	}
 	if unknown := unknownKeys(result, "seq", "entry_hash"); len(unknown) > 0 || len(result) != 2 {
@@ -296,7 +322,111 @@ func Publish(baseURL, token string, recordJSON []byte) (string, error) {
 	if !ok || sequence < 1 || !hashOK || !hex256RE.MatchString(entryHash) {
 		return "", fmt.Errorf("registry returned a malformed submission response")
 	}
-	return strings.TrimSpace(string(body)), nil
+	return strings.TrimSpace(string(httpResult.body)), nil
+}
+
+func doRegistryRequest(client *http.Client, request *http.Request, responseLimit int64, totalDeadline time.Duration) (registryHTTPResult, error) {
+	ctx, cancel := context.WithTimeout(request.Context(), totalDeadline)
+	defer cancel()
+	hasIdempotencyKey := request.Header.Get("Idempotency-Key") != ""
+	var lastErr error
+	for attempt := 1; attempt <= RegistryMaxAttempts; attempt++ {
+		attemptRequest := request.Clone(ctx)
+		if request.GetBody != nil {
+			body, err := request.GetBody()
+			if err != nil {
+				return registryHTTPResult{}, err
+			}
+			attemptRequest.Body = body
+		}
+		response, err := client.Do(attemptRequest) // #nosec G107 -- registry URL comes from pinned machine config
+		if err != nil {
+			lastErr = err
+			if attempt == RegistryMaxAttempts || !RetryPermitted(request.Method, "network_error", hasIdempotencyKey) ||
+				!waitRegistryRetry(ctx, retryDelay(nil, attempt)) {
+				return registryHTTPResult{}, lastErr
+			}
+			continue
+		}
+		body, readErr := readBounded(response.Body, responseLimit)
+		_ = response.Body.Close()
+		if readErr != nil {
+			if !errors.Is(readErr, errRegistryResponseLimit) && attempt < RegistryMaxAttempts &&
+				RetryPermitted(request.Method, "network_error", hasIdempotencyKey) &&
+				waitRegistryRetry(ctx, retryDelay(nil, attempt)) {
+				lastErr = readErr
+				continue
+			}
+			return registryHTTPResult{}, readErr
+		}
+		result := registryHTTPResult{status: response.StatusCode, header: response.Header.Clone(), body: body}
+		outcome := strconv.Itoa(response.StatusCode)
+		if attempt == RegistryMaxAttempts || !RetryPermitted(request.Method, outcome, hasIdempotencyKey) {
+			return result, nil
+		}
+		if !waitRegistryRetry(ctx, retryDelay(response.Header, attempt)) {
+			return result, nil
+		}
+	}
+	return registryHTTPResult{}, lastErr
+}
+
+func retryDelay(header http.Header, attempt int) time.Duration {
+	if header != nil {
+		value := strings.TrimSpace(header.Get("Retry-After"))
+		if seconds, err := strconv.ParseInt(value, 10, 64); value != "" && err == nil && seconds >= 0 {
+			return time.Duration(seconds) * time.Second
+		}
+		if when, err := http.ParseTime(value); value != "" && err == nil {
+			if delay := time.Until(when); delay > 0 {
+				return delay
+			}
+			return 0
+		}
+	}
+	return time.Duration(100*(1<<(attempt-1))) * time.Millisecond
+}
+
+func waitRegistryRetry(ctx context.Context, delay time.Duration) bool {
+	if deadline, ok := ctx.Deadline(); ok && delay > time.Until(deadline) {
+		return false
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func registryStatusError(label string, result registryHTTPResult) error {
+	code := ""
+	var envelope map[string]any
+	if err := decodeJSON(result.body, &envelope); err == nil {
+		if errorValue, ok := envelope["error"].(map[string]any); ok {
+			if candidate, ok := errorValue["code"].(string); ok && stableErrorCode(candidate) {
+				code = candidate
+			}
+		}
+	}
+	if code != "" {
+		return fmt.Errorf("registry %s failed (%d, %s)", label, result.status, code)
+	}
+	return fmt.Errorf("registry %s failed (%d)", label, result.status)
+}
+
+func stableErrorCode(value string) bool {
+	if value == "" || len(value) > 64 {
+		return false
+	}
+	for _, character := range value {
+		if (character < 'a' || character > 'z') && (character < '0' || character > '9') && character != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func readBounded(reader io.Reader, limit int64) ([]byte, error) {
@@ -305,7 +435,7 @@ func readBounded(reader io.Reader, limit int64) ([]byte, error) {
 		return nil, err
 	}
 	if int64(len(payload)) > limit {
-		return nil, fmt.Errorf("registry response exceeds %d bytes", limit)
+		return nil, fmt.Errorf("registry response exceeds %d bytes: %w", limit, errRegistryResponseLimit)
 	}
 	return payload, nil
 }
@@ -321,6 +451,7 @@ func decodeJSON(payload []byte, target any) error {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
+	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		return err
 	}
