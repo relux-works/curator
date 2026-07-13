@@ -61,7 +61,7 @@ Commands:
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
   gc                       remove unreferenced runtime entries
-  shell-init <shell>       print the shell hook (zsh, bash, powershell; --no-global)
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
   ui                       terminal view over installed state
   config show              print the effective configuration
   --version                print the curator version
@@ -322,6 +322,8 @@ func cmdBootstrap(args []string) int {
 		return exitFail
 	}
 	fmt.Println("wrote", path)
+	fmt.Println("shell profile changes are not required: agent skills can invoke project and global command shims directly")
+	fmt.Println("optional bare commands for interactive use: curator shell-init --install")
 	return exitOK
 }
 
@@ -1173,12 +1175,39 @@ func cmdGC() int {
 func cmdShellInit(args []string) int {
 	flags := flag.NewFlagSet("shell-init", flag.ContinueOnError)
 	noGlobal := flags.Bool("no-global", false, "skip global env sourcing")
+	installHook := flags.Bool("install", false, "cache the hook and print its optional profile source command")
 	positional, err := parseInterspersed(flags, args)
-	if err != nil || len(positional) < 1 {
-		fmt.Fprintln(os.Stderr, "curator: shell-init requires a shell: zsh, bash, powershell")
+	if err != nil || len(positional) > 1 {
+		fmt.Fprintln(os.Stderr, "curator: shell-init accepts at most one shell: auto, zsh, bash, powershell")
 		return exitUsage
 	}
-	hook, err := shell.Hook(positional[0], !*noGlobal)
+	shellName := "auto"
+	if len(positional) == 1 {
+		shellName = positional[0]
+	}
+	if shellName == "auto" {
+		shellName = shell.Detect(nil, "")
+	}
+	if shellName != "zsh" && shellName != "bash" && shellName != "powershell" {
+		fmt.Fprintln(os.Stderr, "curator: unsupported shell:", shellName)
+		return exitUsage
+	}
+	if *installHook {
+		hookPath, installErr := shell.InstallHook(shellName, filepath.Dir(config.UserPath()), !*noGlobal)
+		if installErr != nil {
+			fmt.Fprintln(os.Stderr, "curator:", installErr)
+			return exitFail
+		}
+		source, sourceErr := shell.SourceCommand(shellName, hookPath)
+		if sourceErr != nil {
+			fmt.Fprintln(os.Stderr, "curator:", sourceErr)
+			return exitFail
+		}
+		fmt.Println("wrote", hookPath)
+		fmt.Println("optional shell profile line:", source)
+		return exitOK
+	}
+	hook, err := shell.Hook(shellName, !*noGlobal)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
 		return exitUsage
