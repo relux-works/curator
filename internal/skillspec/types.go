@@ -1,11 +1,20 @@
-// Package skillspec parses and validates the skill machine manifest
-// csk-skill.json, schemas 1 through 5 (Spec §5), including the legacy
-// agents/runtime.json fallback (Spec §5.10).
+// Package skillspec parses and validates the portable skill machine manifest,
+// schemas 1 through 5 (Spec §4), including legacy filename and runtime
+// fallbacks.
 package skillspec
 
 import "github.com/relux-works/curator/internal/capabilities"
 
-// SupportedSchemaVersions is the accepted csk-skill.json schema range.
+const (
+	// CanonicalManifestName is the implementation-neutral writer filename.
+	CanonicalManifestName = "agent-skill.json"
+	// LegacyManifestName remains readable throughout protocol 1.x.
+	LegacyManifestName = "csk-skill.json"
+	// RuntimeFallbackName is consulted only when neither modern manifest exists.
+	RuntimeFallbackName = "agents/runtime.json"
+)
+
+// SupportedSchemaVersions is the accepted agent skill manifest schema range.
 var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true}
 
 // UpgradeHint tells the user how to move to a build that understands a newer
@@ -52,7 +61,7 @@ type McpServer struct {
 // Spec is the parsed manifest of one skill snapshot.
 type Spec struct {
 	SchemaVersion int
-	SourceFile    string // "csk-skill.json", "agents/runtime.json", or "" for pure context skills
+	SourceFile    string // canonical, legacy, runtime fallback, or "" for pure context skills
 	RuntimeRoots  []string
 	Capabilities  capabilities.Manifest
 	Commands      map[string]Command

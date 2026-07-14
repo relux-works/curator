@@ -104,7 +104,7 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 		for _, dependency := range node.Spec.Dependencies {
 			if dependency.Type == "skill" {
 				result.Messages = append(result.Messages, fmt.Sprintf(
-					"global: %s uses dependencies.commands with type 'skill'; migrate to csk-skill.json schema v4 dependencies.skills",
+					"global: %s uses dependencies.commands with type 'skill'; migrate to agent-skill.json schema v4 dependencies.skills",
 					node.Name))
 				break
 			}

@@ -33,7 +33,7 @@ gh attestation verify <artifact> --owner relux-works
 
 ## What Curator manages
 
-- **Skill packages**: `SKILL.md` plus context directories, with a machine manifest (`csk-skill.json`, schemas 1 through 5) declaring commands, runtime layout, capabilities, and dependencies.
+- **Skill packages**: `SKILL.md` plus context directories, with an implementation-neutral machine manifest (`agent-skill.json`, schemas 1 through 5) declaring commands, runtime layout, capabilities, and dependencies. The legacy `csk-skill.json` filename remains readable.
 - **Project manifests**: `Skillfile.json` with exact git references; non-committed development substitutions.
 - **Resolution**: transitive dependency closures unified to one commit and one source identity per name, with activation modes.
 - **Installation**: context and runtime separation, install markers with content hashes, a commit-keyed runtime store, command shims, managed per-agent adapters.

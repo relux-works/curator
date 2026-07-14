@@ -58,6 +58,79 @@ func TestPureContextSkill(t *testing.T) {
 	}
 }
 
+func TestCanonicalManifestResolution(t *testing.T) {
+	manifest := `{"schema_version":1,"commands":{}}`
+
+	t.Run("canonical only", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, CanonicalManifestName), []byte(manifest), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		spec, err := Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if spec.SourceFile != CanonicalManifestName {
+			t.Fatalf("source file = %q", spec.SourceFile)
+		}
+	})
+
+	t.Run("equal dual files select canonical", func(t *testing.T) {
+		dir := t.TempDir()
+		files := map[string]string{
+			CanonicalManifestName: manifest,
+			LegacyManifestName:    "{\n\"commands\": {}, \"schema_version\": 1\n}",
+		}
+		for name, content := range files {
+			if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		spec, err := Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if spec.SourceFile != CanonicalManifestName {
+			t.Fatalf("source file = %q", spec.SourceFile)
+		}
+	})
+
+	t.Run("conflicting dual files fail closed", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, CanonicalManifestName), []byte(manifest), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		conflict := `{"schema_version":1,"commands":{"legacy":{"type":"system","command":"legacy"}}}`
+		if err := os.WriteFile(filepath.Join(dir, LegacyManifestName), []byte(conflict), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, err := Load(dir)
+		if err == nil || !strings.Contains(err.Error(), "conflicting_skill_manifests") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+
+	t.Run("invalid peer does not fall back", func(t *testing.T) {
+		for _, invalidName := range []string{CanonicalManifestName, LegacyManifestName} {
+			t.Run(invalidName, func(t *testing.T) {
+				dir := t.TempDir()
+				for _, name := range []string{CanonicalManifestName, LegacyManifestName} {
+					content := manifest
+					if name == invalidName {
+						content = "{"
+					}
+					if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if _, err := Load(dir); err == nil {
+					t.Fatal("invalid peer was ignored")
+				}
+			})
+		}
+	})
+}
+
 func TestSchemaVersionValidation(t *testing.T) {
 	mustFail(t, writeSkill(t, `{"schema_version": "3"}`, nil), "schema_version")
 	mustFail(t, writeSkill(t, `{"schema_version": 3.5}`, nil), "schema_version")
@@ -268,7 +341,7 @@ func TestLegacyRuntimeFallback(t *testing.T) {
 	}
 }
 
-func TestCskSkillWinsOverLegacy(t *testing.T) {
+func TestLegacyManifestWinsOverRuntimeFallback(t *testing.T) {
 	dir := writeSkill(t, `{"schema_version": 1}`, map[string]string{
 		"agents/runtime.json": `{"commands": {"x": "s"}}`,
 	})
@@ -276,7 +349,7 @@ func TestCskSkillWinsOverLegacy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spec.SourceFile != "csk-skill.json" || len(spec.Commands) != 0 {
+	if spec.SourceFile != LegacyManifestName || len(spec.Commands) != 0 {
 		t.Fatalf("precedence: %+v", spec)
 	}
 }

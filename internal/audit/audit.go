@@ -125,7 +125,7 @@ func gate(cfg *config.Config, subjects []Subject, persist bool) (warnings []stri
 		case DecisionAllow:
 		case DecisionRequirePin:
 			errs = append(errs, fmt.Sprintf(
-				"audit requires pin: %s: schema v%d has no capabilities; migrate to csk-skill.json schema v3 or pin the content hash %s with a reason",
+				"audit requires pin: %s: schema v%d has no capabilities; migrate to agent-skill.json schema v3 or pin the content hash %s with a reason",
 				subject.Name, subject.SchemaVersion, report.ContentSHA256))
 		case DecisionBlock:
 			if report.Revoked {
@@ -306,6 +306,10 @@ func detect(snapshot string, caps capabilities.Manifest) []Finding {
 	for _, name := range caps.Exec {
 		declaredExec[name] = true
 	}
+	manifestName := "agent-skill.json"
+	if _, err := os.Stat(filepath.Join(snapshot, manifestName)); os.IsNotExist(err) {
+		manifestName = "csk-skill.json"
+	}
 
 	_ = filepath.WalkDir(snapshot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
@@ -316,7 +320,7 @@ func detect(snapshot string, caps capabilities.Manifest) []Finding {
 			return nil
 		}
 		posix := filepath.ToSlash(rel)
-		if !strings.HasPrefix(posix, "scripts/") && posix != "csk-skill.json" {
+		if !strings.HasPrefix(posix, "scripts/") && posix != manifestName {
 			return nil
 		}
 		payload, readErr := os.ReadFile(path) // #nosec G304 -- walked snapshot
