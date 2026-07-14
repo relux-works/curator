@@ -270,7 +270,7 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		for _, dependency := range node.Spec.Dependencies {
 			if dependency.Type == "skill" {
 				result.Messages = append(result.Messages, fmt.Sprintf(
-					"%s: %s uses dependencies.commands with type 'skill'; migrate to csk-skill.json schema v4 dependencies.skills",
+					"%s: %s uses dependencies.commands with type 'skill'; migrate to agent-skill.json schema v4 dependencies.skills",
 					alias, node.Name))
 				break
 			}

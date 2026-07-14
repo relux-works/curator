@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -137,6 +138,68 @@ func TestGoldenContextCopy(t *testing.T) {
 	wantHash := readGolden(t, "expected/context_sha256.txt")
 	if gotHash != wantHash {
 		t.Fatalf("context hash diverges from golden:\n got %s\nwant %s", gotHash, wantHash)
+	}
+}
+
+func TestSkillManifestResolutionVectors(t *testing.T) {
+	payload, err := os.ReadFile(golden(t, "vectors/skill-manifest-resolution.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Name             string            `json:"name"`
+		Files            map[string]string `json:"files"`
+		ExpectedSource   *string           `json:"expected_source"`
+		ExpectedCommands []string          `json:"expected_commands"`
+		Error            string            `json:"error"`
+	}
+	if err := json.Unmarshal(payload, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			dir := t.TempDir()
+			for rel, content := range testCase.Files {
+				path := filepath.Join(dir, filepath.FromSlash(rel))
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			spec, err := skillspec.Load(dir)
+			if testCase.Error != "" {
+				if err == nil {
+					t.Fatalf("manifest accepted, want %s", testCase.Error)
+				}
+				if testCase.Error == "conflicting_skill_manifests" && !strings.Contains(err.Error(), testCase.Error) {
+					t.Fatalf("error %q does not contain %q", err, testCase.Error)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantSource := ""
+			if testCase.ExpectedSource != nil {
+				wantSource = *testCase.ExpectedSource
+			}
+			if spec.SourceFile != wantSource {
+				t.Fatalf("source = %q, want %q", spec.SourceFile, wantSource)
+			}
+			var commands []string
+			for name := range spec.Commands {
+				commands = append(commands, name)
+			}
+			sort.Strings(commands)
+			if len(commands) == 0 {
+				commands = []string{}
+			}
+			if !reflect.DeepEqual(commands, testCase.ExpectedCommands) {
+				t.Fatalf("commands = %v, want %v", commands, testCase.ExpectedCommands)
+			}
+		})
 	}
 }
 

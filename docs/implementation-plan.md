@@ -30,7 +30,7 @@ Out of scope for v0.1: publisher-side artifact signing, version ranges, lockfile
 | Testing | stdlib `testing`, table-driven; authoritative vectors from `curator-spec/conformance/v1` | Deterministic and shared by independent implementations |
 | Lint/CI | `gofmt`, `go vet`, `golangci-lint`, GitHub Actions matrix (ubuntu, macos, windows) | Windows is first class |
 | Layout | `cmd/curator/` (main), `internal/<domain>/` packages mirroring protocol domains | Spec-traceable package boundaries |
-| Machine home | `~/.curator/` (env `CURATOR_CONFIG`, `CURATOR_SYSTEM_CONFIG`; system config `/etc/curator/config.json`, `%ProgramData%\curator`) | The machine home is tool-specific state (config, caches, runtime store), not a wire format; two managers on one machine must not share it. Shared wire formats stay exactly as specified: `Skillfile.json`, `csk-skill.json`, markers, adapter ledgers |
+| Machine home | `~/.curator/` (env `CURATOR_CONFIG`, `CURATOR_SYSTEM_CONFIG`; system config `/etc/curator/config.json`, `%ProgramData%\curator`) | The machine home is tool-specific state (config, caches, runtime store), not a wire format; two managers on one machine must not share it. Shared wire formats stay exactly as specified: `Skillfile.json`, canonical `agent-skill.json`, legacy `csk-skill.json`, markers, adapter ledgers |
 
 Package sketch: `internal/skillspec`, `internal/manifest`, `internal/devsub`, `internal/config`, `internal/identity`, `internal/gitops`, `internal/snapshot`, `internal/hashing`, `internal/closure`, `internal/whitelist`, `internal/locale`, `internal/marker`, `internal/runtimestore`, `internal/shims`, `internal/adapters`, `internal/mcp`, `internal/scopes` (global, hybrid, consumers, gc), `internal/registry`, `internal/audit`, `internal/shell`, `internal/cli`.
 
@@ -38,7 +38,7 @@ Package sketch: `internal/skillspec`, `internal/manifest`, `internal/devsub`, `i
 
 - Tasks live on the in-repo board `.task-board/` (epics, stories, tasks as directories with `README.md` and `progress.md`; artifacts in `.task-board/.resources/<ID>/`). Every change starts from a task; progress and status are updated as work proceeds.
 - Commits are discrete and meaningful: one logical step per commit, imperative subject, body explaining what and why. Signed (SSH key, verified on GitHub) as Ivan Oparin <oparin@me.com>.
-- The name of the alternative protocol implementation appears exactly once: the README open-protocol section. A CI check greps case-insensitively (zero matches outside README.md, exactly one inside). The protocol is cited as `Spec §N.M` against [curator-spec](https://github.com/relux-works/curator-spec); protocol file names (`Skillfile.json`, `csk-skill.json`, `.csk-install.json`, `.csk-managed.json`) are part of the wire format and are used as-is.
+- The name of the alternative protocol implementation appears exactly once: the README open-protocol section. A CI check greps case-insensitively (zero matches outside README.md, exactly one inside). The protocol is cited as `Spec §N.M` against [curator-spec](https://github.com/relux-works/curator-spec); protocol file names (`Skillfile.json`, `agent-skill.json`, legacy `csk-skill.json`, `.csk-install.json`, `.csk-managed.json`) are part of the wire format and are used as-is.
 - Spec first: when implementation and spec disagree, stop and resolve the spec question before coding around it.
 - Every error message that the spec words normatively (allowlist refusal, MCP hint, conflicts with chains) keeps the same information content, not necessarily the same string.
 - Style for prose (docs, board cards): plain technical English, no em dashes, no guillemets.
@@ -55,7 +55,7 @@ Phases map to board epics one to one. A phase is done when its acceptance criter
 
 Parsing and validation, pure functions over bytes, no filesystem side effects beyond reads:
 
-- `internal/skillspec`: `csk-skill.json` schemas 1 through 5 with every rule of Spec §5 (schema gating, unknown-field rejection for v2+, identifier alphabet §5.2, runtime_roots validation §5.3, script/system commands §5.4, capabilities §5.5 with defaults, dependencies.commands §5.6 incl. legacy skill type, dependencies.skills §5.7 incl. range-marker and branch rejection, mcp_servers §5.8, no install hooks §5.9, legacy `agents/runtime.json` fallback §5.10).
+- `internal/skillspec`: `agent-skill.json` schemas 1 through 5, the `csk-skill.json` read alias, dual-file conflict detection, and every rule of Spec §4 (schema gating, unknown-field rejection for v2+, portable identifiers and paths, runtime roots, commands, capabilities, dependencies, and the legacy `agents/runtime.json` fallback).
 - `internal/manifest`: `Skillfile.json` schema 1 (§6.1), add/remove declaration editing.
 - `internal/devsub`: `Skillfile.dev.json` (§6.2).
 - `internal/config`: user config (§7.1), enforced system config with locked keys (§7.2), env overrides.

@@ -36,7 +36,7 @@ func Validate(skillDir, localeValue string) []Issue {
 	if err != nil {
 		issues = append(issues, Issue{
 			Severity: "error", Code: "skill.manifest_invalid",
-			Path: "csk-skill.json", Message: err.Error(),
+			Path: skillspec.ManifestSourcePath(skillDir), Message: err.Error(),
 		})
 	} else {
 		issues = append(issues, runtimeRootReferenceWarnings(skillDir, spec)...)

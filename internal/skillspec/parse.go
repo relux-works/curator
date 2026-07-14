@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -22,34 +23,93 @@ var (
 	mcpRequiredIn       = map[string]bool{"any": true, "all": true}
 )
 
-// Load reads the skill spec of a snapshot directory: csk-skill.json first,
-// the legacy agents/runtime.json second, a pure context skill otherwise
-// (Spec §5, §5.10).
+// Load reads the skill spec of a snapshot directory. agent-skill.json is
+// canonical, csk-skill.json is a legacy read alias, and agents/runtime.json is
+// consulted only when neither modern filename exists (Spec §4).
 func Load(snapshot string) (*Spec, error) {
-	cskPath := filepath.Join(snapshot, "csk-skill.json")
-	if _, err := os.Stat(cskPath); err == nil {
-		return loadCskSkill(cskPath)
+	canonicalPath := filepath.Join(snapshot, CanonicalManifestName)
+	legacyPath := filepath.Join(snapshot, LegacyManifestName)
+	canonicalExists, err := pathExists(canonicalPath)
+	if err != nil {
+		return nil, err
 	}
-	runtimePath := filepath.Join(snapshot, "agents", "runtime.json")
-	if _, err := os.Stat(runtimePath); err == nil {
+	legacyExists, err := pathExists(legacyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if canonicalExists && legacyExists {
+		canonical, canonicalData, err := loadSkillManifest(canonicalPath, CanonicalManifestName)
+		if err != nil {
+			return nil, err
+		}
+		_, legacyData, err := loadSkillManifest(legacyPath, LegacyManifestName)
+		if err != nil {
+			return nil, err
+		}
+		if !reflect.DeepEqual(canonicalData, legacyData) {
+			return nil, verr.New("", "conflicting_skill_manifests: %s and %s contain different JSON values", CanonicalManifestName, LegacyManifestName)
+		}
+		return canonical, nil
+	}
+	if canonicalExists {
+		spec, _, loadErr := loadSkillManifest(canonicalPath, CanonicalManifestName)
+		return spec, loadErr
+	}
+	if legacyExists {
+		spec, _, loadErr := loadSkillManifest(legacyPath, LegacyManifestName)
+		return spec, loadErr
+	}
+	runtimePath := filepath.Join(snapshot, filepath.FromSlash(RuntimeFallbackName))
+	runtimeExists, err := pathExists(runtimePath)
+	if err != nil {
+		return nil, err
+	}
+	if runtimeExists {
 		return loadRuntimeFallback(runtimePath)
 	}
 	return &Spec{Commands: map[string]Command{}, Capabilities: capabilities.ImplicitNone()}, nil
 }
 
-func loadCskSkill(filePath string) (*Spec, error) {
+// ManifestSourcePath returns the protocol path that Load will report for
+// diagnostics. It does not parse the selected file.
+func ManifestSourcePath(snapshot string) string {
+	if exists, _ := pathExists(filepath.Join(snapshot, CanonicalManifestName)); exists {
+		return CanonicalManifestName
+	}
+	if exists, _ := pathExists(filepath.Join(snapshot, LegacyManifestName)); exists {
+		return LegacyManifestName
+	}
+	if exists, _ := pathExists(filepath.Join(snapshot, filepath.FromSlash(RuntimeFallbackName))); exists {
+		return RuntimeFallbackName
+	}
+	return ""
+}
+
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, error) {
 	data, err := decodeObject(filePath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	snapshot := filepath.Dir(filePath)
 
 	schema, err := intField(data, "schema_version")
 	if err != nil {
-		return nil, verr.New("schema_version", "must be an integer")
+		return nil, nil, verr.New("schema_version", "%s field must be an integer", sourceFile)
 	}
 	if !SupportedSchemaVersions[schema] {
-		return nil, verr.New("schema_version", "unsupported value %d; this skill requires a newer tool. %s", schema, UpgradeHint)
+		return nil, nil, verr.New("schema_version", "unsupported value %d in %s; this skill requires a newer tool. %s", schema, sourceFile, UpgradeHint)
 	}
 
 	if schema >= 2 {
@@ -57,20 +117,20 @@ func loadCskSkill(filePath string) (*Spec, error) {
 		if schema >= 3 {
 			allowed["capabilities"] = true
 		}
-		if err := rejectUnknown(data, allowed, "csk-skill.json"); err != nil {
-			return nil, err
+		if err := rejectUnknown(data, allowed, sourceFile); err != nil {
+			return nil, nil, err
 		}
 	}
 	if schema >= 3 {
 		if _, present := data["capabilities"]; !present {
-			return nil, verr.New("capabilities", "csk-skill.json schema v%d requires 'capabilities'", schema)
+			return nil, nil, verr.New("capabilities", "%s schema v%d requires 'capabilities'", sourceFile, schema)
 		}
 	}
 	caps := capabilities.ImplicitNone()
 	if schema >= 3 {
 		caps, err = capabilities.Parse(data["capabilities"])
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -79,31 +139,31 @@ func loadCskSkill(filePath string) (*Spec, error) {
 		if raw, present := data["runtime_roots"]; present {
 			runtimeRoots, err = parseRuntimeRoots(raw, snapshot)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	}
 
 	commands, err := parseCommands(data["commands"], schema, snapshot, runtimeRoots)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	dependencies, requirements, mcpServers, err := parseDependencies(data["dependencies"], schema)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &Spec{
 		SchemaVersion: schema,
-		SourceFile:    "csk-skill.json",
+		SourceFile:    sourceFile,
 		RuntimeRoots:  runtimeRoots,
 		Capabilities:  caps,
 		Commands:      commands,
 		Dependencies:  dependencies,
 		Requirements:  requirements,
 		McpServers:    mcpServers,
-	}, nil
+	}, data, nil
 }
 
 func loadRuntimeFallback(filePath string) (*Spec, error) {
