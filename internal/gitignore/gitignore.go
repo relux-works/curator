@@ -57,7 +57,9 @@ func Ensure(projectRoot string, entries []string, fix bool) error {
 // lines already present.
 func Append(path string, entries []string) error {
 	existing := ""
-	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- project .gitignore
+	// #nosec G304 -- the path is the caller's own project .gitignore.
+	payload, err := os.ReadFile(path)
+	if err == nil {
 		existing = string(payload)
 	}
 	present := map[string]bool{}

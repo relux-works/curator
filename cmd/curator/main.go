@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"bufio"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -21,14 +22,17 @@ import (
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/gitignore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/install"
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/shell"
 	"github.com/relux-works/curator/internal/skillcheck"
+	"github.com/relux-works/curator/internal/transaction"
 	"github.com/relux-works/curator/internal/ui"
 	"github.com/relux-works/curator/internal/version"
 )
@@ -53,11 +57,11 @@ Commands:
   install [path] [flags]   apply Skillfile.json (see install -h)
   update                   fetch all source repositories under skills_root
   upgrade [path]           fetch the selected dependency closure, then install
-  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
   list                     configured projects and declared skills
   project <subcommand>     add | resolve
   skill check <dir>        validate one skill package (--locale, --json)
-  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
   gc                       remove unreferenced runtime entries
@@ -68,6 +72,14 @@ Commands:
 `
 
 func main() {
+	// The fixed hidden go-v1 build worker is an implementation boundary, not a
+	// user-visible command surface. It is dispatched before any other parsing,
+	// requires exactly this one manager-owned argument, and is never reachable
+	// through a package file, manifest value, environment value, PATH lookup,
+	// shell, or user option.
+	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
+		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
+	}
 	os.Exit(run(os.Args[1:]))
 }
 
@@ -162,7 +174,7 @@ func projectRootArg(args []string) string {
 func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
 	var flagArgs, positional []string
 	for index := 0; index < len(args); index++ {
-		arg := args[index]
+		arg := args[index] // #nosec G602 -- index is bounded by the loop condition and only advanced after an explicit bounds check
 		if arg == "--" {
 			for trailing := index + 1; trailing < len(args); trailing++ {
 				positional = append(positional, args[trailing])
@@ -507,6 +519,9 @@ func cmdInstallMode(args []string, fetch bool) int {
 	for _, target := range targets {
 		result := install.Project(cfg, target.Root, target.Alias, opts)
 		printResult(result)
+		if !opts.DryRun {
+			printRepairNotices(result)
+		}
 		if result.Status == "failed" {
 			exitCode = exitFail
 		}
@@ -518,8 +533,32 @@ func printResult(result install.Result) {
 	for _, message := range result.Messages {
 		fmt.Println(message)
 	}
+	printResultErrors(result)
+}
+
+// printResultErrors reports the failure surface of a result: the redacted
+// failure text plus, when a go-v1 trust boundary refused, the operator guidance
+// that belongs to it — which selection mechanisms exist and which release
+// families this manager tested.
+func printResultErrors(result install.Result) {
+	printFailures(result, "error:")
+}
+
+// printStatusRefusal is the read-only reporting form of the same surface.
+// `status` uses it when the refusal is already published per command in the
+// stable vocabulary: stdout stays one report document, and the same detail is
+// a warning on standard error rather than an error, because the command did
+// produce the report it was asked for.
+func printStatusRefusal(result install.Result) {
+	printFailures(result, "warning:")
+}
+
+func printFailures(result install.Result, prefix string) {
 	for _, message := range result.Errors {
-		fmt.Fprintln(os.Stderr, "error:", message)
+		fmt.Fprintln(os.Stderr, prefix, message)
+	}
+	if guidance := goToolchainGuidance(result.BuildDiagnostic); guidance != "" {
+		fmt.Fprintln(os.Stderr, prefix, guidance)
 	}
 }
 
@@ -587,11 +626,30 @@ func cmdStatus(args []string) int {
 	exitCode := exitOK
 	jsonResults := make([]map[string]any, 0, len(targets))
 	for _, target := range targets {
+		// Installed markers are fingerprinted before the read-only plan and
+		// again after classification, so compiled state that moved during the
+		// whole window is reported as such instead of silently deciding the
+		// verdict from a plan that was already stale.
+		scope := projectStatusScope(cfg, target.Root, target.Alias)
+		before := markerDigests(scope.stores...)
 		result := install.Project(cfg, target.Root, target.Alias, install.Options{DryRun: true})
 		if result.Status == "failed" {
-			printResult(result)
-			exitCode = exitFail
-			continue
+			// A read-only plan that refused, yet still described every compiled
+			// command it was asked about, has produced a currentness verdict — and
+			// reporting a verdict is not itself a failure. The rows below carry it
+			// in the stable vocabulary, and `--check` is the surface that turns a
+			// non-current verdict into a non-zero exit.
+			//
+			// Everything else keeps the historical behaviour exactly: a failure
+			// that describes no compiled command, or describes only some of them,
+			// reports the error and exits non-zero rather than publishing a
+			// silently partial report.
+			if !result.BuildsComplete {
+				printResult(result)
+				exitCode = exitFail
+				continue
+			}
+			printStatusRefusal(result)
 		}
 		if result.Status == "skipped" {
 			printResult(result)
@@ -600,8 +658,14 @@ func cmdStatus(args []string) int {
 			}
 			continue
 		}
-		drift := statusDrift(cfg, target.Root)
-		jsonResults = append(jsonResults, map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift})
+		drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
+		payload := map[string]any{"alias": target.Alias, "path": target.Root, "skills": drift}
+		// A closure without compiled commands keeps the historical object
+		// exactly: no build key appears at all.
+		if len(builds) > 0 {
+			payload["builds"] = builds
+		}
+		jsonResults = append(jsonResults, payload)
 		if !*jsonOut {
 			names := make([]string, 0, len(drift))
 			for name := range drift {
@@ -611,13 +675,12 @@ func cmdStatus(args []string) int {
 			for _, name := range names {
 				fmt.Printf("%s: %s %s\n", target.Alias, name, drift[name])
 			}
-		}
-		if *check {
-			for _, state := range drift {
-				if state != "up-to-date" {
-					exitCode = exitFail
-				}
+			for _, build := range builds {
+				fmt.Printf("%s: %s\n", target.Alias, build.Describe())
 			}
+		}
+		if *check && checkFailed(drift, builds) {
+			exitCode = exitFail
 		}
 	}
 	if *jsonOut {
@@ -631,9 +694,165 @@ func cmdStatus(args []string) int {
 	return exitCode
 }
 
+// statusScope is one installed scope seen by the read-only currentness surface:
+// the declaration document it compares against, the store its own skills are
+// installed into, and every store a command it activates may live in.
+//
+// It exists so the project scope and the machine-wide scope share one
+// classification, one stable vocabulary, and one fail-closed verdict rather than
+// growing a second, weaker one.
+type statusScope struct {
+	alias        string
+	manifestRoot string
+	skillsDir    string
+	// stores is fingerprinted for the classification race window and searched
+	// for the installed directory of a compiled command's skill.
+	stores []string
+}
+
+// projectStatusScope is one project. It also reads the machine-level hybrid
+// store, because a hybrid declaration activates against a project and its
+// installed node is reachable from here.
+func projectStatusScope(cfg *config.Config, projectRoot, alias string) statusScope {
+	skillsDir := filepath.Join(projectRoot, ".agents", "skills")
+	return statusScope{
+		alias:        alias,
+		manifestRoot: projectRoot,
+		skillsDir:    skillsDir,
+		stores:       []string{skillsDir, scopes.HybridSkillsRoot(cfg.Home())},
+	}
+}
+
+// globalStatusScope is the machine-wide scope. It consults no hybrid store:
+// hybrid declarations activate against a project, never against the global
+// scope, and every node the global closure resolves — declared or transitively
+// reached — is installed into the global store itself.
+func globalStatusScope(cfg *config.Config) statusScope {
+	root := install.GlobalRoot(cfg.Home())
+	return statusScope{
+		alias:        "global",
+		manifestRoot: root,
+		skillsDir:    filepath.Join(root, "skills"),
+		stores:       []string{filepath.Join(root, "skills")},
+	}
+}
+
 // statusDrift compares declared skills with installed markers.
 func statusDrift(cfg *config.Config, projectRoot string) map[string]string {
 	return scopeStatusDrift(cfg, projectRoot, filepath.Join(projectRoot, ".agents", "skills"))
+}
+
+// statusReport is the complete read-only currentness verdict of one scope: the
+// historical per-skill drift map plus one diagnostic row per compiled command
+// the closure activates.
+//
+// Compiled state can only demote a skill that every ordinary check already
+// accepted. A skill that is missing, tampered, unresolvable, or behind its
+// declaration keeps that more actionable code.
+func statusReport(
+	cfg *config.Config,
+	scope statusScope,
+	builds []buildFacts,
+	before map[string]string,
+) (map[string]string, []buildReport) {
+	drift := scopeStatusDrift(cfg, scope.manifestRoot, scope.skillsDir)
+	if len(builds) == 0 {
+		return drift, nil
+	}
+
+	bySkill := map[string][]buildFacts{}
+	var skills []string
+	for _, facts := range builds {
+		if _, seen := bySkill[facts.Skill]; !seen {
+			skills = append(skills, facts.Skill)
+		}
+		bySkill[facts.Skill] = append(bySkill[facts.Skill], facts)
+	}
+	sort.Strings(skills)
+
+	type verdict struct {
+		skill     string
+		installed string
+		facts     []buildFacts
+		state     string
+		rows      []buildReport
+	}
+	verdicts := make([]verdict, 0, len(skills))
+	for _, skill := range skills {
+		facts := bySkill[skill]
+		installed, present := installedSkillDir(scope, skill)
+		if !present {
+			verdicts = append(verdicts, verdict{skill: skill, installed: installed, facts: facts,
+				state: stateNotInstalled,
+				rows: plannedRows(facts, stateNotInstalled, "",
+					"the compiled command belongs to a skill that is not installed")})
+			continue
+		}
+		state, rows := classifySkillBuilds(installed, marker.Read(installed), facts)
+		verdicts = append(verdicts, verdict{skill: skill, installed: installed, facts: facts, state: state, rows: rows})
+	}
+
+	// The second look closes the whole window: planning and every classification
+	// above have run, so compiled state that differs from the state this verdict
+	// was derived from makes the verdict stale, not authoritative. Both halves of
+	// that state are re-read — the install markers this run fingerprinted, and
+	// the protected cache evidence every compiled row was classified from —
+	// because either one can move on its own.
+	after := markerDigests(scope.stores...)
+	movedCache := recheckBuildCache(cfg.Home(), builds)
+	var reports []buildReport
+	for _, item := range verdicts {
+		if changed := changedDuringCheck(item.facts, before, after, item.installed, movedCache); changed != "" {
+			item.state = buildStateChanged
+			item.rows = plannedRows(item.facts, buildStateChanged, "", changed)
+		}
+		reports = append(reports, item.rows...)
+		demoteSkill(drift, item.skill, item.state)
+	}
+	return drift, reports
+}
+
+// changedDuringCheck reports why one skill's compiled verdict is not
+// authoritative, or an empty string when nothing it was derived from moved.
+func changedDuringCheck(
+	facts []buildFacts,
+	before, after map[string]string,
+	installedDir string,
+	movedCache map[string]bool,
+) string {
+	if markerMoved(before, after, installedDir) {
+		return "the install marker changed while status was classifying it; re-run status"
+	}
+	for _, item := range facts {
+		if movedCache[item.Skill+"."+item.Command] {
+			return "protected build cache state changed while status was classifying it; re-run status"
+		}
+	}
+	return ""
+}
+
+// demoteSkill lowers one declared skill from up-to-date to a compiled-state
+// code. It never overwrites a code an ordinary check already produced.
+func demoteSkill(drift map[string]string, skill, state string) {
+	if state == "" || currentCode(state) {
+		return
+	}
+	if recorded, declared := drift[skill]; declared && recorded == stateUpToDate {
+		drift[skill] = state
+	}
+}
+
+// installedSkillDir resolves the store that holds one installed skill: the
+// scope's own context store, or another store the scope reads for a node no
+// declaration in it reaches.
+func installedSkillDir(scope statusScope, skill string) (string, bool) {
+	for _, store := range scope.stores {
+		candidate := filepath.Join(store, skill)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, true
+		}
+	}
+	return filepath.Join(scope.skillsDir, skill), false
 }
 
 func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[string]string {
@@ -645,33 +864,37 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
 	for _, decl := range projectManifest.Skills {
 		installed := filepath.Join(skillsDir, decl.Name)
 		if _, err := os.Stat(installed); err != nil {
-			drift[decl.Name] = "not-installed"
+			drift[decl.Name] = stateNotInstalled
 			continue
 		}
 		recorded := marker.Read(installed)
 		if recorded == nil {
-			drift[decl.Name] = "invalid-marker"
-			continue
-		}
-		if recorded.SchemaVersion != marker.SchemaVersion {
-			drift[decl.Name] = "unsupported-marker"
+			// Marker schema 1 stays readable, so an unchanged schema 1 through 5
+			// installation remains current under it. Only a marker the reader
+			// refuses reaches here, and the refusal itself carries the stable
+			// code: a schema this manager cannot read, a build driver outside the
+			// closed set, or an invalid document. A schema-1 marker that has to
+			// describe a compiled command is demoted later, by the build
+			// classification that can actually see the plan.
+			state, _ := markerRefusal(installed)
+			drift[decl.Name] = state
 			continue
 		}
 		actualHash, err := hashing.ContentSHA256(installed, nil)
 		if err != nil || actualHash != recorded.ContentSHA256 {
-			drift[decl.Name] = "content-drift"
+			drift[decl.Name] = stateContentDrift
 			continue
 		}
 		repo := filepath.Join(cfg.SkillsRoot, filepath.FromSlash(decl.Source))
 		resolved, err := gitops.Resolve(repo, decl.Ref.Kind, decl.Ref.Value)
 		if err != nil {
-			drift[decl.Name] = "unresolvable"
+			drift[decl.Name] = stateUnresolvable
 			continue
 		}
 		if recorded.RefKind == decl.Ref.Kind && recorded.Ref == decl.Ref.Value && recorded.Commit == resolved.Commit {
-			drift[decl.Name] = "up-to-date"
+			drift[decl.Name] = stateUpToDate
 		} else {
-			drift[decl.Name] = "needs-install"
+			drift[decl.Name] = stateNeedsInstall
 		}
 	}
 	return drift
@@ -887,16 +1110,7 @@ func cmdGlobal(args []string) int {
 		}
 		return exitOK
 	case "status":
-		drift := scopeStatusDrift(cfg, install.GlobalRoot(cfg.Home()), filepath.Join(install.GlobalRoot(cfg.Home()), "skills"))
-		names := make([]string, 0, len(drift))
-		for name := range drift {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			fmt.Printf("global: %s %s\n", name, drift[name])
-		}
-		return exitOK
+		return cmdGlobalStatus(cfg, args[1:])
 	case "update":
 		return cmdUpdate()
 	case "upgrade":
@@ -904,6 +1118,137 @@ func cmdGlobal(args []string) int {
 	}
 	fmt.Fprintf(os.Stderr, "curator: unknown global subcommand %q\n", args[0])
 	return exitUsage
+}
+
+// cmdGlobalStatus is the read-only currentness surface of the machine-wide
+// scope. It carries the same contract as `curator status`: the same stable
+// codes, the same optional machine-readable document, and the same fail-closed
+// `--check`.
+//
+// Compiled currentness cannot be read off an install marker alone — the logical
+// key is a digest over the whole build input, and only a plan derives the
+// current one — so this command runs the same read-only global plan
+// `curator global install --dry-run` runs. That resolves the closure and passes
+// the read-only audit and registry gates; it runs no compiler and writes no
+// installation target, cache entry, or trust state.
+//
+// The pre-existing surface is preserved exactly. The declared-skill report is
+// still derived straight from install markers, never from the plan, so a global
+// scope without compiled commands prints the lines it always printed and still
+// exits zero — including when the plan itself refused. Reporting and verdict
+// stay separate here too: `--check` is the only surface that turns a
+// non-current, or an unprovable, verdict into a non-zero exit.
+//
+// The command is three phases — parse the request, acquire the plan once,
+// classify and render from it — so the whole reporting contract can be driven
+// from an already acquired plan without a second one being derived for it.
+func cmdGlobalStatus(cfg *config.Config, args []string) int {
+	opts, code := parseGlobalStatusOptions(args)
+	if code != exitOK {
+		return code
+	}
+	return reportGlobalStatus(cfg, opts, globalStatusPlan)
+}
+
+// globalStatusOptions is the parsed request of one `curator global status`
+// invocation: which document to render, and whether the verdict is fail-closed.
+type globalStatusOptions struct {
+	check   bool
+	jsonOut bool
+}
+
+// parseGlobalStatusOptions is the first phase. The machine-wide scope takes no
+// target: it is one scope, so a stray path is a usage error rather than
+// something silently ignored.
+func parseGlobalStatusOptions(args []string) (globalStatusOptions, int) {
+	flags := flag.NewFlagSet("global status", flag.ContinueOnError)
+	check := flags.Bool("check", false, "exit non-zero unless every skill and compiled command is current")
+	jsonOut := flags.Bool("json", false, "machine-readable output")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
+		return globalStatusOptions{}, exitUsage
+	}
+	if len(positional) > 0 {
+		fmt.Fprintln(os.Stderr, "curator: global status accepts flags only")
+		return globalStatusOptions{}, exitUsage
+	}
+	return globalStatusOptions{check: *check, jsonOut: *jsonOut}, exitOK
+}
+
+// globalStatusAcquire is the second phase: it produces the read-only plan the
+// compiled verdict is derived from, and reports whether compiled state stayed
+// unprovable. A command run always passes globalStatusPlan, so every invocation
+// classifies a plan this run acquired itself.
+type globalStatusAcquire func(*config.Config) (install.Result, bool)
+
+// reportGlobalStatus is the third phase: it classifies the acquired plan against
+// installed state, renders the requested document, and applies the fail-closed
+// verdict. Acquisition is a parameter so the phase can be driven from a plan
+// that was already acquired, without the classification, the rendering, or the
+// verdict differing in any way from a command run.
+func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire globalStatusAcquire) int {
+	scope := globalStatusScope(cfg)
+	// Installed markers are fingerprinted before the read-only plan and again
+	// after classification, so compiled state that moved during the whole window
+	// is reported as such instead of published as an authoritative verdict.
+	before := markerDigests(scope.stores...)
+	result, unprovable := acquire(cfg)
+	if result.Status == "failed" {
+		// The declared-skill report was still produced, so the refusal is a
+		// warning on standard error rather than an error, exactly as it is for a
+		// project status that still published every compiled row.
+		printStatusRefusal(result)
+	}
+
+	drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
+	if opts.jsonOut {
+		// The machine-wide document carries no `path`: the scope has no
+		// operator-supplied root, `alias` already identifies it, and the manager
+		// home is never published. A scope without compiled commands produces the
+		// declared-skill document with no `builds` key at all.
+		payload := map[string]any{"alias": scope.alias, "skills": drift}
+		if len(builds) > 0 {
+			payload["builds"] = builds
+		}
+		document, _ := json.MarshalIndent(payload, "", "  ")
+		fmt.Println(string(document))
+	} else {
+		names := make([]string, 0, len(drift))
+		for name := range drift {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			fmt.Printf("%s: %s %s\n", scope.alias, name, drift[name])
+		}
+		for _, build := range builds {
+			fmt.Printf("%s: %s\n", scope.alias, build.Describe())
+		}
+	}
+	if opts.check && (unprovable || checkFailed(drift, builds)) {
+		return exitFail
+	}
+	return exitOK
+}
+
+// globalStatusPlan runs the read-only machine-wide plan and reports whether
+// compiled state stayed unprovable.
+//
+// Unprovable means the plan refused before it could describe every compiled
+// command the closure activates, so this run cannot even tell whether the scope
+// has compiled state. It never suppresses the declared-skill report; it is the
+// fail-closed input of `--check`. A scope with no machine-wide Skillfile is not
+// unprovable: it declares nothing and activates nothing.
+func globalStatusPlan(cfg *config.Config) (install.Result, bool) {
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home()), Status: "failed"}
+		result.Errors = append(result.Errors, fmt.Sprintf(
+			"could not resolve the user home the machine-wide scope mirrors into: %v", err))
+		return result, true
+	}
+	result := install.Global(cfg, userHome, install.Options{DryRun: true})
+	return result, result.Status == "failed" && !result.BuildsComplete
 }
 
 func runGlobalInstall(cfg *config.Config, args []string) int {
@@ -935,6 +1280,9 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	}
 	result := install.Global(cfg, userHome, opts)
 	printResult(result)
+	if !opts.DryRun {
+		printRepairNotices(result)
+	}
 	if result.Status == "failed" {
 		return exitFail
 	}
@@ -1175,21 +1523,63 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string) 
 	return audit.Gate(cfg, subjects)
 }
 
+// cmdGC runs maintenance under the exclusive manager-home mutation lock, so it
+// serializes with every install, rollback, and recovery. Incomplete
+// transactions are recovered first, and their build references are marked, so
+// an installation interrupted by a crash keeps the artifacts it will finish
+// with.
 func cmdGC() int {
 	cfg, code := loadConfig()
 	if code != exitOK {
 		return code
 	}
-	removed, err := scopes.CollectRuntime(cfg.Home())
+	home := cfg.Home()
+	manager, err := managerlock.New(home)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
 		return exitFail
 	}
-	for _, entry := range removed {
+	lock, err := manager.AcquireHomeOnly(context.Background(), false)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator: acquire the manager-home lock:", err)
+		return exitFail
+	}
+	result, err := collectUnderLock(home, lock)
+	if closeErr := lock.Close(); closeErr != nil && err == nil {
+		err = fmt.Errorf("release the manager-home lock: %w", closeErr)
+	}
+	for _, warning := range result.Warnings {
+		fmt.Fprintln(os.Stderr, "curator: warning:", warning)
+	}
+	for _, entry := range result.RemovedRuntime {
 		fmt.Println("removed runtime", entry)
 	}
-	fmt.Printf("gc: %d runtime entr%s removed\n", len(removed), pluralY(len(removed)))
+	for _, key := range result.RemovedBuilds {
+		fmt.Println("removed build", key)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	fmt.Printf("gc: %d runtime entr%s removed, %d build entr%s removed\n",
+		len(result.RemovedRuntime), pluralY(len(result.RemovedRuntime)),
+		len(result.RemovedBuilds), pluralY(len(result.RemovedBuilds)))
 	return exitOK
+}
+
+func collectUnderLock(home string, lock *managerlock.HomeLock) (scopes.MaintenanceResult, error) {
+	engine, err := transaction.New(home)
+	if err != nil {
+		return scopes.MaintenanceResult{}, fmt.Errorf("open the install transaction journal: %w", err)
+	}
+	if err := engine.Recover(lock); err != nil {
+		return scopes.MaintenanceResult{}, fmt.Errorf("recover incomplete install transactions: %w", err)
+	}
+	journalKeys, err := engine.ReferencedBuildKeys(lock)
+	if err != nil {
+		return scopes.MaintenanceResult{}, fmt.Errorf("read in-flight build references: %w", err)
+	}
+	return scopes.Collect(scopes.MaintenanceRequest{Home: home, Lock: lock, JournalKeys: journalKeys})
 }
 
 func cmdShellInit(args []string) int {

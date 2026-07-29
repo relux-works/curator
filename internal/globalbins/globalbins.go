@@ -339,17 +339,31 @@ func unmanagedConflict(path, name string, managed map[string]bool, canonical, pl
 	return true
 }
 
+// ownedTarget recognizes both forwarding shim forms. A staged, transactionally
+// committed mirror is a regular launcher file, because the transaction layer
+// cannot journal a link. A symlink is the pre-transaction form and stays
+// recognized so an installation created by an older manager is still adopted
+// and replaced rather than reported as an unmanaged conflict.
 func ownedTarget(path, canonical, platform string) bool {
 	if platform == "windows" {
 		payload, err := os.ReadFile(path) // #nosec G304 -- path is a validated command below the selected user bin
 		if err != nil {
 			return false
 		}
-		expected := runtimestore.WindowsShimContent(canonical, nil)
-		return string(payload) == expected
+		return string(payload) == runtimestore.WindowsShimContent(canonical, nil)
 	}
 	info, err := os.Lstat(path)
-	if err != nil || info.Mode()&os.ModeSymlink == 0 {
+	if err != nil {
+		return false
+	}
+	if info.Mode().IsRegular() {
+		payload, err := os.ReadFile(path) // #nosec G304 -- path is a validated command below the selected user bin
+		if err != nil {
+			return false
+		}
+		return string(payload) == runtimestore.UnixShimContent(canonical, nil)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
 		return false
 	}
 	target, err := os.Readlink(path)
@@ -360,6 +374,16 @@ func ownedTarget(path, canonical, platform string) bool {
 		target = filepath.Join(filepath.Dir(path), target)
 	}
 	return samePath(target, canonical, platform)
+}
+
+// ledgerPayload renders the canonical ownership ledger bytes so a staged ledger
+// is byte-identical to a directly written one.
+func ledgerPayload(entries map[string]bool) ([]byte, error) {
+	payload, err := json.MarshalIndent(ledger{SchemaVersion: ledgerSchema, Entries: expectedNames(entries)}, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(payload, '\n'), nil
 }
 
 func readLedger(binDir string) map[string]bool {

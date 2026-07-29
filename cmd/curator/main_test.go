@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
@@ -343,5 +344,20 @@ func runGit(t *testing.T, dir string, args ...string) {
 	)
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, output)
+	}
+}
+
+// TestHiddenWorkerModeIsNotAUserVisibleCommand proves the fixed go-v1 worker
+// mode is dispatched before command parsing and never appears in the CLI
+// surface, so no package, manifest, or user option can reach it by name.
+func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
+	if strings.Contains(usage, godriver.WorkerMode) {
+		t.Fatal("the hidden worker mode appears in the user-visible command surface")
+	}
+	if code := run([]string{godriver.WorkerMode}); code != exitUsage {
+		t.Fatalf("run(%q) = %d, want the unknown-command usage exit", godriver.WorkerMode, code)
+	}
+	if code := run([]string{godriver.WorkerMode, "extra"}); code != exitUsage {
+		t.Fatalf("run with an extra argument = %d, want the unknown-command usage exit", code)
 	}
 }
