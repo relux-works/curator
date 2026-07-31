@@ -179,8 +179,13 @@ func TestWindowsProtectedHomeStillServesOrdinaryManagerState(t *testing.T) {
 	if err != nil || string(payload) != "held" {
 		t.Fatalf("read back ordinary manager state = %q, %v", payload, err)
 	}
-	if _, err := os.OpenFile(lock, os.O_RDWR, 0o600); err != nil {
+	reopened, err := os.OpenFile(lock, os.O_RDWR, 0o600)
+	if err != nil {
 		t.Fatalf("reopen ordinary manager state for writing: %v", err)
+	}
+	// Windows refuses to unlink an open file, and t.TempDir cleanup would fail.
+	if err := reopened.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 

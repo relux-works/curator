@@ -460,10 +460,16 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
 	if current.State != buildCurrent || current.CacheOutcome != "cache-hit" {
 		t.Fatalf("current build row = %+v", current)
 	}
+	// The artifact name is the target's, not this host's spelling of it: a
+	// windows build reports bin/build-tool.exe and a unix one bin/build-tool.
+	wantArtifact, err := buildmeta.ArtifactPath("build-tool", runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if current.Skill != "build-skill" || current.Command != "build-tool" ||
 		current.Driver != "go-v1" || current.BuildRoot != "assets/build-tool" ||
 		current.SourceDir != "assets/build-tool/cmd/tool" || current.CacheKey == "" ||
-		current.ArtifactPath != "bin/build-tool" || current.Target == "" ||
+		current.ArtifactPath != wantArtifact || current.Target == "" ||
 		current.BuildSource.ContentSHA256 == "" {
 		t.Fatalf("current build row does not report the full planned command: %+v", current)
 	}
@@ -1302,9 +1308,7 @@ func assertProtectedCacheStateThatMovedDuringTheCheck(t *testing.T, fixture comp
 		},
 		"the protected boundary stops being provable": func(t *testing.T, _ buildmeta.Input) {
 			for _, entry := range cacheEntries(t, home) {
-				if err := os.Chmod(entry, 0o777); err != nil {
-					t.Fatal(err)
-				}
+				breakCacheProtection(t, entry)
 			}
 		},
 		// The hardest case: the entry is still a valid hit for the same logical
