@@ -1,0 +1,235 @@
+TASK-260720-z2z795 CURRENT REWORK VALIDATION
+run: RUN-260730-b00eb8
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+HEAD: 5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+
+PROVENANCE AND SCOPE
+
+The current lock-integrity rework reused the instructed task worktree without
+fetch, reset, rebase, stage, commit, SSH, push, tag, release, or pin changes.
+The accepted worktree HEAD remained
+5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec.
+
+command: git diff --name-only
+exit: 0
+output:
+  src/csk/locking.py
+  src/csk/transactions.py
+  tests/test_locking.py
+  tests/test_transactions.py
+
+EXPECTED-RED RE-REVIEW REGRESSIONS
+
+command:
+  focused selection for wrong manager-home witnesses, stable entry targets,
+  cleanup tomb reappearance, and first-use home recanonicalization
+exit: 1
+output: 14 failed, 3 passed in 2.22s
+rationale: expected pre-implementation failure proving the four review
+boundaries were not already accepted by the existing behavior.
+
+INTERMEDIATE DIAGNOSTICS (NOT CREDITED AS GREEN GATES)
+
+command:
+  focused locking/transaction pytest after the initial implementation
+exit: 1
+output: 1 failed, 121 passed, 4 skipped in 376.06s
+rationale: repeated physical manager-home canonicalization at every mutation
+boundary caused the concurrent-consumer timeout. The engine now binds once
+under the held witness and rechecks the immutable identity cheaply.
+
+command:
+  zsh invocation of parameterized lock-integrity node IDs without quoting
+exit: 1
+output: zsh:1: no matches found: ...[.lock]
+rationale: shell expansion error before pytest collection; the quoted command
+was rerun and is recorded below.
+
+command:
+  task mypy interpreter -m mypy src tests
+exit: 1
+output: Found 791 errors in 41 files (checked 98 source files)
+rationale: this diagnostic invocation overrode pyproject's strict src/csk
+scope and included the legacy untyped test tree in a venv without pytest.
+The exact configured strict command was rerun below.
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 1
+output: two findings (SIM114, SIM117)
+rationale: corrected before the current-byte gates.
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 1
+output: formatting changes required
+rationale: uvx ruff format was run with exit 0; current-byte check is below.
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 1
+output: B010 in the read-only home_identity regression
+rationale: changed the assertion to direct property assignment; current-byte
+lint is below.
+
+command:
+  new boundary pytest selection with obsolete test node
+  test_windows_missing_home_identity_changes_after_case_sensitive_creation
+exit: 4
+output: no tests ran; node not found
+rationale: selection typo only. The corrected node
+test_windows_nested_missing_identity_is_recanonicalized_after_creation was
+rerun below.
+
+One parallel focused-pytest orchestration attempt yielded without a terminal
+status and is not credited. The exact focused command was rerun directly to a
+terminal exit and is recorded below.
+
+CURRENT-BYTE NEW BOUNDARY REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_windows_nested_missing_identity_is_recanonicalized_after_creation
+  tests/test_locking.py::test_each_lock_class_recanonicalizes_the_home_before_process_reservation
+  tests/test_locking.py::test_windows_case_sensitive_first_use_keeps_distinct_lock_classes_concurrent
+  tests/test_transactions.py::test_home_lock_witness_is_bound_to_the_engine_home_before_state_access
+  tests/test_transactions.py::test_entry_target_commit_replaces_the_link_without_mutating_referents
+  tests/test_transactions.py::test_entry_kind_digests_the_link_destination_while_bytes_remain_strict
+  tests/test_transactions.py::test_entry_target_removal_unlinks_only_the_owned_entry
+  tests/test_transactions.py::test_entry_target_rollback_restores_the_exact_link
+  tests/test_transactions.py::test_entry_target_recovery_finishes_an_interrupted_link_commit
+  tests/test_transactions.py::test_entry_target_stale_preimage_preserves_a_repointed_link_and_referents
+  tests/test_transactions.py::test_entry_target_and_its_referent_are_independent_transaction_namespaces
+  tests/test_transactions.py::test_recovery_preserves_cleanup_tomb_reappearing_after_removed_state
+exit: 0
+output: 19 passed, 3 skipped in 7.18s
+skip rationale: the three parameterized real Windows per-directory
+case-sensitive first-use contention cases require a Windows host. The pure
+before/after identity regression and deterministic recanonicalization tests ran
+on this host.
+
+PRESCRIBED PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_requires_offline_migration
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_crashed_owner_and_barrier_contenders_share_one_stable_lock
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+output: 14 passed in 6.15s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_project_locks_are_canonicalized_deduplicated_and_byte_sorted
+  tests/test_locking.py::test_home_lock_is_forbidden_while_build_lock_is_held_by_another_thread
+  tests/test_locking.py::test_pending_home_lock_blocks_project_and_build_acquisition
+  tests/test_transactions.py::test_journal_records_complete_ordered_recovery_state_and_consumer_commits_last
+  tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project
+  tests/test_transactions.py::test_commit_failure_rolls_back_in_exact_reverse_commit_order
+  tests/test_transactions.py::test_concurrent_project_transactions_preserve_both_consumers
+  tests/test_transactions.py::test_failed_second_project_restores_ledger_preimage_containing_first_success
+  tests/test_transactions.py::test_stale_preimage_is_rejected_without_overwriting_newer_state
+  tests/test_transactions.py::test_generation_change_is_rejected_at_commit
+exit: 0
+output: 13 passed in 15.32s
+
+FOCUSED PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 124 passed, 4 skipped in 63.32s
+skip rationale: one existing real-Windows durability case and the three new
+real-Windows per-directory case-sensitive contention cases require Windows.
+
+FULL PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output: 694 passed, 23 skipped in 159.33s
+
+STRICT MYPY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --cache-dir=/tmp/TASK-260720-z2z795-b00eb8-final-mypy-cache
+exit: 0
+output: Success: no issues found in 57 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 4 files already formatted
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+  --outdir .temp/TASK-260720-z2z795/current-review/build-RUN-260730-b00eb8-final
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730.tar.gz and
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730-py3-none-any.whl
+
+DIFF CHECK
+
+command: git diff --check
+exit: 0
+output: empty
+
+SOURCE SHA-256
+
+88a1d0db58c8eb6834cd460b6067371fce222c010d0b1c2b67cae69670015932  src/csk/locking.py
+f479fe784a4dd485d355e41c5344717ad26fbb4eecb10fd52ca9f87d7558b34a  src/csk/transactions.py
+a10530435846d48c3eda01d034c3e717bbbc9763857d658970e313c155e0cca2  tests/test_locking.py
+3d1a03d559b20de0113a434db56b3c184727b390993d894f9b4811875c1223a8  tests/test_transactions.py
+
+BUILD SHA-256
+
+22c170663c525b9f0f6853eca1dab8d6951118773dfc5ad61162718c4a3592a6  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730-py3-none-any.whl
+3cd709fa59616d78ed7cbce97f3ab08fe070257e738fe547ff4810f2c4ee72ff  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730.tar.gz
+
+LOGBOOK AVAILABILITY
+
+command: command -v logbook
+exit: 1
+output: empty
+rationale: no logbook executable is installed. Findings are preserved in this
+task-scoped outcome and the board notes/resources instead.

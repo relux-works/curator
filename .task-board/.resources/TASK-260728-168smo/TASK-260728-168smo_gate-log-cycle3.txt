@@ -1,0 +1,87 @@
+TASK-260728-168smo — gate transcript, rework cycle 3
+=====================================================
+date 2026-07-29 · gate host macOS 26.5 arm64 · qualification host Windows 10 Pro 10.0.19045.6456 AMD64
+
+Every gate was run standalone and its real exit code is recorded. Two gates are
+expected-red and both are attributed below.
+
+curator-spec (worktree .temp/TASK-260728-168smo/curator-spec-worktree, base 57c1f56)
+------------------------------------------------------------------------------------
+  jsonschema is absent from the system interpreter, so validate.py runs from a
+  throwaway venv built from the repo requirements-dev.txt (jsonschema 4.25.1),
+  exactly as in cycle 2.
+
+  /tmp/specvenv/bin/python tools/validate.py   (baseline 57c1f56, clean checkout)
+                                                              exit 0
+  /tmp/specvenv/bin/python tools/validate.py   (task worktree)
+                                                              exit 1   EXPECTED-RED
+      validation failed: docs/external-build-repositories.md:
+        broken local link: ../release/1.0.0-rc.5.json
+      ATTRIBUTION: docs/external-build-repositories.md is an untracked in-flight
+      sibling document copied into this worktree by another task; line 146 links
+      to a release file that does not exist on this base. This task authored 0
+      of the broken links. Cycle 2 saw three such links across two copied-in
+      documents; two of them were in docs/kotlin-native-build-drivers.md, which
+      this cycle rewrote, so the count is now one.
+
+  scoped link sweep over the two documents this task authored
+    decisions/0010-kotlin-native-driver-pair.md
+    docs/kotlin-native-build-drivers.md
+                                                              exit 0
+      6 local links, 0 broken
+
+  /tmp/specvenv/bin/python -m unittest discover -s tools -p 'test_*.py'
+                                                              exit 0   Ran 8 tests
+  go test ./tools/...                                         exit 0
+      ok github.com/relux-works/curator-spec/tools/generate-vectors
+
+curator (repository root)
+-------------------------
+  go build ./...                                              exit 0
+  go vet ./...                                                exit 0
+  gofmt -l ./cmd ./internal                                   exit 0   0 files
+  go test ./...                                               exit 0   31 packages ok
+  make check                                                  exit 2   EXPECTED-RED
+      go vet and go test inside make check both pass; the gofmt stage fails.
+      ATTRIBUTION: it lists 1,528 unformatted Go files, every one of them under
+      another task's .temp/ scratch directory:
+        1,521  .temp/TASK-260728-2jaw7h/go1.25.1/...   (a vendored Go toolchain
+                                                        source tree)
+            4  .temp/TASK-260720-1zntv0/...
+            2  .temp/TASK-260729-1t1z2l/review-tmp/... (generated _testmain.go)
+            1  .temp/TASK-260729-3jmqgl/worktree/...
+      0 of them belong to this task. gofmt -l ./cmd ./internal — the product
+      tree — lists 0 files. This task authored 0 Go files, 0 schemas,
+      0 vectors and 0 release files.
+  golangci-lint                                               NOT RUN
+      not installed on this host.
+
+Qualification host
+-------------------
+  The A1-A9 acceptance test itself is not a repository gate; its exit codes are
+  in TASK-260728-168smo_command-evidence.log records W1-W17 and in the raw host
+  logs inside TASK-260728-168smo_probe.tar.gz.
+  Summary of the qualification exit codes:
+    checksum verification, both archives                      match
+    konanc -version                                           exit 0
+    konanc -list-targets                                      exit 0
+    hydration (the one online run)                            exit 0
+    compile, writable bundle data dir                         exit 0
+    compile, write-denied bundle data dir                     exit 2  (expected)
+    compile, operation-private overlay                        exit 0
+    compile, overlay, under ETW process trace                 exit 0
+    produced artifact run                                     exit 0
+    platform-library sample compile and run                   exit 0
+    airplaneMode=true with a missing dependency               exit 2  (expected)
+    network-denied control, airplaneMode=false                exit 2  (expected)
+    network-denied subject, hydrated, airplaneMode=true       exit 0
+    konanc.bat control under the manager-owned empty PATH     exit 9009 (expected)
+    bundle tree digest, before and after every operation      unchanged
+
+Scope of change
+----------------
+  Two Markdown documents were authored:
+    decisions/0010-kotlin-native-driver-pair.md          (revision 3)
+    docs/kotlin-native-build-drivers.md                  (revision 3)
+  No Go, schema, vector, or release file was touched. No staging, commit,
+  publication, pin, or toolchain installation was performed on any host.

@@ -1,0 +1,40 @@
+TASK-260728-12pnm1 rework cycle 4 — gate log
+host: macOS 26.5 arm64
+rust: rustc 1.91.0 (f8297e351 2025-10-28) / cargo 1.91.0 (ea2d97820 2025-10-10)
+go:   go version go1.25.5 darwin/arm64
+
+probe, from the extracted tarball (/tmp/probe-verify)
+  gofmt -l .      0 files
+  go vet ./...    exit 0
+  go build ./...  exit 0
+  go test ./...   exit 0
+
+probe runs
+  full, macOS arm64          exit 0  green: 19/19 cases, P1+P2, 24 closure checks 0 verdicts,
+                                     15/15 controls failing as required, 124 host-independent
+                                     vectors 0 divergences, 16 structural checks 0 divergences
+                                     (out/probe-run.txt)
+  controls-only              exit 0  15/15 failing as required (out/probe-run-controls.txt)
+  no resolvable toolchain    exit 0  19 cases not_run, 124 vectors still run, nothing installed
+                                     (out/probe-run-absent.txt)
+
+repository (curator)
+  go build ./...  exit 0
+  go vet ./...    exit 0
+  go test ./...   exit 0
+  gofmt -l        0 files outside .temp/ and .task-board/
+
+expected-red, attributed to other tasks' scratch trees
+  make check                exit 2  — gofmt half lists 1521 files under .temp/TASK-260728-2jaw7h
+                                      (a vendored go1.25.1 source tree), 4 under
+                                      .temp/TASK-260720-1zntv0, 2 under .temp/TASK-260729-1t1z2l,
+                                      1 under .temp/TASK-260729-3jmqgl; 0 occurrences of
+                                      TASK-260728-12pnm1. Its go vet and go test halves are green.
+  tools/validate.py         exit 1  — broken local link ../release/1.0.0-rc.5.json in
+                                      docs/external-build-repositories.md, an untracked scratch
+                                      file belonging to another task.
+  clean-tree validate       exit 0  — 'validated 30 schemas and 93 vector files' after moving the
+                                      six untracked scratch paths aside; all six restored.
+  scoped link check         0 broken of 4 local links over the two authored documents
+
+golangci-lint             NOT RUN — not installed on this host

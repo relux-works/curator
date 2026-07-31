@@ -1,0 +1,1 @@
+Use the accepted TASK-260720-poa3ze design, the landed TASK-260720-3lo9jc normative authoring and CLI documentation, and TASK-260720-2g7avf shared executable cases. This task owns the practical cross-manager author guide only. Link normative definitions instead of silently redefining them, and do not claim released manager support before immutable release evidence exists.

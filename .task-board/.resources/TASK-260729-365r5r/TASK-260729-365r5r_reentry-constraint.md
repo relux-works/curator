@@ -1,0 +1,3 @@
+# Re-entry constraint
+
+This run packages already completed production gates. It MUST NOT run or start baseline scripts, atomicity tests, go test, go build, go vet, benchmarks, conformance probes, detached processes, or product edits. Existing valid gate files are authoritative. It MAY run exactly one command after proving the shared process barrier is empty: /Users/iv/go/bin/golangci-lint run in the prototype worktree, with a real exit code captured. Then update task-scoped evidence/checklists and hand off to review. Any partial baseline rerun artifacts from cancelled runs are invalid and must be explicitly excluded.

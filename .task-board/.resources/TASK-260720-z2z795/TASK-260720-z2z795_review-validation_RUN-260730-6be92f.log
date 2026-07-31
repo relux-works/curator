@@ -1,0 +1,249 @@
+TASK-260720-z2z795 INDEPENDENT REVIEW VALIDATION
+run: RUN-260730-6be92f
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+HEAD: 108ae51e549566b0b7e1ff4a8a2424e8cb4fcc77
+remote task ref: 108ae51e549566b0b7e1ff4a8a2424e8cb4fcc77
+verdict: accepted
+
+RUN CONTROL
+
+command: task-board spawn goal "$TASK_BOARD_RUN_ID"
+exit: 0
+result: Active Goal: none (run is not goal-bound)
+
+command: task-board spawn directives "$TASK_BOARD_RUN_ID"
+exit: 0
+result: No directives recorded for RUN-260730-6be92f
+
+TOOL READINESS
+
+task-board version 0.23.0 (commit beec6e9, built 2026-07-27T23:36:53Z)
+git version 2.50.1 (Apple Git-155)
+ripgrep 15.2.0
+Python 3.11.14
+pytest 8.3.4
+mypy 2.3.0 (compiled: yes)
+ruff 0.16.0
+build 1.2.2.post1
+
+PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_requires_offline_migration
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_crashed_owner_and_barrier_contenders_share_one_stable_lock
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+result: 14 passed in 6.85s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_project_locks_are_canonicalized_deduplicated_and_byte_sorted
+  tests/test_locking.py::test_home_lock_is_forbidden_while_build_lock_is_held_by_another_thread
+  tests/test_locking.py::test_pending_home_lock_blocks_project_and_build_acquisition
+  tests/test_transactions.py::test_journal_records_complete_ordered_recovery_state_and_consumer_commits_last
+  tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project
+  tests/test_transactions.py::test_commit_failure_rolls_back_in_exact_reverse_commit_order
+  tests/test_transactions.py::test_concurrent_project_transactions_preserve_both_consumers
+  tests/test_transactions.py::test_failed_second_project_restores_ledger_preimage_containing_first_success
+  tests/test_transactions.py::test_stale_preimage_is_rejected_without_overwriting_newer_state
+  tests/test_transactions.py::test_generation_change_is_rejected_at_commit
+exit: 0
+result: 13 passed in 14.10s
+
+WINDOWS-SENSITIVE SELECTION — PYTHON 3.11
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_stable_lock_descriptor_uses_binary_mode
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_acquire_rechecks_canonical_witness_after_publication
+  tests/test_transactions.py::test_recovery_rejects_journal_filename_id_mismatch_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+result: 21 passed in 5.76s
+
+WINDOWS-SENSITIVE SELECTION — PYTHON 3.14
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 uvx --python 3.14 pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_stable_lock_descriptor_uses_binary_mode
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_acquire_rechecks_canonical_witness_after_publication
+  tests/test_transactions.py::test_recovery_rejects_journal_filename_id_mismatch_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+result: 21 passed in 5.62s
+
+FOCUSED PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: 125 passed, 4 skipped in 64.57s
+skip boundary:
+  one real-Windows durability test and three real-Windows per-directory
+  case-sensitive first-use contention cases
+
+STRICT MYPY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+result: Success: no issues found in 62 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: 4 files already formatted
+
+FULL PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+exit: 0
+result: 804 passed, 58 skipped in 166.24s
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+  --outdir
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-z2z795/review-RUN-260730-6be92f/build
+exit: 0
+result:
+  Successfully built
+  cocoaskills-0.12.6.dev8+g108ae51e5.d20260730.tar.gz
+  cocoaskills-0.12.6.dev8+g108ae51e5.d20260730-py3-none-any.whl
+
+build SHA-256:
+  8b21a7126f9dd68ab1e1ff466aa3ab7d3b4067a1bcbdb6a2ddab974653161079
+    cocoaskills-0.12.6.dev8+g108ae51e5.d20260730-py3-none-any.whl
+  e3ed4503909f6949aad81b543fcdca150b96b5b0fcafc8ed3fbf20838c2de823
+    cocoaskills-0.12.6.dev8+g108ae51e5.d20260730.tar.gz
+
+DIFF CHECK
+
+command: git diff --check
+exit: 0
+result: empty
+
+ALL-LOCK-CLASS DESCRIPTOR PROBE
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src
+  /opt/homebrew/bin/python3.11 -
+  (temporary home; synthetic non-Windows O_BINARY flag; capture manager-home,
+  project, and build stable-descriptor opens)
+initial diagnostic exit: 1
+initial diagnostic result:
+  {"all_binary": true, "labels": ["build", "home", "project"],
+   "stable_open_count": 3, "synthetic_posix_flag": true}
+initial diagnostic rationale:
+  the substantive assertion passed, but the reviewer harness did not restore
+  os.open before TemporaryDirectory teardown and rejected shutil's dir_fd
+  keyword. This was a probe-only defect.
+corrected exit: 0
+corrected result:
+  {"all_binary": true, "labels": ["build", "home", "project"],
+   "stable_open_count": 3, "synthetic_posix_flag": true}
+
+PROVENANCE
+
+accepted base:
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+
+git merge-base --is-ancestor accepted-base HEAD:
+  exit 0
+
+git rev-parse HEAD:
+  108ae51e549566b0b7e1ff4a8a2424e8cb4fcc77
+
+git rev-parse origin/task/TASK-260720-z2z795-transaction-engine:
+  108ae51e549566b0b7e1ff4a8a2424e8cb4fcc77
+
+git status --short --branch:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/locking.py
+   M tests/test_locking.py
+   M tests/test_transactions.py
+
+source SHA-256:
+  6ca6f7b792fba0abd5e25109975e1928b403e5ceb818a45cf48545fc6c5a6aa6
+    src/csk/locking.py
+  f479fe784a4dd485d355e41c5344717ad26fbb4eecb10fd52ca9f87d7558b34a
+    src/csk/transactions.py
+  5b8e7a1a91a3e442e905c3be0037ecdb5747c1b1d2cffd464246af75df80d582
+    tests/test_locking.py
+  3f4edc3fadff19974c0194a9b9ad3535c5b4032308158626f76339170ac937af
+    tests/test_transactions.py
+
+OFFICIAL WINDOWS CONTRACT CHECK
+
+Python os.open:
+  https://docs.python.org/3/library/os.html#os.open
+  On Windows, O_BINARY is required to open the descriptor in binary mode.
+
+Microsoft CRT translation modes:
+  https://learn.microsoft.com/en-us/cpp/c-runtime-library/translation-mode-constants?view=msvc-170
+  Text mode translates LF/CRLF; _O_BINARY suppresses translation.
+
+Microsoft LockFileEx:
+  https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex
+  A second handle opened by the same process cannot access the exclusively
+  locked range until it is unlocked.
+
+PLATFORM AND REVIEWER BOUNDARY
+
+The run executed on macOS. The current three-file patch is unstaged and
+uncommitted, so no current-byte real-Windows CI result is claimed. The
+commit-owning mover should commit the accepted hashes and rerun the Windows
+Python 3.11/3.12/3.13/3.14 matrix before publication.
+
+The reviewer changed no product or test source, staged or committed nothing,
+performed no fetch/reset/rebase/push/tag/release/SSH operation, and supplied no
+commit_ack.

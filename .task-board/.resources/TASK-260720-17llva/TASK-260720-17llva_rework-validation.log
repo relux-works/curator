@@ -1,0 +1,22 @@
+Scoped validation
+command: PATH=.temp/TASK-260720-1nvomm/venv/bin:$PATH python3 tools/validate.py
+exit: 0
+validated 30 schemas and 93 vector files
+
+Full validation
+command: PATH=.temp/TASK-260720-1nvomm/venv/bin:$PATH make validate
+exit: 0
+python3 tools/validate.py
+validated 30 schemas and 93 vector files
+python3 -B -m unittest discover -s tools -p 'test_*.py'
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.808s
+
+OK
+go test ./tools/...
+ok github.com/relux-works/curator-spec/tools/generate-vectors (cached)
+
+Whitespace validation
+command: git diff --check -- profiles/manager.md
+exit: 0

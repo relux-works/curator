@@ -1,0 +1,27 @@
+## Frozen protocol-v6 wire schemas versus accepted rc.4 composite
+byte_compare[schemas/v1/agent-skill-v6.schema.json]=0
+byte_compare[schemas/v1/csk-skill-v6.schema.json]=0
+byte_compare[schemas/v1/build-receipt-v1.schema.json]=0
+byte_compare[schemas/v1/install-marker-v2.schema.json]=0
+byte_compare[schemas/v1/conformance-claim-v2.schema.json]=0
+## Build-driver named coverage versus accepted rc.4 composite
+positive_cases_accepted=7
+positive_cases_landed=8
+positive_cases_removed=0
+positive_cases_added=1
+positive_cases_added_name=portable-execution-policy-is-required-input
+rejection_cases_accepted=75
+rejection_cases_landed=77
+rejection_cases_removed=0
+rejection_cases_added=2
+rejection_cases_added_name=legacy-rc4-input-without-execution-policy
+rejection_cases_added_name=reserved-hardened-execution-policy
+build_source_cases_accepted=10
+build_source_cases_landed=10
+build_source_cases_removed=0
+build_source_cases_added=0
+toolchain_cases_accepted=12
+toolchain_cases_landed=12
+toolchain_cases_removed=0
+toolchain_cases_added=0
+exit_code=0

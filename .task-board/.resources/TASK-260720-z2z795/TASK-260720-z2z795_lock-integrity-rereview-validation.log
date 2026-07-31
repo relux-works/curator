@@ -1,0 +1,184 @@
+TASK-260720-z2z795 lock-integrity re-review validation
+Run: RUN-260730-6f206f
+Date: 2026-07-30
+Worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+
+GOAL / DIRECTIVE
+
+command: task-board spawn goal RUN-260730-6f206f
+exit: 0
+output: Active Goal: none (run is not goal-bound)
+
+command: task-board spawn directives RUN-260730-6f206f
+exit: 0
+output: one acknowledged request_progress directive; review continued to a
+        terminal verdict.
+
+PROVENANCE
+
+original base:
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+committed task head:
+  5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+task-head parent / merge base with task branch:
+  dd76b570f88339fd1d659c02950e68b17f6ba834
+current origin/main and clean canonical main:
+  1d28910f5bb276ff58e2a102e06968bd7640abe3
+original-base ancestor check: exit 0
+
+post-validation scope:
+  src/csk/locking.py
+  src/csk/transactions.py
+  tests/test_locking.py
+  tests/test_transactions.py
+
+post-validation SHA-256:
+  389b8e5e748dd4fba8657fa40b20c45d4c576a5405a10b7ba11b37f7402bbbfd  src/csk/locking.py
+  76975b1c682d5f82834fce3ab4a2174546b1e22301935564d1528b7de5b1e3ab  src/csk/transactions.py
+  81dddf366405965a1861cefa665410bfa7c21e33f1b69d140f04994e5aa9086c  tests/test_locking.py
+  0608671f9c9ee6ff37d85a368eeb0b69a0e8b9c834421b2d72a562ebd64d6cc1  tests/test_transactions.py
+
+NEW LOCK-INTEGRITY REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_is_adopted_into_stable_file
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_crashed_owner_and_barrier_contenders_share_one_stable_lock
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+output: 14 passed in 0.93s
+
+PRIOR REVIEWER REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_failed_project_reentry_preserves_held_process_reservation
+  tests/test_locking.py::test_failed_build_reentry_keeps_home_acquisition_blocked
+  tests/test_locking.py::test_failed_home_reentry_keeps_project_acquisition_blocked
+  tests/test_locking.py::test_home_release_window_hands_off_to_next_serialized_consumer
+  tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+  tests/test_transactions.py::test_recovery_discards_interrupted_partial_staging
+  tests/test_transactions.py::test_staging_entry_intent_is_durable_before_sidecar_creation
+  tests/test_transactions.py::test_completed_staging_manifest_recovers_after_source_disappears
+  tests/test_transactions.py::test_recovery_rejects_foreign_post_crash_staging_bytes
+exit: 0
+output: 14 passed in 1.08s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_project_locks_are_canonicalized_deduplicated_and_byte_sorted
+  tests/test_locking.py::test_home_lock_is_forbidden_while_build_lock_is_held_by_another_thread
+  tests/test_locking.py::test_pending_home_lock_blocks_project_and_build_acquisition
+  tests/test_transactions.py::test_journal_records_complete_ordered_recovery_state_and_consumer_commits_last
+  tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project
+  tests/test_transactions.py::test_commit_failure_rolls_back_in_exact_reverse_commit_order
+  tests/test_transactions.py::test_concurrent_project_transactions_preserve_both_consumers
+  tests/test_transactions.py::test_failed_second_project_restores_ledger_preimage_containing_first_success
+  tests/test_transactions.py::test_stale_preimage_is_rejected_without_overwriting_newer_state
+  tests/test_transactions.py::test_generation_change_is_rejected_at_commit
+exit: 0
+output: 13 passed in 2.53s
+
+FOCUSED PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider tests/test_locking.py tests/test_transactions.py -q
+exit: 0
+output: 82 passed, 1 skipped in 5.82s
+
+STRICT MYPY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy
+  --cache-dir=/tmp/TASK-260720-z2z795-6f206f-review-mypy-cache
+exit: 0
+output: Success: no issues found in 57 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 4 files already formatted
+
+FULL PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output: 652 passed, 20 skipped in 91.59s
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730.tar.gz and
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730-py3-none-any.whl
+
+DIFF CHECK
+
+command: git diff --check
+exit: 0
+output: <none>
+
+ADVERSARIAL LEGACY-BREAKER / STABLE-OWNER PROBE
+
+method:
+  1. Write a dead legacy record at home/.lock.
+  2. Pause current acquisition after its only descriptor/path identity check and
+     before _record_allows_stable_takeover returns.
+  3. Rename that canonical inode aside as the pre-upgrade stale breaker does.
+  4. Acquire a second current ManagerHomeLock on the absent canonical path.
+  5. Resume the first current acquisition.
+  6. Perform the pre-upgrade POSIX mismatch restore with Path.rename.
+  7. Inspect both acquired flags and the second witness.
+exit: 0
+output:
+  first_acquired=True
+  second_acquired=True
+  second_token_before_restore=cec2a52dea3449a585699a902641a012
+  captured_token=89a8b118721d4e288a09a77f458e62a8
+  final_token=89a8b118721d4e288a09a77f458e62a8
+  second_witness_after_restore=LockError:lock ownership was lost: <temporary>/home/.lock
+  first_thread_error=[]
+
+finding:
+  Stable OS locks protect one inode, not the canonical pathname. Automatic
+  takeover of a legacy record at the same path leaves a pre-upgrade stale
+  breaker able to move that inode. A second current owner can then lock a new
+  canonical inode, and the legacy restore can replace it. Both current owners
+  have already returned acquired.
+
+PLATFORM / PUBLICATION BOUNDARY
+
+The current run was macOS. No current-byte real-Windows run was performed.
+Earlier GitHub CI applies only to committed head 5f8bfbbd and is not claimed.
+No SSH, host management, staging, commit, push, tag, release, pin change, Go UX,
+or installer-policy work was performed.

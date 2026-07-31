@@ -1,0 +1,123 @@
+=== group 1: revision-3 discovery/guard forms — the defect ===
+A rev3 $(shell go list|grep) on a failing go list              expected=0 actual=0  PASS
+      | load: parse internal/scopes/gc.go: syntax error
+      | BAD_PKGS=[github.com/relux-works/curator/cmd/curator github.com/relux-works/curator/internal/install]
+      | recipe body ran: discovery did NOT fail closed
+
+B rev3 'go list | grep -q' guard on a failing go list          expected=0 actual=0  PASS
+      | load: parse internal/scopes/gc.go: syntax error
+      | bad-guard: reported ok
+
+=== group 2: revision-4 require-toolchain — the F1 defect ===
+C rev4 accepts GO from rootA paired with GOFMT from rootB      expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | rev4 require-toolchain: ACCEPTED
+
+D rev4 accepts a launcher whose GOROOT is not the approved root expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootB
+      | rev4 require-toolchain: ACCEPTED
+
+E rev4 accepts a wrapper-forced GOTOOLCHAIN=auto               expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | rev4 require-toolchain: ACCEPTED
+
+=== group 3: corrected recipes — healthy must pass ===
+F corrected: healthy native host                               expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=off
+      | require-toolchain: ok
+      | linux-package-guard: ok
+      | test-linux: 3 of 4 packages (excluded: github.com/relux-works/curator/internal/godriver)
+      | STUB go test test -count=1 -timeout 30m github.com/relux-works/curator/cmd/curator github.com/relux-works/curator/internal/install github.com/relux-works/curator/internal/adapters
+
+G corrected: healthy hosted runner (setup-go shape)            expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=off
+      | require-toolchain: ok
+      | linux-package-guard: ok
+
+=== group 4: corrected recipes — must fail closed ===
+H go list fails mid-listing                                    expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=off
+      | require-toolchain: ok
+      | load: parse internal/scopes/gc.go: syntax error
+      | guard: go list ./... failed; cannot validate the Linux exclusion
+      | make: *** [linux-package-guard] Error 1
+
+I native host with no GOROOT_EXPECTED                          expected=2 actual=2  PASS
+      | toolchain: GOROOT_EXPECTED is required on a native host (see 5.0)
+      | make: *** [require-toolchain] Error 1
+
+J relative GO on a native host                                 expected=2 actual=2  PASS
+      | toolchain: GO must be an absolute path; got: go
+      | make: *** [require-toolchain] Error 1
+
+K launcher reports go1.25.1, go.mod needs 1.25.5               expected=2 actual=2  PASS
+      | toolchain: go version go1.25.1 darwin/arm64
+      | toolchain: expected go1.25.5, got: go version go1.25.1 darwin/arm64
+      | make: *** [require-toolchain] Error 1
+
+L reported GOROOT != approved GOROOT_EXPECTED                  expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootB
+      | toolchain: GOROOT drift: reported /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootB != approved /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | make: *** [require-toolchain] Error 1
+
+M GOFMT comes from a different root than the launcher          expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | toolchain: formatter /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootB/bin/gofmt is not /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA/bin/gofmt
+      | make: *** [require-toolchain] Error 1
+
+N wrapper-forced GOTOOLCHAIN=auto                              expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | toolchain: GOTOOLCHAIN=auto
+      | toolchain: GOTOOLCHAIN=auto, not local -- an implicit toolchain download is possible
+      | make: *** [require-toolchain] Error 1
+
+O wrapper-forced user GOENV file                               expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=/Users/u/Library/Application Support/go/env
+      | toolchain: GOENV=/Users/u/Library/Application Support/go/env, not off -- a per-user go env file can inject GOFLAGS/GOTOOLCHAIN
+      | make: *** [require-toolchain] Error 1
+
+P go.mod drifts to 1.25.4 while the Makefile pins go1.25.5     expected=2 actual=2  PASS
+      | toolchain: go.mod requires go1.25.4 but the Makefile pins go1.25.5
+      | make: *** [require-toolchain] Error 1
+
+=== group 5: the hosted exception must not bypass identity ===
+Q hosted runner, GOFMT from a different root                   expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA
+      | toolchain: formatter /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootB/bin/gofmt is not /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.30107/rootA/bin/gofmt
+      | make: *** [require-toolchain] Error 1
+
+=== group 6: F3 source staging ===
+R rev4 unchecked tar|tar pipeline hides a failed producer      expected=0 actual=0  PASS
+      | rev4 staging: completed, 1 of 3 files present
+
+S corrected staging rejects the same failed producer           expected=1 actual=1  PASS
+      | stage: source archive creation failed rc=1
+
+T corrected staging catches a MISSING file after extraction    expected=1 actual=1  PASS
+      | shasum: ./b.txt: No such file or directory
+      | stage: per-file verification failed (changed or missing)
+
+U corrected staging catches an EXTRA file after extraction     expected=1 actual=1  PASS
+      | stage: destination has 4 files, origin enumerated 3
+
+-----------------------------------------------------------
+ALL 21 EXPECTATIONS MET

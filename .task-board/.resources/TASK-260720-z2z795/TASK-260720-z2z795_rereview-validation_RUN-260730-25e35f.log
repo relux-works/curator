@@ -1,0 +1,254 @@
+TASK-260720-z2z795 independent rereview validation
+Run: RUN-260730-25e35f
+Date: 2026-07-30
+Worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+
+CURRENT POST-MIGRATION REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_process_lock_order_uses_canonical_manager_home_identity
+  tests/test_locking.py::test_case_aliases_share_project_and_manager_home_lock_identity
+  tests/test_locking.py::test_unicode_aliases_share_project_lock_identity
+  tests/test_locking.py::test_windows_identity_components_respect_parent_case_sensitivity
+  tests/test_transactions.py::test_windows_read_only_file_sync_falls_back_to_read_handle
+  tests/test_transactions.py::test_recovery_rejects_journal_filename_id_mismatch_before_mutation
+  tests/test_transactions.py::test_read_only_targets_stage_commit_and_cleanup
+  tests/test_transactions.py::test_read_only_directory_rollback_restores_mode_and_cleans_sidecars
+  tests/test_transactions.py::test_recovery_discards_crash_during_read_only_mode_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_finishes_crash_during_read_only_committed_cleanup
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+exit: 0
+output: 18 passed in 4.04s
+
+PRESERVED MIGRATION REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_requires_offline_migration
+  tests/test_locking.py::test_unguarded_v1_record_requires_offline_migration
+  tests/test_locking.py::test_legacy_stale_breaker_cannot_split_current_stable_owners
+  tests/test_locking.py::test_acquire_rechecks_canonical_witness_after_publication
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_stable_lock_timeout_message_forbids_removal
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation
+exit: 0
+output: 14 passed in 1.69s
+
+CORRECTED PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_requires_offline_migration
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_crashed_owner_and_barrier_contenders_share_one_stable_lock
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+output: 14 passed in 2.58s
+
+EARLIER REVIEWER REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_failed_project_reentry_preserves_held_process_reservation
+  tests/test_locking.py::test_failed_build_reentry_keeps_home_acquisition_blocked
+  tests/test_locking.py::test_failed_home_reentry_keeps_project_acquisition_blocked
+  tests/test_locking.py::test_home_release_window_hands_off_to_next_serialized_consumer
+  tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+  tests/test_transactions.py::test_recovery_discards_interrupted_partial_staging
+  tests/test_transactions.py::test_staging_entry_intent_is_durable_before_sidecar_creation
+  tests/test_transactions.py::test_completed_staging_manifest_recovers_after_source_disappears
+  tests/test_transactions.py::test_recovery_rejects_foreign_post_crash_staging_bytes
+exit: 0
+output: 14 passed in 6.35s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_project_locks_are_canonicalized_deduplicated_and_byte_sorted
+  tests/test_locking.py::test_home_lock_is_forbidden_while_build_lock_is_held_by_another_thread
+  tests/test_locking.py::test_pending_home_lock_blocks_project_and_build_acquisition
+  tests/test_transactions.py::test_journal_records_complete_ordered_recovery_state_and_consumer_commits_last
+  tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project
+  tests/test_transactions.py::test_commit_failure_rolls_back_in_exact_reverse_commit_order
+  tests/test_transactions.py::test_concurrent_project_transactions_preserve_both_consumers
+  tests/test_transactions.py::test_failed_second_project_restores_ledger_preimage_containing_first_success
+  tests/test_transactions.py::test_stale_preimage_is_rejected_without_overwriting_newer_state
+  tests/test_transactions.py::test_generation_change_is_rejected_at_commit
+exit: 0
+output: 13 passed in 8.01s
+
+FOCUSED PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 105 passed, 1 skipped in 28.52s
+skip: test_windows_sync_helpers_flush_real_file_and_tree requires Windows
+
+STRICT MYPY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output: Success: no issues found in 57 source files
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 4 files already formatted
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: All checks passed!
+
+FULL PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output: 675 passed, 20 skipped in 127.82s (0:02:07)
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+  --outdir
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-z2z795/review-RUN-260730-25e35f/build
+exit: 0
+output:
+  Successfully built cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730.tar.gz
+  and cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730-py3-none-any.whl
+
+build artifact SHA-256:
+  2b841b40abb2c63837b3030fab4e567e0dcfddbe619786767e77029166b38b0d
+    cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730-py3-none-any.whl
+  a792c4f2fb62faf21f31f0a52da69d0107a07eb1fb724b5aa465f998749b6905
+    cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730.tar.gz
+
+DIFF CHECK
+
+command: git diff --check
+exit: 0
+output: <none>
+
+ADVERSARIAL PROBES
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /opt/homebrew/bin/python3.11 -
+  (temporary-directory wrong-home, symlink-entry, removed-cleanup-reappearance,
+  and pure Windows identity probes; no repository writes)
+exit: 0
+output:
+  wrong_home_commit_succeeded=True
+  wrong_home_lock_for_engine_exists=False
+  journal_live_is_referent=True
+  managed_entry_still_symlink=True
+  referent_was_replaced=True
+  reappeared_tomb_matches_recorded_digest=True
+  reappeared_tomb_exists_before_recovery=True
+  reappeared_tomb_exists_after_recovery=False
+  journal_tomb_exists_after_recovery=False
+  windows_provisional_upper=C:\SENSITIVE\Parent\CHILD
+  windows_provisional_lower=C:\SENSITIVE\Parent\CHILD
+  windows_nested_missing_leaf_identities_equal=True
+
+additional pure Windows before/after-creation probe:
+exit: 0
+output:
+  windows_provisional_identity=C:\SENSITIVE\Parent\CHILD
+  windows_post_creation_identity=C:\SENSITIVE\Parent\Child
+  windows_identity_changes_after_creation=True
+
+One initial adversarial probe invocation omitted PYTHONPATH=src and exited with
+ModuleNotFoundError before importing task code or creating any probe state. The
+corrected, successful command and results are reported above.
+
+PROVENANCE AND SCOPE
+
+original accepted base:
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+
+git rev-parse HEAD:
+  5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+
+git rev-parse origin/task/TASK-260720-z2z795-transaction-engine:
+  5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+
+git merge-base --is-ancestor
+6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12 HEAD:
+  exit 0
+
+canonical main at final evidence checkpoint:
+  ## main...origin/main
+  HEAD: 495ad021847529ce5a544dba415ca2fe19949539
+  local origin/main: 495ad021847529ce5a544dba415ca2fe19949539
+
+The producer's handoff recorded canonical main at
+97a0ed870782b48eebc5a9c25a9cfa8fea5ff245. Another task advanced the clean
+canonical clone during this review; no reset, rebase, fetch, or task-worktree
+mutation was performed.
+
+task worktree status:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/locking.py
+   M src/csk/transactions.py
+   M tests/test_locking.py
+   M tests/test_transactions.py
+
+git diff --stat:
+  src/csk/locking.py         |  780 +++++++++++++++++--- 
+  src/csk/transactions.py    | 1754 +++++++++++++++++++++++++++++++++++++++++++-
+  tests/test_locking.py      |  953 ++++++++++++++++++++++++-
+  tests/test_transactions.py | 1350 +++++++++++++++++++++++++++++++++-
+  4 files changed, 4655 insertions(+), 182 deletions(-)
+
+source SHA-256:
+  dd8b60fa544e0663e55d6da06c97d578175be8b19f97769a4b5502807953fdad  src/csk/locking.py
+  7fd2256a78c84096ce76b60987d3ba80135adb57741961ccc77d2c6ec8f16dd2  src/csk/transactions.py
+  2149953a8d2fb1ad781b0ed27e084ffab7cdc334f0256cb4eb7ede3e9bc284d7  tests/test_locking.py
+  3f5a158361ed10f0538089e613185d7407101e06fd958afeec59568dac956c7c  tests/test_transactions.py
+
+LOGBOOK AND PLATFORM BOUNDARY
+
+command: command -v logbook
+exit: 1
+output: <none>
+
+No standalone logbook executable is installed. Findings and validation evidence
+are persisted as task-scoped board outcome resources.
+
+This review ran on macOS. Current-byte real macOS case/Unicode alias tests ran.
+Pure deterministic tests/probes cover Windows routing, but no current-byte real
+Windows runner result is claimed.
+
+No source was changed. No SSH, stage, commit, push, tag, release, or unrelated
+repository mutation was performed.

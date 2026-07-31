@@ -62,6 +62,43 @@ log for any conforming Curator manager.
 
 The repository uses an in-repo task board (`.task-board/`, epics, stories, and tasks as files) and the agent tooling connected under `agents/`. Go testing follows the closed-loop tooling of `skill-go-testing-tools` (including `tuitestkit` for terminal UI phases).
 
+### Gates and tooling
+
+Every gate below is a script under `.github/ci/`, called directly by
+[.github/workflows/ci.yml](.github/workflows/ci.yml) and mirrored by a `make`
+target for local use. CI calls the scripts rather than `make` because `make` is
+not a guaranteed tool on the Windows runner. Each gate writes its raw stream and
+its report under `EVIDENCE` (default `.temp/ci-evidence/`), which CI uploads per
+runner, so any claim about a gate can be checked against the run that produced
+it.
+
+| Tool | What it gates | How to run it | Where its output goes |
+| --- | --- | --- | --- |
+| `test-gate.sh` | plans the run from the supplied conformance root, executes it, then enforces the platform-case ledger; every status is fatal | `make ci-test` | `$EVIDENCE/test/` — `go-test*.json`, `suite-plan.txt`, `platform-cases.txt`, `skips-observed.tsv` |
+| `test-gate.sh` (`-race`) | the same gate under the race detector | `make race` | `$EVIDENCE/race/` |
+| `suite-plan.sh` | decides, from the root alone, which packages it serves, which it cannot, and which this platform does not qualify | called by `test-gate.sh` | `$EVIDENCE/*/suite-plan.txt`, `plan-*.txt` |
+| `platform-case-gate.sh` | requires every case [`platform-cases.tsv`](.github/ci/platform-cases.tsv) names on this runner, and classifies every skip against [`skip-classes.tsv`](.github/ci/skip-classes.tsv) | called by `test-gate.sh` | `$EVIDENCE/*/platform-cases.txt`, `skips-observed.tsv` |
+| `ledger-consistency.sh` | proves each ledger row against the real per-GOOS builds via `go list` — no runner needed | `make ledger-check` | `$EVIDENCE/ledger/ledger-consistency.txt` |
+| `excluded-packages.sh` | the one resolver of "which packages does this platform not execute, and on whose authority" | called by the two gates above | stdout (TSV) |
+| `candidate-suite.sh` | rejects a non-immutable candidate revision; records a candidate root's identity as candidate-only evidence | `make candidate-verify-ref CANDIDATE_REF=…` / `make candidate-record CANDIDATE_ROOT=…` | `$EVIDENCE/candidate/candidate-suite-identity.txt` |
+| `toolchain-identity.sh` | asserts the resolved Go toolchain is exactly `go.mod`'s, with `GOTOOLCHAIN=local` and `GOENV=off` read back | run by every Go-consuming job | job log |
+| `no-broad-suppression.sh` | rejects bare `//nolint`, bare `//#nosec`, production-path lint exclusions, wholesale disabling, and unrecorded `gosec` exclusions | `make no-broad-suppression` | job log |
+| `gate-selftest.sh` | drives every gate above against synthetic inputs and asserts a real exit code for each negative case | `make gate-selftest` | job log |
+
+`make ci-test`, `make race` and `make check-ci` require `CURATOR_CONFORMANCE_ROOT`
+to point at a materialised `<curator-spec>/conformance/v1`; they refuse to run
+without it, because a gate that runs with the conformance suite unset is a
+smaller gate wearing the same name.
+
+The committed protocol-suite pin is declared once, as `SPEC_PIN` in the workflow
+`env:` block, and every job reads it from there. A schema v6 candidate suite is
+never committed and never a default: it enters only through the
+`candidate-conformance` job, on an explicit `workflow_dispatch` that supplies a
+full 40-character revision or a pre-materialised root. That job sets
+`CI_REQUIRE_FULL_ROOT=1`, so a candidate must serve the whole package set, and
+everything it emits is stamped in the artifact itself as candidate-only evidence
+— neither a published release nor a conformance claim.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the working agreements: board-first workflow, discrete signed commits, spec-first rule.

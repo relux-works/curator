@@ -1,0 +1,154 @@
+--- /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/worktree/cmd/curator/status_test.go	2026-07-29 10:18:38
++++ worktree/cmd/curator/status_test.go	2026-07-29 14:45:13
+@@ -384,6 +384,16 @@
+ 		// to the build state, because compiled state demotes the skill it
+ 		// belongs to.
+ 		skillState string
++		// snapshotCache copies the live protected cache aside and puts every
++		// byte and permission bit back, which is how a case that damages cache
++		// state resets its own fixture. Repairing a reporting fixture by
++		// reinstalling compiles the command again and proves nothing this test
++		// owns; install, repair, and rollback keep their own dedicated tests.
++		snapshotCache bool
++		// humanCLI additionally runs the whole plain-text command path, so the
++		// rendering asserted for every case is pinned to the line the command
++		// really prints for at least one case of each shape.
++		humanCLI bool
+ 	}{
+ 		"artifact hash recorded by the marker no longer matches the entry": {
+ 			tamper: func(t *testing.T) {
+@@ -393,7 +403,8 @@
+ 					build["artifact_sha256"] = testDigest(5)
+ 				})
+ 			},
+-			want: buildArtifactDrift, outcome: "cache-hit",
++			// One no-cause marker drift also proves the whole plain-text path.
++			want: buildArtifactDrift, outcome: "cache-hit", humanCLI: true,
+ 		},
+ 		"receipt recorded by the marker no longer matches the entry": {
+ 			tamper: func(t *testing.T) {
+@@ -413,7 +424,8 @@
+ 					build["cache_key"] = testDigest(5)
+ 				})
+ 			},
+-			want: buildInputDrift, cause: causeUnattributed, outcome: "cache-hit",
++			// One cause-bearing drift also proves the whole plain-text path.
++			want: buildInputDrift, cause: causeUnattributed, outcome: "cache-hit", humanCLI: true,
+ 		},
+ 		"logical key was derived under a build root the marker does not record": {
+ 			tamper: func(t *testing.T) {
+@@ -455,13 +467,13 @@
+ 			},
+ 			want: buildCommandDrift, outcome: "cache-hit",
+ 		},
+-		// The two cases below mutate the shared protected cache rather than the
+-		// marker, so each rebuilds it through the ordinary reconciliation path
+-		// before the next case runs.
++		// The two cases below damage the shared protected cache rather than the
++		// marker, so each restores it from its own byte-and-mode snapshot before
++		// the next case runs.
+ 		"protected cache entry cannot be interpreted": {
+-			tamper:  func(t *testing.T) { corruptCacheArtifact(t, home) },
+-			restore: reinstall,
+-			want:    buildCorruptCache, outcome: "corrupt",
++			tamper:        func(t *testing.T) { corruptCacheArtifact(t, home) },
++			snapshotCache: true,
++			want:          buildCorruptCache, outcome: "corrupt",
+ 		},
+ 		"protected cache holds no entry for the recorded key": {
+ 			tamper: func(t *testing.T) {
+@@ -471,8 +483,8 @@
+ 					}
+ 				}
+ 			},
+-			restore: reinstall,
+-			want:    buildMissingArtifact, outcome: "would-preflight-and-build",
++			snapshotCache: true,
++			want:          buildMissingArtifact, outcome: "would-preflight-and-build",
+ 		},
+ 		"marker schema cannot be read by this manager": {
+ 			tamper: func(t *testing.T) {
+@@ -523,7 +535,8 @@
+ 					}
+ 				}
+ 			},
+-			want: buildUntrustedCache, outcome: "would-rebuild-untrusted-cache",
++			// One cache-boundary drift also proves the whole plain-text path.
++			want: buildUntrustedCache, outcome: "would-rebuild-untrusted-cache", humanCLI: true,
+ 		},
+ 	} {
+ 		t.Run(name, func(t *testing.T) {
+@@ -531,10 +544,10 @@
+ 			if err != nil {
+ 				t.Fatal(err)
+ 			}
+-			testCase.tamper(t)
++			// Cleanup runs in reverse order, so the marker restore is registered
++			// first to make it run last: live state is always put back before the
++			// marker, and a cache snapshot restored afterwards would undo it.
+ 			t.Cleanup(func() {
+-				// Live state is restored before the marker, so a restore that runs
+-				// a real reconciliation cannot leave a rewritten marker behind.
+ 				if testCase.restore != nil {
+ 					testCase.restore(t)
+ 				}
+@@ -542,10 +555,18 @@
+ 					t.Fatal(writeErr)
+ 				}
+ 			})
++			if testCase.snapshotCache {
++				snapshotBuildCacheAfter(t, home)
++			}
++			testCase.tamper(t)
+ 
+-			code, stdout, stderr := capture(t, "status", "app", "--json")
+-			if code != exitOK {
+-				t.Fatalf("status --json = %d\nstderr:\n%s", code, stderr)
++			// `--json` and `--check` are combined so one invocation proves the
++			// published document and the fail-closed exit are the same run's
++			// verdict, rather than two classifications of drifting live state.
++			code, stdout, stderr := capture(t, "status", "app", "--json", "--check")
++			if code != exitFail {
++				t.Fatalf("status --json --check on %s = %d, want %d\nstdout:\n%s\nstderr:\n%s",
++					name, code, exitFail, stdout, stderr)
+ 			}
+ 			drifted := decodeStatus(t, stdout)
+ 			if len(drifted.Builds) != 1 {
+@@ -571,16 +592,30 @@
+ 				t.Fatalf("skills = %v, want build-skill %q", drifted.Skills, wantSkill)
+ 			}
+ 
+-			if code, _, _ := capture(t, "status", "app", "--check"); code != exitFail {
+-				t.Fatalf("status --check on %s = %d, want %d", name, code, exitFail)
++			// Every state and cause is rendered through the same method the
++			// command prints, so the operator surface is proven for all of them
++			// from the row this run published.
++			described := drifted.Builds[0].Describe()
++			if !strings.Contains(described, "state="+testCase.want) {
++				t.Fatalf("the operator line does not report %q:\n%s", testCase.want, described)
+ 			}
+-			code, human, _ := capture(t, "status", "app")
+-			if code != exitOK || !strings.Contains(human, "state="+testCase.want) {
+-				t.Fatalf("human status does not report %q:\n%s", testCase.want, human)
++			if testCase.cause != "" && !strings.Contains(described, "cause="+testCase.cause) {
++				t.Fatalf("the operator line does not report cause %q:\n%s", testCase.cause, described)
+ 			}
+-			if testCase.cause != "" && !strings.Contains(human, "cause="+testCase.cause) {
+-				t.Fatalf("human status does not report cause %q:\n%s", testCase.cause, human)
++			if !testCase.humanCLI {
++				return
+ 			}
++			// One case of each shape also runs the whole plain-text path, which
++			// pins the rendering above to the line the command really prints —
++			// and proves the plain report still exits zero, because reporting a
++			// verdict is not itself a failure.
++			code, human, _ := capture(t, "status", "app")
++			if code != exitOK {
++				t.Fatalf("plain human status on %s = %d, want %d\n%s", name, code, exitOK, human)
++			}
++			if !strings.Contains(human, "app: "+described) {
++				t.Fatalf("the command did not print the line this row renders:\nwant: %s\ngot:\n%s", described, human)
++			}
+ 		})
+ 	}
+ }

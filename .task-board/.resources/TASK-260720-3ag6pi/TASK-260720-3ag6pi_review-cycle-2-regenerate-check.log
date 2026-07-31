@@ -1,0 +1,7 @@
+$ make regenerate-check
+go run ./tools/generate-vectors -root .
+git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json
+exit_code=0
+conformance_file_count=448
+conformance_aggregate_sha256=e6a132157806bf747f0ad24a61bb5a9a4c8b915dac743d9465c889c0a1ad2fae
+worktree_status_bytes=0

@@ -1,0 +1,92 @@
+=== HOST / TOOLCHAIN ===
+2026-07-29T17:54:56Z
+Darwin arm64
+go version go1.25.5 darwin/arm64
+/Users/iv/.goenv/versions/1.25.5
+branch: agent/link-curator-skill-registry @ c06aa1a15e4093410a686ff0ce4f579fba59dec1
+origin/main: 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+
+=== 1. gate self-test (make gate-selftest) ===
+bash .github/ci/gate-selftest.sh
+== platform-case gate ==
+ok    windows: every required case ran, tolerated skips only     (exit 0)
+ok    linux: every required case ran, tolerated skips only       (exit 0)
+ok    windows: a skipped reparse-point case is rejected          (exit 1)
+ok    windows: a skipped .cmd launcher case is rejected          (exit 1)
+ok    linux: a skipped no-follow case is rejected                (exit 1)
+ok    a required case that never ran is rejected (rename or -run filter) (exit 1)
+ok    a required case that failed is rejected                    (exit 1)
+ok    an undeclared skip is rejected                             (exit 1)
+ok    a ledger-tolerated skip is accepted                        (exit 0)
+ok    subtest results resolve to their parent case               (exit 0)
+ok    test output that looks like a result event is not parsed as one (exit 0)
+ok    shipped ledger is satisfiable on linux                     (exit 0)
+ok    shipped ledger is satisfiable on darwin                    (exit 0)
+ok    shipped ledger is satisfiable on windows                   (exit 0)
+
+== candidate suite: revision shape ==
+ok    a branch name is rejected as a candidate pin               (exit 1)
+ok    a tag is rejected as a candidate pin                       (exit 1)
+ok    HEAD is rejected as a candidate pin                        (exit 1)
+ok    a short hash is rejected as a candidate pin                (exit 1)
+ok    uppercase hex is rejected as a candidate pin               (exit 1)
+ok    a placeholder is rejected as a candidate pin               (exit 1)
+ok    an empty revision is rejected                              (exit 1)
+ok    the null commit is rejected                                (exit 1)
+ok    a candidate equal to the committed pin is refused          (exit 1)
+ok    a full 40-hex revision is accepted                         (exit 0)
+
+== candidate suite: identity and evidence ==
+ok    a root without manifest.json is rejected                   (exit 1)
+ok    a nonexistent root is rejected                             (exit 1)
+ok    a well-formed candidate root is recorded                   (exit 0)
+ok    a matching expected manifest digest is accepted            (exit 0)
+ok    a mismatched expected manifest digest aborts the run       (exit 1)
+ok    a candidate identical to the committed pin is refused      (exit 1)
+ok    evidence records revision, digests and both disclaimers    (exit 0)
+
+gate-selftest: 31 passed, 0 failed
+EXIT=0
+
+=== 2. gofmt -l cmd internal ===
+EXIT=0 (empty listing above means clean)
+
+=== 3. go vet ./... ===
+EXIT=0
+
+=== 4. golangci-lint run (v2.12.2, the version CI pins) ===
+0 issues.
+EXIT=0
+
+=== 5. no-broad-suppression guard (the ci.yml lint step body) ===
+EXIT=0
+
+=== 6. naming gate over tracked files ===
+outside-README matches exit=1 (1 = none)
+README lines: 1
+=== 7. make build ===
+go build -ldflags '-X github.com/relux-works/curator/internal/version.value=dev' -o bin/curator ./cmd/curator
+EXIT=0
+
+=== 8. test-gate on THIS BRANCH against the committed pin 00b1688a ===
+test-gate: packages=./...
+test-gate: flags=<none> timeout=30m
+test-gate: conformance root=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1
+test-gate: go test exit=1 (stream: .temp/TASK-260720-1pvfj5/branch-evidence/test/go-test.json)
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/adapters :: TestSymlinkModeUsesRelativeLinks
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+
+platform-case gate: ok
+test-gate: go test exit=1, platform-case gate exit=0
+EXIT=1

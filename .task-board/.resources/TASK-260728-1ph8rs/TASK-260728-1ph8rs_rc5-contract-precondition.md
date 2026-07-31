@@ -1,0 +1,1 @@
+Consume the accepted curator-spec rc.5 release and the independently accepted Curator implementation through TASK-260728-20ao7p. Implement csk independently in Python; behavioral and canonical-byte parity is required, internal code copying is not. Architecture-v6 SHA-256: 2abae77d80eba6789f9911db7e9722595b4f21ba47391ca9eafd0064af03d67e.

@@ -1,0 +1,71 @@
+@startuml
+!theme plain
+
+title Protocol schema v6 — normative install and dry-run ordering
+
+start
+
+partition "Read-only planning" #LightBlue {
+  :Resolve immutable snapshots;
+  :Parse both manifest names and validate schema 6;
+  :Validate link-free disjoint build_roots and source_dir;
+  :Exclude every build_root from agent context and runtime copying;
+  :Compute curator-build-source-v1 before cache lookup;
+  :Build provider-first closure and check collisions;
+  :Run source audit, registry, attestation, and moved-tag gates;
+  :Probe trusted Go, disable telemetry privately,\nand fingerprint the toolchain;
+  :Derive fixed build inputs and inspect protected cache read-only;
+}
+
+if (Dry-run?) then (yes)
+  :Recheck shared-state generations;
+  :Report cache-hit, would-preflight-and-build,\nwould-rebuild-untrusted-cache, corrupt, or unsupported;
+  note right
+    No go list or go build.
+    No persistent cache, audit, registry, lock,
+    journal, marker, shim, consumer, or GC mutation.
+  end note
+  stop
+else (real operation)
+endif
+
+partition "Private build staging" #LightYellow {
+  :Run fixed go list for each miss;
+  :Reject escaped inputs, cgo, native files, syso,\nassembly, and go:cgo_import_dynamic;
+  :Run fixed internal-link go build;
+  :Verify and hash artifacts; generate canonical receipts;
+}
+
+if (Any private build failed?) then (yes)
+  :Delete operation staging;
+  :Leave installation, consumers, and live caches unchanged;
+  stop
+else (no)
+endif
+
+partition "Serialized publication" #LightGreen {
+  :Acquire manager-home mutation lock;
+  :Recover journals and revalidate cache and shared targets;
+  if (Plan changed?) then (yes)
+    :Release lock and restart from earliest affected read;
+    stop
+  else (no)
+  endif
+  :Publish immutable protected cache entries;
+  :Create one rollback journal;
+  :Commit contexts, markers, runtime, shims, adapters,\nand managed removals in deterministic order;
+  :Commit machine-wide consumer ledger last;
+}
+
+if (Publication or target swap failed?) then (yes)
+  :Keep lock and restore journaled targets\nin exact reverse order;
+  :Retain or safely collect unreferenced immutable cache entries;
+else (no)
+  :Remove backups and journal durably;
+  :Run locked runtime, snapshot, and build-cache GC;
+endif
+
+:Release manager-home lock, then project lock;
+stop
+
+@enduml

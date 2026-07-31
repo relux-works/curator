@@ -1,0 +1,111 @@
+== spec: validate.py (task worktree, copied in-flight docs present) ==
+validation failed: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/curator-spec-worktree/docs/external-build-repositories.md: broken local link: ../release/1.0.0-rc.5.json
+exit=1
+== spec: unittest discover ==
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.593s
+
+OK
+unittest exit=0
+== spec: go test ./tools/... ==
+ok  	github.com/relux-works/curator-spec/tools/generate-vectors	0.346s
+gotest exit=0
+== spec: validate.py (clean 57c1f56 baseline worktree) ==
+validated 30 schemas and 93 vector files
+baseline validate exit=0
+== spec: scoped link check over the two authored documents ==
+local links checked: 4, broken: 0
+scoped link check exit=0
+== spec: whole-tree link attribution ==
+BROKEN docs/external-build-repositories.md -> ../release/1.0.0-rc.5.json
+BROKEN docs/portable-go-execution-policy.md -> ../conformance/v1/vectors/go-host-execution-policy.json
+BROKEN docs/portable-go-execution-policy.md -> ../conformance/v1/vectors/go-host-execution-policy.json
+local links checked: 40, broken: 3
+whole-tree link check exit=1
+== curator: go build ./... ==
+go build exit=0
+== curator: go vet ./... ==
+go vet exit=0
+== curator: gofmt -l on tracked Go sources ==
+gofmt exit=0
+== curator: go test ./... ==
+ok  	github.com/relux-works/curator/cmd/curator	(cached)
+ok  	github.com/relux-works/curator/internal/adapters	(cached)
+ok  	github.com/relux-works/curator/internal/audit	(cached)
+ok  	github.com/relux-works/curator/internal/capabilities	(cached)
+ok  	github.com/relux-works/curator/internal/closure	(cached)
+ok  	github.com/relux-works/curator/internal/config	(cached)
+ok  	github.com/relux-works/curator/internal/devsub	(cached)
+ok  	github.com/relux-works/curator/internal/envfiles	(cached)
+ok  	github.com/relux-works/curator/internal/gitignore	(cached)
+ok  	github.com/relux-works/curator/internal/gitops	(cached)
+ok  	github.com/relux-works/curator/internal/hashing	(cached)
+ok  	github.com/relux-works/curator/internal/identifiers	(cached)
+ok  	github.com/relux-works/curator/internal/identity	(cached)
+ok  	github.com/relux-works/curator/internal/install	(cached)
+ok  	github.com/relux-works/curator/internal/interop	(cached)
+ok  	github.com/relux-works/curator/internal/locale	(cached)
+ok  	github.com/relux-works/curator/internal/manifest	(cached)
+ok  	github.com/relux-works/curator/internal/marker	(cached)
+ok  	github.com/relux-works/curator/internal/mcp	(cached)
+ok  	github.com/relux-works/curator/internal/protocoljson	(cached)
+ok  	github.com/relux-works/curator/internal/registry	(cached)
+ok  	github.com/relux-works/curator/internal/runtimestore	(cached)
+ok  	github.com/relux-works/curator/internal/scopes	(cached)
+ok  	github.com/relux-works/curator/internal/shell	(cached)
+ok  	github.com/relux-works/curator/internal/skillcheck	(cached)
+ok  	github.com/relux-works/curator/internal/skillspec	(cached)
+ok  	github.com/relux-works/curator/internal/snapshot	(cached)
+ok  	github.com/relux-works/curator/internal/ui	(cached)
+ok  	github.com/relux-works/curator/internal/verr	(cached)
+ok  	github.com/relux-works/curator/internal/version	(cached)
+ok  	github.com/relux-works/curator/internal/whitelist	(cached)
+go test exit=0
+== curator: make check ==
+go vet ./...
+go test ./...
+ok  	github.com/relux-works/curator/cmd/curator	(cached)
+ok  	github.com/relux-works/curator/internal/adapters	(cached)
+ok  	github.com/relux-works/curator/internal/audit	(cached)
+ok  	github.com/relux-works/curator/internal/capabilities	(cached)
+ok  	github.com/relux-works/curator/internal/closure	(cached)
+ok  	github.com/relux-works/curator/internal/config	(cached)
+ok  	github.com/relux-works/curator/internal/devsub	(cached)
+ok  	github.com/relux-works/curator/internal/envfiles	(cached)
+ok  	github.com/relux-works/curator/internal/gitignore	(cached)
+ok  	github.com/relux-works/curator/internal/gitops	(cached)
+ok  	github.com/relux-works/curator/internal/hashing	(cached)
+ok  	github.com/relux-works/curator/internal/identifiers	(cached)
+ok  	github.com/relux-works/curator/internal/identity	(cached)
+ok  	github.com/relux-works/curator/internal/install	(cached)
+ok  	github.com/relux-works/curator/internal/interop	(cached)
+ok  	github.com/relux-works/curator/internal/locale	(cached)
+ok  	github.com/relux-works/curator/internal/manifest	(cached)
+ok  	github.com/relux-works/curator/internal/marker	(cached)
+ok  	github.com/relux-works/curator/internal/mcp	(cached)
+ok  	github.com/relux-works/curator/internal/protocoljson	(cached)
+ok  	github.com/relux-works/curator/internal/registry	(cached)
+ok  	github.com/relux-works/curator/internal/runtimestore	(cached)
+ok  	github.com/relux-works/curator/internal/scopes	(cached)
+ok  	github.com/relux-works/curator/internal/shell	(cached)
+ok  	github.com/relux-works/curator/internal/skillcheck	(cached)
+ok  	github.com/relux-works/curator/internal/skillspec	(cached)
+ok  	github.com/relux-works/curator/internal/snapshot	(cached)
+ok  	github.com/relux-works/curator/internal/ui	(cached)
+ok  	github.com/relux-works/curator/internal/verr	(cached)
+ok  	github.com/relux-works/curator/internal/version	(cached)
+ok  	github.com/relux-works/curator/internal/whitelist	(cached)
+gofmt: files need formatting:
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/lucasb-eyer/go-colorful/hsluv.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-isatty/isatty_windows.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_unix.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_windows.go
+make: *** [check] Error 1
+make check exit=2
+== attribution: Go files authored by this task ==
+task-authored .go files: 0
+== tracked-tree gofmt (attribution) ==
+tracked gofmt exit=0
+== golangci-lint availability ==
+golangci-lint present exit=1

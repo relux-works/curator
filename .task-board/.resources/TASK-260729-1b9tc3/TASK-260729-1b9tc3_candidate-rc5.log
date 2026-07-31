@@ -1,0 +1,31 @@
+# candidate: immutable rc.5 root TASK-260729-3nx97g (protocol 1.0.0-rc.5, manifest b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c)
+F....................................................................... [ 73%]
+..........................                                               [100%]
+=================================== FAILURES ===================================
+_________________ test_shared_fixture_context_hash_and_marker __________________
+
+tmp_path = PosixPath('/private/tmp/csk-1b9tc3/pytest-of-iv/pytest-3/test_shared_fixture_context_ha0')
+
+    def test_shared_fixture_context_hash_and_marker(tmp_path: Path) -> None:
+        fixture = _root() / "fixtures" / "skill"
+        expected_files = _json("expected/context_files.json")
+        expected_hash = (_root() / "expected" / "context_sha256.txt").read_text(encoding="utf-8").strip()
+        expected_marker = _json("expected/marker.json")
+    
+        spec = skillspec.load_skill_spec(fixture)
+        destination = tmp_path / "context"
+        files = whitelist.copy_context(
+            fixture,
+            destination,
+            include_scripts=not any(command.type == "script" for command in spec.commands.values()),
+            exclude_roots=spec.runtime_roots,
+        )
+>       assert files == expected_files
+E       AssertionError: assert ['.skill_trig.../golden-tool'] == ['.skill_trig...ces/notes.md']
+E         
+E         Left contains one more item: 'scripts/golden-tool'
+E         Use -v to get more diff
+
+tests/test_protocol_conformance.py:50: AssertionError
+1 failed, 97 passed in 0.24s
+exit=1

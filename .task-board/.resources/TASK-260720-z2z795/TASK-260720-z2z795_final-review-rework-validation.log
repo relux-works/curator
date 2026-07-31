@@ -1,0 +1,178 @@
+TASK-260720-z2z795 final-review rework validation
+Run: RUN-260729-e44939
+Date: 2026-07-30
+Worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+Starting reviewed commit: 5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+
+TOOL READINESS
+
+command: git --version
+exit: 0
+output: git version 2.50.1 (Apple Git-155)
+
+command: /opt/homebrew/bin/python3.11 --version
+exit: 0
+output: Python 3.11.14
+
+command: /opt/homebrew/bin/python3.11 -m pytest --version
+exit: 0
+output: pytest 8.3.4
+
+command: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python -m mypy --version
+exit: 0
+output: mypy 2.3.0 (compiled: yes)
+
+command: uvx ruff --version
+exit: 0
+output: ruff 0.16.0
+
+command: /opt/homebrew/bin/python3.11 -m build --version
+exit: 0
+output: build 1.2.2.post1
+
+EXPECTED-RED REGRESSION GATES
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider tests/test_locking.py -q
+exit: 1
+output: 4 failed, 13 passed
+rationale: the reviewed bytes allowed cross-thread held/pending lock-order
+violations; the new deterministic regressions reproduced finding 1.
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider tests/test_transactions.py -q
+  -k 'overlapping_journal_namespace or parent_child_targets or live_path_equal
+  or symlinked_parent_child_alias or platform_case_alias or
+  platform_unicode_alias'
+exit: 1
+output: 7 failed, 23 deselected
+rationale: the reviewed bytes did not reject target/journal, parent/child,
+sidecar/live, symlink, case, or normalization namespace overlap.
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider tests/test_transactions.py -q
+  -k 'sidecar_cleanup_uses or interrupted_sidecar_cleanup or
+  partial_directory_cleanup or unrecorded_bytes_in_partial or
+  before_final_journal_tomb'
+exit: 1
+output: 6 failed, 30 deselected
+rationale: the reviewed bytes had no journal-owned sidecar cleanup tomb,
+progress, or fault recovery.
+
+INTERMEDIATE DIAGNOSTICS (TRUTHFUL NON-ZERO EXITS)
+
+- Focused pytest after the first implementation pass exited 1:
+  2 failed, 50 passed, 1 skipped. The failures identified manager-home
+  serialization being rejected and one updated Windows journal move count;
+  both were corrected.
+- The first changed-file Ruff check exited 1 with B023 and SIM117; corrected.
+- The first Ruff format check exited 1 with three unformatted files; the
+  formatter then exited 0.
+- The first strict mypy pass exited 1 with one untyped callback; corrected.
+- An intermediate cleanup subset exited 1 because an unrecorded entry was
+  reported only as generic changed bytes; the fail-closed diagnostic was made
+  precise and the subset then exited 0.
+- A later Ruff check exited 1 with one SIM117 finding in the partial-staging
+  regression; corrected before final gates.
+
+FINAL FOCUSED PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider tests/test_locking.py tests/test_transactions.py -q
+exit: 0
+output:
+  57 passed, 1 skipped in 2.25s
+skip:
+  test_windows_sync_helpers_flush_real_file_and_tree requires Windows.
+
+FINAL STRICT MYPY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --cache-dir=/tmp/TASK-260720-z2z795-e44939-final-mypy-cache
+exit: 0
+output:
+  Success: no issues found in 57 source files
+
+FINAL RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  All checks passed!
+
+FINAL RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  4 files already formatted
+
+FINAL FULL PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output:
+  627 passed, 20 skipped in 89.86s (0:01:29)
+
+FINAL PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260729.tar.gz and
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260729-py3-none-any.whl
+
+FINAL DIFF CHECK
+
+command: git diff --check
+exit: 0
+output: <none>
+
+FINAL WORKTREE SCOPE
+
+command: git status --short --branch
+exit: 0
+output:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/locking.py
+   M src/csk/transactions.py
+   M tests/test_locking.py
+   M tests/test_transactions.py
+
+command: git diff --name-status
+exit: 0
+output:
+  M src/csk/locking.py
+  M src/csk/transactions.py
+  M tests/test_locking.py
+  M tests/test_transactions.py
+
+FINAL SOURCE SHA-256
+
+c8ad9d12b64b014ed4069b94248d9ef3d18a1d54b2c112624eefef62eced174d  src/csk/locking.py
+6eed62050966181ffc25350d00a0ad80eeca2ab8c6af814b75d5fd8da6f25239  src/csk/transactions.py
+8bb3deed100cd4906b3ce29701226b093f172af3157f83366fae38bed013bdf1  tests/test_locking.py
+88298f3aee8ca705e641555ffad69e83b60cb9de1c61dd7e305d52193739f0f5  tests/test_transactions.py
+
+PLATFORM BOUNDARY
+
+A real Windows execution was not run on these unstaged rework bytes. The
+active directive forbids SSH/host access and other repositories, and the task
+instructions forbid staging, committing, or publishing. Deterministic Windows
+MoveFileExW write-through routing is green locally. The prior remote matrix
+belongs to reviewed commit 5f8bfbbd and is deliberately not claimed for the
+current rework.

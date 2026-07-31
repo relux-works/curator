@@ -1,0 +1,39 @@
+TASK-260720-3ag6pi — review cycle 4 independent regeneration comparison
+Date: 2026-07-30
+
+Source candidate:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3
+
+Independent copy 1:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/cycle-4-regenerate-1
+  command: make regenerate
+  exit code: 0
+
+Independent copy 2:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/cycle-4-regenerate-2
+  command: make regenerate
+  exit code: 0
+
+Comparison ledger:
+  diff -qr copy-1/conformance/v1 copy-2/conformance/v1
+    exit code: 0
+  cmp copy-1/release/1.0.0-rc.5.json copy-2/release/1.0.0-rc.5.json
+    exit code: 0
+  cmp copy-1/release/1.0.0-rc.6.json copy-2/release/1.0.0-rc.6.json
+    exit code: 0
+  diff -qr source/conformance/v1 copy-1/conformance/v1
+    exit code: 0
+  cmp source/release/1.0.0-rc.6.json copy-1/release/1.0.0-rc.6.json
+    exit code: 0
+
+Generated identities:
+  conformance/v1/manifest.json
+    sha256:72c5d717027ca096b14bc32f5d60bb740676974e9429f3d09b730897e5fba89b
+  release/1.0.0-rc.5.json
+    sha256:75ae17fc029b4f51ca40ce768d04fd72991ec3db2602b8fe59213bee6ac34583
+  release/1.0.0-rc.6.json
+    sha256:5844b32cdee1bc089e15a7c6b52046bcd9135f493fbcd027088e97b7c0971f0f
+
+Result:
+  Both independent regenerations are byte-identical to each other and to the
+  accepted source candidate for every generated surface.

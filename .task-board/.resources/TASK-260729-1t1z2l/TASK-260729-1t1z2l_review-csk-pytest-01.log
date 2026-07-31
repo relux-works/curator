@@ -1,0 +1,72 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.4, pytest-9.0.3, pluggy-1.6.0
+rootdir: /Users/iv/Developer/Wildberries/cocoaskills
+configfile: pyproject.toml
+testpaths: tests
+collected 500 items
+
+tests/test_activation_modes.py ........                                  [  1%]
+tests/test_adapters.py .......                                           [  3%]
+tests/test_audit_backends.py ......                                      [  4%]
+tests/test_audit_cache.py ......                                         [  5%]
+tests/test_audit_capabilities.py .....                                   [  6%]
+tests/test_audit_cli.py ............                                     [  8%]
+tests/test_audit_detectors.py ......                                     [ 10%]
+tests/test_audit_policy.py ..                                            [ 10%]
+tests/test_audit_publish.py ....                                         [ 11%]
+tests/test_audit_registry.py ..........................................  [ 19%]
+tests/test_cli.py .........F...........................................  [ 30%]
+tests/test_closure_install.py ............                               [ 32%]
+tests/test_config.py .........................                           [ 37%]
+tests/test_dev_substitution.py .......                                   [ 39%]
+tests/test_e2e.py ....                                                   [ 39%]
+tests/test_env_files.py ...                                              [ 40%]
+tests/test_gc.py .......                                                 [ 41%]
+tests/test_gitignore_gate.py ..                                          [ 42%]
+tests/test_global_install.py ..........................                  [ 47%]
+tests/test_hashing.py .                                                  [ 47%]
+tests/test_hybrid_scope.py .........                                     [ 49%]
+tests/test_install.py ..........................................         [ 57%]
+tests/test_locale.py ....                                                [ 58%]
+tests/test_locking.py ....                                               [ 59%]
+tests/test_manifest.py ............................                      [ 65%]
+tests/test_mcp_dependencies.py ........................                  [ 69%]
+tests/test_project_resolver.py ....                                      [ 70%]
+tests/test_protocol_conformance.py ssssssssssssssss                      [ 73%]
+tests/test_protocol_json.py .......                                      [ 75%]
+tests/test_refs.py ......                                                [ 76%]
+tests/test_requirements_spec.py ..........                               [ 78%]
+tests/test_shell_init.py .....................s                          [ 82%]
+tests/test_shims.py ....                                                 [ 83%]
+tests/test_skillcheck.py ................                                [ 86%]
+tests/test_skillspec.py ........................                         [ 91%]
+tests/test_source_identity.py .........................                  [ 96%]
+tests/test_status.py ..                                                  [ 97%]
+tests/test_system_config.py .............                                [ 99%]
+tests/test_whitelist.py ..                                               [100%]
+
+=================================== FAILURES ===================================
+_______________ test_cli_init_non_git_warns_but_creates_project ________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1099abc40>
+tmp_path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/pytest-of-iv/pytest-0/test_cli_init_non_git_warns_bu0')
+capsys = <_pytest.capture.CaptureFixture object at 0x1099a10d0>
+
+    def test_cli_init_non_git_warns_but_creates_project(monkeypatch, tmp_path, capsys):
+        project = tmp_path / "plain-project"
+        project.mkdir()
+        monkeypatch.setenv("CSK_CONFIG", str(tmp_path / "missing-config.json"))
+        monkeypatch.chdir(project)
+    
+        code = cli.main(["init"])
+        captured = capsys.readouterr()
+    
+        assert code == 0
+>       assert "not inside a git repository" in captured.err
+E       AssertionError: assert 'not inside a git repository' in ''
+E        +  where '' = CaptureResult(out='Initialized CocoaSkill project at /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/pytest-of-iv/pytest-0/test_cli_init_non_git_warns_bu0/plain-project\n', err='').err
+
+/Users/iv/Developer/Wildberries/cocoaskills/tests/test_cli.py:162: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_cli.py::test_cli_init_non_git_warns_but_creates_project - A...
+============ 1 failed, 482 passed, 17 skipped in 116.84s (0:01:56) =============

@@ -1,0 +1,11 @@
+# TASK-260720-wajgn8 final review
+
+Verdict: accepted.
+
+The rework correctly publishes $defs/buildCommandV6 and makes $defs/commandV6 reference it while leaving the schemas 1 through 5 command union unchanged. Both v6 schemas require schema_version 6, preserve the v5 capabilities and dependencies surface, expose build_roots only in v6, and differ only by stable $id and title. The build command is closed to type=build, driver=go-v1, and source_dir; additionalProperties=false rejects the required forbidden and mixed-shape surfaces. Canonical and legacy generated suites each contain 17 indexed cases and are byte-identical.
+
+Independent verification passed: go test ./tools/generate-vectors; make regenerate with conformance digest bf8a4b30dc44bade3a5ead8fa00bfd60ea5b30286396a13fae8787b9831bd004 unchanged before/after; make validate with the pinned task-local Python environment (32 schemas, 127 vector files, 8 Python tests, all Go tests); make regenerate-check against an isolated alternate Git index seeded from the intended uncommitted conformance baseline; go vet ./tools/...; gofmt cleanliness; and git diff --check. Explicit base comparison proved all canonical and legacy v1-v5 schema and generated-case bytes unchanged. Canonical/legacy schema parity and case-directory parity passed.
+
+Verified hashes: common.schema.json 51b41c2edfa1a9d1a64ac21a99d38516739cf2a5c69bce0fc20e2dd7c70d70ea; agent-skill-v6.schema.json 982832e410f85e415e16e8f9104c3b9af23f6d846bbfbe5497ff170dde947f6f; csk-skill-v6.schema.json 2148eafc4fa110311b52f528651424e2f53c69042235338fb2c8b414035eab9c; schema-case index 7eb769182020171c0cd8394cee5d94caf446b201b30b8b70e8d1e54b922e8856; conformance manifest 87caa3ba9fd88a24c77c618c3ddf15d943fb5d97d926371d9599cfd4f09527c4.
+
+The alternate index is necessary only because the reviewed implementation is an uncommitted worktree; the real Git index was left untouched. Untracked operational files generate-vectors and task-board.config.json were outside the reviewed task-owned patch and were not modified by this review.

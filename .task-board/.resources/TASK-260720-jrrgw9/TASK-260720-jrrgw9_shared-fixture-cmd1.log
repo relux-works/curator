@@ -1,0 +1,66 @@
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/marker_schema_cannot_be_read_by_this_manager
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/marker_is_not_a_marker_document_at_all
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/protected_cache_boundary_is_no_longer_provable
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/artifact_hash_recorded_by_the_marker_no_longer_matches_the_entry
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/receipt_recorded_by_the_marker_no_longer_matches_the_entry
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/logical_key_recorded_by_the_marker_was_derived_from_another_build_input
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/logical_key_was_derived_under_a_build_root_the_marker_does_not_record
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/marker_records_no_build_for_the_command_the_closure_activates
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/marker_records_a_build_driver_outside_the_closed_set
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/build_root_reached_agent-facing_context
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/recorded_artifact_is_not_the_one_this_target_derives
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/recorded_build-source_identity_no_longer_matches_the_frozen_snapshot
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/protected_cache_entry_cannot_be_interpreted
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/protected_cache_holds_no_entry_for_the_recorded_key
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/install
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/install/receipt_bytes
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/install/artifact_bytes
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/upgrade
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/upgrade/receipt_bytes
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/upgrade/artifact_bytes
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_restore_the_cache_when_the_commit_fails
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_restore_the_cache_when_the_commit_fails/install
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_restore_the_cache_when_the_commit_fails/upgrade
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check/the_protected_entry_is_corrupted
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check/the_protected_entry_is_removed
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check/the_protected_boundary_stops_being_provable
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check/the_protected_entry_is_replaced_by_another_valid_one
+=== RUN   TestCompiledProjectStatusRepairRollbackRecovery/install_repairs_untrusted_compiled_state_and_preserves_the_old_install
+--- PASS: TestCompiledProjectStatusRepairRollbackRecovery (215.25s)
+    --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check (49.50s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/marker_schema_cannot_be_read_by_this_manager (2.56s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/marker_is_not_a_marker_document_at_all (2.73s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/protected_cache_boundary_is_no_longer_provable (5.29s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/artifact_hash_recorded_by_the_marker_no_longer_matches_the_entry (5.16s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/receipt_recorded_by_the_marker_no_longer_matches_the_entry (2.56s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/logical_key_recorded_by_the_marker_was_derived_from_another_build_input (5.47s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/logical_key_was_derived_under_a_build_root_the_marker_does_not_record (2.56s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/marker_records_no_build_for_the_command_the_closure_activates (2.58s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/marker_records_a_build_driver_outside_the_closed_set (2.56s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/build_root_reached_agent-facing_context (2.54s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/recorded_artifact_is_not_the_one_this_target_derives (2.58s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/recorded_build-source_identity_no_longer_matches_the_frozen_snapshot (2.58s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/protected_cache_entry_cannot_be_interpreted (2.53s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_compiled_currentness_and_fails_check/protected_cache_holds_no_entry_for_the_recorded_key (2.51s)
+    --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state (66.68s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/install (33.06s)
+            --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/install/receipt_bytes (16.39s)
+            --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/install/artifact_bytes (16.67s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/upgrade (33.62s)
+            --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/upgrade/receipt_bytes (16.68s)
+            --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_repair_corrupt_compiled_state/upgrade/artifact_bytes (16.94s)
+    --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_restore_the_cache_when_the_commit_fails (57.24s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_restore_the_cache_when_the_commit_fails/install (28.87s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_restore_the_cache_when_the_commit_fails/upgrade (28.37s)
+    --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check (12.89s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check/the_protected_entry_is_corrupted (2.60s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check/the_protected_entry_is_removed (2.57s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check/the_protected_boundary_stops_being_provable (2.61s)
+        --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/status_reports_protected_cache_state_that_moved_during_the_check/the_protected_entry_is_replaced_by_another_valid_one (2.58s)
+    --- PASS: TestCompiledProjectStatusRepairRollbackRecovery/install_repairs_untrusted_compiled_state_and_preserves_the_old_install (16.21s)
+PASS
+ok  	github.com/relux-works/curator/cmd/curator	215.657s

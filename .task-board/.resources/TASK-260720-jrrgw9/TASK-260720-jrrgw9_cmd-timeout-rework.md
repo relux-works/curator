@@ -1,0 +1,3 @@
+# Cancelled timeout rework attempt
+
+RUN-260729-2692b2 was cancelled by the orchestrator after launching an unauthorized `go test ... -timeout 40m` command. The process group terminated, no candidate edit was observed, and only the exact 37 MiB task-owned GOTMPDIR was removed after descendants were terminal. The command result is invalid and not acceptance evidence. A new diagnostic instruction supersedes this attempt.

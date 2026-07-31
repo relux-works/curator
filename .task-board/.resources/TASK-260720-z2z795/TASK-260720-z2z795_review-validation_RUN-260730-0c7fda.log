@@ -1,0 +1,208 @@
+TASK-260720-z2z795 INDEPENDENT REVIEW VALIDATION
+run: RUN-260730-0c7fda
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+signed HEAD: a5ec015c0b5b51149c81a679ce259920a3523374
+origin/main: 495ad021847529ce5a544dba415ca2fe19949539
+accepted handoff base: 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+reviewer source edits: none
+
+RUN CONTROL
+
+task-board spawn goal RUN-260730-0c7fda
+  Active Goal: none (run is not goal-bound)
+
+task-board spawn directives RUN-260730-0c7fda
+  No directives recorded
+
+CURRENT DELTA
+
+git status --short --branch
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M tests/test_transactions.py
+
+git diff --stat
+  tests/test_transactions.py | 55 +++++++++++++++++++++++++++++++++++-----------
+  1 file changed, 42 insertions(+), 13 deletions(-)
+
+WINDOWS PERMISSION-STIMULUS REGRESSIONS
+
+PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+exit: 0
+output: 2 passed in 2.49s
+
+Forced Windows one-bit permission identity with
+transactions._permission_mode_identity = lambda mode:
+  stat.S_IWRITE if mode & stat.S_IWRITE else 0
+exit: 0
+output: 2 passed in 1.25s
+
+Negative control with transactions._permission_mode_is_allowed returning True:
+pytest exit: 1 (expected)
+output: both repaired tests failed at DID NOT RAISE
+meaning: both tests independently detect removal of foreign-mode rejection.
+
+PRESCRIBED PRIOR LOCK-INTEGRITY REGRESSIONS
+
+Exact 14-case selection from the producer ledger.
+exit: 0
+output: 14 passed in 5.38s
+
+CONTRACT-TARGETED REGRESSIONS
+
+Exact ordering, recovery, reverse rollback, concurrency, stale-preimage,
+generation, and lock-order selection from the producer ledger.
+exit: 0
+output: 13 passed in 15.14s
+
+FOCUSED LOCKING AND TRANSACTION PYTEST
+
+PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 129 passed, 4 skipped in 69.36s
+
+STRICT MYPY
+
+/Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output: Success: no issues found in 62 source files
+version: mypy 2.1.0
+
+/Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output: Success: no issues found in 62 source files
+version: mypy 2.3.0
+
+RUFF
+
+uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: All checks passed!
+
+uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 4 files already formatted
+
+FULL PYTHON 3.14 PYTEST
+
+PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+exit: 1
+output: 1 failed, 807 passed, 58 skipped in 154.27s
+failure:
+  tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+  assertion:
+    assert not any(thread.is_alive() for thread in threads)
+
+FRESH-PROCESS STRESS REPRODUCTION
+
+Repeated the failing test in separate Python 3.11 pytest processes.
+iterations 1-3: passed
+iteration 4: failed
+iteration-4 output:
+  1 failed in 8.21s
+  failure:
+    assert not any(thread.is_alive() for thread in threads)
+
+FAULTHANDLER LOCALIZATION
+
+PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q -o faulthandler_timeout=6
+  tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+exit: 0
+output: 1 passed in 7.79s, with a six-second timeout thread dump
+dump:
+  concurrent consumer threads remained at:
+    src/csk/locking.py:167 in _canonicalize_darwin_existing_path
+    src/csk/locking.py:129 in _canonical_filesystem_identity
+    src/csk/locking.py:113 in _prepare_manager_home
+    src/csk/locking.py:673 in ManagerHomeLock._prepare_for_acquire
+    src/csk/locking.py:303 in _ExclusiveFileLock.__enter__
+  main thread remained in thread.join at tests/test_locking.py:1306
+code inspection:
+  _ExclusiveFileLock.__enter__ calls _prepare_for_acquire at line 303.
+  The acquisition timer is initialized afterward at line 306.
+meaning:
+  same-home consumers concurrently rescan each stored macOS path component
+  before the configured timeout begins, producing the reproduced flake.
+
+PACKAGE BUILD
+
+PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m build
+  --outdir
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-z2z795/review-RUN-260730-0c7fda/build
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730.tar.gz
+  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730-py3-none-any.whl
+
+DIFF AND PROVENANCE
+
+git diff --check
+exit: 0
+
+git diff --cached --check
+exit: 0
+
+git merge-base --is-ancestor 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12 HEAD
+exit: 0
+
+git merge-base --is-ancestor origin/main HEAD
+exit: 0
+
+git verify-commit HEAD
+exit: 0
+output:
+  Good "git" signature for oparin@me.com with ECDSA key
+  SHA256:V6JiKG7J29mjsvikcLoSVp0bLa77VTsFy12gnLO81cM
+
+SOURCE SHA-256
+
+6ca6f7b792fba0abd5e25109975e1928b403e5ceb818a45cf48545fc6c5a6aa6  src/csk/locking.py
+6f5712bf7d0cf8cafdabc7fe5811e918b20ed7c564eb27b23591880dcf5cb6b2  src/csk/transactions.py
+5b8e7a1a91a3e442e905c3be0037ecdb5747c1b1d2cffd464246af75df80d582  tests/test_locking.py
+ea56a97b97b3fddb34fc47099728c45f930117922fb709c454a64a16bc5ecb65  tests/test_transactions.py
+
+BUILD SHA-256
+
+bce70838295135d444f2edf8603243cb434726307e838a72a0a1bf2173fbca88  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730-py3-none-any.whl
+752bb2ffcb3e645b9407966d542c01295ed4d51439f2a4ca0ad88fe5bfc5bb73  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730.tar.gz
+
+Wheel source SHA-256:
+6ca6f7b792fba0abd5e25109975e1928b403e5ceb818a45cf48545fc6c5a6aa6  csk/locking.py
+6f5712bf7d0cf8cafdabc7fe5811e918b20ed7c564eb27b23591880dcf5cb6b2  csk/transactions.py
+
+RAW LOGS
+
+tool-readiness.log
+windows-regressions.log
+windows-identity-probe.log
+windows-negative-control.log
+lock-integrity-14.log
+contract-13.log
+focused-pytest.log
+mypy-2.1.log
+mypy-2.3.log
+ruff-check.log
+ruff-format.log
+full-pytest.log
+home-handoff-stress.log
+home-handoff-faulthandler.log
+build.log
+
+VERDICT
+
+changes_requested -> to-dev
+No commit_ack was supplied.

@@ -1,0 +1,69 @@
+########## A. main worktree, committed pin 00b1688a, refactored gate ##########
+test-gate: packages=./...
+test-gate: flags=<none> timeout=30m
+test-gate: conformance root=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1
+test-gate: go test exit=0 (stream: .temp/ci-evidence/test/go-test.json)
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/adapters :: TestSymlinkModeUsesRelativeLinks
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+
+platform-case gate: ok
+test-gate: go test exit=0, platform-case gate exit=0
+GATE_A_EXIT=0
+
+########## B. main worktree, rc.5 CANDIDATE root ##########
+test-gate: packages=./...
+test-gate: flags=<none> timeout=30m
+test-gate: conformance root=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3nx97g/worktree/conformance/v1
+test-gate: go test exit=0 (stream: .temp/ci-evidence/candidate-test/go-test.json)
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/adapters :: TestSymlinkModeUsesRelativeLinks
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+
+platform-case gate: ok
+test-gate: go test exit=0, platform-case gate exit=0
+GATE_B_EXIT=0
+########## race gate on origin/main worktree, committed pin ##########
+start 2026-07-29T17:54:11Z
+test-gate: packages=./...
+test-gate: flags=-race timeout=30m
+test-gate: conformance root=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1
+test-gate: go test exit=0 (stream: .temp/ci-evidence/race/go-test.json)
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/adapters :: TestSymlinkModeUsesRelativeLinks
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+
+platform-case gate: ok
+test-gate: go test exit=0, platform-case gate exit=0
+GATE_RACE_EXIT=0
+end 2026-07-29T17:54:31Z

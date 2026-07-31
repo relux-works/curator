@@ -1,0 +1,16 @@
+TASK-260720-jrrgw9 Windows verifier 5 raw SSH retry ledger
+
+command: ssh -T -o BatchMode=yes -o ConnectTimeout=15 -o ConnectionAttempts=1 win 'exit 0'
+
+attempt=1 start=2026-07-29T17:24:07Z end=2026-07-29T17:24:22Z exit=255
+ssh: connect to host 100.120.84.42 port 22: Operation timed out
+
+pause-before-next-attempt=2s
+
+attempt=2 start=2026-07-29T17:24:30Z end=2026-07-29T17:24:45Z exit=255
+ssh: connect to host 100.120.84.42 port 22: Operation timed out
+
+pause-before-next-attempt=2s
+
+attempt=3 start=2026-07-29T17:24:55Z end=2026-07-29T17:25:10Z exit=255
+ssh: connect to host 100.120.84.42 port 22: Operation timed out

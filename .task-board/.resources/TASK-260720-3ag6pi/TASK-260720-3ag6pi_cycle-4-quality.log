@@ -1,0 +1,43 @@
+TASK-260720-3ag6pi — review cycle 4 quality command ledger
+Date: 2026-07-30
+
+Reworked tree:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3
+
+Commands:
+  make validate
+    exit code: 0
+    42 schemas, 447 vector files, 60 Python tests, Go tests
+  go vet ./...
+    exit code: 0
+  go test ./... -count=1
+    exit code: 0
+  gofmt -l tools with non-empty-output failure assertion
+    exit code: 0
+  git diff --check
+    exit code: 0
+
+Generated gate candidate:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/cycle-4-gates-candidate
+  make regenerate-check
+    exit code: 0
+  post-command status:
+    M .github/workflows/ci.yml
+    M .github/workflows/release.yml
+    M tools/test_validate.py
+  No generated path changed.
+
+Clean product candidate:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/cycle-3-rc6-validation-candidate
+  HEAD: ddb181ca3b8e243f212e90ff26fcabe2234fb669
+  make release-check VERSION=1.0.0-rc.6
+    exit code: 0
+    release gate passed at ddb181ca3b8e243f212e90ff26fcabe2234fb669
+
+Clean-check boundary:
+  release_gate.py intentionally requires an empty Git status. The directive
+  forbade staging or committing the three review-rework files, so the release
+  check was run on the retained clean commit whose protocol/product bytes are
+  byte-identical to the reworked tree. The reworked workflow/test bytes are
+  covered by make validate, the focused regression test, and regenerate-check.
+  The clean-check was not weakened, bypassed, or spoofed.

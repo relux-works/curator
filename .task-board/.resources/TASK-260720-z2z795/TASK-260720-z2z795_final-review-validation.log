@@ -1,0 +1,185 @@
+TASK-260720-z2z795 final independent review validation
+Run: RUN-260729-216f1f
+Date: 2026-07-30
+Worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+Reviewed commit: 5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+Commit parent: dd76b570f88339fd1d659c02950e68b17f6ba834
+
+TOOL READINESS
+bare command: python --version
+exit: 127
+output: zsh:1: command not found: python
+routing: used the project's existing /opt/homebrew/bin/python3.11 and
+task-local mypy environment, matching the producer validation route.
+
+command group:
+  /opt/homebrew/bin/python3.11 --version
+  /opt/homebrew/bin/python3.11 -m pytest --version
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python -m mypy --version
+  uvx ruff --version
+exit: 0
+output:
+  Python 3.11.14
+  pytest 8.3.4
+  mypy 2.3.0 (compiled: yes)
+  ruff 0.16.0
+
+FOCUSED PYTEST
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider tests/test_locking.py tests/test_transactions.py -q
+exit: 0
+output:
+  32 passed, 1 skipped in 0.98s
+
+STRICT MYPY
+command:
+  PYTHONDONTWRITEBYTECODE=1 /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python -m mypy --cache-dir=/tmp/TASK-260720-z2z795-final-review-mypy-cache
+exit: 0
+output:
+  Success: no issues found in 57 source files
+
+RUFF LINT
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  All checks passed!
+
+RUFF FORMAT
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  4 files already formatted
+
+FULL PYTEST
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider -q
+exit: 0
+output:
+  602 passed, 20 skipped in 88.28s (0:01:28)
+
+PACKAGE BUILD
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+exit: 0
+output:
+  Successfully built cocoaskills-0.12.6.dev2+g5f8bfbbd6.tar.gz and
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6-py3-none-any.whl
+
+DIFF CHECK
+command:
+  git diff --check origin/main...HEAD
+exit: 0
+output: <none>
+
+COMMIT SCOPE
+command:
+  git rev-list --left-right --count origin/main...HEAD
+exit: 0
+output:
+  0  1
+
+command:
+  git diff --name-status origin/main...HEAD
+exit: 0
+output:
+  M  src/csk/locking.py
+  A  src/csk/transactions.py
+  M  tests/test_locking.py
+  A  tests/test_transactions.py
+
+SIGNATURE
+command:
+  git verify-commit HEAD
+exit: 0
+output:
+  Good "git" signature for oparin@me.com with ECDSA key
+  SHA256:V6JiKG7J29mjsvikcLoSVp0bLa77VTsFy12gnLO81cM
+
+REMOTE REFS
+command:
+  git ls-remote origin refs/heads/main refs/heads/task/TASK-260720-z2z795-transaction-engine
+exit: 0
+output:
+  dd76b570f88339fd1d659c02950e68b17f6ba834  refs/heads/main
+  5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec  refs/heads/task/TASK-260720-z2z795-transaction-engine
+
+GITHUB
+PR:
+  https://github.com/ivanopcode/cocoaskills/pull/7
+workflow:
+  https://github.com/ivanopcode/cocoaskills/actions/runs/30498379391
+head SHA:
+  5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+status:
+  completed / success
+checks:
+  14 success: Ubuntu, macOS, and Windows Python 3.11-3.14; strict mypy;
+  build artifacts
+PR merge state:
+  open / mergeable / clean
+
+PROCESS-WIDE LOCK-ORDER PROBE
+setup:
+  Thread A held ProjectLock + BuildLock. Thread B attempted ManagerHomeLock
+  for the same manager home.
+exit: 0
+output:
+  HOME_ACQUIRED_WHILE_BUILD_HELD
+  worker_errors=[]
+  worker_alive=False
+expected:
+  LockOrderError before home-lock acquisition
+
+JOURNAL-NAMESPACE OVERLAP PROBE
+setup:
+  absent target live path = <home>/state, an ancestor of the journal root
+exit: 0
+output:
+  before_prepare=absent
+  after_prepare=sha256:e54e8c4293c97b53b8ecb51e68739a833bf771dceb517639ae38ae0bc365f33d
+  commit_error=stale preimage for 10-context/overlap: got sha256:ce282b8ebe563576c5bacfd322a7340323d70b6e908b7cb1752984f7efbe60fe, expected absent
+  after_failed_commit=sha256:46ad4d926f01073473a1e17b2e7188568c1de3b9ce7a5810d7d121025726a3f2
+  journal_exists=False
+expected:
+  plan rejected before journal/staging/live mutation; live remains absent
+
+WINDOWS SIDECAR CLEANUP ROUTING PROBE
+setup:
+  Windows routing enabled with directory flush represented by the helper's
+  allowed no-op outcome; successful transaction with a real backup sidecar
+exit: 0
+output:
+  backup_removed=True
+  sidecar_cleanup_write_through_moves=[]
+  journal_tomb_moves=[('txn-cleanup-routing.json', 'txn-cleanup-routing.json.delete', 8)]
+expected:
+  durable, journal-owned sidecar cleanup transition before journal removal
+
+FINAL SOURCE SHA-256
+feae9c197a62bce3c320774cd46d5c2fdfd6f694b6f66e9bd15c129c2d29bf5a  src/csk/locking.py
+f50b1d4addb62532155b537303146468965ea9ab2a81ff55b82f3534ef606c49  src/csk/transactions.py
+110db19650592a690804e5904d945f79a67a3f163fc378cefe758f77b9976f47  tests/test_locking.py
+1ae89cd2352d754c972d104366ea96969ab0ddd3ede51aa43a2baac051647c00  tests/test_transactions.py
+
+FINAL WORKTREE STATUS
+command:
+  git status --short --branch
+exit: 0
+output:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+
+LOGBOOK
+command:
+  command -v logbook
+exit: 1
+output: <none>
+
+command:
+  task-board --help | rg -n 'logbook|journal|note'
+exit: 1
+output: <none>
+
+Findings are persisted in the task-scoped verdict resource, this validation
+ledger, and task notes.

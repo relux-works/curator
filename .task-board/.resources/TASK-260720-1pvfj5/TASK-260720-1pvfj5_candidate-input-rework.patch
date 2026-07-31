@@ -1,0 +1,104 @@
+diff --git a/.github/ci/candidate-suite.sh b/.github/ci/candidate-suite.sh
+--- a/.github/ci/candidate-suite.sh
++++ b/.github/ci/candidate-suite.sh
+@@ -9,6 +9,8 @@
+ # produces is stamped as candidate evidence.
+ #
+ # This script:
++#   * requires exactly one candidate source, rejecting an ambiguous revision
++#     plus root before either can be checked out or recorded;
+ #   * rejects any candidate input that is not immutable -- a branch, a tag, a
+ #     short hash, a placeholder or a guess;
+ #   * refuses a candidate root that is byte-identical to the committed pin's
+@@ -20,6 +22,7 @@
+ #     it is neither a published release nor a conformance claim.
+ #
+ # Usage:
++#   candidate-suite.sh verify-inputs <revision> <root>
+ #   candidate-suite.sh verify-ref  <revision>
+ #   candidate-suite.sh record      <root> <evidence-dir>
+ #
+@@ -42,6 +45,21 @@ sha256_of() {
+ 	fi
+ }
+ 
++# A revision and a pre-materialised root are independent identities. Accepting
++# both would let evidence name the revision while measuring the unrelated root,
++# so the caller must supply exactly one source.
++verify_inputs() {
++	ref="$1"
++	root="$2"
++	if [ -n "$ref" ] && [ -n "$root" ]; then
++		die 'candidate revision and candidate root are mutually exclusive; supply exactly one'
++	fi
++	if [ -z "$ref" ] && [ -z "$root" ]; then
++		die 'candidate revision and candidate root are both empty; supply exactly one'
++	fi
++	echo 'candidate-suite: candidate input accepted (exactly one revision or root)'
++}
++
+ # A candidate revision must be a full, lowercase, 40-hex commit id.  Branches,
+ # tags, `HEAD`, short hashes and placeholders are all rejected by shape, before
+ # anything is fetched.
+@@ -147,10 +165,11 @@ record() {
+ 	echo "candidate-suite: identity recorded at $out"
+ }
+ 
+-[ "$#" -ge 1 ] || die 'usage: candidate-suite.sh verify-ref <revision> | record <root> <evidence-dir>'
++[ "$#" -ge 1 ] || die 'usage: candidate-suite.sh verify-inputs <revision> <root> | verify-ref <revision> | record <root> <evidence-dir>'
+ cmd="$1"
+ shift
+ case "$cmd" in
++	verify-inputs) [ "$#" -eq 2 ] || die 'usage: candidate-suite.sh verify-inputs <revision> <root>'; verify_inputs "$1" "$2" ;;
+ 	verify-ref) [ "$#" -eq 1 ] || die 'usage: candidate-suite.sh verify-ref <revision>'; verify_ref "$1" ;;
+ 	record)     [ "$#" -eq 2 ] || die 'usage: candidate-suite.sh record <root> <evidence-dir>'; record "$1" "$2" ;;
+ 	*)          die "unknown subcommand: $cmd" ;;
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -52,6 +52,25 @@ assert_contains() {
+ 
+ echo '=== candidate-suite.sh verify-ref: only a full immutable revision is a candidate ==='
+ CS="$HERE/candidate-suite.sh"
++assert 'candidate inputs reject revision plus root' 1 bash "$CS" verify-inputs '1234567890abcdef1234567890abcdef12345678' '/candidate/root'
++assert 'candidate inputs accept revision only'     0 bash "$CS" verify-inputs '1234567890abcdef1234567890abcdef12345678' ''
++assert 'candidate inputs accept root only'         0 bash "$CS" verify-inputs '' '/candidate/root'
++
++WORKFLOW='.github/workflows/ci.yml'
++validation_line="$(grep -nF 'Reject ambiguous candidate inputs' "$WORKFLOW" | cut -d: -f1)"
++checkout_line="$(grep -nF 'Check out the candidate suite' "$WORKFLOW" | cut -d: -f1)"
++record_line="$(grep -nF 'Resolve and record the candidate suite identity' "$WORKFLOW" | cut -d: -f1)"
++if [ -n "$validation_line" ] &&
++   [ -n "$checkout_line" ] &&
++   [ -n "$record_line" ] &&
++   [ "$validation_line" -lt "$checkout_line" ] &&
++   [ "$validation_line" -lt "$record_line" ]; then
++	ok 'workflow rejects ambiguous inputs before candidate checkout or recording'
++else
++	bad 'workflow rejects ambiguous inputs before candidate checkout or recording' \
++		"validation=$validation_line checkout=$checkout_line record=$record_line"
++fi
++
+ if [ -z "$PIN" ]; then
+ 	bad 'the workflow declares a SPEC_PIN' 'no SPEC_PIN: line in .github/workflows/ci.yml'
+ 	PIN='0000000000000000000000000000000000000001'
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -313,6 +313,16 @@ jobs:
+         with:
+           submodules: true
+ 
++      # A revision and a pre-materialised root are independent identities.
++      # Reject the ambiguous combination before checking out either candidate
++      # revision or recording any candidate evidence.
++      - name: Reject ambiguous candidate inputs
++        shell: bash
++        env:
++          CANDIDATE_REF: ${{ inputs.candidate_ref }}
++          CANDIDATE_ROOT_INPUT: ${{ inputs.candidate_root }}
++        run: bash .github/ci/candidate-suite.sh verify-inputs "$CANDIDATE_REF" "$CANDIDATE_ROOT_INPUT"
++
+       - name: Reject a non-immutable candidate revision
+         if: inputs.candidate_ref != ''
+         shell: bash
