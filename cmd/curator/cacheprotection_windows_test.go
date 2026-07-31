@@ -85,3 +85,8 @@ func setWindowsDACL(t *testing.T, path string, access []windows.EXPLICIT_ACCESS)
 		t.Fatal(err)
 	}
 }
+
+// foreignArtifactPath names an artifact this target does not derive, so a
+// marker recording it is genuine target drift. A windows target derives
+// bin/build-tool.exe, so the foreign spelling here is the unix one.
+func foreignArtifactPath() string { return "bin/build-tool" }

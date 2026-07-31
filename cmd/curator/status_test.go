@@ -557,7 +557,7 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
 					builds := object["builds"].(map[string]any)
 					build := builds["build-tool"].(map[string]any)
 					build["cache_key"] = testDigest(5)
-					build["artifact_path"] = "bin/build-tool.exe"
+					build["artifact_path"] = foreignArtifactPath()
 				})
 			},
 			want: buildInputDrift, cause: causeTarget, outcome: "cache-hit",
@@ -636,16 +636,12 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
 		"protected cache boundary is no longer provable": {
 			tamper: func(t *testing.T) {
 				for _, entry := range cacheEntries(t, home) {
-					if err := os.Chmod(entry, 0o777); err != nil {
-						t.Fatal(err)
-					}
+					breakCacheProtection(t, entry)
 				}
 			},
 			restore: func(t *testing.T) {
 				for _, entry := range cacheEntries(t, home) {
-					if err := os.Chmod(entry, 0o700); err != nil {
-						t.Fatal(err)
-					}
+					restoreCacheProtection(t, entry, true)
 				}
 			},
 			// One cache-boundary drift also proves the whole plain-text path.
@@ -1410,9 +1406,7 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
 		t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
 	}
 	for _, entry := range cacheEntries(t, home) {
-		if err := os.Chmod(entry, 0o777); err != nil {
-			t.Fatal(err)
-		}
+		breakCacheProtection(t, entry)
 	}
 
 	code, dryRun, _ := capture(t, "install", "app", "--dry-run")
