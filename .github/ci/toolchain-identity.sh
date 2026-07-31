@@ -57,8 +57,16 @@ tc="$(go env GOTOOLCHAIN)" || fail 'go env GOTOOLCHAIN failed'
 printf '%s\n' "toolchain: GOTOOLCHAIN=$tc"
 [ "$tc" = local ] || fail "GOTOOLCHAIN=$tc, not local"
 
+# `go env GOENV` reports the per-user env FILE, not the requested setting: go
+# 1.25 prints nothing at all when GOENV=off, because then there is no such
+# file. Older toolchains echo the literal `off`. Both spellings say the same
+# thing -- no per-user go env file is in the loop -- while any other value
+# names a file the toolchain would read.
 ge="$(go env GOENV)" || fail 'go env GOENV failed'
-printf '%s\n' "toolchain: GOENV=$ge"
-[ "$ge" = off ] || fail "GOENV=$ge, not off"
+printf '%s\n' "toolchain: GOENV=${ge:-<none>}"
+case "$ge" in
+	off|'') ;;
+	*) fail "GOENV=$ge names a per-user go env file, want off" ;;
+esac
 
 echo 'ci-toolchain-identity: ok'
