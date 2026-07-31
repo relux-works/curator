@@ -85,6 +85,61 @@ func TestWindowsCreateProtectedDirectoryRefusesAnExistingName(t *testing.T) {
 	}
 }
 
+// TestWindowsPublicationHardensAnInheritingManagerHome pins the first
+// publication into an ordinary manager home — the only kind Curator ever makes,
+// since the home is created with os.MkdirAll and a Windows directory inherits
+// its parent's ACEs.
+//
+// The boundary requires an owner-only, de-inherited DACL, nothing in the manager
+// established one, and so every publication on Windows refused its own manager
+// home as untrusted provenance. This case publishes into an unprotected home and
+// requires it to succeed, then requires the home to satisfy the same validation
+// afterwards: the boundary is established, not waived.
+func TestWindowsPublicationHardensAnInheritingManagerHome(t *testing.T) {
+	home := t.TempDir()
+	if !ownedInheritingDirectory(home) {
+		t.Skip("this host cannot create an inheriting temporary directory")
+	}
+	store, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publication, receiptHash := testPublication(t, home, testInput("tool"), []byte("artifact"))
+	if _, err := store.Publish(publication, testHomeLock{}); err != nil {
+		t.Fatalf("publish into an ordinary manager home: %v", err)
+	}
+	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); hit.Status != Hit {
+		t.Fatalf("inspection after publishing into an ordinary home = %+v", hit)
+	}
+	dir, err := openWindowsProtected(home, true, false)
+	if err != nil {
+		t.Fatalf("manager home is still not protected after publication: %v", err)
+	}
+	if err := dir.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestWindowsPublicationRefusesAHomeOwnedByAnotherPrincipal keeps the repair
+// narrow: only an inheriting DACL is repaired, and only on a directory this
+// user already owns. A directory whose owner is someone else, or that grants
+// another principal explicit access it did not inherit, is still refused.
+func TestWindowsPublicationRefusesAHomeOwnedByAnotherPrincipal(t *testing.T) {
+	home := t.TempDir()
+	grantWorldMutation(t, home) // an explicit, protected, non-owner grant
+	if ownedInheritingDirectory(home) {
+		t.Fatal("a home with an explicit protected DACL was classified as merely inheriting")
+	}
+	store, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publication, _ := testPublication(t, home, testInput("tool"), []byte("artifact"))
+	if _, err := store.Publish(publication, testHomeLock{}); err == nil {
+		t.Fatal("a manager home granting another principal mutation rights was accepted")
+	}
+}
+
 func TestWindowsProtectedStateMatrix(t *testing.T) {
 	tests := []struct {
 		name   string

@@ -386,8 +386,94 @@ func createProtectedDirectory(path string) error {
 	return nil
 }
 
+// prepareProtectedDirectory opens an existing directory the protected boundary
+// needs, hardening it first when the effective user owns it but its DACL still
+// inherits from its parent.
+//
+// Curator attaches the protected descriptor to every directory it creates
+// inside the cache root, but the manager home is made by os.MkdirAll, and so is
+// anything another part of the manager puts beside the build cache, such as the
+// registry cache directory. An ordinary Windows directory inherits its parent's
+// ACEs, and this boundary requires an owner-only, de-inherited DACL, so the
+// first publication into a real manager home refused it as untrusted
+// provenance and no publication on Windows could ever succeed. Unix has no such
+// gap: the mkdir(0o700) that creates the same home already satisfies
+// validateUnixDir, and this is the Windows spelling of that same 0o700.
+//
+// Hardening is not a relaxation of the boundary. Rewriting a DACL requires
+// WRITE_DAC, which only the owner holds, and the owner check below runs first
+// and is unchanged: a directory owned by another principal is still refused,
+// never seized. The only defect repaired is the inherited access the boundary
+// objects to, and the full validation is re-run afterwards rather than assumed.
+func prepareProtectedDirectory(path string) (*os.File, error) {
+	dir, err := openWindowsProtected(path, true, false)
+	if err == nil {
+		return dir, nil
+	}
+	if !errors.Is(err, errUntrusted) || !ownedInheritingDirectory(path) {
+		return nil, err
+	}
+	if protectErr := protectWindowsPath(path); protectErr != nil {
+		return nil, err
+	}
+	return openWindowsProtected(path, true, false)
+}
+
+// ownedInheritingDirectory reports whether path is a real directory the
+// effective user owns whose DACL is merely unprotected — the one defect
+// prepareProtectedDirectory is allowed to repair. Anything else, including a
+// reparse point or another principal's directory, answers false and is refused
+// by the caller with the verdict openWindowsProtected already produced.
+func ownedInheritingDirectory(path string) bool {
+	path16, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return false
+	}
+	handle, err := windows.CreateFile(
+		path16,
+		windows.FILE_READ_ATTRIBUTES|windows.READ_CONTROL,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
+		0,
+	)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = windows.CloseHandle(handle) }()
+
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
+		return false
+	}
+	if info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 ||
+		info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		return false
+	}
+
+	descriptor, err := windows.GetSecurityInfo(handle, windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
+	if err != nil {
+		return false
+	}
+	owner, _, err := descriptor.Owner()
+	if err != nil {
+		return false
+	}
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return false
+	}
+	if validateWindowsOwner(owner, user.User.Sid, path) != nil {
+		return false
+	}
+	control, _, err := descriptor.Control()
+	return err == nil && control&windows.SE_DACL_PROTECTED == 0
+}
+
 func ensureProtectedBase(home, base string) error {
-	root, err := openWindowsProtected(home, true, false)
+	root, err := prepareProtectedDirectory(home)
 	if err != nil {
 		return err
 	}
@@ -405,7 +491,7 @@ func ensureProtectedBase(home, base string) error {
 	}()
 	for _, part := range strings.Split(rel, string(filepath.Separator)) {
 		current = filepath.Join(current, part)
-		dir, openErr := openWindowsProtected(current, true, false)
+		dir, openErr := prepareProtectedDirectory(current)
 		if openErr != nil && errors.Is(openErr, os.ErrNotExist) {
 			if err := createProtectedDirectory(current); err != nil && !errors.Is(err, os.ErrExist) {
 				return err
