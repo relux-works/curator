@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	manifestpkg "github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/runtimestore"
 )
 
 type env struct {
@@ -115,9 +116,41 @@ func (e *env) declareWithAgents(agents []string, names ...string) {
 	e.write(e.project, ".gitignore", ignored)
 }
 
+// installPlatform is the shim platform an installation on this host actually
+// produces. The suite used to pin "unix" on every runner, which made a Windows
+// run assert a shape the platform cannot even build: a unix script runtime is
+// validated for a POSIX execute bit no file on Windows carries, and a natively
+// compiled artifact is refused against a unix shim. Deriving it from the host
+// is what turns the ledger's Windows rows into real coverage instead of a unix
+// fixture re-run that fails before it asserts anything.
+func installPlatform() string { return runtimestore.Platform() }
+
+// shimName is the launcher filename one command gets on this host: Windows
+// launchers are `.cmd` files, so a bare command name names nothing there.
+func shimName(command string) string {
+	if installPlatform() == "windows" {
+		return command + ".cmd"
+	}
+	return command
+}
+
+// userBinOnPath prepares <userHome>/.local/bin and puts it on PATH, which is
+// the only condition under which the machine-wide scope publishes a forwarding
+// shim. It must be called from a sequential test: t.Setenv panics in a parallel
+// one.
+func userBinOnPath(t *testing.T, userHome string) string {
+	t.Helper()
+	userBin := filepath.Join(userHome, ".local", "bin")
+	if err := os.MkdirAll(userBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", userBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return userBin
+}
+
 func (e *env) install(opts Options) Result {
 	e.t.Helper()
-	opts.Platform = "unix"
+	opts.Platform = installPlatform()
 	return Project(e.cfg, e.project, "test", opts)
 }
 
@@ -154,7 +187,7 @@ func TestEndToEndInstall(t *testing.T) {
 	}
 
 	// shim exists and points into the runtime store
-	shim := filepath.Join(e.project, ".agents", "bin", "skill-a-tool")
+	shim := filepath.Join(e.project, ".agents", "bin", shimName("skill-a-tool"))
 	if _, err := os.Lstat(shim); err != nil {
 		t.Fatal("shim missing")
 	}
@@ -411,7 +444,7 @@ func TestRemovedSkillCleanedUp(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(e.project, ".agents", "skills", "skill-b")); err == nil {
 		t.Fatal("removed skill left in context")
 	}
-	if _, err := os.Stat(filepath.Join(e.project, ".agents", "bin", "skill-b-tool")); err == nil {
+	if _, err := os.Stat(filepath.Join(e.project, ".agents", "bin", shimName("skill-b-tool"))); err == nil {
 		t.Fatal("stale shim survived")
 	}
 	if _, err := os.Stat(filepath.Join(e.project, ".claude", "skills", "skill-b")); err == nil {
@@ -569,7 +602,7 @@ func TestRuntimeOnlyProviderGetsMarkerNoAdapter(t *testing.T) {
 		t.Fatal("adapters must not mirror marker-only nodes")
 	}
 	// but its command is live
-	if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", "provider-tool")); err != nil {
+	if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", shimName("provider-tool"))); err != nil {
 		t.Fatal("provider command shim missing")
 	}
 }
@@ -641,7 +674,7 @@ func TestHybridSkillActivatesWithoutTouchingProjectStore(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(e.project, ".claude", "skills", "skill-h", "SKILL.md")); err != nil {
 		t.Fatal("adapter must mirror the hybrid store")
 	}
-	if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", "skill-h-tool")); err != nil {
+	if _, err := os.Lstat(filepath.Join(e.project, ".agents", "bin", shimName("skill-h-tool"))); err != nil {
 		t.Fatal("hybrid command shim missing")
 	}
 }
@@ -683,21 +716,20 @@ func TestGlobalInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	userHome := t.TempDir()
-	userBin := filepath.Join(userHome, ".local", "bin")
-	if runtime.GOOS != "windows" {
-		if err := os.MkdirAll(userBin, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("PATH", userBin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	}
-	result := Global(e.cfg, userHome, Options{Platform: "unix"})
+	// The forwarding shim is published only into a user bin that is already on
+	// PATH, and that condition is preparable on every runner: globalbins splits
+	// PATH with the platform's own separator and names the entry with the
+	// platform's own suffix, so Windows gets the same assertion rather than an
+	// exemption from it.
+	userBin := userBinOnPath(t, userHome)
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform()})
 	if result.Status != "ok" {
 		t.Fatalf("global install: %+v", result)
 	}
 	if _, err := os.Stat(filepath.Join(e.home, "global", "skills", "skill-g", "SKILL.md")); err != nil {
 		t.Fatal("global context missing")
 	}
-	if _, err := os.Lstat(filepath.Join(e.home, "global", "bin", "skill-g-tool")); err != nil {
+	if _, err := os.Lstat(filepath.Join(e.home, "global", "bin", shimName("skill-g-tool"))); err != nil {
 		t.Fatal("global shim missing")
 	}
 	if _, err := os.Stat(filepath.Join(userHome, ".claude", "skills", "skill-g", "SKILL.md")); err != nil {
@@ -706,10 +738,8 @@ func TestGlobalInstall(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(e.home, "global", "env.sh")); err != nil {
 		t.Fatal("global env missing")
 	}
-	if runtime.GOOS != "windows" {
-		if _, err := os.Lstat(filepath.Join(userBin, "skill-g-tool")); err != nil {
-			t.Fatal("PATH-visible global forwarding shim missing")
-		}
+	if _, err := os.Lstat(filepath.Join(userBin, shimName("skill-g-tool"))); err != nil {
+		t.Fatalf("PATH-visible global forwarding shim missing: %v", err)
 	}
 }
 
@@ -727,7 +757,7 @@ func TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged(t *testing.T) {
 	e.git(repo, "remote", "add", "origin", "https://example.invalid/skill-g.git")
 	e.cfg.Audit.Enabled = true
 
-	result := Global(e.cfg, t.TempDir(), Options{Platform: "unix", DryRun: true, Fetch: true})
+	result := Global(e.cfg, t.TempDir(), Options{Platform: installPlatform(), DryRun: true, Fetch: true})
 	if result.Status != "ok" {
 		t.Fatalf("global dry-run: %+v", result)
 	}
@@ -758,7 +788,7 @@ func TestGlobalInstallUsesManifestLocaleAndAuditGate(t *testing.T) {
 		"skills": [{"name": "skill-g", "tag": "v1"}]}`)
 
 	blocked := Global(e.cfg, t.TempDir(), Options{
-		Platform: "unix",
+		Platform: installPlatform(),
 		AuditGate: func(_ []*closure.Node) ([]string, []string) {
 			return nil, []string{"blocked by review gate"}
 		},
@@ -770,7 +800,7 @@ func TestGlobalInstallUsesManifestLocaleAndAuditGate(t *testing.T) {
 		t.Fatalf("audit block must precede global materialization: %v", err)
 	}
 
-	result := Global(e.cfg, t.TempDir(), Options{Platform: "unix"})
+	result := Global(e.cfg, t.TempDir(), Options{Platform: installPlatform()})
 	if result.Status != "ok" {
 		t.Fatalf("global install: %+v", result)
 	}
@@ -791,7 +821,7 @@ func TestGlobalStrictTagsDetectMovedTag(t *testing.T) {
 		t.Fatal(err)
 	}
 	userHome := t.TempDir()
-	if result := Global(e.cfg, userHome, Options{Platform: "unix"}); result.Status != "ok" {
+	if result := Global(e.cfg, userHome, Options{Platform: installPlatform()}); result.Status != "ok" {
 		t.Fatalf("initial global install: %+v", result)
 	}
 	repo := filepath.Join(e.skillsRoot, "skill-g")
@@ -799,7 +829,7 @@ func TestGlobalStrictTagsDetectMovedTag(t *testing.T) {
 	e.git(repo, "add", ".")
 	e.git(repo, "commit", "-qm", "move tag")
 	e.git(repo, "tag", "-f", "v1")
-	strict := Global(e.cfg, userHome, Options{Platform: "unix", StrictTags: true})
+	strict := Global(e.cfg, userHome, Options{Platform: installPlatform(), StrictTags: true})
 	if strict.Status != "failed" || !strings.Contains(strings.Join(strict.Errors, "\n"), "moved tag") {
 		t.Fatalf("strict global tags must fail: %+v", strict)
 	}
@@ -829,7 +859,7 @@ func TestMcpRequirementGatesInstall(t *testing.T) {
 
 	// no server configured anywhere: any-semantics failure with the hint
 	userHome := t.TempDir()
-	e2 := e.install(Options{VerifyMcp: nil, Platform: "unix"})
+	e2 := e.install(Options{VerifyMcp: nil, Platform: installPlatform()})
 	_ = userHome
 	if e2.Status != "failed" || !strings.Contains(strings.Join(e2.Errors, "\n"), "connect the sheets server") {
 		t.Fatalf("mcp gate: %+v", e2)

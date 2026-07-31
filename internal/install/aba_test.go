@@ -127,7 +127,7 @@ func TestGlobalManifestABAAroundTheReadRestartsClosure(t *testing.T) {
 	duringDocumentRead(t, manifestPath, func() error {
 		return manifestpkg.AddDecl(GlobalRoot(e.home), "skill-b", "tag", "v1", "", "")
 	})
-	result := Global(e.cfg, userHome, Options{Platform: "unix", OnStaged: onStagedOnce(func() error {
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), OnStaged: onStagedOnce(func() error {
 		return manifestpkg.RemoveDecl(GlobalRoot(e.home), "skill-b")
 	})})
 

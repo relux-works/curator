@@ -130,9 +130,17 @@ func TestModesAndTimestampsAreNotFrozenInputs(t *testing.T) {
 func TestRejectsInvalidPathsLinksAndCollisions(t *testing.T) {
 	t.Run("invalid protocol path", func(t *testing.T) {
 		root := t.TempDir()
-		writeTestFile(t, root, "bad:name", []byte("x"))
-		if _, err := Validate(root); !errors.Is(err, ErrInvalidSnapshot) {
-			t.Fatalf("Validate error = %v", err)
+		name := writeInvalidProtocolPathEntry(t, root)
+		token, err := Validate(root)
+		if token != nil {
+			// A token holds an open root handle, and on Windows that handle
+			// blocks the temporary directory's own removal, so a case that
+			// wrongly accepted the tree would fail the *next* case's cleanup
+			// instead of its own assertion.
+			t.Cleanup(func() { _ = token.Close() })
+		}
+		if !errors.Is(err, ErrInvalidSnapshot) {
+			t.Fatalf("Validate error for %q = %v", name, err)
 		}
 	})
 
@@ -244,21 +252,24 @@ func TestFrozenTokenRejectsMutation(t *testing.T) {
 	}
 }
 
+// TestFrozenTokenRejectsRootReplacement proves the frozen token refuses a root
+// whose name now leads to a different directory instance, even when the
+// replacement carries byte-identical content.
+//
+// How a root is replaced is not portable, so the fixture is. On POSIX the
+// validated directory is renamed aside while its handle is open and a
+// same-content directory takes the name. Windows refuses that move outright —
+// os.OpenRoot opens the root with FILE_SHARE_READ|FILE_SHARE_WRITE and no
+// FILE_SHARE_DELETE, so the kernel pins the directory for as long as the token
+// is frozen — and newFrozenRootCase there asserts that refusal and then drives
+// the replacement the platform does allow, through a directory reparse point in
+// the path prefix. Both runners reach this same Recheck assertion; neither is
+// exempted from it.
 func TestFrozenTokenRejectsRootReplacement(t *testing.T) {
-	parent := t.TempDir()
-	root := filepath.Join(parent, "snapshot")
-	if err := os.Mkdir(root, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeTestFile(t, root, "file", []byte("same"))
-	token := validateTestTree(t, root)
-	if err := os.Rename(root, filepath.Join(parent, "old")); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(root, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeTestFile(t, root, "file", []byte("same"))
+	fixture := newFrozenRootCase(t, t.TempDir())
+	writeTestFile(t, fixture.root, "file", []byte("same"))
+	token := validateTestTree(t, fixture.root)
+	fixture.replace(t)
 	if err := token.Recheck(); !errors.Is(err, ErrSnapshotMutated) {
 		t.Fatalf("Recheck error = %v", err)
 	}

@@ -691,7 +691,7 @@ func TestGlobalDryRunPlansBuildsWithoutSessionOrPersistentState(t *testing.T) {
 		"skills": [{"name": "build-skill", "tag": "v1"}]}`)
 	deps, toolchain, cache, builder := newFakeDeps(t)
 
-	result := Global(e.cfg, t.TempDir(), Options{Platform: "unix", DryRun: true, Build: deps})
+	result := Global(e.cfg, t.TempDir(), Options{Platform: installPlatform(), DryRun: true, Build: deps})
 	if result.Status != "ok" {
 		t.Fatalf("global dry-run failed: %+v", result)
 	}
@@ -733,7 +733,7 @@ func TestGlobalStagingFailureLeavesGlobalScopeUnchanged(t *testing.T) {
 		"skills": [{"name": "skill-g", "tag": "v1"}]}`)
 	userHome := t.TempDir()
 	baseline, _, _, _ := newFakeDeps(t)
-	if result := Global(e.cfg, userHome, Options{Platform: "unix", Build: baseline}); result.Status != "ok" {
+	if result := Global(e.cfg, userHome, Options{Platform: installPlatform(), Build: baseline}); result.Status != "ok" {
 		t.Fatalf("baseline global install failed: %+v", result)
 	}
 	e.write(GlobalRoot(e.home), "Skillfile.json", `{
@@ -744,7 +744,7 @@ func TestGlobalStagingFailureLeavesGlobalScopeUnchanged(t *testing.T) {
 	deps, _, _, builder := newFakeDeps(t)
 	builder.failOn["alpha"] = errors.New("go build failed")
 
-	result := Global(e.cfg, userHome, Options{Platform: "unix", Build: deps})
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), Build: deps})
 	if result.Status != "failed" {
 		t.Fatalf("global install status = %q, want failed", result.Status)
 	}
@@ -1011,7 +1011,7 @@ func TestGlobalToolchainDriftAfterTheFinalBuildPreservesGlobalScope(t *testing.T
 		"skills": [{"name": "skill-g", "tag": "v1"}]}`)
 	userHome := t.TempDir()
 	baseline, _, _, _ := newFakeDeps(t)
-	if result := Global(e.cfg, userHome, Options{Platform: "unix", Build: baseline}); result.Status != "ok" {
+	if result := Global(e.cfg, userHome, Options{Platform: installPlatform(), Build: baseline}); result.Status != "ok" {
 		t.Fatalf("baseline global install failed: %+v", result)
 	}
 	e.write(GlobalRoot(e.home), "Skillfile.json", `{
@@ -1024,7 +1024,7 @@ func TestGlobalToolchainDriftAfterTheFinalBuildPreservesGlobalScope(t *testing.T
 	toolchain.verifyErr = errors.New("toolchain tree changed during operation")
 	handoffs := 0
 
-	result := Global(e.cfg, userHome, Options{Platform: "unix", Build: deps, OnStaged: func(Staged) error {
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), Build: deps, OnStaged: func(Staged) error {
 		handoffs++
 		return nil
 	}})
@@ -1509,7 +1509,7 @@ func TestGlobalReleaseTakesNoToolchainVerdictAfterLiveMutation(t *testing.T) {
 	deps, toolchain, _, builder := newFakeDeps(t)
 	toolchain.lateVerifyErr = errors.New("toolchain tree changed during operation")
 
-	result := Global(e.cfg, userHome, Options{Platform: "unix", Build: deps})
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), Build: deps})
 	if result.Status != "ok" {
 		t.Fatalf("global install status = %q, want ok: %+v", result.Status, result)
 	}

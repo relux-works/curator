@@ -779,7 +779,7 @@ func TestInstallHelperProcess(t *testing.T) {
 		DefaultAgents: []string{"claude_code"},
 		AdapterMode:   "auto",
 	}
-	result := Project(cfg, project, filepath.Base(project), Options{Platform: "unix"})
+	result := Project(cfg, project, filepath.Base(project), Options{Platform: installPlatform()})
 	if result.Status != "ok" {
 		t.Fatalf("helper install failed: %+v", result)
 	}
@@ -1021,7 +1021,7 @@ func TestGlobalCommitCarriesNoConsumerLedger(t *testing.T) {
 	userHome := t.TempDir()
 	probe := &commitProbe{}
 
-	result := Global(e.cfg, userHome, Options{Platform: "unix", Commit: CommitDeps{Hooks: probe.hooks()}})
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), Commit: CommitDeps{Hooks: probe.hooks()}})
 	if result.Status != "ok" {
 		t.Fatalf("global install failed: %+v", result)
 	}

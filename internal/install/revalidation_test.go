@@ -79,7 +79,7 @@ func assertEntriesPresent(t *testing.T, what string, paths ...string) {
 func projectEntries(e *env, name string) []string {
 	return []string{
 		filepath.Join(e.project, ".agents", "skills", name),
-		filepath.Join(e.project, ".agents", "bin", name+"-tool"),
+		filepath.Join(e.project, ".agents", "bin", shimName(name+"-tool")),
 		filepath.Join(e.project, ".claude", "skills", name),
 	}
 }
@@ -89,7 +89,7 @@ func projectEntries(e *env, name string) []string {
 func globalEntries(e *env, userHome, name string) []string {
 	return []string{
 		filepath.Join(GlobalRoot(e.home), "skills", name),
-		filepath.Join(GlobalRoot(e.home), "bin", name+"-tool"),
+		filepath.Join(GlobalRoot(e.home), "bin", shimName(name+"-tool")),
 		filepath.Join(userHome, ".claude", "skills", name),
 	}
 }
@@ -150,7 +150,7 @@ func TestStableDeclarationInputsCommitWithoutRestarting(t *testing.T) {
 
 	e.skill("skill-g")
 	e.globalDeclareAll("skill-g")
-	global := Global(e.cfg, t.TempDir(), Options{Platform: "unix"})
+	global := Global(e.cfg, t.TempDir(), Options{Platform: installPlatform()})
 	if global.Status != "ok" {
 		t.Fatalf("global install failed: %+v", global)
 	}
@@ -213,7 +213,7 @@ func TestGlobalDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState(t 
 	e.globalDeclareAll("skill-a", "skill-b")
 	userHome := t.TempDir()
 
-	result := Global(e.cfg, userHome, Options{Platform: "unix", OnStaged: onStagedOnce(func() error {
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), OnStaged: onStagedOnce(func() error {
 		return manifestpkg.RemoveDecl(GlobalRoot(e.home), "skill-b")
 	})})
 
@@ -233,7 +233,7 @@ func TestGlobalDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure(t *
 	e.globalDeclareAll("skill-a")
 	userHome := t.TempDir()
 
-	result := Global(e.cfg, userHome, Options{Platform: "unix", OnStaged: onStagedOnce(func() error {
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), OnStaged: onStagedOnce(func() error {
 		return manifestpkg.AddDecl(GlobalRoot(e.home), "skill-b", "tag", "v1", "", "")
 	})})
 
