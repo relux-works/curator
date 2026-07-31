@@ -1,7 +1,9 @@
 package runtimestore
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +18,7 @@ import (
 )
 
 func TestPrepareScriptRuntimeStagesIncompleteReplacementWithoutBuildRoots(t *testing.T) {
+	skipPOSIXScriptRuntime(t)
 	root := t.TempDir()
 	home := filepath.Join(root, "manager")
 	snapshot := filepath.Join(root, "snapshot")
@@ -58,6 +61,7 @@ func TestPrepareScriptRuntimeStagesIncompleteReplacementWithoutBuildRoots(t *tes
 }
 
 func TestPrepareScriptRuntimeReusesOnlyCompleteManagedTree(t *testing.T) {
+	skipPOSIXScriptRuntime(t)
 	root := t.TempDir()
 	home := filepath.Join(root, "manager")
 	snapshot := filepath.Join(root, "snapshot")
@@ -89,6 +93,7 @@ func TestPrepareScriptRuntimeReusesOnlyCompleteManagedTree(t *testing.T) {
 }
 
 func TestPrepareSingleScriptStagesManagedBinWithoutCopyingSnapshotTree(t *testing.T) {
+	skipPOSIXScriptRuntime(t)
 	root := t.TempDir()
 	home := filepath.Join(root, "manager")
 	snapshot := filepath.Join(root, "snapshot")
@@ -154,16 +159,22 @@ func TestPrepareScriptRuntimeRejectsInvalidTypedInputs(t *testing.T) {
 
 func TestShimTransitionMatrixIsDeterministicAndManagerScoped(t *testing.T) {
 	root := t.TempDir()
-	artifact := filepath.Join(root, "cache", "artifact")
-	lay(t, root, map[string]string{"cache/artifact": "artifact", "live/project/manual": "user-owned"})
+	// The compiled artifact and the shims must describe the same platform, and
+	// on Windows a compiled artifact is required to carry an .exe suffix.
+	platform, artifactName := "unix", "artifact"
+	if runtime.GOOS == "windows" {
+		platform, artifactName = "windows", "artifact.exe"
+	}
+	artifact := filepath.Join(root, "cache", artifactName)
+	lay(t, root, map[string]string{"cache/" + artifactName: "artifact", "live/project/manual": "user-owned"})
 	if err := os.Chmod(artifact, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	compiled := compiledTargetFixture(t, artifact, runtime.GOOS)
 	script := ScriptTarget{runtimeDir: filepath.Join(root, "runtime"), executable: artifact}
-	project := mustManagedShim(t, ProjectShim, filepath.Join(root, "live", "project"), "tool", "unix")
-	canonical := mustManagedShim(t, GlobalCanonicalShim, filepath.Join(root, "live", "global"), "tool", "unix")
-	forward := mustManagedShim(t, SafeForwardingShim, filepath.Join(root, "live", "user-bin"), "tool", "unix")
+	project := mustManagedShim(t, ProjectShim, filepath.Join(root, "live", "project"), "tool", platform)
+	canonical := mustManagedShim(t, GlobalCanonicalShim, filepath.Join(root, "live", "global"), "tool", platform)
+	forward := mustManagedShim(t, SafeForwardingShim, filepath.Join(root, "live", "user-bin"), "tool", platform)
 	current := []ManagedShim{forward, project, canonical}
 
 	for _, testCase := range []struct {
@@ -302,6 +313,87 @@ func TestStagingRejectsLiveOverlapAndUnsafePathEntries(t *testing.T) {
 	if _, err := StageShimTransition(filepath.Join(root, "stage"), []ShimSpec{{Destination: shim, Target: target, PathEntries: []string{filepath.Join(root, "bad:path")}}}, nil); err == nil {
 		t.Fatal("Unix PATH entry containing a separator was accepted")
 	}
+}
+
+func TestParseHelperOutputRecoversPayloadFromConsoleNoise(t *testing.T) {
+	payload := `{"args":["space value","quote\"value","percent%PATH%value","Юникод",""],"path":"C:\\dependency path %PATH% Юникод"}`
+	for name, output := range map[string]string{
+		"bare payload":      payload + "\r\n",
+		"leading noise":     "The system cannot find the path specified.\r\n" + payload + "\r\n",
+		"surrounding noise": "'tool' is not recognized.\r\n" + payload + "\r\nAccess is denied.\r\n",
+		"unix line endings": payload + "\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			decoded, err := parseHelperOutput([]byte(output))
+			if err != nil {
+				t.Fatalf("parseHelperOutput() error = %v", err)
+			}
+			args, ok := decoded["args"].([]any)
+			wantArgs := []string{"space value", `quote"value`, "percent%PATH%value", "Юникод", ""}
+			if !ok || len(args) != len(wantArgs) {
+				t.Fatalf("args = %#v", decoded["args"])
+			}
+			for index, want := range wantArgs {
+				if args[index] != want {
+					t.Fatalf("arg %d = %#v, want %#v", index, args[index], want)
+				}
+			}
+			if want := `C:\dependency path %PATH% Юникод`; decoded["path"] != want {
+				t.Fatalf("path = %#v, want %#v", decoded["path"], want)
+			}
+		})
+	}
+}
+
+func TestParseHelperOutputRejectsOutputWithoutPayload(t *testing.T) {
+	for name, output := range map[string]string{
+		"empty":          "",
+		"console only":   "The system cannot find the path specified.\r\n",
+		"truncated json": "{\"args\":[\"space value\"\r\n",
+		"json array":     "[\"args\"]\r\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if decoded, err := parseHelperOutput([]byte(output)); err == nil {
+				t.Fatalf("parseHelperOutput() = %#v, want error", decoded)
+			}
+		})
+	}
+}
+
+// skipPOSIXScriptRuntime guards the script-runtime fixtures that declare
+// Platform "unix". Their staged commands are validated for a POSIX execute bit,
+// which no file on a Windows host can carry, so the fixture is unconstructible
+// there rather than merely unasserted.
+func skipPOSIXScriptRuntime(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the POSIX script runtime is exercised on the unix runners")
+	}
+}
+
+// parseHelperOutput extracts the helper payload from combined wrapper output.
+// Wrappers run through cmd.exe, so stderr from the console host can surround the
+// single JSON object the helper prints; the payload is the last line that
+// decodes into a JSON object.
+//
+// It lives here rather than beside its only caller in targets_windows_test.go so
+// that the parsing contract is compiled and exercised on every platform. The
+// `decodeHelperOutput` wrapper stays windows-only because the `unused` linter
+// runs on linux, where the calling test is not part of the build.
+func parseHelperOutput(output []byte) (map[string]any, error) {
+	lines := strings.Split(strings.ReplaceAll(string(output), "\r\n", "\n"), "\n")
+	for index := len(lines) - 1; index >= 0; index-- {
+		line := strings.TrimSpace(lines[index])
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var decoded map[string]any
+		if err := json.Unmarshal([]byte(line), &decoded); err != nil {
+			continue
+		}
+		return decoded, nil
+	}
+	return nil, fmt.Errorf("helper output carried no JSON payload")
 }
 
 func compiledTargetFixture(t *testing.T, artifactPath, goos string) CompiledTarget {

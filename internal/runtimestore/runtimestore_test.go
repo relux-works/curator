@@ -206,12 +206,42 @@ func TestWindowsLauncherCarriesRuntimePathAndExitStatus(t *testing.T) {
 	content := string(payload)
 	for _, expected := range []string{
 		"setlocal DisableDelayedExpansion",
+		// The set line is expanded once, so a literal percent is doubled. The
+		// call line is expanded twice, because `call` re-parses the remainder
+		// of its own line, so the same literal has to be quadrupled.
 		`set "PATH=` + strings.ReplaceAll(helperBin, "%", "%%") + `;%PATH%"`,
-		`call "` + strings.ReplaceAll(runtimePath, "%", "%%") + `" %*`,
+		`call "` + strings.ReplaceAll(runtimePath, "%", "%%%%") + `" %*`,
 		"exit /b %ERRORLEVEL%",
 	} {
 		if !strings.Contains(content, expected) {
 			t.Fatalf("Windows launcher lacks %q:\n%s", expected, content)
+		}
+	}
+}
+
+// TestWindowsLauncherEscapesEachExpansionPassOnce pins the escaping arity
+// directly, so the rule is stated once in a form that survives changes to the
+// surrounding launcher shape. It also pins the identity case, which is what
+// keeps the pinned conformance vectors byte-identical: their fixture paths
+// carry no percent, so no escaping applies to them at all.
+func TestWindowsLauncherEscapesEachExpansionPassOnce(t *testing.T) {
+	withPercent := WindowsShimContent(`C:\immutable cache % Юникод\tool.exe`, []string{`C:\dependency % path`})
+	for _, expected := range []string{
+		`set "PATH=C:\dependency %% path;%PATH%"`,
+		`call "C:\immutable cache %%%% Юникод\tool.exe" %*`,
+	} {
+		if !strings.Contains(withPercent, expected) {
+			t.Fatalf("Windows launcher lacks %q:\n%s", expected, withPercent)
+		}
+	}
+
+	clean := WindowsShimContent(`C:\immutable\artifact.exe`, []string{`C:\system\dependency`})
+	for _, expected := range []string{
+		`set "PATH=C:\system\dependency;%PATH%"`,
+		`call "C:\immutable\artifact.exe" %*`,
+	} {
+		if !strings.Contains(clean, expected) {
+			t.Fatalf("percent-free launcher was rewritten, breaking the pinned vectors: %q is absent:\n%s", expected, clean)
 		}
 	}
 }

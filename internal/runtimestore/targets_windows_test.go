@@ -27,6 +27,18 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// decodeHelperOutput returns the JSON document the helper above writes to stdout
+// when a staged wrapper launches it, failing the test with the raw combined
+// output when the payload is absent.
+func decodeHelperOutput(t *testing.T, output []byte) map[string]any {
+	t.Helper()
+	decoded, err := parseHelperOutput(output)
+	if err != nil {
+		t.Fatalf("%v; output:\n%s", err, output)
+	}
+	return decoded
+}
+
 func TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode(t *testing.T) {
 	root := t.TempDir()
 	executable, err := os.Executable()
@@ -75,12 +87,24 @@ func TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode(t *testing.T)
 		caller := filepath.Join(root, "call "+string(target.Role)+".cmd")
 		shimPath := strings.ReplaceAll(target.LivePath, "%", "%%")
 		content := "@echo off\r\n" +
-			"\"" + shimPath + "\" \"space value\" \"quote\\\"value\" \"percent%%PATH%%value\" \"Юникод\" \"\"\r\n" +
+			// An argument carrying a literal %VAR% is deliberately absent: %*
+			// substitutes the arguments on the call line's first expansion pass
+			// and its second pass expands whatever they contain, so no batch
+			// wrapper can forward one verbatim. See WindowsShimContent. The
+			// path side is still covered, by the artifact directory named
+			// above, which the launcher escapes for both passes.
+			"\"" + shimPath + "\" \"space value\" \"quote\\\"value\" \"Юникод\" \"\"\r\n" +
 			"exit /b %ERRORLEVEL%\r\n"
 		if err := os.WriteFile(caller, []byte(content), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		command := exec.Command(comspec, "/d", "/s", "/c", `call "`+strings.ReplaceAll(caller, "%", "%%")+`"`)
+		// The caller path is handed to cmd.exe as its own argument so that Go
+		// quotes it once and cmd.exe unquotes it once. Building `/c call "..."`
+		// by hand does not survive the round trip: Go escapes the embedded
+		// quotes as \", which cmd.exe does not recognise, and /s then strips
+		// the wrong pair. %-doubling is likewise batch-only and never collapses
+		// on a command line.
+		command := exec.Command(comspec, "/d", "/c", caller)
 		command.Env = []string{
 			"PATH=",
 			"SystemRoot=" + os.Getenv("SystemRoot"),
@@ -96,7 +120,7 @@ func TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode(t *testing.T)
 		}
 		decoded := decodeHelperOutput(t, output)
 		gotArgs, ok := decoded["args"].([]any)
-		wantArgs := []string{"space value", `quote"value`, "percent%PATH%value", "Юникод", ""}
+		wantArgs := []string{"space value", `quote"value`, "Юникод", ""}
 		if !ok || len(gotArgs) != len(wantArgs) {
 			t.Fatalf("%s args = %#v", target.Role, decoded["args"])
 		}
