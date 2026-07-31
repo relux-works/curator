@@ -27,9 +27,7 @@ import (
 // GOROOT the boundary cannot accept is diagnosed once, here, rather than seven
 // times in cases that are about status reporting.
 func TestHostGoToolchainIsSelectableOnAnInventoryPlatform(t *testing.T) {
-	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
-		t.Skip("the go-v1 compiled-command boundary is exercised on the rc5-native-control-inventory-v1 runners")
-	}
+	requireNativeControlInventoryPlatform(t)
 	snapshot, err := godriver.Probe(context.Background(), godriver.ConfigFromEnvironment(t.TempDir()))
 	if err != nil {
 		t.Fatalf("the go-v1 boundary could not select the host Go installation: %v\n%s", err, hostToolchainFacts())

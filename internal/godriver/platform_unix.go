@@ -5,10 +5,17 @@ package godriver
 import (
 	"encoding/binary"
 	"io/fs"
+	"path/filepath"
 	"syscall"
 )
 
 const platformGoName = "go"
+
+// physicalPath resolves every link in path. filepath.EvalSymlinks is complete
+// here: a unix host has exactly one kind of link and Go follows it.
+func physicalPath(path string) (string, error) {
+	return filepath.EvalSymlinks(filepath.Clean(path))
+}
 
 func executableMode(mode fs.FileMode) bool { return mode.Perm()&0o111 != 0 }
 

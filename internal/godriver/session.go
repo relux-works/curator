@@ -481,7 +481,12 @@ func selectToolchain(config Config, runtimeRoot string) (string, string, fs.File
 	if !filepath.IsAbs(root) || !filepath.IsAbs(candidate) {
 		return "", "", nil, diagnostic("untrusted_go_executable", "trusted Go root and executable must be absolute")
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(filepath.Clean(root))
+	// physicalPath, not filepath.EvalSymlinks: the selected root and the
+	// launcher under it must be resolved to the objects they really name before
+	// either is typed or fingerprinted, and on Windows EvalSymlinks leaves a
+	// directory junction unresolved. Both are resolved the same way, so the
+	// derived-launcher identity below compares like with like.
+	resolvedRoot, err := physicalPath(root)
 	if err != nil {
 		return "", "", nil, diagnosticErr("go_toolchain_missing", err, "trusted GOROOT is unusable")
 	}
@@ -489,7 +494,7 @@ func selectToolchain(config Config, runtimeRoot string) (string, string, fs.File
 	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&fs.ModeSymlink != 0 {
 		return "", "", nil, diagnosticErr("go_toolchain_missing", err, "trusted GOROOT is not a real directory")
 	}
-	resolvedCandidate, err := filepath.EvalSymlinks(filepath.Clean(candidate))
+	resolvedCandidate, err := physicalPath(candidate)
 	if err != nil {
 		return "", "", nil, diagnosticErr("go_toolchain_missing", err, "trusted Go executable is unusable")
 	}
@@ -708,7 +713,7 @@ func absolutePhysical(path string) (string, error) {
 	if !filepath.IsAbs(path) {
 		return "", fmt.Errorf("path is not absolute")
 	}
-	return filepath.EvalSymlinks(filepath.Clean(path))
+	return physicalPath(path)
 }
 
 func strictlyBelow(path, root string) bool { return path != root && isWithin(path, root) }
