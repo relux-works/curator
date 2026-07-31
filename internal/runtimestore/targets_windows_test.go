@@ -27,6 +27,18 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// decodeHelperOutput returns the JSON document the helper above writes to stdout
+// when a staged wrapper launches it, failing the test with the raw combined
+// output when the payload is absent.
+func decodeHelperOutput(t *testing.T, output []byte) map[string]any {
+	t.Helper()
+	decoded, err := parseHelperOutput(output)
+	if err != nil {
+		t.Fatalf("%v; output:\n%s", err, output)
+	}
+	return decoded
+}
+
 func TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode(t *testing.T) {
 	root := t.TempDir()
 	executable, err := os.Executable()
