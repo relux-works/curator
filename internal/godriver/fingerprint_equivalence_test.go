@@ -1172,11 +1172,7 @@ func TestFingerprintReportsUnreadableDirectoryIdentically(t *testing.T) {
 	}
 	root := t.TempDir()
 	writeTree(t, root, map[string]string{"locked/file": "x", "readable": "y"})
-	locked := filepath.Join(root, "locked")
-	if err := os.Chmod(locked, 0o000); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	denyDirectoryListing(t, filepath.Join(root, "locked"))
 
 	assertEquivalent(t, root)
 	_, _, err := fingerprintToolchain(context.Background(), root, equivalenceVersion)

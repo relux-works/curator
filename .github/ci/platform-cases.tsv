@@ -122,11 +122,26 @@ internal/install/atomicity	TestFailureAtEveryTargetClassRestoresPriorStateInReve
 internal/install/atomicity	TestStaleAdapterRemovalRollsBackToTheExactPriorEntry	linux,darwin,windows	-	-	a stale adapter removal rolls back to the exact prior entry
 internal/install/atomicity	TestAdapterMirrorLinksAreJournaledAndRestoredExactly	linux,darwin,windows	linux,darwin,windows	host-capability	adapter mirror links are journaled and restored exactly (link-capability guarded)
 
+# An owned entry's content is path text in the host's own syntax, so every case
+# below states its expectation as the destination the host recorded rather than
+# as a POSIX literal.  They are required without tolerance: this runner set can
+# create a link on all three platforms -- `internal/adapters
+# TestSymlinkModeStagesRelativeLinkTargets` above requires exactly that of it --
+# so the link-capability skip these cases carry firing here is a real loss of
+# coverage and not a host that cannot express the vector.
+internal/transaction	TestCommitAndRollbackRestoreALinkExactly	linux,darwin,windows	-	-	an owned link is replaced and restored with the exact destination the host recorded, across a mode transition
+internal/transaction	TestRecoveryFinishesAPreparedLinkTransaction	linux,darwin,windows	-	-	home-scoped recovery finishes an interrupted link commit instead of leaving it half-applied
+internal/transaction	TestEntryRemovalRestoresTheExactLink	linux,darwin,windows	-	-	a removal target puts the exact prior link back when a later class fails
+internal/transaction	TestEntryTargetsDoNotAliasTheirDestination	linux,darwin,windows	-	-	an owned mirror link and the directory it points at stay independent targets
+internal/transaction	TestNamespaceIdentityIsReadOnceWithinOneValidationPass	linux,darwin,windows	-	-	one validation pass reads each declared path's identity once and answers every later pair from that snapshot
+internal/transaction	TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken	windows	-	-	the pass snapshot completes the file identity Windows leaves deferred, so no comparison reads the filesystem and an unreadable one fails closed
+
 # ===========================================================================
 # Interop / conformance consumer
 # ===========================================================================
 internal/interop	TestGoldenContextCopy	linux,darwin,windows	-	-	the agent context copied for a skill matches the authoritative golden file list
 internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
+internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
 
 # ===========================================================================
 # Compiled-build surface -- rc5-native-control-inventory-v1 carve-out
