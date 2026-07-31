@@ -146,6 +146,10 @@ The migration copies these runtime artifacts to the new host:
 - the Codex session file and its session-index entry
 - task-scoped dry-run evidence under `.temp/BUG-260731-3a5q1p/logs`
 
+Claude Code `2.1.220` and its credential file were installed and verified with
+`claude auth status` for the existing Max account. The credential file is mode
+`0600`; do not commit or copy it into a repository.
+
 Validate the environment before spawning:
 
 ```bash
@@ -176,7 +180,8 @@ First resumed actions:
 
 1. Re-query PR 12, 13, 14 and CocoaSkills PR 16; do not trust the timestamped CI
    snapshot above when newer evidence exists.
-2. Confirm `task-board agents()` has no live inherited runs.
+2. Confirm the four migration-cancelled RUN IDs in this document are terminal;
+   `agents()` reports board assignments, not live operating-system processes.
 3. Spawn fresh Opus review for PR 12 and PR 14, and route PR 13 from its latest
    Windows artifact.
 4. Monitor the four long-running Windows cells on CocoaSkills PR 16. Diagnose
