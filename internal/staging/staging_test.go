@@ -1,9 +1,29 @@
 package staging
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// absoluteTestRoot is the host's own filesystem root: "/" on unix, and the
+// volume of the working directory on Windows. Plan.Validate demands an
+// OS-absolute, already-clean live and staged path, and a POSIX literal is
+// neither on Windows -- filepath.IsAbs rejects "/live/x" for having no volume,
+// and filepath.Clean rewrites its separators. Building the fixtures from the
+// host root keeps the case about path shape rather than POSIX syntax.
+var absoluteTestRoot = func() string {
+	root, err := filepath.Abs(string(filepath.Separator))
+	if err != nil {
+		panic("resolve the host filesystem root: " + err.Error())
+	}
+	return root
+}()
+
+// absoluteTestPath joins an absolute, clean host path from POSIX-shaped parts.
+func absoluteTestPath(elements ...string) string {
+	return filepath.Join(absoluteTestRoot, filepath.Join(elements...))
+}
 
 func TestSortedOrdersClassesThenIdentifiersWithConsumerLast(t *testing.T) {
 	var plan Plan
@@ -60,30 +80,34 @@ func TestRemovalAndEntryKindsAreRecorded(t *testing.T) {
 }
 
 func TestValidateRejectsProducerDefects(t *testing.T) {
+	live := absoluteTestPath("live", "x")
+	// Absolute but not yet clean, so the defect under test is the unresolved
+	// element rather than a path that is merely relative on this host.
+	unclean := absoluteTestRoot + strings.Join([]string{"live", "..", "live", "x"}, string(filepath.Separator))
 	for name, plan := range map[string]Plan{
-		"no class": {Targets: []Target{{Identifier: "x", LivePath: "/live/x"}}},
+		"no class": {Targets: []Target{{Identifier: "x", LivePath: live}}},
 		"no identifier": {Targets: []Target{
-			{Class: ClassContext, LivePath: "/live/x"},
+			{Class: ClassContext, LivePath: live},
 		}},
 		"relative live path": {Targets: []Target{
-			{Class: ClassContext, Identifier: "x", LivePath: "live/x"},
+			{Class: ClassContext, Identifier: "x", LivePath: filepath.Join("live", "x")},
 		}},
 		"unclean live path": {Targets: []Target{
-			{Class: ClassContext, Identifier: "x", LivePath: "/live/../live/x"},
+			{Class: ClassContext, Identifier: "x", LivePath: unclean},
 		}},
 		"relative staged path": {Targets: []Target{
-			{Class: ClassContext, Identifier: "x", LivePath: "/live/x", StagedPath: "stage/x"},
+			{Class: ClassContext, Identifier: "x", LivePath: live, StagedPath: filepath.Join("stage", "x")},
 		}},
 		"unknown kind": {Targets: []Target{
-			{Class: ClassContext, Identifier: "x", Kind: "bogus", LivePath: "/live/x"},
+			{Class: ClassContext, Identifier: "x", Kind: "bogus", LivePath: live},
 		}},
 		"duplicate identifier": {Targets: []Target{
-			{Class: ClassContext, Identifier: "x", LivePath: "/live/one"},
-			{Class: ClassContext, Identifier: "x", LivePath: "/live/two"},
+			{Class: ClassContext, Identifier: "x", LivePath: absoluteTestPath("live", "one")},
+			{Class: ClassContext, Identifier: "x", LivePath: absoluteTestPath("live", "two")},
 		}},
 		"two producers on one live path": {Targets: []Target{
-			{Class: ClassContext, Identifier: "one", LivePath: "/live/x"},
-			{Class: ClassAdapterLedger, Identifier: "two", LivePath: "/live/x"},
+			{Class: ClassContext, Identifier: "one", LivePath: live},
+			{Class: ClassAdapterLedger, Identifier: "two", LivePath: live},
 		}},
 	} {
 		if err := plan.Validate(); err == nil {
@@ -92,9 +116,9 @@ func TestValidateRejectsProducerDefects(t *testing.T) {
 	}
 
 	var valid Plan
-	valid.Replace(ClassContext, "project/skill-a", "/live/skill-a", "/stage/skill-a")
-	valid.ReplaceEntry(ClassAdapterLedger, "root/entry/skill-a", "/mirror/skill-a", "/stage/link")
-	valid.RemoveEntry("adapter/root/skill-gone", "/mirror/skill-gone")
+	valid.Replace(ClassContext, "project/skill-a", absoluteTestPath("live", "skill-a"), absoluteTestPath("stage", "skill-a"))
+	valid.ReplaceEntry(ClassAdapterLedger, "root/entry/skill-a", absoluteTestPath("mirror", "skill-a"), absoluteTestPath("stage", "link"))
+	valid.RemoveEntry("adapter/root/skill-gone", absoluteTestPath("mirror", "skill-gone"))
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("a well-formed plan was rejected: %v", err)
 	}

@@ -308,12 +308,14 @@ const (
 		windows.WRITE_DAC | windows.WRITE_OWNER | windows.DELETE
 )
 
-func protectWindowsPath(path string) error {
+// ownerOnlyACL builds the owner-only, non-inheritable ACL that
+// validateWindowsDACL accepts. It is the one shape Curator ever writes.
+func ownerOnlyACL() (*windows.ACL, error) {
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	access := []windows.EXPLICIT_ACCESS{{
+	return windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
 		AccessPermissions: windows.GENERIC_ALL,
 		AccessMode:        windows.SET_ACCESS,
 		Inheritance:       windows.NO_INHERITANCE,
@@ -322,8 +324,11 @@ func protectWindowsPath(path string) error {
 			TrusteeType:  windows.TRUSTEE_IS_USER,
 			TrusteeValue: windows.TrusteeValueFromSID(user.User.Sid),
 		},
-	}}
-	acl, err := windows.ACLFromEntries(access, nil)
+	}}, nil)
+}
+
+func protectWindowsPath(path string) error {
+	acl, err := ownerOnlyACL()
 	if err != nil {
 		return err
 	}
@@ -336,6 +341,49 @@ func protectWindowsPath(path string) error {
 		acl,
 		nil,
 	)
+}
+
+// createProtectedDirectory creates one directory that is already protected the
+// instant it becomes observable, by passing the owner-only protected security
+// descriptor to the create call rather than applying it afterwards.
+//
+// os.Mkdir followed by protectWindowsPath is not equivalent. Between the two
+// calls the new directory exists with a DACL inherited from its parent, and a
+// concurrent publisher that opens it in that window fails closed on
+// "DACL is not protected from inheritance" -- a spurious untrusted-provenance
+// verdict for state this manager had just created correctly. Unix has no such
+// window because mkdir takes the mode at creation; this gives Windows the same
+// property. It returns os.ErrExist for an existing name, like os.Mkdir.
+func createProtectedDirectory(path string) error {
+	acl, err := ownerOnlyACL()
+	if err != nil {
+		return err
+	}
+	descriptor, err := windows.NewSecurityDescriptor()
+	if err != nil {
+		return err
+	}
+	if err := descriptor.SetDACL(acl, true, false); err != nil {
+		return err
+	}
+	// Without SE_DACL_PROTECTED the DACL supplied here is merged with the
+	// parent's inheritable entries, which is exactly the state being avoided.
+	if err := descriptor.SetControl(windows.SE_DACL_PROTECTED, windows.SE_DACL_PROTECTED); err != nil {
+		return err
+	}
+	attributes := windows.SecurityAttributes{SecurityDescriptor: descriptor}
+	attributes.Length = uint32(unsafe.Sizeof(attributes))
+	path16, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	if err := windows.CreateDirectory(path16, &attributes); err != nil {
+		if errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
+			return &os.PathError{Op: "mkdir", Path: path, Err: os.ErrExist}
+		}
+		return &os.PathError{Op: "mkdir", Path: path, Err: err}
+	}
+	return nil
 }
 
 func ensureProtectedBase(home, base string) error {
@@ -359,10 +407,7 @@ func ensureProtectedBase(home, base string) error {
 		current = filepath.Join(current, part)
 		dir, openErr := openWindowsProtected(current, true, false)
 		if openErr != nil && errors.Is(openErr, os.ErrNotExist) {
-			if err := os.Mkdir(current, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
-				return err
-			}
-			if err := protectWindowsPath(current); err != nil {
+			if err := createProtectedDirectory(current); err != nil && !errors.Is(err, os.ErrExist) {
 				return err
 			}
 			dir, openErr = openWindowsProtected(current, true, false)
@@ -388,10 +433,7 @@ func makeProtectedTempDir(parent, pattern string) (string, error) {
 }
 
 func createProtectedDir(path string) error {
-	if err := os.Mkdir(path, 0o700); err != nil {
-		return err
-	}
-	return protectWindowsPath(path)
+	return createProtectedDirectory(path)
 }
 
 func writeProtectedFile(path string, _ os.FileMode, source io.Reader) error {

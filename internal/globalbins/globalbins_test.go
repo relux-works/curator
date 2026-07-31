@@ -194,7 +194,18 @@ func TestRefreshWarnsWhenNoSafeBinExists(t *testing.T) {
 	}
 }
 
+// TestSafeSelectionFeedsStagedForwardingTargetWithoutLiveMutation runs on the
+// host's own platform profile rather than a fixed "unix" one.
+//
+// The runtime store validates a script command against the semantics of the
+// platform it was asked for, and the unix profile requires a POSIX execute bit.
+// Windows has none to give -- os.WriteFile(0o755) there yields a file Go reports
+// as 0666 -- so pinning "unix" made this case assert a permission model the host
+// cannot express, and it failed on the executable check before reaching the
+// staging behaviour it exists to cover. Asking for the host profile keeps the
+// case running everywhere on the runtime shape that host actually uses.
 func TestSafeSelectionFeedsStagedForwardingTargetWithoutLiveMutation(t *testing.T) {
+	platform := runtimestore.Platform()
 	root := t.TempDir()
 	managerHome := filepath.Join(root, "manager")
 	userHome := filepath.Join(root, "user")
@@ -202,27 +213,35 @@ func TestSafeSelectionFeedsStagedForwardingTargetWithoutLiveMutation(t *testing.
 	if err := os.MkdirAll(userBin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	selection := Select(managerHome, "unix", map[string]string{"PATH": userBin}, userHome)
+	selection := Select(managerHome, platform, map[string]string{"PATH": userBin}, userHome)
 	if selection.Path != userBin {
 		t.Fatalf("safe user bin selection = %+v", selection)
+	}
+
+	command := skillspec.Command{Name: "tool", Type: "script", UnixPath: "scripts/tool", WinPath: "scripts/tool.cmd"}
+	scriptRel, scriptBody := "tool", "#!/bin/sh\n"
+	liveName := "tool"
+	if platform == "windows" {
+		scriptRel, scriptBody = "tool.cmd", "@echo off\r\n"
+		liveName = "tool.cmd"
 	}
 	snapshot := filepath.Join(root, "snapshot")
 	if err := os.MkdirAll(filepath.Join(snapshot, "scripts"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(snapshot, "scripts", "tool"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(snapshot, "scripts", scriptRel), []byte(scriptBody), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	runtimePlan, err := runtimestore.PrepareScriptRuntime(filepath.Join(root, "runtime-stage"), runtimestore.ScriptRuntimeSpec{
 		Home: managerHome, SkillName: "skill-a", Commit: "commit-a", Snapshot: snapshot,
 		RuntimeRoots: []string{"scripts"},
-		Commands:     []skillspec.Command{{Name: "tool", Type: "script", UnixPath: "scripts/tool"}},
-		Platform:     "unix",
+		Commands:     []skillspec.Command{command},
+		Platform:     platform,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	forward, err := runtimestore.NewManagedShim(runtimestore.SafeForwardingShim, selection.Path, "tool", "unix")
+	forward, err := runtimestore.NewManagedShim(runtimestore.SafeForwardingShim, selection.Path, "tool", platform)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +255,7 @@ func TestSafeSelectionFeedsStagedForwardingTargetWithoutLiveMutation(t *testing.
 	if len(plan.Desired) != 1 {
 		t.Fatalf("forwarding transition = %+v", plan)
 	}
-	if _, err := os.Stat(filepath.Join(userBin, "tool")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(userBin, liveName)); !os.IsNotExist(err) {
 		t.Fatalf("staging touched safe live user bin: %v", err)
 	}
 	if _, err := os.Stat(plan.Desired[0].StagedPath); err != nil {
