@@ -87,7 +87,13 @@ func TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode(t *testing.T)
 		caller := filepath.Join(root, "call "+string(target.Role)+".cmd")
 		shimPath := strings.ReplaceAll(target.LivePath, "%", "%%")
 		content := "@echo off\r\n" +
-			"\"" + shimPath + "\" \"space value\" \"quote\\\"value\" \"percent%%PATH%%value\" \"Юникод\" \"\"\r\n" +
+			// An argument carrying a literal %VAR% is deliberately absent: %*
+			// substitutes the arguments on the call line's first expansion pass
+			// and its second pass expands whatever they contain, so no batch
+			// wrapper can forward one verbatim. See WindowsShimContent. The
+			// path side is still covered, by the artifact directory named
+			// above, which the launcher escapes for both passes.
+			"\"" + shimPath + "\" \"space value\" \"quote\\\"value\" \"Юникод\" \"\"\r\n" +
 			"exit /b %ERRORLEVEL%\r\n"
 		if err := os.WriteFile(caller, []byte(content), 0o700); err != nil {
 			t.Fatal(err)
@@ -114,7 +120,7 @@ func TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode(t *testing.T)
 		}
 		decoded := decodeHelperOutput(t, output)
 		gotArgs, ok := decoded["args"].([]any)
-		wantArgs := []string{"space value", `quote"value`, "percent%PATH%value", "Юникод", ""}
+		wantArgs := []string{"space value", `quote"value`, "Юникод", ""}
 		if !ok || len(gotArgs) != len(wantArgs) {
 			t.Fatalf("%s args = %#v", target.Role, decoded["args"])
 		}
