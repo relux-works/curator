@@ -1,5 +1,5 @@
 ## Status
-to-review
+done
 
 ## Review
 required
@@ -20,17 +20,17 @@ estimated(fibonacci(3))
 ## Checklist
 - [x] Preserve legacy marker-v1 fixture byte-for-byte and add generated marker-v2 writer fixture with manifest coverage.
 - [x] Update CocoaSkills conformance consumer to require and compare the marker-v2 writer fixture.
-- [ ] Run focused, regeneration, release, type, full-suite and cross-platform CI gates; attach evidence and obtain independent review.
+- [x] Run focused, regeneration, release, type, full-suite and cross-platform CI gates; attach evidence and obtain independent review.
 - [x] Code written per task description and AC
 - [x] Relevant tests written for new or changed behavior and passing
 - [x] Lint clean
 - [x] Relevant build/validation commands run after changes and build not broken
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
-- [ ] PUBLICATION RESIDUAL (blocks item 3 cross-platform CI): commit+push the curator-spec branch task/BUG-260731-2rhy74-marker-v2-fixture, then set .github/workflows/ci.yml curator-spec ref to that commit and confirm PR 16 CI green on ubuntu/macOS/Windows.
-- [ ] Implementation matches AC
-- [ ] Solution fits project architecture
-- [ ] Tests green
+- [x] PUBLICATION RESIDUAL (blocks item 3 cross-platform CI): commit+push the curator-spec branch task/BUG-260731-2rhy74-marker-v2-fixture, then set .github/workflows/ci.yml curator-spec ref to that commit and confirm PR 16 CI green on ubuntu/macOS/Windows.
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
 - [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
@@ -99,6 +99,13 @@ agent completed: [reviewer] reviewer (claude) (exit=1)
 spawn run completed: claude (run=RUN-260731-4b8855, pid=15345, exit=1)
 REVIEW INFRA FAILURE CONFIRMED RUN-260731-4b8855: Claude Opus 5 returned HTTP 429 monthly spend limit before first token (total_cost_usd=0). No verdict. Work remains ready for Opus review at curator-spec PR15 head 2629aec; do not merge without accepted verdict.
 POST-MERGE CI EVIDENCE: CocoaSkills main run 30643627899 on rebased main commit c7dbd6daf6562a264275fca06b50a527bce236d4 completed SUCCESS. All 12 Python cells across Ubuntu/macOS/Windows, mypy strict, and Build artifacts passed. This strengthens the literal whole-PR acceptance evidence; task still awaits explicit Opus verdict because the reviewer API is capacity-blocked.
+spawn agent resolution: Agent selection: codex via explicit_override
+spawn launch composition: disabled; contract=agents-infra.child-launch-composition; provider=codex; schema=1; diagnostic=launch_composition_disabled; bare child launch retained
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260731-387024, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260731-387024)
+REVIEW VERDICT — accepted (RUN-260731-387024). Exact curator-spec PR 15 head 2629aecff19a33e8cd1b5ebcfd898894ff1eeae0 reviewed; marker-v1 blob/SHA remains byte-identical, generated marker-v2 fixture/manifest/release coverage is correct, and CocoaSkills merged main c7dbd6daf6562a264275fca06b50a527bce236d4 consumes it directly with canonical LF byte writes and separate legacy-read coverage. Independent gates: spec release-check exit 0 (42 schemas/448 vectors, 79 Python tests, Go tests, deterministic regeneration, rc.6 release gate); Cocoa focused 35 passed, mypy 67 files clean, full suite 1319 passed/50 skipped; rc.5 absence fails closed as designed. Remote CI: curator-spec PR 15 8/8 green across Ubuntu/macOS/Windows; CocoaSkills reviewed PR head and post-merge main both 14/14 green. Evidence: BUG-260731-2rhy74_review-verdict_RUN-260731-387024.md.
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260731-387024, pid=3969, exit=0)
 
 ## Precondition Resources
 (none)
@@ -113,12 +120,14 @@ POST-MERGE CI EVIDENCE: CocoaSkills main run 30643627899 on rebased main commit 
 - [BUG-260731-2rhy74_cycle3-verification-and-ci-evidence.md](file://BUG-260731-2rhy74/BUG-260731-2rhy74_cycle3-verification-and-ci-evidence.md) — Cycle 3 (RUN-260731-b4fd97): independent re-verification of the published marker-v2 delta, completed full-suite and cross-platform CI evidence, Windows CRLF fix proven on real Windows, and analysis of the two out-of-scope blockers raised as BUG-260731-1rldqv and BUG-260731-3gm8kc
 - [BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--claude-_RUN-260731-2d73f7.log](file://BUG-260731-2rhy74/BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--claude-_RUN-260731-2d73f7.log) — System spawn log captured by task-board
 - [BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--claude-_RUN-260731-4b8855.log](file://BUG-260731-2rhy74/BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--claude-_RUN-260731-4b8855.log) — System spawn log captured by task-board
+- [BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--codex-_RUN-260731-387024.log](file://BUG-260731-2rhy74/BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--codex-_RUN-260731-387024.log) — System spawn log captured by task-board
+- [BUG-260731-2rhy74_review-verdict_RUN-260731-387024.md](file://BUG-260731-2rhy74/BUG-260731-2rhy74_review-verdict_RUN-260731-387024.md) — Accepted reviewer verdict with exact revisions, independent local gates, fail-closed proof, and cross-platform CI evidence
 
 ## Created
 2026-07-30T23:39:31Z
 
 ## Last Update
-2026-07-31T15:53:26Z
+2026-07-31T22:09:07Z
 
 ## Assigned To
-[reviewer] reviewer (claude)
+[reviewer] reviewer (codex)
