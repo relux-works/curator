@@ -32,7 +32,9 @@ func (domain *controlDomain) launch(_ *exec.Cmd) error {
 
 func (domain *controlDomain) installedControls() []string { return nil }
 
-func (domain *controlDomain) destroy(_ *exec.Cmd) {}
+// destroy has no counterpart here on purpose. The macOS and Windows domains
+// call their own destroy from inside their own launch; nothing in the shared
+// worker client does, so a stub on this build would be code no build can reach.
 
 func (domain *controlDomain) close() {}
 

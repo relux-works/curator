@@ -174,6 +174,19 @@ func UnixShimContent(runtimePath string, pathEntries []string) string {
 
 // WindowsShimContent returns the exact managed Windows launcher bytes. It is
 // shared with forwarding-shim ownership checks.
+//
+// The two lines that embed a caller-supplied path sit in contexts with
+// different percent-expansion arity. cmd.exe expands percent signs once per
+// batch line, but `call` re-parses the remainder of its own line, so that line
+// is expanded twice. A literal percent in the runtime path therefore has to be
+// escaped once for `set "PATH=..."` and twice for `call`.
+//
+// Forwarding an argument that itself contains %VAR% verbatim is out of contract
+// on Windows. %* substitutes the arguments during the first pass, so a percent
+// pair inside them is expanded by the second pass no matter how the path is
+// escaped. That is a property of every cmd.exe batch wrapper rather than
+// something a launcher can escape around; the published contract - forwarding
+// arguments, PATH and the exit status - is unaffected.
 func WindowsShimContent(runtimePath string, pathEntries []string) string {
 	content := "@echo off\r\nsetlocal DisableDelayedExpansion\r\n"
 	if len(pathEntries) > 0 {
@@ -188,7 +201,7 @@ func WindowsShimContent(runtimePath string, pathEntries []string) string {
 			"  set \"PATH=" + prefix + "\"\r\n" +
 			")\r\n"
 	}
-	content += "call \"" + escapeCMDValue(runtimePath) + "\" %*\r\n"
+	content += "call \"" + escapeCMDCallValue(runtimePath) + "\" %*\r\n"
 	content += "exit /b %ERRORLEVEL%\r\n"
 	return content
 }
@@ -200,8 +213,17 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
+// escapeCMDValue protects a literal percent through one cmd.exe expansion pass,
+// which is what an ordinary batch line performs.
 func escapeCMDValue(value string) string {
 	return strings.ReplaceAll(value, "%", "%%")
+}
+
+// escapeCMDCallValue protects a literal percent through the two expansion passes
+// a `call` line performs: the first reduces %%%% to %%, the second reduces %% to
+// %. Escaping once per pass is what makes the arity explicit.
+func escapeCMDCallValue(value string) string {
+	return escapeCMDValue(escapeCMDValue(value))
 }
 
 // RemoveStaleShims deletes shims whose command is no longer expected.

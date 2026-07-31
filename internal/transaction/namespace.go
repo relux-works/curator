@@ -302,25 +302,3 @@ func namespaceComponentEqual(left, right string, caseInsensitive bool) bool {
 	}
 	return left == right
 }
-
-// existingNamespaceAncestor returns the closest path that exists and can be
-// interrogated for filesystem behavior. A symbolic link is skipped rather than
-// returned: its destination may be missing or on another filesystem, while the
-// question being asked is about the directory that holds it.
-func existingNamespaceAncestor(path string) (string, error) {
-	current := filepath.Clean(path)
-	for {
-		if info, err := os.Lstat(current); err == nil {
-			if info.Mode()&os.ModeSymlink == 0 {
-				return current, nil
-			}
-		} else if !os.IsNotExist(err) {
-			return "", err
-		}
-		parent := filepath.Dir(current)
-		if parent == current {
-			return "", fmt.Errorf("path has no existing ancestor: %s", path)
-		}
-		current = parent
-	}
-}

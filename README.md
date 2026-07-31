@@ -363,6 +363,32 @@ to point at a materialised `<curator-spec>/conformance/v1`; they refuse to run
 without it, because a gate that runs with the conformance suite unset is a
 smaller gate wearing the same name.
 
+#### The compiled-build platform carve-out
+
+`rc5-native-control-inventory-v1` defines native control records for exactly
+macOS and Windows, so the go-v1 driver refuses a compiled build on any other
+host before a worker starts. That carve-out reaches the suite at two
+granularities, and neither is a silent omission:
+
+* **whole package** — `internal/godriver` is not executed where the supplied
+  root's own qualification vector marks the platform `excluded` (linux, with
+  `until_task: TASK-260728-1skseh`). `test-gate.sh` still runs
+  `TestProbeRejectsAnUncoveredPlatformBeforeTheWorker` on that very runner, so
+  the exclusion is asserted rather than obeyed;
+* **individual case** — the `cmd/curator` cases that need a *completed*
+  compilation are carved out by `requireNativeControlInventoryPlatform`, which
+  reads `godriver.InventoryPlatform` rather than a GOOS list, so it cannot drift
+  from the inventory. Their skip reason names the inventory and is classified
+  `platform-control` by `skip-classes.tsv`, and
+  `TestCompiledInstallFollowsTheNativeControlInventoryExactly` runs on every
+  runner to prove the boundary from whichever side that runner is on: a covered
+  host installs and publishes exactly one protected cache entry, an uncovered
+  host is refused with `build_execution_control_unavailable`, publishes nothing,
+  and fails `status --check`.
+
+When the inventory gains a record for a platform, the guard stops skipping there
+on its own; only `must_run_on` in `platform-cases.tsv` needs widening.
+
 The committed protocol-suite pin is declared once, as `SPEC_PIN` in the workflow
 `env:` block, and every job reads it from there. A schema v6 candidate suite is
 never committed and never a default: it enters only through the
