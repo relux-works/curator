@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -314,6 +315,56 @@ func cacheFingerprint(t *testing.T, home string) string {
 	return hex.EncodeToString(digest.Sum(nil))
 }
 
+// requireNativeControlInventoryPlatform carves a case that installs a real
+// compiled command out of a host rc5-native-control-inventory-v1 defines no
+// record for.
+//
+// A compiled command is produced by the go-v1 driver, and on such a host the
+// driver refuses before any worker starts: the portable execution policy is
+// specified for macOS and Windows only. A case that needs a completed
+// compilation has nothing to assert there, and asserting one anyway would claim
+// execution the protocol does not grant.
+//
+// The carve-out is never taken on trust. The refusal is asserted positively on
+// this very runner by TestCompiledInstallFollowsTheNativeControlInventoryExactly,
+// exactly as internal/godriver's own platform exclusion is asserted by
+// TestProbeRejectsAnUncoveredPlatformBeforeTheWorker.
+//
+// The predicate is read from godriver.InventoryPlatform rather than written as
+// a GOOS list here, so it cannot drift from the inventory it stands for. Linux
+// is the platform the rc.5 qualification vector still marks excluded, with
+// until_task TASK-260728-1skseh; when the inventory gains a record for a host,
+// these cases run there without an edit to this helper.
+func requireNativeControlInventoryPlatform(t *testing.T) {
+	t.Helper()
+	if godriver.InventoryPlatform(runtime.GOOS) == "" {
+		t.Skipf("rc5-native-control-inventory-v1 defines no record for host %s; "+
+			"the portable execution policy is specified for macOS and Windows only", runtime.GOOS)
+	}
+}
+
+// publishedCacheEntries counts protected build-cache entries without requiring
+// the cache root to exist. A refused operation publishes nothing, so on a host
+// the inventory does not cover the root itself is legitimately absent.
+func publishedCacheEntries(t *testing.T, home string) []string {
+	t.Helper()
+	base := filepath.Join(home, "cache", "build", "go-v1")
+	entries, err := os.ReadDir(base)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		t.Fatalf("protected build cache is unreadable: %v", err)
+	}
+	var paths []string
+	for _, entry := range entries {
+		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			paths = append(paths, filepath.Join(base, entry.Name()))
+		}
+	}
+	return paths
+}
+
 func cacheEntries(t *testing.T, home string) []string {
 	t.Helper()
 	base := filepath.Join(home, "cache", "build", "go-v1")
@@ -370,6 +421,7 @@ func newInstalledCompiledProject(t *testing.T) compiledProjectFixture {
 // carrying a baseline in, and each returns the fixture to a current state
 // before the next one opens its own window.
 func TestCompiledProjectStatusRepairRollbackRecovery(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
 	fixture := newInstalledCompiledProject(t)
 
 	t.Run("status reports compiled currentness and fails check", func(t *testing.T) {
@@ -1059,6 +1111,7 @@ func restoreWrites(t *testing.T, dir string) {
 // node the project reaches only through a dependency is reported, classified,
 // and fails --check on its own, even though no declaration names it.
 func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
 	project, home := compiledProjectDeclaring(t, `{"name":"consumer","tag":"v1"}`)
 	consumer := filepath.Join(filepath.Dir(project), "skills", "consumer")
 	writeFile(t, filepath.Join(consumer, "SKILL.md"), "---\nname: consumer\ndescription: consumer\n---\n")
@@ -1125,6 +1178,7 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 // compiled command still gets a machine-readable row carrying the stable
 // go-v1 boundary code, and `status --check` fails.
 func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
 	compiledProject(t)
 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
@@ -1406,6 +1460,7 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
 // surface: a cache entry a live marker references is neither removed nor
 // reported as removed.
 func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
 	_, home := compiledProject(t)
 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
@@ -1430,6 +1485,67 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
 	}
 	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
 		t.Fatalf("status --check after gc = %d, want %d", code, exitOK)
+	}
+}
+
+// TestCompiledInstallFollowsTheNativeControlInventoryExactly asserts the
+// platform carve-out of the compiled-build surface positively, in both
+// directions, on every runner — including the one where the carved-out cases
+// above do not run.
+//
+// rc5-native-control-inventory-v1 defines control records for exactly macOS and
+// Windows. The claim under test is that a compiled install succeeds on exactly
+// those platforms and fails closed everywhere else, so:
+//
+//   - on a covered host a real compiled command installs and publishes exactly
+//     one protected cache entry;
+//   - on an uncovered host the same invocation is refused with
+//     build_execution_control_unavailable, naming the inventory and the host,
+//     publishes nothing at all, and leaves `status --check` non-zero rather
+//     than reporting a compiled command as current.
+//
+// This is what makes the skip in requireNativeControlInventoryPlatform a
+// recorded boundary rather than a quiet omission: the uncovered runner still
+// proves the refusal it is carved out by.
+func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
+	_, home := compiledProject(t)
+	code, stdout, stderr := capture(t, "install", "app")
+
+	if godriver.InventoryPlatform(runtime.GOOS) != "" {
+		if code != exitOK {
+			t.Fatalf("a compiled install failed on %s, which rc5-native-control-inventory-v1 covers: %d\nstdout:\n%s\nstderr:\n%s",
+				runtime.GOOS, code, stdout, stderr)
+		}
+		if entries := publishedCacheEntries(t, home); len(entries) != 1 {
+			t.Fatalf("a covered platform published %d protected cache entries, want 1", len(entries))
+		}
+		return
+	}
+
+	if code == exitOK {
+		t.Fatalf("a compiled install succeeded on %s, for which rc5-native-control-inventory-v1 defines no record\nstdout:\n%s\nstderr:\n%s",
+			runtime.GOOS, stdout, stderr)
+	}
+	if !strings.Contains(stderr, godriver.CodeControlUnavailable) {
+		t.Fatalf("the refusal did not carry %s:\nstderr:\n%s", godriver.CodeControlUnavailable, stderr)
+	}
+	for _, want := range []string{
+		godriver.NativeControlInventoryVersion,
+		"no record for host " + runtime.GOOS,
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("the refusal did not name %q:\nstderr:\n%s", want, stderr)
+		}
+	}
+	// A refusal before the worker starts publishes nothing: no protected cache
+	// entry, and no compiled state for a later run to trust.
+	if entries := publishedCacheEntries(t, home); len(entries) != 0 {
+		t.Fatalf("a refused compiled install published %d protected cache entries: %v", len(entries), entries)
+	}
+	// And the status surface fails closed rather than reporting the command as
+	// current on a platform that cannot produce it.
+	if checkCode, checkOut, _ := capture(t, "status", "app", "--check"); checkCode == exitOK {
+		t.Fatalf("status --check passed after a refused compiled install:\n%s", checkOut)
 	}
 }
 
