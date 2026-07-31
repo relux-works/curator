@@ -1,5 +1,5 @@
 ## Status
-reviewing
+done
 
 ## Review
 required
@@ -28,9 +28,9 @@ estimated(fibonacci(8))
 - [x] Relevant build/validation commands run after changes and build not broken
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
-- [ ] Implementation matches AC
-- [ ] Solution fits project architecture
-- [ ] Tests green
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
 - [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
@@ -96,6 +96,23 @@ spawn agent resolution: Agent selection: claude via explicit_override
 spawn launch composition: disabled; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=launch_composition_disabled; bare child launch retained
 spawn queued: [reviewer] reviewer (claude) (run=RUN-260731-a902cb, max_parallel=20)
 spawn run started: [reviewer] reviewer (claude) (run=RUN-260731-a902cb)
+REVIEW VERDICT (RUN-260731-a902cb, independent Opus 5, read-only): ACCEPTED. Artifact BUG-260731-27h1yc_independent-review-verdict.md.
+
+AC met, re-derived from primary sources rather than from the implementer notes. Windows evidence artifact of run 30626331508 (head c7bc890) parsed here: internal/install 60->0 failing (100 pass, 7 skip), internal/install/atomicity 8->0 (8 pass), internal/buildsource 2->0 (7 pass, 2 skip); repo-wide 91->19 against the main baseline 3a047d5 / run 30624569953. All 8 non-wildcard required platform-cases.tsv rows for these packages report ok in the gate report.
+
+Ledger verified by diff, not by claim: git diff origin/main...c7bc890 on .github/ci/platform-cases.tsv and skip-classes.tsv is empty (byte identical). skips-observed.tsv 64 rows both sides, single difference is a t.TempDir nonce in an unrelated internal/scopes row. No test file deleted, no t.Skip or GOOS exclusion added. Strengthened: two runtime.GOOS != windows guards removed, so TestGlobalInstall and the global rollback sweep now assert the PATH-visible forwarding shim and user-bin ledger on Windows; TestAdapterMirrorLinksAreJournaledAndRestoredExactly reports ok rather than tol.
+
+Attached artifacts are byte-identical to the CI artifact contents (platform-cases.txt, skips-observed.tsv) - authentic, not hand-authored. Commits 2a02da9, a164dca, c7bc890 all GitHub-verified true/valid; PR 12 base main, merge-base equals origin/main, mergeable.
+
+Design checks: production never passes a non-host Options.Platform (install.go:191, global.go:63 fall through to runtimestore.Platform()), so deriving it in fixtures restores fidelity and drops no coverage. The Windows frozen-root fixture genuinely fires Recheck root-replacement detection - both instances are byte-identical, so a missed repoint would return nil and fail the case. identity driveRE ^[A-Za-z]:[\\/] is narrower than the pre-existing single-letter-host rule at identity.go:83, so it opens no new allowlist bypass. Local darwin/arm64 go1.25.5 re-run of install, atomicity, buildsource, identity, runtimestore, globalbins all ok; vet host + GOOS=windows clean; gofmt clean.
+
+Job still red only on cmd/curator (7 required rows), owned by BUG-260731-33v6zz, as the ownership map predicted.
+
+NON-BLOCKING for the coordinator: (1) pre-existing flake, not from this PR - TestRegistryRevocationDeniesInstall can fail as snapshot timestamp is too far in the future because registry.checkSnapshotsWithPolicy (snapshot.go:75) defaults maxAge but not clockSkew, the install test env builds config.Config as a literal so SnapshotClockSkewSeconds is 0, and fakeRegistry serves second-precision created_at after the now captured at install.go:1134; deserves its own item against internal/registry. (2) TestReadDocumentBindsGenerationToBytesReplacedByRename is weaker on Windows by construction (old-inode assertion trivially true); the other two properties still assert, comments are honest, not a ledger row. (3) TestBuildSourceIdentityVectors and TestBuildSourceConformanceVectors skip as root-unset on every lane including ubuntu, so the authoritative suite did not cross-check the identity change - pre-existing gate gap. (4) No CHANGELOG entry for a user-facing fix; PRs 9/10/11 also skipped it and nothing enforces it. (5) BUG-260731-33v6zz description claims none of its 14 cases appear in platform-cases.tsv, but main carries 7 cmd/curator rows at lines 149-155 and the gate reports all 7 as required-case failures - correct that scope before it starts.
+
+Reviewer archetype: no commit_ack supplied. Acceptance evidence recorded for the commit-owning mover.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260731-a902cb, pid=23825, exit=0)
 
 ## Precondition Resources
 (none)
@@ -107,12 +124,13 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260731-a902cb)
 - [BUG-260731-27h1yc_windows-skips-observed.tsv](file://BUG-260731-27h1yc/BUG-260731-27h1yc_windows-skips-observed.tsv) — skips-observed.tsv from the same Windows run; identical to the main baseline, proving no skip was added
 - [BUG-260731-27h1yc_spawn-log_-reviewer--reviewer--claude-_RUN-260731-5000ae.log](file://BUG-260731-27h1yc/BUG-260731-27h1yc_spawn-log_-reviewer--reviewer--claude-_RUN-260731-5000ae.log) — System spawn log captured by task-board
 - [BUG-260731-27h1yc_spawn-log_-reviewer--reviewer--claude-_RUN-260731-a902cb.log](file://BUG-260731-27h1yc/BUG-260731-27h1yc_spawn-log_-reviewer--reviewer--claude-_RUN-260731-a902cb.log) — System spawn log captured by task-board
+- [BUG-260731-27h1yc_independent-review-verdict.md](file://BUG-260731-27h1yc/BUG-260731-27h1yc_independent-review-verdict.md) — Independent Opus 5 reviewer verdict for PR 12: ACCEPTED. Every claim re-derived from CI artifacts, git and local execution.
 
 ## Created
 2026-07-31T09:29:57Z
 
 ## Last Update
-2026-07-31T13:22:52Z
+2026-07-31T13:49:05Z
 
 ## Assigned To
 [reviewer] reviewer (claude)
