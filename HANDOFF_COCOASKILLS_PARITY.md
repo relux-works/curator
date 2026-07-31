@@ -90,6 +90,10 @@ Never implement product changes directly on the checkpoint branch.
 
 ### Curator specification
 
+- Checkpoint-only branch `handoff/cocoaskills-parity-20260731`, signed head
+  `a06a865`, preserves four previously uncommitted protocol-v6 working
+  documents. Do not merge it wholesale; compare or cherry-pick deliberately
+  after reconciling it with PR 14/15 and current `main`.
 - PR 14: <https://github.com/relux-works/curator-spec/pull/14>, head
   `b07ef1d51dc6ebcc04cf59a20375d191bf82f6bb`, 8/8 checks green.
 - PR 15: <https://github.com/relux-works/curator-spec/pull/15>, head
