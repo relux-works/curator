@@ -387,6 +387,8 @@ make_stub 'go1.25.1' local off
 assert 'a toolchain that is not go.mod'"'"'s version is rejected' 1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
 make_stub "$WANT_GO" auto off
 assert 'GOTOOLCHAIN=auto is rejected'               1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
+make_stub "$WANT_GO" local ''
+assert 'go 1.25'"'"'s empty GOENV spelling passes'    0 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
 make_stub "$WANT_GO" local "$WORK/user.env"
 assert 'a per-user go env file is rejected'         1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
 
