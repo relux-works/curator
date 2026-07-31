@@ -1,5 +1,5 @@
 ## Status
-blocked
+to-review
 
 ## Review
 required
@@ -83,6 +83,20 @@ agent completed: [implementer] developer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260731-b4fd97, pid=49095, exit=0)
 Coordinator decision: retain literal whole-PR cross-platform AC. Keep this bug blocked until BUG-260731-1rldqv and BUG-260731-3gm8kc are independently accepted, landed, and their dependent CI is green. All implementation and review work must use Claude Opus 5; Codex is reserved for orchestration. Land accepted PRs to main autonomously. No tags or GitHub Releases until explicit user command.
 Migration checkpoint 2026-07-31: blocked only on CocoaSkills PR 16 Windows cache lane. Monitor https://github.com/ivanopcode/cocoaskills/pull/16 (head 7a66c73); when green and reviewed/landed, review/land this marker/spec task and unblock the first of seven delivery tasks.
+ORCHESTRATOR UNBLOCK 2026-07-31: literal whole-PR acceptance boundary is now satisfied. CocoaSkills PR 16 was independently ACCEPTED by Opus RUN-260731-d23d45 and merged by rebase into ivanopcode/cocoaskills/main at c7dbd6daf6562a264275fca06b50a527bce236d4. Exact reviewed head f8b90a5 had 14/14 CI green across Ubuntu/macOS/Windows and mypy. BUG-260731-3gm8kc is also done; curator-spec PR 15 head 2629aec has 8/8 green checks. Route this completed marker-v2/spec change to a fresh independent Opus review, then merge accepted PR 15. No tags or GitHub Releases.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: disabled; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=launch_composition_disabled; bare child launch retained
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260731-2d73f7, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260731-2d73f7)
+agent completed: [reviewer] reviewer (claude) (exit=1)
+spawn run completed: claude (run=RUN-260731-2d73f7, pid=12878, exit=1)
+REVIEW INFRA FAILURE RUN-260731-2d73f7: no verdict. Opus independently inspected PR15 state, legacy marker-v1 byte identity/hashes, marker-v2 fixture, generator, validator and release-gate code, then Claude API returned HTTP 429 monthly spend limit before verdict. Treat as technical failure, not changes requested. Retry a concise fresh Opus review; do not substitute Codex.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: disabled; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=launch_composition_disabled; bare child launch retained
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260731-4b8855, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260731-4b8855)
+agent completed: [reviewer] reviewer (claude) (exit=1)
+spawn run completed: claude (run=RUN-260731-4b8855, pid=15345, exit=1)
 
 ## Precondition Resources
 (none)
@@ -95,12 +109,14 @@ Migration checkpoint 2026-07-31: blocked only on CocoaSkills PR 16 Windows cache
 - [BUG-260731-2rhy74_spawn-log_-implementer--developer--claude-_RUN-260731-253dc8.log](file://BUG-260731-2rhy74/BUG-260731-2rhy74_spawn-log_-implementer--developer--claude-_RUN-260731-253dc8.log) — System spawn log captured by task-board
 - [BUG-260731-2rhy74_spawn-log_-implementer--developer--claude-_RUN-260731-b4fd97.log](file://BUG-260731-2rhy74/BUG-260731-2rhy74_spawn-log_-implementer--developer--claude-_RUN-260731-b4fd97.log) — System spawn log captured by task-board
 - [BUG-260731-2rhy74_cycle3-verification-and-ci-evidence.md](file://BUG-260731-2rhy74/BUG-260731-2rhy74_cycle3-verification-and-ci-evidence.md) — Cycle 3 (RUN-260731-b4fd97): independent re-verification of the published marker-v2 delta, completed full-suite and cross-platform CI evidence, Windows CRLF fix proven on real Windows, and analysis of the two out-of-scope blockers raised as BUG-260731-1rldqv and BUG-260731-3gm8kc
+- [BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--claude-_RUN-260731-2d73f7.log](file://BUG-260731-2rhy74/BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--claude-_RUN-260731-2d73f7.log) — System spawn log captured by task-board
+- [BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--claude-_RUN-260731-4b8855.log](file://BUG-260731-2rhy74/BUG-260731-2rhy74_spawn-log_-reviewer--reviewer--claude-_RUN-260731-4b8855.log) — System spawn log captured by task-board
 
 ## Created
 2026-07-30T23:39:31Z
 
 ## Last Update
-2026-07-31T12:47:22Z
+2026-07-31T15:40:17Z
 
 ## Assigned To
-[implementer] developer (claude)
+[reviewer] reviewer (claude)
