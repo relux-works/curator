@@ -92,7 +92,13 @@ func TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode(t *testing.T)
 		if err := os.WriteFile(caller, []byte(content), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		command := exec.Command(comspec, "/d", "/s", "/c", `call "`+strings.ReplaceAll(caller, "%", "%%")+`"`)
+		// The caller path is handed to cmd.exe as its own argument so that Go
+		// quotes it once and cmd.exe unquotes it once. Building `/c call "..."`
+		// by hand does not survive the round trip: Go escapes the embedded
+		// quotes as \", which cmd.exe does not recognise, and /s then strips
+		// the wrong pair. %-doubling is likewise batch-only and never collapses
+		// on a command line.
+		command := exec.Command(comspec, "/d", "/c", caller)
 		command.Env = []string{
 			"PATH=",
 			"SystemRoot=" + os.Getenv("SystemRoot"),

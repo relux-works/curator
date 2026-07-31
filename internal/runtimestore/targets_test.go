@@ -18,6 +18,7 @@ import (
 )
 
 func TestPrepareScriptRuntimeStagesIncompleteReplacementWithoutBuildRoots(t *testing.T) {
+	skipPOSIXScriptRuntime(t)
 	root := t.TempDir()
 	home := filepath.Join(root, "manager")
 	snapshot := filepath.Join(root, "snapshot")
@@ -60,6 +61,7 @@ func TestPrepareScriptRuntimeStagesIncompleteReplacementWithoutBuildRoots(t *tes
 }
 
 func TestPrepareScriptRuntimeReusesOnlyCompleteManagedTree(t *testing.T) {
+	skipPOSIXScriptRuntime(t)
 	root := t.TempDir()
 	home := filepath.Join(root, "manager")
 	snapshot := filepath.Join(root, "snapshot")
@@ -91,6 +93,7 @@ func TestPrepareScriptRuntimeReusesOnlyCompleteManagedTree(t *testing.T) {
 }
 
 func TestPrepareSingleScriptStagesManagedBinWithoutCopyingSnapshotTree(t *testing.T) {
+	skipPOSIXScriptRuntime(t)
 	root := t.TempDir()
 	home := filepath.Join(root, "manager")
 	snapshot := filepath.Join(root, "snapshot")
@@ -156,16 +159,22 @@ func TestPrepareScriptRuntimeRejectsInvalidTypedInputs(t *testing.T) {
 
 func TestShimTransitionMatrixIsDeterministicAndManagerScoped(t *testing.T) {
 	root := t.TempDir()
-	artifact := filepath.Join(root, "cache", "artifact")
-	lay(t, root, map[string]string{"cache/artifact": "artifact", "live/project/manual": "user-owned"})
+	// The compiled artifact and the shims must describe the same platform, and
+	// on Windows a compiled artifact is required to carry an .exe suffix.
+	platform, artifactName := "unix", "artifact"
+	if runtime.GOOS == "windows" {
+		platform, artifactName = "windows", "artifact.exe"
+	}
+	artifact := filepath.Join(root, "cache", artifactName)
+	lay(t, root, map[string]string{"cache/" + artifactName: "artifact", "live/project/manual": "user-owned"})
 	if err := os.Chmod(artifact, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	compiled := compiledTargetFixture(t, artifact, runtime.GOOS)
 	script := ScriptTarget{runtimeDir: filepath.Join(root, "runtime"), executable: artifact}
-	project := mustManagedShim(t, ProjectShim, filepath.Join(root, "live", "project"), "tool", "unix")
-	canonical := mustManagedShim(t, GlobalCanonicalShim, filepath.Join(root, "live", "global"), "tool", "unix")
-	forward := mustManagedShim(t, SafeForwardingShim, filepath.Join(root, "live", "user-bin"), "tool", "unix")
+	project := mustManagedShim(t, ProjectShim, filepath.Join(root, "live", "project"), "tool", platform)
+	canonical := mustManagedShim(t, GlobalCanonicalShim, filepath.Join(root, "live", "global"), "tool", platform)
+	forward := mustManagedShim(t, SafeForwardingShim, filepath.Join(root, "live", "user-bin"), "tool", platform)
 	current := []ManagedShim{forward, project, canonical}
 
 	for _, testCase := range []struct {
@@ -348,6 +357,17 @@ func TestParseHelperOutputRejectsOutputWithoutPayload(t *testing.T) {
 				t.Fatalf("parseHelperOutput() = %#v, want error", decoded)
 			}
 		})
+	}
+}
+
+// skipPOSIXScriptRuntime guards the script-runtime fixtures that declare
+// Platform "unix". Their staged commands are validated for a POSIX execute bit,
+// which no file on a Windows host can carry, so the fixture is unconstructible
+// there rather than merely unasserted.
+func skipPOSIXScriptRuntime(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the POSIX script runtime is exercised on the unix runners")
 	}
 }
 
