@@ -39,6 +39,8 @@ spawn run started: [implementer] developer (claude) (run=RUN-260731-997143)
 Six residuals named from the combined-base windows-latest go-test JSON. internal/transaction: TestCommitAndRollbackRestoreALinkExactly / TestRecoveryFinishesAPreparedLinkTransaction / TestEntryRemovalRestoresTheExactLink / TestEntryTargetsDoNotAliasTheirDestination / TestNamespaceIdentityIsReadOnceWithinOneValidationPass. internal/godriver: TestFingerprintReportsUnreadableDirectoryIdentically. Three causes -- link destinations are host syntax because os.Symlink applies filepath.FromSlash on Windows; the namespace pass snapshot left the Windows file identity deferred to os.SameFile so it was neither a snapshot nor fail-closed; os.Chmod 0o000 leaves a Windows directory listable. PR 15 opened on task/BUG-260731-38dz6m-windows-residuals.
 agent completed: [implementer] developer (claude) (exit=1)
 spawn run completed: claude (run=RUN-260731-997143, pid=96578, exit=1)
+DEVELOPER INFRA INTERRUPTION RUN-260731-997143: published signed Curator PR15 head d0728457 and started all-platform CI, then Claude Opus 5 returned HTTP 429 monthly spend limit while waiting for Windows. This is not a developer handoff or verdict. Resume with Opus after capacity returns; inspect CI run 30643616475, complete checklist/evidence, then route to fresh Opus review.
+CI CHECKPOINT 2026-07-31T16:01Z: Curator PR15 run 30643616475 at signed head d0728457 has 11/12 jobs terminal green/skipped as expected: Ubuntu Test/Race, macOS Test/Race, lint, three gate self-tests, interop, naming; only Windows Test remains in progress inside go test since 15:36:43Z (24m at checkpoint). Do not cancel blindly; inspect terminal result/log first when resuming. No Opus verdict exists.
 
 ## Precondition Resources
 (none)
@@ -50,7 +52,7 @@ spawn run completed: claude (run=RUN-260731-997143, pid=96578, exit=1)
 2026-07-31T14:13:39Z
 
 ## Last Update
-2026-07-31T15:39:35Z
+2026-07-31T16:01:24Z
 
 ## Assigned To
 [implementer] developer (claude)

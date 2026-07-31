@@ -97,6 +97,8 @@ spawn queued: [reviewer] reviewer (claude) (run=RUN-260731-4b8855, max_parallel=
 spawn run started: [reviewer] reviewer (claude) (run=RUN-260731-4b8855)
 agent completed: [reviewer] reviewer (claude) (exit=1)
 spawn run completed: claude (run=RUN-260731-4b8855, pid=15345, exit=1)
+REVIEW INFRA FAILURE CONFIRMED RUN-260731-4b8855: Claude Opus 5 returned HTTP 429 monthly spend limit before first token (total_cost_usd=0). No verdict. Work remains ready for Opus review at curator-spec PR15 head 2629aec; do not merge without accepted verdict.
+POST-MERGE CI EVIDENCE: CocoaSkills main run 30643627899 on rebased main commit c7dbd6daf6562a264275fca06b50a527bce236d4 completed SUCCESS. All 12 Python cells across Ubuntu/macOS/Windows, mypy strict, and Build artifacts passed. This strengthens the literal whole-PR acceptance evidence; task still awaits explicit Opus verdict because the reviewer API is capacity-blocked.
 
 ## Precondition Resources
 (none)
@@ -116,7 +118,7 @@ spawn run completed: claude (run=RUN-260731-4b8855, pid=15345, exit=1)
 2026-07-30T23:39:31Z
 
 ## Last Update
-2026-07-31T15:40:17Z
+2026-07-31T15:53:26Z
 
 ## Assigned To
 [reviewer] reviewer (claude)
