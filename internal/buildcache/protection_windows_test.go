@@ -5,6 +5,7 @@ package buildcache
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"golang.org/x/sys/windows"
@@ -14,6 +15,73 @@ func protectTestHome(t *testing.T, home string) {
 	t.Helper()
 	if err := protectWindowsPath(home); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestWindowsProtectedBaseIsNeverObservableUnprotected pins the property that
+// makes the cache root safe to create from more than one publisher at a time:
+// a directory below the manager home is protected at the instant it becomes
+// observable, never a moment later.
+//
+// Creating it and then applying the DACL leaves a window in which the new
+// directory carries its parent's inherited entries. A concurrent publisher that
+// opens it there is not wrong to refuse it -- inherited access is exactly what
+// the protection check exists to catch -- so the whole publication fails with an
+// untrusted-provenance verdict for state this manager had just created itself.
+// Every racer below must therefore succeed.
+func TestWindowsProtectedBaseIsNeverObservableUnprotected(t *testing.T) {
+	home := t.TempDir()
+	protectTestHome(t, home)
+	base := filepath.Join(home, "cache", "build", "go-v1")
+
+	const racers = 16
+	start := make(chan struct{})
+	errs := make(chan error, racers)
+	var wait sync.WaitGroup
+	for index := 0; index < racers; index++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			<-start
+			errs <- ensureProtectedBase(home, base)
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent protected-base preparation: %v", err)
+		}
+	}
+
+	// The directories are real and each one independently satisfies the same
+	// protection check a later publication or sweep applies.
+	for _, path := range []string{
+		filepath.Join(home, "cache"),
+		filepath.Join(home, "cache", "build"),
+		base,
+	} {
+		dir, err := openWindowsProtected(path, true, false)
+		if err != nil {
+			t.Fatalf("protected cache directory %q: %v", path, err)
+		}
+		if err := dir.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// TestWindowsCreateProtectedDirectoryRefusesAnExistingName keeps the atomic
+// creator's contract identical to the os.Mkdir call it replaced, so a caller
+// that relies on an existing name being an error still gets one.
+func TestWindowsCreateProtectedDirectoryRefusesAnExistingName(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "entry")
+	if err := createProtectedDirectory(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := createProtectedDirectory(path); !os.IsExist(err) {
+		t.Fatalf("second creation = %v, want an already-exists error", err)
 	}
 }
 
