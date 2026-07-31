@@ -74,10 +74,12 @@ func hostToolchainFacts() string {
 func describePathFact(report *strings.Builder, label, path string) {
 	info, err := os.Lstat(path)
 	if err != nil {
-		fmt.Fprintf(report, "  %s %q: lstat err=%v\n", label, path, err)
+		fmt.Fprintf(report, "  %s %q: lstat err=%v%s\n", label, path, err, platformPathFact(path))
 		return
 	}
-	fmt.Fprintf(report, "  %s %q: dir=%t regular=%t symlink=%t mode=%v size=%d\n",
+	followed, followErr := os.Stat(path)
+	fmt.Fprintf(report, "  %s %q: lstatDir=%t regular=%t symlink=%t mode=%v size=%d statDir=%t statErr=%v%s\n",
 		label, path, info.IsDir(), info.Mode().IsRegular(),
-		info.Mode()&fs.ModeSymlink != 0, info.Mode(), info.Size())
+		info.Mode()&fs.ModeSymlink != 0, info.Mode(), info.Size(),
+		followErr == nil && followed.IsDir(), followErr, platformPathFact(path))
 }
