@@ -13,7 +13,7 @@ import (
 
 func protectTestHome(t *testing.T, home string) {
 	t.Helper()
-	if err := protectWindowsPath(home); err != nil {
+	if err := protectWindowsPath(home, true); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -137,6 +137,50 @@ func TestWindowsPublicationRefusesAHomeOwnedByAnotherPrincipal(t *testing.T) {
 	publication, _ := testPublication(t, home, testInput("tool"), []byte("artifact"))
 	if _, err := store.Publish(publication, testHomeLock{}); err == nil {
 		t.Fatal("a manager home granting another principal mutation rights was accepted")
+	}
+}
+
+// TestWindowsProtectedHomeStillServesOrdinaryManagerState pins the half of the
+// hardening that is easy to get wrong. The manager home is the parent of every
+// other thing Curator writes -- manager locks, transaction files, the global
+// root -- and all of those are created by ordinary os calls that rely on
+// inheritance for their ACL.
+//
+// A protected DACL whose single entry does not propagate hands its children
+// nothing: an ordinary file created inside it afterwards gets an empty DACL and
+// is unopenable even by its own owner, which surfaces as "Access is denied" far
+// away from the cache. Protecting the home must therefore keep it usable.
+func TestWindowsProtectedHomeStillServesOrdinaryManagerState(t *testing.T) {
+	home := t.TempDir()
+	if !ownedInheritingDirectory(home) {
+		t.Skip("this host cannot create an inheriting temporary directory")
+	}
+	store, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publication, _ := testPublication(t, home, testInput("tool"), []byte("artifact"))
+	if _, err := store.Publish(publication, testHomeLock{}); err != nil {
+		t.Fatalf("publish into an ordinary manager home: %v", err)
+	}
+
+	// Exactly the shape the manager writes next: a nested directory made with
+	// os.MkdirAll and a file inside it, both created after the home was
+	// protected, then reopened and read.
+	nested := filepath.Join(home, "state", "locks", "v1")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatalf("create ordinary manager state below a protected home: %v", err)
+	}
+	lock := filepath.Join(nested, "home.lock")
+	if err := os.WriteFile(lock, []byte("held"), 0o600); err != nil {
+		t.Fatalf("write ordinary manager state below a protected home: %v", err)
+	}
+	payload, err := os.ReadFile(lock)
+	if err != nil || string(payload) != "held" {
+		t.Fatalf("read back ordinary manager state = %q, %v", payload, err)
+	}
+	if _, err := os.OpenFile(lock, os.O_RDWR, 0o600); err != nil {
+		t.Fatalf("reopen ordinary manager state for writing: %v", err)
 	}
 }
 

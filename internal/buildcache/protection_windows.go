@@ -267,9 +267,18 @@ func validateWindowsOwner(owner, effectiveUser *windows.SID, label string) error
 }
 
 // validateWindowsDACL deliberately accepts only an unambiguous owner-only ACL.
-// Curator creates this shape itself. Rejecting deny, inherited, inherit-only,
-// and non-owner entries avoids treating the ACL text as an access check while
-// still proving that the owner has every right needed to replace the entry.
+// Curator creates this shape itself. Rejecting deny, inherited, and non-owner
+// entries avoids treating the ACL text as an access check while still proving
+// that the owner has every right needed to replace the entry.
+//
+// Propagation flags are permitted; INHERITED_ACE is not. A directory Curator
+// protects has to hand its owner-only access down to the ordinary children
+// other parts of the manager create inside it, and marking its own ACE
+// inheritable is how Windows expresses that. It grants no other principal
+// anything, so the property this check exists for is untouched. An ACE that
+// only propagates still contributes no effective rights on the object itself,
+// so an inherit-only DACL remains a refusal rather than a way to satisfy the
+// mutation-rights requirement without holding them.
 func validateWindowsDACL(dacl *windows.ACL, owner *windows.SID, label string) error {
 	if dacl == nil || owner == nil || !owner.IsValid() {
 		return untrustedf("%s has no valid owner-only DACL", label)
@@ -283,8 +292,8 @@ func validateWindowsDACL(dacl *windows.ACL, owner *windows.SID, label string) er
 		if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
 			return untrustedf("%s DACL contains a deny or unsupported entry", label)
 		}
-		if ace.Header.AceFlags != 0 {
-			return untrustedf("%s DACL contains an inherited or inheritable entry", label)
+		if ace.Header.AceFlags&^windowsPropagationFlags != 0 {
+			return untrustedf("%s DACL contains an inherited or unsupported entry", label)
 		}
 		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
 		if sid == nil || !sid.IsValid() {
@@ -293,7 +302,9 @@ func validateWindowsDACL(dacl *windows.ACL, owner *windows.SID, label string) er
 		if !owner.Equals(sid) {
 			return untrustedf("%s DACL grants access to another principal", label)
 		}
-		ownerRights |= ace.Mask
+		if ace.Header.AceFlags&windows.INHERIT_ONLY_ACE == 0 {
+			ownerRights |= ace.Mask
+		}
 	}
 	if ownerRights&windows.GENERIC_ALL == 0 && ownerRights&windowsConcreteMutationRights != windowsConcreteMutationRights {
 		return untrustedf("%s owner lacks required mutation rights", label)
@@ -306,19 +317,37 @@ const (
 	windowsConcreteMutationRights windows.ACCESS_MASK = windows.FILE_WRITE_DATA | windows.FILE_APPEND_DATA |
 		windows.FILE_WRITE_EA | windows.FILE_WRITE_ATTRIBUTES | windowsFileDeleteChild |
 		windows.WRITE_DAC | windows.WRITE_OWNER | windows.DELETE
+	// windowsPropagationFlags are the ACE flags that describe what a child
+	// inherits. They say nothing about who is granted access on this object, so
+	// they are the only flags an owner-only DACL may carry. INHERITED_ACE is
+	// deliberately absent: an entry this object did not state itself is exactly
+	// what the protected-DACL requirement exists to exclude.
+	windowsPropagationFlags = byte(windows.CONTAINER_INHERIT_ACE | windows.OBJECT_INHERIT_ACE |
+		windows.NO_PROPAGATE_INHERIT_ACE | windows.INHERIT_ONLY_ACE)
 )
 
-// ownerOnlyACL builds the owner-only, non-inheritable ACL that
-// validateWindowsDACL accepts. It is the one shape Curator ever writes.
-func ownerOnlyACL() (*windows.ACL, error) {
+// ownerOnlyACL builds the owner-only ACL that validateWindowsDACL accepts. It
+// is the one shape Curator ever writes.
+//
+// A container's ACE propagates to its children. Without that, a protected
+// directory hands nothing down, and an ordinary child another part of the
+// manager creates inside it later — a lock file under the manager home, a
+// transaction file under the global root — is created with an empty DACL and
+// becomes unopenable even by its own owner. Propagation is not a grant to
+// anyone else: the single entry names the owner either way.
+func ownerOnlyACL(container bool) (*windows.ACL, error) {
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
 		return nil, err
 	}
+	inheritance := uint32(windows.NO_INHERITANCE)
+	if container {
+		inheritance = windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT
+	}
 	return windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
 		AccessPermissions: windows.GENERIC_ALL,
 		AccessMode:        windows.SET_ACCESS,
-		Inheritance:       windows.NO_INHERITANCE,
+		Inheritance:       inheritance,
 		Trustee: windows.TRUSTEE{
 			TrusteeForm:  windows.TRUSTEE_IS_SID,
 			TrusteeType:  windows.TRUSTEE_IS_USER,
@@ -327,8 +356,8 @@ func ownerOnlyACL() (*windows.ACL, error) {
 	}}, nil)
 }
 
-func protectWindowsPath(path string) error {
-	acl, err := ownerOnlyACL()
+func protectWindowsPath(path string, container bool) error {
+	acl, err := ownerOnlyACL(container)
 	if err != nil {
 		return err
 	}
@@ -355,7 +384,7 @@ func protectWindowsPath(path string) error {
 // window because mkdir takes the mode at creation; this gives Windows the same
 // property. It returns os.ErrExist for an existing name, like os.Mkdir.
 func createProtectedDirectory(path string) error {
-	acl, err := ownerOnlyACL()
+	acl, err := ownerOnlyACL(true)
 	if err != nil {
 		return err
 	}
@@ -413,7 +442,7 @@ func prepareProtectedDirectory(path string) (*os.File, error) {
 	if !errors.Is(err, errUntrusted) || !ownedInheritingDirectory(path) {
 		return nil, err
 	}
-	if protectErr := protectWindowsPath(path); protectErr != nil {
+	if protectErr := protectWindowsPath(path, true); protectErr != nil {
 		return nil, err
 	}
 	return openWindowsProtected(path, true, false)
@@ -511,7 +540,7 @@ func makeProtectedTempDir(parent, pattern string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := protectWindowsPath(path); err != nil {
+	if err := protectWindowsPath(path, true); err != nil {
 		_ = os.RemoveAll(path)
 		return "", err
 	}
@@ -534,7 +563,7 @@ func writeProtectedFile(path string, _ os.FileMode, source io.Reader) error {
 			_ = os.Remove(path)
 		}
 	}()
-	if err := protectWindowsPath(path); err != nil {
+	if err := protectWindowsPath(path, false); err != nil {
 		return err
 	}
 	if _, err := io.Copy(file, source); err != nil {
