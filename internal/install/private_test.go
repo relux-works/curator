@@ -178,7 +178,7 @@ func TestGlobalDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot(t *testing
 	var midRun []string
 	toolchain.observeProbe = func() { midRun = tempEntries(t, base) }
 
-	result := Global(e.cfg, userHome, Options{Platform: "unix", DryRun: true, Build: deps})
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), DryRun: true, Build: deps})
 	if result.Status != "ok" {
 		t.Fatalf("global dry-run of a cloned source failed: %+v", result)
 	}
@@ -247,7 +247,7 @@ func TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure(t *testing.T) {
 		Status: buildcache.Unsupported, Reason: "platform protection is unavailable",
 	}
 
-	result := Global(e.cfg, userHome, Options{Platform: "unix", DryRun: true, Build: deps})
+	result := Global(e.cfg, userHome, Options{Platform: installPlatform(), DryRun: true, Build: deps})
 	if result.Status != "failed" {
 		t.Fatalf("global dry-run status = %q, want failed: %+v", result.Status, result)
 	}
@@ -293,7 +293,7 @@ func TestGlobalMcpFailureBlocksToolchainCacheAndBuild(t *testing.T) {
 
 	staged := 0
 	result := Global(e.cfg, userHome, Options{
-		Platform: "unix", Build: deps,
+		Platform: installPlatform(), Build: deps,
 		OnStaged: func(Staged) error { staged++; return nil },
 		VerifyMcp: func([]*closure.Node) (map[string]map[string][]string, []string, error) {
 			return nil, nil, errors.New("missing MCP server \"ledger\" for build-skill")
@@ -318,7 +318,7 @@ func TestGlobalRegistryFailureBlocksToolchainCacheAndBuild(t *testing.T) {
 
 	staged := 0
 	result := Global(e.cfg, userHome, Options{
-		Platform: "unix", Build: deps,
+		Platform: installPlatform(), Build: deps,
 		OnStaged: func(Staged) error { staged++; return nil },
 		ResolveAttest: func([]*closure.Node) (map[string]*marker.Attestation, []string, error) {
 			return nil, nil, errors.New("build-skill is revoked by registry-a")
@@ -380,7 +380,7 @@ func TestGlobalMarkersCarryMcpAndAttestationEvidence(t *testing.T) {
 	deps, _, _, _ := newFakeDeps(t)
 
 	result := Global(e.cfg, userHome, Options{
-		Platform: "unix", Build: deps,
+		Platform: installPlatform(), Build: deps,
 		VerifyMcp: func([]*closure.Node) (map[string]map[string][]string, []string, error) {
 			return map[string]map[string][]string{"skill-g": {"ledger": {"claude_code"}}}, nil, nil
 		},

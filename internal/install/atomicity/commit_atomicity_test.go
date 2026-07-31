@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -116,7 +115,7 @@ func globalSweepScenario(name, mode, userHome string, injectClasses ...string) s
 			if result := e.installGlobal(install.Options{}); result.Status != "ok" {
 				t.Fatalf("baseline global install failed: %+v", result)
 			}
-			if _, err := os.Lstat(filepath.Join(e.userHome, ".local", "bin", "skill-a-tool")); err != nil {
+			if _, err := os.Lstat(filepath.Join(e.userHome, ".local", "bin", shimName("skill-a-tool"))); err != nil {
 				t.Fatalf("the baseline published no user-bin forwarding shim: %v", err)
 			}
 		},
@@ -156,21 +155,24 @@ func TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder(t *testing.T)
 	// one call. Each entry still resolves to its own, because globalbins.Select
 	// prefers <userHome>/.local/bin and its fallback scan refuses any directory
 	// outside the user home it was handed.
+	//
+	// Every runner prepares its bins, Windows included: globalbins splits PATH
+	// with the platform's own separator and names each entry with the platform's
+	// own suffix, so the forwarding-shim and user-bin-ledger classes below are
+	// asserted there rather than exempted.
 	globalUserHomes := make([]string, len(globalSweepClasses))
 	for index := range globalUserHomes {
 		globalUserHomes[index] = t.TempDir()
 	}
-	if runtime.GOOS != "windows" {
-		search := os.Getenv("PATH")
-		for _, userHome := range globalUserHomes {
-			userBin := filepath.Join(userHome, ".local", "bin")
-			if err := os.MkdirAll(userBin, 0o755); err != nil {
-				t.Fatal(err)
-			}
-			search = userBin + string(os.PathListSeparator) + search
+	search := os.Getenv("PATH")
+	for _, userHome := range globalUserHomes {
+		userBin := filepath.Join(userHome, ".local", "bin")
+		if err := os.MkdirAll(userBin, 0o755); err != nil {
+			t.Fatal(err)
 		}
-		t.Setenv("PATH", search)
+		search = userBin + string(os.PathListSeparator) + search
 	}
+	t.Setenv("PATH", search)
 
 	// The sweep is partitioned one injected class per entry. Injections within
 	// an entry are inherently serial — each starts from the state the previous

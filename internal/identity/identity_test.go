@@ -73,6 +73,35 @@ func TestParseRejectsAmbiguousNetworkForms(t *testing.T) {
 	}
 }
 
+// TestParseAcceptsLocalFilesystemSourcesWithoutError pins the *error* half of a
+// local source, which TestCanonical cannot see because Canonical discards it.
+// A Windows checkout is declared by its native path, and every backslash form
+// used to leave Parse through the scp fallback, which saw the drive colon and
+// refused the source as a malformed network remote — so `curator` could not
+// install from a local path on Windows at all.
+func TestParseAcceptsLocalFilesystemSourcesWithoutError(t *testing.T) {
+	for _, source := range []string{
+		`C:\repos\skill`,
+		"C:/repos/skill",
+		`c:\Users\RUNNER~1\AppData\Local\Temp\build\origin\build-skill`,
+		`Z:\share\skills\skill-a.git`,
+		`\\server\share\skills\skill-a`,
+		"/abs/path/repo",
+		"./relative",
+		"~/home/repo",
+	} {
+		identity, err := Parse(source)
+		if err != nil || identity != "" {
+			t.Errorf("Parse(%q) = %q, %v; want a local source with no identity", source, identity, err)
+		}
+	}
+	// The drive carve-out is one letter wide: a real hostname before the colon
+	// stays a network remote and stays subject to the allowlist.
+	if identity, err := Parse(`ci.example.com:skills/a`); err != nil || identity != "ci.example.com/skills/a" {
+		t.Fatalf("Parse of an scp remote = %q, %v", identity, err)
+	}
+}
+
 func TestValidCanonical(t *testing.T) {
 	for _, identity := range []string{"git.example.com/skills/a", "git.example.com/Skills/文書"} {
 		if !ValidCanonical(identity) {
