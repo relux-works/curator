@@ -27,16 +27,17 @@ const platformGoName = "go.exe"
 // Go installation the GitHub Actions tool cache publishes on Windows is reached
 // through exactly such a junction.
 //
+// EvalSymlinks is worse than incomplete for a junction that is not the last
+// component: walkSymlinks refuses to descend through anything whose mode is not
+// a directory, so `<junction>/bin/go.exe` fails outright with ENOTDIR.
+//
 // GetFinalPathNameByHandle resolves every component, of every link kind, in one
 // call. Anchoring on what it returns is stricter than anchoring on the link:
 // the identity this driver fingerprints is the physical directory, so
 // retargeting the junction afterwards cannot silently move the trusted
 // toolchain.
 func physicalPath(path string) (string, error) {
-	resolved, err := filepath.EvalSymlinks(filepath.Clean(path))
-	if err != nil {
-		return "", err
-	}
+	resolved := filepath.Clean(path)
 	encoded, err := windows.UTF16PtrFromString(resolved)
 	if err != nil {
 		return "", err
@@ -54,7 +55,9 @@ func physicalPath(path string) (string, error) {
 		0,
 	)
 	if err != nil {
-		return "", err
+		// A PathError keeps the path in the message and keeps the underlying
+		// Errno reachable, so a missing path still satisfies os.IsNotExist.
+		return "", &os.PathError{Op: "resolve", Path: resolved, Err: err}
 	}
 	defer func() { _ = windows.CloseHandle(handle) }()
 
