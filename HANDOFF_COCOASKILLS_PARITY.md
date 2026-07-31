@@ -25,7 +25,11 @@ their task branches and pull requests.
 
 All local child runs were intentionally cancelled for migration. A cancelled
 run is not a review verdict. No implementation agent should still be running on
-the old Mac.
+the old Mac. The cancelled IDs are `RUN-260731-6b26c6`,
+`RUN-260731-2dec82`, `RUN-260731-5000ae`, and `RUN-260731-63da06`.
+Their raw runtime records were excluded from the checkpoint, so remote
+`task-board spawn status` may report `not found`; task notes preserve the
+handoff state.
 
 ## Repositories
 
@@ -180,8 +184,9 @@ First resumed actions:
 
 1. Re-query PR 12, 13, 14 and CocoaSkills PR 16; do not trust the timestamped CI
    snapshot above when newer evidence exists.
-2. Confirm the four migration-cancelled RUN IDs in this document are terminal;
-   `agents()` reports board assignments, not live operating-system processes.
+2. Treat the four migration-cancelled RUN IDs in this document as terminal and
+   spawn fresh runs where directed. `agents()` reports board assignments, not
+   live operating-system processes.
 3. Spawn fresh Opus review for PR 12 and PR 14, and route PR 13 from its latest
    Windows artifact.
 4. Monitor the four long-running Windows cells on CocoaSkills PR 16. Diagnose
