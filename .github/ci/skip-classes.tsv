@@ -47,6 +47,7 @@ root-content	is a pre-revision root	allow	the supplied root predates this artefa
 
 # --- protocol / platform-defined controls -----------------------------------
 platform-control	available only on (Windows|macOS) in rc5-native-control-inventory-v1	allow	the inventory defines this control for one platform only
+platform-control	rc5-native-control-inventory-v1 defines no record for host 	allow	the inventory covers macOS and Windows only, so this host cannot complete a compiled build; the refusal is asserted on that runner by TestCompiledInstallFollowsTheNativeControlInventoryExactly
 platform-control	(is|are) exercised (on|by) 	allow	the behaviour is asserted on its own platform's runner
 platform-control	is covered by PowerShell on Windows	allow	the behaviour is asserted on the Windows runner
 platform-control	executes (a )?POSIX (launcher|skill commands)	allow	a POSIX launcher fixture, asserted on the unix runners

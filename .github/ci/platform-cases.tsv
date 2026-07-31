@@ -129,6 +129,32 @@ internal/interop	TestGoldenContextCopy	linux,darwin,windows	-	-	the agent contex
 internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
 
 # ===========================================================================
+# Compiled-build surface -- rc5-native-control-inventory-v1 carve-out
+#
+# A completed compiled command needs the go-v1 driver, which refuses before any
+# worker starts on a platform the inventory defines no record for.  These cases
+# therefore run on the two covered platforms and are carved out elsewhere by
+# `requireNativeControlInventoryPlatform`, whose reason names the inventory.
+#
+# The carve-out is asserted, not merely obeyed: the bidirectional case below
+# runs on EVERY runner and proves the boundary from whichever side that runner
+# is on -- a covered host installs and publishes exactly one protected entry, an
+# uncovered host is refused with `build_execution_control_unavailable`,
+# publishes nothing, and fails `status --check`.
+#
+# Linux is the open qualification item (rc.5 qualification vector, until_task
+# TASK-260728-1skseh).  When the inventory gains a linux record, the guard stops
+# skipping there on its own and only `must_run_on` below needs widening.
+# ===========================================================================
+cmd/curator	TestCompiledInstallFollowsTheNativeControlInventoryExactly	linux,darwin,windows	-	-	a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
+cmd/curator	TestCompiledProjectStatusRepairRollbackRecovery	darwin,windows	linux	platform-control	compiled currentness, corrupt-cache repair, commit rollback and untrusted-state repair over one real installation
+cmd/curator	TestStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	project status resolves and classifies a compiled command reached only through a dependency
+cmd/curator	TestStatusReportsAnUnusableToolchainPerCompiledCommand	darwin,windows	linux	platform-control	an unusable Go toolchain is reported per compiled command as a warning, and `--check` turns it non-zero
+cmd/curator	TestGCRetainsAndReportsReferencedCompiledState	darwin,windows	linux	platform-control	gc neither removes nor reports removing a cache entry a live marker references
+cmd/curator	TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck	darwin,windows	linux	platform-control	machine-wide status reports compiled currentness and fails `--check` for every non-current state
+cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	machine-wide status resolves a compiled command no declaration names
+
+# ===========================================================================
 # Protocol platform exclusion -- asserted, never merely omitted.
 #
 # The rc.5 qualification vector marks linux `excluded` (until_task

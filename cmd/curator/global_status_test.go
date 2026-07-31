@@ -342,6 +342,7 @@ func assertGlobalDriftHuman(t *testing.T, want driftExpectation, code int, human
 // while that state is live, because a replayed one would describe cache
 // evidence that no longer exists.
 func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
 	home := compiledGlobalScope(t)
 	if code, stdout, stderr := capture(t, "global", "install"); code != exitOK {
 		t.Fatalf("global install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
@@ -558,6 +559,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 // through a dependency must still be found, classified, and able to fail
 // `--check` on its own.
 func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
 	home := globalScopeDeclaring(t, `{"name":"consumer","tag":"v1"}`)
 	skillsRoot := filepath.Join(filepath.Dir(home), "skills")
 	writeCompiledSkillRepo(t, filepath.Join(skillsRoot, "build-skill"))
