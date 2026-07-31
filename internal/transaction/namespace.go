@@ -250,11 +250,25 @@ func namespacePathsOverlap(left, right *resolvedNamespacePath) (bool, error) {
 	return leftErr == nil && rightErr == nil && os.SameFile(leftInfo, rightInfo), nil
 }
 
-// namespaceIdentity reads the object a path currently names. A byte target is
-// resolved through links so an alias of another target is detected; an owned
-// directory entry is read as itself, because replacing the manager's own link
-// cannot disturb the object at its destination.
+// namespaceIdentity reads the object a path currently names, complete. A byte
+// target is resolved through links so an alias of another target is detected;
+// an owned directory entry is read as itself, because replacing the manager's
+// own link cannot disturb the object at its destination.
+//
+// The stat alone is not the whole answer on every host — see
+// completeNamespaceIdentity — so the identity is completed here, while the pass
+// still holds the object it named, rather than at the comparison that consumes
+// it. Everything the sweep records as one pass's answer is therefore fixed by
+// the time identity() returns it.
 func namespaceIdentity(candidate targetNamespacePath) (os.FileInfo, error) {
+	info, err := namespaceStat(candidate)
+	if err != nil {
+		return nil, err
+	}
+	return completeNamespaceIdentity(candidate, info)
+}
+
+func namespaceStat(candidate targetNamespacePath) (os.FileInfo, error) {
 	if candidate.entry {
 		return os.Lstat(candidate.path)
 	}

@@ -8,12 +8,23 @@ import (
 	"testing"
 )
 
-// mustSymlink creates one link or skips the test on a platform without them.
-func mustSymlink(t *testing.T, destination, path string) {
+// mustSymlink creates one link or skips the test on a platform without them,
+// and returns the destination the host actually recorded for it.
+//
+// A link's content is path text in the host's own syntax. os.Symlink rewrites
+// the destination with filepath.FromSlash before it reaches the filesystem,
+// because '/' is not a separator inside a Windows reparse point, so the string
+// a later os.Readlink returns is the host's spelling of what was asked for and
+// not the argument itself. Expectations below are that recorded string, which
+// keeps "restored exactly" an exact comparison against the destination that was
+// really there rather than against a POSIX literal only one family of hosts can
+// satisfy.
+func mustSymlink(t *testing.T, destination, path string) string {
 	t.Helper()
 	if err := os.Symlink(destination, path); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
+	return mustReadlink(t, path)
 }
 
 func mustReadlink(t *testing.T, path string) string {
@@ -101,16 +112,14 @@ func TestCommitAndRollbackRestoreALinkExactly(t *testing.T) {
 		{
 			name: "link to repointed link",
 			prepare: func(t *testing.T, live string) string {
-				mustSymlink(t, "../old/skill", live)
-				return "link:../old/skill"
+				return "link:" + mustSymlink(t, "../old/skill", live)
 			},
 			stage: func(t *testing.T, source string) { mustSymlink(t, "../canonical/skill", source) },
 		},
 		{
 			name: "link to copied tree",
 			prepare: func(t *testing.T, live string) string {
-				mustSymlink(t, "../old/skill", live)
-				return "link:../old/skill"
+				return "link:" + mustSymlink(t, "../old/skill", live)
 			},
 			stage: func(t *testing.T, source string) { mustWrite(t, filepath.Join(source, "SKILL.md"), "copied") },
 		},
@@ -221,10 +230,10 @@ func TestRecoveryFinishesAPreparedLinkTransaction(t *testing.T) {
 	liveRoot := filepath.Join(root, "adapter")
 	mustMkdirAll(t, liveRoot)
 	live := filepath.Join(liveRoot, "skill")
-	mustSymlink(t, "../old/skill", live)
+	before := mustSymlink(t, "../old/skill", live)
 	source := filepath.Join(root, "stage", "skill")
 	mustMkdirAll(t, filepath.Dir(source))
-	mustSymlink(t, "../canonical/skill", source)
+	prepared := mustSymlink(t, "../canonical/skill", source)
 
 	engine := mustEngine(t, home)
 	if _, err := engine.Prepare(testLock{}, Plan{
@@ -234,14 +243,14 @@ func TestRecoveryFinishesAPreparedLinkTransaction(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if got := mustReadlink(t, live); got != "../old/skill" {
+	if got := mustReadlink(t, live); got != before {
 		t.Fatalf("preparation already replaced the live link: %q", got)
 	}
 	if err := mustEngine(t, home).Recover(testLock{}); err != nil {
 		t.Fatal(err)
 	}
-	if got := mustReadlink(t, live); got != "../canonical/skill" {
-		t.Fatalf("recovery left the link at %q, want the prepared destination", got)
+	if got := mustReadlink(t, live); got != prepared {
+		t.Fatalf("recovery left the link at %q, want the prepared destination %q", got, prepared)
 	}
 }
 
@@ -255,7 +264,7 @@ func TestEntryRemovalRestoresTheExactLink(t *testing.T) {
 			liveRoot := filepath.Join(root, "adapter")
 			mustMkdirAll(t, liveRoot)
 			stale := filepath.Join(liveRoot, "stale")
-			mustSymlink(t, "../canonical/stale", stale)
+			staleDestination := mustSymlink(t, "../canonical/stale", stale)
 			ledgerLive := filepath.Join(liveRoot, "ledger.json")
 			mustWrite(t, ledgerLive, "old-ledger")
 			ledgerSource := filepath.Join(root, "stage", "ledger.json")
@@ -317,8 +326,8 @@ func TestEntryRemovalRestoresTheExactLink(t *testing.T) {
 			if commitErr == nil {
 				t.Fatal("the injected failure did not fail the commit")
 			}
-			if got := mustReadlink(t, stale); got != "../canonical/stale" {
-				t.Fatalf("restored stale link = %q, want its exact prior destination", got)
+			if got := mustReadlink(t, stale); got != staleDestination {
+				t.Fatalf("restored stale link = %q, want its exact prior destination %q", got, staleDestination)
 			}
 			if got := mustRead(t, ledgerLive); got != "old-ledger" {
 				t.Fatalf("ledger = %q, want the restored preimage", got)
@@ -343,7 +352,7 @@ func TestEntryTargetsDoNotAliasTheirDestination(t *testing.T) {
 	canonicalSource := filepath.Join(root, "stage", "canonical")
 	mustWrite(t, filepath.Join(canonicalSource, "SKILL.md"), "new")
 	mirrorSource := filepath.Join(root, "stage", "mirror")
-	mustSymlink(t, "../canonical/skill", mirrorSource)
+	stagedDestination := mustSymlink(t, "../canonical/skill", mirrorSource)
 
 	canonicalDigest, err := DigestPath(canonical)
 	if err != nil {
@@ -370,8 +379,8 @@ func TestEntryTargetsDoNotAliasTheirDestination(t *testing.T) {
 	if got := mustRead(t, filepath.Join(canonical, "SKILL.md")); got != "new" {
 		t.Fatalf("canonical content = %q, want the committed replacement", got)
 	}
-	if got := mustReadlink(t, mirror); got != "../canonical/skill" {
-		t.Fatalf("mirror link = %q", got)
+	if got := mustReadlink(t, mirror); got != stagedDestination {
+		t.Fatalf("mirror link = %q, want the committed destination %q", got, stagedDestination)
 	}
 }
 
