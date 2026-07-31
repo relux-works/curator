@@ -14,6 +14,7 @@ import (
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/install"
+	"github.com/relux-works/curator/internal/runtimestore"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/transaction"
 )
@@ -167,9 +168,25 @@ func (e *env) globalDeclareAll(agents []string, names ...string) {
 	e.write(install.GlobalRoot(e.home), "Skillfile.json", string(payload))
 }
 
+// installPlatform is the shim platform an installation on this host actually
+// produces. This suite used to pin "unix" on every runner, which made a Windows
+// run assert a shape the platform cannot even build: a unix script runtime is
+// validated for a POSIX execute bit no file on Windows carries, so every
+// baseline install failed before a single rollback was exercised.
+func installPlatform() string { return runtimestore.Platform() }
+
+// shimName is the launcher filename one command gets on this host: Windows
+// launchers are `.cmd` files, so a bare command name names nothing there.
+func shimName(command string) string {
+	if installPlatform() == "windows" {
+		return command + ".cmd"
+	}
+	return command
+}
+
 func (e *env) install(opts install.Options) install.Result {
 	e.t.Helper()
-	opts.Platform = "unix"
+	opts.Platform = installPlatform()
 	return install.Project(e.cfg, e.project, "test", opts)
 }
 
@@ -181,7 +198,7 @@ func (e *env) installGlobal(opts install.Options) install.Result {
 	if e.userHome == "" {
 		e.userHome = e.t.TempDir()
 	}
-	opts.Platform = "unix"
+	opts.Platform = installPlatform()
 	return install.Global(e.cfg, e.userHome, opts)
 }
 

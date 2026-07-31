@@ -26,6 +26,14 @@ var urlSchemes = map[string]bool{"ssh": true, "git": true, "http": true, "https"
 var scpRE = regexp.MustCompile(`^(?:[^@/\s]+@)?([A-Za-z0-9][A-Za-z0-9.-]*):([^\\]+)$`)
 var hostRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]*$`)
 
+// driveRE matches a Windows drive-letter path in either spelling. `C:/x` is
+// already local by the single-letter-host rule below, but `C:\x` never reaches
+// it: scpRE forbids a backslash in the path part, so the fallback saw a colon,
+// found no host, and rejected an ordinary local checkout as a malformed
+// network source. A single letter is never a hostname, so both spellings carry
+// no network identity on any platform.
+var driveRE = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
+
 // Canonical returns the canonical "host/path" identity, or "" for local
 // sources and unrecognized forms.
 func Canonical(rawURL string) string {
@@ -68,7 +76,8 @@ func Parse(rawURL string) (string, error) {
 		repoPath = parsed.Path
 	} else if strings.HasPrefix(strings.ToLower(value), "file:") ||
 		strings.HasPrefix(value, "/") || strings.HasPrefix(value, "./") ||
-		strings.HasPrefix(value, "../") || strings.HasPrefix(value, "~") {
+		strings.HasPrefix(value, "../") || strings.HasPrefix(value, "~") ||
+		driveRE.MatchString(value) {
 		return "", nil
 	} else {
 		match := scpRE.FindStringSubmatch(value)

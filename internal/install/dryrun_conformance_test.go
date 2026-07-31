@@ -178,13 +178,13 @@ func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
 			case "project":
 				baseline.declareBoth(t, e.project)
 				e.write(e.project, ".gitignore", ".agents/\n.claude/skills/\nSkillfile.dev.json\n")
-				result = Project(e.cfg, e.project, "test", Options{Platform: "unix", DryRun: true, Fetch: true})
+				result = Project(e.cfg, e.project, "test", Options{Platform: installPlatform(), DryRun: true, Fetch: true})
 			case "global":
 				if _, err := GlobalInit(e.home); err != nil {
 					t.Fatal(err)
 				}
 				baseline.declareBoth(t, GlobalRoot(e.home))
-				result = Global(e.cfg, t.TempDir(), Options{Platform: "unix", DryRun: true, Fetch: true})
+				result = Global(e.cfg, t.TempDir(), Options{Platform: installPlatform(), DryRun: true, Fetch: true})
 			default:
 				t.Fatalf("published dry-run scope %q has no executable binding", published.Scope)
 			}

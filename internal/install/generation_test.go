@@ -86,24 +86,28 @@ func TestReadDocumentBindsGenerationToBytesRewrittenInPlace(t *testing.T) {
 // generation must follow the bytes that were returned, which is exactly what a
 // path digest taken around the read cannot do — and the mismatch it leaves is
 // what makes the under-lock recheck restart.
+//
+// When the rename lands is the one part of this that is not portable, and
+// renameReplacement owns it: POSIX replaces the path inside the read window,
+// Windows cannot — os.Open holds the destination without FILE_SHARE_DELETE, so
+// the kernel refuses the replacement until the read has closed — and settles it
+// immediately afterwards. Both schedules leave exactly the state the three
+// assertions below describe: bytes from the old inode, a generation belonging
+// to those bytes, and a path that now reads differently.
 func TestReadDocumentBindsGenerationToBytesReplacedByRename(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "Skillfile.json")
 	settled := `{"generation": "A"}`
 	writeDocument(t, path, settled)
 	replacement := `{"generation": "B"}`
-	onceAfterOpen(t, path, func() {
-		staged := filepath.Join(dir, "staged.json")
-		writeDocument(t, staged, replacement)
-		if err := os.Rename(staged, path); err != nil {
-			t.Fatal(err)
-		}
-	})
+	rename := renameReplacement(t, dir, path, replacement)
+	onceAfterOpen(t, path, rename.duringRead)
 
 	parsed, err := readDocument(path)
 	if err != nil {
 		t.Fatal(err)
 	}
+	rename.settle(t)
 	if string(parsed.payload) != settled {
 		t.Fatalf("the rename should have left the read on the old inode: %q", parsed.payload)
 	}
