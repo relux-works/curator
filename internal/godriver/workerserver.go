@@ -453,7 +453,10 @@ func verifyGoLauncher(path string) error {
 	if !filepath.IsAbs(path) {
 		return diagnostic(CodeWorkerIdentityInvalid, "the Go launcher path is not absolute")
 	}
-	resolved, err := filepath.EvalSymlinks(filepath.Clean(path))
+	// The parent selected this path with physicalPath, so the worker re-proves
+	// it with the same resolver: any other one would decide canonicality by a
+	// different rule than the one the path was chosen under.
+	resolved, err := physicalPath(filepath.Clean(path))
 	if err != nil || resolved != path {
 		return diagnosticErr(CodeWorkerIdentityInvalid, err, "the Go launcher path is not canonical and link-free")
 	}

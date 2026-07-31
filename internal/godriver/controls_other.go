@@ -32,7 +32,8 @@ func (domain *controlDomain) launch(_ *exec.Cmd) error {
 
 func (domain *controlDomain) installedControls() []string { return nil }
 
-func (domain *controlDomain) destroy(_ *exec.Cmd) {}
+// No destroy here: it is only ever called after a launch that succeeded, and
+// launch on this platform cannot succeed.
 
 func (domain *controlDomain) close() {}
 

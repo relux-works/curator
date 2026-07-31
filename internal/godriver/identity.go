@@ -36,7 +36,7 @@ func resolveExecutableIdentity(path string) (ExecutableIdentity, error) {
 	if err != nil {
 		return ExecutableIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err, "cannot resolve the manager executable")
 	}
-	canonical, err := filepath.EvalSymlinks(filepath.Clean(absolute))
+	canonical, err := physicalPath(filepath.Clean(absolute))
 	if err != nil {
 		return ExecutableIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err, "cannot canonicalize the manager executable")
 	}

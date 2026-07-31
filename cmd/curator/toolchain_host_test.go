@@ -41,6 +41,23 @@ func TestHostGoToolchainIsSelectableOnAnInventoryPlatform(t *testing.T) {
 		t.Fatalf("selected toolchain targets %s/%s, want the host %s/%s",
 			snapshot.Target.GOOS, snapshot.Target.GOARCH, runtime.GOOS, runtime.GOARCH)
 	}
+	// The host GOROOT this runner supplies is reached through a redirection --
+	// on windows-latest actions/setup-go leaves it as a directory junction --
+	// and the boundary is only allowed to accept it by resolving that
+	// redirection, never by accepting a root that is not a plain directory.
+	// Asserting the selected root here is what separates the two: a relaxed
+	// directory check would satisfy the selection above and fail this.
+	info, err := os.Lstat(snapshot.GOROOT)
+	if err != nil || !info.IsDir() || info.Mode()&(fs.ModeSymlink|fs.ModeIrregular) != 0 {
+		t.Fatalf("selected GOROOT %q is not a plain directory: %v, %v\n%s", snapshot.GOROOT, info, err, hostToolchainFacts())
+	}
+	launcher, err := os.Lstat(snapshot.Executable)
+	if err != nil || !launcher.Mode().IsRegular() {
+		t.Fatalf("selected launcher %q is not a regular file: %v, %v", snapshot.Executable, launcher, err)
+	}
+	if directory := filepath.Dir(filepath.Dir(snapshot.Executable)); directory != snapshot.GOROOT {
+		t.Fatalf("selected launcher %q is not under the selected GOROOT %q", snapshot.Executable, snapshot.GOROOT)
+	}
 }
 
 // hostToolchainFacts renders the selection inputs the go-v1 boundary reads,

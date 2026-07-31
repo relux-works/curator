@@ -481,7 +481,12 @@ func selectToolchain(config Config, runtimeRoot string) (string, string, fs.File
 	if !filepath.IsAbs(root) || !filepath.IsAbs(candidate) {
 		return "", "", nil, diagnostic("untrusted_go_executable", "trusted Go root and executable must be absolute")
 	}
-	resolvedRoot, err := filepath.EvalSymlinks(filepath.Clean(root))
+	// physicalPath, not filepath.EvalSymlinks: the selected root is resolved to
+	// the directory the host reaches through it, so the identity frozen below
+	// belongs to that directory and not to a redirection that can later be
+	// re-aimed. The real-directory check is unchanged and now decides about the
+	// resolved location.
+	resolvedRoot, err := physicalPath(filepath.Clean(root))
 	if err != nil {
 		return "", "", nil, diagnosticErr("go_toolchain_missing", err, "trusted GOROOT is unusable")
 	}
@@ -489,7 +494,7 @@ func selectToolchain(config Config, runtimeRoot string) (string, string, fs.File
 	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&fs.ModeSymlink != 0 {
 		return "", "", nil, diagnosticErr("go_toolchain_missing", err, "trusted GOROOT is not a real directory")
 	}
-	resolvedCandidate, err := filepath.EvalSymlinks(filepath.Clean(candidate))
+	resolvedCandidate, err := physicalPath(filepath.Clean(candidate))
 	if err != nil {
 		return "", "", nil, diagnosticErr("go_toolchain_missing", err, "trusted Go executable is unusable")
 	}
@@ -549,7 +554,7 @@ func validatePrivateBase(path string, forbidden []string) (string, error) {
 	if !filepath.IsAbs(path) {
 		return "", diagnostic("private_probe_failed", "private probe base must be absolute")
 	}
-	physical, err := filepath.EvalSymlinks(filepath.Clean(path))
+	physical, err := physicalPath(filepath.Clean(path))
 	if err != nil {
 		return "", diagnosticErr("private_probe_failed", err, "private probe base is unavailable")
 	}
@@ -708,7 +713,7 @@ func absolutePhysical(path string) (string, error) {
 	if !filepath.IsAbs(path) {
 		return "", fmt.Errorf("path is not absolute")
 	}
-	return filepath.EvalSymlinks(filepath.Clean(path))
+	return physicalPath(filepath.Clean(path))
 }
 
 func strictlyBelow(path, root string) bool { return path != root && isWithin(path, root) }

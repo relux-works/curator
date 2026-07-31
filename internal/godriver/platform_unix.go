@@ -5,10 +5,19 @@ package godriver
 import (
 	"encoding/binary"
 	"io/fs"
+	"path/filepath"
 	"syscall"
 )
 
 const platformGoName = "go"
+
+// physicalPath resolves an existing path to the physical location the host
+// reaches through it, so that what this package pins, joins onto, and compares
+// is a location rather than a name that can be re-aimed at another one.
+//
+// On a POSIX host the only redirection interposed on a path component is a
+// symbolic link, and filepath.EvalSymlinks resolves exactly those.
+func physicalPath(path string) (string, error) { return filepath.EvalSymlinks(path) }
 
 func executableMode(mode fs.FileMode) bool { return mode.Perm()&0o111 != 0 }
 

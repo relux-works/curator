@@ -190,6 +190,11 @@ func TestUnsafeToolchainCandidatesFailBeforeExecution(t *testing.T) {
 		{name: "wrapper", config: Config{CuratorGo: filepath.Join(wrapperRoot, "bin", platformGoName)}, code: "untrusted_go_executable"},
 		{name: "repository toolchain", config: Config{CuratorGo: filepath.Join(repositoryRoot, "bin", platformGoName), ForbiddenRoots: []string{repository}}, code: "untrusted_go_executable"},
 		{name: "missing GOROOT", config: Config{GOROOT: filepath.Join(t.TempDir(), "missing")}, code: "go_toolchain_missing"},
+		// The resolved root still has to be a directory. Resolving a host
+		// redirection before this check is what lets the check stay this
+		// strict, so a candidate that resolves to a file is refused here and
+		// not admitted as "close enough to a root".
+		{name: "GOROOT naming a file", config: Config{GOROOT: filepath.Join(wrapperRoot, "bin", platformGoName)}, code: "go_toolchain_missing"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
