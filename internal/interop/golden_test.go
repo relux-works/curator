@@ -23,6 +23,7 @@ import (
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
+	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/registry"
@@ -454,39 +455,93 @@ func TestManagerConfigVectors(t *testing.T) {
 	}
 }
 
-func TestManagerLifecycleVectors(t *testing.T) {
+// compiledCacheMissDryRun names the dry-run case protocol 1.0.0-rc.6 added to
+// the two the earlier surface published: a compiled-build cache miss reports
+// what a real run would build and writes nothing.
+const compiledCacheMissDryRun = "compiled-cache-miss-is-read-only"
+
+// managerLifecycleVector mirrors only the field names of the published
+// lifecycle document. Every expected value is read from the root at run time.
+type managerLifecycleVector struct {
+	LauncherCases []struct {
+		Name                  string   `json:"name"`
+		Platforms             []string `json:"platforms"`
+		RequiredPathRoles     []string `json:"required_path_roles"`
+		PreserveInheritedPath bool     `json:"preserve_inherited_path"`
+		ForwardArguments      bool     `json:"forward_arguments"`
+		PreserveExitStatus    bool     `json:"preserve_exit_status"`
+	} `json:"launcher_cases"`
+	BootstrapCases []struct {
+		Name    string `json:"name"`
+		Outcome string `json:"outcome"`
+	} `json:"bootstrap_cases"`
+	UpgradeCases []struct {
+		Name        string `json:"name"`
+		Deduplicate bool   `json:"deduplicate"`
+	} `json:"upgrade_cases"`
+	DryRunCases []managerDryRunCase `json:"dry_run_cases"`
+}
+
+// managerDryRunCase carries the compiled-build fields rc.6 publishes alongside
+// the forbidden-effect list every dry-run case has always carried. A root that
+// predates them publishes no case that uses them, so the focused test below
+// reports that root by name instead of asserting zero values against it.
+type managerDryRunCase struct {
+	Name                       string   `json:"name"`
+	Scope                      string   `json:"scope"`
+	ForbiddenPersistentEffects []string `json:"forbidden_persistent_effects"`
+	AllowedGoCommands          []string `json:"allowed_go_commands"`
+	ForbiddenGoCommands        []string `json:"forbidden_go_commands"`
+	ReportedBuildOutcomes      []string `json:"reported_build_outcomes"`
+	ArtifactExecuted           bool     `json:"artifact_executed"`
+	OperationPrivateStateAfter string   `json:"operation_private_state_after"`
+}
+
+func loadManagerLifecycleVector(t *testing.T) managerLifecycleVector {
+	t.Helper()
 	payload, err := os.ReadFile(golden(t, "vectors/manager-lifecycle.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var vector struct {
-		LauncherCases []struct {
-			Name                  string   `json:"name"`
-			Platforms             []string `json:"platforms"`
-			RequiredPathRoles     []string `json:"required_path_roles"`
-			PreserveInheritedPath bool     `json:"preserve_inherited_path"`
-			ForwardArguments      bool     `json:"forward_arguments"`
-			PreserveExitStatus    bool     `json:"preserve_exit_status"`
-		} `json:"launcher_cases"`
-		BootstrapCases []struct {
-			Name    string `json:"name"`
-			Outcome string `json:"outcome"`
-		} `json:"bootstrap_cases"`
-		UpgradeCases []struct {
-			Name        string `json:"name"`
-			Deduplicate bool   `json:"deduplicate"`
-		} `json:"upgrade_cases"`
-		DryRunCases []struct {
-			Name                       string   `json:"name"`
-			ForbiddenPersistentEffects []string `json:"forbidden_persistent_effects"`
-		} `json:"dry_run_cases"`
-	}
+	var vector managerLifecycleVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
 		t.Fatal(err)
 	}
-	if len(vector.LauncherCases) != 2 || len(vector.BootstrapCases) != 3 || len(vector.UpgradeCases) != 3 || len(vector.DryRunCases) != 2 {
-		t.Fatalf("manager lifecycle vector is incomplete: %+v", vector)
+	return vector
+}
+
+// requireLifecycleCases fails by name for every behaviour the root does not
+// publish. Counting entries instead would reject a root that merely added a
+// case -- which is how rc.6 shipped the compiled-cache-miss dry run -- while
+// still accepting one that renamed a case this implementation depends on.
+func requireLifecycleCases(t *testing.T, group string, published, required []string) {
+	t.Helper()
+	present := map[string]bool{}
+	for _, name := range published {
+		present[name] = true
 	}
+	var missing []string
+	for _, name := range required {
+		if !present[name] {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("%s cases omit %v; this root publishes %v", group, missing, published)
+	}
+}
+
+func TestManagerLifecycleVectors(t *testing.T) {
+	vector := loadManagerLifecycleVector(t)
+
+	var launchers []string
+	for _, testCase := range vector.LauncherCases {
+		launchers = append(launchers, testCase.Name)
+	}
+	requireLifecycleCases(t, "launcher", launchers, []string{
+		"skill-command-without-shell-activation",
+		"declared-system-command-without-profile",
+	})
 	for _, testCase := range vector.LauncherCases {
 		if !reflect.DeepEqual(testCase.Platforms, []string{"unix", "windows"}) ||
 			len(testCase.RequiredPathRoles) != 3 || !testCase.PreserveInheritedPath ||
@@ -494,25 +549,123 @@ func TestManagerLifecycleVectors(t *testing.T) {
 			t.Fatalf("launcher case %s is incomplete: %+v", testCase.Name, testCase)
 		}
 	}
+
+	var bootstrap []string
 	outcomes := map[string]string{}
 	for _, testCase := range vector.BootstrapCases {
+		bootstrap = append(bootstrap, testCase.Name)
 		outcomes[testCase.Name] = testCase.Outcome
 	}
-	if outcomes["existing-config-if-missing"] != "unchanged-success" || outcomes["if-missing-with-force"] != "usage-error" {
+	requireLifecycleCases(t, "bootstrap", bootstrap, []string{
+		"missing-config-if-missing",
+		"existing-config-if-missing",
+		"if-missing-with-force",
+	})
+	if outcomes["missing-config-if-missing"] != "created" ||
+		outcomes["existing-config-if-missing"] != "unchanged-success" ||
+		outcomes["if-missing-with-force"] != "usage-error" {
 		t.Fatalf("bootstrap outcomes: %v", outcomes)
 	}
+
+	var upgrades []string
 	deduplicated := false
 	for _, testCase := range vector.UpgradeCases {
+		upgrades = append(upgrades, testCase.Name)
 		if testCase.Name == "all-projects-deduplicate" {
 			deduplicated = testCase.Deduplicate
 		}
 	}
+	requireLifecycleCases(t, "upgrade", upgrades, []string{
+		"selected-project-closure",
+		"all-projects-deduplicate",
+		"global-closure",
+	})
 	if !deduplicated {
 		t.Fatal("manager lifecycle vector does not require cross-project fetch deduplication")
 	}
+
+	var dryRuns []string
+	for _, testCase := range vector.DryRunCases {
+		dryRuns = append(dryRuns, testCase.Name)
+	}
+	requireLifecycleCases(t, "dry-run", dryRuns, []string{"project-upgrade", "global-upgrade"})
 	for _, testCase := range vector.DryRunCases {
 		if len(testCase.ForbiddenPersistentEffects) < 8 {
 			t.Fatalf("dry-run case %s omits persistent surfaces: %v", testCase.Name, testCase.ForbiddenPersistentEffects)
+		}
+	}
+}
+
+// TestManagerCompiledCacheMissDryRunVector is the focused regression for the
+// case the old length gate rejected outright. It holds rc.6's compiled-build
+// dry run to the read-only contract it publishes and binds the outcomes it may
+// report to the planner's own vocabulary, so an outcome the suite names but
+// `install.BuildOutcome` cannot produce fails here by name.
+func TestManagerCompiledCacheMissDryRunVector(t *testing.T) {
+	var published managerDryRunCase
+	for _, testCase := range loadManagerLifecycleVector(t).DryRunCases {
+		if testCase.Name == compiledCacheMissDryRun {
+			published = testCase
+		}
+	}
+	if published.Name == "" {
+		// The pinned rc.3 surface publishes only the project and global dry-run
+		// cases. Curator's own read-only compiled planning stays under test in
+		// internal/install (TestDryRunReportsCacheHitWithoutBuilding,
+		// TestAuthoritativeDryRunCasesMutateNothingPersistent); only the shared
+		// cross-manager wording is unavailable from this root.
+		t.Skipf("this conformance root publishes no %s dry-run case", compiledCacheMissDryRun)
+	}
+	if published.ArtifactExecuted {
+		t.Fatalf("%s executes the artifact a dry run only plans: %+v", published.Name, published)
+	}
+	if published.OperationPrivateStateAfter != "absent" {
+		t.Fatalf("%s leaves operation-private state %q behind, want absent",
+			published.Name, published.OperationPrivateStateAfter)
+	}
+	forbidden := map[string]bool{}
+	for _, effect := range published.ForbiddenPersistentEffects {
+		forbidden[effect] = true
+	}
+	// The surfaces only a compiled build can touch. Without them this case
+	// would forbid no more than the two older dry-run cases already do.
+	for _, surface := range []string{
+		"toolchain-probe-memo", "module-cache", "go-build-cache",
+		"compiled-artifact-cache", "cache-build-lock", "manager-home-lock",
+	} {
+		if !forbidden[surface] {
+			t.Fatalf("%s does not forbid %s: %v", published.Name, surface, published.ForbiddenPersistentEffects)
+		}
+	}
+	if len(published.ForbiddenGoCommands) == 0 {
+		t.Fatalf("%s forbids no source-aware Go command: %+v", published.Name, published)
+	}
+	allowed := map[string]bool{}
+	for _, command := range published.AllowedGoCommands {
+		allowed[command] = true
+	}
+	for _, command := range published.ForbiddenGoCommands {
+		if allowed[command] {
+			t.Fatalf("%s both allows and forbids `go %s`", published.Name, command)
+		}
+	}
+	planner := map[string]bool{}
+	for _, outcome := range []install.BuildOutcome{
+		install.BuildCacheHit,
+		install.BuildWouldPreflightAndBuild,
+		install.BuildWouldRebuildUntrustedCache,
+		install.BuildCorrupt,
+		install.BuildUnsupported,
+		install.BuildToolchainUnavailable,
+	} {
+		planner[string(outcome)] = true
+	}
+	if len(published.ReportedBuildOutcomes) == 0 {
+		t.Fatalf("%s reports no build outcome: %+v", published.Name, published)
+	}
+	for _, outcome := range published.ReportedBuildOutcomes {
+		if !planner[outcome] {
+			t.Fatalf("%s reports build outcome %q, which the planner cannot produce", published.Name, outcome)
 		}
 	}
 }
