@@ -3,13 +3,94 @@
 package godriver
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/windows"
 )
 
 const platformGoName = "go.exe"
+
+// physicalPath resolves every link in path to the directory or file it really
+// names.
+//
+// filepath.EvalSymlinks alone is not complete on Windows. A directory junction
+// (IO_REPARSE_TAG_MOUNT_POINT) is a link, but since Go 1.23 os.Lstat reports it
+// as ModeIrregular -- it is a reparse-tag name surrogate, so the ModeDir branch
+// is skipped, and its tag is not IO_REPARSE_TAG_SYMLINK, so it falls through to
+// ModeIrregular. EvalSymlinks follows only ModeSymlink, so it returns a junction
+// path untouched, and a caller that then asks "is this a real directory?" is
+// told no about a perfectly ordinary directory. That is not hypothetical: the
+// Go installation the GitHub Actions tool cache publishes on Windows is reached
+// through exactly such a junction.
+//
+// EvalSymlinks is worse than incomplete for a junction that is not the last
+// component: walkSymlinks refuses to descend through anything whose mode is not
+// a directory, so `<junction>/bin/go.exe` fails outright with ENOTDIR.
+//
+// GetFinalPathNameByHandle resolves every component, of every link kind, in one
+// call. Anchoring on what it returns is stricter than anchoring on the link:
+// the identity this driver fingerprints is the physical directory, so
+// retargeting the junction afterwards cannot silently move the trusted
+// toolchain.
+func physicalPath(path string) (string, error) {
+	resolved := filepath.Clean(path)
+	encoded, err := windows.UTF16PtrFromString(resolved)
+	if err != nil {
+		return "", err
+	}
+	// No FILE_FLAG_OPEN_REPARSE_POINT: the reparse points are meant to be
+	// followed here. FILE_FLAG_BACKUP_SEMANTICS is what lets a directory be
+	// opened at all.
+	handle, err := windows.CreateFile(
+		encoded,
+		0,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS,
+		0,
+	)
+	if err != nil {
+		// A PathError keeps the path in the message and keeps the underlying
+		// Errno reachable, so a missing path still satisfies os.IsNotExist.
+		return "", &os.PathError{Op: "resolve", Path: resolved, Err: err}
+	}
+	defer func() { _ = windows.CloseHandle(handle) }()
+
+	// FILE_NAME_NORMALIZED|VOLUME_NAME_DOS is 0: the normalized, drive-letter
+	// spelling. x/sys/windows declares neither constant. A returned length
+	// above the supplied size is the call asking for a larger buffer, which one
+	// retry at the requested size settles.
+	size := uint32(windows.MAX_PATH)
+	for attempt := 0; attempt < 2; attempt++ {
+		buffer := make([]uint16, size)
+		length, err := windows.GetFinalPathNameByHandle(handle, &buffer[0], size, 0)
+		if err != nil {
+			return "", err
+		}
+		if length <= size {
+			return trimExtendedLengthPrefix(windows.UTF16ToString(buffer[:length])), nil
+		}
+		size = length
+	}
+	return "", fmt.Errorf("resolve physical path of %q: name did not fit twice", resolved)
+}
+
+// trimExtendedLengthPrefix turns the \\?\ form GetFinalPathNameByHandle returns
+// back into the ordinary spelling the rest of the driver compares against.
+func trimExtendedLengthPrefix(path string) string {
+	if after, found := strings.CutPrefix(path, `\\?\UNC\`); found {
+		return `\\` + after
+	}
+	if after, found := strings.CutPrefix(path, `\\?\`); found {
+		return after
+	}
+	return path
+}
 
 func executableMode(mode fs.FileMode) bool { return mode.IsRegular() }
 

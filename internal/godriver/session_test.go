@@ -528,9 +528,12 @@ func assertDirectoryEmpty(t *testing.T, path string) {
 	}
 }
 
+// mustPhysical resolves through the driver's own rule rather than
+// filepath.EvalSymlinks, because on Windows those are not the same rule: a
+// directory junction is a link EvalSymlinks does not follow.
 func mustPhysical(t *testing.T, path string) string {
 	t.Helper()
-	physical, err := filepath.EvalSymlinks(path)
+	physical, err := physicalPath(path)
 	if err != nil {
 		t.Fatal(err)
 	}

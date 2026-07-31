@@ -5,6 +5,7 @@ package buildcache
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"golang.org/x/sys/windows"
@@ -12,7 +13,178 @@ import (
 
 func protectTestHome(t *testing.T, home string) {
 	t.Helper()
-	if err := protectWindowsPath(home); err != nil {
+	if err := protectWindowsPath(home, true); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestWindowsProtectedBaseIsNeverObservableUnprotected pins the property that
+// makes the cache root safe to create from more than one publisher at a time:
+// a directory below the manager home is protected at the instant it becomes
+// observable, never a moment later.
+//
+// Creating it and then applying the DACL leaves a window in which the new
+// directory carries its parent's inherited entries. A concurrent publisher that
+// opens it there is not wrong to refuse it -- inherited access is exactly what
+// the protection check exists to catch -- so the whole publication fails with an
+// untrusted-provenance verdict for state this manager had just created itself.
+// Every racer below must therefore succeed.
+func TestWindowsProtectedBaseIsNeverObservableUnprotected(t *testing.T) {
+	home := t.TempDir()
+	protectTestHome(t, home)
+	base := filepath.Join(home, "cache", "build", "go-v1")
+
+	const racers = 16
+	start := make(chan struct{})
+	errs := make(chan error, racers)
+	var wait sync.WaitGroup
+	for index := 0; index < racers; index++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			<-start
+			errs <- ensureProtectedBase(home, base)
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent protected-base preparation: %v", err)
+		}
+	}
+
+	// The directories are real and each one independently satisfies the same
+	// protection check a later publication or sweep applies.
+	for _, path := range []string{
+		filepath.Join(home, "cache"),
+		filepath.Join(home, "cache", "build"),
+		base,
+	} {
+		dir, err := openWindowsProtected(path, true, false)
+		if err != nil {
+			t.Fatalf("protected cache directory %q: %v", path, err)
+		}
+		if err := dir.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// TestWindowsCreateProtectedDirectoryRefusesAnExistingName keeps the atomic
+// creator's contract identical to the os.Mkdir call it replaced, so a caller
+// that relies on an existing name being an error still gets one.
+func TestWindowsCreateProtectedDirectoryRefusesAnExistingName(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "entry")
+	if err := createProtectedDirectory(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := createProtectedDirectory(path); !os.IsExist(err) {
+		t.Fatalf("second creation = %v, want an already-exists error", err)
+	}
+}
+
+// TestWindowsPublicationHardensAnInheritingManagerHome pins the first
+// publication into an ordinary manager home — the only kind Curator ever makes,
+// since the home is created with os.MkdirAll and a Windows directory inherits
+// its parent's ACEs.
+//
+// The boundary requires an owner-only, de-inherited DACL, nothing in the manager
+// established one, and so every publication on Windows refused its own manager
+// home as untrusted provenance. This case publishes into an unprotected home and
+// requires it to succeed, then requires the home to satisfy the same validation
+// afterwards: the boundary is established, not waived.
+func TestWindowsPublicationHardensAnInheritingManagerHome(t *testing.T) {
+	home := t.TempDir()
+	if !ownedInheritingDirectory(home) {
+		t.Skip("this host cannot create an inheriting temporary directory")
+	}
+	store, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publication, receiptHash := testPublication(t, home, testInput("tool"), []byte("artifact"))
+	if _, err := store.Publish(publication, testHomeLock{}); err != nil {
+		t.Fatalf("publish into an ordinary manager home: %v", err)
+	}
+	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); hit.Status != Hit {
+		t.Fatalf("inspection after publishing into an ordinary home = %+v", hit)
+	}
+	dir, err := openWindowsProtected(home, true, false)
+	if err != nil {
+		t.Fatalf("manager home is still not protected after publication: %v", err)
+	}
+	if err := dir.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestWindowsPublicationRefusesAHomeOwnedByAnotherPrincipal keeps the repair
+// narrow: only an inheriting DACL is repaired, and only on a directory this
+// user already owns. A directory whose owner is someone else, or that grants
+// another principal explicit access it did not inherit, is still refused.
+func TestWindowsPublicationRefusesAHomeOwnedByAnotherPrincipal(t *testing.T) {
+	home := t.TempDir()
+	grantWorldMutation(t, home) // an explicit, protected, non-owner grant
+	if ownedInheritingDirectory(home) {
+		t.Fatal("a home with an explicit protected DACL was classified as merely inheriting")
+	}
+	store, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publication, _ := testPublication(t, home, testInput("tool"), []byte("artifact"))
+	if _, err := store.Publish(publication, testHomeLock{}); err == nil {
+		t.Fatal("a manager home granting another principal mutation rights was accepted")
+	}
+}
+
+// TestWindowsProtectedHomeStillServesOrdinaryManagerState pins the half of the
+// hardening that is easy to get wrong. The manager home is the parent of every
+// other thing Curator writes -- manager locks, transaction files, the global
+// root -- and all of those are created by ordinary os calls that rely on
+// inheritance for their ACL.
+//
+// A protected DACL whose single entry does not propagate hands its children
+// nothing: an ordinary file created inside it afterwards gets an empty DACL and
+// is unopenable even by its own owner, which surfaces as "Access is denied" far
+// away from the cache. Protecting the home must therefore keep it usable.
+func TestWindowsProtectedHomeStillServesOrdinaryManagerState(t *testing.T) {
+	home := t.TempDir()
+	if !ownedInheritingDirectory(home) {
+		t.Skip("this host cannot create an inheriting temporary directory")
+	}
+	store, err := New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publication, _ := testPublication(t, home, testInput("tool"), []byte("artifact"))
+	if _, err := store.Publish(publication, testHomeLock{}); err != nil {
+		t.Fatalf("publish into an ordinary manager home: %v", err)
+	}
+
+	// Exactly the shape the manager writes next: a nested directory made with
+	// os.MkdirAll and a file inside it, both created after the home was
+	// protected, then reopened and read.
+	nested := filepath.Join(home, "state", "locks", "v1")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatalf("create ordinary manager state below a protected home: %v", err)
+	}
+	lock := filepath.Join(nested, "home.lock")
+	if err := os.WriteFile(lock, []byte("held"), 0o600); err != nil {
+		t.Fatalf("write ordinary manager state below a protected home: %v", err)
+	}
+	payload, err := os.ReadFile(lock)
+	if err != nil || string(payload) != "held" {
+		t.Fatalf("read back ordinary manager state = %q, %v", payload, err)
+	}
+	reopened, err := os.OpenFile(lock, os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatalf("reopen ordinary manager state for writing: %v", err)
+	}
+	// Windows refuses to unlink an open file, and t.TempDir cleanup would fail.
+	if err := reopened.Close(); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -5,10 +5,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/install"
@@ -236,11 +238,13 @@ func snapshotBuildCacheAfter(t *testing.T, home string) {
 				if mkErr := os.MkdirAll(path, 0o700); mkErr != nil {
 					t.Fatal(mkErr)
 				}
-				continue
-			}
-			if writeErr := os.WriteFile(path, item.payload, 0o600); writeErr != nil {
+			} else if writeErr := os.WriteFile(path, item.payload, 0o600); writeErr != nil {
 				t.Fatal(writeErr)
 			}
+			// Mode bits are the whole boundary on unix and none of it on
+			// Windows, where a recreated node inherits its parent's DACL and
+			// lands outside the protected boundary it was snapshotted inside.
+			restoreCacheProtection(t, path, item.dir)
 		}
 		for index := len(nodes) - 1; index >= 0; index-- {
 			if chmodErr := os.Chmod(filepath.Join(base, nodes[index].relative), nodes[index].mode); chmodErr != nil {
@@ -366,10 +370,16 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 	if current.State != buildCurrent || current.CacheOutcome != "cache-hit" {
 		t.Fatalf("current build row = %+v", current)
 	}
+	// The artifact name is the target's, not this host's spelling of it: a
+	// windows build reports bin/build-tool.exe and a unix one bin/build-tool.
+	wantArtifact, err := buildmeta.ArtifactPath("build-tool", runtime.GOOS)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if current.Skill != "build-skill" || current.Command != "build-tool" ||
 		current.Driver != "go-v1" || current.BuildRoot != "assets/build-tool" ||
 		current.SourceDir != "assets/build-tool/cmd/tool" || current.CacheKey == "" ||
-		current.ArtifactPath != "bin/build-tool" || current.Target == "" ||
+		current.ArtifactPath != wantArtifact || current.Target == "" ||
 		current.BuildSource.ContentSHA256 == "" {
 		t.Fatalf("current build row does not report the full planned command: %+v", current)
 	}

@@ -117,6 +117,30 @@ func TestLockIdentitiesAreDeterministicAndManagerLocal(t *testing.T) {
 	}
 }
 
+// identityBelow spells the identity this platform assigns to a missing home
+// under an already-resolved existing prefix.
+//
+// The suffix rule is not the same everywhere and must not be assumed here. On
+// unix the identity is the path itself. On Windows a component whose containing
+// directory performs case-insensitive lookup is folded into the identity, so the
+// on-disk spelling is not the identity; identity_windows.go implements that rule
+// and identity_windows_test.go asserts it directly. Spelling the expectation
+// through the same rule keeps these portable cases about what they are for --
+// which existing prefix was resolved, and whether the identity survives creation
+// -- instead of re-asserting one platform's spelling on every host.
+func identityBelow(t *testing.T, existing string, missing ...string) string {
+	t.Helper()
+	reversed := make([]string, 0, len(missing))
+	for index := len(missing) - 1; index >= 0; index-- {
+		reversed = append(reversed, missing[index])
+	}
+	identity, err := canonicalWithExistingPrefix(filepath.Clean(existing), reversed, "expected manager home")
+	if err != nil {
+		t.Fatalf("spell the expected identity below %q: %v", existing, err)
+	}
+	return identity
+}
+
 func TestMissingHomeUsesCanonicalExistingPrefix(t *testing.T) {
 	base := t.TempDir()
 	home := filepath.Join(base, "missing", "curator-home")
@@ -129,7 +153,7 @@ func TestMissingHomeUsesCanonicalExistingPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(resolvedBase, "missing", "curator-home")
+	want := identityBelow(t, resolvedBase, "missing", "curator-home")
 	if before.Home() != want {
 		t.Fatalf("missing home identity = %q, want canonical prefix identity %q", before.Home(), want)
 	}
@@ -142,6 +166,16 @@ func TestMissingHomeUsesCanonicalExistingPrefix(t *testing.T) {
 	}
 	if after.Home() != before.Home() {
 		t.Fatalf("home identity changed after creation: before %q, after %q", before.Home(), after.Home())
+	}
+	// The identity of the created home must also be the identity of the same
+	// physical directory named without the alias the temporary root may carry,
+	// which is the property the canonical existing prefix exists to give.
+	resolved, err := New(filepath.Join(resolvedBase, "missing", "curator-home"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.Home() != after.Home() {
+		t.Fatalf("resolved twin identity = %q, want %q", resolved.Home(), after.Home())
 	}
 }
 
@@ -165,7 +199,7 @@ func TestMissingHomeBelowSymlinkKeepsIdentityAndContends(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantHome := filepath.Join(resolvedRealParent, "missing", "curator-home")
+	wantHome := identityBelow(t, resolvedRealParent, "missing", "curator-home")
 	if before.Home() != wantHome {
 		t.Fatalf("missing aliased home identity = %q, want %q", before.Home(), wantHome)
 	}
