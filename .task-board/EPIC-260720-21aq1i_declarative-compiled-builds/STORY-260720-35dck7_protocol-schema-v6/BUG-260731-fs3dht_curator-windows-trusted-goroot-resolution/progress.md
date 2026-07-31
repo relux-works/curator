@@ -1,5 +1,5 @@
 ## Status
-development
+closed
 
 ## Review
 required
@@ -14,7 +14,7 @@ estimated(fibonacci(5))
 - (none)
 
 ## Blocks
-- BUG-260731-33v6zz
+- (none)
 
 ## Checklist
 - [ ] Reproduce the setup-go Windows GOROOT rejection from native artifact evidence and identify the exact filesystem/path invariant mismatch.
@@ -43,6 +43,7 @@ Consequence chain in internal/godriver/session.go selectToolchain:
 3. Latent second failure behind it: walkSymlinks returns ENOTDIR for a non-symlink non-dir *intermediate* component, so EvalSymlinks(<junction>/bin/go.exe) would also fail.
 
 Fix direction: the boundary already intends full canonicalization; filepath.EvalSymlinks simply is not the host canonicalizer on Windows. Introduce a platform physicalPath() hook -- EvalSymlinks on unix, GetFinalPathNameByHandle(VOLUME_NAME_DOS) on a follow-reparse handle on Windows -- and route every canonicalization in the package through it. After that the *existing* fail-closed predicate (IsDir && !ModeSymlink, SameFile re-verification) is unchanged and now pins the physical directory instead of the junction, which is strictly stronger. No PATH search, no download, no trust relaxation, no platform skip.
+Orchestrator decision after host migration: this standalone alternative is superseded by the integrated physical-path/GOROOT implementation already published in Curator PR 13. Preserve branch task/BUG-260731-fs3dht-windows-goroot at 8aa5810 only as comparison evidence; do not merge it independently.
 
 ## Precondition Resources
 (none)
@@ -54,7 +55,7 @@ Fix direction: the boundary already intends full canonicalization; filepath.Eval
 2026-07-31T10:35:09Z
 
 ## Last Update
-2026-07-31T10:43:53Z
+2026-07-31T13:22:18Z
 
 ## Assigned To
 [implementer] developer (claude)

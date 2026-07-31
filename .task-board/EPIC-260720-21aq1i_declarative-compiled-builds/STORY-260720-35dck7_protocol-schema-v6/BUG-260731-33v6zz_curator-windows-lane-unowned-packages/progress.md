@@ -11,10 +11,10 @@ code
 estimated(fibonacci(8))
 
 ## Blocked By
-- BUG-260731-fs3dht
+- (none)
 
 ## Blocks
-- (none)
+- BUG-260731-3a5q1p
 
 ## Checklist
 - [x] Branch from the current PR 10 head and classify all 14 Windows failures from raw go test JSON.
@@ -72,6 +72,11 @@ OWNERSHIP: internal/godriver was excluded because BUG-260731-lepevi was concurre
 NOT MINE, unowned again: internal/godriver TestFingerprintReportsUnreadableDirectoryIdentically and internal/transaction (5) were mapped to BUG-260731-lepevi and survived PR 11, whose AC covered only the Linux lane.
 PR: https://github.com/relux-works/curator/pull/13
 Migration checkpoint 2026-07-31: developer RUN-260731-6b26c6 was intentionally cancelled after publishing PR 13. Resume by checking run 30630564858 and PR head, then route remaining failures/rework or independent Opus review. Do not use alternative branch task/BUG-260731-fs3dht-windows-goroot unless comparison is needed.
+Host migration resumed on macbook-iv.local. Dependency BUG-260731-fs3dht is closed as superseded because PR 13 already contains the integrated GOROOT solution. Inspect the latest Windows artifact from run 30630564858, fix or classify every remaining red case, push only to PR 13 branch, then hand off to independent Opus review.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: disabled; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=launch_composition_disabled; bare child launch retained
+spawn queued: [implementer] developer (claude) (run=RUN-260731-1b588e, max_parallel=20)
+spawn run started: [implementer] developer (claude) (run=RUN-260731-1b588e)
 
 ## Precondition Resources
 (none)
@@ -79,12 +84,13 @@ Migration checkpoint 2026-07-31: developer RUN-260731-6b26c6 was intentionally c
 ## Outcome Resources
 - [BUG-260731-33v6zz_spawn-log_-implementer--developer--claude-_RUN-260731-6b26c6.log](file://BUG-260731-33v6zz/BUG-260731-33v6zz_spawn-log_-implementer--developer--claude-_RUN-260731-6b26c6.log) — System spawn log captured by task-board
 - [BUG-260731-33v6zz_results.md](file://BUG-260731-33v6zz/BUG-260731-33v6zz_results.md) — Windows lane fix: root causes, per-round native windows-latest evidence, verification exit codes, ownership notes
+- [BUG-260731-33v6zz_spawn-log_-implementer--developer--claude-_RUN-260731-1b588e.log](file://BUG-260731-33v6zz/BUG-260731-33v6zz_spawn-log_-implementer--developer--claude-_RUN-260731-1b588e.log) — System spawn log captured by task-board
 
 ## Created
 2026-07-31T09:59:06Z
 
 ## Last Update
-2026-07-31T12:47:22Z
+2026-07-31T13:41:18Z
 
 ## Assigned To
 [implementer] developer (claude)

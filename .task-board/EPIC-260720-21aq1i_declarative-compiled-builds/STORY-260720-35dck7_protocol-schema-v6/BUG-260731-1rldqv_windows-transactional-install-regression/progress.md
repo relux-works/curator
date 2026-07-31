@@ -62,6 +62,11 @@ CAUSE 4 - _stub_trusted_toolchain hard-coded goos=linux and bin/<cmd>, so it cou
 EVIDENCE. Local macOS: mypy strict exit 0; full suite 1140 passed 100 skipped exit 0 (baseline before fixes 1136/99, delta is exactly the five new tests). windows-latest staged probes each removed one signature and exposed the next, no signature reappearing; final probe run 30620126160 = 253 passed, 55 skipped, success across test_install, test_status, test_gc, test_build_cache_windows, test_build_cache_posix, test_transactions, test_locking, test_adapters, test_config. Probe branches deleted. PR 16 full matrix run 30624304158 in flight on 7a66c73; mypy strict already green.
 
 OPEN PRODUCT DECISION (not blocking this fix): a Windows home created by an elevated shell before this change stays Administrators-owned and fails closed. Adopting it would blunt the drift guard, so no automatic repair was added. Explicit opt-in repair vs documented manual re-provisioning is unresolved.
+Host migration resumed on macbook-iv.local. CocoaSkills PR 16 head 7a66c73 currently has Ubuntu/macOS/mypy and Windows Python 3.11, 3.13, 3.14 green; Windows Python 3.12 remains in progress. Monitor that exact job, collect evidence, make focused rework only if it fails, then hand off to independent Opus review. Push only to ivanopcode/cocoaskills; no tags/releases.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: disabled; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=launch_composition_disabled; bare child launch retained
+spawn queued: [implementer] developer (claude) (run=RUN-260731-d6e3c5, max_parallel=20)
+spawn run started: [implementer] developer (claude) (run=RUN-260731-d6e3c5)
 
 ## Precondition Resources
 (none)
@@ -70,12 +75,13 @@ OPEN PRODUCT DECISION (not blocking this fix): a Windows home created by an elev
 - [BUG-260731-1rldqv_spawn-log_-implementer--developer--claude-_RUN-260731-2dec82.log](file://BUG-260731-1rldqv/BUG-260731-1rldqv_spawn-log_-implementer--developer--claude-_RUN-260731-2dec82.log) — System spawn log captured by task-board
 - [BUG-260731-1rldqv_root-cause-and-fix.md](file://BUG-260731-1rldqv/BUG-260731-1rldqv_root-cause-and-fix.md) — Root cause analysis of all four Windows failure families and the fixes applied
 - [BUG-260731-1rldqv_evidence.md](file://BUG-260731-1rldqv/BUG-260731-1rldqv_evidence.md) — Commands run, exit codes, local and windows-latest CI evidence
+- [BUG-260731-1rldqv_spawn-log_-implementer--developer--claude-_RUN-260731-d6e3c5.log](file://BUG-260731-1rldqv/BUG-260731-1rldqv_spawn-log_-implementer--developer--claude-_RUN-260731-d6e3c5.log) — System spawn log captured by task-board
 
 ## Created
 2026-07-31T01:59:51Z
 
 ## Last Update
-2026-07-31T11:02:13Z
+2026-07-31T13:22:53Z
 
 ## Assigned To
 [implementer] developer (claude)

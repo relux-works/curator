@@ -92,6 +92,10 @@ spawn launch composition: disabled; contract=agents-infra.child-launch-compositi
 spawn queued: [reviewer] reviewer (claude) (run=RUN-260731-5000ae, max_parallel=20)
 spawn run started: [reviewer] reviewer (claude) (run=RUN-260731-5000ae)
 Migration checkpoint 2026-07-31: reviewer RUN-260731-5000ae was intentionally cancelled before host transfer, not a review verdict. On ivan-macbook-air-m1, inspect PR 12 current CI/evidence and spawn a fresh independent Claude Opus 5 reviewer.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: disabled; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=launch_composition_disabled; bare child launch retained
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260731-a902cb, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260731-a902cb)
 
 ## Precondition Resources
 (none)
@@ -102,12 +106,13 @@ Migration checkpoint 2026-07-31: reviewer RUN-260731-5000ae was intentionally ca
 - [BUG-260731-27h1yc_windows-platform-case-gate.txt](file://BUG-260731-27h1yc/BUG-260731-27h1yc_windows-platform-case-gate.txt) — platform-case gate report from Test (windows-latest) run 30626331508: all 8 required ledger rows for buildsource/install/install-atomicity report ok
 - [BUG-260731-27h1yc_windows-skips-observed.tsv](file://BUG-260731-27h1yc/BUG-260731-27h1yc_windows-skips-observed.tsv) — skips-observed.tsv from the same Windows run; identical to the main baseline, proving no skip was added
 - [BUG-260731-27h1yc_spawn-log_-reviewer--reviewer--claude-_RUN-260731-5000ae.log](file://BUG-260731-27h1yc/BUG-260731-27h1yc_spawn-log_-reviewer--reviewer--claude-_RUN-260731-5000ae.log) — System spawn log captured by task-board
+- [BUG-260731-27h1yc_spawn-log_-reviewer--reviewer--claude-_RUN-260731-a902cb.log](file://BUG-260731-27h1yc/BUG-260731-27h1yc_spawn-log_-reviewer--reviewer--claude-_RUN-260731-a902cb.log) — System spawn log captured by task-board
 
 ## Created
 2026-07-31T09:29:57Z
 
 ## Last Update
-2026-07-31T12:47:22Z
+2026-07-31T13:22:52Z
 
 ## Assigned To
 [reviewer] reviewer (claude)
