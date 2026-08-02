@@ -21,8 +21,10 @@ estimated(fibonacci(3))
 - [ ] Select first non-conflicting v0.13.0 RC version and verify tag absence
 - [ ] Create tag on exact verified origin/main and publish GitHub prerelease
 - [ ] Verify remote tag, release metadata, and assets/workflow state without touching wb
+- [ ] Prepare reviewed release notes, asset/checksum inventory, exact target SHA, publication commands and rollback verification without mutating remote state
 
 ## Notes
+User release boundary (supersedes original publication wording and checklist items 3-4): prepare the RC completely, but do not create/push a tag or publish a GitHub Release until an explicit later command. Those original publication actions are not part of the active goal.
 
 ## Precondition Resources
 (none)
@@ -34,4 +36,4 @@ estimated(fibonacci(3))
 2026-07-29T21:46:49Z
 
 ## Last Update
-2026-07-29T21:58:15Z
+2026-08-01T07:19:49Z

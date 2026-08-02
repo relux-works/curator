@@ -16,6 +16,7 @@ estimated(fibonacci(3))
 
 ## Blocks
 - TASK-260720-g7kgox
+- TASK-260720-12r55p
 
 ## Checklist
 - [x] Preserve legacy marker-v1 fixture byte-for-byte and add generated marker-v2 writer fixture with manifest coverage.
@@ -127,7 +128,7 @@ spawn run completed: codex (run=RUN-260731-387024, pid=3969, exit=0)
 2026-07-30T23:39:31Z
 
 ## Last Update
-2026-07-31T22:09:07Z
+2026-08-01T04:59:11Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

@@ -8,7 +8,7 @@ backlog
 2026-07-20T02:09:20Z
 
 ## Last Update
-2026-07-30T14:35:00Z
+2026-08-01T07:19:57Z
 
 ## Blocked By
 - TASK-260720-3pemm6
@@ -33,6 +33,7 @@ backlog
 
 ## Notes
 Cross-story verification boundary from STORY-260720-21bsr2: candidate-suite evidence is not release evidence and must record the exact supplied suite digest without advancing a committed pin. The released-suite pin and no-skip CI audit is TASK-260720-1utsx8 after protocol release qualification.
+The updated rc.6 scope supersedes the original checklist reference to rc.4/rc.5. Verification must use exact curator-spec 432eb2ee and manifest sha256:12e58b82579645ba1ccafba49d3e2dd3216005ddf37ae63c68a9fafd46773071.
 
 ## Precondition Resources
 (none)
