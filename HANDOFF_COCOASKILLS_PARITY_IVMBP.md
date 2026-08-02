@@ -52,7 +52,8 @@ They contain the previous migration branch and untracked historical board logs.
 - Exact reviewed signed head: `6e7742f0d28ad95ddd7d8e92364b84062571ad0b`
 - Hosted CI run: `30743353816`
 - Ubuntu 3.11-3.14, macOS 3.11-3.14, and strict mypy are green.
-- Four Windows jobs were still running at migration capture time.
+- Windows Python 3.11 failed at migration close; Windows Python 3.12-3.14 were
+  still running. PR 19 was `UNSTABLE` at exact head `6e7742f`.
 - The current head must not be merged even if those jobs later appear green;
   two independent reviewers requested changes from static reachable evidence.
 
