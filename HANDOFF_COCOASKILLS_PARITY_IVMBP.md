@@ -20,13 +20,22 @@ records this two-provider policy.
 
 ## Remote workspace
 
-Connect with `ssh ivmbp`. Use these prepared clean paths:
+Connect with `ssh -A ivmbp`; the forwarded SSH agent currently provides GitHub
+Git access. Use these prepared clean paths:
 
 - Orchestration board: `/Users/iv/Developer/ReluxWorks/curator-parity`
 - Protocol spec: `/Users/iv/Developer/ReluxWorks/curator-spec-parity`
 - CocoaSkills canonical clone: `/Users/iv/Developer/Wildberries/cocoaskills`
 - PR 19 task worktree:
   `/Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-12r55p/worktree`
+
+The PR worktree uses local branch
+`task/TASK-260720-12r55p-ivmbp-20260802`, tracking the existing remote PR branch
+`task/TASK-260720-12r55p-shared-v6-vectors`. Push accepted rework explicitly:
+
+```bash
+git push origin HEAD:task/TASK-260720-12r55p-shared-v6-vectors
+```
 
 Do not clean, reset, or reuse these older dirty worktrees:
 
@@ -115,10 +124,11 @@ Candidate provenance remains:
 ## First commands on ivmbp
 
 ```bash
-ssh ivmbp
+ssh -A ivmbp
 export PATH="$HOME/.local/bin:$PATH"
 cd /Users/iv/Developer/ReluxWorks/curator-parity
 
+codex login status || codex login
 claude auth status
 gh auth status
 task-board q --format compact \
@@ -134,6 +144,13 @@ git rev-parse HEAD
 git log -1 --show-signature
 gh pr view 19 --json headRefOid,state,mergeStateStatus,statusCheckRollup
 ```
+
+At migration time `codex login status`, `claude auth status`, and `gh auth
+status` reported no active local login on `ivmbp`. Authenticate Codex before
+resuming this session and authenticate Claude before delegating Opus runs.
+`gh auth login` is needed for `gh pr`/CI operations; Git fetch and push can use
+the forwarded SSH agent from `ssh -A ivmbp`. Do not copy credential files from
+the source Mac.
 
 The first delegated run should be a developer on `TASK-260720-12r55p`, using
 either allowed pool. Give it the cycle-3 verdict resource and require it to keep
