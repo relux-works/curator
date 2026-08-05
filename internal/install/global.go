@@ -275,6 +275,17 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.failBuild(planErr)
 		return result, nil
 	}
+	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, deps.Toolchain, opts.External, opts.DryRun)
+	if externalPlanErr != nil {
+		result.failBuild(externalPlanErr)
+		return result, nil
+	}
+	for _, row := range externalPlan.rows {
+		for _, warning := range row.result.Warnings {
+			result.Messages = append(result.Messages, "global: warning: "+warning)
+		}
+		result.Messages = append(result.Messages, fmt.Sprintf("global: %s.%s external build key=%s outcome=%s", row.node.Name, row.command.Name, row.result.CacheKey, row.result.State))
+	}
 	for _, build := range plan.builds {
 		observed.outcomes[build.skill+"."+build.command] = build.outcome
 	}
@@ -303,6 +314,11 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 			return result, nil
 		}
 	}
+	externalStaged, externalStageErr := stageExternalBuilds(opts.context(), externalPlan, deps.Toolchain, deps.Builder, private)
+	if externalStageErr != nil {
+		result.failBuild(externalStageErr)
+		return result, nil
+	}
 
 	outcome, commitErr := runCommit(opts.context(), commitRequest{
 		scope:    "global",
@@ -319,6 +335,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 				mcpFound: mcpFound, attestations: attestations,
 				skillsDir: skillsDir, binDir: binDir,
 				plan: plan, deps: deps, scoped: scoped,
+				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
 			})
 		},
 	})
@@ -333,20 +350,22 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 
 // globalTargetRequest is the scope-specific input of global target staging.
 type globalTargetRequest struct {
-	cfg             *config.Config
-	home            string
-	userHome        string
-	platform        string
-	nodes           []*closure.Node
-	agents          []string
-	effectiveLocale string
-	mcpFound        map[string]map[string][]string
-	attestations    map[string]*marker.Attestation
-	skillsDir       string
-	binDir          string
-	plan            BuildPlan
-	deps            BuildDeps
-	scoped          scopeCommit
+	cfg               *config.Config
+	home              string
+	userHome          string
+	platform          string
+	nodes             []*closure.Node
+	agents            []string
+	effectiveLocale   string
+	mcpFound          map[string]map[string][]string
+	attestations      map[string]*marker.Attestation
+	skillsDir         string
+	binDir            string
+	plan              BuildPlan
+	deps              BuildDeps
+	scoped            scopeCommit
+	external          stagedExternal
+	externalStoreRoot string
 }
 
 // stageGlobalTargets derives the complete desired machine-wide state under the
@@ -357,12 +376,13 @@ func stageGlobalTargets(request globalTargetRequest) (scopeTargets, error) {
 
 	runtime, err := stageRuntimeAndShims(
 		stageRoot, request.home, request.binDir, request.nodes,
-		runtimestore.GlobalCanonicalShim, request.platform, request.scoped, request.plan.plannedInputs(),
+		runtimestore.GlobalCanonicalShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
 	)
 	if err != nil {
 		return scopeTargets{}, err
 	}
 	targets.plan.Merge(runtime.plan)
+	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
 	targets.referencedKeys = runtime.referencedKeys()
 
 	expectedSkills := map[string]bool{}

@@ -3,215 +3,110 @@
 package snapshot
 
 import (
+	"errors"
 	"fmt"
-	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/relux-works/curator/internal/buildsource"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
-// Dir returns the conventional first-generation cache location for a source
-// at a commit. Get may return a sibling immutable generation after repair.
+// ErrDestinationConflict reports that an existing commit-keyed cache entry
+// could not be authenticated as the exact snapshot being published.
+var ErrDestinationConflict = errors.New("snapshot destination conflicts with immutable commit")
+
+// Dir returns the cache location for a source at a commit.
 func Dir(home, source, commit string) string {
 	return filepath.Join(home, "cache", filepath.FromSlash(source), commit, "snapshot")
 }
 
-// Get returns the snapshot directory after comparing it with the immutable
-// repository commit. Missing, incomplete, and tampered cache entries are
-// rebuilt through atomic staging.
+// Get returns the snapshot directory, producing it from the repository on a
+// cache miss. Staging is atomic: a concurrent producer of the same snapshot
+// wins harmlessly.
 func Get(home, source, repo, commit string) (string, error) {
-	validated, err := GetValidated(home, source, repo, commit)
-	if err != nil {
+	target := Dir(home, source, commit)
+	if _, err := os.Lstat(target); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return "", err
 	}
-	defer func() { _ = validated.Close() }()
-	return validated.Path(), nil
-}
-
-// GetValidated returns a validation token for the commit-keyed snapshot. A
-// cache generation is reused only when it is structurally valid and exactly
-// matches a freshly archived immutable repository tree. Repair publishes a
-// sibling immutable generation and switches a regular-file pointer, avoiding
-// non-portable replacement of a live non-empty directory.
-func GetValidated(home, source, repo, commit string) (*buildsource.Token, error) {
-	target := Dir(home, source, commit)
 	parent := filepath.Dir(target)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
-		return nil, err
+		return "", err
 	}
 	tmp, err := os.MkdirTemp(parent, ".snapshot-*.tmp")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
+	// MkdirTemp deliberately creates a private directory. Restore the cache
+	// root mode used by the original archive publication before comparing or
+	// publishing it.
+	if err := os.Chmod(tmp, 0o755); err != nil { // #nosec G302 -- published immutable snapshots intentionally preserve the historical world-readable cache-root mode.
+		return "", err
+	}
 	if err := gitops.Archive(repo, commit, tmp); err != nil {
-		return nil, err
+		return "", err
 	}
-	authoritative, err := buildsource.Validate(tmp)
-	if err != nil {
-		return nil, fmt.Errorf("validate repository snapshot: %w", err)
-	}
-	// Equivalent only reads the frozen identity and tree state. Closing the
-	// retained root before publication is required on Windows, where an open
-	// directory handle can prevent a rename.
-	if err := authoritative.Close(); err != nil {
-		return nil, fmt.Errorf("close repository snapshot validation: %w", err)
-	}
-
-	lock, err := acquireSnapshotLock(target + ".lock")
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = lock.Close() }()
-
-	for _, candidate := range cacheCandidates(target) {
-		cached, cacheErr := buildsource.Validate(candidate)
-		if cacheErr == nil {
-			if cached.Equivalent(authoritative) {
-				return cached, nil
-			}
-			_ = cached.Close()
+	// A commit-shaped directory name is not evidence that its contents came
+	// from that commit. Authenticate hits against a freshly prepared archive
+	// just like concurrent publication winners; never pass tampered or partial
+	// cache bytes to installers.
+	if _, err := os.Lstat(target); err == nil {
+		if err := authenticateDestination(tmp, target); err != nil {
+			return "", err
 		}
+		return target, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", err
 	}
-
-	validated, err := publish(tmp, target, authoritative)
-	if err != nil {
-		return nil, err
+	if err := publishPreparedSnapshot(tmp, target); err != nil {
+		return "", err
 	}
-	return validated, nil
+	return target, nil
 }
 
-func cacheCandidates(target string) []string {
-	candidates := make([]string, 0, 2)
-	if generation := selectedGeneration(target); generation != "" {
-		candidates = append(candidates, generation)
+// publishPreparedSnapshot atomically installs expected without replacing any
+// destination that appeared while the caller prepared it. A concurrent winner
+// is reusable only when its complete tree authenticates as expected.
+func publishPreparedSnapshot(expected, target string) error {
+	if _, err := os.Lstat(target); err == nil {
+		return authenticateDestination(expected, target)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
 	}
-	return append(candidates, target)
-}
-
-func selectedGeneration(target string) string {
-	pointer := target + ".current"
-	pathInfo, err := os.Lstat(pointer)
-	if err != nil || !pathInfo.Mode().IsRegular() || pathInfo.Size() < 2 || pathInfo.Size() > 255 {
-		return ""
-	}
-	file, err := os.Open(pointer) // #nosec G304 -- path is manager-derived
-	if err != nil {
-		return ""
-	}
-	defer func() { _ = file.Close() }()
-	openedInfo, err := file.Stat()
-	if err != nil || !openedInfo.Mode().IsRegular() || !os.SameFile(pathInfo, openedInfo) {
-		return ""
-	}
-	payload, err := io.ReadAll(io.LimitReader(file, 256))
-	if err != nil || int64(len(payload)) != openedInfo.Size() || payload[len(payload)-1] != '\n' {
-		return ""
-	}
-	name := strings.TrimSuffix(string(payload), "\n")
-	if strings.ContainsAny(name, "/\\\r\n") || filepath.Base(name) != name ||
-		!strings.HasPrefix(name, "snapshot-generation-") {
-		return ""
-	}
-	return filepath.Join(filepath.Dir(target), name)
-}
-
-func publish(staged, target string, authoritative *buildsource.Token) (*buildsource.Token, error) {
-	// Preserve the historical cache path on a cold miss. Repairs never replace
-	// a present path: Windows cannot atomically replace a non-empty directory.
-	if _, err := os.Lstat(target); os.IsNotExist(err) && selectedGeneration(target) == "" {
-		if err := os.Rename(staged, target); err == nil {
-			return validatePublished(target, authoritative)
+	if err := renameNoReplace(expected, target); err != nil {
+		// Another process may have published the same immutable commit after
+		// our final pre-rename check. Reuse its destination only after proving
+		// the complete link-free tree, file bytes, and permission bits equal
+		// the archive we prepared for this commit.
+		authErr := authenticateDestination(expected, target)
+		if authErr == nil {
+			return nil
 		}
+		return errors.Join(fmt.Errorf("publish snapshot: %w", err), authErr)
 	}
-
-	parent := filepath.Dir(target)
-	oldGeneration := selectedGeneration(target)
-	generation, err := os.MkdirTemp(parent, "snapshot-generation-*")
-	if err != nil {
-		return nil, err
-	}
-	if err := os.Remove(generation); err != nil {
-		return nil, err
-	}
-	if err := os.Rename(staged, generation); err != nil {
-		return nil, err
-	}
-	published, err := validatePublished(generation, authoritative)
-	if err != nil {
-		_ = os.RemoveAll(generation)
-		return nil, err
-	}
-	if err := writeCurrent(target+".current", filepath.Base(generation)); err != nil {
-		_ = published.Close()
-		_ = os.RemoveAll(generation)
-		return nil, err
-	}
-	pruneRetiredGenerations(parent, generation, oldGeneration)
-	return published, nil
+	return nil
 }
 
-func validatePublished(path string, authoritative *buildsource.Token) (*buildsource.Token, error) {
-	validated, err := buildsource.Validate(path)
+func authenticateDestination(expected, destination string) error {
+	info, err := os.Lstat(destination)
 	if err != nil {
-		return nil, fmt.Errorf("validate published snapshot: %w", err)
+		return fmt.Errorf("%w: inspect destination: %v", ErrDestinationConflict, err)
 	}
-	if !validated.Equivalent(authoritative) {
-		_ = validated.Close()
-		return nil, fmt.Errorf("published snapshot does not match repository commit")
+	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {
+		return fmt.Errorf("%w: destination is not a directory", ErrDestinationConflict)
 	}
-	return validated, nil
-}
-
-func writeCurrent(path, generation string) error {
-	parent := filepath.Dir(path)
-	tmp, err := os.CreateTemp(parent, ".snapshot-current-*.tmp")
+	expectedDigest, err := transaction.DigestPath(expected)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: authenticate expected snapshot: %v", ErrDestinationConflict, err)
 	}
-	tmpPath := tmp.Name()
-	defer func() { _ = os.Remove(tmpPath) }()
-	if _, err := tmp.WriteString(generation + "\n"); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err == nil {
-		return nil
-	}
-	// A tampered pointer may be a directory or another non-replaceable type.
-	// Snapshot API callers are serialized by the adjacent OS lock, and raw
-	// generation paths remain present while this metadata is repaired.
-	if err := os.RemoveAll(path); err != nil {
-		return err
-	}
-	return os.Rename(tmpPath, path)
-}
-
-func pruneRetiredGenerations(parent, current, previous string) {
-	entries, err := os.ReadDir(parent)
+	destinationDigest, err := transaction.DigestPath(destination)
 	if err != nil {
-		return
+		return fmt.Errorf("%w: authenticate destination: %v", ErrDestinationConflict, err)
 	}
-	for _, entry := range entries {
-		if !strings.HasPrefix(entry.Name(), "snapshot-generation-") {
-			continue
-		}
-		path := filepath.Join(parent, entry.Name())
-		if path == current || path == previous {
-			continue
-		}
-		// Best effort: Windows correctly refuses while an older validation
-		// token still holds the generation open. A later repair retries.
-		_ = os.RemoveAll(path)
+	if destinationDigest != expectedDigest {
+		return fmt.Errorf("%w: destination tree does not match expected snapshot", ErrDestinationConflict)
 	}
+	return nil
 }

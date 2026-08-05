@@ -7,9 +7,11 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -17,6 +19,8 @@ import (
 
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/audit"
+	"github.com/relux-works/curator/internal/buildrepo"
+	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
@@ -515,6 +519,7 @@ func cmdInstallMode(args []string, fetch bool) int {
 	}
 	opts.Fetch = fetch && !opts.DryRun
 	opts.FetchedRepos = map[string]bool{}
+	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	exitCode := exitOK
 	for _, target := range targets {
 		result := install.Project(cfg, target.Root, target.Alias, opts)
@@ -632,7 +637,7 @@ func cmdStatus(args []string) int {
 		// verdict from a plan that was already stale.
 		scope := projectStatusScope(cfg, target.Root, target.Alias)
 		before := markerDigests(scope.stores...)
-		result := install.Project(cfg, target.Root, target.Alias, install.Options{DryRun: true})
+		result := install.Project(cfg, target.Root, target.Alias, install.Options{DryRun: true, External: productionExternalDeps(cfg, true)})
 		if result.Status == "failed" {
 			// A read-only plan that refused, yet still described every compiled
 			// command it was asked about, has produced a currentness verdict — and
@@ -1247,7 +1252,7 @@ func globalStatusPlan(cfg *config.Config) (install.Result, bool) {
 			"could not resolve the user home the machine-wide scope mirrors into: %v", err))
 		return result, true
 	}
-	result := install.Global(cfg, userHome, install.Options{DryRun: true})
+	result := install.Global(cfg, userHome, install.Options{DryRun: true, External: productionExternalDeps(cfg, true)})
 	return result, result.Status == "failed" && !result.BuildsComplete
 }
 
@@ -1273,6 +1278,7 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	}
 	opts.Fetch = fetch && !opts.DryRun
 	opts.FetchedRepos = map[string]bool{}
+	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
@@ -1287,6 +1293,85 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 		return exitFail
 	}
 	return exitOK
+}
+
+// productionExternalDeps binds schema-7 repository work to manager/operator
+// state. Discovery happens before package data is consulted; an unavailable
+// tool remains a zero-value fail-closed dependency and affects only closures
+// that actually activate go-repository-v1.
+func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDeps {
+	deps := install.ExternalDeps{GitTool: productionGitTool()}
+	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
+		candidate := audit.Subject{
+			Name: subject.Declared.Repository, Source: subject.Declared.Identity,
+			Git: subject.Declared.Identity, Commit: subject.Effective.Commit,
+			Snapshot: subject.SnapshotRoot, SchemaVersion: 7,
+			Capabilities: capabilities.ImplicitNone(),
+		}
+		var auditWarnings, auditErrs []string
+		if dryRun {
+			auditWarnings, auditErrs = audit.GateReadOnly(cfg, []audit.Subject{candidate})
+		} else {
+			auditWarnings, auditErrs = audit.Gate(cfg, []audit.Subject{candidate})
+		}
+		if len(auditErrs) != 0 {
+			return auditWarnings, errors.New(strings.Join(auditErrs, "; "))
+		}
+		return auditWarnings, nil
+	}
+	return deps
+}
+
+func productionGitTool() buildrepo.GitTool {
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		return buildrepo.GitTool{}
+	}
+	gitPath, err = filepath.EvalSymlinks(gitPath)
+	if err != nil {
+		return buildrepo.GitTool{}
+	}
+	run := func(args ...string) string {
+		command := exec.Command(gitPath, args...) // #nosec G204 -- resolved operator tool, fixed discovery arguments.
+		output, runErr := command.Output()
+		if runErr != nil || len(output) > 4096 {
+			return ""
+		}
+		return strings.TrimSpace(string(output))
+	}
+	execPath := run("--exec-path")
+	version := run("--version")
+	if execPath == "" || version == "" {
+		return buildrepo.GitTool{}
+	}
+	execPath, err = filepath.EvalSymlinks(execPath)
+	if err != nil {
+		return buildrepo.GitTool{}
+	}
+	tool := buildrepo.GitTool{Executable: gitPath, ExecPath: execPath, AllowedVersions: []string{version}}
+	tool.AskPass = admittedOperatorFile(os.Getenv("GIT_ASKPASS"))
+	if tool.AskPass == "" {
+		if executable, executableErr := os.Executable(); executableErr == nil {
+			tool.AskPass = admittedOperatorFile(executable)
+		}
+	}
+	tool.SSHWrapper = admittedOperatorFile(os.Getenv("GIT_SSH"))
+	return tool
+}
+
+func admittedOperatorFile(name string) string {
+	if name == "" {
+		return ""
+	}
+	resolved, err := filepath.EvalSymlinks(name)
+	if err != nil || !filepath.IsAbs(resolved) {
+		return ""
+	}
+	info, err := os.Lstat(resolved)
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return ""
+	}
+	return resolved
 }
 
 func cmdHybrid(args []string) int {

@@ -116,6 +116,38 @@ func CompiledTargetFromCache(hit buildcache.Result, platform string) (CompiledTa
 	}, nil
 }
 
+// ExternalCompiledTarget constructs the same immutable runtime target from a
+// transaction-staged receipt-v2 artifact. The launcher names only the final
+// manager-derived protected-cache path; validation reads the staged bytes and
+// never executes them.
+func ExternalCompiledTarget(stagedArtifact, finalArtifact string, cacheKey buildmeta.CacheKey, receiptHash buildmeta.ReceiptHash, artifactSHA256, platform string) (CompiledTarget, error) {
+	if _, err := cleanAbsolute(stagedArtifact); err != nil {
+		return CompiledTarget{}, fmt.Errorf("staged external artifact: %w", err)
+	}
+	if _, err := cleanAbsolute(finalArtifact); err != nil {
+		return CompiledTarget{}, fmt.Errorf("final external artifact: %w", err)
+	}
+	if !strings.HasPrefix(string(cacheKey), "sha256:") || !strings.HasPrefix(string(receiptHash), "sha256:") || !strings.HasPrefix(artifactSHA256, "sha256:") {
+		return CompiledTarget{}, fmt.Errorf("external artifact identity is malformed")
+	}
+	info, err := os.Lstat(stagedArtifact)
+	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return CompiledTarget{}, fmt.Errorf("external artifact is not a regular file")
+	}
+	if platform == "unix" && info.Mode().Perm()&0o111 == 0 {
+		return CompiledTarget{}, fmt.Errorf("external artifact is not executable")
+	}
+	payload, err := os.ReadFile(stagedArtifact) // #nosec G304 -- absolute transaction-staged path was shape-validated above.
+	if err != nil {
+		return CompiledTarget{}, err
+	}
+	digest := sha256.Sum256(payload)
+	if "sha256:"+hex.EncodeToString(digest[:]) != artifactSHA256 {
+		return CompiledTarget{}, fmt.Errorf("external artifact hash mismatch")
+	}
+	return CompiledTarget{artifactPath: finalArtifact, cacheKey: cacheKey, receiptHash: receiptHash}, nil
+}
+
 // LauncherTarget selects a canonical managed shim as the executable a
 // forwarding shim runs. It exists so the user-bin mirror never has to name an
 // arbitrary path: the only thing it may forward to is a launcher this package

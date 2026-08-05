@@ -50,7 +50,10 @@ func newEnv(t *testing.T) *env {
 
 func (e *env) git(dir string, args ...string) {
 	e.t.Helper()
-	cmd := exec.Command("git", args...)
+	// Keep lifecycle fixtures independent of workstation signing policy and
+	// prevent signing credentials from entering any staged package input.
+	gitArgs := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
+	cmd := exec.Command("git", gitArgs...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",

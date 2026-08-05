@@ -144,16 +144,16 @@ func readManifestDocument(root string) (*manifest.Manifest, string, error) {
 // readSubstitutionsDocument reads and parses the project development
 // substitution manifest and returns the generation of the exact bytes it parsed.
 // An absent file yields an empty map, matching devsub.Load.
-func readSubstitutionsDocument(projectRoot string) (map[string]devsub.Substitution, string, error) {
+func readSubstitutionsDocument(projectRoot string) (*devsub.Manifest, string, error) {
 	path := devsub.PathIn(projectRoot)
 	current, err := readDocument(path)
 	if err != nil {
 		return nil, "", err
 	}
 	if !current.exists {
-		return map[string]devsub.Substitution{}, current.generation, nil
+		return &devsub.Manifest{SchemaVersion: 1, Substitutions: map[string]devsub.Substitution{}, BuildRepositorySubstitutions: map[string]map[string]devsub.BuildRepositorySubstitution{}}, current.generation, nil
 	}
-	parsed, err := devsub.ParseBytes(current.payload, projectRoot)
+	parsed, err := devsub.ParseManifestBytes(current.payload, projectRoot)
 	if err != nil {
 		return nil, "", err
 	}

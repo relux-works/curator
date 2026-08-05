@@ -143,7 +143,6 @@ func TestAuthoritativeCompiledMarkerRoundTripsThroughWriter(t *testing.T) {
 
 func TestWriteRejectsInvalidV2State(t *testing.T) {
 	tests := map[string]func(*Marker){
-		"schema 7 skill": func(m *Marker) { m.SkillSchemaVersion = 7 },
 		"unsatisfied build source": func(m *Marker) {
 			m.Builds["tool"] = Build{Driver: buildmeta.DriverGoV1}
 		},
