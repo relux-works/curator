@@ -176,6 +176,13 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 		fixture := newSnapshotFixture(t)
 		fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
 		values := environmentMap(fixture.session.Environment())
+		target := fixture.session.Target()
+		if values["GOOS"] != target.GOOS || values["GOARCH"] != target.GOARCH {
+			t.Fatalf("closed environment target = %s/%s, probed target = %s/%s", values["GOOS"], values["GOARCH"], target.GOOS, target.GOARCH)
+		}
+		if key := tuningVariable(target.GOARCH); key != "" && values[key] != target.Tuning[key] {
+			t.Fatalf("closed environment %s = %q, probed target publishes %q", key, values[key], target.Tuning[key])
+		}
 
 		published := make([]string, 0, len(vectors.FixedEnvironment))
 		for key := range vectors.FixedEnvironment {
@@ -184,6 +191,9 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 		sort.Strings(published)
 		for _, key := range published {
 			want := vectors.FixedEnvironment[key]
+			if platformDerivedEnvironmentKey(key) {
+				continue
+			}
 			got, present := values[key]
 			if !present {
 				t.Fatalf("Curator's closed environment omits %s", key)
@@ -198,11 +208,23 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 			}
 		}
 		for key := range values {
+			if platformDerivedEnvironmentKey(key) {
+				continue
+			}
 			if _, ok := vectors.FixedEnvironment[key]; !ok {
 				t.Fatalf("Curator's closed environment carries %s, which the suite does not publish", key)
 			}
 		}
 	})
+}
+
+func platformDerivedEnvironmentKey(key string) bool {
+	switch key {
+	case "GOOS", "GOARCH", "GO386", "GOAMD64", "GOARM", "GOARM64":
+		return true
+	default:
+		return false
+	}
 }
 
 // TestToolchainIdentityVectors proves every authoritative toolchain identity
