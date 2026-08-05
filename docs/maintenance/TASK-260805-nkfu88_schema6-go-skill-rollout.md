@@ -1,7 +1,7 @@
 # Schema 6 vendored Go skill rollout guide
 
-Task: `TASK-260805-nkfu88` — publish-go-skill-rollout-guide  
-Audience: agentic-infra skill, CLI, and CocoaSkills maintainers  
+Task: `TASK-260805-nkfu88` — publish-go-skill-rollout-guide
+Audience: agentic-infra skill, CLI, and CocoaSkills maintainers
 Status: maintainer guide based on locally accepted artifacts; remote publication and landing are not asserted
 
 ## Accepted reference pilot
