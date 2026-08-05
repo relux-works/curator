@@ -32,10 +32,8 @@ permissions:
 env:
   # The one immutable committed protocol-suite pin, referenced by every job.
   # It stays on the currently qualified released revision; promoting it is
-  # owned by TASK-260720-38l1sy, after TASK-260720-25d05o qualifies the
-  # release. This pin publishes protocol 1.0.0-rc.3 and claims no later
-  # revision. The schema v6 candidate never appears here -- it enters through
-  # the non-default `candidate-conformance` job below and nowhere else.
+  # owned solely by TASK-260728-d8ktna after rc.5 release qualification. The
+  # rc.5 candidate enters only through explicit non-default candidate paths.
   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
   # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
   # workflow pins @v5, so without these two lines a job may download a

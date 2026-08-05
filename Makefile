@@ -13,7 +13,7 @@ CANDIDATE := .github/ci/candidate-suite.sh
 .PHONY: build test fmt lint vet check \
 	require-pin-root ci-test race race-full check-ci \
 	gate-selftest ledger-check no-broad-suppression \
-	candidate-verify-ref candidate-record candidate-test
+	candidate-verify-ref candidate-record candidate-test rc5-external-test
 
 build:
 	$(GO) build -ldflags '$(LDFLAGS)' -o bin/curator ./cmd/curator
@@ -85,6 +85,17 @@ check-ci: require-pin-root
 	$(GO) vet ./...
 	$(MAKE) ledger-check
 	$(MAKE) ci-test
+
+# Authenticates and consumes the separately released rc.5 external-repository
+# corpus. It is explicit because the protocol conformance root and the interop
+# corpus are independently versioned inputs.
+rc5-external-test: require-pin-root
+	@test -n "$(CURATOR_EXTERNAL_REPOSITORY_CORPUS_ROOT)" || { \
+		echo 'CURATOR_EXTERNAL_REPOSITORY_CORPUS_ROOT is required by this gate.'; \
+		exit 1; }
+	$(GO) test ./internal/conformanceconsumer ./internal/rc5interop ./cmd/curator \
+		-run 'TestAcceptedRC5ExternalRepositoryCorpus|TestEveryAcceptedRC5CaseHasACuratorBinding|TestNativeBlackBoxProjectGlobalLifecycle' \
+		-count=1
 
 # --- Candidate protocol suite ----------------------------------------------
 #

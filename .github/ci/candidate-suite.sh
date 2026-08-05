@@ -140,8 +140,7 @@ record() {
 		echo '# candidate protocol suite. It is NOT a published release, NOT a release'
 		echo '# claim and NOT a conformance claim, and it must not be cited as any of'
 		echo '# them. The committed default pin is unchanged by this run; promoting it'
-		echo '# is owned by TASK-260720-38l1sy after TASK-260720-25d05o qualifies the'
-		echo '# release.'
+		echo '# is owned solely by TASK-260728-d8ktna after rc.5 release qualification.'
 		echo '#'
 		echo "candidate_revision      $ref"
 		echo "candidate_root          $root"
@@ -150,6 +149,7 @@ record() {
 		echo "tree_sha256             sha256:$tree_sha"
 		echo "file_count              $files"
 		echo "committed_released_pin  ${SPEC_PIN:-<unset>}"
+		echo 'pin_promotion_owner     TASK-260728-d8ktna'
 		echo "runner_goos             $(go env GOOS 2>/dev/null || echo '<unknown>')"
 		echo "runner_goarch           $(go env GOARCH 2>/dev/null || echo '<unknown>')"
 		echo 'evidence_class          candidate-only'

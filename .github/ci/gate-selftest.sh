@@ -28,6 +28,7 @@ PASS=0; FAIL=0; SKIPPED=0
 # these cases also assert that the pin CI actually uses is itself a full,
 # immutable, lowercase 40-hex revision -- the same shape a candidate must have.
 PIN="$(awk '/^[ \t]*SPEC_PIN:[ \t]*/{print $2; exit}' .github/workflows/ci.yml)"
+QUALIFIED_PIN='00b1688a9b2457ca397a0bb550acf47cad8ee967'
 
 ok()   { PASS=$((PASS + 1)); printf 'ok    %s\n' "$1"; }
 bad()  { FAIL=$((FAIL + 1)); printf 'FAIL  %s\n      %s\n' "$1" "$2"; }
@@ -50,6 +51,15 @@ assert_contains() {
 	else bad "$1" "expected to find: $2"
 	fi
 }
+
+if [ "$PIN" = "$QUALIFIED_PIN" ]; then
+	ok 'the default SPEC_PIN remains on the currently qualified release'
+else
+	bad 'the default SPEC_PIN remains on the currently qualified release' "got $PIN, want $QUALIFIED_PIN; TASK-260728-d8ktna owns promotion"
+fi
+assert_contains 'the candidate revision remains an explicit workflow input' 'ref: ${{ inputs.candidate_ref }}' .github/workflows/ci.yml
+assert_contains 'the candidate root remains an explicit workflow input' 'CANDIDATE_ROOT_INPUT: ${{ inputs.candidate_root }}' .github/workflows/ci.yml
+assert_contains 'the candidate lane remains non-default' "github.event_name == 'workflow_dispatch'" .github/workflows/ci.yml
 
 echo '=== candidate-suite.sh verify-ref: only a full immutable revision is a candidate ==='
 CS="$HERE/candidate-suite.sh"
@@ -120,6 +130,7 @@ if [ -f "$EV" ]; then
 	assert_contains 'evidence records the file count'        'file_count              2'        "$EV"
 	assert_contains 'evidence records the protocol version'  '1.0.0-rc.5'            "$EV"
 	assert_contains 'evidence records the committed pin'     "committed_released_pin  $PIN"     "$EV"
+	assert_contains 'evidence records the sole pin-promotion owner' 'pin_promotion_owner     TASK-260728-d8ktna' "$EV"
 else
 	bad 'record wrote its evidence file' "missing: $EV"
 fi
