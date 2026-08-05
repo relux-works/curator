@@ -3,6 +3,15 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-08-05
+
+### `TASK-260728-1hwq5b`: runner implemented; candidate/platform qualification remains blocked
+
+- CORRECTION: the task precondition defines "released managers" as independently built distributable candidates, so the earlier conclusion that only already-public schema-7 releases are admissible was wrong. Public Curator 0.12.5/csk 0.9.0 remain the required negative baseline. Fresh immutable release probes additionally show Curator 0.13.0, csk 0.12.5, and csk 0.13.0rc3 reject schema 7.
+- RUNNER: `internal/crossmanager` now authenticates the accepted 60-case `rc5-external-repository-interop-v1` corpus, runs the same cases through independent process adapters with isolated homes/repos, continuously samples process/network activity on macOS and Windows, snapshots watched filesystems, rejects failed-install mutation and escaped writes, compares normalized protocol observations exactly, and preserves raw artifacts plus exact manager/spec/toolchain/OS metadata. The package location keeps the qualification harness independent of Curator-owned conformance-consumer code.
+- GATES: focused tests and corpus binding exit 0 at 81.0% statement coverage; race exits 0; Windows amd64 test cross-build, `go vet`, formatting, diff checks, pinned `golangci-lint` 2.12.2, and the no-broad-suppression policy exit 0. Repository-wide tests exit 1 only because the ignored local tuitestkit replacement is absent.
+- STOP-LINE: the owning manager E2E tasks still have changes-requested candidates with uncommitted deltas and no accepted exact distributable revisions; Windows SSH again times out before remote execution. Running those bytes and calling them exact reviewed candidates would falsify provenance and bypass their native gates. Exact unblock inputs are accepted Curator and CocoaSkills candidate revisions/artifact hashes plus restored Windows reachability. Evidence: `.temp/TASK-260728-1hwq5b/release-capability-report.json`.
+
 ## 2026-08-02
 
 ### 1505 — `BUG-260802-1s021p`: CocoaSkills PR 19 head `6e7742f` fixes 1 of 5 identical Windows `utime` call sites
@@ -2493,3 +2502,8 @@
 - CANDIDATE PROVENANCE: curator-spec `432eb2ee1fe2d6b271e37269f867c8851c325539` is a GitHub-verified merged commit; its `conformance/v1/manifest.json` is `sha256:12e58b82579645ba1ccafba49d3e2dd3216005ddf37ae63c68a9fafd46773071`. Its candidate bytes and rc.6 metadata are byte-equivalent to the immutable CocoaSkills CI pin `0c81c1f8d5321d822be2a2817b05aea03e656e15`.
 - CLAIM BOUNDARY: no upstream rc.6 tag or GitHub Release exists; rc.6 metadata records no claims, macOS/Windows pending native evidence, and Linux excluded. Integrated evidence may report native macOS/Windows results and Ubuntu portable/fail-closed results only; it may not create a tag, Release, pin advance, conformance claim, or Linux driver-success claim.
 - HANDOFF: `.research/260802_csk-integrated-verification-readiness-audit.md` maps the clean-base gate, candidate authentication, platform commands, full pytest/mypy/build/Twine/diff/CI gates, skip and release guards, evidence inventory, criterion coverage, ordering, and stop conditions.
+
+### 2026-08-05 — TASK-260728-1hwq5b cross-manager external-repository runner blocked
+- STOP-LINE: the accepted rc.5 interoperability corpus is pinned to curator-spec `f5d7673039226ab81de2f4f87e2155ae995c4df3`, manifest `sha256:cc9e9c0f93b2497a060a533503a4d030d1a715fe1dd4eb8bf9820168a9257697`, but the installed released Curator 0.12.5 and csk 0.9.0 both reject the authenticated schema-7 probe at schema validation with exit 1 and explicit upgrade diagnostics. Neither starts Git or mutates persistent state.
+- WINDOWS: three bounded `ssh win` attempts exited 255 with TCP connect timeout before authentication or remote execution; no Windows task root was created.
+- DECISION: do not substitute uncommitted manager candidates, translate schema 7 to schema 6, emulate outcomes, or reuse old preflight as corpus evidence. Exact unblock input is immutable signed schema-7-capable releases with artifact hashes on both hosts plus restored Windows reachability. Machine-readable evidence is `.temp/TASK-260728-1hwq5b/release-capability-report.json`.

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:relux-works:curator:cross-manager-report:v1",
+  "title": "Cross-manager black-box corpus report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "corpus", "adapter", "manager", "cases"],
+  "properties": {
+    "schema": { "const": "urn:relux-works:curator:cross-manager-report:v1" },
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary", "protocol_version", "revision", "manifest_sha256"],
+      "properties": {
+        "boundary": { "const": "rc5-external-repository-interop/v1" },
+        "protocol_version": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1 },
+        "manifest_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "adapter": { "type": "string", "minLength": 1 },
+    "manager": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "revision", "binary_sha256", "toolchain", "os", "architecture"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1 },
+        "binary_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "toolchain": { "type": "string", "minLength": 1 },
+        "os": { "type": "string", "minLength": 1 },
+        "architecture": { "type": "string", "minLength": 1 }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "exit_code"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["observed", "mismatch", "error", "not-run"] },
+          "exit_code": { "type": "integer" },
+          "expected": { "type": "object" },
+          "observed": { "type": "object" },
+          "stdout_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "stderr_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "changed_paths": { "type": "array", "items": { "type": "string" } },
+          "outside_writes": { "type": "array", "items": { "type": "string" } },
+          "boundary": { "type": "object" },
+          "violations": { "type": "array", "items": { "type": "string" } },
+          "artifact_dir": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}
