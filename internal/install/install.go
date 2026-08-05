@@ -53,6 +53,9 @@ type Options struct {
 	// Build injects the narrow toolchain, protected-cache, builder, clock, and
 	// generation-read boundaries. The zero value resolves the real ones.
 	Build BuildDeps
+	// External injects operator-owned external repository acquisition, audit,
+	// protected-store, and signer policy. Package manifests cannot populate it.
+	External ExternalDeps
 	// Commit injects the manager locks, transaction journal, cache publisher,
 	// and post-commit collector of the serialized commit phase, plus the fault
 	// hooks a rollback test drives. The zero value resolves the real ones.
@@ -254,13 +257,15 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	// checkout or another ref and it decides the strict-audit refusal below, so
 	// it selects installed content exactly like the manifest and is observed
 	// the same way.
-	substitutions, substitutionsGeneration, err := readSubstitutionsDocument(projectRoot)
+	substitutionManifest, substitutionsGeneration, err := readSubstitutionsDocument(projectRoot)
 	if err != nil {
 		result.failf("%v", err)
 		return result, nil
 	}
 	observed.observeDocument(substitutionsKey, devsub.PathIn(projectRoot), substitutionsGeneration)
-	if len(substitutions) > 0 {
+	substitutions := substitutionManifest.Substitutions
+	buildRepositorySubstitutions := substitutionManifest.BuildRepositorySubstitutions
+	if len(substitutions) > 0 || len(buildRepositorySubstitutions) > 0 {
 		if cfg.Audit.Enabled && cfg.Audit.Mode == "strict" {
 			result.failf("dev substitutions are active in %s; strict audit refuses substituted installs", devsub.Name)
 			return result, nil
@@ -278,6 +283,12 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		for _, name := range names {
 			result.Messages = append(result.Messages, fmt.Sprintf(
 				"%s: SUBSTITUTION %s -> %s", alias, name, substitutions[name].Describe()))
+		}
+		for _, skillName := range sortedBuildSubstitutionSkills(buildRepositorySubstitutions) {
+			for _, repositoryName := range sortedBuildSubstitutionRepositories(buildRepositorySubstitutions[skillName]) {
+				result.Messages = append(result.Messages, fmt.Sprintf(
+					"%s: BUILD REPOSITORY SUBSTITUTION %s.%s", alias, skillName, repositoryName))
+			}
 		}
 	}
 
@@ -517,6 +528,19 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		result.failBuild(planErr)
 		return result, nil
 	}
+	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), alias, alias, cfg.Home(), nodes,
+		buildRepositorySubstitutions, deps.Toolchain, opts.External, opts.DryRun)
+	if externalPlanErr != nil {
+		result.failBuild(externalPlanErr)
+		return result, nil
+	}
+	for _, row := range externalPlan.rows {
+		for _, warning := range row.result.Warnings {
+			result.Messages = append(result.Messages, alias+": warning: "+warning)
+		}
+		result.Messages = append(result.Messages, fmt.Sprintf("%s: %s.%s external build key=%s outcome=%s",
+			alias, row.node.Name, row.command.Name, row.result.CacheKey, row.result.State))
+	}
 	for _, build := range plan.builds {
 		observed.outcomes[build.skill+"."+build.command] = build.outcome
 	}
@@ -548,6 +572,11 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 			return result, nil
 		}
 	}
+	externalStaged, externalStageErr := stageExternalBuilds(opts.context(), externalPlan, deps.Toolchain, deps.Builder, private)
+	if externalStageErr != nil {
+		result.failBuild(externalStageErr)
+		return result, nil
+	}
 
 	// 20. Serialized publication and commit. Everything below the private build
 	// staging is derived and published under one manager-home mutation lock, in
@@ -568,6 +597,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 				effectiveLocale: effectiveLocale, mcpFound: mcpFound, attestations: attestations,
 				skillsDir: skillsDir, binDir: binDir, hybridStore: hybridStore,
 				plan: plan, deps: deps, scoped: scoped, verbose: opts.Verbose,
+				external: externalStaged, externalStoreRoot: externalPlan.deps.StoreRoot,
 			})
 		},
 	})
@@ -607,23 +637,25 @@ func (r *Result) failCommit(commitErr error) (Result, *restartError) {
 
 // projectTargetRequest is the scope-specific input of project target staging.
 type projectTargetRequest struct {
-	cfg             *config.Config
-	alias           string
-	projectRoot     string
-	platform        string
-	nodes           []*closure.Node
-	hybridNames     map[string]bool
-	agents          []string
-	effectiveLocale string
-	mcpFound        map[string]map[string][]string
-	attestations    map[string]*marker.Attestation
-	skillsDir       string
-	binDir          string
-	hybridStore     string
-	plan            BuildPlan
-	deps            BuildDeps
-	scoped          scopeCommit
-	verbose         bool
+	cfg               *config.Config
+	alias             string
+	projectRoot       string
+	platform          string
+	nodes             []*closure.Node
+	hybridNames       map[string]bool
+	agents            []string
+	effectiveLocale   string
+	mcpFound          map[string]map[string][]string
+	attestations      map[string]*marker.Attestation
+	skillsDir         string
+	binDir            string
+	hybridStore       string
+	plan              BuildPlan
+	deps              BuildDeps
+	scoped            scopeCommit
+	verbose           bool
+	external          stagedExternal
+	externalStoreRoot string
 }
 
 // stageProjectTargets derives the complete desired state of one project under
@@ -638,12 +670,13 @@ func stageProjectTargets(request projectTargetRequest) (scopeTargets, error) {
 	// protected cache entry must already be resolved when the marker is built.
 	runtime, err := stageRuntimeAndShims(
 		stageRoot, request.cfg.Home(), request.binDir, request.nodes,
-		runtimestore.ProjectShim, request.platform, request.scoped, request.plan.plannedInputs(),
+		runtimestore.ProjectShim, request.platform, request.scoped, request.plan.plannedInputs(), request.external.entries, request.externalStoreRoot,
 	)
 	if err != nil {
 		return scopeTargets{}, err
 	}
 	targets.plan.Merge(runtime.plan)
+	targets.plan.Merge(request.external.transactionPlan(request.externalStoreRoot))
 	targets.referencedKeys = runtime.referencedKeys()
 
 	expectedSkills := map[string]bool{}
@@ -915,6 +948,17 @@ func buildMarker(
 	// A node with no published build must not carry a build source at all.
 	if builds == nil {
 		builds = map[string]marker.Build{}
+	}
+	if node.Spec.SchemaVersion == 7 {
+		upgraded := make(map[string]marker.Build, len(builds))
+		for command, build := range builds {
+			if build.Driver == "go-v1" {
+				build.ReceiptSchemaVersion = 1
+				build.ExecutionPolicy = "manager-worker-v1"
+			}
+			upgraded[command] = build
+		}
+		builds = upgraded
 	}
 	if len(builds) == 0 {
 		source = nil

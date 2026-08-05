@@ -135,6 +135,8 @@ func stageRuntimeAndShims(
 	platform string,
 	commit scopeCommit,
 	plannedInputs map[string]map[string]buildmeta.Input,
+	external map[string]map[string]externalEntry,
+	externalRoot string,
 ) (runtimeStaging, error) {
 	result := runtimeStaging{commands: map[string]bool{}, builds: map[string]map[string]marker.Build{}}
 	var specs []runtimestore.ShimSpec
@@ -169,6 +171,25 @@ func stageRuntimeAndShims(
 		for _, name := range node.ActiveCommandNames() {
 			command := node.Spec.Commands[name]
 			if command.Type != "build" || !active[name] {
+				continue
+			}
+			if command.Driver == "go-repository-v1" {
+				entry, known := external[node.Name][name]
+				if !known {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: the external build was not staged", node.Name, name)
+				}
+				keyName := strings.TrimPrefix(entry.result.CacheKey, "sha256:")
+				finalArtifact := filepath.Join(externalRoot, "artifacts", keyName, "artifact")
+				compiled, err := runtimestore.ExternalCompiledTarget(entry.artifactPath, finalArtifact,
+					entry.record.CacheKey, entry.record.ReceiptSHA256, entry.record.ArtifactSHA256, platform)
+				if err != nil {
+					return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
+				}
+				targets[name] = compiled
+				if result.builds[node.Name] == nil {
+					result.builds[node.Name] = map[string]marker.Build{}
+				}
+				result.builds[node.Name][name] = entry.record
 				continue
 			}
 			input, known := plannedInputs[node.Name][name]

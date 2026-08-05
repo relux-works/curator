@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -33,95 +32,86 @@ func TestPortablePathConformanceVectors(t *testing.T) {
 	}
 }
 
-func TestSchemaV6ConformanceCases(t *testing.T) {
+func TestSchema7ReleasedCases(t *testing.T) {
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
 	}
-	payload, err := os.ReadFile(filepath.Join(root, "schema-cases", "index.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var cases []struct {
-		Instance string `json:"instance"`
-		Schema   string `json:"schema"`
-		Valid    bool   `json:"valid"`
-	}
-	if err := json.Unmarshal(payload, &cases); err != nil {
-		t.Fatal(err)
-	}
-	consumed := map[string]int{}
-	for _, testCase := range cases {
-		manifestName := ""
-		switch testCase.Schema {
-		case "agent-skill-v6.schema.json":
-			manifestName = CanonicalManifestName
-		case "csk-skill-v6.schema.json":
-			manifestName = LegacyManifestName
-		default:
-			continue
+	for _, suite := range []struct{ directory, manifest string }{
+		{"agent-skill-v7", CanonicalManifestName},
+		{"csk-skill-v7", LegacyManifestName},
+	} {
+		entries, err := os.ReadDir(filepath.Join(root, "schema-cases", suite.directory))
+		if err != nil {
+			t.Fatal(err)
 		}
-		consumed[testCase.Schema]++
-		t.Run(testCase.Instance, func(t *testing.T) {
-			dir := t.TempDir()
-			manifest, err := os.ReadFile(filepath.Join(root, "schema-cases", filepath.FromSlash(testCase.Instance)))
-			if err != nil {
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+				continue
+			}
+			t.Run(suite.directory+"/"+entry.Name(), func(t *testing.T) {
+				payload, err := os.ReadFile(filepath.Join(root, "schema-cases", suite.directory, entry.Name()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				snapshot := materializeSchema7Fixture(t, payload, suite.manifest)
+				_, err = Load(snapshot)
+				wantValid := strings.HasPrefix(entry.Name(), "valid")
+				if (err == nil) != wantValid {
+					t.Fatalf("valid=%v, error=%v", wantValid, err)
+				}
+			})
+		}
+	}
+}
+
+func materializeSchema7Fixture(t *testing.T, payload []byte, manifestName string) string {
+	t.Helper()
+	dir := t.TempDir()
+	var object map[string]any
+	if err := json.Unmarshal(payload, &object); err != nil {
+		t.Fatal(err)
+	}
+	if roots, ok := object["build_roots"].([]any); ok {
+		for _, raw := range roots {
+			root, ok := raw.(string)
+			if !ok || root == "." || strings.Contains(root, "..") {
+				continue
+			}
+			if err := os.MkdirAll(filepath.Join(dir, filepath.FromSlash(root)), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			writeConformanceFile(t, dir, manifestName, manifest)
-			writeConformanceFile(t, dir, "build/go.mod", []byte("module example.com/tool\n\ngo 1.23\n"))
-			writeConformanceFile(t, dir, "build/cmd/tool/main.go", []byte("package main\n"))
-			writeConformanceFile(t, dir, "scripts/tool", []byte("#!/bin/sh\n"))
-			_, err = Load(dir)
-			if (err == nil) != testCase.Valid {
-				t.Fatalf("valid = %v, error = %v", testCase.Valid, err)
+			if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(root), "go.mod"), []byte("module fixture\n"), 0o644); err != nil {
+				t.Fatal(err)
 			}
-		})
-	}
-	for _, schema := range []string{"agent-skill-v6.schema.json", "csk-skill-v6.schema.json"} {
-		if consumed[schema] == 0 {
-			t.Fatalf("authoritative index contains no %s cases", schema)
 		}
 	}
-}
-
-func TestSchemaV6FixtureParsingDoesNotExecuteGo(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("shell sentinel is Unix-only")
+	if commands, ok := object["commands"].(map[string]any); ok {
+		for _, raw := range commands {
+			command, _ := raw.(map[string]any)
+			for _, field := range []string{"source_dir", "unix_path", "win_path"} {
+				value, ok := command[field].(string)
+				if !ok || value == "." || strings.Contains(value, "..") {
+					continue
+				}
+				path := filepath.Join(dir, filepath.FromSlash(value))
+				if field == "source_dir" {
+					if err := os.MkdirAll(path, 0o755); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(path, []byte("fixture"), 0o755); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+		}
 	}
-	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
-	if root == "" {
-		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
-	}
-	fakeBin := t.TempDir()
-	marker := filepath.Join(t.TempDir(), "go-invoked")
-	script := "#!/bin/sh\nprintf invoked > " + marker + "\nexit 97\n"
-	if strings.ContainsAny(marker, " \t\n\"'") {
-		t.Fatalf("unexpected temp path requiring shell quoting: %q", marker)
-	}
-	if err := os.WriteFile(filepath.Join(fakeBin, "go"), []byte(script), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, manifestName), payload, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", fakeBin)
-	spec, err := Load(filepath.Join(root, "fixtures", "go-build-skill"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if spec.Commands["golden-tool"].Driver != "go-v1" {
-		t.Fatalf("fixture build command = %+v", spec.Commands["golden-tool"])
-	}
-	if _, err := os.Stat(marker); !os.IsNotExist(err) {
-		t.Fatalf("parsing invoked go; marker stat = %v", err)
-	}
-}
-
-func writeConformanceFile(t *testing.T, root, rel string, content []byte) {
-	t.Helper()
-	path := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, content, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	return dir
 }

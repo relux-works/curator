@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/buildcache"
+	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/marker"
 )
 
@@ -121,6 +122,11 @@ func Collect(request MaintenanceRequest) (MaintenanceResult, error) {
 	if err != nil {
 		return result, fmt.Errorf("sweep the protected build cache: %w", err)
 	}
+	externalRemoved, externalErr := buildrepo.Collect(filepath.Join(request.Home, "external-build-cache"), referenced, request.Now, request.Grace)
+	result.RemovedBuilds = append(result.RemovedBuilds, externalRemoved...)
+	if externalErr != nil {
+		return result, fmt.Errorf("sweep the external build cache: %w", externalErr)
+	}
 	return result, nil
 }
 
@@ -204,7 +210,7 @@ func markScopes(home string) marks {
 func (marked *marks) absorb(scope scopeMarks) {
 	for _, installed := range scope.markers {
 		marked.runtime[installed.Name+"/"+installed.Commit] = true
-		if installed.SchemaVersion != marker.SchemaVersion {
+		if installed.SchemaVersion != marker.SchemaVersion && installed.SchemaVersion != marker.ExternalSchemaVersion {
 			continue
 		}
 		for _, build := range installed.Builds {

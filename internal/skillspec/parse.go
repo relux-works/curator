@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -121,6 +122,9 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 		if schema >= 6 {
 			allowed["build_roots"] = true
 		}
+		if schema >= 7 {
+			allowed["build_repositories"] = true
+		}
 		if err := rejectUnknown(data, allowed, sourceFile); err != nil {
 			return nil, nil, err
 		}
@@ -156,6 +160,10 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 			}
 		}
 	}
+	buildRepositories, err := parseBuildRepositories(data["build_repositories"], schema)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	commands, err := parseCommands(data["commands"], schema, snapshot, runtimeRoots)
 	if err != nil {
@@ -166,6 +174,11 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 			return nil, nil, err
 		}
 	}
+	if schema >= 7 {
+		if err := validateRepositoryCommands(buildRepositories, commands); err != nil {
+			return nil, nil, err
+		}
+	}
 
 	dependencies, requirements, mcpServers, err := parseDependencies(data["dependencies"], schema)
 	if err != nil {
@@ -173,15 +186,16 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 	}
 
 	return &Spec{
-		SchemaVersion: schema,
-		SourceFile:    sourceFile,
-		RuntimeRoots:  runtimeRoots,
-		BuildRoots:    buildRoots,
-		Capabilities:  caps,
-		Commands:      commands,
-		Dependencies:  dependencies,
-		Requirements:  requirements,
-		McpServers:    mcpServers,
+		SchemaVersion:     schema,
+		SourceFile:        sourceFile,
+		RuntimeRoots:      runtimeRoots,
+		BuildRoots:        buildRoots,
+		BuildRepositories: buildRepositories,
+		Capabilities:      caps,
+		Commands:          commands,
+		Dependencies:      dependencies,
+		Requirements:      requirements,
+		McpServers:        mcpServers,
 	}, data, nil
 }
 
@@ -300,12 +314,33 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 			if schema < 6 {
 				return verr.New(label, "has unsupported type %v", entry["type"])
 			}
+			driver, ok := entry["driver"].(string)
+			if !ok {
+				return verr.New(label+".driver", "must be a supported build driver")
+			}
+			if driver == "go-repository-v1" {
+				if schema < 7 {
+					return verr.New(label+".driver", "requires schema_version 7")
+				}
+				if err := rejectUnknown(entry, map[string]bool{"type": true, "driver": true, "repository": true, "target": true}, label); err != nil {
+					return err
+				}
+				repository, repositoryOK := entry["repository"].(string)
+				target, targetOK := entry["target"].(string)
+				if !repositoryOK || !identifiers.Valid(repository) {
+					return verr.New(label+".repository", "must be a portable repository identifier")
+				}
+				if !targetOK || !identifiers.Valid(target) {
+					return verr.New(label+".target", "must be a portable target identifier")
+				}
+				commands[name] = Command{Name: name, Type: "build", Driver: driver, Repository: repository, Target: target}
+				return nil
+			}
+			if driver != "go-v1" {
+				return verr.New(label+".driver", "must be 'go-v1' or 'go-repository-v1'")
+			}
 			if err := rejectUnknownBuildFields(entry, label); err != nil {
 				return err
-			}
-			driver, ok := entry["driver"].(string)
-			if !ok || driver != "go-v1" {
-				return verr.New(label+".driver", "must be 'go-v1'")
 			}
 			rawSource, present := entry["source_dir"]
 			sourceDir, ok := rawSource.(string)
@@ -341,6 +376,92 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 		}
 	}
 	return commands, nil
+}
+
+func parseBuildRepositories(raw any, schema int) (map[string]BuildRepository, error) {
+	repositories := map[string]BuildRepository{}
+	if raw == nil {
+		return repositories, nil
+	}
+	if schema < 7 {
+		return nil, verr.New("build_repositories", "requires schema_version 7")
+	}
+	obj, ok := raw.(map[string]any)
+	if !ok || len(obj) == 0 {
+		return nil, verr.New("build_repositories", "must be a non-empty object")
+	}
+	names := make([]string, 0, len(obj))
+	for name := range obj {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		label := "build_repositories." + name
+		if !identifiers.Valid(name) {
+			return nil, verr.New(label, "repository name %s", identifiers.Rule)
+		}
+		entry, ok := obj[name].(map[string]any)
+		if !ok {
+			return nil, verr.New(label, "must be an object")
+		}
+		if err := rejectUnknown(entry, map[string]bool{"git": true, "locked_commit": true, "tag": true}, label); err != nil {
+			return nil, err
+		}
+		git, ok := entry["git"].(string)
+		if !ok {
+			return nil, verr.New(label+".git", "must be an HTTPS or SSH repository URL")
+		}
+		source, err := buildrepo.ParseSource(git)
+		if err != nil {
+			return nil, verr.New(label+".git", "%v", err)
+		}
+		lock, err := buildrepo.ParseLockedCommit(entry["locked_commit"], label+".locked_commit")
+		if err != nil {
+			return nil, err
+		}
+		tag := ""
+		if rawTag, present := entry["tag"]; present {
+			tag, ok = rawTag.(string)
+			if !ok || !buildrepo.ValidRefName(tag) {
+				return nil, verr.New(label+".tag", "must be a safe Git tag name of at most 255 UTF-8 bytes")
+			}
+		}
+		repositories[name] = BuildRepository{
+			Name: name, Git: git, Identity: source.Identity, Transport: source.Transport,
+			LockedCommit: LockedCommit{ObjectFormat: lock.ObjectFormat, Hex: lock.Hex}, Tag: tag,
+		}
+	}
+	return repositories, nil
+}
+
+func validateRepositoryCommands(repositories map[string]BuildRepository, commands map[string]Command) error {
+	used := map[string]bool{}
+	names := make([]string, 0, len(commands))
+	for name := range commands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		command := commands[name]
+		if command.Driver != "go-repository-v1" {
+			continue
+		}
+		if _, present := repositories[command.Repository]; !present {
+			return verr.New("commands."+name+".repository", "selects undeclared build repository %q", command.Repository)
+		}
+		used[command.Repository] = true
+	}
+	repositoryNames := make([]string, 0, len(repositories))
+	for name := range repositories {
+		repositoryNames = append(repositoryNames, name)
+	}
+	sort.Strings(repositoryNames)
+	for _, name := range repositoryNames {
+		if !used[name] {
+			return verr.New("build_repositories."+name, "is not selected by any go-repository-v1 command")
+		}
+	}
+	return nil
 }
 
 func parseDependencies(raw any, schema int) (map[string]CommandDependency, map[string]Requirement, map[string]McpServer, error) {
@@ -709,7 +830,7 @@ func validateBuildLayout(snapshot string, buildRoots []string, commands map[stri
 	sort.Strings(names)
 	for _, name := range names {
 		command := commands[name]
-		if command.Type != "build" {
+		if command.Driver != "go-v1" {
 			continue
 		}
 		field := "commands." + name + ".source_dir"

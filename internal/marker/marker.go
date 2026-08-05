@@ -31,6 +31,9 @@ const (
 	LegacySchemaVersion = 1
 	// SchemaVersion is the marker schema written by every installation mutation.
 	SchemaVersion = 2
+	// ExternalSchemaVersion is written for schema-7 installations. It can
+	// represent local go-v1 and external go-repository-v1 commands together.
+	ExternalSchemaVersion = 3
 )
 
 var (
@@ -55,11 +58,84 @@ type Attestation struct {
 // Build records the portable identities needed to revalidate one compiled
 // command without persisting any manager-home path.
 type Build struct {
-	Driver         string                `json:"driver"`
-	CacheKey       buildmeta.CacheKey    `json:"cache_key"`
-	ReceiptSHA256  buildmeta.ReceiptHash `json:"receipt_sha256"`
-	ArtifactSHA256 string                `json:"artifact_sha256"`
-	ArtifactPath   string                `json:"artifact_path"`
+	Driver               string                `json:"driver"`
+	ReceiptSchemaVersion int                   `json:"receipt_schema_version,omitempty"`
+	ExecutionPolicy      string                `json:"execution_policy,omitempty"`
+	Repository           string                `json:"repository,omitempty"`
+	DeclaredIdentity     *RepositoryIdentity   `json:"declared_identity,omitempty"`
+	DeclaredLockedCommit *RepositoryCommit     `json:"declared_locked_commit,omitempty"`
+	DeclaredTag          string                `json:"declared_tag,omitempty"`
+	EffectiveIdentity    *RepositoryIdentity   `json:"effective_identity,omitempty"`
+	ObjectFormat         string                `json:"object_format,omitempty"`
+	Commit               string                `json:"commit,omitempty"`
+	Substituted          bool                  `json:"substituted,omitempty"`
+	Substitution         *RepositorySubstitute `json:"substitution,omitempty"`
+	BuildSource          *buildsource.Identity `json:"build_source,omitempty"`
+	DescriptorTarget     string                `json:"descriptor_target,omitempty"`
+	CacheKey             buildmeta.CacheKey    `json:"cache_key"`
+	ReceiptSHA256        buildmeta.ReceiptHash `json:"receipt_sha256"`
+	ArtifactSHA256       string                `json:"artifact_sha256"`
+	ArtifactPath         string                `json:"artifact_path"`
+}
+
+// MarshalJSON keeps marker-v2 local records byte-compatible while emitting
+// the closed marker-v3 record selected by the driver. In particular,
+// substituted=false is required for external records and forbidden for local
+// ones, which cannot be expressed with a single struct tag.
+func (b Build) MarshalJSON() ([]byte, error) {
+	value := map[string]any{
+		"driver": b.Driver, "cache_key": b.CacheKey, "receipt_sha256": b.ReceiptSHA256,
+		"artifact_sha256": b.ArtifactSHA256, "artifact_path": b.ArtifactPath,
+	}
+	if b.ReceiptSchemaVersion != 0 {
+		value["receipt_schema_version"] = b.ReceiptSchemaVersion
+	}
+	if b.ExecutionPolicy != "" {
+		value["execution_policy"] = b.ExecutionPolicy
+	}
+	if b.Driver == "go-repository-v1" {
+		value["repository"] = b.Repository
+		value["declared_identity"] = b.DeclaredIdentity
+		value["declared_locked_commit"] = b.DeclaredLockedCommit
+		if b.DeclaredTag != "" {
+			value["declared_tag"] = b.DeclaredTag
+		}
+		value["effective_identity"] = b.EffectiveIdentity
+		value["object_format"] = b.ObjectFormat
+		value["commit"] = b.Commit
+		value["substituted"] = b.Substituted
+		if b.Substitution != nil {
+			value["substitution"] = b.Substitution
+		}
+		value["build_source"] = b.BuildSource
+		value["descriptor_target"] = b.DescriptorTarget
+	}
+	return json.Marshal(value)
+}
+
+// RepositoryIdentity is a marker-v3 declared/effective source identity.
+type RepositoryIdentity struct {
+	Kind  string `json:"kind"`
+	Value string `json:"value"`
+}
+
+// RepositoryCommit is the package-declared immutable Git object lock.
+type RepositoryCommit struct {
+	ObjectFormat string `json:"object_format"`
+	Hex          string `json:"hex"`
+}
+
+// RepositoryRef is the typed operator-selected network substitution ref.
+type RepositoryRef struct {
+	Kind  string `json:"kind"`
+	Value string `json:"value"`
+}
+
+// RepositorySubstitute records substitution semantics without paths or
+// credentials. Local selectors deliberately collapse to type only.
+type RepositorySubstitute struct {
+	Type string         `json:"type"`
+	Ref  *RepositoryRef `json:"ref,omitempty"`
 }
 
 // Marker is the install marker payload (Spec §8.5).
@@ -102,6 +178,12 @@ type BuildCurrentness struct {
 	Inputs       map[string]buildmeta.Input
 	ContextFiles []string
 	RuntimeFiles []string
+	// InspectExternal verifies one receipt-v2 protected entry without fetching,
+	// auditing, repairing, adopting, signing, or executing it.
+	InspectExternal func(command string, recorded Build) (bool, error)
+	// VerifyShim checks the manager-derived launcher/PATH relationship for any
+	// local or external build command. Nil evidence fails closed for marker v3.
+	VerifyShim func(command string, recorded Build) (bool, error)
 }
 
 // MarshalJSON keeps the marker object compatible with the protocol wire
@@ -166,6 +248,9 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 	case SchemaVersion:
 		required = append(required, "build_roots", "builds")
 		allowed = append(allowed, "build_roots", "build_source", "builds")
+	case ExternalSchemaVersion:
+		required = append(required, "build_roots", "builds")
+		allowed = append(allowed, "build_roots", "build_source", "builds")
 	default:
 		return false
 	}
@@ -179,10 +264,11 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		m.Ref == "" || utf8.RuneCountInString(m.Ref) > 8192 || !markerCommitRE.MatchString(m.Commit) ||
 		!markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
 		(m.SchemaVersion == LegacySchemaVersion && m.SkillSchemaVersion > 5) ||
-		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) {
+		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) ||
+		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) {
 		return false
 	}
-	setsSorted := m.SchemaVersion == SchemaVersion
+	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion
 	if !validNullableLocale(raw["locale"], m.Locale) || !validTimestamp(m.InstalledAt) ||
 		!validIdentifierSet(m.Agents, setsSorted) || !validIdentifierSet(m.Commands, setsSorted) ||
 		!validIdentifierSet(m.Dependencies, setsSorted) || !validPathSet(m.RuntimeRoots, setsSorted) ||
@@ -229,7 +315,7 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 			return false
 		}
 	}
-	if m.SchemaVersion == SchemaVersion && !validBuildState(m, raw) {
+	if (m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion) && !validBuildState(m, raw) {
 		return false
 	}
 	return true
@@ -256,12 +342,20 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 	if len(m.Builds) == 0 {
 		return !sourcePresent && m.BuildSource == nil
 	}
-	if len(m.BuildRoots) == 0 || !sourcePresent || m.BuildSource == nil || m.BuildSource.Algorithm != buildsource.Algorithm ||
-		!markerSHA256RE.MatchString(m.BuildSource.ContentSHA256) {
+	hasLocal := false
+	for _, build := range m.Builds {
+		hasLocal = hasLocal || build.Driver == buildmeta.DriverGoV1
+	}
+	if hasLocal {
+		if len(m.BuildRoots) == 0 || !sourcePresent || m.BuildSource == nil || m.BuildSource.Algorithm != buildsource.Algorithm ||
+			!markerSHA256RE.MatchString(m.BuildSource.ContentSHA256) {
+			return false
+		}
+	} else if sourcePresent || m.BuildSource != nil {
 		return false
 	}
 	for command, build := range m.Builds {
-		if !identifiers.Valid(command) || !containsString(m.Commands, command) || build.Driver != buildmeta.DriverGoV1 ||
+		if !identifiers.Valid(command) || !containsString(m.Commands, command) ||
 			!markerSHA256RE.MatchString(string(build.CacheKey)) ||
 			!markerSHA256RE.MatchString(string(build.ReceiptSHA256)) ||
 			!markerSHA256RE.MatchString(build.ArtifactSHA256) || !identifiers.PortablePath(build.ArtifactPath) {
@@ -272,6 +366,58 @@ func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
 		if unixErr != nil || windowsErr != nil || (build.ArtifactPath != unixPath && build.ArtifactPath != windowsPath) {
 			return false
 		}
+		if m.SchemaVersion == SchemaVersion {
+			if build.Driver != buildmeta.DriverGoV1 || build.ReceiptSchemaVersion != 0 || build.ExecutionPolicy != "" || hasRepositoryState(build) {
+				return false
+			}
+			continue
+		}
+		if !validV3Build(build) {
+			return false
+		}
+	}
+	return true
+}
+
+func hasRepositoryState(build Build) bool {
+	return build.Repository != "" || build.DeclaredIdentity != nil || build.DeclaredLockedCommit != nil ||
+		build.DeclaredTag != "" || build.EffectiveIdentity != nil || build.ObjectFormat != "" ||
+		build.Commit != "" || build.Substituted || build.Substitution != nil || build.BuildSource != nil ||
+		build.DescriptorTarget != ""
+}
+
+func validV3Build(build Build) bool {
+	if build.ExecutionPolicy != buildmeta.ExecutionPolicy {
+		return false
+	}
+	if build.Driver == buildmeta.DriverGoV1 {
+		return build.ReceiptSchemaVersion == 1 && !hasRepositoryState(build)
+	}
+	if build.Driver != "go-repository-v1" || build.ReceiptSchemaVersion != 2 ||
+		!identifiers.Valid(build.Repository) || !identifiers.Valid(build.DescriptorTarget) ||
+		build.DeclaredIdentity == nil || build.DeclaredIdentity.Kind != "network-git" || build.DeclaredIdentity.Value == "" ||
+		build.DeclaredLockedCommit == nil || build.DeclaredLockedCommit.ObjectFormat != build.ObjectFormat ||
+		build.EffectiveIdentity == nil || (build.EffectiveIdentity.Kind != "network-git" && build.EffectiveIdentity.Kind != "operator-local-git") ||
+		build.EffectiveIdentity.Value == "" || build.BuildSource == nil || build.BuildSource.Algorithm != buildsource.Algorithm ||
+		!markerSHA256RE.MatchString(build.BuildSource.ContentSHA256) {
+		return false
+	}
+	wantLen := 40
+	if build.ObjectFormat == "sha256" {
+		wantLen = 64
+	} else if build.ObjectFormat != "sha1" {
+		return false
+	}
+	if len(build.Commit) != wantLen || len(build.DeclaredLockedCommit.Hex) != wantLen ||
+		!markerCommitRE.MatchString(build.Commit) || !markerCommitRE.MatchString(build.DeclaredLockedCommit.Hex) {
+		return false
+	}
+	if build.Substituted != (build.Substitution != nil) {
+		return false
+	}
+	if build.Substitution != nil && build.Substitution.Type != "local-path" &&
+		(build.Substitution.Type != "network-git" || build.Substitution.Ref == nil) {
+		return false
 	}
 	return true
 }
@@ -367,7 +513,11 @@ func Write(dir string, m *Marker) error {
 	if m == nil {
 		return errors.New("install marker is nil")
 	}
-	m.SchemaVersion = SchemaVersion
+	if m.SkillSchemaVersion == 7 {
+		m.SchemaVersion = ExternalSchemaVersion
+	} else {
+		m.SchemaVersion = SchemaVersion
+	}
 	m.Agents = nonNilStrings(m.Agents)
 	m.Commands = nonNilStrings(m.Commands)
 	m.Dependencies = nonNilStrings(m.Dependencies)
@@ -405,7 +555,7 @@ func Write(dir string, m *Marker) error {
 	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &raw); err != nil || !validMarker(m, raw) {
-		return errors.New("install marker is invalid for schema 2")
+		return fmt.Errorf("install marker is invalid for schema %d", m.SchemaVersion)
 	}
 	return os.WriteFile(filepath.Join(dir, Name), append(payload, '\n'), 0o644)
 }
@@ -428,14 +578,14 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if len(buildState) > 1 {
 		return false, errors.New("multiple build currentness values supplied")
 	}
-	if version, ok := markerSchemaVersion(installedDir); ok && version != LegacySchemaVersion && version != SchemaVersion {
+	if version, ok := markerSchemaVersion(installedDir); ok && version != LegacySchemaVersion && version != SchemaVersion && version != ExternalSchemaVersion {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
 	}
 	recorded := Read(installedDir)
 	if recorded == nil {
 		return false, nil
 	}
-	if recorded.SchemaVersion != LegacySchemaVersion && recorded.SchemaVersion != SchemaVersion {
+	if recorded.SchemaVersion != LegacySchemaVersion && recorded.SchemaVersion != SchemaVersion && recorded.SchemaVersion != ExternalSchemaVersion {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
 	}
 	if recorded.SchemaVersion == LegacySchemaVersion &&
@@ -463,7 +613,7 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if !reflect.DeepEqual(recorded.Attestation, expected.Attestation) {
 		return false, nil
 	}
-	if recorded.SchemaVersion == SchemaVersion {
+	if recorded.SchemaVersion == SchemaVersion || recorded.SchemaVersion == ExternalSchemaVersion {
 		if !equalStrings(recorded.BuildRoots, normalizedStrings(expected.BuildRoots)) ||
 			!reflect.DeepEqual(recorded.Builds, normalizedBuilds(expected.Builds)) ||
 			!reflect.DeepEqual(recorded.BuildSource, expected.BuildSource) {
@@ -480,15 +630,14 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if len(recorded.Builds) == 0 {
 		return true, nil
 	}
-	if recorded.SchemaVersion != SchemaVersion || len(buildState) != 1 {
+	if (recorded.SchemaVersion != SchemaVersion && recorded.SchemaVersion != ExternalSchemaVersion) || len(buildState) != 1 {
 		return false, nil
 	}
 	return currentBuilds(installedDir, recorded, buildState[0])
 }
 
 func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness) (bool, error) {
-	if state.RawSnapshot == nil || state.InspectCache == nil || state.Inputs == nil ||
-		state.ContextFiles == nil || state.RuntimeFiles == nil || recorded.BuildSource == nil {
+	if state.ContextFiles == nil || state.RuntimeFiles == nil {
 		return false, nil
 	}
 	contextFiles := normalizedStrings(state.ContextFiles)
@@ -503,7 +652,40 @@ func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness
 			return false, err
 		}
 	}
-	if !sameBuildCommands(recorded.Builds, state.Inputs) {
+	localBuilds := map[string]Build{}
+	externalBuilds := map[string]Build{}
+	for command, build := range recorded.Builds {
+		if build.Driver == buildmeta.DriverGoV1 {
+			localBuilds[command] = build
+		} else {
+			externalBuilds[command] = build
+		}
+	}
+	if len(localBuilds) != len(state.Inputs) {
+		return false, nil
+	}
+	for command := range localBuilds {
+		if _, present := state.Inputs[command]; !present {
+			return false, nil
+		}
+	}
+	for command, build := range externalBuilds {
+		if state.InspectExternal == nil || state.VerifyShim == nil {
+			return false, nil
+		}
+		ok, err := state.InspectExternal(command, build)
+		if err != nil || !ok {
+			return false, err
+		}
+		ok, err = state.VerifyShim(command, build)
+		if err != nil || !ok {
+			return false, err
+		}
+	}
+	if len(localBuilds) == 0 {
+		return true, nil
+	}
+	if state.RawSnapshot == nil || state.InspectCache == nil || state.Inputs == nil || recorded.BuildSource == nil {
 		return false, nil
 	}
 
@@ -524,13 +706,13 @@ func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness
 			current = false
 			return nil
 		}
-		commands := make([]string, 0, len(recorded.Builds))
-		for command := range recorded.Builds {
+		commands := make([]string, 0, len(localBuilds))
+		for command := range localBuilds {
 			commands = append(commands, command)
 		}
 		sort.Strings(commands)
 		for _, command := range commands {
-			build := recorded.Builds[command]
+			build := localBuilds[command]
 			input := state.Inputs[command]
 			if input.Command != command || input.Driver != build.Driver || input.BuildSource != identity ||
 				!containsString(recorded.BuildRoots, input.BuildRoot) || input.Validate() != nil {
@@ -547,6 +729,20 @@ func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness
 			if !validCacheResult(result, input, build) {
 				current = false
 				return nil
+			}
+			if recorded.SchemaVersion == ExternalSchemaVersion {
+				if state.VerifyShim == nil {
+					current = false
+					return nil
+				}
+				shimOK, shimErr := state.VerifyShim(command, build)
+				if shimErr != nil {
+					return shimErr
+				}
+				if !shimOK {
+					current = false
+					return nil
+				}
 			}
 		}
 		return nil
@@ -580,18 +776,6 @@ func validCacheResult(result buildcache.Result, input buildmeta.Input, build Bui
 	}
 	receipt, err := buildmeta.DecodeExpectedReceipt(result.ReceiptBytes, input)
 	return err == nil && reflect.DeepEqual(receipt, result.Receipt)
-}
-
-func sameBuildCommands(builds map[string]Build, inputs map[string]buildmeta.Input) bool {
-	if len(builds) != len(inputs) {
-		return false
-	}
-	for command := range builds {
-		if _, present := inputs[command]; !present {
-			return false
-		}
-	}
-	return true
 }
 
 func pathsUnderRoots(paths, roots []string) bool {

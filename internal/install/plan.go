@@ -574,7 +574,7 @@ func plannedCommands(nodes []*closure.Node) []plannedCommand {
 		active := node.ActiveCommands()
 		for _, name := range node.ActiveCommandNames() {
 			command := node.Spec.Commands[name]
-			if command.Type != "build" || !active[name] {
+			if command.Type != "build" || command.Driver != buildmeta.DriverGoV1 || !active[name] {
 				continue
 			}
 			planned = append(planned, plannedCommand{node: node, command: command})

@@ -134,7 +134,7 @@ func TestCanonicalManifestResolution(t *testing.T) {
 func TestSchemaVersionValidation(t *testing.T) {
 	mustFail(t, writeSkill(t, `{"schema_version": "3"}`, nil), "schema_version")
 	mustFail(t, writeSkill(t, `{"schema_version": 3.5}`, nil), "schema_version")
-	mustFail(t, writeSkill(t, `{"schema_version": 7}`, nil), "schema_version")
+	mustFail(t, writeSkill(t, `{"schema_version": 8}`, nil), "schema_version")
 	mustFail(t, writeSkill(t, `{"schema_version": true}`, nil), "schema_version")
 	mustFail(t, writeSkill(t, `{}`, nil), "schema_version")
 }
