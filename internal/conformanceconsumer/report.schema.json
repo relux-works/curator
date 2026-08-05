@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:relux-works:curator:black-box-consumer-report:v1",
+  "title": "Curator black-box corpus consumer report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "corpus", "adapter", "cases"],
+  "properties": {
+    "schema": { "const": "urn:relux-works:curator:black-box-consumer-report:v1" },
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary", "protocol_version", "manifest_sha256"],
+      "properties": {
+        "boundary": { "const": "curator-conformance-corpus/v1" },
+        "protocol_version": { "type": "string", "minLength": 1 },
+        "manifest_sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "adapter": { "type": "string", "minLength": 1 },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "exit_code"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["observed", "mismatch", "error", "not-run"] },
+          "exit_code": { "type": "integer" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

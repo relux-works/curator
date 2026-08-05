@@ -3,6 +3,25 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-08-05
+
+### Provisional rc.5 corpus consumer boundary
+
+- Added isolated, implementation-neutral consumer scaffolding under
+  `internal/conformanceconsumer`; it authenticates caller-supplied corpus files
+  through a versioned manifest boundary and invokes only injected black-box
+  processes.
+- Candidate commit `f5d7673039226ab81de2f4f87e2155ae995c4df3` remains read-only
+  and replaceable pending acceptance of `TASK-260728-2u5u14`; no candidate bytes
+  were added to this repository.
+- Reports are observational and explicitly exclude manager qualification,
+  platform, parity, merge, promotion, and release claims.
+- Relevant package tests, race tests, vet, formatting, and the full build pass.
+  Repository-wide tests/vet cannot load the ignored local tuitestkit replacement
+  in this isolated worktree, `golangci-lint` is not installed, and the configured
+  signed commit cannot be created without the human-held SSH key passphrase;
+  these exit codes are retained in the task outcome rather than treated as green.
+
 ## 2026-08-02
 
 ### 1505 — `BUG-260802-1s021p`: CocoaSkills PR 19 head `6e7742f` fixes 1 of 5 identical Windows `utime` call sites
