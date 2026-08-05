@@ -47,6 +47,14 @@
 internal/buildcache	TestWindowsProtectedStateMatrix	windows	-	-	Windows DACL protected-state matrix for the build cache
 internal/buildcache	TestWindowsProtectedStateMatrix/*	-	windows	host-capability	a subtest needing a Windows symlink may skip where the host forbids it; the matrix itself must still pass
 internal/buildcache	TestValidateWindowsSecurityPolicy	windows	-	-	validates the Windows security-descriptor policy on cache state
+internal/buildrepo	TestWindowsProtectedStoreReusesOwnerPrivateArtifact	windows	-	-	trusted owner-controlled protected external artifacts are reusable
+internal/buildrepo	TestWindowsProtectedStoreReusesOwnerPrivateSnapshot	windows	-	-	trusted owner-controlled protected external snapshots are reusable
+internal/buildrepo	TestWindowsProtectedSecurityDescriptorRejectsWrongOwnerAndDACL	windows	-	-	owner and exact protected-DACL policy rejects adversarial descriptors
+internal/buildrepo	TestWindowsProtectedArtifactAdversarialStateQuarantines	windows	-	-	hard-link DACL and reparse attacks force protected external artifact quarantine
+internal/buildrepo	TestWindowsProtectedArtifactAdversarialStateQuarantines/*	-	windows	host-capability	a reparse-point subtest may skip where the host forbids symlink creation
+internal/buildrepo	TestWindowsProtectedArtifactPathSwapCannotReturnBytes	windows	-	-	path replacement during retained-handle validation cannot return cache bytes
+internal/buildrepo	TestWindowsProtectedArtifactEntrySwapCannotReturnBytes	windows	-	-	entry-directory replacement during guarded validation cannot return cache bytes
+internal/buildrepo	TestWindowsProtectedSnapshotHardLinkQuarantines	windows	-	-	hard-linked protected snapshot files force quarantine
 
 # ===========================================================================
 # Windows reparse points
