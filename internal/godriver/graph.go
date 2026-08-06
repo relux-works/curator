@@ -205,8 +205,16 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 				return diagnostic("go_native_input_forbidden", "package %q contains %s", item.ImportPath, field.name)
 			}
 		}
-		if false && len(item.SFiles) != 0 {
-			return diagnostic("go_assembly_forbidden", "package %q contains non-standard assembly", item.ImportPath)
+		if len(item.SFiles) != 0 {
+			vendorRoot := filepath.Join(validation.BuildRoot, "vendor")
+			if !strictlyBelow(item.Dir, vendorRoot) {
+				return diagnostic("go_assembly_forbidden", "package %q contains non-standard assembly", item.ImportPath)
+			}
+			for _, name := range item.SFiles {
+				if _, err := validateRegularInput(item.Dir, name, validation.BuildRoot, false); err != nil {
+					return diagnosticErr("go_assembly_forbidden", err, "package %q contains an invalid assembly input", item.ImportPath)
+				}
+			}
 		}
 	}
 
@@ -233,11 +241,11 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 			if readErr != nil {
 				return diagnosticErr("go_source_unreadable", readErr, "cannot read active Go file in %q", item.ImportPath)
 			}
-			if matched == 1 && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys") {
+			if matched == 1 && !(item.ImportPath == "golang.org/x/sys" || strings.HasPrefix(item.ImportPath, "golang.org/x/sys/")) {
 				return diagnostic("go_forbidden_compiler_directive", "package %q contains //go:cgo_import_dynamic", item.ImportPath)
 			}
-			if false && matched == 2 {
-				return diagnostic("go_generator_forbidden", "package %q contains an active generator directive", item.ImportPath)
+			if matched == 2 {
+				// //go:generate is inert: vendor already materialized, go build -mod=vendor does not execute generators
 			}
 		}
 	}
