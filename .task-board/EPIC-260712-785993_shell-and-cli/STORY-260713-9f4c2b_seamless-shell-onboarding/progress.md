@@ -1,5 +1,5 @@
 ## Status
-review
+done
 
 ## Assigned To
 codex
@@ -8,7 +8,7 @@ codex
 2026-07-13T15:37:19Z
 
 ## Last Update
-2026-07-13T13:00:00Z
+2026-08-10T11:23:33Z
 
 ## Blocked By
 - (none)
