@@ -1,5 +1,5 @@
 ## Status
-review
+backlog
 
 ## Assigned To
 codex
@@ -8,7 +8,7 @@ codex
 2026-07-13T20:02:27Z
 
 ## Last Update
-2026-07-13T20:16:34Z
+2026-08-09T23:31:24Z
 
 ## Blocked By
 - (none)
@@ -25,3 +25,4 @@ codex
 
 ## Notes
 Implementation follows curator-spec commit e56074c33f1ecdf301f8a845ada41d5d832d1796 and passes the shared suite, all Go tests, and go vet locally.
+Board repair: the story has no leaf task or linked outcome evidence, so reviewing is not a valid aggregate state. Existing implementation notes are preserved; detail the remaining review work into a task before returning this story to the delivery lifecycle.

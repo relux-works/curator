@@ -8,7 +8,7 @@ codex
 2026-07-13T15:37:19Z
 
 ## Last Update
-2026-07-13T13:00:00Z
+2026-08-09T23:41:26Z
 
 ## Blocked By
 - (none)
@@ -23,3 +23,9 @@ codex
 
 ## Notes
 Research is attached under `.task-board/.resources/TASK-260713-c7a18d/`.
+
+## Precondition Resources
+(none)
+
+## Outcome Resources
+- [research.md](file://TASK-260713-c7a18d/research.md) — Shell activation regression audit and verification evidence
