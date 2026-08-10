@@ -1,5 +1,5 @@
 ## Status
-review
+done
 
 ## Assigned To
 codex
@@ -8,7 +8,7 @@ codex
 2026-07-13T03:14:10Z
 
 ## Last Update
-2026-08-09T23:42:09Z
+2026-08-10T11:23:33Z
 
 ## Blocked By
 - (none)
@@ -32,3 +32,4 @@ Board repair 2026-08-10: removed 11 dangling prose-valued blockedBy entries; ado
 
 ## Outcome Resources
 - [review.md](file://TASK-260713-7a9c1e/review.md) — V0.1 conformance review findings and correction evidence
+- [TASK-260713-7a9c1e_PR1-equivalence-evidence.md](file://TASK-260713-7a9c1e/TASK-260713-7a9c1e_PR1-equivalence-evidence.md) — Closed PR #1, stable patch equivalence, metadata-only closure commit, six-job CI, and reviewer transition evidence
