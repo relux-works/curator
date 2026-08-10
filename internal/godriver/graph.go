@@ -172,7 +172,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 		if item.Module != nil {
 			return diagnostic("go_standard_input_escape", "standard package %q unexpectedly has module metadata", item.ImportPath)
 		}
-		if item.Root != validation.GOROOT && !(item.Root == "" && strings.HasPrefix(item.ImportPath, "vendor/")) {
+		if item.Root != validation.GOROOT && (item.Root != "" || !strings.HasPrefix(item.ImportPath, "vendor/")) {
 			return diagnostic("go_standard_input_escape", "standard package %q has an unexpected Root", item.ImportPath)
 		}
 	} else if err := validateModule(item, validation.BuildRoot); err != nil {
@@ -241,11 +241,11 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 			if readErr != nil {
 				return diagnosticErr("go_source_unreadable", readErr, "cannot read active Go file in %q", item.ImportPath)
 			}
-			if matched == 1 && !(item.ImportPath == "golang.org/x/sys" || strings.HasPrefix(item.ImportPath, "golang.org/x/sys/")) {
+			if matched == 1 && item.ImportPath != "golang.org/x/sys" && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys/") {
 				return diagnostic("go_forbidden_compiler_directive", "package %q contains //go:cgo_import_dynamic", item.ImportPath)
 			}
 			if matched == 2 {
-				// //go:generate is inert: vendor already materialized, go build -mod=vendor does not execute generators
+				return diagnostic("go_generator_forbidden", "package %q contains an active generator directive", item.ImportPath)
 			}
 		}
 	}
