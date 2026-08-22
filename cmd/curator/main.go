@@ -3,6 +3,7 @@ package main
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/term"
 
 	"bufio"
 	"context"
@@ -71,7 +72,7 @@ Commands:
   gc                       remove unreferenced runtime entries
   shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
   ui                       terminal view over installed state
-  config show              print the effective configuration
+  config <subcommand>      show | build-ssh (see config build-ssh -h)
   --version                print the curator version
 `
 
@@ -133,9 +134,7 @@ func run(args []string) int {
 	case "ui":
 		return cmdUI()
 	case "config":
-		if len(args) >= 2 && args[1] == "show" {
-			return cmdConfigShow()
-		}
+		return cmdConfig(args[1:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return exitOK
@@ -481,6 +480,13 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
 	verbose := flags.Bool("verbose", false, "print detailed progress")
 	var auditMode auditModeValue
 	flags.Var(&auditMode, "audit", "run the audit gate in advisory or strict mode")
+	sshIdentity := flags.String("build-ssh-identity", "",
+		"identity file for external SSH build repositories (or "+install.EnvBuildSSHIdentity+")")
+	sshAgent := flags.String("build-ssh-agent", "",
+		"agent socket for external SSH build repositories, or \""+install.BuildSSHAgentAuto+
+			"\" for your own agent (or "+install.EnvBuildSSHAgent+")")
+	sshKnownHosts := flags.String("build-ssh-known-hosts", "",
+		"host keys external SSH build repositories are verified against (or "+install.EnvBuildSSHKnownHosts+")")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil {
 		return install.Options{}, nil, false, "", err
@@ -488,6 +494,9 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
 	return install.Options{
 		DryRun: *dryRun, FixGitignore: *fixGitignore,
 		StrictTags: *strictTags, Verbose: *verbose,
+		BuildSSH: install.BuildSSHFlags{
+			Identity: *sshIdentity, Agent: *sshAgent, KnownHosts: *sshKnownHosts,
+		},
 	}, positional, *all, auditMode.value, nil
 }
 
@@ -520,6 +529,8 @@ func cmdInstallMode(args []string, fetch bool) int {
 	opts.Fetch = fetch && !opts.DryRun
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
+	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
+	opts.External.BuildSSH.Resolve = operatorBuildSSHResolver(cfg, opts.DryRun)
 	exitCode := exitOK
 	for _, target := range targets {
 		result := install.Project(cfg, target.Root, target.Alias, opts)
@@ -1279,6 +1290,8 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	opts.Fetch = fetch && !opts.DryRun
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
+	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
+	opts.External.BuildSSH.Resolve = operatorBuildSSHResolver(cfg, opts.DryRun)
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
@@ -1295,12 +1308,45 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	return exitOK
 }
 
+// operatorBuildSSHResolver supplies the interactive credential prompt when
+// this process actually has an operator in front of it.
+//
+// A dry run never returns one: it reports what a run would do, and persisting
+// a credential the operator was asked for mid-report would make the read-only
+// surface write. A non-interactive run never returns one either, which is the
+// fail-closed path: the precheck then names every uncovered repository and the
+// exact commands that would cover it.
+func operatorBuildSSHResolver(cfg *config.Config, dryRun bool) install.BuildSSHResolver {
+	if dryRun || !attachedToTerminal(os.Stdin) || !attachedToTerminal(os.Stderr) {
+		return nil
+	}
+	// The prompt speaks on stderr so a caller redirecting stdout still sees
+	// the questions it is being asked.
+	return install.InteractiveBuildSSHResolver(os.Stdin, os.Stderr,
+		func(credential config.BuildSSHCredential) error {
+			_, err := config.SetBuildSSH(cfg.Path, credential)
+			return err
+		})
+}
+
+// attachedToTerminal reports whether one standard stream is a real terminal.
+//
+// The character-device test alone is not enough: `< /dev/null` is a character
+// device, and treating it as a terminal would make a scripted run block on a
+// prompt nobody can answer instead of failing closed.
+func attachedToTerminal(file *os.File) bool {
+	return term.IsTerminal(file.Fd())
+}
+
 // productionExternalDeps binds schema-7 repository work to manager/operator
 // state. Discovery happens before package data is consulted; an unavailable
 // tool remains a zero-value fail-closed dependency and affects only closures
 // that actually activate go-repository-v1.
 func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDeps {
 	deps := install.ExternalDeps{GitTool: productionGitTool()}
+	// Read-only surfaces get the environment and configured scopes; a command
+	// that also parses --build-ssh-* flags overrides this with them.
+	deps.BuildSSH = install.CaptureBuildSSHSelection(cfg, install.BuildSSHFlags{}, os.Getenv)
 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
 		candidate := audit.Subject{
 			Name: subject.Declared.Repository, Source: subject.Declared.Identity,
@@ -1709,6 +1755,229 @@ func cmdShellInit(args []string) int {
 	}
 	fmt.Print(hook)
 	return exitOK
+}
+
+const configUsage = `curator config: inspect and edit the machine configuration
+
+Usage:
+  curator config show                  print the effective configuration
+  curator config build-ssh <subcommand>
+                                       operator SSH credentials for external
+                                       build repositories (add | list | remove)
+`
+
+const buildSSHUsage = `curator config build-ssh: operator SSH credentials for external build repositories
+
+Usage:
+  curator config build-ssh add <scope> [--agent [SOCKET]] [--identity PATH] [--known-hosts PATH]
+  curator config build-ssh list
+  curator config build-ssh remove <scope>
+
+A scope is a lowercase host optionally followed by '/'-separated path segments.
+It is matched against the canonical host/path identity of a build repository on
+whole-segment boundaries, and the longest matching scope wins: scope
+'git.example.com/portals' covers 'git.example.com/portals/app' and never
+'git.example.com/portals-other'.
+
+An entry names an agent, an identity file, or both:
+  --agent                  the agent socket the operator's environment provides
+  --agent SOCKET           a named agent socket
+  --identity PATH          an identity file offered to the destination
+  --agent --identity PATH  an agent pinned to that one identity
+  --known-hosts PATH       a known-hosts file for this scope
+Every path must be absolute or start with '~/'.
+
+add replaces whatever was recorded under the same scope; remove reports a scope
+that is not configured as an error; list prints one line per scope, sorted.
+
+Precedence: command-line flags override CURATOR_BUILD_SSH_* environment values,
+which override the scopes configured here. Credentials are operator-owned: no
+manifest, descriptor, repository, substitution, or marker can select them.
+
+An install that reaches an SSH build repository nothing covers stops before it
+fetches anything. With a terminal attached it lists the agent and ~/.ssh/*.pub
+files found on this host and asks which to record and under which scope; with
+no terminal, and on a dry run, it prints those same candidates as ready-to-run
+add commands and fails with build_repository_ssh_credential_missing.
+`
+
+func cmdConfig(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprint(os.Stderr, configUsage)
+		return exitUsage
+	}
+	switch args[0] {
+	case "show":
+		return cmdConfigShow()
+	case "build-ssh":
+		return cmdConfigBuildSSH(args[1:])
+	case "-h", "--help", "help":
+		fmt.Print(configUsage)
+		return exitOK
+	}
+	fmt.Fprintf(os.Stderr, "curator: unknown config subcommand %q\n\n%s", args[0], configUsage)
+	return exitUsage
+}
+
+// buildSSHAgentValue is the --agent selector. Bare, it selects the agent
+// socket the operator's environment provides; with a value it names one
+// socket. Only the affirmative spelling exists, matching the config grammar,
+// where "agent": false would be a second way to write an identity-only entry.
+type buildSSHAgentValue struct {
+	selected bool
+	socket   string
+}
+
+func (value *buildSSHAgentValue) String() string {
+	if value.socket != "" {
+		return value.socket
+	}
+	if value.selected {
+		return "true"
+	}
+	return ""
+}
+
+func (value *buildSSHAgentValue) Set(raw string) error {
+	switch raw {
+	case "true":
+		value.selected = true
+		return nil
+	case "false":
+		return fmt.Errorf("--agent %s", config.BuildSSHAgentRule)
+	}
+	if !config.ValidBuildSSHPath(raw) {
+		return fmt.Errorf("agent socket %s", config.BuildSSHPathRule)
+	}
+	value.selected, value.socket = true, raw
+	return nil
+}
+
+func (*buildSSHAgentValue) IsBoolFlag() bool { return true }
+
+// AcceptsOptionalValue claims the next token only when it reads as a socket
+// path, so `--agent <scope>` keeps the scope positional.
+func (*buildSSHAgentValue) AcceptsOptionalValue(raw string) bool {
+	return config.ValidBuildSSHPath(raw)
+}
+
+func cmdConfigBuildSSH(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprint(os.Stderr, buildSSHUsage)
+		return exitUsage
+	}
+	switch args[0] {
+	case "add":
+		return cmdConfigBuildSSHAdd(args[1:])
+	case "list":
+		return cmdConfigBuildSSHList()
+	case "remove":
+		return cmdConfigBuildSSHRemove(args[1:])
+	case "-h", "--help", "help":
+		fmt.Print(buildSSHUsage)
+		return exitOK
+	}
+	fmt.Fprintf(os.Stderr, "curator: unknown config build-ssh subcommand %q\n\n%s", args[0], buildSSHUsage)
+	return exitUsage
+}
+
+func cmdConfigBuildSSHAdd(args []string) int {
+	flags := flag.NewFlagSet("config build-ssh add", flag.ContinueOnError)
+	agent := &buildSSHAgentValue{}
+	flags.Var(agent, "agent", "select an SSH agent, optionally by socket path")
+	identity := flags.String("identity", "", "identity file offered to the destination")
+	knownHosts := flags.String("known-hosts", "", "known-hosts file for this scope")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
+		return exitUsage
+	}
+	if len(positional) != 1 {
+		fmt.Fprintln(os.Stderr, "curator: config build-ssh add requires exactly one <scope>")
+		return exitUsage
+	}
+	credential := config.BuildSSHCredential{
+		Scope:       positional[0],
+		Agent:       agent.selected,
+		AgentSocket: agent.socket,
+		Identity:    *identity,
+		KnownHosts:  *knownHosts,
+	}
+	// Checked before the config is read, so a malformed invocation is a usage
+	// error rather than a failure attributed to the config file.
+	if err := config.ValidateBuildSSH(credential); err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitUsage
+	}
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	replaced, err := config.SetBuildSSH(cfg.Path, credential)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	verb := "added"
+	if replaced {
+		verb = "replaced"
+	}
+	fmt.Printf("%s build_ssh scope %s: %s\n", verb, credential.Scope, formatBuildSSH(credential))
+	return exitOK
+}
+
+func cmdConfigBuildSSHList() int {
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	scopes := cfg.BuildSSHScopes()
+	if len(scopes) == 0 {
+		// On stderr, so a caller parsing the listing sees an empty stdout
+		// rather than a line that names no scope.
+		fmt.Fprintln(os.Stderr, "curator: no build_ssh scopes are configured")
+		return exitOK
+	}
+	for _, scope := range scopes {
+		fmt.Printf("%s\t%s\n", scope, formatBuildSSH(cfg.BuildSSH[scope]))
+	}
+	return exitOK
+}
+
+func cmdConfigBuildSSHRemove(args []string) int {
+	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
+		fmt.Fprintln(os.Stderr, "curator: config build-ssh remove requires exactly one <scope>")
+		return exitUsage
+	}
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	if err := config.RemoveBuildSSH(cfg.Path, args[0]); err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	fmt.Printf("removed build_ssh scope %s\n", args[0])
+	return exitOK
+}
+
+// formatBuildSSH renders one credential in the operator's own spelling, so a
+// listed line names the paths the config file carries rather than resolved
+// ones.
+func formatBuildSSH(credential config.BuildSSHCredential) string {
+	var parts []string
+	switch {
+	case credential.AgentSocket != "":
+		parts = append(parts, "agent="+credential.AgentSocket)
+	case credential.Agent:
+		parts = append(parts, "agent")
+	}
+	if credential.Identity != "" {
+		parts = append(parts, "identity="+credential.Identity)
+	}
+	if credential.KnownHosts != "" {
+		parts = append(parts, "known_hosts="+credential.KnownHosts)
+	}
+	return strings.Join(parts, " ")
 }
 
 func cmdConfigShow() int {

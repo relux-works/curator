@@ -95,6 +95,11 @@ type GitTool struct {
 	AllowedVersions []string
 	AskPass         string
 	SSHWrapper      string
+	// SSHCredentials is the operator selection for the one repository this
+	// tool is about to reach. It is bound per repository rather than per run
+	// so a closure that spans two hosts cannot offer either host the other's
+	// key (Spec §12.2).
+	SSHCredentials OperatorSSHCredentials
 }
 
 // SSHPolicy contains the manager-owned inputs for the fixed SSH wrapper.
@@ -252,6 +257,13 @@ func AcquireNetwork(ctx context.Context, request NetworkRequest) (*Snapshot, err
 	}
 	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
 		return nil, admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
+	}
+	// The admission boundary refuses an unselected SSH repository even when a
+	// caller forgot to resolve credentials, so no fetch can quietly fall back
+	// to whatever the operator's ambient SSH state happens to offer.
+	if request.Source.Transport == "ssh" && !request.Tool.SSHCredentials.Selected() {
+		return nil, admissionError(CodeSSHCredentialMissing,
+			"SSH build repositories require an operator identity or agent")
 	}
 	if _, err := ParseLockedCommit(map[string]any{"object_format": request.Lock.ObjectFormat, "hex": request.Lock.Hex}, "lock"); err != nil {
 		return nil, admissionError(CodeIdentityInvalid, "invalid immutable lock")
