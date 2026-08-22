@@ -28,7 +28,16 @@ type rawWorker struct {
 // controls rather than an unconstrained process.
 func startRawWorker(t *testing.T, identity ExecutableIdentity, limits ResourceLimits, probes []ControlProbe) *rawWorker {
 	t.Helper()
-	command := exec.Command(identity.Path, WorkerMode) // #nosec G204 -- identity-verified re-execution of the test binary
+	return startRawWorkerFrom(t, identity.Path, limits, probes)
+}
+
+// startRawWorkerFrom launches the worker from launchPath, which is the physical
+// executable for every ordinary test and a package-manager link naming that
+// same installed file when a test reproduces an operator launch shape. The
+// worker resolves its own identity from whatever path it was started through.
+func startRawWorkerFrom(t *testing.T, launchPath string, limits ResourceLimits, probes []ControlProbe) *rawWorker {
+	t.Helper()
+	command := exec.Command(launchPath, WorkerMode) // #nosec G204 -- identity-verified re-execution of the test binary
 	command.Env = workerEnvironment()
 	command.SysProcAttr = workerSysProcAttr()
 	stdin, err := command.StdinPipe()
@@ -120,6 +129,10 @@ type workerScenario struct {
 	stage    string
 	limits   ResourceLimits
 	probes   []ControlProbe
+
+	// launchPath is the path the worker is started from. Empty means the
+	// physical executable, which is what the production parent uses.
+	launchPath string
 }
 
 func newWorkerScenario(t *testing.T) *workerScenario {
@@ -192,7 +205,11 @@ func newWorkerScenario(t *testing.T) *workerScenario {
 // start launches a worker inside the real control domain and sends the
 // (possibly mutated) request.
 func (scenario *workerScenario) start() *rawWorker {
-	worker := startRawWorker(scenario.fixture.t, scenario.identity, scenario.limits, scenario.probes)
+	launchPath := scenario.launchPath
+	if launchPath == "" {
+		launchPath = scenario.identity.Path
+	}
+	worker := startRawWorkerFrom(scenario.fixture.t, launchPath, scenario.limits, scenario.probes)
 	request := scenario.request
 	worker.send(workerMessage{Kind: kindRequest, Nonce: scenario.nonce, Request: &request})
 	return worker
