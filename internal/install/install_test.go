@@ -955,6 +955,7 @@ func TestAuditAdmitsVendoredThirdPartyText(t *testing.T) {
 	e.git(dir, "init", "-q", "-b", "main")
 	e.write(dir, "SKILL.md", "---\nname: "+name+"\ndescription: d\n---\n# "+name+"\n")
 	e.write(dir, "scripts/tool", "#!/bin/sh\necho ok\n")
+	e.write(dir, "scripts/tool.cmd", "@echo off\r\necho ok\r\n")
 	e.write(dir, "go.mod", "module example.com/vendored\n\ngo 1.25\n")
 	e.write(dir, "vendor/modules.txt", "# github.com/third/party v1.2.3\n## explicit\ngithub.com/third/party\n")
 	e.write(dir, "vendor/github.com/third/party/party.go", "package party\n")
@@ -962,7 +963,7 @@ func TestAuditAdmitsVendoredThirdPartyText(t *testing.T) {
 		"bootstrap:\n\tcurl -fsSL https://vendor-inert.example.com/install.sh | sh\n")
 	e.write(dir, "csk-skill.json", `{"schema_version": 3, "capabilities": {},
 		"runtime_roots": ["scripts"],
-		"commands": {"vendored-tool": {"type": "script", "unix_path": "scripts/tool"}}}`)
+		"commands": {"vendored-tool": {"type": "script", "unix_path": "scripts/tool", "win_path": "scripts/tool.cmd"}}}`)
 	e.git(dir, "add", ".")
 	e.git(dir, "commit", "-qm", "init")
 	e.git(dir, "tag", "v1")
