@@ -21,6 +21,12 @@ func TestValidateMissingSkillAndInvalidManifest(t *testing.T) {
 	if !HasErrors(issues) || !strings.Contains(Format(issues[0]), "SKILL.md") {
 		t.Fatalf("error helpers rejected issues: %+v", issues)
 	}
+	// Closure provenance (skill name, resolved ref, requirement chain) is
+	// added at the closure call site, not inside skillspec.Load, so a
+	// standalone check keeps reporting the bare validation message.
+	if issues[1].Path != "csk-skill.json" || strings.Contains(issues[1].Message, "invalid skill manifest for") {
+		t.Fatalf("standalone manifest issue = %+v", issues[1])
+	}
 }
 
 func TestValidateLocaleWarning(t *testing.T) {

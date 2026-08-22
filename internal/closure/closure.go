@@ -309,7 +309,8 @@ func resolveNode(opts Options, item pending, substitutions map[string]devsub.Sub
 	}
 	spec, err := skillspec.Load(snap)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", item.name, err)
+		return nil, fmt.Errorf("invalid skill manifest for %s %s %s -> %s (via %s): %w",
+			item.name, resolved.Kind, resolved.Ref, short(resolved.Commit), item.chain, err)
 	}
 
 	id := ""

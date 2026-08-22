@@ -885,3 +885,53 @@ func TestAuditGateBlocksUndeclaredNetwork(t *testing.T) {
 		t.Fatalf("advisory must warn and pass: %+v", result)
 	}
 }
+
+// TestBrokenTransitiveManifestNamesTheBrokenSkill covers the install planning
+// path: the closure fails on the required skill's manifest, and the reported
+// error must point at that skill's name, resolved ref and requirement chain
+// rather than at the skill the project declared.
+func TestBrokenTransitiveManifestNamesTheBrokenSkill(t *testing.T) {
+	e := newEnv(t)
+	broken := filepath.Join(e.skillsRoot, "skill-leaf")
+	if err := os.MkdirAll(broken, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.git(broken, "init", "-q", "-b", "main")
+	e.write(broken, "SKILL.md", "---\nname: skill-leaf\ndescription: d\n---\n# skill-leaf\n")
+	e.write(broken, "csk-skill.json", `{"schema_version": 4, "capabilities": {}, "commands": "not-an-object"}`)
+	e.git(broken, "add", ".")
+	e.git(broken, "commit", "-qm", "init")
+	e.git(broken, "tag", "v1")
+
+	mid := filepath.Join(e.skillsRoot, "skill-mid")
+	if err := os.MkdirAll(mid, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.git(mid, "init", "-q", "-b", "main")
+	e.write(mid, "SKILL.md", "---\nname: skill-mid\ndescription: d\n---\n# skill-mid\n")
+	e.write(mid, "csk-skill.json", `{"schema_version": 4, "capabilities": {}, "commands": {}, "dependencies": {"skills": {
+		"skill-leaf": {"git": "./skill-leaf", "ref": {"kind": "tag", "value": "v1"}, "mode": "full"}}}}`)
+	e.git(mid, "add", ".")
+	e.git(mid, "commit", "-qm", "init")
+	e.git(mid, "tag", "v1")
+
+	e.declare("skill-mid")
+	result := e.install(Options{})
+	if result.Status != "failed" {
+		t.Fatalf("status = %s, want failed: %+v", result.Status, result)
+	}
+	joined := strings.Join(result.Errors, "\n")
+	for _, want := range []string{
+		"invalid skill manifest for skill-leaf",
+		"tag v1",
+		"(via " + closure.ProjectEdge + " -> skill-mid -> skill-leaf)",
+		"commands: must be an object",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("install error must contain %q:\n%s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "manifest for skill-mid") {
+		t.Fatalf("install error must not blame the declared skill:\n%s", joined)
+	}
+}
