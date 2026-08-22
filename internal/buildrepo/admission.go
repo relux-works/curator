@@ -148,8 +148,21 @@ func ExactSSHCommand(policy SSHPolicy, argv []string) ([]string, error) {
 			return nil, admissionError(CodeIdentityInvalid, "SSH agent path is not absolute")
 		}
 		result = append(result, "-o", "IdentitiesOnly=no", "-o", "IdentityFile=none", "-o", "IdentityAgent="+policy.AgentSocket)
+	case policy.Identity != "" && policy.AgentSocket != "":
+		// The pinned-agent form: the operator agent holds the private key and
+		// the named identity (conventionally the public half) pins which
+		// single key the agent offers. One authentication attempt, one
+		// disclosed public key, and passphrase-protected keys authenticate
+		// without a prompt.
+		if !filepath.IsAbs(policy.Identity) {
+			return nil, admissionError(CodeIdentityInvalid, "SSH identity path is not absolute")
+		}
+		if !filepath.IsAbs(policy.AgentSocket) {
+			return nil, admissionError(CodeIdentityInvalid, "SSH agent path is not absolute")
+		}
+		result = append(result, "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent="+policy.AgentSocket, "-i", policy.Identity)
 	default:
-		return nil, admissionError(CodeIdentityInvalid, "SSH authentication policy must select exactly one mode")
+		return nil, admissionError(CodeIdentityInvalid, "SSH authentication policy must select an identity, an agent, or both")
 	}
 	return append(result, policy.ExpectedHost, expectedCommand), nil
 }
