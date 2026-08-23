@@ -157,6 +157,31 @@ func TestPrepareScriptRuntimeRejectsInvalidTypedInputs(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeTreeUsesDeclaredPlatformExecutableSemantics(t *testing.T) {
+	windowsRoot := t.TempDir()
+	lay(t, windowsRoot, map[string]string{"bin/tool.cmd": "@echo off\r\n"})
+	windowsCommand := skillspec.Command{Name: "tool", Type: "script", WinPath: "tool.cmd"}
+	if err := validateRuntimeTree(windowsRoot, nil, []skillspec.Command{windowsCommand}, "windows"); err != nil {
+		t.Fatalf("regular Windows command rejected without a POSIX execute bit: %v", err)
+	}
+
+	if runtime.GOOS == "windows" {
+		return
+	}
+	unixRoot := t.TempDir()
+	lay(t, unixRoot, map[string]string{"bin/tool": "#!/bin/sh\n"})
+	unixCommand := skillspec.Command{Name: "tool", Type: "script", UnixPath: "tool"}
+	if err := validateRuntimeTree(unixRoot, nil, []skillspec.Command{unixCommand}, "unix"); err == nil {
+		t.Fatal("Unix command without an execute bit was accepted")
+	}
+	if err := os.Chmod(filepath.Join(unixRoot, "bin", "tool"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateRuntimeTree(unixRoot, nil, []skillspec.Command{unixCommand}, "unix"); err != nil {
+		t.Fatalf("executable Unix command rejected: %v", err)
+	}
+}
+
 func TestShimTransitionMatrixIsDeterministicAndManagerScoped(t *testing.T) {
 	root := t.TempDir()
 	// The compiled artifact and the shims must describe the same platform, and
