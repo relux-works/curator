@@ -2,7 +2,9 @@ package skillspec
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -88,15 +90,21 @@ func ManifestSourcePath(snapshot string) string {
 	return ""
 }
 
+// pathExists reports whether a manifest entry exists at path. Only a genuine
+// "does not exist" is absence: an entry that exists but cannot be inspected --
+// an unreadable directory, a component that is not a directory -- is reported
+// as an error, because degrading it to absence would silently hand a snapshot
+// the legacy fallback spec or an empty one (Spec §4). Lstat, not Stat, so a
+// manifest symlink counts as present even when its target is gone; the parse
+// that follows is then what fails, loudly, naming the file.
 func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
+	if _, err := os.Lstat(path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, fmt.Errorf("cannot determine whether %s exists: %w", path, err)
 	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
+	return true, nil
 }
 
 func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, error) {
