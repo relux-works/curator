@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // toolchainCase is one authoritative toolchain identity vector.
@@ -309,9 +310,8 @@ func TestToolchainIdentityVectors(t *testing.T) {
 			case "invalid-unicode-toolchain-path":
 				root := t.TempDir()
 				writeTestFile(t, filepath.Join(root, "bin", "go"), []byte("GO"), 0o755)
-				name := filepath.Join(root, "bin", string(decodeBase64(t, testCase.Input.PathBytesBase64)))
-				if err := os.WriteFile(name, []byte("x"), 0o600); err != nil { // #nosec G306 -- deliberate invalid-UTF-8 probe
-					t.Skipf("this host cannot create a non-UTF-8 filename: %v", err)
+				if !writeInvalidUnicodeMember(t, filepath.Join(root, "bin"), decodeBase64(t, testCase.Input.PathBytesBase64)) {
+					t.Skip("this host cannot create a member whose name is not valid Unicode")
 				}
 				_, _, err := fingerprintToolchain(context.Background(), root, "go version go1.25.5 darwin/arm64")
 				requireDiagnostic(t, testCase, err)
@@ -352,6 +352,61 @@ func TestToolchainIdentityVectors(t *testing.T) {
 			}
 		})
 	}
+}
+
+// invalidUnicodeNames lists the byte spellings that can carry an invalid
+// Unicode scalar into a directory entry on this host, the vector's own bytes
+// first.
+//
+// A POSIX directory stores those bytes verbatim. Windows stores names as
+// UTF-16, and Go replaces the vector's ill-formed UTF-8 with U+FFFD on the way
+// in, which would launder the probe into a perfectly valid name; the reachable
+// spelling of an invalid scalar there is an unpaired surrogate, which Go's
+// WTF-8 encoding carries into and back out of the filesystem unchanged.
+func invalidUnicodeNames(vector []byte) [][]byte {
+	names := [][]byte{vector}
+	if runtime.GOOS == "windows" {
+		names = append(names, []byte{0xed, 0xa0, 0x80})
+	}
+	return names
+}
+
+// writeInvalidUnicodeMember creates one member of dir whose name the host
+// reads back as invalid Unicode. It reports false when no spelling survives,
+// which is a host capability limit and not a Curator result.
+func writeInvalidUnicodeMember(t *testing.T, dir string, vector []byte) bool {
+	t.Helper()
+	for _, raw := range invalidUnicodeNames(vector) {
+		path := filepath.Join(dir, string(raw))
+		if err := os.WriteFile(path, []byte("x"), 0o600); err != nil { // #nosec G306 -- deliberate invalid-UTF-8 probe
+			continue
+		}
+		if hasInvalidUnicodeMember(t, dir) {
+			return true
+		}
+		// The host laundered this spelling into valid Unicode, so it proves
+		// nothing about the guard. Remove it before trying the next one.
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return false
+}
+
+// hasInvalidUnicodeMember reports whether dir presents a member whose name is
+// not valid Unicode.
+func hasInvalidUnicodeMember(t *testing.T, dir string) bool {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !utf8.ValidString(entry.Name()) {
+			return true
+		}
+	}
+	return false
 }
 
 func requireDiagnostic(t *testing.T, testCase toolchainCase, err error) {
