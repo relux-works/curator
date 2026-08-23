@@ -840,14 +840,14 @@ func TestDryRunEffectBindingsSeeWhatARealOperationWrites(t *testing.T) {
 	baseline.declareEvery(t, e.project)
 	e.write(e.project, ".gitignore", dryRunGitignore)
 	if result := Project(e.cfg, e.project, "test",
-		Options{Platform: "unix", Fetch: true}); result.Status != "ok" {
+		Options{Platform: installPlatform(), Fetch: true}); result.Status != "ok" {
 		t.Fatalf("the real project install failed: %+v", result)
 	}
 	if _, err := GlobalInit(e.home); err != nil {
 		t.Fatal(err)
 	}
 	baseline.declareEvery(t, GlobalRoot(e.home))
-	if result := Global(e.cfg, t.TempDir(), Options{Platform: "unix", Fetch: true}); result.Status != "ok" {
+	if result := Global(e.cfg, t.TempDir(), Options{Platform: installPlatform(), Fetch: true}); result.Status != "ok" {
 		t.Fatalf("the real global install failed: %+v", result)
 	}
 	takeEveryLockClass(t, e.home, e.project)
