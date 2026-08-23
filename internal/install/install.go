@@ -953,7 +953,10 @@ func buildMarker(
 	if builds == nil {
 		builds = map[string]marker.Build{}
 	}
-	if node.Spec.SchemaVersion == 7 {
+	// Marker v3 and v4 record an explicit receipt schema version and an
+	// explicit execution policy for every local go-v1 build; marker v2 records
+	// neither. The band is the manifest schema, not one exact version.
+	if node.Spec.SchemaVersion >= 7 {
 		upgraded := make(map[string]marker.Build, len(builds))
 		for command, build := range builds {
 			if build.Driver == "go-v1" {

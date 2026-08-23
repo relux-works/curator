@@ -30,7 +30,8 @@
 internal/buildsource	vectors/build-drivers.json	TestBuildSourceConformanceVectors reads the vector directly
 internal/buildcache	vectors/build-drivers.json	TestCandidateCacheOutcomeVocabulary reads the vector directly
 internal/scopes	vectors/external-repository-lifecycle.json	TestAuthoritativeGarbageCollectionRootsAreRetained reads the vector directly
-internal/marker	schema-cases/install-marker-v2,expected/build-driver/marker.json	the marker v2 schema cases and the authoritative compiled marker
+internal/marker	schema-cases/install-marker-v2,schema-cases/install-marker-v4,expected/build-driver/marker.json	the marker v2 and v4 schema cases and the authoritative compiled marker
 internal/whitelist	fixtures/go-build-skill,expected/build-driver/context_files.json	the build-root context exclusion fixture and its expected file list
-internal/skillspec	schema-cases/agent-skill-v6,fixtures/go-build-skill	the schema v6 cases and the go-build skill fixture
+internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the vector directly
+internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v8,fixtures/go-build-skill	the schema v6 and v8 cases and the go-build skill fixture
 internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly

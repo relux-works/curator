@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/buildrepo"
 	"github.com/relux-works/curator/internal/capabilities"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/moduleroots"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/verr"
 )
@@ -182,6 +183,11 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 			return nil, nil, err
 		}
 	}
+	if schema >= 8 {
+		if err := validateModuleRoots(snapshot, buildRoots, runtimeRoots, commands); err != nil {
+			return nil, nil, err
+		}
+	}
 	if schema >= 7 {
 		if err := validateRepositoryCommands(buildRepositories, commands); err != nil {
 			return nil, nil, err
@@ -269,7 +275,12 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 		switch entry["type"] {
 		case "script":
 			if schema >= 2 {
-				if err := rejectUnknown(entry, map[string]bool{"type": true, "unix_path": true, "win_path": true}, label); err != nil {
+				allowed := map[string]bool{"type": true, "unix_path": true, "win_path": true}
+				if schema >= 8 {
+					allowed["execution_policy"] = true
+					allowed["interpreter"] = true
+				}
+				if err := rejectUnknown(entry, allowed, label); err != nil {
 					return err
 				}
 			}
@@ -294,7 +305,14 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 					}
 				}
 			}
-			commands[name] = Command{Name: name, Type: "script", UnixPath: unixPath, WinPath: winPath}
+			policy, interpreter, err := parseScriptExecution(entry, schema, label)
+			if err != nil {
+				return err
+			}
+			commands[name] = Command{
+				Name: name, Type: "script", UnixPath: unixPath, WinPath: winPath,
+				ExecutionPolicy: policy, Interpreter: interpreter,
+			}
 		case "system":
 			if schema >= 2 {
 				if err := rejectUnknown(entry, map[string]bool{"type": true, "command": true, "hint": true}, label); err != nil {
@@ -347,7 +365,7 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 			if driver != "go-v1" {
 				return verr.New(label+".driver", "must be 'go-v1' or 'go-repository-v1'")
 			}
-			if err := rejectUnknownBuildFields(entry, label); err != nil {
+			if err := rejectUnknownBuildFields(entry, schema, label); err != nil {
 				return err
 			}
 			rawSource, present := entry["source_dir"]
@@ -359,7 +377,11 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 			if err != nil {
 				return err
 			}
-			commands[name] = Command{Name: name, Type: "build", Driver: driver, SourceDir: sourceDir}
+			modules, err := parseModuleDeclaration(entry, schema, label)
+			if err != nil {
+				return err
+			}
+			commands[name] = Command{Name: name, Type: "build", Driver: driver, SourceDir: sourceDir, Modules: modules}
 		default:
 			return verr.New(label, "has unsupported type %v", entry["type"])
 		}
@@ -814,8 +836,11 @@ func overlappingRoots(roots []string) (string, string, bool) {
 	return "", "", false
 }
 
-func rejectUnknownBuildFields(entry map[string]any, label string) error {
+func rejectUnknownBuildFields(entry map[string]any, schema int, label string) error {
 	allowed := map[string]bool{"type": true, "driver": true, "source_dir": true}
+	if schema >= 8 {
+		allowed["modules"] = true
+	}
 	unknown := make([]string, 0)
 	for field := range entry {
 		if !allowed[field] {
@@ -827,6 +852,103 @@ func rejectUnknownBuildFields(entry map[string]any, label string) error {
 	}
 	sort.Strings(unknown)
 	return verr.New(label+"."+unknown[0], "field is not supported for build commands")
+}
+
+// parseScriptExecution reads the schema-8 script execution surface. The
+// absence of `execution_policy` is the default and the only spelling of
+// declared-only, so null, "none", and every other value is rejected: a
+// manifest cannot express declared-only twice. `dependentRequired` binds the
+// two fields in both directions -- a command declares both or neither.
+//
+// Schemas 2 through 7 never reach this function's checks: rejectUnknown has
+// already refused both field names for them. Schema 1 does reach it, and must
+// leave with nothing -- it keeps its deployed extension tolerance, so an
+// unknown command field there is ignored, never read as an enforcement claim.
+func parseScriptExecution(entry map[string]any, schema int, label string) (string, string, error) {
+	if schema < 8 {
+		return "", "", nil
+	}
+	rawPolicy, policyPresent := entry["execution_policy"]
+	rawInterpreter, interpreterPresent := entry["interpreter"]
+	if !policyPresent && !interpreterPresent {
+		return "", "", nil
+	}
+	if !policyPresent {
+		return "", "", verr.New(label+".interpreter", "requires 'execution_policy'")
+	}
+	if !interpreterPresent {
+		return "", "", verr.New(label+".execution_policy", "requires 'interpreter'")
+	}
+	policy, ok := rawPolicy.(string)
+	if !ok || policy != ScriptExecutionPolicy {
+		return "", "", verr.New(label+".execution_policy", "must be %q; omit the field for declared-only execution", ScriptExecutionPolicy)
+	}
+	interpreter, ok := rawInterpreter.(string)
+	if !ok || !ScriptInterpreters[interpreter] {
+		return "", "", verr.New(label+".interpreter", "must be one of %s", strings.Join(sortedKeys(ScriptInterpreters), ", "))
+	}
+	return policy, interpreter, nil
+}
+
+// parseModuleDeclaration reads the schema-8 `modules` list of a local go-v1
+// build command. An absent list is the default; an empty list is admitted and
+// means the same thing. Null is not a spelling of either.
+//
+// The schema guard is not reachable today -- rejectUnknownBuildFields already
+// refuses the field below schema 8, and build commands start at schema 6 --
+// but it keeps the band stated where the field is read.
+func parseModuleDeclaration(entry map[string]any, schema int, label string) ([]string, error) {
+	raw, present := entry["modules"]
+	if !present || schema < 8 {
+		return nil, nil
+	}
+	field := label + ".modules"
+	list, ok := raw.([]any)
+	if !ok {
+		return nil, verr.New(field, "must be a list of portable relative directory paths")
+	}
+	modules := make([]string, 0, len(list))
+	for index, item := range list {
+		text, ok := item.(string)
+		if !ok {
+			return nil, verr.New(fmt.Sprintf("%s[%d]", field, index), "must be a non-empty string")
+		}
+		modules = append(modules, text)
+	}
+	return modules, nil
+}
+
+// validateModuleRoots performs the declaration and containment half of
+// Spec §4.2.3 for every local go-v1 build command. It runs at parse time,
+// before the driver's fixed `go list`, which is where the failure boundary of
+// that section places it. Form and bijection validation belong to the driver,
+// after `go list` returns and before `go build`.
+func validateModuleRoots(snapshot string, buildRoots, runtimeRoots []string, commands map[string]Command) error {
+	names := make([]string, 0, len(commands))
+	for name := range commands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		command := commands[name]
+		if command.Driver != "go-v1" || len(command.Modules) == 0 {
+			continue
+		}
+		field := "commands." + name + ".modules"
+		if err := moduleroots.ValidateDeclaration(snapshot, field, command.Modules, buildRoots, runtimeRoots); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func sortedKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func validateBuildLayout(snapshot string, buildRoots []string, commands map[string]Command) error {
