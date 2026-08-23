@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/fsunicode"
 )
 
 const toolchainDomain = "curator-go-toolchain-v1\x00"
@@ -275,7 +277,7 @@ func claimEncodedPath(encoded map[string]struct{}, path string) error {
 }
 
 func validToolchainPath(path string) bool {
-	if path == "" || path == "." || !utf8.ValidString(path) || strings.ContainsRune(path, 0) {
+	if path == "" || path == "." || !fsunicode.Valid(path) || strings.ContainsRune(path, 0) {
 		return false
 	}
 	for _, component := range strings.Split(path, "/") {
