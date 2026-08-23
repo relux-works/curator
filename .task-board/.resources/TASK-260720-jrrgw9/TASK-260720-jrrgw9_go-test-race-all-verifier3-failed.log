@@ -1,0 +1,320 @@
+ok  	github.com/relux-works/curator/cmd/curator	557.779s
+ok  	github.com/relux-works/curator/internal/adapters	3.213s
+ok  	github.com/relux-works/curator/internal/audit	6.650s
+ok  	github.com/relux-works/curator/internal/buildcache	6.029s
+ok  	github.com/relux-works/curator/internal/buildmeta	4.293s
+ok  	github.com/relux-works/curator/internal/buildsource	4.649s
+ok  	github.com/relux-works/curator/internal/capabilities	1.757s
+ok  	github.com/relux-works/curator/internal/closure	8.818s
+ok  	github.com/relux-works/curator/internal/config	6.000s
+ok  	github.com/relux-works/curator/internal/devsub	3.882s
+ok  	github.com/relux-works/curator/internal/envfiles	7.000s
+ok  	github.com/relux-works/curator/internal/gitignore	5.486s
+ok  	github.com/relux-works/curator/internal/gitops	3.494s
+ok  	github.com/relux-works/curator/internal/globalbins	6.306s
+ok  	github.com/relux-works/curator/internal/godriver	76.752s
+ok  	github.com/relux-works/curator/internal/hashing	5.613s
+ok  	github.com/relux-works/curator/internal/identifiers	5.794s
+ok  	github.com/relux-works/curator/internal/identity	4.858s
+panic: test timed out after 10m0s
+	running tests:
+		TestStrictRegistryPolicyFailsUnknown (3s)
+
+goroutine 1161 [running]:
+testing.(*M).startAlarm.func1()
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2682 +0x490
+created by time.goFunc
+	/Users/iv/.goenv/versions/1.25.5/src/time/sleep.go:215 +0x44
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0xc000003dc0, {0x1053a6a36, 0x24}, 0x105594858)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x700
+testing.runTests.func1(0xc000003dc0)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2477 +0x78
+testing.tRunner(0xc000003dc0, 0xc00021fad8)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0x168
+testing.runTests(0xc00000e180, {0x105903ba0, 0x6b, 0x6b}, {0xf4e32fa8340d96e7?, 0x0?, 0x105908d60?})
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2475 +0x738
+testing.(*M).Run(0xc000232280)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2337 +0xaf8
+main.main()
+	_testmain.go:257 +0x104
+
+goroutine 1145 [IO wait]:
+internal/poll.runtime_pollWait(0x106d69600, 0x72)
+	/Users/iv/.goenv/versions/1.25.5/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0xc0003e43a0, 0x72, 0x0)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:84 +0xb8
+internal/poll.(*pollDesc).waitRead(...)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc0003e4380, {0xc000411000, 0x1000, 0x1000})
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:165 +0x2f8
+net.(*netFD).Read(0xc0003e4380, {0xc000411000, 0x1000, 0x1000})
+	/Users/iv/.goenv/versions/1.25.5/src/net/fd_posix.go:68 +0x48
+net.(*conn).Read(0xc0005bc270, {0xc000411000, 0x1000, 0x1000})
+	/Users/iv/.goenv/versions/1.25.5/src/net/net.go:196 +0x88
+net/http.(*persistConn).Read(0xc0003acb40, {0xc000411000, 0x1000, 0x1000})
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/transport.go:2125 +0xc0
+bufio.(*Reader).fill(0xc000495680)
+	/Users/iv/.goenv/versions/1.25.5/src/bufio/bufio.go:113 +0x210
+bufio.(*Reader).Peek(0xc000495680, 0x1)
+	/Users/iv/.goenv/versions/1.25.5/src/bufio/bufio.go:152 +0xac
+net/http.(*persistConn).readLoop(0xc0003acb40)
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/transport.go:2278 +0x228
+created by net/http.(*Transport).dialConn in goroutine 1143
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/transport.go:1947 +0x20a8
+
+goroutine 1146 [select]:
+net/http.(*persistConn).writeLoop(0xc0003acb40)
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/transport.go:2600 +0x114
+created by net/http.(*Transport).dialConn in goroutine 1143
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/transport.go:1948 +0x2110
+
+goroutine 1115 [runnable]:
+strings.FieldsFunc({0xc0003c7800, 0xb5}, 0x105595108)
+	/Users/iv/.goenv/versions/1.25.5/src/strings/strings.go:441 +0x33c
+github.com/relux-works/curator/internal/transaction.namespaceComponents({0xc0003c7800, 0xb5})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:221 +0x48
+github.com/relux-works/curator/internal/transaction.namespaceContains({0xc0003732c0, 0xb4}, {0xc0003c7800, 0xb5}, 0x1, 0x1)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:205 +0x64
+github.com/relux-works/curator/internal/transaction.namespacePathsOverlap({{0xc00017d878, 0x8}, {0xc00049ab28, 0x13}, {0xc0003694a0, 0xac}, {0xc0003732c0, 0xb4}, 0x0, 0x1, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:178 +0x88
+github.com/relux-works/curator/internal/transaction.validateIndependentTargetNamespaces({0xc0000ab508, 0x8, 0x1?}, {0x0, 0x0, 0x1053912c9?})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:104 +0x920
+github.com/relux-works/curator/internal/transaction.validateJournal(0xc0001762c0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:344 +0x3078
+github.com/relux-works/curator/internal/transaction.(*Engine).validateJournal(0xc000228540, 0xc0001762c0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:351 +0x34
+github.com/relux-works/curator/internal/transaction.(*Engine).saveJournal(0xc000228540, 0xc0001762c0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:72 +0x40
+github.com/relux-works/curator/internal/transaction.(*Engine).copyStagingFile(0xc000228540, 0xc0001762c0, 0x0, {{0xc0004fafa3, 0x12}, {0x10538f676, 0x4}, 0x1a4, {0xc000032f50, 0x47}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/staging.go:161 +0x68c
+github.com/relux-works/curator/internal/transaction.(*Engine).stageTarget(0xc000228540, 0xc0001762c0, 0x0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/staging.go:37 +0x2c8
+github.com/relux-works/curator/internal/transaction.(*Engine).Prepare(0xc000228540, {0x105599a20, 0xc0005bc280}, {{0xc0004845a0, 0x28}, {0xc000448af0, 0x63}, {0xc0000ecd88, 0x8, 0x8}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/engine.go:78 +0x4a0
+github.com/relux-works/curator/internal/install.runCommit({_, _}, {{0x10538f6c6, 0x4}, {0xc000448cb0, 0x63}, {0xc000448af0, 0x63}, {{0x10559ba28, 0xc00009d240}, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/commit.go:661 +0x1140
+github.com/relux-works/curator/internal/install.projectAttempt(_, {_, _}, {_, _}, {0x0, 0x0, 0x0, 0x0, 0x0, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:555 +0x5644
+github.com/relux-works/curator/internal/install.Project.func2()
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:159 +0x118
+github.com/relux-works/curator/internal/install.runWithRestarts({0x10538f6c6, 0x4}, {{0x10559b9d8, 0xc0001746d0}, {0x10559d998, 0xc000228540}, {0x10559d190, 0xc00028ce20}, _, {_, ...}, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:169 +0xe0
+github.com/relux-works/curator/internal/install.Project(_, {_, _}, {_, _}, {0x0, 0x0, 0x0, 0x0, 0x0, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:158 +0x4fc
+github.com/relux-works/curator/internal/install.(*env).install(_, {0x0, 0x0, 0x0, 0x0, 0x0, {0x10538f6b2, 0x4}, 0x0, {0x0, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install_test.go:121 +0xcc
+github.com/relux-works/curator/internal/install.TestStrictRegistryPolicyFailsUnknown(0xc000245500)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/registry_e2e_test.go:119 +0x28c
+testing.tRunner(0xc000245500, 0x105594858)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0x168
+created by testing.(*T).Run in goroutine 1
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x6e4
+
+goroutine 1119 [IO wait]:
+internal/poll.runtime_pollWait(0x106d69a00, 0x72)
+	/Users/iv/.goenv/versions/1.25.5/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0xc00033c6a0, 0x72, 0x0)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:84 +0xb8
+internal/poll.(*pollDesc).waitRead(...)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc00033c680, {0xc000498000, 0x1000, 0x1000})
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:165 +0x2f8
+net.(*netFD).Read(0xc00033c680, {0xc000498000, 0x1000, 0x1000})
+	/Users/iv/.goenv/versions/1.25.5/src/net/fd_posix.go:68 +0x48
+net.(*conn).Read(0xc0002827b8, {0xc000498000, 0x1000, 0x1000})
+	/Users/iv/.goenv/versions/1.25.5/src/net/net.go:196 +0x88
+net/http.(*connReader).Read(0xc000528780, {0xc000498000, 0x1000, 0x1000})
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/server.go:812 +0x208
+bufio.(*Reader).fill(0xc00054ecc0)
+	/Users/iv/.goenv/versions/1.25.5/src/bufio/bufio.go:113 +0x210
+bufio.(*Reader).Peek(0xc00054ecc0, 0x4)
+	/Users/iv/.goenv/versions/1.25.5/src/bufio/bufio.go:152 +0xac
+net/http.(*conn).serve(0xc0001c0900, {0x10559da40, 0xc0004ea3f0})
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/server.go:2145 +0xb60
+created by net/http.(*Server).Serve in goroutine 1132
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/server.go:3493 +0x5e0
+
+goroutine 1132 [IO wait]:
+internal/poll.runtime_pollWait(0x106d69c00, 0x72)
+	/Users/iv/.goenv/versions/1.25.5/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0xc0001ac420, 0x72, 0x0)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:84 +0xb8
+internal/poll.(*pollDesc).waitRead(...)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Accept(0xc0001ac400)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:613 +0x364
+net.(*netFD).accept(0xc0001ac400)
+	/Users/iv/.goenv/versions/1.25.5/src/net/fd_unix.go:161 +0x38
+net.(*TCPListener).accept(0xc000020a40)
+	/Users/iv/.goenv/versions/1.25.5/src/net/tcpsock_posix.go:159 +0x40
+net.(*TCPListener).Accept(0xc000020a40)
+	/Users/iv/.goenv/versions/1.25.5/src/net/tcpsock.go:380 +0x68
+net/http.(*Server).Serve(0xc0002a0400, {0x10559d490, 0xc000020a40})
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/server.go:3463 +0x404
+net/http/httptest.(*Server).goServe.func1()
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/httptest/server.go:311 +0x9c
+created by net/http/httptest.(*Server).goServe in goroutine 1115
+	/Users/iv/.goenv/versions/1.25.5/src/net/http/httptest/server.go:309 +0x98
+FAIL	github.com/relux-works/curator/internal/install	603.306s
+panic: test timed out after 10m0s
+	running tests:
+		TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder/global-auto (8m28s)
+		TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder/global-auto/80-removal (44s)
+		TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder/project-hybrid-auto (8m28s)
+		TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder/project-hybrid-auto/50-env-file (52s)
+
+goroutine 202 [running]:
+testing.(*M).startAlarm.func1()
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2682 +0x490
+created by time.goFunc
+	/Users/iv/.goenv/versions/1.25.5/src/time/sleep.go:215 +0x44
+
+goroutine 1 [chan receive, 8 minutes]:
+testing.(*T).Run(0xc000003880, {0x102fdf3c3, 0x3d}, 0x1031876c8)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x700
+testing.runTests.func1(0xc000003880)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2477 +0x78
+testing.tRunner(0xc000003880, 0xc00029fad8)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0x168
+testing.runTests(0xc00000e180, {0x1034b1da0, 0x8, 0x8}, {0x583ce2e7b8af25ca?, 0x0?, 0x1034ba680?})
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2475 +0x738
+testing.(*M).Run(0xc000278280)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2337 +0xaf8
+main.main()
+	_testmain.go:59 +0x104
+
+goroutine 140 [chan receive, 8 minutes]:
+testing.tRunner.func1()
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1891 +0x66c
+testing.tRunner(0xc00009b180, 0x1031876c8)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1940 +0x190
+created by testing.(*T).Run in goroutine 1
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x6e4
+
+goroutine 141 [chan receive]:
+testing.(*T).Run(0xc00009b340, {0x102fbe2ab, 0xb}, 0xc000034100)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x700
+github.com/relux-works/curator/internal/install/atomicity.TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder.func1(0xc00009b340)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/atomicity/commit_atomicity_test.go:164 +0x328
+testing.tRunner(0xc00009b340, 0xc0001a4000)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0x168
+created by testing.(*T).Run in goroutine 140
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x6e4
+
+goroutine 142 [chan receive]:
+testing.(*T).Run(0xc00009b6c0, {0x102fbda79, 0xa}, 0xc000034100)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x700
+github.com/relux-works/curator/internal/install/atomicity.TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder.func1(0xc00009b6c0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/atomicity/commit_atomicity_test.go:164 +0x328
+testing.tRunner(0xc00009b6c0, 0xc0001a4230)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0x168
+created by testing.(*T).Run in goroutine 140
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x6e4
+
+goroutine 290 [runnable]:
+strings.FieldsFunc({0xc00043f260, 0xd8}, 0x103187ed8)
+	/Users/iv/.goenv/versions/1.25.5/src/strings/strings.go:441 +0x33c
+github.com/relux-works/curator/internal/transaction.namespaceComponents({0xc00043f260, 0xd8})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:221 +0x48
+github.com/relux-works/curator/internal/transaction.namespaceContains({0xc0002ac8f0, 0xc6}, {0xc00043f260, 0xd8}, 0x1, 0x1)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:205 +0x64
+github.com/relux-works/curator/internal/transaction.namespacePathsOverlap({{0xc000688148, 0x8}, {0xc0001257a0, 0x15}, {0xc00069b110, 0xd0}, {0xc00043f260, 0xd8}, 0x0, 0x1, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:178 +0xa0
+github.com/relux-works/curator/internal/transaction.validateIndependentTargetNamespaces({0xc0001f7808, 0x13, 0xc000338a20?}, {0x0, 0x0, 0x102fbcde7?})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:104 +0x920
+github.com/relux-works/curator/internal/transaction.validateJournal(0xc0000bc0b0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:344 +0x3078
+github.com/relux-works/curator/internal/transaction.(*Engine).validateJournal(0xc000624420, 0xc0000bc0b0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:351 +0x34
+github.com/relux-works/curator/internal/transaction.(*Engine).saveJournal(0xc000624420, 0xc0000bc0b0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:72 +0x40
+github.com/relux-works/curator/internal/transaction.(*Engine).stageTarget(0xc000624420, 0xc0000bc0b0, 0x7)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/staging.go:26 +0x1e4
+github.com/relux-works/curator/internal/transaction.(*Engine).Prepare(0xc000624420, {0x10318bfa0, 0xc0004103a8}, {{0xc000338a20, 0x28}, {0xc000342cf0, 0x85}, {0xc000274608, 0x13, 0x25}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/engine.go:78 +0x4a0
+github.com/relux-works/curator/internal/install.runCommit({_, _}, {{0x102fbbbf3, 0x6}, {0xc0001cc240, 0x7e}, {0x0, 0x0}, {{0x10318e0f8, 0xc0003653e0}, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/commit.go:661 +0x1140
+github.com/relux-works/curator/internal/install.globalAttempt(_, {_, _}, {0x0, 0x0, 0x0, 0x0, 0x0, {0x102fbb3c0, 0x4}, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/global.go:307 +0x3908
+github.com/relux-works/curator/internal/install.Global.func2()
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/global.go:56 +0x118
+github.com/relux-works/curator/internal/install.runWithRestarts({0x102fbbbf3, 0x6}, {{0x10318e0d0, 0xc0001f4570}, {0x10318f970, 0xc000624420}, {0x10318f228, 0xc000364400}, _, {_, ...}, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:169 +0xe0
+github.com/relux-works/curator/internal/install.Global(_, {_, _}, {0x0, 0x0, 0x0, 0x0, 0x0, {0x102fbb3c0, 0x4}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/global.go:55 +0x64c
+github.com/relux-works/curator/internal/install/atomicity.(*env).installGlobal(_, {0x0, 0x0, 0x0, 0x0, 0x0, {0x102fbb3c0, 0x4}, 0x0, {0x0, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/atomicity/fixture_test.go:185 +0x134
+github.com/relux-works/curator/internal/install/atomicity.TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder.globalSweepScenario.func7(_, {0x0, 0x0, 0x0, 0x0, 0x0, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/atomicity/commit_atomicity_test.go:117 +0x68
+github.com/relux-works/curator/internal/install/atomicity.TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder.func1.1(0xc00056d880)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/atomicity/commit_atomicity_test.go:169 +0x294
+testing.tRunner(0xc00056d880, 0xc000034100)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0x168
+created by testing.(*T).Run in goroutine 142
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x6e4
+
+goroutine 261 [runnable]:
+strings.FieldsFunc({0xc0001f1ce0, 0xd5}, 0x103187ed8)
+	/Users/iv/.goenv/versions/1.25.5/src/strings/strings.go:441 +0x33c
+github.com/relux-works/curator/internal/transaction.namespaceComponents({0xc0001f1ce0, 0xd5})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:221 +0x48
+github.com/relux-works/curator/internal/transaction.namespaceContains({0xc00021edd0, 0xca}, {0xc0001f1ce0, 0xd5}, 0x1, 0x1)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:205 +0x64
+github.com/relux-works/curator/internal/transaction.namespacePathsOverlap({{0xc000449578, 0x8}, {0xc0004b1278, 0x13}, {0xc0004e5860, 0xcd}, {0xc0001f1ce0, 0xd5}, 0x0, 0x1, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:178 +0xa0
+github.com/relux-works/curator/internal/transaction.validateIndependentTargetNamespaces({0xc0001ad988, 0x14, 0x102f3f84c?}, {0xc0003e2888, 0x1, 0x1000000?})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:104 +0x920
+github.com/relux-works/curator/internal/transaction.(*Engine).validateJournal(0xc00007d2c0, 0xc0000c6000)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:354 +0xe8
+github.com/relux-works/curator/internal/transaction.(*Engine).saveJournal(0xc00007d2c0, 0xc0000c6000)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:72 +0x40
+github.com/relux-works/curator/internal/transaction.(*Engine).copyStagingFile(0xc00007d2c0, 0xc0000c6000, 0x3, {{0xc00040dd74, 0x14}, {0x102fbb36c, 0x4}, 0x1ed, {0xc00047dae0, 0x47}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/staging.go:161 +0x68c
+github.com/relux-works/curator/internal/transaction.(*Engine).stageTarget(0xc00007d2c0, 0xc0000c6000, 0x3)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/staging.go:37 +0x2c8
+github.com/relux-works/curator/internal/transaction.(*Engine).Prepare(0xc00007d2c0, {0x10318bfa0, 0xc000110280}, {{0xc000121410, 0x28}, {0xc0001b7a80, 0x7d}, {0xc000275908, 0x14, 0x25}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/engine.go:78 +0x4a0
+github.com/relux-works/curator/internal/install.runCommit({_, _}, {{0x102fbb3a0, 0x4}, {0xc00037e000, 0x7d}, {0xc0001b7a80, 0x7d}, {{0x10318e0f8, 0xc00007f400}, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/commit.go:661 +0x1140
+github.com/relux-works/curator/internal/install.projectAttempt(_, {_, _}, {_, _}, {0x0, 0x0, 0x0, 0x0, 0x0, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:555 +0x5644
+github.com/relux-works/curator/internal/install.Project.func2()
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:159 +0x118
+github.com/relux-works/curator/internal/install.runWithRestarts({0x102fbb3a0, 0x4}, {{0x10318e0d0, 0xc0001f4490}, {0x10318f970, 0xc00007d2c0}, {0x10318f228, 0xc0003643a0}, _, {_, ...}, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:169 +0xe0
+github.com/relux-works/curator/internal/install.Project(_, {_, _}, {_, _}, {0x0, 0x0, 0x0, 0x0, 0x0, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:158 +0x4fc
+github.com/relux-works/curator/internal/install/atomicity.(*env).install(_, {0x0, 0x0, 0x0, 0x0, 0x0, {0x102fbb3c0, 0x4}, 0x0, {0x0, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/atomicity/fixture_test.go:173 +0xcc
+github.com/relux-works/curator/internal/install/atomicity.TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder.projectSweepScenario.func4(_, {0x0, 0x0, 0x0, 0x0, 0x0, {0x0, 0x0}, 0x0, {0x0, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/atomicity/commit_atomicity_test.go:73 +0x68
+github.com/relux-works/curator/internal/install/atomicity.TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder.func1.1(0xc00056cc40)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/atomicity/commit_atomicity_test.go:169 +0x294
+testing.tRunner(0xc00056cc40, 0xc000034100)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0x168
+created by testing.(*T).Run in goroutine 141
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x6e4
+FAIL	github.com/relux-works/curator/internal/install/atomicity	603.701s
+ok  	github.com/relux-works/curator/internal/interop	5.259s
+ok  	github.com/relux-works/curator/internal/locale	5.036s
+ok  	github.com/relux-works/curator/internal/managerlock	15.542s
+ok  	github.com/relux-works/curator/internal/manifest	4.692s
+ok  	github.com/relux-works/curator/internal/marker	4.777s
+ok  	github.com/relux-works/curator/internal/mcp	4.940s
+ok  	github.com/relux-works/curator/internal/protocoljson	5.025s
+ok  	github.com/relux-works/curator/internal/registry	6.699s
+ok  	github.com/relux-works/curator/internal/runtimestore	18.244s
+ok  	github.com/relux-works/curator/internal/scopes	5.339s
+ok  	github.com/relux-works/curator/internal/shell	5.130s
+ok  	github.com/relux-works/curator/internal/skillcheck	4.646s
+ok  	github.com/relux-works/curator/internal/skillspec	4.352s
+ok  	github.com/relux-works/curator/internal/snapshot	5.602s
+ok  	github.com/relux-works/curator/internal/staging	4.015s
+ok  	github.com/relux-works/curator/internal/transaction	34.106s
+ok  	github.com/relux-works/curator/internal/ui	4.015s
+ok  	github.com/relux-works/curator/internal/verr	4.584s
+ok  	github.com/relux-works/curator/internal/version	3.081s
+ok  	github.com/relux-works/curator/internal/whitelist	3.200s
+FAIL

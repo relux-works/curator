@@ -1,0 +1,43 @@
+=== RUN   TestExecutableIdentityRejectsSubstitutionAndMutation
+    guards_test.go:218: identity = {Path:/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestExecutableIdentityRejectsSubstitutionAndMutation1000421018/001/manager SHA256:sha256:fcf54e1be5076ff591a64caba1928927c797c7b204a608e865edfe05013649e1 Size:13 info:0x140000a6b60}
+--- FAIL: TestExecutableIdentityRejectsSubstitutionAndMutation (0.00s)
+=== RUN   TestExecutableIdentityResolvesALauncherLink
+=== RUN   TestExecutableIdentityResolvesALauncherLink/shim_symlink_on_PATH
+    identity_test.go:96: a manager launched through this shape was refused: go-v1 build_execution_worker_identity_invalid: the manager executable is not a canonical regular file
+=== RUN   TestExecutableIdentityResolvesALauncherLink/chain_of_shim_symlinks
+    identity_test.go:96: a manager launched through this shape was refused: go-v1 build_execution_worker_identity_invalid: the manager executable is not a canonical regular file
+=== RUN   TestExecutableIdentityResolvesALauncherLink/symlinked_install_directory
+    identity_test.go:99: identity = {Path:/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestExecutableIdentityResolvesALauncherLinksymlinked_install_di2256655088/001/opt/curator SHA256:sha256:45f42a32205d4d539f90328580e3338da476aece875ff8633573f7f22e037aea Size:31 info:0x1400032e680}, want the installed file {Path:/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestExecutableIdentityResolvesALauncherLink3442473314/001/curator SHA256:sha256:45f42a32205d4d539f90328580e3338da476aece875ff8633573f7f22e037aea Size:31 info:0x1400032e000}
+=== RUN   TestExecutableIdentityResolvesALauncherLink/unclean_relative_spelling_of_the_link
+    identity_test.go:96: a manager launched through this shape was refused: go-v1 build_execution_worker_identity_invalid: the manager executable is not a canonical regular file
+--- FAIL: TestExecutableIdentityResolvesALauncherLink (0.00s)
+    --- FAIL: TestExecutableIdentityResolvesALauncherLink/shim_symlink_on_PATH (0.00s)
+    --- FAIL: TestExecutableIdentityResolvesALauncherLink/chain_of_shim_symlinks (0.00s)
+    --- FAIL: TestExecutableIdentityResolvesALauncherLink/symlinked_install_directory (0.00s)
+    --- FAIL: TestExecutableIdentityResolvesALauncherLink/unclean_relative_spelling_of_the_link (0.00s)
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/dangling_launcher_link
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_directory
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_an_empty_file
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_loop
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_hard-linked_file
+=== NAME  TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+    identity_test.go:194: go-v1 build_execution_worker_identity_invalid: the manager executable is not a canonical regular file
+--- FAIL: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink (0.01s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/dangling_launcher_link (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_directory (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_an_empty_file (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_loop (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_hard-linked_file (0.00s)
+=== RUN   TestExecutableIdentityResolvesARealSymlinkedProcessLaunch
+    identity_test.go:260: a manager started through "/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestExecutableIdentityResolvesARealSymlinkedProcessLaunch568935560/001/curator" refused its own identity: go-v1 build_execution_worker_identity_invalid: the manager executable is not a canonical regular file
+--- FAIL: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch (0.01s)
+=== RUN   TestBuildAcceptsAManagerStartedThroughALauncherLink
+    identity_test.go:301: a build by a manager started through a shim link was refused: go-v1 build_execution_worker_identity_invalid: the manager executable is not a canonical regular file
+--- FAIL: TestBuildAcceptsAManagerStartedThroughALauncherLink (0.76s)
+=== RUN   TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink
+    identity_test.go:326: a worker started through "/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink670139481/004/curator" sent "failure", want ready
+--- FAIL: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink (0.37s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	1.577s
+FAIL

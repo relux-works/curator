@@ -1,0 +1,7 @@
+# TASK-260720-1zl1cj review rework cycle 6
+
+Reworked only internal/managerlock/managerlock_test.go: the two portable missing-home tests now canonicalize independently constructed resolved-prefix expectations through the package platform canonicalization path. This preserves pre/post-creation identity stability and aliased-prefix subprocess contention while honoring intentional Windows case normalization.
+
+Native Windows 10.0.19045: complete verbose package test binary exited 0. Test binary SHA-256 cff6319218783241284f1ea237b4abdb052b5bd33b347297d1e2f10e204c896f matched before and after transfer. All available tests passed; the two mixed per-directory case-sensitivity tests skipped because the runner reports that feature unsupported. Remote task artifacts were removed and cleanup verified.
+
+Validation: go test -race -cover ./internal/managerlock -count=1 -v passed at 82.8%; go test -race ./... -count=1 passed; make check passed; go build ./... and go vet ./... passed; gofmt and git diff --check clean; Linux/Windows managerlock test and CLI compilation passed; no staged changes. golangci-lint is unavailable on this host. Candidate remains based on 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8 with the previously imported accepted product diff and task-owned managerlock package.

@@ -1,0 +1,46 @@
+{
+  "contract_version": "board-goal-v2",
+  "goal_id": "PRIMARY-GOAL-260731-v5a1is",
+  "revision": 2,
+  "expected_previous_revision": 1,
+  "previous_ref": {
+    "id": "PRIMARY-GOAL-260731-v5a1is",
+    "revision": 1
+  },
+  "owner": {
+    "kind": "parent",
+    "id": "primary"
+  },
+  "kind": "alignment",
+  "objective": "Complete CocoaSkills Go compiled-build parity with Curator: finish all remaining tracked delivery tasks and blocking CI bugs, obtain independent review, land every accepted Curator, curator-spec, and ivanopcode/cocoaskills PR to main, validate macOS/Windows/Linux CI, and prepare the release candidate without creating tags or GitHub Releases until the user's explicit release command. Use this Codex session only for orchestration; delegate implementation, testing, and review to tracked Codex specialists, using as many parallel runs as the dependency graph and review independence reasonably allow.",
+  "scope": {
+    "requested_ids": null,
+    "resolved_leaf_items": null
+  },
+  "mutation_authority": "agent_discretion",
+  "success_predicate": "alignment_handled",
+  "provider_condition": "The bound parent session has handled this exact alignment revision.",
+  "native_reflection": "required",
+  "state": "active",
+  "legacy_refs": [
+    {
+      "contract": "primary-goal-v1",
+      "id": "PRIMARY-GOAL-260731-v5a1is",
+      "revision": 2
+    }
+  ],
+  "role_policy": {},
+  "mutation": {
+    "kind": "alignment_realigned",
+    "reason": "User lifted the Opus-only constraint and directed autonomous continuation with Codex agents.",
+    "actor_context": {
+      "kind": "agent",
+      "actor_id": "iv"
+    },
+    "authority": "agent_discretion"
+  },
+  "created_at": "2026-07-31T08:38:23.862123Z",
+  "updated_at": "2026-07-31T21:54:25.023656Z",
+  "created_by": "iv",
+  "reason": "User lifted the Opus-only constraint and directed autonomous continuation with Codex agents."
+}

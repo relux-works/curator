@@ -1,0 +1,106 @@
+=== RUN   TestParseBuildSSH
+--- PASS: TestParseBuildSSH (0.00s)
+=== RUN   TestParseBuildSSHAbsentAndEmpty
+=== RUN   TestParseBuildSSHAbsentAndEmpty/absent
+=== RUN   TestParseBuildSSHAbsentAndEmpty/null
+=== RUN   TestParseBuildSSHAbsentAndEmpty/empty
+--- PASS: TestParseBuildSSHAbsentAndEmpty (0.00s)
+    --- PASS: TestParseBuildSSHAbsentAndEmpty/absent (0.00s)
+    --- PASS: TestParseBuildSSHAbsentAndEmpty/null (0.00s)
+    --- PASS: TestParseBuildSSHAbsentAndEmpty/empty (0.00s)
+=== RUN   TestBuildSSHSerializationRoundtrip
+--- PASS: TestBuildSSHSerializationRoundtrip (0.00s)
+=== RUN   TestBuildSSHObjectOmitsUnsetFields
+=== RUN   TestBuildSSHObjectOmitsUnsetFields/identity_only
+=== RUN   TestBuildSSHObjectOmitsUnsetFields/agent_only
+=== RUN   TestBuildSSHObjectOmitsUnsetFields/pinned_socket
+--- PASS: TestBuildSSHObjectOmitsUnsetFields (0.00s)
+    --- PASS: TestBuildSSHObjectOmitsUnsetFields/identity_only (0.00s)
+    --- PASS: TestBuildSSHObjectOmitsUnsetFields/agent_only (0.00s)
+    --- PASS: TestBuildSSHObjectOmitsUnsetFields/pinned_socket (0.00s)
+=== RUN   TestValidBuildSSHScope
+--- PASS: TestValidBuildSSHScope (0.00s)
+=== RUN   TestParseBuildSSHRejections
+=== RUN   TestParseBuildSSHRejections/not_an_object
+=== RUN   TestParseBuildSSHRejections/entry_not_an_object
+=== RUN   TestParseBuildSSHRejections/uppercase_host
+=== RUN   TestParseBuildSSHRejections/empty_segment
+=== RUN   TestParseBuildSSHRejections/trailing_slash
+=== RUN   TestParseBuildSSHRejections/dot_segment
+=== RUN   TestParseBuildSSHRejections/dotdot_segment
+=== RUN   TestParseBuildSSHRejections/scheme_in_scope
+=== RUN   TestParseBuildSSHRejections/port_in_scope
+=== RUN   TestParseBuildSSHRejections/empty_scope
+=== RUN   TestParseBuildSSHRejections/unknown_entry_field
+=== RUN   TestParseBuildSSHRejections/unknown_entry_fields_sorted
+=== RUN   TestParseBuildSSHRejections/no_selection
+=== RUN   TestParseBuildSSHRejections/empty_entry
+=== RUN   TestParseBuildSSHRejections/agent_false
+=== RUN   TestParseBuildSSHRejections/agent_false_with_identity
+=== RUN   TestParseBuildSSHRejections/agent_null
+=== RUN   TestParseBuildSSHRejections/agent_number
+=== RUN   TestParseBuildSSHRejections/agent_empty_socket
+=== RUN   TestParseBuildSSHRejections/agent_relative_socket
+=== RUN   TestParseBuildSSHRejections/identity_empty
+=== RUN   TestParseBuildSSHRejections/identity_null
+=== RUN   TestParseBuildSSHRejections/identity_relative
+=== RUN   TestParseBuildSSHRejections/identity_bare_tilde
+=== RUN   TestParseBuildSSHRejections/identity_padded
+=== RUN   TestParseBuildSSHRejections/identity_control_byte
+=== RUN   TestParseBuildSSHRejections/identity_number
+=== RUN   TestParseBuildSSHRejections/known_hosts_empty
+=== RUN   TestParseBuildSSHRejections/known_hosts_null
+=== RUN   TestParseBuildSSHRejections/known_hosts_relative
+=== RUN   TestParseBuildSSHRejections/known_hosts_control_byte
+=== RUN   TestParseBuildSSHRejections/known_hosts_number
+--- PASS: TestParseBuildSSHRejections (0.03s)
+    --- PASS: TestParseBuildSSHRejections/not_an_object (0.00s)
+    --- PASS: TestParseBuildSSHRejections/entry_not_an_object (0.00s)
+    --- PASS: TestParseBuildSSHRejections/uppercase_host (0.00s)
+    --- PASS: TestParseBuildSSHRejections/empty_segment (0.00s)
+    --- PASS: TestParseBuildSSHRejections/trailing_slash (0.00s)
+    --- PASS: TestParseBuildSSHRejections/dot_segment (0.00s)
+    --- PASS: TestParseBuildSSHRejections/dotdot_segment (0.00s)
+    --- PASS: TestParseBuildSSHRejections/scheme_in_scope (0.00s)
+    --- PASS: TestParseBuildSSHRejections/port_in_scope (0.00s)
+    --- PASS: TestParseBuildSSHRejections/empty_scope (0.00s)
+    --- PASS: TestParseBuildSSHRejections/unknown_entry_field (0.00s)
+    --- PASS: TestParseBuildSSHRejections/unknown_entry_fields_sorted (0.00s)
+    --- PASS: TestParseBuildSSHRejections/no_selection (0.00s)
+    --- PASS: TestParseBuildSSHRejections/empty_entry (0.00s)
+    --- PASS: TestParseBuildSSHRejections/agent_false (0.00s)
+    --- PASS: TestParseBuildSSHRejections/agent_false_with_identity (0.00s)
+    --- PASS: TestParseBuildSSHRejections/agent_null (0.00s)
+    --- PASS: TestParseBuildSSHRejections/agent_number (0.00s)
+    --- PASS: TestParseBuildSSHRejections/agent_empty_socket (0.00s)
+    --- PASS: TestParseBuildSSHRejections/agent_relative_socket (0.00s)
+    --- PASS: TestParseBuildSSHRejections/identity_empty (0.00s)
+    --- PASS: TestParseBuildSSHRejections/identity_null (0.00s)
+    --- PASS: TestParseBuildSSHRejections/identity_relative (0.00s)
+    --- PASS: TestParseBuildSSHRejections/identity_bare_tilde (0.00s)
+    --- PASS: TestParseBuildSSHRejections/identity_padded (0.00s)
+    --- PASS: TestParseBuildSSHRejections/identity_control_byte (0.00s)
+    --- PASS: TestParseBuildSSHRejections/identity_number (0.00s)
+    --- PASS: TestParseBuildSSHRejections/known_hosts_empty (0.00s)
+    --- PASS: TestParseBuildSSHRejections/known_hosts_null (0.00s)
+    --- PASS: TestParseBuildSSHRejections/known_hosts_relative (0.00s)
+    --- PASS: TestParseBuildSSHRejections/known_hosts_control_byte (0.00s)
+    --- PASS: TestParseBuildSSHRejections/known_hosts_number (0.00s)
+=== RUN   TestParseBuildSSHReportsOneFaultDeterministically
+--- PASS: TestParseBuildSSHReportsOneFaultDeterministically (0.00s)
+=== RUN   TestBuildSSHAcceptsWindowsPaths
+--- PASS: TestBuildSSHAcceptsWindowsPaths (0.00s)
+=== RUN   TestBuildSSHLongestPrefixMatch
+--- PASS: TestBuildSSHLongestPrefixMatch (0.00s)
+=== RUN   TestBuildSSHMatchCarriesCredential
+--- PASS: TestBuildSSHMatchCarriesCredential (0.00s)
+=== RUN   TestBuildSSHExpandedResolvesHome
+--- PASS: TestBuildSSHExpandedResolvesHome (0.00s)
+=== RUN   TestValidateBuildSSH
+--- PASS: TestValidateBuildSSH (0.00s)
+=== RUN   TestValidateBuildSSHAcceptsEveryParsedCredential
+--- PASS: TestValidateBuildSSHAcceptsEveryParsedCredential (0.00s)
+=== RUN   TestBuildSSHIsAManagerKey
+--- PASS: TestBuildSSHIsAManagerKey (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/config	0.395s

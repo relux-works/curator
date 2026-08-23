@@ -1,0 +1,286 @@
+TASK-260720-z2z795 MACOS MANAGER-HOME HANDOFF REWORK VALIDATION
+run: RUN-260730-19bc86
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+signed HEAD: a5ec015c0b5b51149c81a679ce259920a3523374
+accepted base: 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+
+SCOPE
+
+Current-run edits:
+  src/csk/locking.py
+  tests/test_locking.py
+
+Preserved accepted prior edit, unchanged by this run:
+  tests/test_transactions.py
+
+No current-run change:
+  src/csk/transactions.py
+
+EXPECTED-RED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_lock_timeout_includes_acquisition_preparation
+  tests/test_locking.py::test_darwin_canonical_identity_does_not_scan_parent_directories
+  tests/test_locking.py::test_concurrent_home_preparation_avoids_canonicalization_stampede
+exit: 1
+output:
+  3 failed in 2.57s
+rationale:
+  Expected red before product implementation. Slow preparation was outside the
+  timeout, and both Darwin tests reached the old directory-enumeration path.
+
+DARWIN API DIAGNOSTIC
+
+Initial F_GETPATH probe with a 4096-byte mutable fcntl argument:
+exit: 1
+output:
+  ValueError: fcntl string arg too long
+rationale:
+  Diagnostic failure established Python's 1024-byte mutable fcntl limit.
+
+Corrected 1024-byte probe:
+exit: 0
+output:
+  F_GETPATH returned stored `ManagerHome` casing for a lowercase alias and
+  stored NFC `café` for an NFD lookup alias.
+
+POST-IMPLEMENTATION TARGETED REGRESSIONS
+
+First targeted run:
+exit: 1
+output:
+  1 failed, 2 passed
+rationale:
+  Product behavior was correct; the new timeout test expected text not present
+  in the existing timeout message. The assertion and preparation-timeout
+  diagnostic were made precise.
+
+Final repaired-boundary command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_lock_timeout_includes_acquisition_preparation
+  tests/test_locking.py::test_darwin_canonical_identity_does_not_scan_parent_directories
+  tests/test_locking.py::test_concurrent_home_preparation_avoids_canonicalization_stampede
+  tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+exit: 0
+output:
+  4 passed in 0.95s
+
+ALIAS, FIRST-USE, ORDER, AND HANDOFF SELECTION
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  [new three tests plus case alias, Unicode alias, per-lock first-use
+  recanonicalization, canonical process order, release-window handoff, and
+  repeated concurrent home consumers]
+exit: 0
+output:
+  11 passed in 1.43s
+
+FRESH-PROCESS STRESS
+
+command:
+  set -e
+  for iteration in {1..20}; do
+    PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+    -p no:cacheprovider -q
+    tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+  done
+exit: 0
+output:
+  iterations 1 through 20 each reported `1 passed`;
+  individual elapsed times ranged from 0.38s to 0.81s.
+
+PRESCRIBED PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  exact 14-node selection recorded in the prior producer/reviewer ledgers
+exit: 0
+output:
+  14 passed in 1.05s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  exact ordering, recovery, reverse rollback, concurrency, stale-preimage,
+  generation, and lock-order selection recorded in the prior ledgers
+exit: 0
+output:
+  13 passed in 4.21s
+
+FOCUSED LOCKING AND TRANSACTION PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  132 passed, 4 skipped in 9.76s
+skip boundary:
+  Existing real-Windows durability and first-use cases remain platform-gated.
+
+PRESERVED WINDOWS PERMISSION-IDENTITY PROBE
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /opt/homebrew/bin/python3.11
+  -c 'patch transactions._permission_mode_identity to Windows S_IWRITE
+  identity and run the two repaired foreign-mode recovery regressions'
+exit: 0
+output:
+  2 passed in 0.31s
+
+STRICT MYPY 2.1
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output:
+  Success: no issues found in 62 source files
+
+STRICT MYPY 2.3
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output:
+  Success: no issues found in 62 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  All checks passed!
+
+RUFF FORMAT
+
+Initial check:
+exit: 1
+output:
+  one line in src/csk/locking.py would be reformatted
+rationale:
+  Real formatting failure; corrected mechanically and not claimed green.
+
+Final command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  4 files already formatted
+
+FULL PYTHON 3.14 PYTEST
+
+First full run:
+exit: 1
+output:
+  1 failed, 810 passed, 58 skipped in 77.96s
+failure:
+  test_concurrent_home_preparation_avoids_canonicalization_stampede
+rationale:
+  The initial test monkeypatch rejected every os.scandir call, including the
+  intentional stale-breaker inspection after the OS lock was serialized. A
+  traceback localized the harness error. The test was narrowed to reject only
+  pre-lock parent-component scans while allowing the serialized home-lock
+  directory check.
+
+Final command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output:
+  811 passed, 58 skipped in 90.28s
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m build
+  --outdir
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/current-run-RUN-260730-19bc86/build
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730.tar.gz
+  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730-py3-none-any.whl
+
+DIFF AND PROVENANCE
+
+git diff --check
+exit: 0
+
+git diff --cached --check
+exit: 0
+
+git diff --cached --quiet
+exit: 0
+meaning:
+  Nothing is staged.
+
+git merge-base --is-ancestor
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12 HEAD
+exit: 0
+
+git merge-base --is-ancestor origin/main HEAD
+exit: 1
+rationale:
+  Diagnostic non-green result. Local origin/main advanced independently to
+  138ab82a9a8cda8de3ca260a535c25c4f7dc054f after the preserved signed task
+  branch. The merge base is
+  495ad021847529ce5a544dba415ca2fe19949539. This run was explicitly required
+  to preserve current bytes and prohibited from rebase/stage/commit/push.
+
+git verify-commit HEAD
+exit: 0
+output:
+  Good "git" signature for oparin@me.com with ECDSA key
+  SHA256:V6JiKG7J29mjsvikcLoSVp0bLa77VTsFy12gnLO81cM
+
+git status --short --branch
+exit: 0
+output:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/locking.py
+   M tests/test_locking.py
+   M tests/test_transactions.py
+
+SOURCE SHA-256
+
+4a743347eefb084f1051dfbf5d1528eaf64c0e5188aaa9aafcf13461352433c9  src/csk/locking.py
+6f5712bf7d0cf8cafdabc7fe5811e918b20ed7c564eb27b23591880dcf5cb6b2  src/csk/transactions.py
+e354cafcee95ba3891638651ecbe3ef40d10a76a2c41170ffbc7020284c04d29  tests/test_locking.py
+ea56a97b97b3fddb34fc47099728c45f930117922fb709c454a64a16bc5ecb65  tests/test_transactions.py
+
+BUILD SHA-256
+
+27c5fcc598af4057d0d12b414231657c500f7c84aaef2bc67964948e8264ec4c  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730-py3-none-any.whl
+0498392beca11dbfe472a3ce26100d00fa7e4b0f4b78a228ad8e15ec0bcbfd5b  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730.tar.gz
+
+LOGBOOK
+
+command:
+  command -v logbook
+exit: 1
+output:
+  empty
+rationale:
+  No standalone logbook executable is installed. Findings and decisions are
+  persisted in this ledger, the outcome resource, and task notes.
+
+PLATFORM BOUNDARY
+
+No SSH, stage, commit, push, tag, release, or pin change occurred. Real Windows
+CI cannot execute unstaged bytes, so current-byte Windows matrix success is not
+claimed. Pure Windows routing and permission-identity coverage ran locally.

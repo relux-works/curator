@@ -1,0 +1,361 @@
+TASK-260720-z2z795 WINDOWS TEST REWORK VALIDATION
+run: RUN-260730-1faeaf
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+signed HEAD: a5ec015c0b5b51149c81a679ce259920a3523374
+
+DIRECTIVE
+
+Reuse the exact existing PR worktree at signed a5ec015, preserve
+src/csk/transactions.py behavior, and narrow the repair to the two
+platform-aware regression stimuli unless evidence proves a product defect.
+Run focused/full/mypy/Ruff/build and hand off without commit or push.
+
+INPUT WINDOWS CI EVIDENCE
+
+source:
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/ci-a5ec015/windows-failures.log
+commit:
+  a5ec015c0b5b51149c81a679ce259920a3523374
+result:
+  Windows Python 3.11, 3.12, 3.13, and 3.14 each failed exactly:
+    test_recovery_rejects_foreign_mode_during_staging_finalization
+    test_recovery_rejects_foreign_mode_during_read_only_cleanup
+  Representative Python 3.14 exit: 1
+  Representative Python 3.14 summary:
+    2 failed, 940 passed, 42 skipped in 261.12s
+root cause:
+  Both tests changed the currently write-ahead-active permission entry.
+  That entry legitimately permits both the pre-mutation and post-mutation
+  modes after a crash. Windows exposes only the settable read-only/writable
+  identity, so the original 0440/0751 stimuli did not represent a foreign
+  identity. The accepted engine behavior is correct.
+
+TOOL READINESS
+
+See:
+  TASK-260720-z2z795_windows-test-tool-readiness_RUN-260730-1faeaf.md
+
+INTERMEDIATE DIAGNOSTIC LEDGER
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+first-draft exit: 0
+first-draft output:
+  2 passed in 2.27s
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /opt/homebrew/bin/python3.11
+  -c 'import stat; import pytest; from csk import transactions;
+  transactions._permission_mode_identity = lambda mode: stat.S_IWRITE if
+  mode & stat.S_IWRITE else 0; raise SystemExit(pytest.main(["-p",
+  "no:cacheprovider", "-q",
+  "tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization",
+  "tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup"]))'
+first-draft exit: 1
+first-draft output:
+  1 failed, 1 passed in 1.31s
+rationale:
+  Real intermediate diagnostic failure. The cleanup draft changed a later
+  not-yet-active entry; recovery could durably mark that entry active before
+  validating it, so both Windows permission identities became valid.
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+second-draft exit: 0
+second-draft output:
+  2 passed in 1.32s
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /opt/homebrew/bin/python3.11
+  -c 'import stat; import pytest; from csk import transactions;
+  transactions._permission_mode_identity = lambda mode: stat.S_IWRITE if
+  mode & stat.S_IWRITE else 0; raise SystemExit(pytest.main(["-p",
+  "no:cacheprovider", "-q",
+  "tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization",
+  "tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup"]))'
+second-draft exit: 1
+second-draft output:
+  1 failed, 1 passed in 1.29s
+rationale:
+  Real intermediate diagnostic failure. The local POSIX branch selected 0640
+  for the cleanup stimulus; under the forced Windows identity that remained
+  writable and therefore did not cross the intended one-bit boundary.
+
+FINAL TARGETED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+exit: 0
+output:
+  2 passed in 1.35s
+
+DETERMINISTIC WINDOWS ONE-BIT PERMISSION IDENTITY PROBE
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /opt/homebrew/bin/python3.11
+  -c 'import stat; import pytest; from csk import transactions;
+  transactions._permission_mode_identity = lambda mode: stat.S_IWRITE if
+  mode & stat.S_IWRITE else 0; raise SystemExit(pytest.main(["-p",
+  "no:cacheprovider", "-q",
+  "tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization",
+  "tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup"]))'
+exit: 0
+output:
+  2 passed in 1.30s
+
+WINDOWS-SENSITIVE SELECTION — PYTHON 3.11
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_transactions.py::test_windows_staging_mode_identity_uses_only_the_settable_read_only_bit
+  tests/test_transactions.py::test_windows_cleanup_mode_identity_detects_read_only_attribute_changes
+  tests/test_transactions.py::test_read_only_targets_stage_commit_and_cleanup
+  tests/test_transactions.py::test_read_only_directory_rollback_restores_mode_and_cleans_sidecars
+  tests/test_transactions.py::test_recovery_discards_crash_during_read_only_mode_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_finishes_crash_during_read_only_committed_cleanup
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+  'tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]'
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+exit: 0
+output:
+  15 passed in 6.14s
+
+WINDOWS-SENSITIVE SELECTION — PYTHON 3.14
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+  tests/test_transactions.py::test_windows_staging_mode_identity_uses_only_the_settable_read_only_bit
+  tests/test_transactions.py::test_windows_cleanup_mode_identity_detects_read_only_attribute_changes
+  tests/test_transactions.py::test_read_only_targets_stage_commit_and_cleanup
+  tests/test_transactions.py::test_read_only_directory_rollback_restores_mode_and_cleans_sidecars
+  tests/test_transactions.py::test_recovery_discards_crash_during_read_only_mode_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_finishes_crash_during_read_only_committed_cleanup
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+  'tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]'
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+exit: 0
+output:
+  15 passed in 5.95s
+
+PRESCRIBED PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_requires_offline_migration
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_crashed_owner_and_barrier_contenders_share_one_stable_lock
+  'tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]'
+  'tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks]'
+  'tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects]'
+  'tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects/arbitrary.lock]'
+  'tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds]'
+  'tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds/arbitrary.lock]'
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+output:
+  14 passed in 6.23s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_project_locks_are_canonicalized_deduplicated_and_byte_sorted
+  tests/test_locking.py::test_home_lock_is_forbidden_while_build_lock_is_held_by_another_thread
+  tests/test_locking.py::test_pending_home_lock_blocks_project_and_build_acquisition
+  tests/test_transactions.py::test_journal_records_complete_ordered_recovery_state_and_consumer_commits_last
+  tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project
+  tests/test_transactions.py::test_commit_failure_rolls_back_in_exact_reverse_commit_order
+  tests/test_transactions.py::test_concurrent_project_transactions_preserve_both_consumers
+  tests/test_transactions.py::test_failed_second_project_restores_ledger_preimage_containing_first_success
+  tests/test_transactions.py::test_stale_preimage_is_rejected_without_overwriting_newer_state
+  tests/test_transactions.py::test_generation_change_is_rejected_at_commit
+exit: 0
+output:
+  13 passed in 14.99s
+
+FOCUSED LOCKING AND TRANSACTION PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  129 passed, 4 skipped in 65.51s
+skip boundary:
+  Existing real-Windows durability and first-use canonicalization cases remain
+  platform-gated.
+
+STRICT MYPY 2.1
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output:
+  Success: no issues found in 62 source files
+
+STRICT MYPY 2.3
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output:
+  Success: no issues found in 62 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  4 files already formatted
+
+FULL PYTHON 3.14 PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output:
+  808 passed, 58 skipped in 155.54s
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m build
+  --outdir
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/windows-test-rework/build-RUN-260730-1faeaf
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730.tar.gz and
+  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730-py3-none-any.whl
+
+DIFF AND PROVENANCE GATES
+
+command:
+  git diff --check
+exit: 0
+output:
+  empty
+
+command:
+  git merge-base --is-ancestor
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12 HEAD
+exit: 0
+output:
+  empty
+
+command:
+  git rev-parse HEAD
+exit: 0
+output:
+  a5ec015c0b5b51149c81a679ce259920a3523374
+
+command:
+  git verify-commit HEAD
+exit: 0
+output:
+  Good "git" signature for oparin@me.com with ECDSA key
+  SHA256:V6JiKG7J29mjsvikcLoSVp0bLa77VTsFy12gnLO81cM
+
+command:
+  git diff --quiet HEAD -- src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py
+exit: 0
+output:
+  empty
+meaning:
+  Accepted product behavior and all non-target test paths are unchanged.
+
+command:
+  git diff --cached --quiet
+exit: 0
+output:
+  empty
+meaning:
+  Nothing is staged.
+
+command:
+  git diff --name-only
+exit: 0
+output:
+  tests/test_transactions.py
+
+command:
+  git status --short --branch
+exit: 0
+output:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M tests/test_transactions.py
+
+SOURCE SHA-256
+
+6ca6f7b792fba0abd5e25109975e1928b403e5ceb818a45cf48545fc6c5a6aa6  src/csk/locking.py
+6f5712bf7d0cf8cafdabc7fe5811e918b20ed7c564eb27b23591880dcf5cb6b2  src/csk/transactions.py
+5b8e7a1a91a3e442e905c3be0037ecdb5747c1b1d2cffd464246af75df80d582  tests/test_locking.py
+ea56a97b97b3fddb34fc47099728c45f930117922fb709c454a64a16bc5ecb65  tests/test_transactions.py
+
+BUILD SHA-256
+
+c7499d63b66290e383d01ff28e25aabddc2490620604225dd74f84a4660809db  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730-py3-none-any.whl
+56c97b152334f9690ab8eef4cb533fb89cd2a310bffda17e990231e5f939946a  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730.tar.gz
+
+LOGBOOK AVAILABILITY
+
+command:
+  command -v logbook
+exit: 1
+output:
+  empty
+rationale:
+  No standalone logbook executable is installed. The diagnosis, intermediate
+  failures, decision to preserve product behavior, and validation are persisted
+  in this task-scoped ledger, the outcome resource, and task notes.
+
+CURRENT-BYTE WINDOWS MATRIX BOUNDARY
+
+This developer run was explicitly prohibited from commit and push. GitHub
+Actions can execute only committed repository bytes. The final unstaged test
+patch was therefore not run on real Windows, and no current-byte Windows
+success is claimed. The commit-owning orchestrator must publish the reviewed
+test-only bytes and rerun Windows Python 3.11, 3.12, 3.13, and 3.14.

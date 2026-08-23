@@ -1,0 +1,46 @@
+{
+  "contract_version": "board-goal-v2",
+  "goal_id": "PRIMARY-GOAL-260731-v5a1is",
+  "revision": 4,
+  "expected_previous_revision": 3,
+  "previous_ref": {
+    "id": "PRIMARY-GOAL-260731-v5a1is",
+    "revision": 3
+  },
+  "owner": {
+    "kind": "parent",
+    "id": "primary"
+  },
+  "kind": "alignment",
+  "objective": "Complete CocoaSkills Go compiled-build parity with Curator: finish all remaining tracked delivery tasks and blocking CI bugs, obtain independent review, land every accepted Curator, curator-spec, and ivanopcode/cocoaskills PR to main, validate macOS/Windows/Linux CI, and prepare the release candidate without creating tags or GitHub Releases until the user's explicit release command. Use the parent Codex session only for orchestration. Delegate implementation, testing, research, documentation, and review through tracked task-board runs using Claude Opus 5 and Codex gpt-5.6-sol with reasoning-effort medium; parallelize only independent work and preserve producer-reviewer independence.",
+  "scope": {
+    "requested_ids": null,
+    "resolved_leaf_items": null
+  },
+  "mutation_authority": "agent_discretion",
+  "success_predicate": "alignment_handled",
+  "provider_condition": "The bound parent session has handled this exact alignment revision.",
+  "native_reflection": "required",
+  "state": "active",
+  "legacy_refs": [
+    {
+      "contract": "primary-goal-v1",
+      "id": "PRIMARY-GOAL-260731-v5a1is",
+      "revision": 4
+    }
+  ],
+  "role_policy": {},
+  "mutation": {
+    "kind": "alignment_realigned",
+    "reason": "User explicitly authorized both Claude Opus 5 and Codex Sol Medium delegated pools.",
+    "actor_context": {
+      "kind": "agent",
+      "actor_id": "iv"
+    },
+    "authority": "agent_discretion"
+  },
+  "created_at": "2026-07-31T08:38:23.862123Z",
+  "updated_at": "2026-08-02T12:12:31.665452Z",
+  "created_by": "iv",
+  "reason": "User explicitly authorized both Claude Opus 5 and Codex Sol Medium delegated pools."
+}

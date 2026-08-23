@@ -1,0 +1,22 @@
+........................................s..sssssssssssss.ssssssss        [100%]
+43 passed, 22 skipped in 0.74s
+
+=== host full pytest ===
+......................................................................   [100%]
+854 passed, 80 skipped in 84.52s (0:01:24)
+FULL_PYTEST_EXIT=0
+
+=== host strict mypy ===
+Success: no issues found in 65 source files
+MYPY_EXIT=0
+
+=== native full pytest, process-env-var attempt (pre-existing unrelated failure) ===
+=========================== short test summary info ===========================
+FAILED tests/test_shell_init.py::test_powershell_hook_activates_and_restores_on_every_prompt
+1 failed, 789 passed, 144 skipped in 300.59s (0:05:00)
+NATIVE_FULL_EXIT=1
+
+=== native full pytest, powershell -ExecutionPolicy Bypass ===
+..........................................s...........................   [100%]
+790 passed, 144 skipped in 302.18s (0:05:02)
+NATIVE_FULL_BYPASS_EXIT=0

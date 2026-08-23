@@ -1,0 +1,25 @@
+manifest=447_sorted_unique_complete_hashes_match
+schema_case_index=376_unique_complete
+schema_group[agent-skill-v6.schema.json]=24
+schema_group[csk-skill-v6.schema.json]=24
+schema_group[build-receipt-v1.schema.json]=18
+schema_group[install-marker-v2.schema.json]=14
+schema_group[conformance-claim-v2.schema.json]=7
+schema_group[conformance-claim-v3.schema.json]=13
+go_build_fixture_files=13
+expected_build_driver_files=11
+build_driver_vectors=8_positive_77_rejection_10_build_source_12_toolchain
+rejection_outcomes=reject_no_execution_no_reuse
+manager_lifecycle=32_unique_named_cases
+compiled_dry_run=no_list_no_build_no_execution
+frozen_legacy_files=36_byte_identical_to_pre_v6_and_published_main
+legacy_index_semantics=24_rows_preserved
+legacy_manifest_semantics=24_entries_preserved
+legacy_v7_negative_guards=70_all_invalid
+published_rc5_metadata=frozen
+rc6_pins=exact
+rc6_claims=none
+428:def git(*arguments: str) -> str:
+430:        ["git", *arguments],
+package_execution_surface=none
+release_subprocess_scope=git_only

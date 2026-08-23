@@ -1,0 +1,3 @@
+# Final exact-commit review
+
+Review signed commit `1d28910f5bb276ff58e2a102e06968bd7640abe3` and GitHub run `30505740935` for PR #9. Do not edit, stage, commit, push, or merge. Verify signature, two-file scope, hashes, and that all prior `tests/test_builds_toolchain.py` Windows failures are closed on Python 3.11-3.14. Inspect every failed Windows summary and confirm the only remaining failures are the same eight `tests/test_build_source.py` failures owned by `TASK-260720-3c0ss2` / PR #8. Re-run the focused toolchain suite and strict mypy from exact commit if needed. Accept `done` only if landing #9 is safe as an independently closed task despite the separately tracked source failures; otherwise route precise changes requested.

@@ -1,0 +1,167 @@
+TASK-260729-rhjxtx gate transcript, rework cycle 1
+Every command below was run directly. The exit code shown is the command's own.
+
+
+##### PROBE MODULE (task-owned, standalone Go module) #####
+
+=== probe: gofmt -l .
+    cwd  : /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/probe
+    argv : gofmt -l . 
+    --- output --- (empty)
+    --- REAL EXIT CODE: 0
+
+=== probe: go build ./...
+    cwd  : /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/probe
+    argv : go build ./... 
+    --- output --- (empty)
+    --- REAL EXIT CODE: 0
+
+=== probe: go vet ./...
+    cwd  : /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/probe
+    argv : go vet ./... 
+    --- output --- (empty)
+    --- REAL EXIT CODE: 0
+
+=== probe: go test -count=1 ./...
+    cwd  : /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/probe
+    argv : go test -count=1 ./... 
+    --- output ---
+    ok  	curator.probe/toolchainboundary	2.305s
+    --- REAL EXIT CODE: 0
+
+=== probe: golangci-lint run ./...
+    cwd  : /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/probe
+    argv : go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./... 
+    --- output ---
+    0 issues.
+    --- REAL EXIT CODE: 0
+
+=== probe: executed-vs-declared regression against REAL local toolchains
+    cwd  : /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/probe
+    argv : env PROBE_TEST_RUST=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin PROBE_TEST_SWIFT=/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain PROBE_TEST_KOTLINC_JVM=/opt/homebrew/bin/kotlinc go test -count=1 -run TestEmittedCasesCarryTheDeclaredExpectation\|TestNotRunAndExecutedCasesAgreeOnTheContract -v ./... 
+    --- output ---
+    === RUN   TestEmittedCasesCarryTheDeclaredExpectation
+    --- PASS: TestEmittedCasesCarryTheDeclaredExpectation (5.50s)
+    === RUN   TestNotRunAndExecutedCasesAgreeOnTheContract
+    --- PASS: TestNotRunAndExecutedCasesAgreeOnTheContract (5.52s)
+    PASS
+    ok  	curator.probe/toolchainboundary	11.302s
+    --- REAL EXIT CODE: 0
+
+
+##### CURATOR PROJECT (unmodified by this task) #####
+
+=== curator: go build ./...
+    cwd  : /Users/iv/Developer/ReluxWorks/curator
+    argv : go build ./... 
+    --- output --- (empty)
+    --- REAL EXIT CODE: 0
+
+=== curator: make vet
+    cwd  : /Users/iv/Developer/ReluxWorks/curator
+    argv : make vet 
+    --- output ---
+    go vet ./...
+    --- REAL EXIT CODE: 0
+
+=== curator: make test
+    cwd  : /Users/iv/Developer/ReluxWorks/curator
+    argv : make test 
+    --- output ---
+    go test ./...
+    ok  	github.com/relux-works/curator/cmd/curator	(cached)
+    ok  	github.com/relux-works/curator/internal/adapters	(cached)
+    ok  	github.com/relux-works/curator/internal/audit	(cached)
+    ok  	github.com/relux-works/curator/internal/capabilities	(cached)
+    ok  	github.com/relux-works/curator/internal/closure	(cached)
+    ok  	github.com/relux-works/curator/internal/config	(cached)
+    ok  	github.com/relux-works/curator/internal/devsub	(cached)
+    ok  	github.com/relux-works/curator/internal/envfiles	(cached)
+    ok  	github.com/relux-works/curator/internal/gitignore	(cached)
+    ok  	github.com/relux-works/curator/internal/gitops	(cached)
+    ok  	github.com/relux-works/curator/internal/hashing	(cached)
+    ok  	github.com/relux-works/curator/internal/identifiers	(cached)
+    ok  	github.com/relux-works/curator/internal/identity	(cached)
+    ok  	github.com/relux-works/curator/internal/install	(cached)
+    ok  	github.com/relux-works/curator/internal/interop	(cached)
+    ok  	github.com/relux-works/curator/internal/locale	(cached)
+    ok  	github.com/relux-works/curator/internal/manifest	(cached)
+    ok  	github.com/relux-works/curator/internal/marker	(cached)
+    ok  	github.com/relux-works/curator/internal/mcp	(cached)
+    ok  	github.com/relux-works/curator/internal/protocoljson	(cached)
+    ok  	github.com/relux-works/curator/internal/registry	(cached)
+    ok  	github.com/relux-works/curator/internal/runtimestore	(cached)
+    ok  	github.com/relux-works/curator/internal/scopes	(cached)
+    ok  	github.com/relux-works/curator/internal/shell	(cached)
+    ok  	github.com/relux-works/curator/internal/skillcheck	(cached)
+    ok  	github.com/relux-works/curator/internal/skillspec	(cached)
+    ok  	github.com/relux-works/curator/internal/snapshot	(cached)
+    ok  	github.com/relux-works/curator/internal/ui	(cached)
+    ok  	github.com/relux-works/curator/internal/verr	(cached)
+    ok  	github.com/relux-works/curator/internal/version	(cached)
+    ok  	github.com/relux-works/curator/internal/whitelist	(cached)
+    --- REAL EXIT CODE: 0
+
+=== curator: make check
+    cwd  : /Users/iv/Developer/ReluxWorks/curator
+    argv : make check 
+    --- output ---
+    go vet ./...
+    go test ./...
+    ok  	github.com/relux-works/curator/cmd/curator	(cached)
+    ok  	github.com/relux-works/curator/internal/adapters	(cached)
+    ok  	github.com/relux-works/curator/internal/audit	(cached)
+    ok  	github.com/relux-works/curator/internal/capabilities	(cached)
+    ok  	github.com/relux-works/curator/internal/closure	(cached)
+    ok  	github.com/relux-works/curator/internal/config	(cached)
+    ok  	github.com/relux-works/curator/internal/devsub	(cached)
+    ok  	github.com/relux-works/curator/internal/envfiles	(cached)
+    ok  	github.com/relux-works/curator/internal/gitignore	(cached)
+    ok  	github.com/relux-works/curator/internal/gitops	(cached)
+    ok  	github.com/relux-works/curator/internal/hashing	(cached)
+    ok  	github.com/relux-works/curator/internal/identifiers	(cached)
+    ok  	github.com/relux-works/curator/internal/identity	(cached)
+    ok  	github.com/relux-works/curator/internal/install	(cached)
+    ok  	github.com/relux-works/curator/internal/interop	(cached)
+    ok  	github.com/relux-works/curator/internal/locale	(cached)
+    ok  	github.com/relux-works/curator/internal/manifest	(cached)
+    ok  	github.com/relux-works/curator/internal/marker	(cached)
+    ok  	github.com/relux-works/curator/internal/mcp	(cached)
+    ok  	github.com/relux-works/curator/internal/protocoljson	(cached)
+    ok  	github.com/relux-works/curator/internal/registry	(cached)
+    ok  	github.com/relux-works/curator/internal/runtimestore	(cached)
+    ok  	github.com/relux-works/curator/internal/scopes	(cached)
+    ok  	github.com/relux-works/curator/internal/shell	(cached)
+    ok  	github.com/relux-works/curator/internal/skillcheck	(cached)
+    ok  	github.com/relux-works/curator/internal/skillspec	(cached)
+    ok  	github.com/relux-works/curator/internal/snapshot	(cached)
+    ok  	github.com/relux-works/curator/internal/ui	(cached)
+    ok  	github.com/relux-works/curator/internal/verr	(cached)
+    ok  	github.com/relux-works/curator/internal/version	(cached)
+    ok  	github.com/relux-works/curator/internal/whitelist	(cached)
+    gofmt: files need formatting:
+    .temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/lucasb-eyer/go-colorful/hsluv.go
+    .temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-isatty/isatty_windows.go
+    .temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_unix.go
+    .temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_windows.go
+    make: *** [check] Error 1
+    --- REAL EXIT CODE: 2
+
+=== curator: gofmt -l . (attribution for the make check failure above)
+    cwd  : /Users/iv/Developer/ReluxWorks/curator
+    argv : gofmt -l . 
+    --- output ---
+    .temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/lucasb-eyer/go-colorful/hsluv.go
+    .temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-isatty/isatty_windows.go
+    .temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_unix.go
+    .temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_windows.go
+    --- REAL EXIT CODE: 0
+
+=== curator: git status --porcelain (nothing tracked was modified)
+    cwd  : /Users/iv/Developer/ReluxWorks/curator
+    argv : git status --porcelain -- :\!.temp :\!.task-board :\!.planning :\!.research 
+    --- output ---
+    ?? LOGBOOK.md
+    ?? diagrams/
+    ?? task-board.config.json
+    --- REAL EXIT CODE: 0

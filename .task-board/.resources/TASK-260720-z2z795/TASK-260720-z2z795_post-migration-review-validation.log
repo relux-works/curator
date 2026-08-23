@@ -1,0 +1,256 @@
+TASK-260720-z2z795 post-migration review validation
+Run: RUN-260730-9dff10
+Date: 2026-07-30
+Worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+
+GOAL AND DIRECTIVES
+
+command: task-board spawn goal RUN-260730-9dff10
+exit: 0
+output: Active Goal: none (run is not goal-bound)
+
+command: task-board spawn directives RUN-260730-9dff10
+exit: 0
+output: No directives recorded for RUN-260730-9dff10
+
+TOOL READINESS
+
+git --version
+exit: 0
+output: git version 2.50.1 (Apple Git-155)
+
+rg --version
+exit: 0
+output: ripgrep 15.2.0
+
+/opt/homebrew/bin/python3.11 --version
+exit: 0
+output: Python 3.11.14
+
+/opt/homebrew/bin/python3.11 -m pytest --version
+exit: 0
+output: pytest 8.3.4
+
+/Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python -m mypy --version
+exit: 0
+output: mypy 2.3.0 (compiled: yes)
+
+uvx ruff --version
+exit: 0
+output: ruff 0.16.0
+
+/opt/homebrew/bin/python3.11 -m build --version
+exit: 0
+output: build 1.2.2.post1
+
+task-board --version
+exit: 0
+output: task-board version 0.23.0
+
+PROVENANCE
+
+original accepted base:
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+
+git rev-parse HEAD
+exit: 0
+output: 5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+
+git rev-parse origin/task/TASK-260720-z2z795-transaction-engine
+exit: 0
+output: 5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+
+git merge-base --is-ancestor 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12 HEAD
+exit: 0
+
+canonical main status:
+  ## main...origin/main
+canonical main HEAD and local origin/main:
+  97a0ed870782b48eebc5a9c25a9cfa8fea5ff245
+
+worktree status:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/locking.py
+   M src/csk/transactions.py
+   M tests/test_locking.py
+   M tests/test_transactions.py
+
+MIGRATION REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_requires_offline_migration
+  tests/test_locking.py::test_unguarded_v1_record_requires_offline_migration
+  tests/test_locking.py::test_legacy_stale_breaker_cannot_split_current_stable_owners
+  tests/test_locking.py::test_acquire_rechecks_canonical_witness_after_publication
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_stable_lock_timeout_message_forbids_removal
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation
+exit: 0
+output: 14 passed in 0.23s
+
+PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  exact 14-test set from TASK-260720-z2z795_lock-migration-validation.log,
+  covering stable crash handoff, home/project/build namespace rejection,
+  physical aliases, corrupt-journal lock redirection, and witness loss
+exit: 0
+output: 14 passed in 1.20s
+raw command/output: lock-integrity-regressions.log
+
+EARLIER REVIEWER REGRESSIONS
+
+command:
+  exact 14-case set covering failed re-entry reservation cleanup, serialized
+  home handoff, repeated consumers, durable staging intent, partial staging
+  cleanup, source loss, and foreign post-crash bytes
+exit: 0
+output: 14 passed in 1.68s
+raw command/output: prior-reviewer-regressions.log
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  exact 13-case set covering unsigned-byte project ordering, lock-order
+  failures, complete journal state, cross-project recovery, reverse rollback,
+  concurrent consumers, stale preimages, and generation changes
+exit: 0
+output: 13 passed in 3.72s
+raw command/output: contract-regressions.log
+
+FOCUSED PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider tests/test_locking.py tests/test_transactions.py -q
+exit: 0
+output: 88 passed, 1 skipped in 5.51s
+skip: test_windows_sync_helpers_flush_real_file_and_tree requires Windows
+
+STRICT MYPY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy
+  --cache-dir=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-z2z795/review-RUN-260730-9dff10/mypy-cache
+exit: 0
+output: Success: no issues found in 57 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 4 files already formatted
+
+FULL PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output: 658 passed, 20 skipped in 91.97s
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+  --outdir=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-z2z795/review-RUN-260730-9dff10/build-artifacts
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730.tar.gz and
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730-py3-none-any.whl
+
+DIFF CHECK
+
+command: git diff --check
+exit: 0
+output: <none>
+
+ADVERSARIAL PROBE: MACOS CASE ALIASES
+
+exit: 0
+output:
+  home_samefile=true
+  project_samefile=true
+  home_id_equal=false
+  project_id_equal=false
+  duplicate_project_acquired=true
+  home_acquired_while_build_held=true
+raw output: macos-case-alias-lock-probe.log
+
+ADVERSARIAL PROBE: MACOS UNICODE NORMALIZATION ALIASES
+
+exit: 0
+output:
+  samefile=true
+  identity_equal=false
+  duplicate_project_acquired=true
+raw output: macos-unicode-alias-lock-probe.log
+
+ADVERSARIAL PROBE: JOURNAL FILENAME/EMBEDDED-ID BINDING
+
+setup:
+  public prepare followed by a simulated process crash immediately before the
+  install rename, leaving a canonical phase=committing/state=backed_up record;
+  canonical real-id.json was renamed byte-for-byte to alias-id.json.
+exit: 0
+output:
+  before embedded_id=real-id filename=alias-id.json live=absent
+  after live_text=desired
+  error="recover transaction alias-id: transaction journal disappeared: real-id"
+  journals=["alias-id.json"]
+raw output: journal-id-binding-probe.log
+
+ADVERSARIAL PROBE: READ-ONLY STAGING
+
+exit: 0
+output:
+  0444 desired file: prepare returned PermissionError opening .desired
+  0555 desired directory: prepare returned PermissionError creating child
+  both failed preparations cleaned journal and sidecars
+raw output: readonly-mode-probe.log
+
+ADVERSARIAL PROBE: READ-ONLY BACKUP CLEANUP
+
+exit: 0
+output:
+  commit_returned=false
+  live_new=new
+  error=PermissionError removing .backup.delete/old
+  journal and backup tomb remain
+raw output: readonly-cleanup-probe.log
+
+FINAL HASHES
+
+c272ff852f44a965c8da6e15afb396b43cd4ce7f6fbcc9522350fbf8f4760bb0  src/csk/locking.py
+415a2418474582fbc9094c7f6e157212fd1e67543ccd77c905182f587e77cb52  src/csk/transactions.py
+b668a726eb685d5a4882790c2283cb035697adbe189ed17cb73c572bcd42eb11  tests/test_locking.py
+f578bbc4f400b6003e754e2ab58401af2875a287312ef055567fe9dd7b67606c  tests/test_transactions.py
+
+LOGBOOK AND PLATFORM BOUNDARY
+
+command: command -v logbook
+exit: 1
+output: <none>
+
+task-board help exposes no logbook operation. Findings are persisted in the
+task-scoped verdict, raw evidence, and board notes.
+
+This run was on macOS. The earlier GitHub Windows matrix covers only committed
+head 5f8bfbbd, not the current unstaged rework. No current-byte Windows result
+is claimed. No product/test source was modified, staged, committed, pushed, or
+published by this review.

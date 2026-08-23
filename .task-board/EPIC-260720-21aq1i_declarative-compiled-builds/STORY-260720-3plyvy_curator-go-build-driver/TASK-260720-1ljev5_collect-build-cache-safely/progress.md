@@ -1,0 +1,111 @@
+## Status
+done
+
+## Assigned To
+[reviewer] reviewer (codex)
+
+## Created
+2026-07-20T02:11:48Z
+
+## Last Update
+2026-07-29T00:49:41Z
+
+## Blocked By
+- TASK-260720-3pwg2w
+- TASK-260720-31nl14
+- TASK-260720-4bd0it
+- TASK-260720-2284br
+
+## Blocks
+- TASK-260720-1nlmvv
+- TASK-260720-jrrgw9
+- TASK-260729-2sxx7k
+
+## Checklist
+- [x] Marker and journal references protect live build keys
+- [x] Sweep stays inside verified protected cache boundaries
+- [x] GC serializes with install, rollback, and recovery on all platforms
+- [x] Code written per task description and AC
+- [x] Relevant tests written for new or changed behavior and passing
+- [x] Lint clean
+- [x] Relevant build/validation commands run after changes and build not broken
+- [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
+- [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+
+## Notes
+Acceleration execution directive 2026-07-28: run as the second concurrent Claude Opus 5 producer in its own task-owned worktree. Compose only the accepted product states of all four done blockers, preserving their final accepted reworks: TASK-260720-3pwg2w protected immutable build cache, TASK-260720-31nl14 durable transaction journal, TASK-260720-4bd0it marker-v2 activation state, and TASK-260720-2284br atomic cross-scope install whose accepted stacked tree is /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1zntv0/worktree. Treat predecessor worktrees as read-only; derive and document exact provenance, overlaps, and task-only delta before editing. Do not stage, commit, publish, or import .temp/board/config/evidence artifacts. Implement only safe compiled-cache GC and focused helpers from task scope. macOS is primary native platform; use SSH host win for native Windows runtime validation where relevant. Linux validation is later/non-gating, but cross-compile and portable tests remain required. The separate fail-closed hardened containment story is non-gating. Produce task-scoped implementation and gate evidence, then hand off to independent Codex review.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (claude) (run=RUN-260728-a448d8, max_parallel=20)
+spawn run started: [implementer] developer (claude) (run=RUN-260728-a448d8)
+Worktree .temp/TASK-260720-1ljev5/worktree composed from the accepted TASK-260720-2284br tree. Plan: buildcache.Sweep over a revalidated protected cache root under a caller-held home lock; scopes.Collect marks runtime and build keys in one traversal, prunes consumers, then sweeps; install commit passes the held lock and journal keys; curator gc acquires the home lock and recovers journals first.
+Implementation complete in .temp/TASK-260720-1ljev5/worktree. Delta is 15 files: buildcache Sweep plus openProtectedDir/openProtectedChildFile on all three backends, a shared scopes mark phase with Collect, install commit passing the held lock and journal keys, locked recovery-first curator gc, and README. macOS gofmt/diff-check/build/vet/lint all exit 0 with 0 issues; four race gates exit 0. Native Windows via non-elevated schtasks: every new sweep test passes, scopes and gc serialization exit 0. GOOS=windows go vet exits 1 on a pre-existing runtimestore defect the accepted base reproduces identically.
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260728-a448d8, pid=33781, exit=0)
+REVIEW DIRECTIVE: Independently validate GC safety against the accepted composed product state. Focus on (1) live-key protection from marker-v2 and durable journal references, including malformed/torn/legacy state; (2) containment and symlink/reparse/path traversal resistance so sweep cannot escape verified cache roots; (3) serialization with install, rollback, recovery, and concurrent GC on Unix and Windows; (4) fail-closed behavior for ambiguous protection state; (5) CLI diagnostics/exit behavior; (6) macOS native and SSH win evidence plus cross-compiled platform gates. Re-run focused Go tests, race tests where supported, vet/format/build gates, and inspect TASK-260720-1ljev5_gate-evidence.tar.gz. Accept only if no live/recoverable artifact can be collected and prior accepted behavior is preserved.
+spawn agent resolution: Agent selection: codex via explicit_override
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=codex; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260728-93cc5c, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260728-93cc5c)
+Review cycle 1 verdict: changes requested. Route to to-dev. P1: uncertainty is erased when Collect rewrites or prunes consumers before checking marked.uncertain, so a second GC can delete builds behind a corrupt registry, invalid-only marker, unreadable skill directory, or redirected scope. P1: retirement uses pathname CreateTemp/Rename/RemoveAll after handle validation, so mutation is not bound to the proven cache root. P2: attached native Windows evidence is red and contradicts its base comparison for TestAtomicPublicationConflictingRace; reparse and real scope sweeps also skipped. Full evidence: TASK-260720-1ljev5_review-verdict-cycle-1.md
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260728-93cc5c, pid=77170, exit=0)
+REWORK CYCLE 1 directive 2026-07-28: close all findings in TASK-260720-1ljev5_review-verdict-cycle-1.md in the existing task worktree. P1 conservative retention: never rewrite unreadable/invalid consumers.json; strictly validate shape/version; retain every registered consumer while any scope/marker metadata is uncertain; prune only after proving absent or valid-empty; treat symlink/reparse roots and members plus every non-absence Lstat/read failure as uncertainty. Add two-pass regressions for corrupt registry, invalid-only marker, unreadable installed-skill directory, and redirected roots, proving pass two still cannot sweep. P1 boundary binding: retirement and resumable cleanup must operate relative to the already validated cache-root handle with no-follow semantics and platform-appropriate identity revalidation; add adversarial root-swap race coverage proving replacement/outside trees cannot be touched. P2 Windows: provide a task-scoped native SSH win gate where relevant race/reparse/scopes cases actually execute and pass, or exact like-for-like baseline evidence resolving the conflicting TestAtomicPublicationConflictingRace result; separate inherited failures and do not claim skipped coverage. Preserve accepted lock/journal/marker/atomic-install behavior, macOS primary gates, no staging/commit/publish, and attach new implementation plus gate evidence for independent review cycle 2. This rework is queued for the first available Claude Opus 5 producer slot; current producer ceiling remains three.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (claude) (run=RUN-260728-62c65a, max_parallel=20)
+spawn run started: [implementer] developer (claude) (run=RUN-260728-62c65a)
+Rework cycle 1 complete in .temp/TASK-260720-1ljev5/worktree; all three cycle-1 findings closed. P1 conservative retention: pruneConsumers never rewrites an untrusted registry (Collect and CollectRuntime), a consumer is unregistered only once its scope is proven absent or valid-and-empty, parseConsumers accepts only the canonical shape, RecordConsumer/StageConsumer fail closed, readScope refuses symlink/reparse roots and members plus every non-absence metadata failure, non-directory members stay advisory so .DS_Store cannot disable GC. P1 boundary binding: sweepRoot pairs the validated protectedDir with an os.Root mutator accepted only on os.SameFile identity; rename, RemoveAll, resumable cleanup and fsync all go through the proven object, and inspectUnexpected asserts each candidate parent is that object. P2 Windows: scopes fixture now builds a protected DACL natively (integration tests run, exit 0), reparse cases run via junctions, curator TestGC exit 0, and 5x like-for-like runs show TestAtomicPublicationConflictingRace flaky on BOTH trees (3/2 mine, 4/1 base, identical DACL-inheritance race in sibling-owned ensureProtectedBase), resolving the cycle-1 contradiction. macOS gofmt/diff-check/build/vet/test-all/2 race gates/lint all exit 0 with 0 issues; GOOS=linux build+vet 0; GOOS=windows build 0, vet 1 only on the pre-existing sibling runtimestore defect the accepted base reproduces identically. Two negative controls prove the new regressions are real. Artifacts: TASK-260720-1ljev5_rework-cycle-1-notes.md, TASK-260720-1ljev5_gate-evidence-cycle-2.tar.gz.
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260728-62c65a, pid=90091, exit=0)
+REVIEW CYCLE 2 directive: independently verify every cycle-1 blocker is closed in the final task worktree. Reproduce two consecutive GC passes for corrupt/unknown consumers registries, invalid-only or unreadable markers, redirected roots/members and every non-absence metadata failure; no uncertain consumer may be pruned or later swept. Challenge the strict canonical consumers.json parser and fail-closed RecordConsumer/StageConsumer paths. Reproduce cache-root exchange immediately before retirement and prove classification, rename, recursive removal, cleanup and fsync remain handle/root-object-bound with no-follow/identity checks on Unix and native Windows; replacement/outside trees must remain untouched. Verify os.Root/toolchain compatibility with the repository baseline. Independently run macOS full/race/lint gates, Windows and Linux cross-build/vet gates, and native SSH win scopes/GC/buildcache/reparse/race coverage. Separate inherited accepted-base Windows failures only with like-for-like evidence; reject any task-owned skip or red gate. Confirm no stage/commit/publish and attach explicit ACCEPTED or CHANGES REQUESTED verdict.
+spawn agent resolution: Agent selection: codex via explicit_override
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=codex; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260728-f503ea, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260728-f503ea)
+Review cycle 2 verdict: changes requested; route to to-dev. P1: parseConsumers accepts duplicate known JSON members, so an earlier live-consumer list can be overridden by a later empty list, trusted, and rewritten empty, recreating the two-pass sweep hazard. P1: inspectUnexpected parent-binds and reads the receipt through handles but then reopens entryPath for the decisive Unix structure/hash classification; a root exchange in that window can validate a replacement and retire an unproven original. Focused, race, vet, format/diff, and full-tree Go gates pass. Full evidence: TASK-260720-1ljev5_review-verdict-cycle-2.md
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260728-f503ea, pid=10582, exit=0)
+REWORK CYCLE 2 directive: queue for the first free Claude Opus 5 producer slot and continue only in the existing task worktree. Close both P1 findings in TASK-260720-1ljev5_review-verdict-cycle-2.md. (1) Reject duplicate schema_version/consumers and every ambiguous/noncanonical registry shape before Collect, RecordConsumer, or StageConsumer can normalize it; use duplicate-aware token parsing or exact canonical validation. Add two-pass duplicate-field regressions proving the original bytes and live references survive, writer fail-closed tests, and an expected-red control against the current parser. (2) Keep the entire decisive sweep classification handle/root-object-bound: receipt decode/canonicality, exact entry members, publication lookup, artifact open/hash/size and structural checks must not reopen store.home, root.path, or candidate pathname. Add a deterministic root exchange during classification using replacement-valid/original-invalid entries; original and replacement must both remain untouched when identity cannot be proven, plus a negative control for the old reopen path. Preserve cycle-1 fixes and accepted lock/journal/marker/install behavior, macOS primary full/race/lint gates, native SSH win and cross-platform evidence, no stage/commit/publish. Attach cycle-3 evidence and hand off for independent review.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (claude) (run=RUN-260728-d2e59b, max_parallel=20)
+spawn run started: [implementer] developer (claude) (run=RUN-260728-d2e59b)
+Rework cycle 2 complete in .temp/TASK-260720-1ljev5/worktree; both cycle-2 P1 findings closed. (1) Ambiguous registry: parseConsumers now walks JSON tokens and refuses a repeated schema_version/consumers member, any repeated member name, unsupported members, non-string names, non-array/null consumers, non-string/empty/relative paths, nested lists, trailing content, and any schema_version that is not the exact integer 1; repetition inside the consumers array stays accepted because dedup cannot drop a checkout. RecordConsumer and StageConsumer fail closed through the same reader. Regressions: TestARepeatedRegistryMemberNeverEmptiesTheRegistry (two passes never sweep, bytes byte-identical, and after repair the live marker key is marked again), a case in the shared two-pass runner, TestWritersRefuseARepeatedRegistryMember, 10 new parse-table rejects, and in-suite control TestStructDecodingWouldTrustARepeatedRegistryMember. (2) Classification binding: inspectProvenEntry/openProtectedEntryFrom run the entire decisive classification on the proven candidate descriptor (openat+O_NOFOLLOW receipt/bin/artifact on Unix; borrowed handle for the exact-members listing on both platforms; Windows additionally re-asserts entry identity before opening children). Nothing in the sweep reopens store.home, the cache-root path, or the candidate pathname after the boundary is proven; Store.Inspect keeps the pathname entry point and both share classifyEntry. Regression: TestSweepClassificationSurvivesACacheRootExchangedMidPass (Unix and Windows) exchanges the root during classification with a replacement-valid/original-invalid pair; nothing is removed, both trees intact, candidate retained and reported, and an in-test control shows the replacement classifying as Hit through the old pathname. macOS gofmt/diff-check/build/vet/test-all(40 pkgs)/2 race gates/lint all exit 0 with 0 issues. Cross build linux+windows 0, vet linux 0; GOOS=windows go vet exits 1 only on the pre-existing sibling runtimestore defect the accepted base reproduces identically (scoped vet 0). Native Windows non-elevated: scopes 0, curator TestGC 0, buildcache 1 with inherited failures only - every sweep and registry test passes, and 5x like-for-like race runs show the ensureProtectedBase DACL race flaky on both trees (mine 3/2 and 0/5, base 1/4 and 0/5, identical message). Two negative controls exit 1 by construction. Artifacts: TASK-260720-1ljev5_rework-cycle-2-notes.md, TASK-260720-1ljev5_gate-evidence-cycle-3.tar.gz.
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260728-d2e59b, pid=19954, exit=0)
+REVIEW CYCLE 3 directive: independently review TASK-260720-1ljev5_rework-cycle-2-notes.md against both P1 findings in TASK-260720-1ljev5_review-verdict-cycle-2.md and the full GC AC. Prove duplicate-aware consumers.json parsing rejects every repeated object member, noncanonical schema_version, malformed/trailing content, preserves bytes and live references over two passes, and makes RecordConsumer/StageConsumer fail closed. Prove the entire decisive unexpected-entry classification remains bound to the originally proven cache-root/entry handles with no pathname reopen after proof; reproduce root exchange during classification where replacement is valid and original is invalid, and run the old-path negative control. Challenge Unix openat/O_NOFOLLOW and Windows no-share-delete/object-identity semantics. Re-run scoped/full macOS tests, race/lint/build/vet, native Windows sweep cases, and compare inherited Windows failures against the accepted base. Do not edit candidate code. Attach TASK-260720-1ljev5_review-verdict-cycle-3.md with explicit accepted or changes-requested routing.
+spawn agent resolution: Agent selection: codex via explicit_override
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=codex; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260728-269cc6, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260728-269cc6)
+Review cycle 3 verdict: ACCEPTED. Both cycle-2 P1 findings are closed: duplicate-aware registry parsing preserves ambiguous state across passes and makes writers fail closed; decisive cache classification remains bound to the proven entry/root handles. Independent focused, race, full-tree, format, vet, build, and cross-platform gates pass. Native Windows task-owned sweep/scopes/GC/reparse/race cases pass; remaining reds reproduce on the accepted base. Evidence: TASK-260720-1ljev5_review-verdict-cycle-3.md
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260728-269cc6, pid=37640, exit=0)
+
+## Precondition Resources
+(none)
+
+## Outcome Resources
+- [TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-a448d8.log](file://TASK-260720-1ljev5/TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-a448d8.log) — System spawn log captured by task-board
+- [TASK-260720-1ljev5_implementation-notes.md](file://TASK-260720-1ljev5/TASK-260720-1ljev5_implementation-notes.md)
+- [TASK-260720-1ljev5_gate-evidence.tar.gz](file://TASK-260720-1ljev5/TASK-260720-1ljev5_gate-evidence.tar.gz) — All gate logs with an EXIT-CODES.md manifest: macOS static/test/race/lint gates, cross-platform build and vet, and native Windows runs for this tree and the accepted base
+- [TASK-260720-1ljev5_spawn-log_-reviewer--reviewer--codex-_RUN-260728-93cc5c.log](file://TASK-260720-1ljev5/TASK-260720-1ljev5_spawn-log_-reviewer--reviewer--codex-_RUN-260728-93cc5c.log) — System spawn log captured by task-board
+- [TASK-260720-1ljev5_review-verdict-cycle-1.md](file://TASK-260720-1ljev5/TASK-260720-1ljev5_review-verdict-cycle-1.md) — Reviewer changes-requested verdict with conservative-reference, boundary, and Windows evidence findings
+- [TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-62c65a.log](file://TASK-260720-1ljev5/TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-62c65a.log) — System spawn log captured by task-board
+- [TASK-260720-1ljev5_rework-cycle-1-notes.md](file://TASK-260720-1ljev5/TASK-260720-1ljev5_rework-cycle-1-notes.md) — Rework cycle 1: how each cycle-1 review finding was closed, with regression and negative-control evidence
+- [TASK-260720-1ljev5_gate-evidence-cycle-2.tar.gz](file://TASK-260720-1ljev5/TASK-260720-1ljev5_gate-evidence-cycle-2.tar.gz) — Cycle-2 gate logs: macOS format/build/vet/test/race/lint, cross-compiles, negative controls, native Windows runs
+- [TASK-260720-1ljev5_spawn-log_-reviewer--reviewer--codex-_RUN-260728-f503ea.log](file://TASK-260720-1ljev5/TASK-260720-1ljev5_spawn-log_-reviewer--reviewer--codex-_RUN-260728-f503ea.log) — System spawn log captured by task-board
+- [TASK-260720-1ljev5_review-verdict-cycle-2.md](file://TASK-260720-1ljev5/TASK-260720-1ljev5_review-verdict-cycle-2.md) — Reviewer cycle 2 changes-requested verdict with duplicate-registry and classification TOCTOU evidence
+- [TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-d2e59b.log](file://TASK-260720-1ljev5/TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-d2e59b.log) — System spawn log captured by task-board
+- [TASK-260720-1ljev5_rework-cycle-2-notes.md](file://TASK-260720-1ljev5/TASK-260720-1ljev5_rework-cycle-2-notes.md) — Rework cycle 2: how both cycle-2 P1 findings were closed, with regression and negative-control evidence
+- [TASK-260720-1ljev5_gate-evidence-cycle-3.tar.gz](file://TASK-260720-1ljev5/TASK-260720-1ljev5_gate-evidence-cycle-3.tar.gz) — Cycle-3 gate logs with an EXIT-CODES.md manifest: macOS format/build/vet/test/race/lint, cross-platform build and vet, two negative controls, native Windows suites and like-for-like race comparison
+- [TASK-260720-1ljev5_spawn-log_-reviewer--reviewer--codex-_RUN-260728-269cc6.log](file://TASK-260720-1ljev5/TASK-260720-1ljev5_spawn-log_-reviewer--reviewer--codex-_RUN-260728-269cc6.log) — System spawn log captured by task-board
+- [TASK-260720-1ljev5_review-verdict-cycle-3.md](file://TASK-260720-1ljev5/TASK-260720-1ljev5_review-verdict-cycle-3.md) — Reviewer cycle 3 accepted verdict with independent macOS, cross-platform, and Windows evidence review
+
+## Estimate
+estimated(fibonacci(13))

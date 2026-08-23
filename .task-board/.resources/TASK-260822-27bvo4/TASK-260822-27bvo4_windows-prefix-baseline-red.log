@@ -1,0 +1,11 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+=== RUN   TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction
+    identity_windows_test.go:47: EvalSymlinks("C:\\Users\\admin\\AppData\\Local\\Temp\\TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJ1839211754\\002\\current\\curator.exe") = "", The system cannot find the path specified.
+    identity_windows_test.go:52: a manager launched through a directory junction was refused: go-v1 build_execution_worker_identity_invalid: cannot canonicalize the manager executable
+--- FAIL: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction (0.04s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	1.214s
+FAIL
+GO_TEST_EXIT=1

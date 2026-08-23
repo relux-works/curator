@@ -1,0 +1,16 @@
+gofmt -l tools/generate-vectors/main.go tools/generate-vectors/main_test.go
+exit_code=0
+output_empty=true
+empty_output_assertion_exit_code=0
+
+go vet ./...
+exit_code=0
+output_empty=true
+
+go test ./... -count=1
+exit_code=0
+output=ok github.com/relux-works/curator-spec/tools/generate-vectors
+
+git diff --check HEAD^ HEAD
+exit_code=0
+output_empty=true

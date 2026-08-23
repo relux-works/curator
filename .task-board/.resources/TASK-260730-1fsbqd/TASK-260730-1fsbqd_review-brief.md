@@ -1,0 +1,5 @@
+# Independent curator-spec landing review
+
+Review exact local commit 0aae5dff11ab90400fc6a0b003a4492767b38043 on branch release/curator-spec-v1.0.0-rc.5-candidate in /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3nx97g/worktree. The prior signed commit 5c29c1a65bcf084c8ad27d91bcaf9d319f6146f3 is superseded and must not be reviewed or landed. Parent must be current relux-works/curator-spec origin/main 57c1f56846d221ecc55786bd3c2467ec32f11730 and commit tree must be 78210085727ec33b79a050a807f51da253ffb0c8.
+
+Independently verify that the raw commit object is unsigned and has no gpgsig header; verify the accepted 447-file suite, manifest sha256:b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c, tree sha256:e6a132157806bf747f0ad24a61bb5a9a4c8b915dac743d9465c889c0a1ad2fae, rc.5 metadata, clean worktree, one commit, no dirty-primary contamination, and no remote branch/tag/release. Do not modify, push, tag, publish a release, or advance downstream pins. Attach verdict. If accepted, route task to done; main landing occurs only after acceptance, while tag and GitHub Release remain deferred until a new human command.

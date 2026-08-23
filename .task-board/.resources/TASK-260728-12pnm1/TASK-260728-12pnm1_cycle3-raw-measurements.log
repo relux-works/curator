@@ -1,0 +1,166 @@
+host: macOS 26.5 arm64; rustc 1.91.0 (f8297e351 2025-10-28); cargo 1.91.0 (ea2d97820 2025-10-10)
+
+########## M1: build-script auto-discovery scope ##########
+argv: cargo metadata --format-version 1 --locked --offline --quiet --all-features
+env:  PATH=/nonexistent HOME=<private> CARGO_HOME=<private> CARGO_NET_OFFLINE=true RUSTC=<root>/bin/rustc
+
+--- fixture: absent-key-with-buildrs
+    manifest:
+      [package]
+      name = "abskey"
+      version = "0.1.0"
+      edition = "2021"
+    entries: Cargo.lock Cargo.toml build.rs src target 
+    exit=0
+    targets: [(['bin'], 'abskey', 'main.rs'), (['custom-build'], 'build-script-build', 'build.rs')]
+    BUILD SCRIPT DISCOVERED: True
+
+--- fixture: false-with-buildrs
+    manifest:
+      [package]
+      name = "falsebs"
+      version = "0.1.0"
+      edition = "2021"
+      build = false
+    entries: Cargo.lock Cargo.toml build.rs src 
+    exit=0
+    targets: [(['bin'], 'falsebs', 'main.rs')]
+    BUILD SCRIPT DISCOVERED: False
+
+--- fixture: false-no-buildrs
+    manifest:
+      [package]
+      name = "falsenobs"
+      version = "0.1.0"
+      edition = "2021"
+      build = false
+    entries: Cargo.lock Cargo.toml src 
+    exit=0
+    targets: [(['bin'], 'falsenobs', 'main.rs')]
+    BUILD SCRIPT DISCOVERED: False
+
+--- fixture: explicit-buildrs
+    manifest:
+      [package]
+      name = "explbs"
+      version = "0.1.0"
+      edition = "2021"
+      build = "build.rs"
+    entries: Cargo.lock Cargo.toml build.rs src 
+    exit=0
+    targets: [(['bin'], 'explbs', 'main.rs'), (['custom-build'], 'build-script-build', 'build.rs')]
+    BUILD SCRIPT DISCOVERED: True
+
+--- fixture: othername
+    manifest:
+      [package]
+      name = "othername"
+      version = "0.1.0"
+      edition = "2021"
+    entries: Cargo.lock Cargo.toml custom.rs src 
+    exit=0
+    targets: [(['bin'], 'othername', 'main.rs')]
+    BUILD SCRIPT DISCOVERED: False
+
+--- fixture: nested
+    manifest:
+      [package]
+      name = "nested"
+      version = "0.1.0"
+      edition = "2021"
+    entries: Cargo.lock Cargo.toml src sub 
+    exit=0
+    targets: [(['bin'], 'nested', 'main.rs')]
+    BUILD SCRIPT DISCOVERED: False
+
+--- fixture: ed2024
+    manifest:
+      [package]
+      name = "ed2024"
+      version = "0.1.0"
+      edition = "2024"
+    entries: Cargo.lock Cargo.toml build.rs src 
+    exit=0
+    targets: [(['bin'], 'ed2024', 'main.rs'), (['custom-build'], 'build-script-build', 'build.rs')]
+    BUILD SCRIPT DISCOVERED: True
+
+--- fixture: builddir
+    manifest:
+      [package]
+      name = "builddir"
+      version = "0.1.0"
+      edition = "2021"
+    entries: Cargo.lock Cargo.toml build.rs src 
+    exit=0
+    targets: [(['bin'], 'builddir', 'main.rs')]
+    BUILD SCRIPT DISCOVERED: False
+
+########## M2: the auto-discovered script actually executes ##########
+manifest (no build key):
+  [package]
+  name = "abskey"
+  version = "0.1.0"
+  edition = "2021"
+build.rs writes a marker file
+
+-- graph phase --
+  cargo metadata exit=0  marker present: NO
+
+-- compile phase --
+   Compiling abskey v0.1.0 (/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/m/bs/absent-key-run2)
+    Finished `release` profile [optimized] target(s) in 0.84s
+  cargo build exit=0  marker present: YES  content: auto-discovered build script executed
+
+########## M3: CRLF size boundary, superseded order vs replacement ##########
+== the reviewer's constructed pair: folded stream exactly 4096 ==
+4093 'x' + LF + 'A' + LF
+  folded stream = 4096 bytes, LF form raw = 4096, CRLF form raw = 4098
+  OLD: LF=accepted                           CRLF=rejected: over 4096 raw bytes      *** DIVERGE ***
+  NEW: LF=accepted                           CRLF=accepted                           AGREE  payload=4095/4095 sha=f168ab077a348ef9/f168ab077a348ef9
+
+== folded stream exactly 4097 ==
+4094 'x' + LF + 'A' + LF
+  folded stream = 4097 bytes, LF form raw = 4097, CRLF form raw = 4099
+  OLD: LF=rejected: over 4096 raw bytes      CRLF=rejected: over 4096 raw bytes      AGREE
+  NEW: LF=rejected: folded 4097 > 4096       CRLF=rejected: folded 4097 > 4096       AGREE
+
+== many-line shape, folded stream exactly 4096 ==
+409 x 10-byte lines + a 6-byte line
+  folded stream = 4096 bytes, LF form raw = 4096, CRLF form raw = 4506
+  OLD: LF=accepted                           CRLF=rejected: over 4096 raw bytes      *** DIVERGE ***
+  NEW: LF=accepted                           CRLF=accepted                           AGREE  payload=4095/4095 sha=f8bf84b67b4517c4/f8bf84b67b4517c4
+
+== many-line shape, folded stream exactly 4097 ==
+409 x 10-byte lines + a 7-byte line
+  folded stream = 4097 bytes, LF form raw = 4097, CRLF form raw = 4507
+  OLD: LF=rejected: over 4096 raw bytes      CRLF=rejected: over 4096 raw bytes      AGREE
+  NEW: LF=rejected: folded 4097 > 4096       CRLF=rejected: folded 4097 > 4096       AGREE
+
+== raw-capture-bound tightness: maximal CRLF expansion ==
+  4095 CRLF pairs: raw=8190 folded=4095 NEW -> rejected: two terminal LFs
+  4096 CRLF pairs: raw=8192 folded=4096 NEW -> rejected: two terminal LFs
+  4097 CRLF pairs: raw=8194 folded=4097 NEW -> rejected: over 8192 raw bytes
+  lemma: folded >= ceil(raw/2), so raw > 8192 always folds > 4096; verifying over every raw length 0..20000
+  raw lengths where the raw bound could reject a semantically admissible stream: 0
+
+== the measured 192-byte stream is unaffected ==
+  OLD payload=191 sha256(payload)=7d8e08339e557ede5a9e565773c4cf17f83dea27f7d0c6591869f184bd1b81b5 sha256(record)=7fc35c11acae420849418f9c9f9b5681651beedc6d68f00bf1e4db022cd5f06b
+  NEW payload=191 sha256(payload)=7d8e08339e557ede5a9e565773c4cf17f83dea27f7d0c6591869f184bd1b81b5 sha256(record)=7fc35c11acae420849418f9c9f9b5681651beedc6d68f00bf1e4db022cd5f06b
+
+########## M4: canonicalization of absent paths ##########
+R = /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/canon-2364284004
+case 1: leaf exists
+  pkg/src/lib.rs                     EvalSymlinks -> /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/canon-2364284004/pkg/src/lib.rs
+case 2: leaf ABSENT, ancestors are real dirs  (reference 4.3 permits absence AND demands canonical form)
+  pkg/src/absent.rs                  EvalSymlinks -> ERROR lstat /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/canon-2364284004/pkg/src/absent.rs: no such file or directory
+case 3: leaf ABSENT below a symlink ancestor
+  pkg/linkdir/absent.rs              EvalSymlinks -> ERROR lstat /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/canon-2364284004/elsewhere/absent.rs: no such file or directory
+case 4: leaf ABSENT below a regular-file ancestor
+  pkg/afile/absent.rs                EvalSymlinks -> ERROR not a directory
+case 5: deepest EXISTING ancestor of case 2 (the total rule's anchor)
+  pkg/src                            EvalSymlinks -> /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/canon-2364284004/pkg/src
+case 6: deepest EXISTING ancestor of case 3, non-following lstat verdict
+  pkg/linkdir                        lstat mode=L--------- symlink=true err=<nil>
+case 7: realpath(3) via /bin, same question
+  realpath(3) absent leaf   -> None errno= 2 No such file or directory
+  realpath(3) existing dir  -> /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/tmp2xdjopzo/src errno= 0

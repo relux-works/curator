@@ -1,0 +1,32 @@
+=== RUN   TestBrokenCskSkillNeverFallsBackToLegacy
+=== RUN   TestBrokenCskSkillNeverFallsBackToLegacy/newer_schema_version
+=== RUN   TestBrokenCskSkillNeverFallsBackToLegacy/malformed_json
+=== RUN   TestBrokenCskSkillNeverFallsBackToLegacy/not_a_json_object
+=== RUN   TestBrokenCskSkillNeverFallsBackToLegacy/empty_file
+=== RUN   TestBrokenCskSkillNeverFallsBackToLegacy/valid_schema,_invalid_body
+--- PASS: TestBrokenCskSkillNeverFallsBackToLegacy (0.01s)
+    --- PASS: TestBrokenCskSkillNeverFallsBackToLegacy/newer_schema_version (0.00s)
+    --- PASS: TestBrokenCskSkillNeverFallsBackToLegacy/malformed_json (0.00s)
+    --- PASS: TestBrokenCskSkillNeverFallsBackToLegacy/not_a_json_object (0.00s)
+    --- PASS: TestBrokenCskSkillNeverFallsBackToLegacy/empty_file (0.00s)
+    --- PASS: TestBrokenCskSkillNeverFallsBackToLegacy/valid_schema,_invalid_body (0.00s)
+=== RUN   TestNewerSchemaVersionReportsUpgradeHint
+--- PASS: TestNewerSchemaVersionReportsUpgradeHint (0.00s)
+=== RUN   TestLegacyFallbackNeedsAbsentManifest
+--- PASS: TestLegacyFallbackNeedsAbsentManifest (0.00s)
+=== RUN   TestUnreadableCskSkillNeverFallsBackToLegacy
+--- PASS: TestUnreadableCskSkillNeverFallsBackToLegacy (0.00s)
+=== RUN   TestCskSkillDirectoryNeverFallsBackToLegacy
+--- PASS: TestCskSkillDirectoryNeverFallsBackToLegacy (0.00s)
+=== RUN   TestDanglingCskSkillSymlinkNeverFallsBackToLegacy
+    parse_test.go:438: present manifest degraded into a parsed spec: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestDanglingCskSkillSymlinkNeverFallsBackToLegacy (0.00s)
+=== RUN   TestUnreadableSnapshotNeverDegradesToEmptySpec
+    parse_test.go:453: present manifest degraded into a parsed spec: &{SchemaVersion:0 SourceFile: RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestUnreadableSnapshotNeverDegradesToEmptySpec (0.00s)
+=== RUN   TestDanglingLegacyManifestNeverDegradesToEmptySpec
+    parse_test.go:471: present manifest degraded into a parsed spec: &{SchemaVersion:0 SourceFile: RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestDanglingLegacyManifestNeverDegradesToEmptySpec (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/skillspec	5.231s
+FAIL

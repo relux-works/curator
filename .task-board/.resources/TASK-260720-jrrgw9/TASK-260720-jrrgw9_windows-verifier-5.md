@@ -1,0 +1,9 @@
+# Windows-only verifier 5
+
+The integrated candidate and exact macOS full/race gates are already accepted evidence from verifier 4. Do not run any local Go command and do not alter the macOS candidate. This run only retries native Windows qualification through ssh win.
+
+Attempt BatchMode SSH connectivity up to three times with 15-second connect timeouts and a short pause between attempts. If all attempts time out, attach exact exits/logs and return to review with Windows externally unqualified; do not block or reinterpret the green macOS gates. If a connection succeeds, inventory Windows version, architecture, PowerShell/cmd, tar/scp availability, and Go. Require Go 1.25.5; do not install/download or change PATH/system configuration.
+
+Create a uniquely task-owned remote directory under the remote user TEMP. Transfer the exact current TASK-260720-jrrgw9 candidate snapshot without .git, local .temp, or board data, preserving all source and test files needed by go test. Verify key accepted hashes remotely, including namespace.go bb332038..., namespace_pass_test.go 3611f04f..., and unchanged fixture_test.go e0732e2e.... Run native Windows go test -count=1 for the platform-sensitive packages and launcher/lifecycle surfaces (at minimum internal/runtimestore, internal/scopes, internal/globalbins, internal/install, internal/transaction, and cmd/curator with an evidence-based focused filter); run broader/full Windows testing only if it fits the unchanged default package timeout and remaining run budget. Capture exact commands, exits, package timings, skips, and first failure.
+
+After descendants stop, remove only the task-owned remote directory and local transfer archive, verify cleanup, attach a Windows verifier-5 outcome/raw logs, and route to review. Never commit, stage, publish, pin, install software, mutate machine configuration, or claim Windows pass when only connectivity/inventory succeeded.

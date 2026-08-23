@@ -1,0 +1,280 @@
+diff --git a/status_test.before.go b/status_test.after.go
+index 9424a93..4c7ec3e 100644
+--- a/status_test.before.go
++++ b/status_test.after.go
+@@ -330,16 +330,71 @@ func cacheEntries(t *testing.T, home string) []string {
+ 	return paths
+ }
+ 
+-// TestStatusReportsCompiledCurrentnessAndFailsCheck is the end-to-end proof of
+-// the compiled currentness surface: a real installation reports every planned
+-// command as current, and each independent way that state can stop being
+-// current produces its own stable code and a non-zero `status --check`.
+-func TestStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
++// compiledProjectFixture is one real compiled installation: the project the
++// operator declared, the manager home that owns the protected build cache, and
++// the installed skill whose marker records the compiled state.
++type compiledProjectFixture struct {
++	project   string
++	home      string
++	installed string
++}
++
++// newInstalledCompiledProject builds that fixture and installs it once, through
++// the real command path.
++//
++// Every surface below starts from the same thing: one installed compiled
++// command whose protected entry and install marker agree. Deriving it costs a
++// real compilation of the vendored module, so it is derived once and handed to
++// each case rather than rebuilt per test.
++func newInstalledCompiledProject(t *testing.T) compiledProjectFixture {
++	t.Helper()
+ 	project, home := compiledProject(t)
+ 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+ 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+-	installed := filepath.Join(project, ".agents", "skills", "build-skill")
++	return compiledProjectFixture{
++		project:   project,
++		home:      home,
++		installed: filepath.Join(project, ".agents", "skills", "build-skill"),
++	}
++}
++
++// TestCompiledProjectStatusRepairRollbackRecovery drives the whole compiled
++// project lifecycle over one installed fixture: currentness reporting, corrupt
++// cache repair by install and by upgrade, the rollback and recovery of a commit
++// that failed after a real publication, protected cache state that moves during
++// a check, and the repair of cache bytes outside a provable boundary.
++//
++// The cases run sequentially and share live state deliberately, so each one
++// re-reads the marker, cache, and plan evidence it asserts against instead of
++// carrying a baseline in, and each returns the fixture to a current state
++// before the next one opens its own window.
++func TestCompiledProjectStatusRepairRollbackRecovery(t *testing.T) {
++	fixture := newInstalledCompiledProject(t)
++
++	t.Run("status reports compiled currentness and fails check", func(t *testing.T) {
++		assertCompiledCurrentnessAndFailedCheck(t, fixture)
++	})
++	t.Run("install and upgrade repair corrupt compiled state", func(t *testing.T) {
++		assertCorruptCompiledStateIsRepaired(t, fixture)
++	})
++	t.Run("install and upgrade restore the cache when the commit fails", func(t *testing.T) {
++		assertTheCacheIsRestoredWhenTheCommitFails(t, fixture)
++	})
++	t.Run("status reports protected cache state that moved during the check", func(t *testing.T) {
++		assertProtectedCacheStateThatMovedDuringTheCheck(t, fixture)
++	})
++	t.Run("install repairs untrusted compiled state and preserves the old install", func(t *testing.T) {
++		assertUntrustedCompiledStateIsRepaired(t, fixture)
++	})
++}
++
++// assertCompiledCurrentnessAndFailedCheck is the end-to-end proof of the
++// compiled currentness surface: a real installation reports every planned
++// command as current, and each independent way that state can stop being
++// current produces its own stable code and a non-zero `status --check`.
++func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProjectFixture) {
++	project, home, installed := fixture.project, fixture.home, fixture.installed
+ 
+ 	code, stdout, stderr := capture(t, "status", "app", "--json")
+ 	if code != exitOK {
+@@ -620,24 +675,16 @@ func TestStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+ 	}
+ }
+ 
+-// TestInstallAndUpgradeRepairCorruptCompiledState proves the reconciliation
+-// path for a protected entry that cannot be interpreted at all: corrupt
+-// receipt bytes and corrupt artifact bytes are rebuilt by install and by
+-// upgrade, only after every gate has passed, and a run that fails leaves the
+-// previous installation and the live cache exactly as they were.
+-func TestInstallAndUpgradeRepairCorruptCompiledState(t *testing.T) {
++// assertCorruptCompiledStateIsRepaired proves the reconciliation path for a
++// protected entry that cannot be interpreted at all: corrupt receipt bytes and
++// corrupt artifact bytes are rebuilt by install and by upgrade, only after
++// every gate has passed, and a run that fails leaves the previous installation
++// and the live cache exactly as they were.
++func assertCorruptCompiledStateIsRepaired(t *testing.T, fixture compiledProjectFixture) {
++	home, installed := fixture.home, fixture.installed
++
+ 	for _, command := range []string{"install", "upgrade"} {
+ 		t.Run(command, func(t *testing.T) {
+-			project, home := compiledProject(t)
+-			if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+-				t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+-			}
+-			installed := filepath.Join(project, ".agents", "skills", "build-skill")
+-			before := marker.Read(installed)
+-			if before == nil || len(before.Builds) != 1 {
+-				t.Fatalf("first install did not record compiled state: %+v", before)
+-			}
+-
+ 			for _, corruption := range []struct {
+ 				name    string
+ 				corrupt func(t *testing.T, home string)
+@@ -646,6 +693,15 @@ func TestInstallAndUpgradeRepairCorruptCompiledState(t *testing.T) {
+ 				{"artifact bytes", corruptCacheArtifact},
+ 			} {
+ 				t.Run(corruption.name, func(t *testing.T) {
++					// The shared fixture is current when this case starts, and a
++					// preceding repair legitimately republished the entry the marker
++					// names, so the compiled state every assertion below compares
++					// against is re-read here instead of being carried in.
++					before := marker.Read(installed)
++					if before == nil || len(before.Builds) != 1 {
++						t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
++					}
++
+ 					corruption.corrupt(t, home)
+ 					if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+ 						decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+@@ -695,8 +751,8 @@ func TestInstallAndUpgradeRepairCorruptCompiledState(t *testing.T) {
+ 	}
+ }
+ 
+-// TestInstallAndUpgradeRestoreTheCacheWhenTheCommitFails is the other half of
+-// the repair contract, driven end to end through the real commands.
++// assertTheCacheIsRestoredWhenTheCommitFails is the other half of the repair
++// contract, driven end to end through the real commands.
+ //
+ // The refusal case above fails a gate *before* the repair. This one lets the
+ // repair happen — the corrupt entry is really quarantined and a rebuilt entry
+@@ -709,26 +765,38 @@ func TestInstallAndUpgradeRepairCorruptCompiledState(t *testing.T) {
+ // The commit is failed by taking away write access to the context store the
+ // first target class swaps in, which is the last moment a real installation can
+ // still fail without leaving a durable transaction behind.
+-func TestInstallAndUpgradeRestoreTheCacheWhenTheCommitFails(t *testing.T) {
++func assertTheCacheIsRestoredWhenTheCommitFails(t *testing.T, fixture compiledProjectFixture) {
++	project, home, installed := fixture.project, fixture.home, fixture.installed
++
+ 	for _, command := range []string{"install", "upgrade"} {
+ 		t.Run(command, func(t *testing.T) {
+-			project, home := compiledProject(t)
+-			if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+-				t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+-			}
+-			installed := filepath.Join(project, ".agents", "skills", "build-skill")
++			// The shared fixture is current when this case starts, and a preceding
++			// repair legitimately republished the entry the marker names, so the
++			// compiled state this case must find unchanged is re-read here.
+ 			before := marker.Read(installed)
+ 			if before == nil || len(before.Builds) != 1 {
+-				t.Fatalf("first install did not record compiled state: %+v", before)
++				t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
+ 			}
+ 
+ 			corruptCacheArtifact(t, home)
++			// A privileged process ignores the directory mode this case fails the
++			// commit with, and skips below with the cache already corrupted. The
++			// next case is handed a current fixture on that path too.
++			t.Cleanup(func() {
++				if t.Skipped() {
++					reinstall(t)
++				}
++			})
+ 			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+ 				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+ 				t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
+ 			}
+ 			corruptArtifact := liveArtifactBytes(t, home)
+ 			installedBefore := installedFingerprint(t, project, home)
++			// Withdrawn entries are never deleted, only collected by the ordinary
++			// sweep, so a shared cache root still holds what earlier cases withdrew.
++			// The count this case owns is therefore measured against what it found.
++			withdrawnBefore := quarantinedEntries(t, home)
+ 
+ 			store := filepath.Join(project, ".agents", "skills")
+ 			denyWrites(t, store)
+@@ -743,7 +811,7 @@ func TestInstallAndUpgradeRestoreTheCacheWhenTheCommitFails(t *testing.T) {
+ 			// the commit failed. Publication quarantines the corrupt entry and the
+ 			// reversal withdraws the replacement the same way, so exactly one
+ 			// withdrawn entry is left behind for the ordinary sweep.
+-			if withdrawn := quarantinedEntries(t, home); withdrawn != 1 {
++			if withdrawn := quarantinedEntries(t, home) - withdrawnBefore; withdrawn != 1 {
+ 				t.Fatalf("withdrawn cache entries = %d, want exactly the one this run published", withdrawn)
+ 			}
+ 			// Nothing half-built survives in the shared cache root either: a
+@@ -1128,8 +1196,8 @@ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
+ 	}
+ }
+ 
+-// TestStatusReportsProtectedCacheStateThatMovedDuringTheCheck closes the other
+-// half of the classification window.
++// assertProtectedCacheStateThatMovedDuringTheCheck closes the other half of the
++// classification window.
+ //
+ // Install markers are fingerprinted around the whole run, but a marker is only
+ // half the evidence a compiled verdict is derived from: the protected cache is
+@@ -1141,11 +1209,9 @@ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
+ // as a concurrent install, sweep, or permission change would move it. Nothing
+ // rewrites a marker, so a verdict that stays authoritative could only have come
+ // from evidence nobody re-read.
+-func TestStatusReportsProtectedCacheStateThatMovedDuringTheCheck(t *testing.T) {
+-	project, home := compiledProject(t)
+-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+-		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+-	}
++func assertProtectedCacheStateThatMovedDuringTheCheck(t *testing.T, fixture compiledProjectFixture) {
++	project, home := fixture.project, fixture.home
++
+ 	cfg, code := loadConfig()
+ 	if code != exitOK {
+ 		t.Fatalf("loading the configuration = %d", code)
+@@ -1197,9 +1263,10 @@ func TestStatusReportsProtectedCacheStateThatMovedDuringTheCheck(t *testing.T) {
+ 		},
+ 	} {
+ 		t.Run(name, func(t *testing.T) {
+-			// Each case opens its own window: a preceding case restored the
+-			// installation through a real reinstall, which legitimately rewrites
+-			// the marker this fingerprint has to be taken from.
++			// Each case opens its own window over the state it is about to move:
++			// the case before it put every protected cache byte back from its own
++			// snapshot, so the production plan and the marker fingerprint this
++			// window is taken from are acquired again here rather than carried in.
+ 			planned := install.Project(cfg, project, "app", install.Options{DryRun: true})
+ 			if planned.Status != "ok" || len(planned.Builds) != 1 {
+ 				t.Fatalf("read-only plan = %+v", planned)
+@@ -1212,8 +1279,12 @@ func TestStatusReportsProtectedCacheStateThatMovedDuringTheCheck(t *testing.T) {
+ 				t.Fatal(err)
+ 			}
+ 
++			// Every byte and permission bit this case moves is copied aside before
++			// it moves, and put back when the case ends. Repairing the fixture by
++			// reinstalling compiles the command again and proves nothing this test
++			// owns; install, repair, and rollback keep their own dedicated cases.
++			snapshotBuildCacheAfter(t, home)
+ 			move(t, planned.Builds[0].Expectation().Input)
+-			t.Cleanup(func() { reinstall(t) })
+ 
+ 			// The marker is deliberately untouched, so only the cache recheck can
+ 			// have produced the verdict below.
+@@ -1267,18 +1338,18 @@ func TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands(t *test
+ 	}
+ }
+ 
+-// TestInstallRepairsUntrustedCompiledStateAndPreservesTheOldInstall proves the
+-// documented reconciliation path: install rebuilds candidate bytes that are
+-// outside a provable protected boundary instead of adopting them.
+-func TestInstallRepairsUntrustedCompiledStateAndPreservesTheOldInstall(t *testing.T) {
+-	project, home := compiledProject(t)
+-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+-		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+-	}
+-	installed := filepath.Join(project, ".agents", "skills", "build-skill")
++// assertUntrustedCompiledStateIsRepaired proves the documented reconciliation
++// path: install rebuilds candidate bytes that are outside a provable protected
++// boundary instead of adopting them.
++func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjectFixture) {
++	home, installed := fixture.home, fixture.installed
++
++	// The shared fixture is current when this case starts, and a preceding
++	// repair legitimately republished the entry the marker names, so the
++	// compiled state this case must find preserved is re-read here.
+ 	before := marker.Read(installed)
+ 	if before == nil || len(before.Builds) != 1 {
+-		t.Fatalf("first install did not record compiled state: %+v", before)
++		t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
+ 	}
+ 	for _, entry := range cacheEntries(t, home) {
+ 		if err := os.Chmod(entry, 0o777); err != nil {

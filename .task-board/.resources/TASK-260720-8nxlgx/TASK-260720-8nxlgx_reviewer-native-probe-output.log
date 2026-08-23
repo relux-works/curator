@@ -1,0 +1,51 @@
+=== reviewer boundary probe (18 cases) ===
+probe root: C:\Users\admin\AppData\Local\Temp\reviewer-af18fc-7k13qrkq
+HOLD: manager-home write-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home delete-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home write-dac-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home write-owner-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home append-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home inherit-only-write untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: reparse at entry: inspect=untrusted-provenance reason='C:\\Users\\admin\\AppData\\Local\\Temp\\reviewer-af18fc-7k13qrkq\\reparse-entry\\.cocoaskills\\buil'
+HOLD: reparse at bin: inspect=untrusted-provenance reason='C:\\Users\\admin\\AppData\\Local\\Temp\\reviewer-af18fc-7k13qrkq\\reparse-bin\\.cocoaskills\\builds'
+HOLD: bin-as-file: inspect=untrusted-provenance reason='artifact directory is not a directory'
+HOLD: receipt-as-directory: inspect=untrusted-provenance reason='cache receipt is not a regular file'
+HOLD: permissive pre-existing entry lookup: inspect=untrusted-provenance leaked_foreign_receipt=False
+HOLD: permissive pre-existing entry publication: publish=published live_bytes_are_foreign=False
+HOLD: alternate data stream: inspect=untrusted-provenance reason='cache artifact has alternate data streams'
+HOLD: untrusted grant on driver-root: inspect=untrusted-provenance reason='build driver cache DACL differs from its protected profile'
+HOLD: untrusted grant on sealed-entry: inspect=untrusted-provenance reason='cache entry DACL differs from its protected profile'
+HOLD: untrusted grant on sealed-bin: inspect=untrusted-provenance reason='artifact directory DACL differs from its protected profile'
+HOLD: real owner drift on artifact: inspect=untrusted-provenance reason='cache artifact owner does not match the current manager principal'
+HOLD: read-only lookup and missing lock: inspect=miss publish=cache_lock_required tree_after=()
+HOLD: diagnostic residual hard-link window: link_present=True inspect=hit admitted_multiply_linked_artifact=True
+
+=== summary ===
+HOLD: manager-home write-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home delete-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home write-dac-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home write-owner-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home append-only untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: manager-home inherit-only-write untrusted grant: inspect=untrusted-provenance publish=cache_boundary_untrusted roots=[]
+HOLD: reparse at entry: inspect=untrusted-provenance reason='C:\\Users\\admin\\AppData\\Local\\Temp\\reviewer-af18fc-7k13qrkq\\reparse-entry\\.cocoaskills\\buil'
+HOLD: reparse at bin: inspect=untrusted-provenance reason='C:\\Users\\admin\\AppData\\Local\\Temp\\reviewer-af18fc-7k13qrkq\\reparse-bin\\.cocoaskills\\builds'
+HOLD: bin-as-file: inspect=untrusted-provenance reason='artifact directory is not a directory'
+HOLD: receipt-as-directory: inspect=untrusted-provenance reason='cache receipt is not a regular file'
+HOLD: permissive pre-existing entry lookup: inspect=untrusted-provenance leaked_foreign_receipt=False
+HOLD: permissive pre-existing entry publication: publish=published live_bytes_are_foreign=False
+HOLD: alternate data stream: inspect=untrusted-provenance reason='cache artifact has alternate data streams'
+HOLD: untrusted grant on driver-root: inspect=untrusted-provenance reason='build driver cache DACL differs from its protected profile'
+HOLD: untrusted grant on sealed-entry: inspect=untrusted-provenance reason='cache entry DACL differs from its protected profile'
+HOLD: untrusted grant on sealed-bin: inspect=untrusted-provenance reason='artifact directory DACL differs from its protected profile'
+HOLD: real owner drift on artifact: inspect=untrusted-provenance reason='cache artifact owner does not match the current manager principal'
+HOLD: read-only lookup and missing lock: inspect=miss publish=cache_lock_required tree_after=()
+HOLD: diagnostic residual hard-link window: link_present=True inspect=hit admitted_multiply_linked_artifact=True
+
+all probed boundaries held
+BOUNDARY_PROBE_EXIT=0
+
+=== reviewer profile probe (2 cases) ===
+probe root: C:\Users\admin\AppData\Local\Temp\reviewer-af18fc-profile-z7x_ijpd
+HOLD: inheritable untrusted read ACE: publish=published inspect=hit inherited_everyone_aces=none
+HOLD: sealed read/execute publication source: publish=cache_publication_invalid detail='publication artifact source is not private, singly linked, owner-controlled regular state: manager home does not grant the manager principal'
+PROFILE_PROBE_EXIT=0

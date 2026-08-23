@@ -1,0 +1,75 @@
+TASK-260720-z2z795 atomic rework validation
+Date: 2026-07-30
+Run: RUN-260729-4ad5fe
+Worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+HEAD: 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+
+EXPECTED-RED REGRESSION RUN
+command: /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider tests/test_transactions.py -q -k 'native_no_replace or commit_race or rollback_race or absent_live_parent'
+exit: 1
+summary: 5 failed, 13 deselected in 0.09s
+rationale: expected failures against the reviewed implementation before the native no-replace and absent-parent fixes
+
+POST-IMPLEMENTATION NEW REGRESSIONS
+command: /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider tests/test_transactions.py -q -k 'native_no_replace or commit_race or rollback_race or absent_live_parent'
+exit: 0
+output: 5 passed, 13 deselected in 0.04s
+
+FINAL FOCUSED PYTEST
+command: /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider tests/test_locking.py tests/test_transactions.py -q
+exit: 0
+output: 28 passed in 0.98s
+
+FINAL STRICT MYPY
+command: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python -m mypy --cache-dir=/tmp/TASK-260720-z2z795-mypy-cache-final
+exit: 0
+output: Success: no issues found in 56 source files
+
+FINAL RUFF LINT
+command: uvx ruff check src/csk/locking.py src/csk/transactions.py tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: All checks passed!
+
+FINAL RUFF FORMAT
+command: uvx ruff format --check src/csk/locking.py src/csk/transactions.py tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 4 files already formatted
+
+FINAL FULL PYTEST
+command: /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider -q
+exit: 0
+output: 512 passed, 18 skipped in 77.06s (0:01:17)
+
+FINAL PACKAGE BUILD
+command: /opt/homebrew/bin/python3.11 -m build
+exit: 0
+output: Successfully built cocoaskills-0.12.6.dev0+g6fc2fd97d.d20260729.tar.gz and cocoaskills-0.12.6.dev0+g6fc2fd97d.d20260729-py3-none-any.whl
+
+FINAL TRACKED-DIFF WHITESPACE
+command: git diff --check
+exit: 0
+output: <none>
+
+UNTRACKED NO-INDEX DIAGNOSTICS
+command: git diff --no-index --check /dev/null src/csk/transactions.py
+exit: 1
+output: <none>
+rationale: no-index reports the intentional file-content difference; no whitespace diagnostic was emitted
+
+command: git diff --no-index --check /dev/null tests/test_transactions.py
+exit: 1
+output: <none>
+rationale: no-index reports the intentional file-content difference; no whitespace diagnostic was emitted
+
+CURRENT STATUS
+## task/TASK-260720-z2z795-transaction-engine
+ M src/csk/locking.py
+ M tests/test_locking.py
+?? src/csk/transactions.py
+?? tests/test_transactions.py
+
+CURRENT SHA-256
+feae9c197a62bce3c320774cd46d5c2fdfd6f694b6f66e9bd15c129c2d29bf5a  src/csk/locking.py
+cd1f3344151014f299561535d90f9337f45d7198fbf10457ae1545966f3454aa  src/csk/transactions.py
+110db19650592a690804e5904d945f79a67a3f163fc378cefe758f77b9976f47  tests/test_locking.py
+c0ddd310cb7643b969a0c54d7e9a9ac28221c6eb5570dbddfd0f50ba0d3ce21b  tests/test_transactions.py

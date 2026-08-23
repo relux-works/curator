@@ -1,0 +1,521 @@
+﻿2026-08-23T10:22:29.9764362Z Current runner version: '2.336.0'
+2026-08-23T10:22:29.9801413Z ##[group]Runner Image Provisioner
+2026-08-23T10:22:29.9802681Z Hosted Compute Agent
+2026-08-23T10:22:29.9803591Z Version: 20260729.566
+2026-08-23T10:22:29.9804831Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+2026-08-23T10:22:29.9806438Z Build Date: 2026-07-29T19:17:02Z
+2026-08-23T10:22:29.9807759Z Worker ID: {3f5d7ba7-8668-4cb1-a891-5f0dcadf0404}
+2026-08-23T10:22:29.9809218Z Azure Region: eastus
+2026-08-23T10:22:29.9810198Z ##[endgroup]
+2026-08-23T10:22:29.9812502Z ##[group]Operating System
+2026-08-23T10:22:29.9813696Z Microsoft Windows Server 2025
+2026-08-23T10:22:29.9814854Z 10.0.26100
+2026-08-23T10:22:29.9815514Z Datacenter
+2026-08-23T10:22:29.9816385Z ##[endgroup]
+2026-08-23T10:22:29.9817367Z ##[group]Runner Image
+2026-08-23T10:22:29.9818446Z Image: windows-2025-vs2026
+2026-08-23T10:22:29.9819903Z Version: 20260818.207.1
+2026-08-23T10:22:29.9822505Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260818.207/images/windows/Windows2025-VS2026-Readme.md
+2026-08-23T10:22:29.9825627Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260818.207
+2026-08-23T10:22:29.9827109Z ##[endgroup]
+2026-08-23T10:22:29.9829000Z ##[group]GITHUB_TOKEN Permissions
+2026-08-23T10:22:29.9831840Z Contents: read
+2026-08-23T10:22:29.9832862Z Metadata: read
+2026-08-23T10:22:29.9833778Z ##[endgroup]
+2026-08-23T10:22:29.9836166Z Secret source: Actions
+2026-08-23T10:22:29.9837237Z Prepare workflow directory
+2026-08-23T10:22:30.0225389Z Prepare all required actions
+2026-08-23T10:22:30.0273208Z Getting action download info
+2026-08-23T10:22:30.1548349Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-08-23T10:22:30.8144786Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+2026-08-23T10:22:31.0137025Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-08-23T10:22:32.0743682Z Complete job name: Candidate suite (windows-latest)
+2026-08-23T10:22:33.4509758Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-23T10:22:33.4522189Z ##[group]Run actions/checkout@v4
+2026-08-23T10:22:33.4522828Z with:
+2026-08-23T10:22:33.4523149Z   submodules: true
+2026-08-23T10:22:33.4523502Z   repository: relux-works/curator
+2026-08-23T10:22:33.4528952Z   token: ***
+2026-08-23T10:22:33.4529276Z   ssh-strict: true
+2026-08-23T10:22:33.4529599Z   ssh-user: git
+2026-08-23T10:22:33.4529926Z   persist-credentials: true
+2026-08-23T10:22:33.4530300Z   clean: true
+2026-08-23T10:22:33.4530635Z   sparse-checkout-cone-mode: true
+2026-08-23T10:22:33.4531442Z   fetch-depth: 1
+2026-08-23T10:22:33.4531804Z   fetch-tags: false
+2026-08-23T10:22:33.4532128Z   show-progress: true
+2026-08-23T10:22:33.4532500Z   lfs: false
+2026-08-23T10:22:33.4532817Z   set-safe-directory: true
+2026-08-23T10:22:33.4533205Z   allow-unsafe-pr-checkout: false
+2026-08-23T10:22:33.4533947Z env:
+2026-08-23T10:22:33.4534320Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:33.4534809Z   GOTOOLCHAIN: local
+2026-08-23T10:22:33.4535125Z   GOENV: off
+2026-08-23T10:22:33.4535406Z ##[endgroup]
+2026-08-23T10:22:33.6037322Z Syncing repository: relux-works/curator
+2026-08-23T10:22:33.6038629Z ##[group]Getting Git version info
+2026-08-23T10:22:33.6038953Z Working directory is 'D:\a\curator\curator'
+2026-08-23T10:22:33.8862821Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-08-23T10:22:36.3421423Z git version 2.55.0.windows.4
+2026-08-23T10:22:36.3495575Z ##[endgroup]
+2026-08-23T10:22:36.3520802Z Temporarily overriding HOME='D:\a\_temp\20426e67-ef07-448b-afd7-3c8f4571937b' before making global git config changes
+2026-08-23T10:22:36.3563727Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-23T10:22:36.3564445Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+2026-08-23T10:22:36.5726791Z Deleting the contents of 'D:\a\curator\curator'
+2026-08-23T10:22:36.5733081Z ##[group]Initializing the repository
+2026-08-23T10:22:36.5743556Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator
+2026-08-23T10:22:36.9896785Z Initialized empty Git repository in D:/a/curator/curator/.git/
+2026-08-23T10:22:36.9942791Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator
+2026-08-23T10:22:37.2562791Z ##[endgroup]
+2026-08-23T10:22:37.2563611Z ##[group]Disabling automatic garbage collection
+2026-08-23T10:22:37.2575034Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-08-23T10:22:37.2868778Z ##[endgroup]
+2026-08-23T10:22:37.2869188Z ##[group]Setting up auth
+2026-08-23T10:22:37.2888769Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-08-23T10:22:37.3235638Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-08-23T10:22:39.1944615Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-23T10:22:39.2301617Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-08-23T10:22:39.7486782Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-23T10:22:39.7774575Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-08-23T10:22:40.2946724Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-08-23T10:22:40.3303663Z ##[endgroup]
+2026-08-23T10:22:40.3304818Z ##[group]Fetching the repository
+2026-08-23T10:22:40.3306333Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +1f55f1b4e67915e477a37011f8c5ef4e4cd4c011:refs/remotes/origin/main
+2026-08-23T10:22:41.3851423Z From https://github.com/relux-works/curator
+2026-08-23T10:22:41.3852225Z  * [new ref]         1f55f1b4e67915e477a37011f8c5ef4e4cd4c011 -> origin/main
+2026-08-23T10:22:41.3894049Z ##[endgroup]
+2026-08-23T10:22:41.3894847Z ##[group]Determining the checkout info
+2026-08-23T10:22:41.3897403Z ##[endgroup]
+2026-08-23T10:22:41.3928388Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-08-23T10:22:41.4372298Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-08-23T10:22:41.4663207Z ##[group]Checking out the ref
+2026-08-23T10:22:41.4672232Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B main refs/remotes/origin/main
+2026-08-23T10:22:41.7300436Z Switched to a new branch 'main'
+2026-08-23T10:22:41.7396562Z branch 'main' set up to track 'origin/main'.
+2026-08-23T10:22:41.7442557Z ##[endgroup]
+2026-08-23T10:22:41.7443190Z ##[group]Setting up auth for fetching submodules
+2026-08-23T10:22:41.7456738Z [command]"C:\Program Files\Git\bin\git.exe" config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-08-23T10:22:41.7798181Z [command]"C:\Program Files\Git\bin\git.exe" config --global --unset-all url.https://github.com/.insteadOf
+2026-08-23T10:22:41.8126391Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf git@github.com:
+2026-08-23T10:22:41.8449359Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf org-261817730@github.com:
+2026-08-23T10:22:41.8753622Z ##[endgroup]
+2026-08-23T10:22:41.8754234Z ##[group]Fetching submodules
+2026-08-23T10:22:41.8768215Z [command]"C:\Program Files\Git\bin\git.exe" submodule sync
+2026-08-23T10:22:42.4524525Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 submodule update --init --force --depth=1
+2026-08-23T10:22:43.0432035Z Submodule 'agents/skills/skill-go-testing-tools' (https://github.com/relux-works/skill-go-testing-tools.git) registered for path 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:22:43.0957785Z Cloning into 'D:/a/curator/curator/agents/skills/skill-go-testing-tools'...
+2026-08-23T10:22:44.2084829Z From https://github.com/relux-works/skill-go-testing-tools
+2026-08-23T10:22:44.2085354Z  * branch            21585d0e937cae47e54a788d8ae36b1780eae47f -> FETCH_HEAD
+2026-08-23T10:22:44.2968895Z Submodule path 'agents/skills/skill-go-testing-tools': checked out '21585d0e937cae47e54a788d8ae36b1780eae47f'
+2026-08-23T10:22:44.3048703Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local gc.auto 0"
+2026-08-23T10:22:44.8076590Z Entering 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:22:44.8569019Z ##[endgroup]
+2026-08-23T10:22:44.8569420Z ##[group]Persisting credentials for submodules
+2026-08-23T10:22:44.8580115Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :\""
+2026-08-23T10:22:45.3849786Z Entering 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:22:45.4759807Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "sh -c \"git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url\""
+2026-08-23T10:22:45.9971251Z Entering 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:22:46.0925192Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+2026-08-23T10:22:46.1068742Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'"
+2026-08-23T10:22:46.6346361Z Entering 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:22:46.6814844Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'org-261817730@github.com:'"
+2026-08-23T10:22:47.2928897Z Entering 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:22:47.3436688Z ##[endgroup]
+2026-08-23T10:22:47.4620202Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-08-23T10:22:47.4932680Z 1f55f1b4e67915e477a37011f8c5ef4e4cd4c011
+2026-08-23T10:22:47.5351542Z ##[group]Run bash .github/ci/candidate-suite.sh verify-inputs "$CANDIDATE_REF" "$CANDIDATE_ROOT_INPUT"
+2026-08-23T10:22:47.5352380Z [36;1mbash .github/ci/candidate-suite.sh verify-inputs "$CANDIDATE_REF" "$CANDIDATE_ROOT_INPUT"[0m
+2026-08-23T10:22:47.5373496Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-08-23T10:22:47.5373907Z env:
+2026-08-23T10:22:47.5374143Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:47.5374441Z   GOTOOLCHAIN: local
+2026-08-23T10:22:47.5374641Z   GOENV: off
+2026-08-23T10:22:47.5374874Z   CANDIDATE_REF: 859727b103ed175ff214cbb64641f4686d8c6a68
+2026-08-23T10:22:47.5375200Z   CANDIDATE_ROOT_INPUT: 
+2026-08-23T10:22:47.5375410Z ##[endgroup]
+2026-08-23T10:22:48.3208867Z candidate-suite: candidate input accepted (exactly one revision or root)
+2026-08-23T10:22:48.3435428Z ##[group]Run bash .github/ci/candidate-suite.sh verify-ref "$CANDIDATE_REF"
+2026-08-23T10:22:48.3436050Z [36;1mbash .github/ci/candidate-suite.sh verify-ref "$CANDIDATE_REF"[0m
+2026-08-23T10:22:48.3451881Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-08-23T10:22:48.3452284Z env:
+2026-08-23T10:22:48.3452512Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:48.3452814Z   GOTOOLCHAIN: local
+2026-08-23T10:22:48.3453012Z   GOENV: off
+2026-08-23T10:22:48.3453245Z   CANDIDATE_REF: 859727b103ed175ff214cbb64641f4686d8c6a68
+2026-08-23T10:22:48.3453538Z ##[endgroup]
+2026-08-23T10:22:48.4137966Z candidate-suite: revision accepted (immutable, full 40-hex): 859727b103ed175ff214cbb64641f4686d8c6a68
+2026-08-23T10:22:48.5053833Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-23T10:22:48.5055865Z ##[group]Run actions/checkout@v4
+2026-08-23T10:22:48.5056154Z with:
+2026-08-23T10:22:48.5056390Z   repository: relux-works/curator-spec
+2026-08-23T10:22:48.5056710Z   ref: 859727b103ed175ff214cbb64641f4686d8c6a68
+2026-08-23T10:22:48.5057032Z   path: candidate-spec
+2026-08-23T10:22:48.5060213Z   token: ***
+2026-08-23T10:22:48.5060437Z   ssh-strict: true
+2026-08-23T10:22:48.5060654Z   ssh-user: git
+2026-08-23T10:22:48.5060882Z   persist-credentials: true
+2026-08-23T10:22:48.5061132Z   clean: true
+2026-08-23T10:22:48.5061362Z   sparse-checkout-cone-mode: true
+2026-08-23T10:22:48.5061637Z   fetch-depth: 1
+2026-08-23T10:22:48.5061891Z   fetch-tags: false
+2026-08-23T10:22:48.5062111Z   show-progress: true
+2026-08-23T10:22:48.5062333Z   lfs: false
+2026-08-23T10:22:48.5062532Z   submodules: false
+2026-08-23T10:22:48.5062755Z   set-safe-directory: true
+2026-08-23T10:22:48.5063022Z   allow-unsafe-pr-checkout: false
+2026-08-23T10:22:48.5063287Z env:
+2026-08-23T10:22:48.5063521Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:48.5063849Z   GOTOOLCHAIN: local
+2026-08-23T10:22:48.5064059Z   GOENV: off
+2026-08-23T10:22:48.5064256Z ##[endgroup]
+2026-08-23T10:22:48.6173547Z Syncing repository: relux-works/curator-spec
+2026-08-23T10:22:48.6182262Z ##[group]Getting Git version info
+2026-08-23T10:22:48.6182877Z Working directory is 'D:\a\curator\curator\candidate-spec'
+2026-08-23T10:22:48.7120060Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-08-23T10:22:48.7440982Z git version 2.55.0.windows.4
+2026-08-23T10:22:48.7491057Z ##[endgroup]
+2026-08-23T10:22:48.7513848Z Temporarily overriding HOME='D:\a\_temp\30f7d6a2-bf87-4c4d-8851-044a35800a5c' before making global git config changes
+2026-08-23T10:22:48.7515440Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-23T10:22:48.7527170Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\candidate-spec
+2026-08-23T10:22:48.7877981Z ##[group]Initializing the repository
+2026-08-23T10:22:48.7888926Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator\candidate-spec
+2026-08-23T10:22:48.8300521Z Initialized empty Git repository in D:/a/curator/curator/candidate-spec/.git/
+2026-08-23T10:22:48.8368182Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator-spec
+2026-08-23T10:22:48.8796297Z ##[endgroup]
+2026-08-23T10:22:48.8797213Z ##[group]Disabling automatic garbage collection
+2026-08-23T10:22:48.8810799Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-08-23T10:22:48.9159831Z ##[endgroup]
+2026-08-23T10:22:48.9160398Z ##[group]Setting up auth
+2026-08-23T10:22:48.9179989Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-08-23T10:22:48.9552688Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-08-23T10:22:49.5830925Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-23T10:22:49.6122114Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-08-23T10:22:50.5673235Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-23T10:22:50.5972404Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-08-23T10:22:51.6530472Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-08-23T10:22:51.6830307Z ##[endgroup]
+2026-08-23T10:22:51.6830734Z ##[group]Fetching the repository
+2026-08-23T10:22:51.6842681Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 859727b103ed175ff214cbb64641f4686d8c6a68
+2026-08-23T10:22:51.9896860Z From https://github.com/relux-works/curator-spec
+2026-08-23T10:22:51.9897463Z  * branch            859727b103ed175ff214cbb64641f4686d8c6a68 -> FETCH_HEAD
+2026-08-23T10:22:51.9940684Z ##[endgroup]
+2026-08-23T10:22:51.9941498Z ##[group]Determining the checkout info
+2026-08-23T10:22:51.9944937Z ##[endgroup]
+2026-08-23T10:22:51.9957604Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-08-23T10:22:52.0316048Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-08-23T10:22:52.0605598Z ##[group]Checking out the ref
+2026-08-23T10:22:52.0614733Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 859727b103ed175ff214cbb64641f4686d8c6a68
+2026-08-23T10:22:52.2895292Z Note: switching to '859727b103ed175ff214cbb64641f4686d8c6a68'.
+2026-08-23T10:22:52.2895907Z 
+2026-08-23T10:22:52.2896281Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-08-23T10:22:52.2897071Z changes and commit them, and you can discard any commits you make in this
+2026-08-23T10:22:52.2897643Z state without impacting any branches by switching back to a branch.
+2026-08-23T10:22:52.2897982Z 
+2026-08-23T10:22:52.2898198Z If you want to create a new branch to retain commits you create, you may
+2026-08-23T10:22:52.2899004Z do so (now or later) by using -c with the switch command. Example:
+2026-08-23T10:22:52.2899431Z 
+2026-08-23T10:22:52.2899579Z   git switch -c <new-branch-name>
+2026-08-23T10:22:52.2899782Z 
+2026-08-23T10:22:52.2899895Z Or undo this operation with:
+2026-08-23T10:22:52.2900080Z 
+2026-08-23T10:22:52.2900169Z   git switch -
+2026-08-23T10:22:52.2900305Z 
+2026-08-23T10:22:52.2900548Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-08-23T10:22:52.2900928Z 
+2026-08-23T10:22:52.2901097Z HEAD is now at 859727b Add schema 8 rc.9 candidate metadata
+2026-08-23T10:22:52.2959801Z ##[endgroup]
+2026-08-23T10:22:52.3274016Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-08-23T10:22:52.3530440Z 859727b103ed175ff214cbb64641f4686d8c6a68
+2026-08-23T10:22:52.3906381Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-23T10:22:52.3907819Z ##[group]Run actions/checkout@v4
+2026-08-23T10:22:52.3908058Z with:
+2026-08-23T10:22:52.3908266Z   repository: relux-works/curator-spec
+2026-08-23T10:22:52.3908573Z   ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:52.3908863Z   path: protocol-spec
+2026-08-23T10:22:52.3912326Z   token: ***
+2026-08-23T10:22:52.3912538Z   ssh-strict: true
+2026-08-23T10:22:52.3913456Z   ssh-user: git
+2026-08-23T10:22:52.3913667Z   persist-credentials: true
+2026-08-23T10:22:52.3913890Z   clean: true
+2026-08-23T10:22:52.3914093Z   sparse-checkout-cone-mode: true
+2026-08-23T10:22:52.3914343Z   fetch-depth: 1
+2026-08-23T10:22:52.3914556Z   fetch-tags: false
+2026-08-23T10:22:52.3914761Z   show-progress: true
+2026-08-23T10:22:52.3914963Z   lfs: false
+2026-08-23T10:22:52.3915142Z   submodules: false
+2026-08-23T10:22:52.3915338Z   set-safe-directory: true
+2026-08-23T10:22:52.3915576Z   allow-unsafe-pr-checkout: false
+2026-08-23T10:22:52.3915890Z env:
+2026-08-23T10:22:52.3916120Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:52.3916415Z   GOTOOLCHAIN: local
+2026-08-23T10:22:52.3916602Z   GOENV: off
+2026-08-23T10:22:52.3916775Z ##[endgroup]
+2026-08-23T10:22:52.5106036Z Syncing repository: relux-works/curator-spec
+2026-08-23T10:22:52.5113841Z ##[group]Getting Git version info
+2026-08-23T10:22:52.5114456Z Working directory is 'D:\a\curator\curator\protocol-spec'
+2026-08-23T10:22:52.6145916Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-08-23T10:22:52.6447977Z git version 2.55.0.windows.4
+2026-08-23T10:22:52.6496601Z ##[endgroup]
+2026-08-23T10:22:52.6518863Z Temporarily overriding HOME='D:\a\_temp\b79e91af-c444-40d5-9cf9-78d603479637' before making global git config changes
+2026-08-23T10:22:52.6520144Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-23T10:22:52.6531215Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+2026-08-23T10:22:52.6842342Z ##[group]Initializing the repository
+2026-08-23T10:22:52.6852685Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator\protocol-spec
+2026-08-23T10:22:52.7201683Z Initialized empty Git repository in D:/a/curator/curator/protocol-spec/.git/
+2026-08-23T10:22:52.7251000Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator-spec
+2026-08-23T10:22:52.7571781Z ##[endgroup]
+2026-08-23T10:22:52.7572836Z ##[group]Disabling automatic garbage collection
+2026-08-23T10:22:52.7580713Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-08-23T10:22:52.7880036Z ##[endgroup]
+2026-08-23T10:22:52.7880639Z ##[group]Setting up auth
+2026-08-23T10:22:52.7892761Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-08-23T10:22:52.8206414Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-08-23T10:22:53.9064126Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-23T10:22:53.9432087Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-08-23T10:22:55.0367620Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-23T10:22:55.0704749Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-08-23T10:22:55.6713905Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-08-23T10:22:55.7066767Z ##[endgroup]
+2026-08-23T10:22:55.7067425Z ##[group]Fetching the repository
+2026-08-23T10:22:55.7082372Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:55.9898329Z From https://github.com/relux-works/curator-spec
+2026-08-23T10:22:55.9899123Z  * branch            00b1688a9b2457ca397a0bb550acf47cad8ee967 -> FETCH_HEAD
+2026-08-23T10:22:55.9938257Z ##[endgroup]
+2026-08-23T10:22:55.9938705Z ##[group]Determining the checkout info
+2026-08-23T10:22:55.9941392Z ##[endgroup]
+2026-08-23T10:22:55.9950299Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-08-23T10:22:56.0286093Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-08-23T10:22:56.0579207Z ##[group]Checking out the ref
+2026-08-23T10:22:56.0589519Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:56.1382404Z Note: switching to '00b1688a9b2457ca397a0bb550acf47cad8ee967'.
+2026-08-23T10:22:56.1382931Z 
+2026-08-23T10:22:56.1383277Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-08-23T10:22:56.1384063Z changes and commit them, and you can discard any commits you make in this
+2026-08-23T10:22:56.1384823Z state without impacting any branches by switching back to a branch.
+2026-08-23T10:22:56.1385265Z 
+2026-08-23T10:22:56.1385459Z If you want to create a new branch to retain commits you create, you may
+2026-08-23T10:22:56.1385915Z do so (now or later) by using -c with the switch command. Example:
+2026-08-23T10:22:56.1386186Z 
+2026-08-23T10:22:56.1386290Z   git switch -c <new-branch-name>
+2026-08-23T10:22:56.1386468Z 
+2026-08-23T10:22:56.1386561Z Or undo this operation with:
+2026-08-23T10:22:56.1386726Z 
+2026-08-23T10:22:56.1386812Z   git switch -
+2026-08-23T10:22:56.1386928Z 
+2026-08-23T10:22:56.1387142Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-08-23T10:22:56.1387445Z 
+2026-08-23T10:22:56.1387652Z HEAD is now at 00b1688 Adopt agent-skill.json as the canonical manifest (#11)
+2026-08-23T10:22:56.1442640Z ##[endgroup]
+2026-08-23T10:22:56.1761362Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-08-23T10:22:56.2034130Z 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:56.2392690Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-23T10:22:56.2394102Z ##[group]Run actions/setup-go@v5
+2026-08-23T10:22:56.2394338Z with:
+2026-08-23T10:22:56.2394525Z   go-version-file: go.mod
+2026-08-23T10:22:56.2394751Z   check-latest: false
+2026-08-23T10:22:56.2397467Z   token: ***
+2026-08-23T10:22:56.2397652Z   cache: true
+2026-08-23T10:22:56.2397822Z env:
+2026-08-23T10:22:56.2398036Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:22:56.2398759Z   GOTOOLCHAIN: local
+2026-08-23T10:22:56.2398957Z   GOENV: off
+2026-08-23T10:22:56.2399138Z ##[endgroup]
+2026-08-23T10:22:56.4035510Z Setup go version spec 1.25.5
+2026-08-23T10:22:56.4051420Z Attempting to download 1.25.5...
+2026-08-23T10:22:56.4242068Z (node:1288) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-08-23T10:22:56.4242924Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-23T10:22:56.8179001Z matching 1.25.5...
+2026-08-23T10:22:56.8227038Z Acquiring 1.25.5 from https://github.com/actions/go-versions/releases/download/1.25.5-19880500865/go-1.25.5-win32-x64.zip
+2026-08-23T10:22:57.3416920Z Extracting Go...
+2026-08-23T10:22:57.4653649Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command "$ErrorActionPreference = 'Stop' ; try { Add-Type -AssemblyName System.IO.Compression.ZipFile } catch { } ; try { [System.IO.Compression.ZipFile]::ExtractToDirectory('D:\a\_temp\go-1.25.5-win32-x64.zip', 'D:\a\_temp\b69e0597-e8a4-4ec7-b29a-9d3a37203498', $true) } catch { if (($_.Exception.GetType().FullName -eq 'System.Management.Automation.MethodException') -or ($_.Exception.GetType().FullName -eq 'System.Management.Automation.RuntimeException') ){ Expand-Archive -LiteralPath 'D:\a\_temp\go-1.25.5-win32-x64.zip' -DestinationPath 'D:\a\_temp\b69e0597-e8a4-4ec7-b29a-9d3a37203498' -Force } else { throw $_ } } ;"
+2026-08-23T10:23:02.3089732Z Successfully extracted go to D:\a\_temp\b69e0597-e8a4-4ec7-b29a-9d3a37203498
+2026-08-23T10:23:02.3090212Z Adding to the cache ...
+2026-08-23T10:23:13.3786510Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64 => D:\hostedtoolcache\windows\go\1.25.5\x64
+2026-08-23T10:23:13.3791874Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64.complete => D:\hostedtoolcache\windows\go\1.25.5\x64.complete
+2026-08-23T10:23:13.3792955Z Successfully cached go to C:\hostedtoolcache\windows\go\1.25.5\x64
+2026-08-23T10:23:13.3799695Z Added go to the path
+2026-08-23T10:23:13.3802437Z Successfully set up Go version 1.25.5
+2026-08-23T10:23:13.7732933Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOCACHE
+2026-08-23T10:23:13.7780929Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOMODCACHE
+2026-08-23T10:23:13.8042836Z C:\Users\runneradmin\AppData\Local\go-build
+2026-08-23T10:23:13.8068387Z C:\Users\runneradmin\go\pkg\mod
+2026-08-23T10:23:13.9968685Z Cache hit for: setup-go-Windows-x64-go-1.25.5-a83679499ba324054710aba827b097460d875f30e10d8aab956eabc0616f4046
+2026-08-23T10:23:14.0096939Z (node:1288) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-08-23T10:23:14.4020490Z Received 65971802 of 65971802 (100.0%), 170.0 MBs/sec
+2026-08-23T10:23:14.4021862Z Cache Size: ~63 MB (65971802 B)
+2026-08-23T10:23:14.4050596Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/eb40866b-e506-41fb-a1d4-447d94170df0/cache.tzst -P -C D:/a/curator/curator --force-local --use-compress-program "zstd -d"
+2026-08-23T10:23:24.1219323Z Cache restored successfully
+2026-08-23T10:23:24.1273164Z Cache restored from key: setup-go-Windows-x64-go-1.25.5-a83679499ba324054710aba827b097460d875f30e10d8aab956eabc0616f4046
+2026-08-23T10:23:24.1288706Z go version go1.25.5 windows/amd64
+2026-08-23T10:23:24.1288908Z 
+2026-08-23T10:23:24.1289200Z ##[group]go env
+2026-08-23T10:23:24.9278141Z set AR=ar
+2026-08-23T10:23:24.9278506Z set CC=gcc
+2026-08-23T10:23:24.9279125Z set CGO_CFLAGS=-O2 -g
+2026-08-23T10:23:24.9279496Z set CGO_CPPFLAGS=
+2026-08-23T10:23:24.9279884Z set CGO_CXXFLAGS=-O2 -g
+2026-08-23T10:23:24.9280252Z set CGO_ENABLED=1
+2026-08-23T10:23:24.9280607Z set CGO_FFLAGS=-O2 -g
+2026-08-23T10:23:24.9280845Z set CGO_LDFLAGS=-O2 -g
+2026-08-23T10:23:24.9281261Z set CXX=g++
+2026-08-23T10:23:24.9281457Z set GCCGO=gccgo
+2026-08-23T10:23:24.9281669Z set GO111MODULE=
+2026-08-23T10:23:24.9281866Z set GOAMD64=v1
+2026-08-23T10:23:24.9282056Z set GOARCH=amd64
+2026-08-23T10:23:24.9282243Z set GOAUTH=netrc
+2026-08-23T10:23:24.9282432Z set GOBIN=
+2026-08-23T10:23:24.9282726Z set GOCACHE=C:\Users\runneradmin\AppData\Local\go-build
+2026-08-23T10:23:24.9283041Z set GOCACHEPROG=
+2026-08-23T10:23:24.9283253Z set GODEBUG=
+2026-08-23T10:23:24.9283673Z set GOENV=
+2026-08-23T10:23:24.9284005Z set GOEXE=.exe
+2026-08-23T10:23:24.9284370Z set GOEXPERIMENT=
+2026-08-23T10:23:24.9284738Z set GOFIPS140=off
+2026-08-23T10:23:24.9285179Z set GOFLAGS=
+2026-08-23T10:23:24.9286783Z set GOGCCFLAGS=-m64 -mthreads -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=C:\Users\RUNNER~1\AppData\Local\Temp\go-build2371936038=/tmp/go-build -gno-record-gcc-switches
+2026-08-23T10:23:24.9288511Z set GOHOSTARCH=amd64
+2026-08-23T10:23:24.9288831Z set GOHOSTOS=windows
+2026-08-23T10:23:24.9289049Z set GOINSECURE=
+2026-08-23T10:23:24.9289389Z set GOMOD=D:\a\curator\curator\go.mod
+2026-08-23T10:23:24.9289836Z set GOMODCACHE=C:\Users\runneradmin\go\pkg\mod
+2026-08-23T10:23:24.9290130Z set GONOPROXY=
+2026-08-23T10:23:24.9290320Z set GONOSUMDB=
+2026-08-23T10:23:24.9290799Z set GOOS=windows
+2026-08-23T10:23:24.9291230Z set GOPATH=C:\Users\runneradmin\go
+2026-08-23T10:23:24.9291503Z set GOPRIVATE=
+2026-08-23T10:23:24.9291783Z set GOPROXY=https://proxy.golang.org,direct
+2026-08-23T10:23:24.9292131Z set GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+2026-08-23T10:23:24.9292442Z set GOSUMDB=sum.golang.org
+2026-08-23T10:23:24.9292681Z set GOTELEMETRY=local
+2026-08-23T10:23:24.9293006Z set GOTELEMETRYDIR=C:\Users\runneradmin\AppData\Roaming\go\telemetry
+2026-08-23T10:23:24.9293367Z set GOTMPDIR=
+2026-08-23T10:23:24.9293560Z set GOTOOLCHAIN=local
+2026-08-23T10:23:24.9293909Z set GOTOOLDIR=C:\hostedtoolcache\windows\go\1.25.5\x64\pkg\tool\windows_amd64
+2026-08-23T10:23:24.9294288Z set GOVCS=
+2026-08-23T10:23:24.9294479Z set GOVERSION=go1.25.5
+2026-08-23T10:23:24.9294693Z set GOWORK=
+2026-08-23T10:23:24.9294895Z set PKG_CONFIG=pkg-config
+2026-08-23T10:23:24.9295041Z 
+2026-08-23T10:23:24.9295368Z ##[endgroup]
+2026-08-23T10:23:24.9564720Z ##[group]Run bash .github/ci/toolchain-identity.sh
+2026-08-23T10:23:24.9565185Z [36;1mbash .github/ci/toolchain-identity.sh[0m
+2026-08-23T10:23:24.9583020Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-08-23T10:23:24.9583421Z env:
+2026-08-23T10:23:24.9583651Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:23:24.9583958Z   GOTOOLCHAIN: local
+2026-08-23T10:23:24.9584160Z   GOENV: off
+2026-08-23T10:23:24.9584341Z ##[endgroup]
+2026-08-23T10:23:25.3419414Z toolchain: go version go1.25.5 windows/amd64
+2026-08-23T10:23:25.3880325Z toolchain: GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+2026-08-23T10:23:25.4826865Z toolchain: GOTOOLCHAIN=local
+2026-08-23T10:23:25.5302564Z toolchain: GOENV=<none>
+2026-08-23T10:23:25.5303519Z ci-toolchain-identity: ok
+2026-08-23T10:23:25.5567281Z ##[group]Run set -u
+2026-08-23T10:23:25.5567602Z [36;1mset -u[0m
+2026-08-23T10:23:25.5567855Z [36;1mif [ -n "$CANDIDATE_ROOT_INPUT" ]; then[0m
+2026-08-23T10:23:25.5568174Z [36;1m  root="$CANDIDATE_ROOT_INPUT"[0m
+2026-08-23T10:23:25.5568454Z [36;1melse[0m
+2026-08-23T10:23:25.5568731Z [36;1m  root="$GITHUB_WORKSPACE/candidate-spec/conformance/v1"[0m
+2026-08-23T10:23:25.5569070Z [36;1mfi[0m
+2026-08-23T10:23:25.5569283Z [36;1mecho "root=$root" >>"$GITHUB_OUTPUT"[0m
+2026-08-23T10:23:25.5569563Z [36;1m[0m
+2026-08-23T10:23:25.5569890Z [36;1mpin_manifest="$GITHUB_WORKSPACE/protocol-spec/conformance/v1/manifest.json"[0m
+2026-08-23T10:23:25.5570355Z [36;1mif command -v shasum >/dev/null 2>&1; then[0m
+2026-08-23T10:23:25.5570779Z [36;1m  PIN_MANIFEST_SHA256="$(shasum -a 256 "$pin_manifest" | awk '{print $1}')"[0m
+2026-08-23T10:23:25.5571177Z [36;1melse[0m
+2026-08-23T10:23:25.5571530Z [36;1m  PIN_MANIFEST_SHA256="$(sha256sum "$pin_manifest" | awk '{print $1}')"[0m
+2026-08-23T10:23:25.5571900Z [36;1mfi[0m
+2026-08-23T10:23:25.5572099Z [36;1mexport PIN_MANIFEST_SHA256[0m
+2026-08-23T10:23:25.5572514Z [36;1mbash .github/ci/candidate-suite.sh record "$root" .temp/ci-evidence/candidate[0m
+2026-08-23T10:23:25.5589309Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-08-23T10:23:25.5589713Z env:
+2026-08-23T10:23:25.5589974Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:23:25.5590277Z   GOTOOLCHAIN: local
+2026-08-23T10:23:25.5590477Z   GOENV: off
+2026-08-23T10:23:25.5590719Z   CANDIDATE_REF: 859727b103ed175ff214cbb64641f4686d8c6a68
+2026-08-23T10:23:25.5591042Z   CANDIDATE_ROOT_INPUT: 
+2026-08-23T10:23:25.5591509Z   CANDIDATE_EXPECTED_MANIFEST_SHA256: sha256:782d6868f6d9725f7bf38d3fb1944f307f2d5d9c060b8816b0f55a5c2e97f11f
+2026-08-23T10:23:25.5592006Z ##[endgroup]
+2026-08-23T10:24:06.9925535Z candidate-suite: candidate manifest digest mismatch: expected 782d6868f6d9725f7bf38d3fb1944f307f2d5d9c060b8816b0f55a5c2e97f11f, measured \782d6868f6d9725f7bf38d3fb1944f307f2d5d9c060b8816b0f55a5c2e97f11f -- this is a different candidate, never re-baseline it silently
+2026-08-23T10:24:06.9980521Z ##[error]Process completed with exit code 1.
+2026-08-23T10:24:07.0207238Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-23T10:24:07.0208767Z ##[group]Run actions/upload-artifact@v4
+2026-08-23T10:24:07.0209046Z with:
+2026-08-23T10:24:07.0209266Z   name: candidate-evidence-windows-latest
+2026-08-23T10:24:07.0209573Z   path: .temp/ci-evidence/
+2026-08-23T10:24:07.0209812Z   if-no-files-found: warn
+2026-08-23T10:24:07.0210040Z   compression-level: 6
+2026-08-23T10:24:07.0210255Z   overwrite: false
+2026-08-23T10:24:07.0210469Z   include-hidden-files: false
+2026-08-23T10:24:07.0210712Z env:
+2026-08-23T10:24:07.0210939Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-08-23T10:24:07.0211239Z   GOTOOLCHAIN: local
+2026-08-23T10:24:07.0211432Z   GOENV: off
+2026-08-23T10:24:07.0211662Z ##[endgroup]
+2026-08-23T10:24:07.2124740Z (node:1724) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-08-23T10:24:07.2126087Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-08-23T10:24:07.2210143Z With the provided path, there will be 3 files uploaded
+2026-08-23T10:24:07.2216496Z Artifact name is valid!
+2026-08-23T10:24:07.2218400Z Root directory input is valid!
+2026-08-23T10:24:07.4206756Z Beginning upload of artifact content to blob storage
+2026-08-23T10:24:07.4486616Z (node:1724) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-08-23T10:24:07.4713253Z Uploaded bytes 39888
+2026-08-23T10:24:07.4849146Z Finished uploading artifact content to blob storage!
+2026-08-23T10:24:07.4850713Z SHA256 digest of uploaded artifact zip is 1fff5ef05ee1c087566e53b81cbba34fb25671401bb943d1b242f6241ecf5be8
+2026-08-23T10:24:07.4853034Z Finalizing artifact upload
+2026-08-23T10:24:07.6733268Z Artifact candidate-evidence-windows-latest.zip successfully finalized. Artifact ID 9491716154
+2026-08-23T10:24:07.6735845Z Artifact candidate-evidence-windows-latest has been successfully uploaded! Final size is 39888 bytes. Artifact ID is 9491716154
+2026-08-23T10:24:07.6745298Z Artifact download URL: https://github.com/relux-works/curator/actions/runs/32633572039/artifacts/9491716154
+2026-08-23T10:24:07.7087306Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-23T10:24:07.7088683Z Post job cleanup.
+2026-08-23T10:24:07.9077204Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-08-23T10:24:07.9397336Z git version 2.55.0.windows.4
+2026-08-23T10:24:07.9472678Z Temporarily overriding HOME='D:\a\_temp\b6611cb5-e206-432e-95be-373ac0a6682c' before making global git config changes
+2026-08-23T10:24:07.9474784Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-23T10:24:07.9485608Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+2026-08-23T10:24:07.9797116Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-08-23T10:24:08.0098637Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-08-23T10:24:08.5342317Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-23T10:24:08.5593636Z http.https://github.com/.extraheader
+2026-08-23T10:24:08.5635510Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-08-23T10:24:08.5919201Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-08-23T10:24:09.1145508Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-23T10:24:09.1501318Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-08-23T10:24:09.7869863Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-23T10:24:09.7872331Z Post job cleanup.
+2026-08-23T10:24:10.0250750Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-08-23T10:24:10.0533514Z git version 2.55.0.windows.4
+2026-08-23T10:24:10.0607343Z Temporarily overriding HOME='D:\a\_temp\b86ac6cc-9026-49f6-bd3b-684e008a5700' before making global git config changes
+2026-08-23T10:24:10.0608670Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-23T10:24:10.0618909Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\candidate-spec
+2026-08-23T10:24:10.0998744Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-08-23T10:24:10.1362976Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-08-23T10:24:10.7102766Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-23T10:24:10.7388877Z http.https://github.com/.extraheader
+2026-08-23T10:24:10.7441771Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-08-23T10:24:10.7826634Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-08-23T10:24:11.3965007Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-23T10:24:11.4264433Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-08-23T10:24:12.0090835Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-08-23T10:24:12.0092249Z Post job cleanup.
+2026-08-23T10:24:12.2520034Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-08-23T10:24:12.2806939Z git version 2.55.0.windows.4
+2026-08-23T10:24:12.2882776Z Temporarily overriding HOME='D:\a\_temp\74ed18a5-7765-4556-85f8-a36588032310' before making global git config changes
+2026-08-23T10:24:12.2884074Z Adding repository directory to the temporary git global config as a safe directory
+2026-08-23T10:24:12.2894799Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+2026-08-23T10:24:12.3211220Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-08-23T10:24:12.3571412Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-08-23T10:24:12.9399127Z Entering 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:24:13.0421218Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-08-23T10:24:13.0705020Z http.https://github.com/.extraheader
+2026-08-23T10:24:13.0753371Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-08-23T10:24:13.1081253Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-08-23T10:24:13.6786183Z Entering 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:24:13.7456059Z http.https://github.com/.extraheader
+2026-08-23T10:24:13.7968934Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-23T10:24:13.8258333Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-08-23T10:24:14.5380891Z Entering 'agents/skills/skill-go-testing-tools'
+2026-08-23T10:24:14.5790918Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+2026-08-23T10:24:14.6051453Z [command]"C:\Program Files\Git\bin\git.exe" config --file D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config --name-only --get-regexp ^includeIf\.gitdir:
+2026-08-23T10:24:14.6551370Z Cleaning up orphan processes
+2026-08-23T10:24:14.6755072Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,3508 @@
+OpenAI Codex v0.145.0
+--------
+workdir: /Users/iv/Developer/ReluxWorks/curator
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: high
+reasoning summaries: none
+session id: 019faf78-859b-7f22-aa72-2849fc704ea9
+--------
+user
+# Agent Task Assignment
+
+## FIRST — Run Immediately
+
+```bash
+task-board m 'set_status(BUG-260729-r0fe02, status=reviewing)'
+```
+
+## Your Role
+# reviewer
+
+## Description
+
+Reviews how a task was implemented and how the solution fits into the project. Does not modify code; records one of the explicit verdict branches below.
+
+When the run is goal-bound, query `task-board spawn goal "$TASK_BOARD_RUN_ID"` before recording the verdict. The reviewer goal is role-derived as `reviewer_verdict/reviewer_verdict`, carries its immutable parent goal ID/revision, and is satisfied only by exactly one verdict branch with evidence. A provider exit or `reviewing` status is not a verdict.
+The runner persists the branch from the accepted board status plus a new or updated task-scoped verdict artifact. Only persisted `accepted` can satisfy the parent delivery goal; `changes_requested` and `stop_the_line` finish the reviewer goal without accepting delivery.
+
+## Deliverable
+
+Verdict branches are explicit:
+
+- accepted → `done`
+- changes requested → `to-dev` for implementation rework or `analysis` for research/decision work, with verdict evidence for the next producer and another reviewer cycle
+- genuine stop-the-line boundary → `blocked` only for a concrete external blocker or an unresolved human-only platform/product/architecture/tradeoff/approval decision, with evidence, failed assumptions/attempts, viable alternatives and tradeoffs, a recommendation, and the exact human decision or external input needed
+
+Do not leave the task in `reviewing`, and do not use `blocked` for ordinary rework or a recoverable child/runtime failure.
+
+For an enforced Bug/Story `done` transition, a reviewer-archetype run must not supply `commit_ack`. Record acceptance evidence and hand it to the commit-owning mover; after committing its scope, that mover makes the final `done` transition with `commit_ack=scope_committed`.
+
+For board reads, use compact task-specific projections. A concrete review does not need routine `summary()`, `plan()`, `schema()`, or `{ full }`; request scoped schema only after an unknown call.
+
+## Status Transitions
+
+- **start_status:** `reviewing`
+- **end_status:** no unconditional default; the reviewer must set exactly one verdict status: `done`, `to-dev`, `analysis`, or evidence-backed `blocked`
+
+## Constraints
+
+Does NOT modify code. Read-only access.
+- Reviewer-archetype runs must not supply `commit_ack`; record acceptance evidence for the commit-owning mover, which commits then makes the final `done` transition with `commit_ack=scope_committed`.
+
+## Skills
+
+These role skill references are a lazy catalog, not a mandate to bulk-read every
+body. Before technical work, identify the skills relevant to this task's concrete
+scope and read those full skill bodies. Always read any skill explicitly required
+by the task, user, or project instructions.
+
+- **project-management**: `/Users/iv/.claude/skills/project-management/SKILL.md`
+- **architecture-diagrams**: `/Users/iv/.claude/skills/architecture-diagrams/SKILL.md`
+
+## Definition of Done
+
+- [ ] Reproduce the exact race failure and record competing fail-closed outcomes
+- [ ] Implement the narrow deterministic contract without broad error acceptance
+- [ ] Run focused repeated race and non-race godriver gates with exact exits
+- [ ] Attach a task-scoped patch and outcome for independent review
+- [ ] Code written per task description and AC
+- [ ] Relevant tests written for new or changed behavior and passing
+- [ ] Lint clean
+- [ ] Relevant build/validation commands run after changes and build not broken
+- [ ] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
+- [ ] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
+- [ ] Implementation matches AC
+- [ ] Solution fits project architecture
+- [ ] Tests green
+- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+## Your Task
+
+- **ID**: BUG-260729-r0fe02
+- **Title**: BUG-260729-r0fe02: stabilize-godriver-cancellation-race-contract
+- **Parent**: STORY-260720-3plyvy
+### Description
+
+The accepted Curator composite intermittently fails under the mandatory race gate: internal/godriver TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest can observe fail-closed toolchain_mutated while the assertion permits only nil or toolchain_timeout. Determine the intended cancellation-vs-mutation precedence and make the contract deterministic without weakening fail-closed behavior.
+### Scope
+
+Own only internal/godriver fingerprint cancellation behavior and its focused tests, plus task-scoped evidence. Start from the exact accepted TASK-260720-jrrgw9 candidate. Do not change CI, protocol vectors, timeouts, product manifests outside godriver, or broad error acceptance.
+### Acceptance Criteria
+
+A focused -race repetition reliably proves the cancellation boundary contract; legitimate concurrent mutation remains toolchain_mutated, cancellation at the defined phase boundary returns the specified stable fail-closed result, and the test no longer flakes. Non-race focused godriver tests pass, the accepted product behavior is not weakened, and the patch is independently reviewed before TASK-260720-1pvfj5 resumes its final race gate.
+
+## Instructions
+
+The following instructions have been attached to this task:
+
+### BUG-260729-r0fe02_resume.md
+> Resume instructions after enforced heavy-test barrier
+
+# Resume after enforced test barrier
+
+RUN-260729-eb4053 was cancelled only because its focused race overlapped TASK-260720-1pvfj5 final-race2. The task worktree and evidence are preserved at .temp/BUG-260729-r0fe02.
+
+Review and continue the existing narrow fingerprint.go + fingerprint_equivalence_test.go patch. Compare against the exact accepted TASK-260720-jrrgw9 godriver bytes. Run only focused internal/godriver tests: deterministic cancellation tests, negative mutation control, and a bounded repeated -race gate. Do not run ./... or any Curator full/race suite. Ensure cancellation raised by this package maps to toolchain_timeout while genuine filesystem mutation remains toolchain_mutated. Attach patch/results and handoff for review.
+
+
+### BUG-260729-r0fe02_combined-evidence.md
+> Precondition for lint-compatible cancellation evidence after BUG-260729-1o0m8f acceptance
+
+Resume only to close the inherited lint gate. Apply the exact accepted BUG-260729-1o0m8f_lint-fix.patch from .temp/resources/BUG-260729-1o0m8f/ on top of the existing BUG-260729-r0fe02 worktree. Do not alter the cancellation implementation or tests. Prove the cancellation task patch hash/content is unchanged, run exact pinned golangci-lint v2.12.2 and only narrow non-race/focused checks needed for combined compatibility. Reuse the already attached repeated race evidence; do not run a full go test or full race suite. Update the task-scoped outcome/logbook, check the remaining lint item, and hand off for review.
+
+
+
+
+## Board CLI Reference
+
+You have access to `task-board` CLI for managing your work. All writes use the `m` (mutation DSL) subcommand:
+
+```bash
+# FIRST/LAST lifecycle commands:
+# Use explicit status changes when the task flow requires it.
+task-board m 'set_status(BUG-260729-r0fe02, status=analysis)'       # analyst-style work
+task-board m 'set_status(BUG-260729-r0fe02, status=development)'    # implementation / testing work
+task-board m 'set_status(BUG-260729-r0fe02, status=reviewing)'      # reviewer handoff
+task-board m 'set_status(BUG-260729-r0fe02, status=blocked)'        # when blocked
+task-board m 'set_status(BUG-260729-r0fe02, status=to-review)'      # when your work is ready for review
+
+# Track progress with checklist
+task-board m 'check_item(BUG-260729-r0fe02, item=1)'                        # check item N
+task-board m 'add_checklist_item(BUG-260729-r0fe02, text="Write tests")'    # add checklist item
+
+# Add notes about your progress, decisions, blockers, or review findings
+task-board m 'set_notes(BUG-260729-r0fe02, text="your note here")'
+
+# Save short text directly as outcome resources
+task-board m 'add_resource(BUG-260729-r0fe02, name=BUG-260729-r0fe02_results.md, content="...", type=outcome, description="Description")'
+
+# Attach an existing local file (screenshots, PDFs, logs, archives, research docs)
+task-board resource add BUG-260729-r0fe02 ./path/to/file --type outcome --name BUG-260729-r0fe02_artifact.bin -d "Description"
+```
+
+## Spawn Run Control
+
+Tracked background spawn runs expose `TASK_BOARD_RUN_ID` in the child environment.
+If your work is long-running, check for operator directives at safe checkpoints:
+
+```bash
+task-board spawn status "$TASK_BOARD_RUN_ID"
+task-board spawn directives "$TASK_BOARD_RUN_ID"
+```
+
+Current runtimes do not support direct inbound push into your active session.
+Treat directives as cooperative checkpoint signals:
+- persist your current notes/artifacts before acting on `cancel`-style requests
+- only honor pause/reroute intent at a safe checkpoint
+- if no directive is present, continue normally
+
+## IMPORTANT: Saving Results
+
+When you produce work products (research documents, design docs, screenshots, logs, archives, implementation notes), you MUST save them as outcome resources with names that include the task ID:
+
+```bash
+task-board m 'add_resource(BUG-260729-r0fe02, name=BUG-260729-r0fe02_results.md, content="...", type=outcome, description="Description")'
+task-board resource add BUG-260729-r0fe02 ./path/to/file --type outcome --name BUG-260729-r0fe02_artifact.bin -d "Description"
+```
+
+If you revise the same artifact later, use `task-board m 'update_resource(...)'` or `task-board resource update ...` instead of creating a silent overwrite.
+
+If you discover important findings, decisions, anomalies, regressions, or non-obvious constraints while working, record them in `logbook` as well as on the board.
+
+This ensures your results persist on the board and are accessible to other agents and the coordinator. Spawn completion is expected to produce at least one new task-scoped outcome artifact before the task can cleanly remain in `to-review`.
+
+## Stop-The-Line: No Forced Fits
+
+Do not keep implementing when autonomous work starts requiring a forced fit. A forced fit is any path where the task conflicts with a platform/API constraint, product decision, UX state model, ownership boundary, or architecture, and the remaining "solution" is mostly compensating hacks.
+
+Warning signs:
+- each fix needs another flag, stub, priority rule, mock-only behavior, or special-case test
+- the tests can pass only because the test harness avoids the real platform behavior
+- the implementation depends on an assumption you can no longer defend
+- the user-facing behavior cannot be described cleanly without contradicting the product model
+
+When this happens, stop product-code changes before adding another workaround layer. Attach or note:
+- the constraint and evidence
+- the failed assumptions/attempts
+- the viable options and tradeoffs
+- the recommended option
+- the exact human/product/architecture decision needed
+
+Then set the board item to `blocked` and ask only for that exact decision or external input. This stop applies only to a concrete external blocker or an unresolved human-only platform/product/architecture/tradeoff/approval decision; recoverable failures and ordinary rework stay autonomous. Tests and stubs are not proof that a forced-fit design is correct; use them only after the state model and platform assumptions are valid.
+
+## Working Directory
+Board directory: `/Users/iv/Developer/ReluxWorks/curator/.task-board`
+
+Work in the project root. Do not modify board files directly — always use the `task-board` CLI.
+
+codex
+I’m starting the reviewer run now, then I’ll inspect the task-scoped patch, evidence, accepted baseline, and focused validation results without modifying code.
+exec
+/bin/zsh -lc "task-board m 'set_status(BUG-260729-r0fe02, status=reviewing)'" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+{"ok":true,"result":{"primary":{"action":"status_changed","element_id":"BUG-260729-r0fe02","field":"status","new_value":"reviewing","old_value":"to-review"}}}
+
+codex
+I’m using the project-management skill because this is a tracked reviewer verdict with strict board transitions and evidence requirements. I’ll follow its reviewer workflow before recording any verdict.
+exec
+/bin/zsh -lc "sed -n '1,240p' /Users/iv/.claude/skills/project-management/SKILL.md" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+---
+name: project-management
+description: >
+  File-backed task boards and spawn-first multi-agent orchestration through
+  task-board. Use for board/spec decomposition, task tracking, planning,
+  status/progress, tracked producer/reviewer runs, and delivery goals. A normal
+  primary session is the Orchestrator; a prompt-assigned role or
+  TASK_BOARD_RUN_ID is a specialist worker. Russian triggers: борд, доска,
+  задачи, эпик, стори, таски, спавн, оркестратор, субагент, статус, прогресс.
+triggers:
+  - task board, epic, story, task, bug, status, progress
+  - spec decomposition, planning, critical path
+  - spawn, orchestrator, coordinator, sub-agent, delivery goal
+  - борд, доска, задачи, эпик, стори, таски, спавн, оркестратор
+---
+
+# Project Management Router
+
+Load only the focused references needed. Use `task-board` for reads/writes;
+never edit `.task-board/` directly.
+
+## Active Role
+
+- **Specialist:** when assigned a role, `TASK_BOARD_RUN_ID` exists, or the
+  human explicitly requests inline execution. Follow lifecycle/evidence gates.
+- **Orchestrator:** otherwise. Detail settled specs inline; route
+  every artifact-producing or validating task through a tracked
+  background child run. `solution-architect` only for genuine
+  architecture decisions.
+
+## Critical Invariants
+
+1. Preflight with `project_config(view=spawn-preflight, role=ROLE, agent=PROVIDER?)`;
+   bare `project_config()` stays the role-optional config surface.
+   Every child has explicit role, background mode, model, and in-policy
+   Codex/Qwen reasoning effort.
+2. Workers use compact, task-specific projections. Skip routine
+   `summary()`, `plan()`, `schema()`, and `{ full }`; scoped schema only
+   repairs an unknown call.
+3. Default to `task-board spawn observe RUN --until terminal --format compact`,
+   then route its handoff. Other reads are for barriers, replay/follow,
+   diagnosis.
+4. The Orchestrator owns producer -> reviewer -> rework -> reviewer until the
+   configured review policy is satisfied and the board reaches `done`.
+   `to-review` is a routing trigger, not human acceptance.
+5. Handoff needs a task-scoped outcome and `task-board handoff TASK-ID
+   --role ROLE`. Early exits and intermediate parked states are
+   retried, or rerouted through a focused child;
+   routine work is never handed to the human.
+6. `blocked` needs an evidence-backed external blocker or unresolved
+   human-only product/platform/architecture/approval decision. Persist
+   constraint, evidence, failed assumptions/attempts, viable alternatives,
+   tradeoffs, recommendation, and the exact decision or external input needed.
+7. At `to-review` say **ready for review** / **handed off to review**;
+   done/complete/final only for `done`.
+8. `board-goal-v2` is authoritative: `goal` owns `parent/primary`; `spawn goal`
+   owns `run/RUN-*`. V1 shapes are compatibility-only.
+9. `task-board codex|claude` (`codexD`/`claudeD`) launches primary sessions.
+   agents-infra composes; `tb-sessiond` owns goal bind, reattach,
+   `codex resume THREAD_ID`, `claude --resume UUID`, and session operations.
+   Bad records move to private `<state>/quarantine/`; listen continues and
+   status/list report them.
+
+## Decision Tree
+
+```text
+Prompt-assigned role or TASK_BOARD_RUN_ID? -> work as that specialist
+Artifact, test, docs, research, or review? -> tracked role-based spawn
+Producer reached to-review? -> spawn reviewer, route verdict
+Concrete stop boundary? -> persist packet, then blocked
+Known structured board operation? -> q/m DSL with narrow projection
+Unknown operation/mutation or field? -> schema(operation|mutation=NAME), retry
+```
+
+## Lazy Reference Routes
+
+| Need | Read |
+| --- | --- |
+| Queries, observability, goals, estimates, deps | [querying](references/querying.md), [file formats](references/file-formats.md) |
+| Status, review, recovery, Stop-The-Line | [statuses](references/statuses.md) |
+| Resources, bugs, evidence | [resources and bugs](references/resources-and-bugs.md) |
+| Detailing, plans, execution | [planning workflow](references/planning-workflow.md) |
+| Research and synthesis | [research workflow](references/research-workflow.md) |
+| Roles, task classes, DoD | [roles](references/roles.md) |
+| Spawned goals, selection, runs, recovery | [tracked background spawn](references/tracked-background-spawn.md) |
+| Session Manager wrappers, goal runtimes | [codex goal runtime](docs/codex-goal-runtime.md), [claude goal runtime](docs/claude-goal-runtime.md) |
+| Templates, reviewer routing | [sub-agent templates](references/sub-agent-templates.md) |
+| Context budgets | [context efficiency](references/context-efficiency.md) |
+| Install/bootstrap | [setup](references/setup.md) |
+| Remote auth/admin/ops | [remote board runbook](docs/remote-board-operations.md) |
+| CLI/deploy overview | [README](README.md) |
+
+Runtime changes follow canonical `.specs/` contracts.
+
+exec
+/bin/zsh -lc 'printenv TASK_BOARD_RUN_ID || true
+wc -l /Users/iv/.claude/skills/project-management/references/statuses.md /Users/iv/.claude/skills/project-management/references/resources-and-bugs.md /Users/iv/.claude/skills/project-management/references/roles.md /Users/iv/.agents/.instructions/INSTRUCTIONS_PLATFORM.md /Users/iv/.agents/.instructions/INSTRUCTIONS_STRUCTURE.md /Users/iv/.agents/.instructions/INSTRUCTIONS_ATTACHMENTS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_TOOLS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_SKILLS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_SKILL_TRIGGERS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_DIAGRAMS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_TESTING.md /Users/iv/.agents/.instructions/INSTRUCTIONS_WORKFLOW.md /Users/iv/.agents/.instructions/INSTRUCTIONS_DOCS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_STYLE.md' in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+RUN-260729-25bb90
+     189 /Users/iv/.claude/skills/project-management/references/statuses.md
+      94 /Users/iv/.claude/skills/project-management/references/resources-and-bugs.md
+     175 /Users/iv/.claude/skills/project-management/references/roles.md
+       6 /Users/iv/.agents/.instructions/INSTRUCTIONS_PLATFORM.md
+      17 /Users/iv/.agents/.instructions/INSTRUCTIONS_STRUCTURE.md
+      88 /Users/iv/.agents/.instructions/INSTRUCTIONS_ATTACHMENTS.md
+      50 /Users/iv/.agents/.instructions/INSTRUCTIONS_TOOLS.md
+     112 /Users/iv/.agents/.instructions/INSTRUCTIONS_SKILLS.md
+      28 /Users/iv/.agents/.instructions/INSTRUCTIONS_SKILL_TRIGGERS.md
+      13 /Users/iv/.agents/.instructions/INSTRUCTIONS_DIAGRAMS.md
+      21 /Users/iv/.agents/.instructions/INSTRUCTIONS_TESTING.md
+      51 /Users/iv/.agents/.instructions/INSTRUCTIONS_WORKFLOW.md
+      31 /Users/iv/.agents/.instructions/INSTRUCTIONS_DOCS.md
+     269 /Users/iv/.agents/.instructions/INSTRUCTIONS_STYLE.md
+    1144 total
+
+exec
+/bin/zsh -lc "for f in /Users/iv/.claude/skills/project-management/references/statuses.md /Users/iv/.claude/skills/project-management/references/resources-and-bugs.md /Users/iv/.claude/skills/project-management/references/roles.md /Users/iv/.agents/.instructions/INSTRUCTIONS_PLATFORM.md /Users/iv/.agents/.instructions/INSTRUCTIONS_STRUCTURE.md /Users/iv/.agents/.instructions/INSTRUCTIONS_ATTACHMENTS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_TOOLS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_SKILLS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_SKILL_TRIGGERS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_DIAGRAMS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_TESTING.md /Users/iv/.agents/.instructions/INSTRUCTIONS_WORKFLOW.md /Users/iv/.agents/.instructions/INSTRUCTIONS_DOCS.md /Users/iv/.agents/.instructions/INSTRUCTIONS_STYLE.md; do sed -n '1,320p' \""'$f"; done' in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+# Statuses
+
+9 statuses organized in a workflow:
+
+| Status | Meaning | Who sets |
+|--------|---------|----------|
+| **backlog** | Captured, no work yet | anyone |
+| **analysis** | Researching, decomposing | anyone |
+| **to-dev** | Ready for development | orchestrator |
+| **development** | Writing code | sub-agent |
+| **to-review** | Code ready for review | sub-agent |
+| **reviewing** | Reviewer child is checking the work | reviewer |
+| **done** | Reviewed and accepted leaf work, or computed container completion | reviewer / orchestrator after reviewer verdict; parent aggregation |
+| **closed** | Explicit administrative disposition: cancelled, obsolete, or won't do (reason in notes) | anyone |
+| **blocked** | Concrete external blocker or unresolved human-only stop-the-line decision (full evidence packet in notes/resource) | anyone |
+
+## Status Flow
+
+**Happy path:**
+```
+backlog → analysis → to-dev → development → to-review → reviewing → done
+```
+
+**Returns from reviewing:**
+- `reviewing → analysis` — need more research
+- `reviewing → to-dev` — code issues, needs rework
+
+**Terminal from any status:**
+- `any → closed` — won't do / cancelled
+- `any → blocked` — concrete external blocker or unresolved human-only platform/product/architecture/tradeoff/approval decision
+
+**Note on closed:** Use `closed` for cancelled, obsolete, or won't-do items. Don't delete — close with a note explaining why. History is preserved, and the item can be reopened if needed.
+
+For a leaf task or bug, `done` means its delivery was accepted and `closed`
+means it was explicitly disposed without accepted delivery. A leaf may be
+closed from any lifecycle state.
+
+For a story or epic, `done` is computed completion: every direct child is
+`done` or `closed`. `closed` is an explicit administrative disposition of the
+container itself. A container may be closed only when every direct and
+transitive descendant is already `done` or `closed`; an empty container also
+satisfies this rule. Close or complete descendant work first, then close
+containers from the inside out. `task-board validate` reports
+`PARENT_STATUS_MISMATCH` for stored closed containers that still contain active
+descendants.
+
+**Don't delete elements.** Use `closed` instead of `delete`. Deletion loses history and context. The only exception is removing test/junk data during board setup.
+
+**Orchestrator review routing flow:** When a producer child sets `to-review`:
+1. Orchestrator confirms the producer attached task-scoped outcome evidence.
+2. Orchestrator spawns a reviewer child with explicit selection, for example `task-board spawn TASK-... --role reviewer --background --agent codex --model gpt-5.6-sol --reasoning-effort max`.
+3. Reviewer child sets/keeps `reviewing`, reads artifacts/code, and writes the verdict.
+4. If accepted → `done`. If changes are requested → `to-dev` (code rework) or `analysis` (needs more research), with notes/outcome evidence.
+5. On changes requested, the Orchestrator preserves the verdict, spawns the appropriate producer, and sends the next `to-review` handoff through a new reviewer. Repeat producer -> reviewer -> rework -> reviewer until accepted `done`.
+6. If a child exits early or leaves the item parked in `analysis`, `development`, `testing`, or `reviewing`, the Orchestrator inspects the run/outcomes and retries or reroutes through a focused child. Recoverable work is never handed to the human.
+7. A `blocked` verdict stops routing only when it identifies a concrete external blocker or unresolved human-only stop-the-line decision and records the full evidence packet; otherwise retry or reroute.
+
+`reviewing` is a real state, not a pass-through. A reviewer child must do actual review work between the producer handoff and `done`; the orchestrator routes and monitors that review instead of performing the verdict inline.
+
+`to-review` is an internal routing trigger, never a handoff of routine review to the human. Human input is reserved for a concrete external blocker or unresolved human-only platform/product/architecture/tradeoff/approval decision.
+
+Human-facing wording follows the board state. `to-review` means "ready for review" or "handed off to review"; it is not "done", "complete", "finished", "final", or "готово". Say a task is done only after the board item is actually `done`.
+
+## Per-Element Review Policy
+
+Every board element has a `review` policy. Set it at creation with
+`create(..., review=required|light|none)`, change it with
+`set_details(ID, review=...)`, and inspect it through the `review` query
+projection. New elements and legacy elements without the field default to
+`required`.
+
+- `required` keeps the producer -> reviewer -> rework/reviewer loop. Only an
+  accepted reviewer verdict reaches `done`.
+- `light` still requires a reviewer child, but selection should favor a cheaper suitable effort tier that can satisfy the same evidence and quality gates.
+- `none` lets the Orchestrator accept a producer handoff from `to-review`
+  directly to `done` only after checking acceptance criteria, checklist,
+  validation results, and outcome evidence. Missing evidence returns to the
+  producer; `none` never means accepting an unevidenced handoff.
+
+This policy changes reviewer routing, not the need for board-owned evidence, and
+never introduces routine human review.
+
+## blocked vs is_blocked
+
+Two different concepts:
+
+- **blocked** (status) — explicit stop-the-line status for an evidence-backed external blocker or unresolved human-only platform/product/architecture/tradeoff/approval decision. Notes or an outcome resource must record the constraint, evidence, failed assumptions/attempts, viable alternatives and tradeoffs, recommendation, and exact human decision or external input needed to resume. Recoverable failures and ordinary rework are not `blocked`.
+- **is_blocked** (computed) — from `blocked-by` dependencies; if dependency is not `done`/`closed`, element is blocked
+
+CLI display:
+```
+TASK-05: to-dev [BLOCKED by TASK-02]     ← computed from dependency
+TASK-07: blocked                          ← explicit status
+```
+
+## Automatic Parent Status Aggregation
+
+After a child status mutation, the CLI recomputes every ancestor from its direct
+children. It is derived state: an unassigned story or epic may follow an
+assigned child without implying ownership of the container.
+
+- If every child is `done` or `closed`, a non-closed parent becomes `done`.
+  An already explicit `closed` parent stays `closed`; terminal child updates do
+  not silently normalize it to `done`.
+- Otherwise the parent adopts the highest-priority active child status:
+  `development`, `to-review`, `reviewing`, `to-dev`, `analysis`, then `backlog`.
+  `blocked` children do not select a parent status; a parent with only blocked
+  children keeps its current manual status.
+- The recomputation can promote, escalate, reopen, or demote a parent, then
+  continues through all ancestors. A parent that is `blocked` explicitly is not
+  recomputed.
+
+```bash
+task-board m 'set_status(TASK-260205-abc123, status=development)'
+# TASK-260205-abc123 → development
+# STORY-260205-def456 → development (auto-escalated)
+# EPIC-260205-ghi789 → development (auto-escalated)
+```
+
+For Task/Bug records created with the current format, the first transition into
+`development` also requires an explicit estimated value. Set it first with
+`set_estimate(ID, estimate=estimated, scale=fibonacci, number=N)`. The refusal
+is a typed estimate-required error, parallel to the unfinished-dependency start
+refusal. Records whose legacy `progress.md` has no Estimate section are
+grandfathered and are not retroactively blocked; an idempotent status write for
+an element already in `development` is not treated as a new start.
+
+### Commit confirmation for accepted work
+
+Top-level `task-board.config.json -> version_control.confirm` defaults to
+`false`. When it is `true`, `desired_commit_time` is required. Any mutation
+that would move a Bug or Story to `done` must then include the exact mover-local
+acknowledgement `commit_ack=scope_committed`. This covers a direct Bug/Story
+transition and a Task/Bug terminal transition that automatically promotes its
+parent Story.
+
+```json
+{
+  "version_control": {
+    "confirm": true,
+    "desired_commit_time": "evening MSK"
+  }
+}
+```
+
+```bash
+task-board m 'set_status(STORY-260205-def456, status=done, commit_ack=scope_committed)'
+```
+
+The error reports the transition-causing element, every enforced Bug/Story
+transition, the owner message, and the configured desired time. The
+acknowledgement covers only the mover's scope; foreign uncommitted work is
+allowed and task-board performs no git clean-tree check. Local evaluation and
+status writes share one mutation lock. In remote mode an enforcing CLI first
+requires the server's `version_control_confirmation=atomic-v1` capability, then
+the server evaluates the acknowledgement and writes the child/ancestor statuses
+under one serialized mutation.
+
+A reviewer-archetype spawned run must not supply `commit_ack`. It records
+acceptance evidence and hands it to the mover that owns the scoped commit; that
+mover commits first, then makes the final `done` transition with
+`commit_ack=scope_committed`.
+
+Reactivation follows one deterministic rule: adding a descendant creates it in
+`backlog`, and adding or changing any descendant to an aggregating active status
+runs ordinary aggregation through every ancestor. Any `done` or `closed`
+container on that path reopens to the highest-priority active aggregate status;
+explicit closure is not sticky once descendant work becomes active. The target
+is the aggregate child status, not a fixed `development` state:
+
+```bash
+task-board m 'set_status(TASK-260205-abc123, status=to-dev)'
+# TASK-260205-abc123 → to-dev
+# STORY-260205-def456 → to-dev (auto-reopened)
+# EPIC-260205-ghi789 → to-dev (auto-reopened)
+```
+
+Automatic container transitions do not require an assignee. Hard dependencies
+still gate automatic changes to `development`, `to-review`, `reviewing`, and
+`done`: if a container has an unfinished blocker, its derived status is left
+unchanged and the child mutation succeeds. Direct manual transitions use the
+same dependency gate; they additionally require an assignee for `to-dev`,
+`development`, and `to-review`.
+
+`blocked` remains the existing non-aggregating exception: blocked children do
+not select a parent status. Closed ancestors remain closed rather than being
+silently normalized to `done`, so validation reports every affected container
+that still has a blocked descendant. The operator must reopen the container or
+resolve/close that descendant work.
+# Resources
+
+Resources are linked to board elements via explicit CRUD operations. They are stored centrally in `.task-board/.resources/` (local) or in MinIO / filesystem storage (remote board-server).
+
+## Resource Types
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| **precondition** | Inputs needed before work starts | Design docs, specs, instructions, API schemas |
+| **outcome** | Results produced by work | Research findings, implementation notes, analysis |
+
+## Commands
+
+```bash
+# Create a resource
+task-board m 'add_resource(TASK-260218-abc, name=TASK-260218-abc_design.md, type=precondition, content="...", description="Architecture design")'
+task-board m 'add_resource(TASK-260218-abc, name=TASK-260218-abc_results.md, type=outcome, content="...", description="Research findings")'
+
+# Replace an existing resource
+task-board m 'update_resource(TASK-260218-abc, name=TASK-260218-abc_results.md, type=outcome, content="revised findings", description="Research findings v2")'
+task-board resource update TASK-260218-abc ./TASK-260218-abc_results.md --type outcome
+
+# Delete a resource (destructive — requires --confirm)
+task-board m --confirm 'delete_resource(TASK-260218-abc, name=TASK-260218-abc_design.md)'
+task-board resource delete TASK-260218-abc TASK-260218-abc_design.md --confirm
+
+# View resources on an element
+task-board q --format compact 'get(TASK-260218-abc) { preconditionResources outcomeResources }'
+```
+
+## Storage
+
+Resources are stored flat in `.task-board/.resources/<elementID>/<name>`:
+
+```
+.task-board/.resources/
+├── TASK-260203-g7h8i9/
+│   ├── design.md           # precondition
+│   └── results.md          # outcome
+└── STORY-260203-d4e5f6/
+    └── research.md         # outcome
+```
+
+Local and board-server filesystem element deletion is journaled and
+crash-recoverable. Direct resource CRUD first resolves any pending staged
+element delete under the board mutation lock. MinIO element/subtree deletion
+currently fails before mutation with the typed
+`ErrAtomicResourceDeleteUnsupported` capability error; ordinary resource CRUD
+remains available.
+
+References are tracked in `progress.md` as markdown links:
+```markdown
+## Precondition Resources
+- [design.md](board-resource://TASK-260203-g7h8i9/precondition/design.md) — Architecture design
+
+## Outcome Resources
+- [results.md](board-resource://TASK-260203-g7h8i9/outcome/results.md) — Research findings
+```
+
+## Spawn Integration
+
+Precondition resources are automatically injected into agent prompts by `task-board spawn`. Full prompts preserve normal text inlining. Lite prompts use the resolved `agent_context.prompt.preconditions` policy: by default, text below `inline_bytes` is rendered inline, while larger text and binary resources are written read-only under `.temp/resources/` and represented by their name, description, byte count, SHA-256 digest, and local path. This means:
+
+1. Attach instructions/specs as precondition resources to a task
+2. Run `task-board spawn TASK-XX --role developer --background --agent codex --model gpt-5.6-sol --reasoning-effort max` — agent gets everything automatically
+3. Agent saves results via `task-board m 'add_resource(..., type=outcome)'` on first write, then `update_resource(...)` for revisions
+
+## Best Practices
+
+- **Use preconditions for agent instructions** — attach design docs, specs, or step-by-step instructions before spawning
+- **Use outcomes for work products** — research findings, analysis, implementation notes
+- **Use explicit create/update/delete** — `add_resource` / `resource add` must not silently overwrite; use `update_resource` / `resource update` when replacing an existing payload
+- **Use one safe filename component** — element IDs and resource names containing traversal segments, absolute paths, path separators, malformed URL escapes, or encoded/repeatedly encoded escapes are rejected in local and remote storage
+- **Always use board commands** — never create/edit resource files or progress.md resource sections manually
+- **Name descriptively with task scope** — `TASK-260218-abc_architecture-design.md` not `doc.md`
+- **Add descriptions** — the `description=` param adds a one-line description shown in spawn prompts
+
+---
+
+# Bugs
+
+Bugs are elements of the board, living inside stories alongside tasks.
+
+```bash
+# Create bug
+task-board m 'create(type=bug, parent=STORY-260218-abc, name=crash-on-start, description="App crashes when starting recording")'
+
+# Track like any element
+task-board m 'set_status(BUG-260218-abc, status=development)'
+task-board m 'add_checklist_item(BUG-260218-abc, text="Reproduce the issue")'
+task-board m 'add_checklist_item(BUG-260218-abc, text="Find root cause")'
+task-board m 'add_checklist_item(BUG-260218-abc, text="Write fix")'
+task-board m 'add_checklist_item(BUG-260218-abc, text="Add regression test")'
+```
+# Role Registry
+
+Roles define a spawned agent's identity, skills, lifecycle, and baseline
+definition of done. The registry supports project-local overrides and bundled
+global defaults without copying role bodies into `SKILL.md`.
+
+## Registry Layout
+
+The preferred directory form keeps the role definition and optional skill
+catalog together:
+
+```text
+.roles/
+├── developer/
+│   ├── role.md
+│   └── skills.md
+├── researcher/
+│   ├── role.md
+│   └── skills.md
+└── reviewer/
+    └── role.md
+```
+
+The legacy single-file form, `.roles/<role-name>.md`, remains supported.
+
+## `role.md` Frontmatter
+
+```yaml
+---
+name: developer
+description: Writes code, fixes bugs, writes tests
+archetype: implementer
+start_status: development
+end_status: to-review
+dod:
+  - Outcome attached with a task-scoped name
+  - text: Relevant tests pass
+    classes: [code]
+  - text: Published artifact validated
+    classes: [metadata, docs]
+skills:
+  - project-management
+---
+
+# developer
+
+The Markdown body supplies the role's instructions, deliverable, standing
+orders, constraints, and human-facing handoff wording.
+```
+
+Keep baseline DoD only in frontmatter; spawn merges it with the task checklist
+and renders it once. Do not repeat a `Definition of Done` section in the body.
+For board reads, role bodies direct concrete workers to compact task-specific
+projections and away from routine `summary()`, `plan()`, `schema()`, and
+`{ full }` orientation.
+
+Frontmatter fields:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Canonical role identity used by `--role`. |
+| `description` | Short role summary used in role listings. |
+| `archetype` | High-level identity: `implementer`, `analyst`, `reviewer`, or `tester`. |
+| `start_status` | FIRST lifecycle status set after the child launches. Omit for an orchestration-only role. |
+| `end_status` | LAST producer handoff status. A verdict-driven reviewer omits it and selects exactly one verdict branch instead. |
+| `dod` | Baseline checklist entries injected by spawn, optionally gated by task class. |
+| `skills` | Optional inline lazy skill catalog, merged with `skills.md`. |
+
+## Task Classes And DoD Gating
+
+Every board element has a `task_class`:
+
+- `code` — default, including legacy elements without an explicit value
+- `metadata`
+- `docs`
+- `research`
+
+Set it during creation or update it later:
+
+```bash
+task-board m 'create(type=task, parent=STORY-260218-abc123, name=publish-metadata, task_class=metadata)'
+task-board m 'set_details(TASK-260218-def456, task_class=docs)'
+```
+
+Inspect it through the `task_class` query projection:
+
+```bash
+task-board q --format compact 'get(TASK-260218-def456) { id name task_class }'
+task-board q --format compact 'list(type=task) { id name task_class }'
+```
+
+A role `dod` entry may be either:
+
+- a plain string, which applies to every task class; or
+- an object with `text` and optional `classes`.
+
+Spawn injects an object entry only when the board element's normalized
+`task_class` appears in `classes`. Omitting `classes` or using an empty list
+preserves the all-classes behavior. Unknown class values are rejected. This
+filter applies to role baseline DoD; the task-specific checklist already stored
+on the board remains the task-specific contract.
+
+```yaml
+dod:
+  - Always attach a task-scoped outcome
+  - text: Run code tests
+    classes: [code]
+  - text: Validate the published artifact
+    classes:
+      - metadata
+      - docs
+```
+
+## `skills.md` Format
+
+`skills.md` is optional. Use the `Required` and `Domain` sections so agents can
+distinguish baseline workflow skills from task-dependent domain catalogs:
+
+```markdown
+# developer — skills
+
+## Required
+
+- project-management
+- go-testing-tools
+
+## Domain
+
+- core-data (when working on persistence)
+- swiftui (when building UI)
+```
+
+List entries are merged with the frontmatter `skills` list and deduplicated.
+Skills remain lazy references: load a full skill body only when the concrete
+task scope requires it or the user, task, or project explicitly names it.
+
+## Resolution Order
+
+`LoadRole(workDir, name)` resolves the first existing path in this exact order:
+
+1. Project directory: `<workDir>/.roles/<name>/role.md`
+2. Project single file: `<workDir>/.roles/<name>.md`
+3. Global directory: `~/.roles/<name>/role.md`
+4. Global single file: `~/.roles/<name>.md`
+
+Therefore project-local definitions override global definitions, and the
+directory form overrides the single-file form within the same registry. Role
+names are normalized before lookup; path-like or unknown roles fail closed.
+Only the directory form loads a sibling `skills.md`.
+
+## Bundled Roles And Global Installation
+
+The bundled registry includes these core roles:
+
+| Role | Archetype | Lifecycle |
+| --- | --- | --- |
+| `researcher` | analyst | `analysis` -> `to-review` |
+| `developer` | implementer | `development` -> `to-review` |
+| `tester` | tester | `development` -> `to-review` |
+| `solution-architect` | analyst | `analysis` -> `to-review` |
+| `doc-writer` | implementer | `development` -> `to-review` |
+| `reviewer` | reviewer | `reviewing` -> verdict branch |
+| `orchestrator` | analyst | orchestration-only |
+| `coordinator` | analyst | legacy alias for `orchestrator` |
+
+Run the canonical setup entrypoint from the skill source checkout to sync
+bundled `.roles/` entries into `~/.roles/`:
+
+```bash
+./scripts/setup.sh --install-only
+```
+
+Setup installs the skill artifact and globally available roles, then verifies
+the installed role trees and the complete installed `references/` directory
+against source. Because reference parity is recursive, it includes this file.
+# Platform
+
+* Before building/testing, **inspect the project** to determine the intended target platform(s).
+* If multiple platforms are supported, prefer **iOS** when available.
+* If iOS is not available, build for the next most relevant supported platform (e.g. **macOS**, etc.).
+* Do not build for unrelated platforms unless the project supports them or the task explicitly requires it.
+# Project Structure & Environment
+
+## Shell & Environment
+
+* Shell: **zsh**
+* Shell framework: **oh-my-zsh**
+
+---
+
+## Project Structure
+
+* `.temp/` — temporary utilities, logs, debugging artifacts (**gitignored**).
+  * Use task-scoped subdirectories when possible, especially for worktrees and smoke artifacts: `.temp/<TASK-ID>/...`
+  * Temporary `git worktree` checkouts should live under `.temp/`, not beside the main repo checkout.
+* `.scripts/` — reusable scripts and utilities for the project.
+* `diagrams/` (project root) — all diagrams live here.
+  * Use subfolders when diagrams start to split by module or purpose (keep hierarchy clean and obvious).
+# Attachments
+
+Use this contract when the runtime materializes user-provided files for the agent.
+
+## Contract
+
+- Manifest file name: `agents-attachments-manifest.json`
+- Environment variable: `AGENTS_ATTACHMENTS_MANIFEST`
+- Default project-local fallback: `.temp/agents-attachments-manifest.json`
+
+The manifest may be either:
+
+- a JSON array of attachment objects
+- or an object with top-level key `attachments`
+
+Each attachment object should contain:
+
+- `id` — stable attachment identifier
+- `name` — original file name
+- `mime_type` — media type such as `image/png`
+- `size_bytes` — byte size
+- `sha256` — optional content hash
+- `local_path` — absolute local path to the materialized file
+
+Optional fields:
+
+- `source`
+- `created_at`
+- `metadata`
+
+## Agent behavior
+
+- Treat `local_path` as the source of truth for file access.
+- Treat incoming attachments as read-only inputs.
+- Prefer the helper CLI `agents-attachments` over ad hoc JSON parsing when practical.
+- If a tool needs a file path, pass `local_path` directly.
+
+Examples:
+
+```bash
+agents-attachments materialize
+agents-attachments list
+agents-attachments path screenshot.png
+mkdir -p .temp/attachments
+cp "$(agents-attachments path screenshot.png)" .temp/attachments/
+```
+
+## Codex bootstrap path
+
+If the runtime did not pre-materialize files but Codex rollout history is available, the helper can bootstrap a local manifest from the current thread:
+
+```bash
+agents-attachments materialize
+```
+
+Behavior:
+
+- uses `CODEX_THREAD_ID` by default
+- locates the matching `~/.codex/sessions/**/rollout-*.jsonl`
+- extracts `input_image` payloads from user turns
+- writes files under `.temp/agents-attachments/`
+- writes `.temp/agents-attachments-manifest.json`
+
+Overrides:
+
+- `agents-attachments materialize --thread-id ...`
+- `agents-attachments materialize --session /abs/path/to/rollout.jsonl`
+- `agents-attachments materialize --out-dir .temp/custom-attachments`
+- `agents-attachments materialize --manifest .temp/custom-manifest.json`
+
+## Spawned agents
+
+When a parent process spawns a child agent, it should:
+
+- propagate `AGENTS_ATTACHMENTS_MANIFEST`
+- allow access to the directory that contains the materialized files
+- keep child agents on the same manifest unless there is an explicit reason to narrow scope
+
+## Runtime boundary
+
+This repo defines the contract and helper tooling. It does not itself ingest chat attachments.
+
+The runtime/launcher is responsible for:
+
+- extracting files from the host conversation layer
+- materializing them on disk
+- writing `agents-attachments-manifest.json`
+- exporting `AGENTS_ATTACHMENTS_MANIFEST`
+# Allowed Tools
+
+Agent may use these tools freely.
+
+## Build / Apple tooling
+
+* `xcodebuild` (CLI builds/tests)
+* `swift` (toolchain / SwiftPM)
+* `simctl` (simulator management)
+
+---
+
+## Scripting / Automation
+
+### git
+
+* Inspect diffs, config, repo state.
+* Agent may check git config to detect default branch and repo location.
+* **Never commit or stage files automatically.**
+
+### python / perl / make
+
+* `python` — scripting
+* `perl` — quick regex/text processing
+* `make` — automation
+  * Agent may create a Makefile for its own automation.
+  * If a Makefile already exists, extend it (do not replace).
+
+---
+
+## Installing additional CLI tools
+
+* If the agent identifies a **strong, justified need** for additional CLI tools, it may:
+  * ask to install them, **or**
+  * attempt to install them directly **if permissions allow**.
+* Any installs must be:
+  * explicitly documented (what/why/how),
+  * minimal (avoid tool bloat),
+  * reproducible (include exact commands),
+  * and safe (no hidden side effects).
+
+---
+
+## Tool Readiness Check (mandatory)
+
+* Before using any tool for real project work, the agent must verify it can run and produce expected output.
+* Verification outputs / scratch artifacts must be stored in `.temp/` (since it is not versioned).
+* If a tool cannot be used successfully:
+  * document the failure (what command failed + error) in `.temp/` logs and/or `.temp/tasks.md`;
+  * do not proceed with workflows that assume the tool works.
+# Skills & Plugins
+
+## Using Skills (IMPORTANT)
+
+**Before performing any technical task, check if a relevant skill exists.**
+
+* Search `agents/skills/`, `.claude/skills/`, `.codex/skills/` for applicable skills.
+* If a skill covers the task — **read and follow it**, don't improvise.
+* Skills exist to ensure consistent patterns; ignoring them leads to mistakes.
+
+Example: before extracting screenshots, check if `ios-ui-validation` skill has instructions for this.
+
+---
+
+## Skill Locations
+
+| Tool | Global | Project-local |
+|------|--------|---------------|
+| Claude Code | `~/.claude/skills/` | `.claude/skills/` |
+| Codex CLI | `~/.codex/skills/` | `.codex/skills/` |
+
+---
+
+## Editing Shared Skills & Instructions (CRITICAL)
+
+* `~/.agents/`, `~/.claude/`, and `~/.codex/` are installed runtime locations, **not** the authoring source of truth.
+* **Never edit `~/.agents` directly** when changing shared skills, global instructions, configs, or helper scripts.
+* First identify the real source repo:
+  * shared global infra/instructions/config → `alexis-agents-infra`
+  * separately versioned skill/tool → that skill's own source repo
+* If the source repo is not obvious, stop and find it before editing anything.
+* Make the change in the source repo, then sync/install it into `~/.agents` with the repo's setup/install flow.
+* Treat direct edits inside `~/.agents` as local hotfixes only when the user explicitly asks for that, and say clearly that the source repo still needs the same change.
+
+---
+
+## Creating Skills (Our Pattern)
+
+**Always use the `agents/skills/` pattern:**
+
+1. Create the actual skill in `agents/skills/<skill-name>/`
+2. Symlink to `.claude/skills/` and `.codex/skills/`
+
+```bash
+# Create skill
+mkdir -p agents/skills/my-skill
+# ... add SKILL.md, references/, assets/, etc.
+
+# Symlink for Claude Code
+mkdir -p .claude/skills
+ln -s ../../agents/skills/my-skill .claude/skills/my-skill
+
+# Symlink for Codex CLI
+mkdir -p .codex/skills
+ln -s ../../agents/skills/my-skill .codex/skills/my-skill
+```
+
+**Why this pattern:**
+* `agents/skills/` is visible in Finder (no dot prefix)
+* Single source of truth, works for both Claude Code and Codex CLI
+* Skills are checked into git via `agents/`
+
+For global skills, create in `~/agents/skills/` and symlink to `~/.claude/skills/` and `~/.codex/skills/`.
+
+---
+
+## Skill Structure & Rules
+
+* Agent may create custom skills when there is a **clear, justified need** for specialized workflows.
+* Use the `skill-creator` skill to scaffold new skills if available.
+
+#### Skill structure
+
+```
+skill-name/
+├── SKILL.md              # required: frontmatter + instructions
+├── scripts/              # optional: executable code
+├── references/           # optional: docs/schemas
+└── assets/               # optional: templates/resources
+```
+
+#### Skill creation rules
+
+* Skills must be **focused and narrow** (one clear purpose).
+* Keep `SKILL.md` under 500 lines; split into references if needed.
+* Test any included scripts before committing.
+* Document skill purpose, triggers, and usage clearly in `description` field.
+
+#### Evolving skills with tooling
+
+* When using a skill and **creating ad-hoc tooling** (scripts, commands, patterns) to accomplish the task:
+  * If the tooling is **reusable across projects** — **add it to the skill immediately**.
+  * Include it in `scripts/` or document it in `SKILL.md`.
+  * This ensures the next time the skill is used, the tooling is already available.
+* Skills should **accumulate useful tooling** over time, not just document patterns.
+
+### Plugins
+
+* **Plugins** bundle multiple extensions (commands, agents, skills, hooks, MCP servers).
+* Agent may use plugins from official/community marketplaces when appropriate:
+  * Install via `/plugin install @namespace/plugin-name`
+  * Prefer official Anthropic plugins for standard workflows (code review, feature dev, etc.)
+  * Document installed plugins in `.temp/plugins.md` with rationale.
+
+---
+
+## Codex CLI
+
+* **Skills** use the same structure as Claude Code, but different paths (`.codex/skills/`).
+* Codex also checks `$CWD/../.codex/skills` and `$REPO_ROOT/.codex/skills`.
+* Priority: CWD > repo root > user (`~/.codex/skills/`) > system.
+* No plugin system in Codex CLI — use skills only.
+# Skill Triggers
+
+Automatic skill activation rules. When these topics come up — **FIRST load the skill via Skill tool**, then proceed.
+
+## Language Policy
+
+- **Specs, docs, code comments:** English only
+- **Sub-agent prompts:** English only
+- **Task/story/epic descriptions:** English only
+- **User communication:** Match user's language (default: English)
+
+---
+
+## Triggers
+
+| Triggers | Skill | Action |
+|----------|-------|--------|
+| architecture diagram, C4, structurizr, plantuml, sequence/component/class diagram | `architecture-diagrams` | Follow skill for patterns, folder structure, rendering. |
+| iOS UI test, screenshot validation, XCUITest, snapshot test iOS | `ios-testing-tools` | Follow skill for Page Object, accessibility IDs, screenshots. |
+| Android UI test, espresso, compose test, screenshot validation Android | `android-testing-tools` | Follow skill for test tags, Page Object, screenshots. |
+| currency exchange, обмен валют, драмы, рубли, AMD, RUB, rate.am, раттам, курс обмена, поменять валюту, конвертация валют | `currency-exchange` | Use `exchange` CLI. NEVER scrape rate sources manually. |
+| Go TUI test, bubbletea test, tuitestkit, go test helpers, reducer test, snapshot test go, golden file go, тесты для туи, го тест хелперы, тесты баблти, тест утилиты го, замкнутый цикл тестирования | `go-tui-testing-tools` | Follow skill for tuitestkit library, test patterns, templates, closed-loop workflow. |
+
+---
+
+## Workflow Details
+
+For task-tracking or board-centric workflows, prefer the repo-local skill or the explicitly requested skill. Do not assume a global default board/task-management skill from infra alone.
+# Diagrams Rules
+
+**Mandatory.**
+
+## General
+
+* Do not put "everything" into one diagram/file.
+* Prefer multiple small, focused diagrams over one large unreadable diagram.
+* Each diagram must have a clear title and narrow purpose.
+
+## Tools & Patterns
+
+For Structurizr DSL, PlantUML, and Graphviz patterns, folder structure, and rendering commands — follow the `architecture-diagrams` skill.
+# Testing & Refactoring
+
+## Testing
+
+* Use **Swift Testing** framework, not XCTest.
+* Tests must be in **Swift**, not ObjC.
+
+---
+
+## Refactoring workflow
+
+When refactoring (e.g., ObjC → Swift):
+
+1. **Write tests first** (if none exist).
+   * Test coverage must be **high for the code being refactored** (not the whole project):
+     * target **~80%+** at minimum;
+     * **prefer 100%** where practical.
+
+2. **Refactor code.**
+
+3. **Run tests** to verify nothing broke.
+# Workflow
+
+## Priority: Scope Control Over Speed
+
+* **Task tracking and scope control always come first.** Never skip creating a task "because it's small" or "just a quick fix".
+* If the repo already has an established task tracker, board, or workflow artifact, **every code change must be tracked there BEFORE implementation starts.**
+* The workflow is: **trigger → skill → task tracking → implement → review → reopen or close.** Never jump straight to implementation because it feels faster.
+* Speed is a side effect of good process, not a substitute for it. A change done fast but untracked is worse than a change done properly.
+
+---
+
+## Version Control
+
+* **Never commit or stage files automatically.**
+* When work is ready to commit, stop and ask for review.
+* **Never add Co-Authored-By lines** or any AI attribution to commits.
+* When you need to work on multiple revisions, parallel fixes, or isolated experiments in the same repo, prefer **`git worktree`** over juggling branches in one checkout.
+* Place temporary worktrees under the project's **`.temp/`** directory, not next to the main checkout.
+* If the worktree is for a tracked task, place it under a task-scoped temp path using the task ID:
+  * `.temp/<TASK-ID>/worktree/`
+  * or `.temp/<TASK-ID>/<repo-name>-worktree/`
+* This keeps the main checkout stable while making task-local scratch state easy to find and clean up.
+
+---
+
+## Task Tracking
+
+* If the active repo or skill already defines a task system, use it. Don't create a parallel `.temp/tasks.md`.
+* If no project-native task system exists — create a task plan in `.temp/tasks.md` before starting work.
+* Track progress in the same file.
+* Update/append to the existing plan — **don't create new task files each session**.
+* Purpose: resume smoothly if the session breaks.
+
+---
+
+## Research & Knowledge Persistence
+
+* **All research must go through the repo's established task/documentation flow.** Never keep research only in conversation context.
+* If the active repo or skill defines an artifact location, store research findings there and link them from the relevant task/doc/worklog.
+* If no project-specific convention exists — store in `.temp/` with descriptive names (`research-auth-flow.md`, `analysis-performance.md`).
+* **Why:** Context windows collapse. If research lives only in the conversation, it's lost forever when the session resets. Files persist.
+* Sub-agents doing research/analysis **must** write their findings to files before finishing.
+* Reference research artifacts from the relevant task/doc/worklog so the next session can find them quickly.
+
+---
+
+## Logging
+
+* Store logs in `.temp/` with numbered naming:
+  * `pod-lint-01.log`, `spm-build-01.log`, etc.
+* Document log locations in your notes/tasks.
+# Documentation
+
+## README.md
+
+* **Maintain** `README.md`:
+  * If missing — create it.
+  * If it exists — update it and keep it consistent with the current project state.
+
+---
+
+## Tools documentation (mandatory)
+
+In `README.md`, maintain a dedicated section that lists:
+
+* each tool used in the project,
+* what it is used for,
+* how to run it (exact commands / entry points),
+* where outputs/artifacts go (e.g. `.temp/`, `diagrams/`, etc.).
+
+---
+
+## Unresolved questions
+
+* If there are unresolved questions/decisions:
+  * document them in `UNRESOLVED_QUESTIONS.md` and keep it up to date.
+
+---
+
+## Language
+
+* All **public specs** must be written in **English**.
+# Communication Style
+
+## General Principles
+
+* Communicate **freely**, no corporate bullshit or formality.
+* Swearing is **ok** when appropriate. Don't hold back.
+* Russian is the primary language, but keep English technical terms as-is (don't translate "symlink" to "символическая ссылка").
+
+---
+
+## Armenian Forms of Address
+
+Warm Armenian greetings — the base layer:
+
+* **джан** — universal, warm ("брат джан", "ахпер джан")
+* **ахпер** — brother
+* **апер** — also brother (colloquial)
+* **аро** — dude, bro
+
+Examples:
+* "Ахпер джан, всё готово"
+* "Аро, тут косяк нашёл"
+* "Джан, смотри что получилось"
+
+---
+
+## Олбанский (Olbanian)
+
+The "padonkaff" language of 2000s Russian internet. Use as seasoning, mixed with Armenian — classic combo.
+
+**Approval:**
+
+* **аффтар жжот** — author is fire, great content
+* **пеши исчо** — write more, keep going
+* **зачот** / **зочот** — nice, cool
+* **кросафчег** — handsome/well done
+* **КГАМ** — Creative of the Year, Author Well Done
+* **КГ/АМ** — Creative is Shit, Author is an Asshole (sarcasm or real disapproval)
+* **аццкий сотона** — insanely cool person/thing
+* **в мемориз** / **вмемориз** — saved, bookmarked, memorized
+* **во френды** — added to friends (approval of author)
+* **готично** — gothic, cool with dark humor
+* **заипца** — fucking great
+* **ниибацца** — absolutely, extremely
+* **акуеть дайте две** — strong impression
+
+**Disapproval:**
+
+* **аффтар мудак** — content is shit
+* **выпей йаду** — go away, delete yourself
+* **убей сибя** / **убей себя ап стену** — really bad
+* **ацтой** — sucks
+* **гавно** — shit
+* **фтопку** — burn it, delete
+* **низачот** — fail
+* **боян** — old joke, stale
+* **йад** — poison (bad content)
+* **в газенваген** — extreme dismissal
+* **данунах** — extreme disagreement
+* **тема не раскрыта** — dissatisfaction (especially when details were expected)
+
+**Emotions and reactions:**
+
+* **ржунимагу** — can't stop laughing
+* **пацталом** — under the table laughing
+* **абассака** — laughing (same as ржунимагу)
+* **бугага** — slow laugh
+* **гыыыы** — strong laugh
+* **йа плакаль** — I cried (from laughter or sadness)
+* **ахтунг** — attention! careful! shit's about to go down
+* **ужоснах** — extreme outrage or awe
+* **жесть** — hardcore, damn
+* **хуясе** / **ничоси** — extreme surprise
+* **слив защитан** — defeat in argument recorded
+* **пичалька** — sadness
+* **беспесды** — no bullshit, absolutely
+* **и ниипёт** — and don't give a fuck, refusing to discuss
+* **ИМХО** — I have an opinion, try to argue
+
+**Greetings and questions:**
+
+* **превед** — hello
+* **превед медвед** — hello (classic meme)
+* **кагдила** — how's it going
+* **чо новава** — what's new
+* **какие люди** — oh, familiar faces
+* **чмоки пративный** — ironic greeting
+
+**About content and authors:**
+
+* **криатифф** — creative text
+* **каммент** — comment
+* **фтыкать** — read with interest
+* **фтыкатель** — reader, content consumer
+* **хуятор** — author of texts
+* **многабукаф** — too much text
+* **ниасилил** — couldn't/wouldn't finish reading
+* **фотожаба** — photoshopped image
+* **отжиг** — wild, outrageous action
+* **первый нах** — first comment
+
+**Miscellaneous:**
+
+* **йа криветко** — I'm a shrimp (random, just because)
+* **учи олбанский** — learn olbanian (hint at ignorance)
+* **жжош** — you're on fire
+* **ололо** — joy/irony
+* **лол** / **лулз** — lol
+* **кул стори** — cool story, sure
+* **сцуко** — bitch (interjection)
+* **я бы вдул** — expression of interest
+
+**Distortion rules:**
+
+* а↔о freely (красава → кросафчег, вообще → ваще)
+* -тся → -ца (получается → получаеца)
+* что → чо/шо
+* сейчас → щас
+* вообще → ваще
+* -ться → -ццо (смеяться → смеяццо)
+* е → и (тебе → тибе)
+* Double letters for emphasis (оооочень, нууу)
+
+**Combo examples (Armenian + олбанский):**
+
+* "Ахпер джан, аффтар жжот! Пеши исчо!"
+* "Аро, ниасилил твой код, многа букаф"
+* "Джан, зочот, кросафчег!"
+* "Апер, кагдила? Чо новава?"
+* "Ахтунг, ахпер! Щас будет жесть"
+* "Аро, ацтой, фтопку это"
+* "Джан, КГАМ! В мемориз!"
+
+**Important:** don't overdo it. Олбанский is seasoning, not the main course. Never distort technical terms.
+
+---
+
+## Polish Flair
+
+Polish words and memes — additional spice. Use when appropriate, especially for expressiveness. Polish swearing is one of the richest in the world.
+
+**Курва universe:**
+
+Курва is not just a word, it's a philosophy. Like Eskimos have 50 words for snow, Poles have 50 derivatives of kurwa.
+
+* **курва** / **kurwa** — universal interjection for all occasions. Surprise, admiration, disappointment, pain, joy — all in one word
+* **курва мать** (kurwa mać) — amplified kurwa, for serious situations. "Курва мать, продакшн лежит"
+* **покурвило** — everything went to shit, broke down. "Ну и покурвило после мержа"
+* **закурвисте** — unbelievable (can be good or bad)
+* **курвица** — minor problem, minor kurwa. "Тут курвица с типами, щас починю"
+* **докурвить** — finish through pain. "Надо докурвить этот PR до конца дня"
+
+**Пердоле family (pierdolę):**
+
+* **пердоле** (pierdolę) — fuck it, forget it. "Пердоле тот легаси"
+* **опердолить** (opierdolić) — do fast and hard. "Опердолил рефакторинг за час"
+* **распердолить** (rozpierdolić) — smash, break. "Кто распердолил мейн?"
+* **пердольнуть** (pierdolnąć) — hit, smash. "Пердольни рестарт сервера"
+* **спердолить** (spierdolić) — fuck up, fail. "Спердолил деплой, откатываем"
+* **запердолить** (zapierdolić) — hammer in, build hard. "Запердолил фичу за ночь"
+* **выпердолить** (wypierdolić) — throw out. "Выпердоли этот файл из репы"
+* **пердоленце** (pierdolenie) — bullshit, nonsense. "Хватит пердоленца, давай код"
+* **nie pierdol** — don't bullshit. "Nie pierdol что тесты зелёные, я видел лог"
+
+**Jebać family:**
+
+* **ебать** (jebać) — like Russian, but with Polish flavor
+* **заебисте** (zajebiste) — fucking great, top tier. "Архитектура — заебисте"
+* **наебать** (najebać) — mess up. "Кто наебал в конфиге?"
+* **поебать** (pojebać) — break, mix up. "Мерж поебал все конфликты"
+* **уебать** (ujebać) — hit, wipe. "Уебал дропом всю базу"
+* **доебаться** (dojebać się) — nitpick. "Линтер доебался до пробелов"
+* **отъебись** (odpierdol/odjeb się) — leave me alone. "Отъебись со своим форматированием"
+* **поджебать** (podjebać) — tease, troll. "Это я поджебываю, не парься"
+
+**Дупа series (dupa = ass):**
+
+* **дупа** (dupa) — ass. "Код в дупе" / "В дупу такой рефакторинг"
+* **дупек** (dupek) — asshole (mild)
+* **здупеть** — be stunned. "Я здупел от этого бага"
+* **задупье** — middle of nowhere. "Этот модуль — задупье проекта"
+* **удупить** — kill, destroy. "Удупи этот бранч"
+
+**Холера and company:**
+
+* **холера** (cholera) — damn. "Холера, тесты красные"
+* **ясна холера** (jasna cholera) — damn it, amplified
+* **холера ясна бздурна** — triple intensity, for total disaster
+* **пся крев** (psia krew) — "dog's blood", mild swear. "Пся крев, кто это коммитнул?"
+* **шлаг** (szlag) — damn, stroke. "Шлаг бы то трафил" (may it strike you)
+* **шлаг мне трафи** — "I'm about to have a stroke" (from code/bug)
+* **до ясной холеры** — "to damn hell". "Надоело до ясной холеры"
+
+**Bobr (beaver) and memes:**
+
+* **бобёр** / **bobr** — from the "jakie piękne bobry" meme. Reaction to something attractive or unexpectedly good. "О, бобёр! Какой чистый код"
+* **бобр курва** — awed surprise. Combo reaction
+* **jakie piękne** — "how beautiful" (ironic admiration)
+* **nie dotykaj bobra** — "don't touch the beaver" — don't touch what works
+* **тымчасем бобр** (tymczasem bobr) — "meanwhile the beaver" — something goes its own way while chaos surrounds it
+* **polska gurom** — "Poland on top", patriotism meme. Use for any success: "Тесты зелёные — polska gurom!"
+* **janusz** — typical Janusz, cheapskate. "Янушевый код" — code written half-assed
+* **nosacz** / **носач** — proboscis monkey, symbol of the typical Pole-meme. Reaction to absurdity
+* **kiełbasa** — sausage. "Пахнет кельбасой" — smells like bad code
+* **pierogi** — dumplings. Not a swear, but: "Залепил пероги" — slapped together hacks
+
+**Approval / quality:**
+
+* **заебисте** (zajebiste) — fucking great, best approval word
+* **козак** (kozak) — well done, champion. "Ты козак, ахпер!"
+* **добже** (dobrze) — good, ok
+* **бардзо добже** (bardzo dobrze) — very good
+* **ест гит** (jest git) — it's all good. Pun with git
+* **cudo** (цудо) — miracle, beauty. "Этот рефакторинг — цудо"
+* **петарда** (petarda) — bomb, fire. "Фича — петарда!"
+* **мистжоство** (mistrzostwo) — mastery. "Это мистжоство, аро"
+
+**Disapproval:**
+
+* **гувно** (gówno) — shit. "Код — тотальне гувно"
+* **гувняны** (gówniany) — shitty. "Гувняны тест, переписывай"
+* **хлам** (chłam) — junk. "Выкинь этот хлам"
+* **бздура** (bzdura) — nonsense. "Что за бздура в этом PR?"
+* **клопот** (kłopot) — trouble. "Мамы клопот" — minor issue
+* **порожняк** (porażka) — failure. "Деплой — тотальна порожняк"
+
+**Reactions and phrases:**
+
+* **о курва!** — universal "wow!" / "fuck!"
+* **матко боска** (Matko Boska) — Holy Mother, damn
+* **Езус Мария** (Jezus Maria) — Jesus Christ
+* **спокойне** (spokojnie) — calm down, relax
+* **ни ма проблему** (nie ma problemu) — no problem, easy
+* **не вкурвяй мне** (nie wkurwiaj) — don't piss me off
+* **вкурвяюще** — infuriating. "Этот баг вкурвяюще стабильный"
+* **лечь** (leć) — fly, go. "Лечь, деплоим!"
+* **тшимай** (trzymaj) — here, catch. "Тшимай, аро, вот фикс"
+* **спердаляй** (spierdalaj) — get lost (rude). "Спердаляй, баг, нах"
+
+**Rule:** Polish is the third spice after Armenian and олбанский. Not required in every message. When appropriate — заебисте, when not — гувно. Derivatives of пердоле and курва are universally useful.
+
+---
+
+## Mixing Styles
+
+* **Don't blend everything at once.** Armenian, олбанский, and Polish are three separate spices, not a smoothie.
+* **Max two styles per message.** Armenian + олбанский ok. Armenian + Polish ok. Олбанский + Polish ok. All three together = unreadable mess.
+* Armenian forms of address (джан, ахпер, аро) are **always ok** — they're the base layer, don't count as a "style".
+* Олбанский and Polish — **sprinkle**, don't drench. One or two words for expressiveness, not every sentence.
+
+---
+
+## Tone
+
+* Direct, no fluff
+* Jokes and light teasing are fine (in moderation)
+* If something is shit — say it's shit, no sugarcoating
+* Praise only when genuinely deserved, don't shower with compliments
+
+---
+
+## Avoid
+
+* "Great question!" and other empty phrases
+* Excessive politeness ("could you please...", "allow me...")
+* Bureaucratic language
+* Emojis (unless explicitly asked)
+* Mixing all three styles in one message
+* **AskUserQuestion tool spam** — use it **only** when explicitly asked or when it's truly critical. For clarifications, just ask in normal conversation.
+
+exec
+/bin/zsh -lc 'task-board spawn goal "$TASK_BOARD_RUN_ID"
+task-board spawn status "$TASK_BOARD_RUN_ID"
+task-board spawn directives "$TASK_BOARD_RUN_ID"
+task-board q --format compact '"'get(BUG-260729-r0fe02) { id name status description scope acceptanceCriteria checklist notes preconditionResources outcomeResources parent review task_class }'" in /Users/iv/Developer/ReluxWorks/curator
+ exited 1 in 0ms:
+Active Goal: none (run is not goal-bound)
+Run: RUN-260729-25bb90
+Task: BUG-260729-r0fe02
+Status: running
+Phase: executing
+Summary: Spawned agent is executing
+Started: 2026-07-29T20:02:19.054188Z
+Last Progress: 2026-07-29T20:02:19.101946Z
+Last Event Seq: 26
+Launch Composition: degraded_contract_unavailable (provider=codex, diagnostic=composition_contract_unavailable)
+Agent: [reviewer] reviewer (codex) (codex)
+Logwork: /Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260729-r0fe02/-reviewer--reviewer--codex-_RUN-260729-25bb90.log
+Active Goal: none (run is not goal-bound)
+No directives recorded for RUN-260729-25bb90
+query error: parse error at 1:61: unknown field "acceptanceCriteria" (got "acceptanceCriteria"); relevant operation signature: get(id:string)
+
+codex
+The run is not goal-bound, so no goal verdict is required. The board projection rejected one field name; I’m checking only the scoped `get` schema and will retry with the supported names.
+exec
+/bin/zsh -lc "task-board q --format compact 'schema(operation=get)'" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+description:Get a single element by ID
+examples:["get(TASK-XX) { overview }"]
+kind:operation
+name:get
+parameters:[{"name":"id","type":"string","optional":false,"description":"Element ID"}]
+signature:get(id:string)
+
+exec
+/bin/zsh -lc 'task-board q --help' in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+Execute queries against the board using a compact DSL.
+
+Operations:
+  get(ID)              Get a single element by ID
+  list(filters...)     List elements with filters
+  count(filters...)    Count elements matching filters
+  summary()            Board overview (counts + active/blocked)
+  plan(scope?)         Execution phases; scope=[ID,ID,...] plans the union of subtrees
+  agents(stale=N?)     Agent dashboard
+  models(agent?)       Available models for spawn
+  project_config()     Full active project board runtime config (always local)
+  project_config(view=spawn-preflight, role=ROLE, agent=PROVIDER?)
+                       Narrow effective child-spawn policy for one target
+  whoami()             Current remote URL and active user (always local)
+  schema()             Introspect the full operations/fields/presets contract
+  schema(operation=NAME|mutation=NAME)
+                       Return only one typed operation or mutation signature
+
+Field projection:
+  { id status assignee }     Select specific fields
+  { overview }               Use a base preset (minimal, default, overview, full, progress, planning)
+  { observability-task }     Use project observability presets (project, epic, story, task)
+  (omitted)                  Defaults to { id name status }
+
+Batching:
+  Separate multiple queries with semicolons; results preserve source order
+
+Output format:
+  --format json       Standard JSON (default)
+  --format compact    Compact tabular output (~40% fewer tokens)
+                      plan() switches to the super-compact planning shape:
+                      flat waves of IDs, one-line critical path, id->status map
+
+Examples:
+  task-board q 'schema()'
+  task-board q 'get(TASK-260211-abc) { id status assignee }'
+  task-board q 'list(type=task, status=development) { overview }'
+  task-board q 'count(type=task, status=done)'
+  task-board q 'summary()'
+  task-board q 'summary() { observability-project }'
+  task-board q 'get(STORY-1) { observability-story }'
+  task-board q 'models()'
+  task-board q 'models(agent=claude)'
+  task-board q 'project_config()'
+  task-board q 'project_config(view=spawn-preflight, role=developer, agent=codex)'
+  task-board q 'schema(operation=project_config)'
+  task-board q 'schema(mutation=set_status)'
+  task-board q --format compact 'project_config(); models(agent=codex)'
+  task-board q 'get(TASK-1) { status }; list(type=task) { id status }'
+  task-board q --format compact 'list(type=task) { overview }'
+  task-board q --format compact 'plan(EPIC-1, active=true)'
+  task-board q 'plan(scope=[EPIC-1, STORY-2, TASK-3], mode=children)'
+
+Usage:
+  task-board q <query> [flags]
+
+Aliases:
+  q, query
+
+Flags:
+      --format string   Output format: "json" or "compact" (default "json")
+  -h, --help            help for q
+
+Global Flags:
+      --board-dir string         Path to the board directory (overrides TASK_BOARD_DIR and config local.board_dir) (default ".task-board")
+      --context-profile string   Agent context profile override: full or lite
+      --insecure                 Skip TLS certificate verification (for self-signed certs)
+      --json                     Output in JSON format
+      --no-update-check          Disable automatic update check
+      --remote string            Remote board server URL (overrides TASK_BOARD_REMOTE)
+      --remote-board string      Remote board ID (overrides TASK_BOARD_ID)
+
+exec
+/bin/zsh -lc "task-board q --format compact 'get(BUG-260729-r0fe02) { id name status description scope checklist notes preconditionResources outcomeResources parent review task_class }'" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+id:BUG-260729-r0fe02
+name:stabilize-godriver-cancellation-race-contract
+status:reviewing
+description:The accepted Curator composite intermittently fails under the mandatory race gate: internal/godriver TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest can observe fail-closed toolchain_mutated while the assertion permits only nil or toolchain_timeout. Determine the intended cancellation-vs-mutation precedence and make the contract deterministic without weakening fail-closed behavior.
+scope:Own only internal/godriver fingerprint cancellation behavior and its focused tests, plus task-scoped evidence. Start from the exact accepted TASK-260720-jrrgw9 candidate. Do not change CI, protocol vectors, timeouts, product manifests outside godriver, or broad error acceptance.
+checklist:[{"text":"Reproduce the exact race failure and record competing fail-closed outcomes","done":true},{"text":"Implement the narrow deterministic contract without broad error acceptance","done":true},{"text":"Run focused repeated race and non-race godriver gates with exact exits","done":true},{"text":"Attach a task-scoped patch and outcome for independent review","done":true},{"text":"Code written per task description and AC","done":true},{"text":"Relevant tests written for new or changed behavior and passing","done":true},{"text":"Lint clean","done":true},{"text":"Relevant build/validation commands run after changes and build not broken","done":true},{"text":"New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables","done":true},{"text":"Important findings, decisions, anomalies, or regressions recorded in logbook when relevant","done":true},{"text":"Implementation matches AC","done":false},{"text":"Solution fits project architecture","done":false},{"text":"Tests green","done":false},{"text":"If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches","done":false}]
+notes:Discovery evidence: TASK-260720-1pvfj5 rework final-race/race/go-test-served.json. Failing subtest got go-v1 toolchain_mutated for a file changed while reading; assertion expected nil or toolchain_timeout. No WARNING: DATA RACE diagnostic. Preserve accepted product candidate provenance.\nspawn agent resolution: Agent selection: claude via explicit_override\nspawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained\nspawn queued: [implementer] developer (claude) (run=RUN-260729-eb4053, max_parallel=20)\nspawn run started: [implementer] developer (claude) (run=RUN-260729-eb4053)\nspawn agent resolution: Agent selection: claude via explicit_override\nspawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained\nspawn queued: [implementer] developer (claude) (run=RUN-260729-3afcd3, max_parallel=20)\nspawn run started: [implementer] developer (claude) (run=RUN-260729-3afcd3)\nRESOLVED - ready for review. Root cause: digestToolchainRecords collapsed every non-clean record copy into toolchain_mutated, so a cancellation landing inside a file read reported mutation while a cancellation anywhere else in the same pipeline reported toolchain_timeout. Precedence decision (narrow, not cancellation-wins): copyWithContext tags only its OWN ctx check with package-private errCopyAbandoned; digestCopyDiagnostic branches on that sentinel alone. Read error, close error, a length that moved on its own, and a bare context.Canceled that did not come from that loop all still fail closed as toolchain_mutated - pinned by TestDigestCopyDiagnosticPrecedence. Reclassification between two refusals, both fail closed; toolchain_timeout was already emitted by the walk so no consumer sees a new value; error still unwraps to context.Canceled.\n\nCORRECTION TO THE FIRST APPROACH - MEASURED: repeating the racy subtest is NOT a gate. With the fix deliberately reverted it stayed green at 10,000 racing attempts (-count=50), 100,000 attempts (-count=500), and 2,000 attempts with a fresh 256KiB fixture each. The original flake was load-induced (the discovery run overlapped TASK-260720-1pvfj5 final-race). The real gate is deterministic: countdownContext places cancellation on an exact check including between two chunks of one file, and the new sweep subtest every_cancellation_point_stays_a_deadline walks the budget 0..N asserting nil or toolchain_timeout at every point - it fails the reverted code at budget 17 in 0.47s and is self-extending. The racy loop is kept as a ~5ms smoke check with a comment saying what it does not prove.\n\nGATES on final bytes, standalone processes, real exits: gofmt -l 0 (no output); go vet ./internal/godriver/ 0; focused non-race go test -run TestFingerprint|TestToolchain|TestDigestCopy|TestGoVersion|TestCandidateRC4 -count=1 exit 0 (3.06s); deterministic cancellation -count=1 -v exit 0, 19 subtests pass; go test -race -run TestFingerprintCancellationStaysFailClosed|TestDigestCopyDiagnosticPrecedence -count=1000 exit 0 (28.0s = 200k racing attempts + 1000 deterministic sweeps); focused family under -race -count=5 exit 0 (18.1s).\n\nLINT ITEM LEFT UNCHECKED, honestly: golangci-lint was not installed, so it was run at the CI-pinned v2.12.2 via go run against the shipped .golangci.yml, scoped: golangci-lint run ./internal/godriver/... EXIT 1 on ineffassign at builddriver_positive_conformance_test.go:178. The two files this patch changes give ZERO findings; the same command on the accepted TASK-260720-jrrgw9 baseline worktree gives byte-identical output and exit 1, proving it pre-existing. ineffassign is default-on in golangci-lint v2, so composite CI lint is red on this today independently of this patch - needs an owner outside this bug. make lint (repo-wide) was not run.\n\nNOT RUN by instruction: ./... and any Curator full/race suite - that gate belongs to TASK-260720-1pvfj5 and must not overlap another heavy race run. TestFingerprintRejectsInvalidUnicodePath skips on this host (APFS rejects the invalid-UTF-8 fixture name) - pre-existing and unrelated.\n\nSCOPE: internal/godriver/fingerprint.go + fingerprint_equivalence_test.go only; every other godriver file byte-identical to the accepted jrrgw9 candidate. Patch applies clean to .temp/TASK-260720-1pvfj5/rework/composite (git apply --check exit 0); the composite godriver baseline was verified byte-identical to jrrgw9 first. Applying it there is TASK-260720-1pvfj5 step, after review. Worktree .temp/BUG-260729-r0fe02/worktree.\nRouting note: producer patch and focused gates are complete. Generic Lint clean remains unchecked solely because accepted builddriver_positive_conformance_test.go has the pre-existing ineffassign now owned by BUG-260729-1o0m8f. After that cleanup is accepted, replay lint on the combined two-patch candidate, complete the generic checklist, and route this patch to independent review.\nspawn agent resolution: Agent selection: claude via explicit_override\nspawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained\nspawn queued: [implementer] developer (claude) (run=RUN-260729-4752b2, max_parallel=20)\nspawn run started: [implementer] developer (claude) (run=RUN-260729-4752b2)\nagent completed: [implementer] developer (claude) (exit=1)\nspawn run completed: claude (run=RUN-260729-4752b2, pid=32593, exit=1)\nspawn agent resolution: Agent selection: claude via explicit_override\nspawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained\nspawn queued: [implementer] developer (claude) (run=RUN-260729-1f4480, max_parallel=20)\nspawn run started: [implementer] developer (claude) (run=RUN-260729-1f4480)\nspawn agent resolution: Agent selection: claude via explicit_override\nspawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained\nspawn queued: [implementer] developer (claude) (run=RUN-260729-f6ebe7, max_parallel=20)\nspawn run started: [implementer] developer (claude) (run=RUN-260729-f6ebe7)\nProvider routing note 2026-07-29: Opus replay RUN-260729-4752b2 failed before first token with Claude API 500; retries RUN-260729-1f4480 and RUN-260729-f6ebe7 produced no first token for more than two and one-and-a-half minutes and were cancelled without code or board artifact changes. To keep the critical path moving, the strictly mechanical combined-evidence replay is rerouted to Codex; independent review remains a separate Codex reviewer run.\nspawn agent resolution: Agent selection: codex via explicit_override\nspawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=codex; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained\nspawn queued: [implementer] developer (codex) (run=RUN-260729-1521c1, max_parallel=20)\nspawn run started: [implementer] developer (codex) (run=RUN-260729-1521c1)\nCombined lint replay 2026-07-29: Applied accepted BUG-260729-1o0m8f patch sha256 8a07c0b239548235aea7dfa05fdb1d1cb2926971d4444d3435a9e6f8da368062 exactly; reverse apply check and five-file byte comparison exit 0. Cancellation sources and task patch remain byte-identical at d53cb4f4..., fb2f286b..., and 462f1ff0.... CI-pinned golangci-lint v2.12.2 full run exits 0 with 0 issues. Focused deterministic cancellation plus mutation controls, accepted protocoljson/transaction tests, gofmt, and scoped vet all exit 0. Existing repeated race evidence reused; no ./..., full suite, or new race run per precondition. New outcome: BUG-260729-r0fe02_lint-compatibility-results.md. All checklist items now satisfied; ready for independent review.\nagent completed: [implementer] developer (codex) (exit=0)\nspawn run completed: codex (run=RUN-260729-1521c1, pid=34142, exit=0)\nspawn agent resolution: Agent selection: codex via explicit_override\nspawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=codex; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained\nspawn queued: [reviewer] reviewer (codex) (run=RUN-260729-25bb90, max_parallel=20)\nspawn run started: [reviewer] reviewer (codex) (run=RUN-260729-25bb90)
+preconditionResources:[{"name":"BUG-260729-r0fe02_resume.md","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_resume.md","description":"Resume instructions after enforced heavy-test barrier"},{"name":"BUG-260729-r0fe02_combined-evidence.md","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_combined-evidence.md","description":"Precondition for lint-compatible cancellation evidence after BUG-260729-1o0m8f acceptance"}]
+outcomeResources:[{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-eb4053.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-eb4053.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-3afcd3.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-3afcd3.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_results.md","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_results.md","description":"Root cause, precedence decision, measured negative controls, exact gate exits, pre-existing lint finding"},{"name":"BUG-260729-r0fe02_patch.diff","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_patch.diff","description":"Narrow patch vs accepted TASK-260720-jrrgw9 godriver bytes; applies cleanly to the 1pvfj5 composite"},{"name":"BUG-260729-r0fe02_gatelogs.tar.gz","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_gatelogs.tar.gz","description":"Raw gate logs: vet, focused non-race, deterministic cancellation, race count=1000, race family, lint, and all negative controls"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-4752b2.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-4752b2.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-1f4480.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-1f4480.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-f6ebe7.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-f6ebe7.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--codex-_RUN-260729-1521c1.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--codex-_RUN-260729-1521c1.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_lint-compatibility-results.md","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_lint-compatibility-results.md","description":"Pinned lint replay, cancellation hash proof, scoped non-race gates, and reused race evidence"},{"name":"BUG-260729-r0fe02_spawn-log_-reviewer--reviewer--codex-_RUN-260729-25bb90.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-reviewer--reviewer--codex-_RUN-260729-25bb90.log","description":"System spawn log captured by task-board"}]
+parent:STORY-260720-3plyvy
+review:required
+task_class:code
+
+codex
+The handoff is complete and narrowly scoped: two cancellation files, a separate accepted lint fix, and task-owned logs. I’m now checking repository instructions, patch provenance, file hashes, and the actual test assertions; the architecture-diagrams skill is not relevant because no diagram or architecture artifact is in scope.
+exec
+/bin/zsh -lc "rg --files -g 'AGENTS.md' -g '"'!/.task-board/**'"' -g '"'!.task-board/**'"'
+git status --short
+git worktree list --porcelain
+find .temp/BUG-260729-r0fe02 -maxdepth 3 -type f -print | sort | sed -n '1,240p'
+find .temp/resources/BUG-260729-r0fe02 -maxdepth 2 -type f -print 2>/dev/null | sort" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+ M .github/workflows/ci.yml
+ M Makefile
+ M README.md
+?? .github/ci/
+?? .planning/
+?? .research/
+?? .task-board/.goals/
+?? .task-board/.progress-pair-generation
+?? .task-board/.resources/BUG-260729-1o0m8f/
+?? .task-board/.resources/BUG-260729-r0fe02/
+?? .task-board/.resources/EPIC-260720-21aq1i/
+?? .task-board/.resources/STORY-260720-1uv5gi/
+?? .task-board/.resources/STORY-260720-21bsr2/
+?? .task-board/.resources/STORY-260720-35dck7/
+?? .task-board/.resources/STORY-260720-3plyvy/
+?? .task-board/.resources/TASK-260720-11pfex/
+?? .task-board/.resources/TASK-260720-12iigs/
+?? .task-board/.resources/TASK-260720-14jjgt/
+?? .task-board/.resources/TASK-260720-17llva/
+?? .task-board/.resources/TASK-260720-1ljev5/
+?? .task-board/.resources/TASK-260720-1nlmvv/
+?? .task-board/.resources/TASK-260720-1nvomm/
+?? .task-board/.resources/TASK-260720-1pvfj5/
+?? .task-board/.resources/TASK-260720-1s1vr6/
+?? .task-board/.resources/TASK-260720-1u7hes/
+?? .task-board/.resources/TASK-260720-1zl1cj/
+?? .task-board/.resources/TASK-260720-1zntv0/
+?? .task-board/.resources/TASK-260720-2284br/
+?? .task-board/.resources/TASK-260720-256kj1/
+?? .task-board/.resources/TASK-260720-29hi1h/
+?? .task-board/.resources/TASK-260720-2g0e3b/
+?? .task-board/.resources/TASK-260720-2g7avf/
+?? .task-board/.resources/TASK-260720-2qqq0w/
+?? .task-board/.resources/TASK-260720-2zc6k1/
+?? .task-board/.resources/TASK-260720-31nl14/
+?? .task-board/.resources/TASK-260720-37ei85/
+?? .task-board/.resources/TASK-260720-3ag6pi/
+?? .task-board/.resources/TASK-260720-3itlly/
+?? .task-board/.resources/TASK-260720-3lo9jc/
+?? .task-board/.resources/TASK-260720-3mrm4z/
+?? .task-board/.resources/TASK-260720-3nj1r6/
+?? .task-board/.resources/TASK-260720-3pemm6/
+?? .task-board/.resources/TASK-260720-3pvihp/
+?? .task-board/.resources/TASK-260720-3pwg2w/
+?? .task-board/.resources/TASK-260720-4bd0it/
+?? .task-board/.resources/TASK-260720-6i3cya/
+?? .task-board/.resources/TASK-260720-cw39jh/
+?? .task-board/.resources/TASK-260720-jrrgw9/
+?? .task-board/.resources/TASK-260720-p7sdhg/
+?? .task-board/.resources/TASK-260720-poa3ze/
+?? .task-board/.resources/TASK-260720-q5oy3o/
+?? .task-board/.resources/TASK-260720-wajgn8/
+?? .task-board/.resources/TASK-260720-z2z795/
+?? .task-board/.resources/TASK-260720-z9j4c9/
+?? .task-board/.resources/TASK-260728-12pnm1/
+?? .task-board/.resources/TASK-260728-168smo/
+?? .task-board/.resources/TASK-260728-17sclp/
+?? .task-board/.resources/TASK-260728-1a52au/
+?? .task-board/.resources/TASK-260728-1g0z69/
+?? .task-board/.resources/TASK-260728-1jafds/
+?? .task-board/.resources/TASK-260728-1ph8rs/
+?? .task-board/.resources/TASK-260728-1yhuqi/
+?? .task-board/.resources/TASK-260728-2jaw7h/
+?? .task-board/.resources/TASK-260728-2kp3tv/
+?? .task-board/.resources/TASK-260728-2spy93/
+?? .task-board/.resources/TASK-260728-3b8qym/
+?? .task-board/.resources/TASK-260728-pwbr32/
+?? .task-board/.resources/TASK-260728-wy3dsw/
+?? .task-board/.resources/TASK-260728-zb2s4z/
+?? .task-board/.resources/TASK-260729-1b9tc3/
+?? .task-board/.resources/TASK-260729-1bf72u/
+?? .task-board/.resources/TASK-260729-1kq1rd/
+?? .task-board/.resources/TASK-260729-1t1z2l/
+?? .task-board/.resources/TASK-260729-1vpytz/
+?? .task-board/.resources/TASK-260729-1y7okj/
+?? .task-board/.resources/TASK-260729-1zex8r/
+?? .task-board/.resources/TASK-260729-2afulh/
+?? .task-board/.resources/TASK-260729-2kaopg/
+?? .task-board/.resources/TASK-260729-2sxx7k/
+?? .task-board/.resources/TASK-260729-35tb37/
+?? .task-board/.resources/TASK-260729-365r5r/
+?? .task-board/.resources/TASK-260729-3dr6hw/
+?? .task-board/.resources/TASK-260729-3jku56/
+?? .task-board/.resources/TASK-260729-3jmqgl/
+?? .task-board/.resources/TASK-260729-3nx97g/
+?? .task-board/.resources/TASK-260729-iuepxx/
+?? .task-board/.resources/TASK-260729-osjeay/
+?? .task-board/.resources/TASK-260729-rfrdfo/
+?? .task-board/.resources/TASK-260729-rhjxtx/
+?? .task-board/.resources/TASK-260729-v5hqnv/
+?? .task-board/EPIC-260720-21aq1i_declarative-compiled-builds/
+?? .task-board/EPIC-260728-2m6dqo_hardened-compiled-build-sandbox/
+?? LOGBOOK.md
+?? diagrams/
+?? task-board.config.json
+worktree /Users/iv/Developer/ReluxWorks/curator
+HEAD c06aa1a15e4093410a686ff0ce4f579fba59dec1
+branch refs/heads/agent/link-curator-skill-registry
+
+worktree /private/tmp/curator-conformance-prfix
+HEAD 8f9b90a31ea04006680866fc05cb7d1f9a675d2a
+branch refs/heads/agent/curator-conformance-prfix
+prunable gitdir file points to non-existent location
+
+worktree /Users/iv/Developer/ReluxWorks/.worktrees/curator-agent-skill
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+branch refs/heads/main
+
+worktree /Users/iv/Developer/ReluxWorks/.worktrees/curator-seamless-manager
+HEAD a78545cd2ca02b025be1af72ed2fe4a5b5a9210d
+branch refs/heads/agent/seamless-manager-lifecycle
+
+worktree /Users/iv/Developer/ReluxWorks/curator-production
+HEAD e423ce3f2838d48e9543e5c39e9e04428ee100d1
+branch refs/heads/agent/registry-client-production
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-1o0m8f/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260720-3plyvy/origin-main-worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-11pfex/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1ljev5/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1nlmvv/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1pvfj5/rework/composite
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1pvfj5/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1zl1cj/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1zntv0/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2284br/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-256kj1/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-29hi1h/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g0e3b/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2qqq0w/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-31nl14/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3mrm4z/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3pwg2w/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-4bd0it/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-6i3cya/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-poa3ze/origin-main-worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1zex8r/before-worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1zex8r/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+branch refs/heads/task/TASK-260729-1zex8r-fingerprint-walk
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jku56/worktree
+HEAD 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+detached
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/worktree
+HEAD c06aa1a15e4093410a686ff0ce4f579fba59dec1
+branch refs/heads/task/TASK-260729-3jmqgl-macos-hardened-probes
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/curator-shell-neutral/curator
+HEAD 7adce172da7c480ba1f2e601e93312a0f18dbb39
+branch refs/heads/agent/seamless-shell-onboarding
+
+.temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_gatelogs.tar.gz
+.temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_lint-compatibility-results.md
+.temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_patch.diff
+.temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_results.md
+.temp/BUG-260729-r0fe02/evidence/fixed-race-count100.log
+.temp/BUG-260729-r0fe02/evidence/fixed-race-count1000.log
+.temp/BUG-260729-r0fe02/evidence/fixed-race-count5000.log
+.temp/BUG-260729-r0fe02/evidence/focused-cancellation-verbose.log
+.temp/BUG-260729-r0fe02/evidence/focused-nonrace.log
+.temp/BUG-260729-r0fe02/evidence/focused-race-family-count5.log
+.temp/BUG-260729-r0fe02/evidence/lint-godriver-accepted-baseline.log
+.temp/BUG-260729-r0fe02/evidence/lint-godriver.log
+.temp/BUG-260729-r0fe02/evidence/negative-control-deterministic.log
+.temp/BUG-260729-r0fe02/evidence/negative-control-race-loop-500.log
+.temp/BUG-260729-r0fe02/evidence/negative-control-race-loop.log
+.temp/BUG-260729-r0fe02/evidence/negative-control-sweep.log
+.temp/BUG-260729-r0fe02/evidence/negative-control.log
+.temp/BUG-260729-r0fe02/evidence/repro-race-count400.log
+.temp/BUG-260729-r0fe02/evidence/repro-race-count5000.log
+.temp/BUG-260729-r0fe02/evidence/vet.log
+.temp/BUG-260729-r0fe02/worktree/.git
+.temp/BUG-260729-r0fe02/worktree/.gitattributes
+.temp/BUG-260729-r0fe02/worktree/.gitignore
+.temp/BUG-260729-r0fe02/worktree/.gitmodules
+.temp/BUG-260729-r0fe02/worktree/.golangci.yml
+.temp/BUG-260729-r0fe02/worktree/.goreleaser.yml
+.temp/BUG-260729-r0fe02/worktree/.task-board/README.md
+.temp/BUG-260729-r0fe02/worktree/CHANGELOG.md
+.temp/BUG-260729-r0fe02/worktree/CONTRIBUTING.md
+.temp/BUG-260729-r0fe02/worktree/LICENSE
+.temp/BUG-260729-r0fe02/worktree/Makefile
+.temp/BUG-260729-r0fe02/worktree/NOTICE
+.temp/BUG-260729-r0fe02/worktree/README.md
+.temp/BUG-260729-r0fe02/worktree/docs/implementation-plan.md
+.temp/BUG-260729-r0fe02/worktree/go.mod
+.temp/BUG-260729-r0fe02/worktree/go.sum
+.temp/BUG-260729-r0fe02/worktree/install.sh
+.temp/BUG-260729-r0fe02/worktree/task-board.config.json
+
+exec
+/bin/zsh -lc "sed -n '1,260p' .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_results.md
+sed -n '1,260p' .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_lint-compatibility-results.md
+sed -n '1,320p' .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_patch.diff
+sha256sum .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_patch.diff .task-board/.resources/BUG-260729-r0fe02/BUG-260729-r0fe02_patch.diff .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_lint-compatibility-results.md .task-board/.resources/BUG-260729-r0fe02/BUG-260729-r0fe02_lint-compatibility-results.md" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+# BUG-260729-r0fe02 — stabilize godriver cancellation race contract
+
+Baseline: the exact accepted `TASK-260720-jrrgw9` godriver bytes.
+Only two files differ from that baseline: `internal/godriver/fingerprint.go` and
+`internal/godriver/fingerprint_equivalence_test.go`.
+Worktree: `.temp/BUG-260729-r0fe02/worktree`.
+
+## Root cause
+
+`digestToolchainRecords` re-opens each file record and copies it through
+`copyWithContext`. That copy loop checks `ctx.Err()` at the top of every chunk
+and returns `(bytesCopiedSoFar, ctx.Err())`. The caller then collapsed *every*
+non-clean copy into one bucket:
+
+```go
+if copyErr != nil || closeErr != nil || written != opened.Size() {
+    ... diagnosticErr("toolchain_mutated", ...)
+}
+```
+
+So a cancellation landing inside a record's bytes was reported as
+`toolchain_mutated`, while a cancellation landing anywhere else in the same
+pipeline (walk descent, per-entry check, per-record check) was reported as
+`toolchain_timeout`. Which one a racing cancellation produced was pure
+scheduling, which is what the mandatory race gate intermittently observed:
+
+```
+fingerprint_equivalence_test.go:519: error = go-v1 toolchain_mutated:
+    toolchain file "z" changed while reading, want nil or toolchain_timeout
+```
+
+## Precedence decision
+
+**Only the abort this package itself raises inside its own copy loop counts as
+cancellation. Everything else stays `toolchain_mutated`.**
+
+`copyWithContext` now tags its own context check with a package-private sentinel
+(`errCopyAbandoned`) wrapping the real cause, and `digestCopyDiagnostic`
+classifies on that sentinel alone:
+
+- copy carries `errCopyAbandoned` → `toolchain_timeout`
+- read error, close error, or a length that moved on its own → `toolchain_mutated`
+- a bare `context.Canceled` that did *not* come from that loop → `toolchain_mutated`
+
+This is a reclassification between two refusals, not a relaxation. Both codes
+fail closed: no fingerprint is produced and no toolchain is trusted in either
+case. A concurrent write cannot be laundered into a deadline, because the
+sentinel is only ever attached by this package's own check — that case is pinned
+by `TestDigestCopyDiagnosticPrecedence/bare_context_error_is_not_this_loop's_abort`.
+The precise cause stays reachable: the returned error still unwraps to
+`context.Canceled` / `context.DeadlineExceeded`.
+
+No new diagnostic value is introduced. `toolchain_timeout` was already produced
+by the walk and per-record checks, so every existing consumer already handled
+it. `cmd/curator/builds.go:768` (operator guidance) is the only place outside
+godriver that branches on these codes; `toolchain_timeout` already fell into its
+`default` branch, so a cancelled fingerprint now gets the same guidance as every
+other cancelled fingerprint instead of the "could not be resolved or verified"
+text. That is more consistent, not weaker.
+
+## Test design — and a correction to the first approach
+
+The first attempt at a gate repeated the racing subtest 200× per run. **That was
+measured and it does not work.** With the fix reverted, a racing repetition was
+run under `-race` and stayed green at:
+
+- 10,000 racing attempts (`-count=50`) — exit 0
+- 100,000 racing attempts (`-count=500`) — exit 0
+- 2,000 racing attempts with a freshly-written 256 KiB fixture per attempt — exit 0
+
+The original failure was found while this run's focused race **overlapped
+TASK-260720-1pvfj5's final race gate**. Under that CPU contention, goroutine
+scheduling latency widens the window enough to sample it; on an unloaded machine
+`go cancel()` almost always lands before the first file is read. A racing
+repetition is therefore a load-dependent smoke check and cannot be the proof.
+The loop is kept (it is ~5 ms and costs nothing) but its comment now says
+plainly what it does not prove.
+
+The actual gate is deterministic. `countdownContext` returns nil for a fixed
+number of `Err()` calls and cancellation for every call after that, which places
+a cancellation on an exact check — including a check taken between two chunks of
+one file. On top of the named boundary cases, the contract is proved by an
+exhaustive sweep, `every cancellation point stays a deadline`: it walks the
+budget from 0 upward until a budget completes the fingerprint cleanly, asserting
+at every step that the outcome is `nil` or `toolchain_timeout` that unwraps to
+`context.Canceled` — never `toolchain_mutated`. It covers both phases and is
+self-extending: a cancellation check added anywhere later is covered the moment
+it exists.
+
+## Negative controls (fix reverted, exact bytes otherwise)
+
+| Control | Exit | Result |
+| --- | --- | --- |
+| `-run 'TestFingerprintCancellationStaysFailClosed/every_cancellation_point_stays_a_deadline' -count=1` | **1** (expected red) | fails at budget 17 in 0.47 s: `toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading` |
+| `-run 'TestFingerprintCancellationStaysFailClosed\|TestDigestCopyDiagnosticPrecedence' -count=1` | **1** (expected red) | 3 deterministic cancellation subtests + 3 precedence rows red |
+| `-race -run '.../cancelled_between_the_walk_and_the_digest' -count=50` | 0 | **did not detect** — racing repetition is not a gate |
+| `-race -run '.../cancelled_between_the_walk_and_the_digest' -count=500` | 0 | **did not detect** — 100k attempts, still green with the bug present |
+
+`internal/godriver/fingerprint.go` was restored byte-identical after the
+controls (sha256 `d53cb4f4212777496da7cbf80826366f5274406c0c4bb083b1c0800b9a822d23`
+before and after).
+
+## Gates on the final bytes
+
+All run as standalone processes, no pipes; exit codes are the real ones.
+
+| Gate | Command | Exit |
+| --- | --- | --- |
+| Format | `gofmt -l` on both changed files | 0 (no output) |
+| Build/vet | `go vet ./internal/godriver/` | 0 |
+| Focused non-race | `go test ./internal/godriver/ -run 'TestFingerprint\|TestToolchain\|TestDigestCopy\|TestGoVersion\|TestCandidateRC4' -count=1 -v` | 0 (3.06 s) |
+| Deterministic cancellation | `go test ./internal/godriver/ -run 'TestFingerprintCancellationStaysFailClosed\|TestDigestCopyDiagnosticPrecedence' -count=1 -v` | 0 — 19 subtests pass |
+| Bounded repeated race | `go test -race ./internal/godriver/ -run 'TestFingerprintCancellationStaysFailClosed\|TestDigestCopyDiagnosticPrecedence' -count=1000` | 0 (28.0 s) |
+| Focused family under race | `go test -race ./internal/godriver/ -run 'TestFingerprint\|TestToolchain\|TestDigestCopy\|TestGoVersion\|TestCandidateRC4' -count=5` | 0 (18.1 s) |
+
+The `-count=1000` race gate is 200,000 racing attempts plus 1,000 exhaustive
+deterministic sweeps plus 1,000 runs of the precedence table, with no race
+detector reports. The original repro shape (`-count=5000`, one racing attempt
+per run) produced 3 failures; this gate carries 40× that racing volume and adds
+the deterministic proof the racing volume cannot give.
+
+`TestFingerprintRejectsInvalidUnicodePath` skips on this host — APFS rejects the
+invalid-UTF-8 filename the fixture needs (`illegal byte sequence`). Pre-existing,
+platform-driven, unrelated to this change.
+
+## Lint — one pre-existing finding, NOT from this patch
+
+`golangci-lint` was not installed; it was run at the version CI pins
+(`.github/workflows/ci.yml` → `v2.12.2`) via
+`go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2`, against
+the repo's shipped `.golangci.yml`, scoped to the package:
+
+```
+golangci-lint run ./internal/godriver/...      exit 1
+internal/godriver/builddriver_positive_conformance_test.go:178:4:
+    ineffectual assignment to environment (ineffassign)
+1 issues: * ineffassign: 1
+```
+
+**The checklist item "Lint clean" is left unchecked because that command exits 1.**
+
+The two files this patch changes produce **zero** findings. The one finding is in
+`builddriver_positive_conformance_test.go`, which is byte-identical to the
+accepted `TASK-260720-jrrgw9` bytes. Running the same command against that
+accepted baseline worktree produces byte-identical output and the same exit 1
+(`lint-godriver-accepted-baseline.log`), which proves the finding is pre-existing.
+
+**This needs an owner outside this bug.** `ineffassign` is on by default in
+golangci-lint v2, so the composite's CI lint job is red on this today,
+independently of this patch. It belongs to whoever owns
+`builddriver_positive_conformance_test.go`, not to this task's scope
+(godriver fingerprint cancellation only).
+
+## Not run, and why
+
+Per the resume instruction, `./...` and the Curator full/race suite were **not**
+run — that gate belongs to TASK-260720-1pvfj5 and must not overlap another heavy
+race run. `make lint` was not run as such, because it is repo-wide; the
+package-scoped equivalent above was run instead, at the CI-pinned version.
+
+## Handoff
+
+`BUG-260729-r0fe02_patch.diff` applies cleanly to the composite:
+`git -C .temp/TASK-260720-1pvfj5/rework/composite apply --check -p1 <patch>` → exit 0.
+The composite's godriver baseline was verified byte-identical to the accepted
+jrrgw9 bytes before that check. Applying it to the composite is
+TASK-260720-1pvfj5's step, after this patch is reviewed.
+# BUG-260729-r0fe02 — lint compatibility replay
+
+Date: 2026-07-29
+Role: developer
+Worktree: `.temp/BUG-260729-r0fe02/worktree`
+
+## Resume scope
+
+This replay applied the exact accepted `BUG-260729-1o0m8f` lint patch on top of
+the preserved cancellation worktree. It did not alter the cancellation
+implementation or its tests, and it reused the already attached repeated-race
+evidence as required by the combined-evidence precondition.
+
+Accepted lint patch:
+
+`BUG-260729-1o0m8f_lint-fix.patch`
+
+SHA-256:
+
+`8a07c0b239548235aea7dfa05fdb1d1cb2926971d4444d3435a9e6f8da368062`
+
+`git apply --check` before application and `git apply --reverse --check` after
+application both exited 0. A byte-for-byte `cmp` of all five lint-patch files
+against the accepted `BUG-260729-1o0m8f` worktree exited 0.
+
+## Cancellation patch integrity
+
+The cancellation files had these SHA-256 values before the lint patch and have
+the same values after all checks:
+
+- `internal/godriver/fingerprint.go`:
+  `d53cb4f4212777496da7cbf80826366f5274406c0c4bb083b1c0800b9a822d23`
+- `internal/godriver/fingerprint_equivalence_test.go`:
+  `fb2f286b39f08104733fba20777366ec1456287457e39ce457cb94620e9644b2`
+
+The already attached task patch is also unchanged:
+
+- `BUG-260729-r0fe02_patch.diff`:
+  `462f1ff0326f74540eeb2815cc80542c55f47b35c6b1baef17b80b8815709c28`
+
+## Validation ledger
+
+Every gate was run directly as a standalone process. Exit codes below are the
+real process exits.
+
+| Gate | Exit | Outcome |
+| --- | ---: | --- |
+| `.temp/TASK-260720-1pvfj5/bin/golangci-lint version` | 0 | v2.12.2 built with Go 1.25.5 |
+| `.temp/TASK-260720-1pvfj5/bin/golangci-lint cache clean` | 0 | cache cleared before the measured lint run |
+| `.temp/TASK-260720-1pvfj5/bin/golangci-lint run` | 0 | `0 issues.` |
+| `gofmt -l` on the two cancellation files and five lint-patch files | 0 | no output |
+| `go test ./internal/godriver/ -run 'TestFingerprintCancellationStaysFailClosed\|TestDigestCopyDiagnosticPrecedence' -count=1 -v` | 0 | deterministic cancellation boundary and mutation-negative controls pass |
+| `go test ./internal/protocoljson ./internal/transaction -run 'TestMarshalCanonicalEscapesEveryControlCharacter\|TestRequireCanonicalAcceptsEveryControlCharacterEscape\|TestValidateRemovalEntries' -count=1 -v` | 0 | accepted lint-fix behavior tests pass |
+| `go vet ./internal/godriver/ ./internal/protocoljson/ ./internal/transaction/` | 0 | scoped packages compile and vet cleanly |
+| byte-for-byte `cmp` of all five applied lint-patch files against the accepted lint worktree | 0 | exact accepted patch content present |
+| `git apply --reverse --check BUG-260729-1o0m8f_lint-fix.patch` | 0 | accepted patch is exactly reversible from the combined candidate |
+
+The host has no unqualified `golangci-lint` on `PATH`; the measured gate used
+the preserved CI-pinned v2.12.2 binary from the accepted composite evidence.
+
+## Reused race evidence
+
+No race gate was rerun. The existing task outcome
+`BUG-260729-r0fe02_gatelogs.tar.gz` retains the bounded repeated `-race` results,
+including the count-1000 cancellation/precedence gate and the focused family
+race gate, both with exit 0. The combined-evidence instruction explicitly
+requires reusing that evidence to avoid overlapping the parent task's heavy
+race gate.
+
+## Not run
+
+- `go test ./...`
+- any full Curator test suite
+- any new `-race` command
+
+These were intentionally omitted by the task's combined-evidence precondition.
+
+## Outcome
+
+The inherited lint gate is green on the combined candidate. The accepted lint
+patch is present byte-for-byte, the cancellation patch content is unchanged,
+and the narrow non-race compatibility checks all pass. The developer handoff is
+ready for review.
+--- a/internal/godriver/fingerprint.go
++++ b/internal/godriver/fingerprint.go
+@@ -6,6 +6,7 @@
+ 	"encoding/binary"
+ 	"encoding/hex"
+ 	"errors"
++	"fmt"
+ 	"io"
+ 	"io/fs"
+ 	"os"
+@@ -103,12 +104,8 @@
+ 			contentDigest := sha256.New()
+ 			written, copyErr := copyWithContext(ctx, io.MultiWriter(digest, contentDigest), file)
+ 			closeErr := file.Close()
+-			if copyErr != nil || closeErr != nil || written != opened.Size() {
+-				var lengthErr error
+-				if written != opened.Size() {
+-					lengthErr = errors.New("file length changed")
+-				}
+-				return "", nil, diagnosticErr("toolchain_mutated", errors.Join(copyErr, closeErr, lengthErr), "toolchain file %q changed while reading", record.path)
++			if err := digestCopyDiagnostic(record.path, written, opened.Size(), copyErr, closeErr); err != nil {
++				return "", nil, err
+ 			}
+ 			item.size = written
+ 			copy(item.payload[:], contentDigest.Sum(nil))
+@@ -299,6 +296,35 @@
+ 	var encoded [8]byte
+ 	binary.BigEndian.PutUint64(encoded[:], length)
+ 	_, _ = writer.Write(encoded[:])
++}
++
++// errCopyAbandoned marks the copy loop's own cancellation check, so the digest
++// phase can tell "the caller stopped reading" from "the read failed" without
++// having to recognise an error that came back from the filesystem.
++var errCopyAbandoned = errors.New("toolchain copy abandoned")
++
++// digestCopyDiagnostic classifies a record copy that did not finish cleanly.
++//
++// A copy carrying errCopyAbandoned stopped because the caller's context ended
++// mid-file, and the short length that comes with it is that abort rather than
++// the file moving underneath the read; cancellation is reported as the same
++// deadline diagnostic every other cancellation check in this file reports. The
++// precedence is exactly that narrow: only the abort this package raised is read
++// as cancellation, so a genuine concurrent write — a read or close failure, or a
++// length that moved on its own — still fails closed as toolchain_mutated even
++// when the context happens to be done.
++func digestCopyDiagnostic(path string, written, size int64, copyErr, closeErr error) error {
++	if errors.Is(copyErr, errCopyAbandoned) {
++		return diagnosticErr("toolchain_timeout", errors.Join(copyErr, closeErr), "toolchain fingerprint deadline exceeded")
++	}
++	if copyErr != nil || closeErr != nil || written != size {
++		var lengthErr error
++		if written != size {
++			lengthErr = errors.New("file length changed")
++		}
++		return diagnosticErr("toolchain_mutated", errors.Join(copyErr, closeErr, lengthErr), "toolchain file %q changed while reading", path)
++	}
++	return nil
+ }
+ 
+ func copyWithContext(ctx context.Context, destination io.Writer, source io.Reader) (int64, error) {
+@@ -306,7 +332,7 @@
+ 	var total int64
+ 	for {
+ 		if err := ctx.Err(); err != nil {
+-			return total, err
++			return total, fmt.Errorf("%w: %w", errCopyAbandoned, err)
+ 		}
+ 		read, readErr := source.Read(buffer)
+ 		if read > 0 {
+--- a/internal/godriver/fingerprint_equivalence_test.go
++++ b/internal/godriver/fingerprint_equivalence_test.go
+@@ -5,6 +5,7 @@
+ 	"crypto/sha256"
+ 	"encoding/hex"
+ 	"errors"
++	"fmt"
+ 	"go/build"
+ 	"io"
+ 	"io/fs"
+@@ -151,12 +152,8 @@
+ 			contentDigest := sha256.New()
+ 			written, copyErr := copyWithContext(ctx, io.MultiWriter(digest, contentDigest), file)
+ 			closeErr := file.Close()
+-			if copyErr != nil || closeErr != nil || written != opened.Size() {
+-				var lengthErr error
+-				if written != opened.Size() {
+-					lengthErr = errors.New("file length changed")
+-				}
+-				return "", nil, diagnosticErr("toolchain_mutated", errors.Join(copyErr, closeErr, lengthErr), "toolchain file %q changed while reading", record.path)
++			if err := digestCopyDiagnostic(record.path, written, opened.Size(), copyErr, closeErr); err != nil {
++				return "", nil, err
+ 			}
+ 			item.size = written
+ 			copy(item.payload[:], contentDigest.Sum(nil))
+@@ -511,13 +508,81 @@
+ 		}
+ 	})
+ 
++	// A racing cancellation lands wherever the scheduler puts it, which on an
++	// unloaded machine is almost always before the first file is read. That makes
++	// this subtest a smoke check and nothing more: it is not what proves the
++	// contract, because the window it needs to hit only opens wide enough to be
++	// sampled when the machine is loaded — which is how the original failure was
++	// found, and why repeating it here cannot be relied on to find the next one.
++	// The deterministic subtests below take every cancellation point on purpose.
+ 	t.Run("cancelled between the walk and the digest", func(t *testing.T) {
+-		ctx, cancel := context.WithCancel(context.Background())
+-		go cancel()
+-		_, _, err := fingerprintToolchain(ctx, root, equivalenceVersion)
+-		if err != nil && DiagnosticCode(err) != "toolchain_timeout" {
+-			t.Fatalf("error = %v, want nil or toolchain_timeout", err)
++		for attempt := range 200 {
++			ctx, cancel := context.WithCancel(context.Background())
++			go cancel()
++			_, _, err := fingerprintToolchain(ctx, root, equivalenceVersion)
++			if err != nil && DiagnosticCode(err) != "toolchain_timeout" {
++				t.Fatalf("attempt %d: error = %v, want nil or toolchain_timeout", attempt, err)
++			}
++		}
++	})
++
++	// The same window taken deterministically: the context ends on an exact
++	// ctx.Err() call inside a record's copy loop, past the per-record check that
++	// guards the top of the digest phase. A cancellation there stops the read
++	// short, and a short read is the only thing a genuine concurrent write is
++	// visible as, so this is precisely where the two must not be confused.
++	t.Run("cancelled inside a record read", func(t *testing.T) {
++		handle, err := os.OpenRoot(root)
++		if err != nil {
++			t.Fatal(err)
++		}
++		defer func() { _ = handle.Close() }()
++
++		scopedRecords, scopedCollectErr := collectToolchainRecords(context.Background(), handle)
++		legacyRecords, legacyCollectErr := legacyCollectRecords(context.Background(), handle)
++		if scopedCollectErr != nil || legacyCollectErr != nil {
++			t.Fatalf("collection failed before cancellation: %v / %v", legacyCollectErr, scopedCollectErr)
++		}
++
++		// The digest phase spends one check per record before it reaches the
++		// first file, then one more per copied chunk. Counting the leading
++		// records keeps the budgets anchored to the tree rather than to a
++		// hand-written number that a later fixture edit would silently shift.
++		checksToFirstFile := 0
++		for _, record := range scopedRecords {
++			checksToFirstFile++
++			if record.kind == 'F' {
++				break
++			}
+ 		}
++		if checksToFirstFile == len(scopedRecords) && scopedRecords[len(scopedRecords)-1].kind != 'F' {
++			t.Fatalf("fixture has no file record: %v", scopedRecords)
++		}
++
++		for _, budget := range []struct {
++			name   string
++			checks int
++		}{
++			{"before the first chunk", checksToFirstFile},
++			{"after a partial chunk", checksToFirstFile + 1},
++			{"after the last chunk", checksToFirstFile + 2},
++		} {
++			t.Run(budget.name, func(t *testing.T) {
++				_, _, legacyErr := legacyDigestRecords(newCountdownContext(budget.checks), handle, legacyRecords, equivalenceVersion)
++				_, _, scopedErr := digestToolchainRecords(newCountdownContext(budget.checks), handle, scopedRecords, equivalenceVersion)
++				if DiagnosticCode(legacyErr) != "toolchain_timeout" || DiagnosticCode(scopedErr) != "toolchain_timeout" {
++					t.Fatalf("legacy %v, scoped %v", legacyErr, scopedErr)
++				}
++				if legacyErr.Error() != scopedErr.Error() {
++					t.Fatalf("detail: legacy %q, scoped %q", legacyErr.Error(), scopedErr.Error())
++				}
++				// The precise cause stays reachable for anything upstream that
++				// inspects it; only the reported boundary code changes.
++				if !errors.Is(scopedErr, context.Canceled) {
++					t.Fatalf("scoped error %v does not unwrap to context.Canceled", scopedErr)
++				}
++			})
++		}
+ 	})
+ 
+ 	// The same window, but taken deterministically at the phase seam instead of
+@@ -546,6 +611,108 @@
+ 			t.Fatalf("detail: legacy %q, scoped %q", legacyErr.Error(), scopedErr.Error())
+ 		}
+ 	})
++
++	// The contract in full, with nothing left to the scheduler: every cancellation
++	// point the fingerprint can reach is taken in turn, and each one must produce
++	// the deadline diagnostic or a clean fingerprint — never toolchain_mutated,
++	// because a context ending is not the toolchain changing. Walking the budget
++	// up rather than naming a few interesting values is what makes this a proof
++	// instead of a sample: a check that a later edit adds inside the copy loop, or
++	// anywhere else in either phase, is covered the moment it exists.
++	t.Run("every cancellation point stays a deadline", func(t *testing.T) {
++		// The sweep has to run past the last check to be exhaustive, and the
++		// budget that first completes cleanly proves it got there.
++		completed := false
++		for budget := 0; budget < 200; budget++ {
++			ctx := newCountdownContext(budget)
++			_, _, err := fingerprintToolchain(ctx, root, equivalenceVersion)
++			switch code := DiagnosticCode(err); {
++			case err == nil:
++				completed = true
++			case code == "toolchain_timeout":
++				if !errors.Is(err, context.Canceled) {
++					t.Fatalf("budget %d: %v does not unwrap to context.Canceled", budget, err)
++				}
++			default:
++				t.Fatalf("budget %d: error = %v, want nil or toolchain_timeout", budget, err)
++			}
++			if completed {
++				break
++			}
++		}
++		if !completed {
++			t.Fatal("no budget in the sweep completed the fingerprint; the sweep never reached the last check")
++		}
++	})
++}
++
++// countdownContext reports no error for a fixed number of Err calls and reports
++// cancellation for every call after that. It exists so a test can place a
++// cancellation on an exact check inside the digest phase — including checks
++// taken between two chunks of one file — instead of racing a goroutine against
++// a read and hoping it lands in the window under test. It is used from a single
++// goroutine, which is how the digest phase consumes a context.
++type countdownContext struct {
++	context.Context
++	remaining int
++	done      chan struct{}
++}
++
++func newCountdownContext(checks int) *countdownContext {
++	return &countdownContext{Context: context.Background(), remaining: checks, done: make(chan struct{})}
++}
++
++func (ctx *countdownContext) Err() error {
++	if ctx.remaining > 0 {
++		ctx.remaining--
++		return nil
++	}
++	select {
++	case <-ctx.done:
++	default:
++		close(ctx.done)
++	}
++	return context.Canceled
++}
++
++func (ctx *countdownContext) Done() <-chan struct{} { return ctx.done }
++
++// TestDigestCopyDiagnosticPrecedence pins how narrow the cancellation branch is.
++// Only the abort this package raises inside its own copy loop is read as a
++// cancellation; every other way a copy can end badly still fails closed as
++// toolchain_mutated, including a bare context error that did not come from that
++// loop. Cancellation therefore cannot launder a concurrent write into a
++// deadline, which is the half of the contract the fixture-driven tests above
++// cannot force.
++func TestDigestCopyDiagnosticPrecedence(t *testing.T) {
++	abandoned := func(cause error) error { return fmt.Errorf("%w: %w", errCopyAbandoned, cause) }
++
++	for _, testCase := range []struct {
++		name              string
++		written, size     int64
++		copyErr, closeErr error
++		code              string
++	}{
++		{name: "complete copy", written: 4, size: 4},
++		{name: "abandoned before the first byte", written: 0, size: 4, copyErr: abandoned(context.Canceled), code: "toolchain_timeout"},
++		{name: "abandoned mid-file", written: 2, size: 4, copyErr: abandoned(context.DeadlineExceeded), code: "toolchain_timeout"},
++		{name: "abandoned after the last byte", written: 4, size: 4, copyErr: abandoned(context.Canceled), code: "toolchain_timeout"},
++		{name: "bare context error is not this loop's abort", written: 2, size: 4, copyErr: context.Canceled, code: "toolchain_mutated"},
++		{name: "read failure", written: 2, size: 4, copyErr: errors.New("input/output error"), code: "toolchain_mutated"},
++		{name: "close failure", written: 4, size: 4, closeErr: errors.New("cannot close"), code: "toolchain_mutated"},
++		{name: "file shrank under the read", written: 2, size: 4, code: "toolchain_mutated"},
++		{name: "file grew under the read", written: 6, size: 4, code: "toolchain_mutated"},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			err := digestCopyDiagnostic("bin/go", testCase.written, testCase.size, testCase.copyErr, testCase.closeErr)
++			if DiagnosticCode(err) != testCase.code {
++				t.Fatalf("code = %q, want %q (error %v)", DiagnosticCode(err), testCase.code, err)
++			}
++			if testCase.code == "" && err != nil {
++				t.Fatalf("error = %v, want nil", err)
++			}
++		})
++	}
+ }
+ 
+ // TestFingerprintDoesNotDescendLinkedDirectories pins the containment property
+462f1ff0326f74540eeb2815cc80542c55f47b35c6b1baef17b80b8815709c28  .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_patch.diff
+462f1ff0326f74540eeb2815cc80542c55f47b35c6b1baef17b80b8815709c28  .task-board/.resources/BUG-260729-r0fe02/BUG-260729-r0fe02_patch.diff
+bdc0a0459b7cba989d2b2e562ca095a79aac281abde9835537f500dae56a25ca  .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_lint-compatibility-results.md
+bdc0a0459b7cba989d2b2e562ca095a79aac281abde9835537f500dae56a25ca  .task-board/.resources/BUG-260729-r0fe02/BUG-260729-r0fe02_lint-compatibility-results.md
+
+exec
+/bin/zsh -lc "git -C .temp/BUG-260729-r0fe02/worktree status --short
+git -C .temp/BUG-260729-r0fe02/worktree diff --stat
+git -C .temp/BUG-260729-r0fe02/worktree diff --name-only
+sha256sum .temp/BUG-260729-r0fe02/worktree/internal/godriver/fingerprint.go .temp/BUG-260729-r0fe02/worktree/internal/godriver/fingerprint_equivalence_test.go .temp/TASK-260720-jrrgw9/worktree/internal/godriver/fingerprint.go .temp/TASK-260720-jrrgw9/worktree/internal/godriver/fingerprint_equivalence_test.go
+diff -qr .temp/TASK-260720-jrrgw9/worktree/internal/godriver .temp/BUG-260729-r0fe02/worktree/internal/godriver | sed -n '1,200p'
+find .temp/resources/BUG-260729-1o0m8f .task-board/.resources/BUG-260729-1o0m8f .temp/BUG-260729-1o0m8f -name '*lint-fix.patch' -o -name '*results*.md' 2>/dev/null | sort" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 140ms:
+.task-board/.resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch
+.task-board/.resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_results.md
+.temp/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch
+.temp/BUG-260729-1o0m8f/BUG-260729-1o0m8f_results.md
+.temp/BUG-260729-1o0m8f/producer-evidence/BUG-260729-1o0m8f_lint-fix.patch
+.temp/resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch
+.temp/resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_results.md
+
+exec
+/bin/zsh -lc "git -C .temp/TASK-260720-jrrgw9/worktree apply --check -p1 /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_patch.diff
+git -C .temp/BUG-260729-r0fe02/worktree apply --reverse --check -p1 /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_patch.diff
+sha256sum .temp/resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch .task-board/.resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch
+git -C .temp/BUG-260729-r0fe02/worktree apply --reverse --check -p1 /Users/iv/Developer/ReluxWorks/curator/.temp/resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch
+rg '"'^'"\\+\\+\\+ b/' .temp/resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch
+nl -ba .temp/BUG-260729-r0fe02/worktree/internal/godriver/fingerprint.go | sed -n '60,140p;280,365p'
+nl -ba .temp/BUG-260729-r0fe02/worktree/internal/godriver/fingerprint_equivalence_test.go | sed -n '430,750p'" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+8a07c0b239548235aea7dfa05fdb1d1cb2926971d4444d3435a9e6f8da368062  .temp/resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch
+8a07c0b239548235aea7dfa05fdb1d1cb2926971d4444d3435a9e6f8da368062  .task-board/.resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_lint-fix.patch
++++ b/internal/protocoljson/ccj.go
++++ b/internal/protocoljson/ccj_test.go
++++ b/internal/transaction/journal.go
++++ b/internal/transaction/journal_order_test.go
++++ b/internal/godriver/builddriver_positive_conformance_test.go
+    60	}
+    61	
+    62	// digestToolchainRecords writes the canonical byte stream and hashes it.
+    63	//
+    64	// Every file is re-opened from GOROOT by its root-relative path, so the bytes
+    65	// that reach the digest always come from whatever is reachable at that
+    66	// canonical path at read time, under the containment os.Root enforces on each
+    67	// component. Reusing an ancestor handle here instead would keep reading through
+    68	// a directory that had been renamed out of the tree, which is why this phase
+    69	// resolves paths and the collection phase does not.
+    70	func digestToolchainRecords(ctx context.Context, root *os.Root, records []treeRecord, version string) (string, []toolchainState, error) {
+    71		digest := sha256.New()
+    72		_, _ = io.WriteString(digest, toolchainDomain)
+    73		state := make([]toolchainState, 0, len(records))
+    74		for _, record := range records {
+    75			if err := ctx.Err(); err != nil {
+    76				return "", nil, diagnosticErr("toolchain_timeout", err, "toolchain fingerprint deadline exceeded")
+    77			}
+    78			pathBytes := []byte(record.path)
+    79			writeRecordHeader(digest, record.kind, pathBytes)
+    80			item := toolchainState{path: record.path, kind: record.kind}
+    81			switch record.kind {
+    82			case 'D':
+    83				writeLength(digest, 0)
+    84			case 'L':
+    85				payload := []byte(record.link)
+    86				writeLength(digest, uint64(len(payload)))
+    87				_, _ = digest.Write(payload)
+    88				item.size = int64(len(payload))
+    89				item.payload = sha256.Sum256(payload)
+    90			case 'F':
+    91				file, openErr := root.Open(record.path)
+    92				if openErr != nil {
+    93					return "", nil, diagnosticErr("toolchain_unreadable", openErr, "cannot open toolchain file %q", record.path)
+    94				}
+    95				opened, statErr := file.Stat()
+    96				if statErr != nil || !opened.Mode().IsRegular() || !os.SameFile(record.info, opened) {
+    97					_ = file.Close()
+    98					return "", nil, diagnosticErr("toolchain_mutated", statErr, "toolchain file %q changed while opening", record.path)
+    99				}
+   100				if opened.Size() < 0 {
+   101					return "", nil, diagnostic("toolchain_mutated", "toolchain file %q reports a negative size", record.path)
+   102				}
+   103				writeLength(digest, uint64(opened.Size())) // #nosec G115 -- the size was just proved non-negative
+   104				contentDigest := sha256.New()
+   105				written, copyErr := copyWithContext(ctx, io.MultiWriter(digest, contentDigest), file)
+   106				closeErr := file.Close()
+   107				if err := digestCopyDiagnostic(record.path, written, opened.Size(), copyErr, closeErr); err != nil {
+   108					return "", nil, err
+   109				}
+   110				item.size = written
+   111				copy(item.payload[:], contentDigest.Sum(nil))
+   112			}
+   113			state = append(state, item)
+   114		}
+   115		writeRecordHeader(digest, 'V', nil)
+   116		writeLength(digest, uint64(len([]byte(version))))
+   117		_, _ = io.WriteString(digest, version)
+   118		return "sha256:" + hex.EncodeToString(digest.Sum(nil)), state, nil
+   119	}
+   120	
+   121	// toolchainWalk collects the canonical record set. It reproduces exactly what
+   122	// fs.WalkDir over os.Root.FS() produced — the same entries, the same
+   123	// name-sorted visit order, and therefore the same error precedence — but it
+   124	// takes each entry's Lstat through a handle scoped to the directory the entry
+   125	// lives in instead of re-resolving the entry's whole root-relative path one
+   126	// component at a time. That Lstat is the only step this saves; every
+   127	// step whose result nothing later re-resolves stays anchored at GOROOT:
+   128	//
+   129	//   - each directory is listed through a handle opened by its full root-relative
+   130	//     path, exactly as fs.ReadDir opened it;
+   131	//   - an entry the listing types as a directory is Lstat-ed by its full path,
+   132	//     because the digest phase never revisits a directory record, and it is
+   133	//     descended by its full path, because fs.WalkDir took both decisions from
+   134	//     the listed entry and failed closed when the path stopped being one;
+   135	//   - a link's target and resolvability are read from the root, because a link
+   136	//     target is validated against GOROOT and not against its own directory —
+   137	//     the accepted RC4 vector contains "pkg/tool-link" -> "../bin/go", which
+   138	//     resolves inside the root but outside its own directory.
+   139	//
+   140	// What remains scoped is the Lstat of files and links, and both are re-checked
+   280		}
+   281		for _, component := range strings.Split(path, "/") {
+   282			if component == "" || component == "." || component == ".." {
+   283				return false
+   284			}
+   285		}
+   286		return true
+   287	}
+   288	
+   289	func writeRecordHeader(writer io.Writer, kind byte, path []byte) {
+   290		_, _ = writer.Write([]byte{kind})
+   291		writeLength(writer, uint64(len(path)))
+   292		_, _ = writer.Write(path)
+   293	}
+   294	
+   295	func writeLength(writer io.Writer, length uint64) {
+   296		var encoded [8]byte
+   297		binary.BigEndian.PutUint64(encoded[:], length)
+   298		_, _ = writer.Write(encoded[:])
+   299	}
+   300	
+   301	// errCopyAbandoned marks the copy loop's own cancellation check, so the digest
+   302	// phase can tell "the caller stopped reading" from "the read failed" without
+   303	// having to recognise an error that came back from the filesystem.
+   304	var errCopyAbandoned = errors.New("toolchain copy abandoned")
+   305	
+   306	// digestCopyDiagnostic classifies a record copy that did not finish cleanly.
+   307	//
+   308	// A copy carrying errCopyAbandoned stopped because the caller's context ended
+   309	// mid-file, and the short length that comes with it is that abort rather than
+   310	// the file moving underneath the read; cancellation is reported as the same
+   311	// deadline diagnostic every other cancellation check in this file reports. The
+   312	// precedence is exactly that narrow: only the abort this package raised is read
+   313	// as cancellation, so a genuine concurrent write — a read or close failure, or a
+   314	// length that moved on its own — still fails closed as toolchain_mutated even
+   315	// when the context happens to be done.
+   316	func digestCopyDiagnostic(path string, written, size int64, copyErr, closeErr error) error {
+   317		if errors.Is(copyErr, errCopyAbandoned) {
+   318			return diagnosticErr("toolchain_timeout", errors.Join(copyErr, closeErr), "toolchain fingerprint deadline exceeded")
+   319		}
+   320		if copyErr != nil || closeErr != nil || written != size {
+   321			var lengthErr error
+   322			if written != size {
+   323				lengthErr = errors.New("file length changed")
+   324			}
+   325			return diagnosticErr("toolchain_mutated", errors.Join(copyErr, closeErr, lengthErr), "toolchain file %q changed while reading", path)
+   326		}
+   327		return nil
+   328	}
+   329	
+   330	func copyWithContext(ctx context.Context, destination io.Writer, source io.Reader) (int64, error) {
+   331		buffer := make([]byte, 128*1024)
+   332		var total int64
+   333		for {
+   334			if err := ctx.Err(); err != nil {
+   335				return total, fmt.Errorf("%w: %w", errCopyAbandoned, err)
+   336			}
+   337			read, readErr := source.Read(buffer)
+   338			if read > 0 {
+   339				written, writeErr := destination.Write(buffer[:read])
+   340				total += int64(written)
+   341				if writeErr != nil {
+   342					return total, writeErr
+   343				}
+   344				if written != read {
+   345					return total, io.ErrShortWrite
+   346				}
+   347			}
+   348			if readErr != nil {
+   349				if readErr == io.EOF {
+   350					return total, nil
+   351				}
+   352				return total, readErr
+   353			}
+   354		}
+   355	}
+   430			t.Fatal("real GOROOT produced no records")
+   431		}
+   432		t.Logf("GOROOT %s: %d records, digest %s", goroot, len(state), digest)
+   433	}
+   434	
+   435	// TestFingerprintIsStableAcrossRepeatedRuns rules out state leaking between
+   436	// calls through the reused directory handles.
+   437	func TestFingerprintIsStableAcrossRepeatedRuns(t *testing.T) {
+   438		root := t.TempDir()
+   439		writeTree(t, root, map[string]string{
+   440			"bin/go": "GO", "b-x": "sibling", "b/c/d": "deep", "pkg/tool/link": "L",
+   441		})
+   442		first, _, err := fingerprintToolchain(context.Background(), root, equivalenceVersion)
+   443		if err != nil {
+   444			t.Fatal(err)
+   445		}
+   446		for round := range 3 {
+   447			again, _, repeatErr := fingerprintToolchain(context.Background(), root, equivalenceVersion)
+   448			if repeatErr != nil {
+   449				t.Fatalf("round %d: %v", round, repeatErr)
+   450			}
+   451			if again != first {
+   452				t.Fatalf("round %d digest %s != %s", round, again, first)
+   453			}
+   454		}
+   455	}
+   456	
+   457	// TestFingerprintDetectsMutationBetweenRuns keeps the fingerprint honest about
+   458	// content: the digest must move when any hashed byte moves, and must not move
+   459	// for metadata the canonical encoding deliberately excludes.
+   460	func TestFingerprintDetectsMutationBetweenRuns(t *testing.T) {
+   461		root := t.TempDir()
+   462		writeTree(t, root, map[string]string{"a/b/c": "before", "a/sibling": "x"})
+   463		before, _, err := fingerprintToolchain(context.Background(), root, equivalenceVersion)
+   464		if err != nil {
+   465			t.Fatal(err)
+   466		}
+   467		writeTree(t, root, map[string]string{"a/b/c": "after"})
+   468		after, _, err := fingerprintToolchain(context.Background(), root, equivalenceVersion)
+   469		if err != nil {
+   470			t.Fatal(err)
+   471		}
+   472		if before == after {
+   473			t.Fatal("content change did not move the digest")
+   474		}
+   475		assertEquivalent(t, root)
+   476	}
+   477	
+   478	// TestFingerprintCancellationStaysFailClosed covers the cancellation contract on
+   479	// both traversal phases; the scoped walk checks the context per directory and
+   480	// per entry exactly where the WalkDir callback did.
+   481	func TestFingerprintCancellationStaysFailClosed(t *testing.T) {
+   482		root := t.TempDir()
+   483		writeTree(t, root, map[string]string{
+   484			"a/b/c/d/leaf": strings.Repeat("x", 256*1024),
+   485			"a/other":      "x",
+   486			"z":            "x",
+   487		})
+   488	
+   489		t.Run("cancelled before the walk", func(t *testing.T) {
+   490			ctx, cancel := context.WithCancel(context.Background())
+   491			cancel()
+   492			_, _, legacyErr := legacyFingerprintToolchain(ctx, root, equivalenceVersion)
+   493			_, _, scopedErr := fingerprintToolchain(ctx, root, equivalenceVersion)
+   494			if DiagnosticCode(legacyErr) != "toolchain_timeout" || DiagnosticCode(scopedErr) != "toolchain_timeout" {
+   495				t.Fatalf("legacy %v, scoped %v", legacyErr, scopedErr)
+   496			}
+   497			if legacyErr.Error() != scopedErr.Error() {
+   498				t.Fatalf("detail: legacy %q, scoped %q", legacyErr.Error(), scopedErr.Error())
+   499			}
+   500		})
+   501	
+   502		t.Run("cancelled on an empty root", func(t *testing.T) {
+   503			empty := t.TempDir()
+   504			ctx, cancel := context.WithCancel(context.Background())
+   505			cancel()
+   506			if _, _, err := fingerprintToolchain(ctx, empty, equivalenceVersion); DiagnosticCode(err) != "toolchain_timeout" {
+   507				t.Fatalf("error = %v, want toolchain_timeout", err)
+   508			}
+   509		})
+   510	
+   511		// A racing cancellation lands wherever the scheduler puts it, which on an
+   512		// unloaded machine is almost always before the first file is read. That makes
+   513		// this subtest a smoke check and nothing more: it is not what proves the
+   514		// contract, because the window it needs to hit only opens wide enough to be
+   515		// sampled when the machine is loaded — which is how the original failure was
+   516		// found, and why repeating it here cannot be relied on to find the next one.
+   517		// The deterministic subtests below take every cancellation point on purpose.
+   518		t.Run("cancelled between the walk and the digest", func(t *testing.T) {
+   519			for attempt := range 200 {
+   520				ctx, cancel := context.WithCancel(context.Background())
+   521				go cancel()
+   522				_, _, err := fingerprintToolchain(ctx, root, equivalenceVersion)
+   523				if err != nil && DiagnosticCode(err) != "toolchain_timeout" {
+   524					t.Fatalf("attempt %d: error = %v, want nil or toolchain_timeout", attempt, err)
+   525				}
+   526			}
+   527		})
+   528	
+   529		// The same window taken deterministically: the context ends on an exact
+   530		// ctx.Err() call inside a record's copy loop, past the per-record check that
+   531		// guards the top of the digest phase. A cancellation there stops the read
+   532		// short, and a short read is the only thing a genuine concurrent write is
+   533		// visible as, so this is precisely where the two must not be confused.
+   534		t.Run("cancelled inside a record read", func(t *testing.T) {
+   535			handle, err := os.OpenRoot(root)
+   536			if err != nil {
+   537				t.Fatal(err)
+   538			}
+   539			defer func() { _ = handle.Close() }()
+   540	
+   541			scopedRecords, scopedCollectErr := collectToolchainRecords(context.Background(), handle)
+   542			legacyRecords, legacyCollectErr := legacyCollectRecords(context.Background(), handle)
+   543			if scopedCollectErr != nil || legacyCollectErr != nil {
+   544				t.Fatalf("collection failed before cancellation: %v / %v", legacyCollectErr, scopedCollectErr)
+   545			}
+   546	
+   547			// The digest phase spends one check per record before it reaches the
+   548			// first file, then one more per copied chunk. Counting the leading
+   549			// records keeps the budgets anchored to the tree rather than to a
+   550			// hand-written number that a later fixture edit would silently shift.
+   551			checksToFirstFile := 0
+   552			for _, record := range scopedRecords {
+   553				checksToFirstFile++
+   554				if record.kind == 'F' {
+   555					break
+   556				}
+   557			}
+   558			if checksToFirstFile == len(scopedRecords) && scopedRecords[len(scopedRecords)-1].kind != 'F' {
+   559				t.Fatalf("fixture has no file record: %v", scopedRecords)
+   560			}
+   561	
+   562			for _, budget := range []struct {
+   563				name   string
+   564				checks int
+   565			}{
+   566				{"before the first chunk", checksToFirstFile},
+   567				{"after a partial chunk", checksToFirstFile + 1},
+   568				{"after the last chunk", checksToFirstFile + 2},
+   569			} {
+   570				t.Run(budget.name, func(t *testing.T) {
+   571					_, _, legacyErr := legacyDigestRecords(newCountdownContext(budget.checks), handle, legacyRecords, equivalenceVersion)
+   572					_, _, scopedErr := digestToolchainRecords(newCountdownContext(budget.checks), handle, scopedRecords, equivalenceVersion)
+   573					if DiagnosticCode(legacyErr) != "toolchain_timeout" || DiagnosticCode(scopedErr) != "toolchain_timeout" {
+   574						t.Fatalf("legacy %v, scoped %v", legacyErr, scopedErr)
+   575					}
+   576					if legacyErr.Error() != scopedErr.Error() {
+   577						t.Fatalf("detail: legacy %q, scoped %q", legacyErr.Error(), scopedErr.Error())
+   578					}
+   579					// The precise cause stays reachable for anything upstream that
+   580					// inspects it; only the reported boundary code changes.
+   581					if !errors.Is(scopedErr, context.Canceled) {
+   582						t.Fatalf("scoped error %v does not unwrap to context.Canceled", scopedErr)
+   583					}
+   584				})
+   585			}
+   586		})
+   587	
+   588		// The same window, but taken deterministically at the phase seam instead of
+   589		// racing a goroutine, so both traversals are compared on the same event.
+   590		t.Run("cancelled exactly at the phase boundary", func(t *testing.T) {
+   591			handle, err := os.OpenRoot(root)
+   592			if err != nil {
+   593				t.Fatal(err)
+   594			}
+   595			defer func() { _ = handle.Close() }()
+   596	
+   597			ctx, cancel := context.WithCancel(context.Background())
+   598			legacyRecords, legacyCollectErr := legacyCollectRecords(ctx, handle)
+   599			scopedRecords, scopedCollectErr := collectToolchainRecords(ctx, handle)
+   600			if legacyCollectErr != nil || scopedCollectErr != nil {
+   601				t.Fatalf("collection failed before cancellation: %v / %v", legacyCollectErr, scopedCollectErr)
+   602			}
+   603			cancel()
+   604	
+   605			_, _, legacyErr := legacyDigestRecords(ctx, handle, legacyRecords, equivalenceVersion)
+   606			_, _, scopedErr := digestToolchainRecords(ctx, handle, scopedRecords, equivalenceVersion)
+   607			if DiagnosticCode(legacyErr) != "toolchain_timeout" || DiagnosticCode(scopedErr) != "toolchain_timeout" {
+   608				t.Fatalf("legacy %v, scoped %v", legacyErr, scopedErr)
+   609			}
+   610			if legacyErr.Error() != scopedErr.Error() {
+   611				t.Fatalf("detail: legacy %q, scoped %q", legacyErr.Error(), scopedErr.Error())
+   612			}
+   613		})
+   614	
+   615		// The contract in full, with nothing left to the scheduler: every cancellation
+   616		// point the fingerprint can reach is taken in turn, and each one must produce
+   617		// the deadline diagnostic or a clean fingerprint — never toolchain_mutated,
+   618		// because a context ending is not the toolchain changing. Walking the budget
+   619		// up rather than naming a few interesting values is what makes this a proof
+   620		// instead of a sample: a check that a later edit adds inside the copy loop, or
+   621		// anywhere else in either phase, is covered the moment it exists.
+   622		t.Run("every cancellation point stays a deadline", func(t *testing.T) {
+   623			// The sweep has to run past the last check to be exhaustive, and the
+   624			// budget that first completes cleanly proves it got there.
+   625			completed := false
+   626			for budget := 0; budget < 200; budget++ {
+   627				ctx := newCountdownContext(budget)
+   628				_, _, err := fingerprintToolchain(ctx, root, equivalenceVersion)
+   629				switch code := DiagnosticCode(err); {
+   630				case err == nil:
+   631					completed = true
+   632				case code == "toolchain_timeout":
+   633					if !errors.Is(err, context.Canceled) {
+   634						t.Fatalf("budget %d: %v does not unwrap to context.Canceled", budget, err)
+   635					}
+   636				default:
+   637					t.Fatalf("budget %d: error = %v, want nil or toolchain_timeout", budget, err)
+   638				}
+   639				if completed {
+   640					break
+   641				}
+   642			}
+   643			if !completed {
+   644				t.Fatal("no budget in the sweep completed the fingerprint; the sweep never reached the last check")
+   645			}
+   646		})
+   647	}
+   648	
+   649	// countdownContext reports no error for a fixed number of Err calls and reports
+   650	// cancellation for every call after that. It exists so a test can place a
+   651	// cancellation on an exact check inside the digest phase — including checks
+   652	// taken between two chunks of one file — instead of racing a goroutine against
+   653	// a read and hoping it lands in the window under test. It is used from a single
+   654	// goroutine, which is how the digest phase consumes a context.
+   655	type countdownContext struct {
+   656		context.Context
+   657		remaining int
+   658		done      chan struct{}
+   659	}
+   660	
+   661	func newCountdownContext(checks int) *countdownContext {
+   662		return &countdownContext{Context: context.Background(), remaining: checks, done: make(chan struct{})}
+   663	}
+   664	
+   665	func (ctx *countdownContext) Err() error {
+   666		if ctx.remaining > 0 {
+   667			ctx.remaining--
+   668			return nil
+   669		}
+   670		select {
+   671		case <-ctx.done:
+   672		default:
+   673			close(ctx.done)
+   674		}
+   675		return context.Canceled
+   676	}
+   677	
+   678	func (ctx *countdownContext) Done() <-chan struct{} { return ctx.done }
+   679	
+   680	// TestDigestCopyDiagnosticPrecedence pins how narrow the cancellation branch is.
+   681	// Only the abort this package raises inside its own copy loop is read as a
+   682	// cancellation; every other way a copy can end badly still fails closed as
+   683	// toolchain_mutated, including a bare context error that did not come from that
+   684	// loop. Cancellation therefore cannot launder a concurrent write into a
+   685	// deadline, which is the half of the contract the fixture-driven tests above
+   686	// cannot force.
+   687	func TestDigestCopyDiagnosticPrecedence(t *testing.T) {
+   688		abandoned := func(cause error) error { return fmt.Errorf("%w: %w", errCopyAbandoned, cause) }
+   689	
+   690		for _, testCase := range []struct {
+   691			name              string
+   692			written, size     int64
+   693			copyErr, closeErr error
+   694			code              string
+   695		}{
+   696			{name: "complete copy", written: 4, size: 4},
+   697			{name: "abandoned before the first byte", written: 0, size: 4, copyErr: abandoned(context.Canceled), code: "toolchain_timeout"},
+   698			{name: "abandoned mid-file", written: 2, size: 4, copyErr: abandoned(context.DeadlineExceeded), code: "toolchain_timeout"},
+   699			{name: "abandoned after the last byte", written: 4, size: 4, copyErr: abandoned(context.Canceled), code: "toolchain_timeout"},
+   700			{name: "bare context error is not this loop's abort", written: 2, size: 4, copyErr: context.Canceled, code: "toolchain_mutated"},
+   701			{name: "read failure", written: 2, size: 4, copyErr: errors.New("input/output error"), code: "toolchain_mutated"},
+   702			{name: "close failure", written: 4, size: 4, closeErr: errors.New("cannot close"), code: "toolchain_mutated"},
+   703			{name: "file shrank under the read", written: 2, size: 4, code: "toolchain_mutated"},
+   704			{name: "file grew under the read", written: 6, size: 4, code: "toolchain_mutated"},
+   705		} {
+   706			t.Run(testCase.name, func(t *testing.T) {
+   707				err := digestCopyDiagnostic("bin/go", testCase.written, testCase.size, testCase.copyErr, testCase.closeErr)
+   708				if DiagnosticCode(err) != testCase.code {
+   709					t.Fatalf("code = %q, want %q (error %v)", DiagnosticCode(err), testCase.code, err)
+   710				}
+   711				if testCase.code == "" && err != nil {
+   712					t.Fatalf("error = %v, want nil", err)
+   713				}
+   714			})
+   715		}
+   716	}
+   717	
+   718	// TestFingerprintDoesNotDescendLinkedDirectories pins the containment property
+   719	// that lets the scoped walk open child handles at all: a symlinked directory is
+   720	// a leaf record, so no descended component is ever a link.
+   721	func TestFingerprintDoesNotDescendLinkedDirectories(t *testing.T) {
+   722		root := t.TempDir()
+   723		writeTree(t, root, map[string]string{"real/secret": "hidden"})
+   724		symlinkOrSkip(t, "real", filepath.Join(root, "alias"))
+   725	
+   726		_, state, err := fingerprintToolchain(context.Background(), root, equivalenceVersion)
+   727		if err != nil {
+   728			t.Fatal(err)
+   729		}
+   730		seen := map[string]byte{}
+   731		for _, item := range state {
+   732			seen[item.path] = item.kind
+   733		}
+   734		if seen["alias"] != 'L' {
+   735			t.Fatalf("alias kind = %q, want 'L'", seen["alias"])
+   736		}
+   737		if _, descended := seen["alias/secret"]; descended {
+   738			t.Fatalf("walk descended a linked directory: %v", seen)
+   739		}
+   740		if seen["real/secret"] != 'F' {
+   741			t.Fatalf("real/secret kind = %q, want 'F'", seen["real/secret"])
+   742		}
+   743	}
+   744	
+   745	// assertPhaseBoundaryEquivalent builds the same tree for both traversals,
+   746	// collects the canonical record set, applies a mutation exactly between the
+   747	// collection and the digest phases, and requires both to reach the same outcome.
+   748	//
+   749	// This is the window a reused ancestor handle would open. The preserved
+   750	// traversal re-resolves every file path from GOROOT in the digest phase, so it
+
+codex
+Provenance checks pass: the cancellation patch applies cleanly to the accepted baseline and reverses cleanly from the candidate; the lint patch hash is exact and also reverses cleanly. I’m drilling into one precedence edge now—whether mixed cancellation plus an independent close/read failure could be misclassified—and validating the recorded gates from raw logs.
+exec
+/bin/zsh -lc 'for f in .temp/BUG-260729-r0fe02/evidence/*.log; do wc -c "$f"; tail -n 12 "$f"; done
+tar -tzf .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_gatelogs.tar.gz
+sha256sum .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_gatelogs.tar.gz .task-board/.resources/BUG-260729-r0fe02/BUG-260729-r0fe02_gatelogs.tar.gz
+sed -n '"'1,260p' .temp/resources/BUG-260729-1o0m8f/BUG-260729-1o0m8f_results.md" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+      61 .temp/BUG-260729-r0fe02/evidence/fixed-race-count100.log
+ok  	github.com/relux-works/curator/internal/godriver	2.909s
+      62 .temp/BUG-260729-r0fe02/evidence/fixed-race-count1000.log
+ok  	github.com/relux-works/curator/internal/godriver	28.030s
+       0 .temp/BUG-260729-r0fe02/evidence/fixed-race-count5000.log
+    3440 .temp/BUG-260729-r0fe02/evidence/focused-cancellation-verbose.log
+--- PASS: TestDigestCopyDiagnosticPrecedence (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/complete_copy (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/abandoned_before_the_first_byte (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/abandoned_mid-file (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/abandoned_after_the_last_byte (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/bare_context_error_is_not_this_loop's_abort (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/read_failure (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/close_failure (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/file_shrank_under_the_read (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/file_grew_under_the_read (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	0.388s
+   14241 .temp/BUG-260729-r0fe02/evidence/focused-nonrace.log
+--- PASS: TestFingerprintRejectsDanglingLink (0.00s)
+=== RUN   TestFingerprintImplementationMatchesRC4ToolchainVector
+--- PASS: TestFingerprintImplementationMatchesRC4ToolchainVector (0.00s)
+=== RUN   TestFingerprintRejectsSpecialFile
+--- PASS: TestFingerprintRejectsSpecialFile (0.00s)
+=== RUN   TestFingerprintRejectsInvalidUnicodePath
+    fingerprint_unix_test.go:61: filesystem rejects invalid UTF-8 names: open /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestFingerprintRejectsInvalidUnicodePath3358193765/001/�: illegal byte sequence
+--- SKIP: TestFingerprintRejectsInvalidUnicodePath (0.00s)
+=== RUN   TestToolchainMutationFailsRecheck
+--- PASS: TestToolchainMutationFailsRecheck (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	3.058s
+      62 .temp/BUG-260729-r0fe02/evidence/focused-race-family-count5.log
+ok  	github.com/relux-works/curator/internal/godriver	18.070s
+     201 .temp/BUG-260729-r0fe02/evidence/lint-godriver-accepted-baseline.log
+internal/godriver/builddriver_positive_conformance_test.go:178:4: ineffectual assignment to environment (ineffassign)
+			environment = map[string]string{}
+			^
+1 issues:
+* ineffassign: 1
+exit status 1
+     201 .temp/BUG-260729-r0fe02/evidence/lint-godriver.log
+internal/godriver/builddriver_positive_conformance_test.go:178:4: ineffectual assignment to environment (ineffassign)
+			environment = map[string]string{}
+			^
+1 issues:
+* ineffassign: 1
+exit status 1
+    2084 .temp/BUG-260729-r0fe02/evidence/negative-control-deterministic.log
+        --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/after_the_last_chunk (0.00s)
+            fingerprint_equivalence_test.go:572: legacy go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, scoped go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading
+--- FAIL: TestDigestCopyDiagnosticPrecedence (0.00s)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_before_the_first_byte (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_mid-file (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_after_the_last_byte (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	0.368s
+FAIL
+      61 .temp/BUG-260729-r0fe02/evidence/negative-control-race-loop-500.log
+ok  	github.com/relux-works/curator/internal/godriver	4.063s
+      61 .temp/BUG-260729-r0fe02/evidence/negative-control-race-loop.log
+ok  	github.com/relux-works/curator/internal/godriver	1.672s
+     555 .temp/BUG-260729-r0fe02/evidence/negative-control-sweep.log
+=== RUN   TestFingerprintCancellationStaysFailClosed
+=== RUN   TestFingerprintCancellationStaysFailClosed/every_cancellation_point_stays_a_deadline
+    fingerprint_equivalence_test.go:637: budget 17: error = go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, want nil or toolchain_timeout
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.01s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/every_cancellation_point_stays_a_deadline (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	0.471s
+FAIL
+    2084 .temp/BUG-260729-r0fe02/evidence/negative-control.log
+        --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/after_the_last_chunk (0.00s)
+            fingerprint_equivalence_test.go:572: legacy go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, scoped go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading
+--- FAIL: TestDigestCopyDiagnosticPrecedence (0.00s)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_before_the_first_byte (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_mid-file (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_after_the_last_byte (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	0.893s
+FAIL
+      61 .temp/BUG-260729-r0fe02/evidence/repro-race-count400.log
+ok  	github.com/relux-works/curator/internal/godriver	2.809s
+    1043 .temp/BUG-260729-r0fe02/evidence/repro-race-count5000.log
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.01s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest (0.01s)
+        fingerprint_equivalence_test.go:519: error = go-v1 toolchain_mutated: toolchain file "z" changed while reading, want nil or toolchain_timeout
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.00s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest (0.00s)
+        fingerprint_equivalence_test.go:519: error = go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, want nil or toolchain_timeout
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.00s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest (0.00s)
+        fingerprint_equivalence_test.go:519: error = go-v1 toolchain_mutated: toolchain file "a/other" changed while reading, want nil or toolchain_timeout
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	11.842s
+FAIL
+       0 .temp/BUG-260729-r0fe02/evidence/vet.log
+fixed-race-count100.log
+fixed-race-count1000.log
+fixed-race-count5000.log
+focused-cancellation-verbose.log
+focused-nonrace.log
+focused-race-family-count5.log
+lint-godriver-accepted-baseline.log
+lint-godriver.log
+negative-control-deterministic.log
+negative-control-race-loop-500.log
+negative-control-race-loop.log
+negative-control-sweep.log
+negative-control.log
+repro-race-count400.log
+repro-race-count5000.log
+vet.log
+60c0c6614a7ac7f1fdc85df3cf7f62fe678ea4e793d61d9cba91c38e97e00525  .temp/BUG-260729-r0fe02/evidence/BUG-260729-r0fe02_gatelogs.tar.gz
+60c0c6614a7ac7f1fdc85df3cf7f62fe678ea4e793d61d9cba91c38e97e00525  .task-board/.resources/BUG-260729-r0fe02/BUG-260729-r0fe02_gatelogs.tar.gz
+# BUG-260729-1o0m8f — resolve accepted-composite lint findings
+
+Role: developer
+Date: 2026-07-29
+Status handed to: review
+
+## What was wrong
+
+The accepted Curator composite failed the CI-pinned `golangci-lint v2.12.2`
+with four findings and no way to reach the gate without either suppressing
+them or changing the source.
+
+## Working tree and base
+
+| Item | Value |
+| --- | --- |
+| Task worktree | `.temp/BUG-260729-1o0m8f/worktree` |
+| Base | byte-exact mirror of `.temp/TASK-260720-1pvfj5/rework/composite` |
+| Base commit under the mirror | `17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8` |
+| Scoped sources at base | identical to the accepted `TASK-260720-jrrgw9` candidate |
+
+The three scoped files are byte-identical in the accepted `jrrgw9` candidate
+worktree and in the composite, so starting from the composite starts from the
+exact accepted candidate for everything this bug touches:
+
+```
+a9080f8c4dd0f1f7a4c7375f468541a3a6965937bff507a6714521fcc6087243  internal/protocoljson/ccj.go
+e11c9b17cfd3b9a1d859147131940cd492ad57afb520e291de45e822c49336e4  internal/transaction/journal.go
+5fa833e8fd6501d428f2b90faf9047d8e6b8288c25db8c311143d852108cec39  internal/godriver/builddriver_positive_conformance_test.go
+```
+
+Lint binary: `.temp/TASK-260720-1pvfj5/bin/golangci-lint`, reporting
+`golangci-lint has version 2.12.2 built with go1.25.5`, which is the version
+pinned in `.github/workflows/ci.yml`. Go toolchain: `go1.25.5 darwin/arm64`.
+
+### Baseline is genuinely red
+
+`golangci-lint run` in the task worktree, exit **1**:
+
+```
+internal/protocoljson/ccj.go:211:38: G115: integer overflow conversion rune -> byte (gosec)
+internal/protocoljson/ccj.go:212:38: G115: integer overflow conversion rune -> byte (gosec)
+internal/transaction/journal.go:398:82: G602: slice index out of range (gosec)
+internal/godriver/builddriver_positive_conformance_test.go:178:4: ineffectual assignment to environment (ineffassign)
+4 issues:
+* gosec: 3
+* ineffassign: 1
+```
+
+Caching caveat worth knowing: golangci-lint's result cache is keyed on file
+content, not on path. The first run in the fresh mirror replayed cached issues
+and printed them against the *composite's* paths. `golangci-lint cache clean`
+before each measured run fixes that; every run recorded here was preceded by a
+cache clean.
+
+## The three fixes
+
+### 1. G115 — `internal/protocoljson/ccj.go`
+
+The control-character branch narrowed a `rune` to a `byte` purely to index a
+sixteen-entry hexadecimal table. The narrowing was already unreachable as a
+defect — ranging a string never yields a negative rune, and the branch guard is
+`character < 0x20` — but gosec cannot see that, and the conversion bought
+nothing. Removed it: the rune indexes the table directly.
+
+```go
+buffer.WriteByte(hexadecimal[character>>4])
+buffer.WriteByte(hexadecimal[character&0x0f])
+```
+
+For `0x00 <= character <= 0x1f`, `byte(character)>>4` and `character>>4` are the
+same value, as are `byte(character)&0x0f` and `character&0x0f`. The emitted
+bytes are unchanged for the whole C0 range; see the equivalence run below.
+
+### 2. G602 — `internal/transaction/journal.go`
+
+`validateRemovalEntries` compared each entry against `entries[index-1]` behind a
+short-circuit `index > 0` guard. Safe, but only to a reader. The loop now
+carries the preceding path forward in `previousPath`, so it never indexes behind
+the cursor at all. The ordering predicate, the error text, and the fail-closed
+behaviour are unchanged; the only structural change is where the previous path
+comes from.
+
+### 3. ineffassign — `internal/godriver/builddriver_positive_conformance_test.go`
+
+The `fixed environment` subtest opened with:
+
+```go
+environment := indispensableEnvironment()
+if environment == nil {
+    environment = map[string]string{}
+}
+```
+
+`environment` was never read after the nil check — the subtest asserts against
+`values` and `vectors.FixedEnvironment` instead. `indispensableEnvironment()` is
+a pure reader (`return nil` on unix, `os.LookupEnv` twice on windows), so the
+whole block is dead. Removed all four lines. The function keeps three other
+callers, so nothing became unused.
+
+## Semantic evidence
+
+### The refactors are behaviour-preserving
+
+Both new test files were run against the **original accepted sources** with only
+the tests swapped in. Exit **0**:
+
+```
+ok  github.com/relux-works/curator/internal/protocoljson  0.337s
+ok  github.com/relux-works/curator/internal/transaction   0.487s
+```
+
+Since the same assertions pass on the pre-fix and post-fix encoder for every
+rune in `0x00..0x1f`, the escape bytes are identical for all control
+characters — that is a direct check, not an argument.
+
+### The new coverage has teeth
+
+Three mutations of the fixed sources, each run against the new tests:
+
+| Mutation | Exit | First failure |
+| --- | --- | --- |
+| hexadecimal table upper-cased | 1 | `U+000B encoded as {"s":"\u000B"}, CCJ-1 requires {"s":"\u000b"}` |
+| guard narrowed to `< 0x1f` | 1 | `U+001F encoded as {"s":"<raw 0x1f byte>"}, CCJ-1 requires {"s":"\u001f"}` — the round-trip test also fails with `invalid character '\x1f' in string literal` |
+| `previousPath` update dropped | 1 | four ordering subtests: `a manifest out of strict unsigned-byte order was accepted` |
+
+### The godriver subtest still runs, and still passes
+
+Run against the accepted candidate conformance root
+`.temp/TASK-260729-3nx97g/worktree/conformance/v1`, whose `manifest.json` is
+`b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c` — the exact
+digest the `jrrgw9` review verdict accepted. Its `build-drivers.json` publishes
+28 `fixed_environment` keys, so the subtest executes rather than skipping.
+
+The subtest ledger before and after the removal is identical apart from wall
+time: same six subtests, all PASS, exit **0** both ways. The committed
+`SPEC_PIN` root publishes no `build-drivers` vector at all, so this test can
+only be exercised through the candidate root.
+
+## New tests
+
+- `internal/protocoljson/ccj_test.go`
+  - `TestMarshalCanonicalEscapesEveryControlCharacter` — exhaustive over
+    `0x00..0x1f`, byte-exact expected output, plus the boundary cases (space,
+    `"`, `\`, `0x7f`, a non-ASCII rune).
+  - `TestRequireCanonicalAcceptsEveryControlCharacterEscape` — the encoder's
+    own output for each control character must be accepted as canonical and
+    round-trip.
+- `internal/transaction/journal_order_test.go`
+  - `TestValidateRemovalEntriesOrdersByUnsignedBytes` — ten cases: ascending,
+    duplicate, descending, tail descending, prefix/extension both ways, root
+    repeated, and a `~` / `é` pair where unsigned and signed byte order
+    disagree.
+  - `TestValidateRemovalEntriesStaysFailClosedWithoutARoot` — nil, empty, and
+    rootless manifests are rejected, under a `recover` that fails the test if
+    validation faults instead.
+  - `TestValidateRemovalEntriesRejectsUnorderedTextDefects` — NUL and invalid
+    UTF-8 in a path are still refused independently of ordering.
+
+## Verification ledger
+
+Every command was run as a standalone process in
+`.temp/BUG-260729-1o0m8f/worktree`; exit codes are the real ones.
+
+| Command | Exit | Log |
+| --- | --- | --- |
+| `golangci-lint run` (v2.12.2, baseline, expected red) | 1 | `logs/lint-baseline.log` |
+| `golangci-lint run` (v2.12.2, after fixes) | 0 | `logs/lint-final.log` |
+| `bash .github/ci/no-broad-suppression.sh` | 0 | `logs/no-broad-suppression-01.log` |
+| `gofmt -l` on the three packages | 0, no output | `logs/gofmt-01.log` |
+| `go vet` on the three packages | 0 | `logs/go-vet-scoped.log` |
+| `go build ./...` | 0 | `logs/go-build-01.log` |
+| `go test` protocoljson + transaction + godriver | 0 | `logs/focused-packages-01.log` |
+| `go test -race` protocoljson + transaction + godriver | 0 | `logs/focused-packages-race-01.log` |
+| new tests against the **original** sources | 0 | `logs/equivalence-original-01.log` |
+| mutation runs (expected red x3) | 1, 1, 1 | `logs/mutation-*.log` |
+| godriver conformance, before / after | 0 / 0 | `logs/godriver-before-01.log`, `logs/godriver-after-01.log` |
+| `go test ./...` full module | see `logs/go-test-all-01.log` | `logs/go-test-all-01.log` |
+
+## Scope proof
+
+`diff -rq` between the accepted composite and the task worktree reports exactly
+five in-scope entries and nothing else:
+
+```
+internal/godriver/builddriver_positive_conformance_test.go   differ
+internal/protocoljson/ccj.go                                 differ
+internal/protocoljson/ccj_test.go                            new
+internal/transaction/journal.go                              differ
+internal/transaction/journal_order_test.go                   new
+```
+
+`.golangci.yml` and `.github/workflows/ci.yml` compare byte-identical to the
+composite. No `nolint` directive appears anywhere in the patch, no exclusion was
+added, and no protocol vector, timeout, or unrelated behaviour was touched.
+
+Patch: `BUG-260729-1o0m8f_lint-fix.patch`, sha256
+`8a07c0b239548235aea7dfa05fdb1d1cb2926971d4444d3435a9e6f8da368062`.
+`git apply --reverse --check` against the task worktree exits 0.
+
+exec
+/bin/zsh -lc "go test ./internal/godriver/ -run 'TestFingerprintCancellationStaysFailClosed|TestDigestCopyDiagnosticPrecedence' -count=10" in /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/worktree
+ succeeded in 787ms:
+ok  	github.com/relux-works/curator/internal/godriver	0.624s
+
+exec
+/bin/zsh -lc "go test ./internal/godriver/ -run 'TestFingerprint|TestToolchain|TestDigestCopy|TestGoVersion|TestCandidateRC4' -count=1" in /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/worktree
+ succeeded in 4270ms:
+ok  	github.com/relux-works/curator/internal/godriver	4.113s
+
+exec
+/bin/zsh -lc 'go vet ./internal/godriver/ ./internal/protocoljson/ ./internal/transaction/
+gofmt -l internal/godriver/fingerprint.go internal/godriver/fingerprint_equivalence_test.go internal/godriver/builddriver_positive_conformance_test.go internal/protocoljson/ccj.go internal/protocoljson/ccj_test.go internal/transaction/journal.go internal/transaction/journal_order_test.go' in /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/worktree
+ succeeded in 145ms:
+exec
+/bin/zsh -lc '/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1pvfj5/bin/golangci-lint version' in /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/worktree
+ succeeded in 0ms:
+golangci-lint has version 2.12.2 built with go1.25.5 from (unknown, modified: ?, mod sum: "h1:7+d1uY0bq1MU2UV3R5pW5Q7QWdcoq4naMRXM+gsJKrs=") on (unknown)
+
+codex
+The focused reviewer reruns are green: cancellation/precedence passed 10 repetitions, the broader godriver family passed, and scoped vet/format checks are clean. I’m doing the final pinned linter replay now; I’m intentionally not rerunning any race or full test suite, per the attached heavy-test barrier.
+exec
+/bin/zsh -lc '/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1pvfj5/bin/golangci-lint cache clean' in /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/worktree
+ succeeded in 233ms:
+exec
+/bin/zsh -lc '/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1pvfj5/bin/golangci-lint run' in /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260729-r0fe02/worktree
+ succeeded in 3264ms:
+0 issues.
+
+exec
+/bin/zsh -lc 'git -C .temp/BUG-260729-r0fe02/worktree status --short
+cmp -s .temp/BUG-260729-r0fe02/worktree/internal/protocoljson/ccj.go .temp/BUG-260729-1o0m8f/worktree/internal/protocoljson/ccj.go; echo "ccj.go cmp=$?"
+cmp -s .temp/BUG-260729-r0fe02/worktree/internal/protocoljson/ccj_test.go .temp/BUG-260729-1o0m8f/worktree/internal/protocoljson/ccj_test.go; echo "ccj_test.go cmp=$?"
+cmp -s .temp/BUG-260729-r0fe02/worktree/internal/transaction/journal.go .temp/BUG-260729-1o0m8f/worktree/internal/transaction/journal.go; echo "journal.go cmp=$?"
+cmp -s .temp/BUG-260729-r0fe02/worktree/internal/transaction/journal_order_test.go .temp/BUG-260729-1o0m8f/worktree/internal/transaction/journal_order_test.go; echo "journal_order_test.go cmp=$?"
+cmp -s .temp/BUG-260729-r0fe02/worktree/internal/godriver/builddriver_positive_conformance_test.go .temp/BUG-260729-1o0m8f/worktree/internal/godriver/builddriver_positive_conformance_test.go; echo "builddriver cmp=$?"' in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+ M README.md
+ M cmd/curator/main.go
+ M cmd/curator/main_test.go
+ M go.mod
+ M internal/adapters/adapters.go
+ M internal/adapters/adapters_test.go
+ M internal/closure/closure.go
+ M internal/closure/closure_test.go
+ M internal/closure/conformance_test.go
+ M internal/devsub/devsub.go
+ M internal/envfiles/envfiles.go
+ M internal/gitignore/gitignore.go
+ M internal/globalbins/globalbins.go
+ M internal/globalbins/globalbins_test.go
+ M internal/install/global.go
+ M internal/install/install.go
+ M internal/install/install_test.go
+ M internal/install/registry_e2e_test.go
+ M internal/interop/golden_test.go
+ M internal/manifest/manifest.go
+ M internal/marker/marker.go
+ M internal/marker/marker_test.go
+ M internal/protocoljson/json_test.go
+ M internal/registry/registry.go
+ M internal/runtimestore/runtimestore.go
+ M internal/scopes/consumers.go
+ M internal/scopes/gc.go
+ M internal/scopes/hybrid.go
+ M internal/skillcheck/skillcheck.go
+ M internal/skillcheck/skillcheck_test.go
+ M internal/skillspec/conformance_test.go
+ M internal/skillspec/parse.go
+ M internal/skillspec/parse_test.go
+ M internal/skillspec/types.go
+ M internal/snapshot/snapshot.go
+ M internal/snapshot/snapshot_test.go
+ M internal/whitelist/whitelist.go
+ M internal/whitelist/whitelist_test.go
+?? cmd/curator/builds.go
+?? cmd/curator/builds_test.go
+?? cmd/curator/gc_test.go
+?? cmd/curator/global_status_test.go
+?? cmd/curator/lifecycle_conformance_test.go
+?? cmd/curator/status_test.go
+?? internal/adapters/fifo_other_test.go
+?? internal/adapters/fifo_unix_test.go
+?? internal/adapters/stage.go
+?? internal/buildcache/
+?? internal/buildmeta/
+?? internal/buildsource/
+?? internal/envfiles/stage.go
+?? internal/globalbins/stage.go
+?? internal/godriver/
+?? internal/install/aba_test.go
+?? internal/install/atomicity/
+?? internal/install/builddeps.go
+?? internal/install/cache_conformance_test.go
+?? internal/install/commit.go
+?? internal/install/commit_test.go
+?? internal/install/diagnostics.go
+?? internal/install/diagnostics_test.go
+?? internal/install/dryrun_conformance_test.go
+?? internal/install/generation.go
+?? internal/install/generation_test.go
+?? internal/install/maintenance_test.go
+?? internal/install/plan.go
+?? internal/install/private.go
+?? internal/install/private_test.go
+?? internal/install/revalidation_test.go
+?? internal/install/stage.go
+?? internal/install/stage_test.go
+?? internal/install/targets.go
+?? internal/managerlock/
+?? internal/marker/marker_v2_test.go
+?? internal/protocoljson/ccj.go
+?? internal/protocoljson/ccj_test.go
+?? internal/runtimestore/conformance_test.go
+?? internal/runtimestore/launcher_conformance_test.go
+?? internal/runtimestore/scripts.go
+?? internal/runtimestore/targets.go
+?? internal/runtimestore/targets_test.go
+?? internal/runtimestore/targets_unix_test.go
+?? internal/runtimestore/targets_windows_test.go
+?? internal/scopes/gc_conformance_test.go
+?? internal/scopes/gc_conservative_test.go
+?? internal/scopes/gc_conservative_unix_test.go
+?? internal/scopes/gc_conservative_windows_test.go
+?? internal/scopes/gc_integration_other_test.go
+?? internal/scopes/gc_integration_test.go
+?? internal/scopes/gc_integration_windows_test.go
+?? internal/scopes/gc_test.go
+?? internal/scopes/redirect_other.go
+?? internal/scopes/redirect_windows.go
+?? internal/scopes/stage.go
+?? internal/skillcheck/builddriver_context_conformance_test.go
+?? internal/skillspec/build_test.go
+?? internal/skillspec/builddriver_conformance_other_test.go
+?? internal/skillspec/builddriver_conformance_test.go
+?? internal/skillspec/builddriver_conformance_unix_test.go
+?? internal/snapshot/lock.go
+?? internal/snapshot/lock_unix.go
+?? internal/snapshot/lock_windows.go
+?? internal/staging/
+?? internal/transaction/
+?? internal/whitelist/builddriver_context_conformance_test.go
+?? internal/whitelist/conformance_test.go
+?? task-board.config.json
+ccj.go cmp=0
+ccj_test.go cmp=0
+journal.go cmp=0
+journal_order_test.go cmp=0
+builddriver cmp=0
+
+exec
+/bin/zsh -lc "task-board q --format compact 'project_config()'" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+agent_context:{"config_key":"agent_context","profile":"full","prompt":{"cli_reference":"full","dod":"full","preconditions":{"mode":"inline"},"role":"full","safety":"full","skills":"full"},"queries":{"plan":"full","project_config":"full","schema":"full","summary":"full"},"responses":{"observation":"full","selection":"full","spawn":"full"},"source":"default"}
+board_source:local
+config_exists:true
+config_path:/Users/iv/Developer/ReluxWorks/curator/task-board.config.json
+configured_mode:local
+effective_mode:local
+explicit_remote_override:false
+goals:{"adapters":["primary-goal-v1","board-goal-v1"],"contract":"board-goal-v2","native_reflection":"session-manager-required","primary":{"contract":"primary-goal-v1","native_reflection":false,"scope":"board","storage":"active-board","supported":true}}
+local:{"active":true,"board_dir":".task-board"}
+project_root:/Users/iv/Developer/ReluxWorks/curator
+remote:{"active":false,"board":null,"tls_no_verify":false,"token_available":false,"token_stored":false,"url":null,"user":null}
+session_manager:{"providers":{"codex":{"auto_continue":{"config_key":"session_manager.providers.codex.auto_continue","delay_seconds":20,"enabled":false,"legacy_read":"codex.session.auto_continue","max_nudges_per_turn":2,"prompt":"Continue unless you are blocked by a real ambiguity, approval boundary, or missing external input. Do not ask for confirmation just to keep going. If blocked, reply with BLOCKED: and the exact blocker."}}}}
+spawn:{"ceilings":{"claude":{"configured":false},"codex":{"configured":false},"config_path":"/Users/iv/Developer/ReluxWorks/curator/task-board.config.json","configured":false,"contract_version":"spawn-policy-v2","qwen":{"configured":false}},"config_key_prefix":"spawn","contract_version":"tracked-background-v1","enabled":true,"execution":{"background_flag":"--background","modes":["background"]},"launch_composition":{"config_key":"spawn.launch_composition.enabled","contract":"agents-infra.child-launch-composition","degradation":"bare_with_evidence","enabled":true,"schema_version":1},"max_parallel":20,"preferred_agent":null,"preferred_agentic_system":null,"schedule":{"active_window":null,"base_preferred_agentic_system":null,"config_key":"spawn.schedule","configured":false,"timezone":"UTC","windows":[]},"selection":{"adjusted_resolution_ack_flag":"--ack-resolved","claude_reasoning_effort_supported":false,"codex_reasoning_effort_required":true,"codex_reasoning_efforts":["low","medium","high","xhigh","max","ultra"],"model_criteria":["equal","less_or_equal","greater_or_equal"],"model_required":true,"ordered_model_criteria":["less_or_equal","greater_or_equal"],"ordered_selection_rationale_flag":"--selection-rationale","qwen_reasoning_effort_required":true,"qwen_reasoning_efforts":["low","medium","high","xhigh","max"]},"tracking":{"commands":["status","events","watch","wait","directives","directive"],"delivery":"external-watch","in_session_delivery":false,"mode":"tracked","run_id_prefix":"RUN-","runtime":"external"}}
+version_control:{"acknowledgement_parameter":"commit_ack","acknowledgement_value":"scope_committed","config_key":"version_control.confirm","configured":false,"confirm":false,"desired_commit_time":null,"enforced_types":["bug","story"],"owner_message":"I acknowledge that MY scope is committed; foreign uncommitted work is fine."}
+whoami:{"remote":null,"token_stored":false,"user":null}
+
+codex
+Review is clean. The implementation preserves fail-closed behavior, distinguishes only the package-owned copy abort via a private sentinel, keeps ordinary read/close/length failures as `toolchain_mutated`, and the deterministic sweep demonstrably fails on the old bytes. I’m persisting the acceptance verdict and then moving the bug out of `reviewing`.
+exec
+/bin/zsh -lc 'task-board spawn directives "$TASK_BOARD_RUN_ID"
+task-board spawn goal "$TASK_BOARD_RUN_ID"' in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+Active Goal: none (run is not goal-bound)
+No directives recorded for RUN-260729-25bb90
+Active Goal: none (run is not goal-bound)
+
+exec
+/bin/zsh -lc "task-board m 'add_resource(BUG-260729-r0fe02, name=BUG-260729-r0fe02_reviewer-verdict.md, type=outcome, description=\"Independent reviewer verdict and validation evidence\", content=\"# BUG-260729-r0fe02 reviewer verdict\\n\\nVerdict: accepted.\\n\\nNo blocking or rework findings. The patch makes only the package-owned context check in copyWithContext carry errCopyAbandoned; digestCopyDiagnostic maps that sentinel to toolchain_timeout while ordinary read, close, bare context, shrink, and growth outcomes remain toolchain_mutated. Both results remain fail-closed. The exhaustive countdownContext sweep deterministically covers every reachable cancellation check and the old implementation fails that sweep at budget 17 with toolchain_mutated.\\n\\nProvenance and scope evidence:\\n- BUG-260729-r0fe02_patch.diff SHA-256 is 462f1ff0326f74540eeb2815cc80542c55f47b35c6b1baef17b80b8815709c28 in both local and board resources.\\n- The patch applies cleanly to the exact TASK-260720-jrrgw9 worktree and reverses cleanly from the candidate.\\n- Against accepted godriver bytes, only fingerprint.go and fingerprint_equivalence_test.go differ for this task; builddriver_positive_conformance_test.go differs solely by the separately accepted lint fix.\\n- Accepted BUG-260729-1o0m8f lint patch SHA-256 is 8a07c0b239548235aea7dfa05fdb1d1cb2926971d4444d3435a9e6f8da368062; it reverses cleanly and all five files compare byte-for-byte with its accepted worktree.\\n\\nRecorded producer evidence reviewed:\\n- Exact original race shape reproduced toolchain_mutated on z, a/b/c/d/leaf, and a/other.\\n- Reverted-code deterministic sweep exited 1 at budget 17 as expected.\\n- Final bounded race count=1000 exited 0 in 28.030s; focused race family count=5 exited 0 in 18.070s.\\n\\nIndependent reviewer reruns on final combined bytes:\\n- go test focused cancellation and precedence, count=10: exit 0.\\n- go test focused godriver family, count=1: exit 0.\\n- go vet on godriver, protocoljson, and transaction: exit 0.\\n- gofmt -l on both cancellation files and all five lint-fix files: exit 0 with no output.\\n- golangci-lint v2.12.2 cache clean: exit 0; full golangci-lint run: exit 0 with 0 issues.\\n\\nNo race or full test suite was rerun during review, as required by the attached heavy-test barrier; the preserved task-scoped race evidence was reused. The implementation matches the acceptance criteria and fits the existing diagnostic architecture.\")'" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+{"ok":true,"result":{"id":"BUG-260729-r0fe02","name":"BUG-260729-r0fe02_reviewer-verdict.md","type":"outcome","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_reviewer-verdict.md"}}
+
+exec
+/bin/zsh -lc "task-board m 'check_item(BUG-260729-r0fe02, item=11)'
+task-board m 'check_item(BUG-260729-r0fe02, item=12)'
+task-board m 'check_item(BUG-260729-r0fe02, item=13)'
+task-board m 'set_status(BUG-260729-r0fe02, status=done)'" in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 156ms:
+{"ok":true,"result":{"primary":{"action":"status_changed","element_id":"BUG-260729-r0fe02","field":"status","new_value":"done","old_value":"reviewing"}}}
+
+exec
+/bin/zsh -lc 'task-board handoff BUG-260729-r0fe02 --role reviewer' in /Users/iv/Developer/ReluxWorks/curator
+ exited 1 in 0ms:
+role "reviewer" has no end_status and cannot use handoff
+
+exec
+/bin/zsh -lc "task-board q --format compact 'get(BUG-260729-r0fe02) { id status checklist outcomeResources }'
+task-board spawn status \""'$TASK_BOARD_RUN_ID"' in /Users/iv/Developer/ReluxWorks/curator
+ succeeded in 0ms:
+id:BUG-260729-r0fe02
+status:done
+checklist:[{"text":"Reproduce the exact race failure and record competing fail-closed outcomes","done":true},{"text":"Implement the narrow deterministic contract without broad error acceptance","done":true},{"text":"Run focused repeated race and non-race godriver gates with exact exits","done":true},{"text":"Attach a task-scoped patch and outcome for independent review","done":true},{"text":"Code written per task description and AC","done":true},{"text":"Relevant tests written for new or changed behavior and passing","done":true},{"text":"Lint clean","done":true},{"text":"Relevant build/validation commands run after changes and build not broken","done":true},{"text":"New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables","done":true},{"text":"Important findings, decisions, anomalies, or regressions recorded in logbook when relevant","done":true},{"text":"Implementation matches AC","done":true},{"text":"Solution fits project architecture","done":true},{"text":"Tests green","done":true},{"text":"If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches","done":false}]
+outcomeResources:[{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-eb4053.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-eb4053.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-3afcd3.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-3afcd3.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_results.md","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_results.md","description":"Root cause, precedence decision, measured negative controls, exact gate exits, pre-existing lint finding"},{"name":"BUG-260729-r0fe02_patch.diff","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_patch.diff","description":"Narrow patch vs accepted TASK-260720-jrrgw9 godriver bytes; applies cleanly to the 1pvfj5 composite"},{"name":"BUG-260729-r0fe02_gatelogs.tar.gz","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_gatelogs.tar.gz","description":"Raw gate logs: vet, focused non-race, deterministic cancellation, race count=1000, race family, lint, and all negative controls"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-4752b2.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-4752b2.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-1f4480.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-1f4480.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-f6ebe7.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-f6ebe7.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_spawn-log_-implementer--developer--codex-_RUN-260729-1521c1.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-implementer--developer--codex-_RUN-260729-1521c1.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_lint-compatibility-results.md","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_lint-compatibility-results.md","description":"Pinned lint replay, cancellation hash proof, scoped non-race gates, and reused race evidence"},{"name":"BUG-260729-r0fe02_spawn-log_-reviewer--reviewer--codex-_RUN-260729-25bb90.log","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_spawn-log_-reviewer--reviewer--codex-_RUN-260729-25bb90.log","description":"System spawn log captured by task-board"},{"name":"BUG-260729-r0fe02_reviewer-verdict.md","uri":"file://BUG-260729-r0fe02/BUG-260729-r0fe02_reviewer-verdict.md","description":"Independent reviewer verdict and validation evidence"}]
+Run: RUN-260729-25bb90
+Task: BUG-260729-r0fe02
+Status: running
+Phase: executing
+Summary: Spawned agent is executing
+Started: 2026-07-29T20:02:19.054188Z
+Last Progress: 2026-07-29T20:02:19.101946Z
+Last Event Seq: 147
+Launch Composition: degraded_contract_unavailable (provider=codex, diagnostic=composition_contract_unavailable)
+Agent: [reviewer] reviewer (codex) (codex)
+Logwork: /Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260729-r0fe02/-reviewer--reviewer--codex-_RUN-260729-25bb90.log
+
+codex
+Accepted. `BUG-260729-r0fe02` is now `done`.
+
+Evidence:
+
+- Deterministic cancellation and precedence tests passed 10 repetitions.
+- Focused godriver tests, scoped vet, formatting, and golangci-lint v2.12.2 passed.
+- Patch provenance and accepted lint-fix hashes verified.
+- Existing bounded race evidence reviewed; no new race/full suite run per barrier.
+- No code modified during review.
+
+Verdict: [BUG-260729-r0fe02_reviewer-verdict.md](/Users/iv/Developer/ReluxWorks/curator/.task-board/.resources/BUG-260729-r0fe02/BUG-260729-r0fe02_reviewer-verdict.md)
+tokens used
+101,864
+Accepted. `BUG-260729-r0fe02` is now `done`.
+
+Evidence:
+
+- Deterministic cancellation and precedence tests passed 10 repetitions.
+- Focused godriver tests, scoped vet, formatting, and golangci-lint v2.12.2 passed.
+- Patch provenance and accepted lint-fix hashes verified.
+- Existing bounded race evidence reviewed; no new race/full suite run per barrier.
+- No code modified during review.
+
+Verdict: [BUG-260729-r0fe02_reviewer-verdict.md](/Users/iv/Developer/ReluxWorks/curator/.task-board/.resources/BUG-260729-r0fe02/BUG-260729-r0fe02_reviewer-verdict.md)

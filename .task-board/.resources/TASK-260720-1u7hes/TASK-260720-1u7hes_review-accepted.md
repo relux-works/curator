@@ -1,0 +1,9 @@
+# TASK-260720-1u7hes reviewer verdict
+
+Verdict: accepted.
+
+The task-only content delta from accepted predecessor TASK-260720-cw39jh is limited to tools/validate.py, tools/release_gate.py, tools/test_release_gate.py, tools/test_validate.py, and tools/generate-vectors/main_test.go. It matches task ownership and adds no release prose.
+
+The validator pins the exact 35-schema, 129-case, and 189-file rc.4 inventories, validates every indexed positive and negative case with reference resolution, verifies canonical manifest entries and SHA-256 values, and enforces exact build-driver and manager-lifecycle coverage. The release gate composes the validator and independently requires decision 0004, both v6 manifest schemas, receipt v1, marker v2 with schema-6 support, claim v2 at rc.4, byte-frozen claim v1 rc.3 artifacts, and claim evidence bound to the SHA-256 of current manifest bytes. Negative tests cover every required artifact removal, every new schema and generated case removal, renamed and stale artifacts, unresolved references, claim v1/v2 mismatches, duplicate claim keys, and rejection of the actual rc.3 suite hash as rc.4 evidence.
+
+Independent verification passed: python3 -B -m unittest discover -s tools -p test_*.py (27 tests), go test ./tools/..., go vet ./tools/..., gofmt diff check, make validate (35 schemas and 189 files), make regenerate-check with an isolated Git index, and git diff --check. The manifest contains protocol_version 1.0.0-rc.4 and hashes to sha256:70cd274150d629f16ca04f2073a8eae5a0f3fff4584f905d807775040af21eae. System Python lacks jsonschema, so Python gates used the existing pinned task-local environment without changing dependencies. No code was modified, staged, or committed during review.

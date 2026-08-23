@@ -1,0 +1,113 @@
+TASK-260720-z2z795 Windows durability validation
+Run: RUN-260729-a702af
+Worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+HEAD: 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+
+TOOL READINESS
+command group:
+  git --version
+  rg --version
+  /opt/homebrew/bin/python3.11 --version
+  /opt/homebrew/bin/python3.11 -m pytest --version
+  /opt/homebrew/bin/python3.11 -m mypy --version
+  /opt/homebrew/bin/python3.11 -m ruff --version
+exit: 1
+output:
+  git version 2.50.1 (Apple Git-155)
+  ripgrep 15.2.0
+  Python 3.11.14
+  pytest 8.3.4
+  system Python: No module named mypy
+  system Python: No module named ruff
+rationale: the system Python is valid for pytest/build but does not contain the
+static tools; the existing task-local mypy environment and uvx Ruff were
+verified separately and used for their gates.
+
+command: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python -m mypy --version
+exit: 0
+output: mypy 2.3.0 (compiled: yes)
+
+command: uvx ruff --version
+exit: 0
+output: ruff 0.16.0
+
+WINDOWS/TOMB REGRESSION SUBSET
+command: /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider tests/test_transactions.py -q -k 'windows or journal_removal_tomb'
+exit: 0
+output: 4 passed, 1 skipped, 18 deselected in 0.06s
+
+FINAL FOCUSED PYTEST
+command: /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider tests/test_locking.py tests/test_transactions.py -q
+exit: 0
+output: 32 passed, 1 skipped in 0.91s
+skip rationale: test_windows_sync_helpers_flush_real_file_and_tree requires a
+real Windows host; the orchestrator owns the windows-latest follow-up.
+
+FINAL STRICT MYPY
+command: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python -m mypy --cache-dir=/tmp/TASK-260720-z2z795-mypy-cache-windows-final
+exit: 0
+output: Success: no issues found in 56 source files
+
+FINAL RUFF LINT
+command: uvx ruff check src/csk/locking.py src/csk/transactions.py tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: All checks passed!
+
+PRE-FORMAT DIAGNOSTIC
+command: uvx ruff format --check src/csk/locking.py src/csk/transactions.py tests/test_locking.py tests/test_transactions.py
+exit: 1
+output: 1 file would be reformatted, 3 files already formatted
+rationale: expected mechanical format correction after the Win32 constants
+edit; uvx ruff format was run and the final exact gate below passed.
+
+FINAL RUFF FORMAT
+command: uvx ruff format --check src/csk/locking.py src/csk/transactions.py tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 4 files already formatted
+
+FINAL FULL PYTEST
+command: /opt/homebrew/bin/python3.11 -m pytest -p no:cacheprovider -q
+exit: 0
+output: 516 passed, 19 skipped in 77.37s (0:01:17)
+
+FINAL PACKAGE BUILD
+command: /opt/homebrew/bin/python3.11 -m build
+exit: 0
+output: Successfully built cocoaskills-0.12.6.dev0+g6fc2fd97d.d20260729.tar.gz and cocoaskills-0.12.6.dev0+g6fc2fd97d.d20260729-py3-none-any.whl
+
+FINAL TRACKED-DIFF WHITESPACE
+command: git diff --check
+exit: 0
+output: <none>
+
+UNTRACKED NO-INDEX DIAGNOSTICS
+command: git diff --no-index --check /dev/null src/csk/transactions.py
+exit: 1
+output: <none>
+rationale: Git no-index reports the intentional file-content difference; no
+whitespace diagnostic was emitted. This is not claimed as a green gate.
+
+command: git diff --no-index --check /dev/null tests/test_transactions.py
+exit: 1
+output: <none>
+rationale: Git no-index reports the intentional file-content difference; no
+whitespace diagnostic was emitted. This is not claimed as a green gate.
+
+WINDOWS RUNNER
+not run by this worker
+rationale: the task's latest orchestrator boundary explicitly reserves
+GitHub windows-latest validation for the orchestrator after developer handoff
+and forbids this worker from SSH, VM/host management, or publication.
+
+CURRENT STATUS
+## task/TASK-260720-z2z795-transaction-engine
+ M src/csk/locking.py
+ M tests/test_locking.py
+?? src/csk/transactions.py
+?? tests/test_transactions.py
+
+CURRENT SHA-256
+feae9c197a62bce3c320774cd46d5c2fdfd6f694b6f66e9bd15c129c2d29bf5a  src/csk/locking.py
+f50b1d4addb62532155b537303146468965ea9ab2a81ff55b82f3534ef606c49  src/csk/transactions.py
+110db19650592a690804e5904d945f79a67a3f163fc378cefe758f77b9976f47  tests/test_locking.py
+1ae89cd2352d754c972d104366ea96969ab0ddd3ede51aa43a2baac051647c00  tests/test_transactions.py

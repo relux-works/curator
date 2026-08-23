@@ -1,0 +1,64 @@
+platform-case gate: GOOS=windows
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+platform-case gate: deferred packages (root unset): internal/godriver
+platform-case gate: excluded packages (not run here): cmd/curator internal/adapters internal/buildcache internal/buildsource internal/config internal/envfiles internal/gitops internal/hashing internal/install internal/install/atomicity internal/interop internal/runtimestore internal/scopes internal/shell internal/transaction internal/whitelist 
+
+FAIL  ledger case skipped for the wrong reason on windows: internal/godriver :: TestCandidateGoV1SourceAwareContract
+      the ledger tolerates a root-content skip here; this one classified as root-unset
+      reason: CURATOR_CONFORMANCE_ROOT is not set
+excl  internal/buildcache :: TestWindowsProtectedStateMatrix (package not executed on windows)
+excl  internal/buildcache :: TestValidateWindowsSecurityPolicy (package not executed on windows)
+excl  internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry (package not executed on windows)
+excl  internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot (package not executed on windows)
+excl  internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes (package not executed on windows)
+excl  internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode (package not executed on windows)
+excl  internal/runtimestore :: TestInstallSingleCommandAndShims (package not executed on windows)
+excl  internal/runtimestore :: TestRuntimeCommandPath (package not executed on windows)
+excl  internal/config :: TestBootstrapAndAddProject (package not executed on windows)
+excl  internal/buildsource :: TestFrozenTokenRejectsMutation (package not executed on windows)
+excl  internal/buildsource :: TestFrozenTokenRejectsRootReplacement (package not executed on windows)
+excl  internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation (package not executed on windows)
+excl  internal/install :: TestDryRunTouchesNothing (package not executed on windows)
+excl  internal/whitelist :: TestRuntimeRootsExcludedFromContext (package not executed on windows)
+ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+ok    internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch
+ok    internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink
+ok    internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction
+ok    internal/godriver :: TestExecutableIdentityStillRejectsSubstitutionBehindAJunction
+excl  internal/shell :: TestPowerShellHookRunsOnEveryPrompt (package not executed on windows)
+excl  internal/envfiles :: TestWriteProjectShapesAndSourcing (package not executed on windows)
+excl  internal/install :: TestEndToEndInstall (package not executed on windows)
+excl  internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets (package not executed on windows)
+excl  internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths (package not executed on windows)
+excl  internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves (package not executed on windows)
+excl  internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped (package not executed on windows)
+excl  internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder (package not executed on windows)
+excl  internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry (package not executed on windows)
+excl  internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly (package not executed on windows)
+excl  internal/transaction :: TestCommitAndRollbackRestoreALinkExactly (package not executed on windows)
+excl  internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction (package not executed on windows)
+excl  internal/transaction :: TestEntryRemovalRestoresTheExactLink (package not executed on windows)
+excl  internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination (package not executed on windows)
+excl  internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass (package not executed on windows)
+excl  internal/transaction :: TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken (package not executed on windows)
+excl  internal/interop :: TestGoldenContextCopy (package not executed on windows)
+tol   internal/godriver :: TestCandidateGoV1SourceAwareContract (tolerated skip: root-content)
+ok    internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically
+excl  cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly (package not executed on windows)
+excl  cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery (package not executed on windows)
+excl  cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand (package not executed on windows)
+excl  cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand (package not executed on windows)
+excl  cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState (package not executed on windows)
+excl  cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck (package not executed on windows)
+excl  cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand (package not executed on windows)
+ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+
+platform-case gate: 17 skips recorded in .temp/gates/evidence-win/skips-observed.tsv
+platform-case gate: FAILED

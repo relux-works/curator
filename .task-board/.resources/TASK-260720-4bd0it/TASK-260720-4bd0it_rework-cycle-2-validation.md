@@ -1,0 +1,5 @@
+# TASK-260720-4bd0it rework cycle 2 validation
+
+Resolved both reviewer findings in the preserved exact-base integration worktree. Non-null marker locales now use identifiers.ValidLocale and reject schema-invalid values such as !. String-set validation continues to require non-nil unique values and v2 ordering while preserving the schema-valid empty string used by requirers; regression coverage proves v1 read followed by v2 rewrite/read.
+
+Passing evidence: authoritative rc.4 internal/marker race suite at 81.5% coverage; legacy TestGoldenMarkerObject; scoped golangci-lint with 0 issues; make check; go test -race ./...; go build ./...; Linux amd64 and Windows amd64 compile graphs; git diff --check; gofmt; no staged files. Native Windows runtime remains unavailable on the Darwin host. Candidate rc.4 was used only as non-release test input.

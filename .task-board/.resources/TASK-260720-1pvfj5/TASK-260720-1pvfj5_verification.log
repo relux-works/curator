@@ -1,0 +1,25 @@
+TASK-260720-1pvfj5 rework — verification transcript (real exit codes, each command its own unpiped process)
+host: Darwin 25.5.0 arm64; go: go version go1.25.5 darwin/arm64
+composite: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1pvfj5/rework/composite (worktree 17804ce + accepted TASK-260720-jrrgw9 bytes)
+
+== provenance ==
+live candidate manifest == verifier4 post-run-manifest   cmp exit 0   sha256 83b5df8b81ec21f472a90ad082d1ab3464b807968418a7d3d82c8672ff6a2819
+composite base manifest == verifier4 post-run-manifest   cmp exit 0   (359 entries)
+product-only manifest, base vs final                     cmp exit 0   (356 entries each)
+
+== gates ==
+DEFAULT_PIN_LANE_EXIT=0
+CANDIDATE_LANE_EXIT=0
+MAKE_RACE_EXIT=2
+MAKE_RACE_ATTEMPT2_EXIT=0
+GATE_SELFTEST_EXIT=0 (70 passed, 0 failed)
+LEDGER_CHECK_EXIT=0 (49 rows across linux darwin windows)
+NO_BROAD_SUPPRESSION_EXIT=0
+GOFMT_EXIT=0
+GO_VET_EXIT=0
+MAKE_BUILD_EXIT=0
+EXCLUSION_ASSERT_EXIT=0 (TestProbeRejectsAnUncoveredPlatformBeforeTheWorker PASS)
+WORKFLOW_YAML_SHAPE_EXIT=0
+GOLANGCI_LINT_v2.12.2_EXIT=1  <- 4 findings in accepted product code, see results §6
+GOLANGCI_LINT_v2.4.0_EXIT=1   <- 1 finding (ineffassign), pre-existing
+FOCUSED_RACE_FLAKE_REPRO_EXIT=0 (185 executions, 0 failures)

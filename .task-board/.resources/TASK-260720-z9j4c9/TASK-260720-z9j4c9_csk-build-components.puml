@@ -1,0 +1,85 @@
+@startuml
+!theme plain
+!pragma layout smetana
+
+title csk schema v6 compiled-build component boundaries
+
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam package {
+  BackgroundColor #F8F9FA
+  BorderColor #6C757D
+}
+
+cloud "curator-spec rc.4\nschemas + shared vectors" as Spec
+
+package "Domain and identity" #EAF4FF {
+  [Schema v6 manifest model\nTASK-260720-z9j4c9] as Manifest
+  [Build-source + context boundary\nTASK-260720-3c0ss2] as Source
+  [Trusted Go session + fingerprint\nTASK-260720-3j8pp5] as Toolchain
+  [Cache input + receipt + marker v2\nTASK-260720-2dnqw2] as Metadata
+}
+
+package "Execution and protected storage" #FFF4E6 {
+  [Fixed go-v1 compiler driver\nTASK-260720-2g21eg] as Driver
+  [Protected cache interface + POSIX\nTASK-260720-2jfnz6] as PosixCache
+  [Protected Windows cache backend\nTASK-260720-8nxlgx] as WindowsCache
+}
+
+package "Coordination and activation" #EEFBEF {
+  [Lock hierarchy + transaction journal\nTASK-260720-z2z795] as Transaction
+  [Runtime validation + platform shims\nTASK-260720-11yhth] as Activation
+  [Audit-first build planner + dry-run\nTASK-260720-2x6mjn] as Planner
+}
+
+package "Install and maintenance surfaces" #F7EEFF {
+  [Project + hybrid atomic install\nTASK-260720-3t8nr3] as ProjectInstall
+  [Global atomic install\nTASK-260720-g7kgox] as GlobalInstall
+  [Status + repair + locked GC\nTASK-260720-th0jdi] as Maintenance
+}
+
+package "Independent evidence" #FFFDE7 {
+  [Shared vector consumer\nTASK-260720-12r55p] as Vectors
+  [Cross-platform real Go E2E\nTASK-260720-3pemm6] as E2E
+  [Author and operator docs\nTASK-260720-akf5kh] as Docs
+  [Integrated verification\nTASK-260720-3s27te] as Verify
+}
+
+Spec --> Manifest : schema contract
+note right of Vectors
+  Independently consumes the generated rc.4 suite.
+end note
+
+Manifest --> Source : declared roots
+Manifest --> Toolchain : active build commands
+Source --> Metadata : build_source
+Toolchain --> Metadata : target + toolchain
+Source --> Driver : frozen snapshot
+Toolchain --> Driver : trusted session
+
+Metadata --> PosixCache : logical entry
+PosixCache --> WindowsCache : backend contract
+WindowsCache --> Activation : immutable artifact
+
+Driver --> Planner : miss preflight
+WindowsCache --> Planner : hit / miss / trust
+Transaction --> Planner : lock-free plan boundary
+
+Activation --> ProjectInstall : shim targets
+Planner --> ProjectInstall : ordered build plan
+Transaction --> ProjectInstall : commit / rollback
+ProjectInstall --> GlobalInstall : shared install APIs
+GlobalInstall --> Maintenance : marker + cache state
+
+Maintenance --> Vectors : currentness lifecycle
+Vectors --> E2E : shared expectations
+Maintenance --> Docs : observable behavior
+E2E --> Verify : platform evidence
+Docs --> Verify : documented contract
+
+note bottom of PosixCache
+  csk physical layout remains implementation-specific:
+  <manager-home>/builds/go-v1/<logical-key>/...
+end note
+
+@enduml

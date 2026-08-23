@@ -8,10 +8,10 @@ claude
 2026-07-12T00:00:00Z
 
 ## Last Update
-2026-08-09T23:41:10Z
+2026-07-12T19:00:00Z
 
 ## Blocked By
-- (none)
+- (see dependency order in docs/implementation-plan.md section 5)
 
 ## Blocks
 - (none)

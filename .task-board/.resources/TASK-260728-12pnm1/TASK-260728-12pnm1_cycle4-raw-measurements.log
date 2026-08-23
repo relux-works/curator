@@ -1,0 +1,172 @@
+TASK-260728-12pnm1 rework cycle 4 — raw host measurements
+macOS 26.5 arm64, rustc 1.91.0 (f8297e351 2025-10-28), cargo 1.91.0 (ea2d97820 2025-10-10)
+Every run below used the contract's exact two argument vectors, an env -i environment,
+absolute RUSTC/RUSTDOC, pinned rust-lld + ld64.lld, pinned SDKROOT, the manager-written
+$CARGO_HOME/config.toml, private HOME/TMPDIR/XDG roots, and a PATH holding 30 logging shims.
+
+== M1. profile key sweep: which stable [profile] keys start a process ==
+baseline                           metadata_exit=0 build_exit=0 shims=[]
+buildoverride                      metadata_exit=0 build_exit=0 shims=[]
+buildoverride_full                 metadata_exit=0 build_exit=0 shims=[]
+cgu_1                              metadata_exit=0 build_exit=0 shims=[]
+cgu_256                            metadata_exit=0 build_exit=0 shims=[]
+custom_inherits                    metadata_exit=0 build_exit=0 shims=[]
+debug2_packed                      metadata_exit=0 build_exit=0 shims=[dsymutil]
+debug_0                            metadata_exit=0 build_exit=0 shims=[]
+debug_1                            metadata_exit=0 build_exit=0 shims=[]
+debug_2                            metadata_exit=0 build_exit=0 shims=[]
+debug_false                        metadata_exit=0 build_exit=0 shims=[]
+debug_full                         metadata_exit=0 build_exit=0 shims=[]
+debug_limited                      metadata_exit=0 build_exit=0 shims=[]
+debug_linedirectivesonly           metadata_exit=0 build_exit=0 shims=[]
+debug_linetablesonly               metadata_exit=0 build_exit=0 shims=[]
+debug_none                         metadata_exit=0 build_exit=0 shims=[]
+debug_true                         metadata_exit=0 build_exit=0 shims=[]
+debugassert_true                   metadata_exit=0 build_exit=0 shims=[]
+incremental_false                  metadata_exit=0 build_exit=0 shims=[]
+incremental_true                   metadata_exit=0 build_exit=0 shims=[]
+lto_false                          metadata_exit=0 build_exit=0 shims=[]
+lto_fat                            metadata_exit=0 build_exit=0 shims=[]
+lto_off                            metadata_exit=0 build_exit=0 shims=[]
+lto_thin                           metadata_exit=0 build_exit=0 shims=[]
+lto_true                           metadata_exit=0 build_exit=0 shims=[]
+optlevel_0                         metadata_exit=0 build_exit=0 shims=[]
+optlevel_1                         metadata_exit=0 build_exit=0 shims=[]
+optlevel_2                         metadata_exit=0 build_exit=0 shims=[]
+optlevel_3                         metadata_exit=0 build_exit=0 shims=[]
+optlevel_s                         metadata_exit=0 build_exit=0 shims=[]
+optlevel_z                         metadata_exit=0 build_exit=0 shims=[]
+overflow_true                      metadata_exit=0 build_exit=0 shims=[]
+packed_debug2_strip_symbols        metadata_exit=0 build_exit=0 shims=[dsymutil]
+packed_debug_0                     metadata_exit=0 build_exit=0 shims=[]
+packed_debug_1                     metadata_exit=0 build_exit=0 shims=[dsymutil]
+packed_debug_2                     metadata_exit=0 build_exit=0 shims=[dsymutil]
+packed_debug_false                 metadata_exit=0 build_exit=0 shims=[]
+packed_debug_full                  metadata_exit=0 build_exit=0 shims=[dsymutil]
+packed_debug_limited               metadata_exit=0 build_exit=0 shims=[dsymutil]
+packed_debug_linedirectivesonly    metadata_exit=0 build_exit=0 shims=[dsymutil]
+packed_debug_linetablesonly        metadata_exit=0 build_exit=0 shims=[dsymutil]
+packed_debug_none                  metadata_exit=0 build_exit=0 shims=[]
+packed_debug_true                  metadata_exit=0 build_exit=0 shims=[dsymutil]
+panic_abort                        metadata_exit=0 build_exit=0 shims=[]
+panic_unwind                       metadata_exit=0 build_exit=0 shims=[]
+pathdep_profile                    metadata_exit=0 build_exit=0 shims=[]
+pkgoverride_self                   metadata_exit=0 build_exit=0 shims=[dsymutil]
+pkgoverride_self_dbg               metadata_exit=0 build_exit=0 shims=[dsymutil]
+pkgoverride_star                   metadata_exit=0 build_exit=0 shims=[]
+pkgoverride_star_dbg               metadata_exit=0 build_exit=0 shims=[]
+profile_bench_packed               metadata_exit=0 build_exit=0 shims=[]
+profile_codegen_backend            metadata_exit=101 build_exit=101 shims=[]
+profile_dev_packed                 metadata_exit=0 build_exit=0 shims=[]
+profile_rustflags                  metadata_exit=101 build_exit=101 shims=[]
+profile_test_packed                metadata_exit=0 build_exit=0 shims=[]
+rpath_true                         metadata_exit=0 build_exit=0 shims=[]
+sdi_PACKED_case                    metadata_exit=0 build_exit=0 shims=[dsymutil]
+sdi_bogus_value                    metadata_exit=0 build_exit=0 shims=[dsymutil]
+sdi_bool                           metadata_exit=101 build_exit=101 shims=[]
+sdi_empty                          metadata_exit=0 build_exit=0 shims=[dsymutil]
+sdi_int                            metadata_exit=101 build_exit=101 shims=[]
+sdi_off_debug2                     metadata_exit=0 build_exit=0 shims=[]
+sdi_off_nodebug                    metadata_exit=0 build_exit=0 shims=[]
+sdi_packed_debug2                  metadata_exit=0 build_exit=0 shims=[dsymutil]
+sdi_packed_nodebug                 metadata_exit=0 build_exit=0 shims=[]
+sdi_unpacked_debug2                metadata_exit=0 build_exit=0 shims=[]
+sdi_unpacked_nodebug               metadata_exit=0 build_exit=0 shims=[]
+strip_debuginfo                    metadata_exit=0 build_exit=0 shims=[]
+strip_debuginfo_debug2             metadata_exit=0 build_exit=0 shims=[]
+strip_false                        metadata_exit=0 build_exit=0 shims=[]
+strip_false_debug2                 metadata_exit=0 build_exit=0 shims=[]
+strip_none                         metadata_exit=0 build_exit=0 shims=[]
+strip_none_debug2                  metadata_exit=0 build_exit=0 shims=[]
+strip_symbols                      metadata_exit=0 build_exit=0 shims=[]
+strip_symbols_debug2               metadata_exit=0 build_exit=0 shims=[]
+strip_true                         metadata_exit=0 build_exit=0 shims=[]
+strip_true_debug2                  metadata_exit=0 build_exit=0 shims=[]
+trimpaths_all                      metadata_exit=101 build_exit=101 shims=[]
+trimpaths_array                    metadata_exit=101 build_exit=101 shims=[]
+trimpaths_diagnostics              metadata_exit=101 build_exit=101 shims=[]
+trimpaths_macro                    metadata_exit=101 build_exit=101 shims=[]
+trimpaths_none                     metadata_exit=101 build_exit=101 shims=[]
+trimpaths_object                   metadata_exit=101 build_exit=101 shims=[]
+unknown_key                        metadata_exit=0 build_exit=0 shims=[]
+vend_clean                         metadata_exit=0 build_exit=0 shims=[]
+vend_profile                       metadata_exit=0 build_exit=101 shims=[]
+vend_profile_fixed                 metadata_exit=0 build_exit=0 shims=[]
+
+== M2. rustc argv, captured by a logging RUSTC wrapper ==
+bogus_instr      forwarded=[NONE] shims=[dsymutil]
+packed_instr     forwarded=[split-debuginfo=packed] shims=[dsymutil]
+unpacked_instr   forwarded=[split-debuginfo=unpacked] shims=[]
+nodkey_instr     forwarded=[split-debuginfo=unpacked] shims=[]
+off_instr        forwarded=[split-debuginfo=off] shims=[]
+rustc --print split-debuginfo --target aarch64-apple-darwin -> off packed unpacked
+direct rustc -g with NO -Csplit-debuginfo under poisoned PATH -> dsymutil invoked (rustc default is packed)
+
+== M3. the manager-owned -Csplit-debuginfo pin ==
+PIN[-Csplit-debuginfo=off]      pin_off_packed   build_exit=0 shims=[]
+PIN[-Csplit-debuginfo=off]      pin_off_bogus    build_exit=0 shims=[]
+PIN[-Csplit-debuginfo=unpacked] pin_unp_packed   build_exit=0 shims=[]
+PIN[]                           nopin_packed     build_exit=0 shims=[dsymutil]
+pin_clean/pin_profile_packed/pin_pkgoverride/pin_bogus/pin_empty: meta=0 build=0 run=0 stdout='profile probe' shims=[]
+nopin_pkgoverride: shims=[dsymutil]
+
+== M4. artifact identity under the pin, same directory ==
+pin=''                           sha256=33c634e477008568d31ee3b0db3241d9920d1049fea4ed951bd5304d91d5ddb8 size=407088
+pin='' (repeat)                  sha256=33c634e477008568d31ee3b0db3241d9920d1049fea4ed951bd5304d91d5ddb8 size=407088
+pin='-Csplit-debuginfo=unpacked' sha256=738d82680780c54ddb7f41a7e992baf1867e779ecfaa25c1c5ece3d345e84091 size=407088
+pin='-Csplit-debuginfo=off'      sha256=db383465c5efe55cbf12a4cea580ce778bb5c2d3b94ceff6db9db65e2d23d082 size=407088
+
+== M5. strip is effective and starts no process ==
+strip_false 427168  strip_none 427168  strip_debuginfo 407088  strip_symbols 336656  baseline 407088
+
+== M6. profile tables in dependency manifests are inert ==
+pathdep_profile     path dependency inside R carrying [profile.release] packed -> shims=[] exit 0
+vend_profile        vendored cfg-if Cargo.toml edited, checksum NOT repaired -> metadata_exit=0 build_exit=101 checksum error
+vend_profile_fixed  same edit with .cargo-checksum.json repaired            -> metadata_exit=0 build_exit=0 shims=[]
+
+== M7. real-world profile key frequency, host registry cache ==
+506 cached crate manifests; 37 carry a [profile*] table
+  debug 34 | lto 25 | opt-level 17 | codegen-units 15 | panic 13 | incremental 3 | inherits 1
+  split-debuginfo occurrences: 0
+  distinct values: codegen-units [1]; debug [2,true]; incremental [false]; inherits ["release"];
+                   lto ["fat","thin",true]; opt-level [1,2,3]; panic ["abort"]
+
+== M8. cargo target auto-discovery: every reported src_path and whether it exists ==
+=== plain_main (metadata exit 0) ===
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+=== lib_and_main (metadata exit 0) ===
+   kind=['lib'] name='discprobe' src=src/lib.rs exists=True
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+=== autobin_extra (metadata exit 0) ===
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+   kind=['bin'] name='extra' src=src/bin/extra.rs exists=True
+=== autobin_subdir (metadata exit 0) ===
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+   kind=['bin'] name='sub' src=src/bin/sub/main.rs exists=True
+=== examples_tests_benches (metadata exit 0) ===
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+   kind=['example'] name='e' src=examples/e.rs exists=True
+   kind=['test'] name='t' src=tests/t.rs exists=True
+   kind=['bench'] name='b' src=benches/b.rs exists=True
+=== example_subdir (metadata exit 0) ===
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+   kind=['example'] name='e' src=examples/e/main.rs exists=True
+=== declared_absent_bin (metadata exit 0) ===
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+   kind=['bin'] name='ghost' src=src/ghost.rs exists=False
+=== bin_name_only (metadata exit 0) ===
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+=== autobins_false (metadata exit 101) ===
+   err: error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework4/disc/autobins_false/Cargo.toml`~~Caused by:~  no targets specified in the manifest~  either 
+=== buildrs_auto (metadata exit 0) ===
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+   kind=['custom-build'] name='build-script-build' src=build.rs exists=True
+=== bin_name_only_nofile (metadata exit 101) ===
+   err: error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework4/disc/bin_name_only_nofile/Cargo.toml`~~Caused by:~  can't find `ghostonly` bin at `src/bin/g
+=== lib_name_only_nofile (metadata exit 101) ===
+   err: error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework4/disc/lib_name_only_nofile/Cargo.toml`~~Caused by:~  can't find library `onlylib`, rename fil
+=== declared_absent_lib (metadata exit 0) ===
+   kind=['lib'] name='discprobe' src=src/nolib.rs exists=False
+   kind=['bin'] name='discprobe' src=src/main.rs exists=True
+=== no_targets_at_all (metadata exit 101) ===
+   err: error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework4/disc/no_targets_at_all/Cargo.toml`~~Caused by:~  no targets specified in the manifest~  eith

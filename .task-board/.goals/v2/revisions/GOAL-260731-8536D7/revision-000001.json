@@ -1,0 +1,80 @@
+{
+  "contract_version": "board-goal-v2",
+  "goal_id": "GOAL-260731-8536d7",
+  "revision": 1,
+  "expected_previous_revision": 0,
+  "previous_ref": {
+    "id": "GOAL-260731-318711",
+    "revision": 1
+  },
+  "owner": {
+    "kind": "run",
+    "id": "RUN-260731-8536d7"
+  },
+  "kind": "delivery_pool",
+  "objective": "Intent summary (non-authoritative): Execute BUG-260731-11bpa4, BUG-260731-3gm8kc, BUG-260731-lepevi within the active board delivery scope\nReview-policy snapshot: BUG-260731-11bpa4=required, BUG-260731-3gm8kc=required, BUG-260731-lepevi=required\n\nEnvironment contract: Act with maximum autonomy and keep progressing through recoverable work without asking for routine confirmation. After surfacing final board evidence for a satisfied success predicate, clear the provider goal through its successful-completion path; never early-clear it to evade acceptance. If the requested outcome objectively does not fit, never force it or fake a fit: make the next optimal assumption only when it is unambiguously derivable; otherwise invoke the repository's existing **Stop-The-Line: No Forced Fits** boundary, persist its evidence packet, and surface only the exact human-only decision or external input needed.\n\nOwn board scope **BUG-260731-11bpa4, BUG-260731-3gm8kc, BUG-260731-lepevi** through accepted delivery. Do not stop or hand routine work to the human while any scoped item is not accepted `done`. For every item, autonomously route producer -\u003e reviewer -\u003e rework -\u003e reviewer until the board records `done`; treat `to-review`, requested changes, failed checks, early child exits, transient runtime failures, usage or budget limits, and other recoverable conditions as continuation, retry, or reroute signals. Before marking this goal complete, query the board and surface every scoped ID with its `done` status, current outcome evidence, and an accepted reviewer verdict for `review=required|light`, or the orchestrator evidence check for `review=none`. The only agent-initiated unresolved terminal is the repository's existing **Stop-The-Line: No Forced Fits** contract; apply it by reference, persist its required evidence packet, and request only the exact human-only decision or external input. Never force-fit an impossible design, weaken acceptance, self-accept review-required producer work, or change status merely to satisfy this goal. A revision-bound owner agent may create a role-compatible goal, monotonically expand its scope, and refresh its non-authoritative `objective_intent` without operator acknowledgement. Only an acknowledged operator cancel or reroute may remove scope, replace role-compatible structural goal semantics, weaken acceptance, or terminate ownership; those restricted mutations supersede or cancel the prior goal and are never successful delivery.",
+  "scope": {
+    "requested_ids": [
+      "BUG-260731-11BPA4",
+      "BUG-260731-3GM8KC",
+      "BUG-260731-LEPEVI"
+    ],
+    "resolved_leaf_items": [
+      {
+        "id": "BUG-260731-11bpa4",
+        "title": "BUG-260731-11bpa4: curator-windows-test-vet-compile-break",
+        "review_policy": "required",
+        "baseline_status": "backlog"
+      },
+      {
+        "id": "BUG-260731-3gm8kc",
+        "title": "BUG-260731-3gm8kc: curator-interop-lifecycle-vector-gate",
+        "review_policy": "required",
+        "baseline_status": "to-review"
+      },
+      {
+        "id": "BUG-260731-lepevi",
+        "title": "BUG-260731-lepevi: curator-main-ci-red-linux-lane",
+        "review_policy": "required",
+        "baseline_status": "backlog"
+      }
+    ]
+  },
+  "mutation_authority": "agent_discretion",
+  "success_predicate": "accepted_done",
+  "provider_condition": "Own the latest active revision of board goal **GOAL-260731-318711** for run **RUN-260731-8536d7** through its board-defined success predicate. Before nested spawn, at every directive checkpoint, and before claiming success, run `task-board spawn goal RUN-260731-8536d7`; treat the returned objective, resolved scope, and revision as authoritative and surface them with the required board acceptance evidence. A stale revision, cancelled/superseded goal, or missing scoped acceptance evidence is not success.",
+  "native_reflection": "required",
+  "state": "active",
+  "legacy_refs": [
+    {
+      "contract": "board-goal-v1",
+      "id": "GOAL-260731-318711",
+      "revision": 1
+    }
+  ],
+  "role_policy": {},
+  "delivery_owner": {
+    "role": {
+      "role": "orchestrator",
+      "archetype": "analyst"
+    },
+    "agent": "[analyst] orchestrator (claude)",
+    "run_id": "RUN-260731-8536d7"
+  },
+  "objective_intent": "Execute BUG-260731-11bpa4, BUG-260731-3gm8kc, BUG-260731-lepevi within the active board delivery scope",
+  "stop_boundary_ref": "Stop-The-Line: No Forced Fits",
+  "mutation": {
+    "kind": "created",
+    "reason": "Goal-bound tracked spawn launch",
+    "actor_context": {
+      "kind": "agent",
+      "actor_id": "[analyst] orchestrator (claude)",
+      "run_id": "RUN-260731-dfca53"
+    },
+    "authority": "agent_discretion"
+  },
+  "created_at": "2026-07-31T08:42:25.422443Z",
+  "updated_at": "2026-07-31T08:42:25.422443Z",
+  "created_by": "[analyst] orchestrator (claude)",
+  "reason": "Goal-bound tracked spawn launch"
+}
