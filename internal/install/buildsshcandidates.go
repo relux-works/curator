@@ -144,6 +144,13 @@ func sshAgentKeyCount(socket string) (int, bool) {
 		}
 	}
 	output, err := command.Output()
+	if ctx.Err() != nil {
+		// A timed-out probe was killed, and on Windows a terminated process
+		// reports exit code 1 — indistinguishable from the real "agent holds
+		// nothing" answer below. The deadline firing means the question was
+		// never answered.
+		return 0, false
+	}
 	if err != nil {
 		// `ssh-add -l` exits 1 for an agent that holds nothing, which is a
 		// real answer and not a failure to reach it.
