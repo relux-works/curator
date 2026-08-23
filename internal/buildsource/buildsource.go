@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/relux-works/curator/internal/fsunicode"
 	"github.com/relux-works/curator/internal/identifiers"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
@@ -313,7 +314,7 @@ func newPathSet() *pathSet {
 }
 
 func (set *pathSet) add(path string) error {
-	if !identifiers.PortablePath(path) {
+	if !fsunicode.Valid(path) || !identifiers.PortablePath(path) {
 		return fmt.Errorf("%w: invalid protocol path %q", ErrInvalidSnapshot, path)
 	}
 	if _, exists := set.exact[path]; exists {
