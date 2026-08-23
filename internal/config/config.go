@@ -42,7 +42,9 @@ const (
 var DefaultAgents = []string{"codex_cli"}
 
 // LockableKeys are the top-level keys an organization may lock from the
-// system config (Spec §7.2).
+// system config (Spec §7.2). Operator credential selections — build_ssh
+// among them — are deliberately absent and never lockable: credential
+// material is operator-owned (ratified with the spec owner 2026-08-23).
 var LockableKeys = map[string]bool{
 	"audit_registries":           true,
 	"disable_builtin_registries": true,
