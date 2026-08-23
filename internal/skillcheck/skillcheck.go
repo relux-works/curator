@@ -3,6 +3,7 @@
 package skillcheck
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/locale"
+	"github.com/relux-works/curator/internal/scriptpolicy"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/whitelist"
 )
@@ -39,6 +41,7 @@ func Validate(skillDir, localeValue string) []Issue {
 			Path: skillspec.ManifestSourcePath(skillDir), Message: err.Error(),
 		})
 	} else {
+		issues = append(issues, executionPolicyIssues(spec)...)
 		issues = append(issues, runtimeRootReferenceWarnings(skillDir, spec)...)
 		issues = append(issues, buildRootReferenceWarnings(skillDir, spec)...)
 		issues = append(issues, commandResolutionWarnings(skillDir, spec)...)
@@ -48,6 +51,28 @@ func Validate(skillDir, localeValue string) []Issue {
 		issues = append(issues, Issue{Severity: item.Severity, Code: item.Code, Path: item.Path, Message: item.Message})
 	}
 	return issues
+}
+
+// executionPolicyIssues reports a manifest that selects an execution policy
+// this manager does not implement. The manifest itself is a valid schema-8
+// document — the parser accepted it — so the refusal is reported here, where
+// the manager answers for what it will actually install, and it carries the
+// closed §4.1.1 diagnostic rather than a `skill.`-namespaced one.
+func executionPolicyIssues(spec *skillspec.Spec) []Issue {
+	err := scriptpolicy.Admit(spec.Commands)
+	if err == nil {
+		return nil
+	}
+	var refusal *scriptpolicy.Error
+	if !errors.As(err, &refusal) {
+		return []Issue{{Severity: "error", Code: scriptpolicy.PolicyUnsupported, Message: err.Error()}}
+	}
+	return []Issue{{
+		Severity: refusal.Severity,
+		Code:     refusal.DiagnosticCode,
+		Path:     refusal.Path,
+		Message:  refusal.Detail,
+	}}
 }
 
 func runtimeRootReferenceWarnings(skillDir string, spec *skillspec.Spec) []Issue {

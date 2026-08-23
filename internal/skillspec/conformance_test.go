@@ -79,10 +79,17 @@ func TestReleasedSchemaCases(t *testing.T) {
 }
 
 // materializeManifestFixture lays out the snapshot a schema case describes:
-// build roots with their go.mod, command source directories and script files,
-// and the schema-8 declared module directories with their own go.mod. A path
-// the case deliberately makes non-portable is left unmaterialised, because the
-// parser must reject it on its spelling alone.
+// build roots with their go.mod, declared runtime roots, command source
+// directories and script files, and the schema-8 declared module directories
+// with their own go.mod. A path the case deliberately makes non-portable is
+// left unmaterialised, because the parser must reject it on its spelling
+// alone.
+//
+// Runtime roots are materialised so an invalid case fails for the rule it was
+// written to test. Without them every schema-8 script case that declares a
+// runtime root is rejected first by "runtime root does not exist", which is
+// true of the valid cases too and therefore proves nothing about the invalid
+// ones.
 func materializeManifestFixture(t *testing.T, payload []byte, manifestName string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -100,6 +107,17 @@ func materializeManifestFixture(t *testing.T, payload []byte, manifestName strin
 				t.Fatal(err)
 			}
 			if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(root), "go.mod"), []byte("module fixture\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if roots, ok := object["runtime_roots"].([]any); ok {
+		for _, raw := range roots {
+			root, ok := raw.(string)
+			if !ok || !materializablePath(root) {
+				continue
+			}
+			if err := os.MkdirAll(filepath.Join(dir, filepath.FromSlash(root)), 0o755); err != nil {
 				t.Fatal(err)
 			}
 		}
