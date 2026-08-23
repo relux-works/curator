@@ -374,9 +374,9 @@ jobs:
 
           pin_manifest="$GITHUB_WORKSPACE/protocol-spec/conformance/v1/manifest.json"
           if command -v shasum >/dev/null 2>&1; then
-            PIN_MANIFEST_SHA256="$(shasum -a 256 "$pin_manifest" | awk '{print $1}')"
+            PIN_MANIFEST_SHA256="$(shasum -a 256 <"$pin_manifest" | awk '{print $1}')"
           else
-            PIN_MANIFEST_SHA256="$(sha256sum "$pin_manifest" | awk '{print $1}')"
+            PIN_MANIFEST_SHA256="$(sha256sum <"$pin_manifest" | awk '{print $1}')"
           fi
           export PIN_MANIFEST_SHA256
           bash .github/ci/candidate-suite.sh record "$root" .temp/ci-evidence/candidate
