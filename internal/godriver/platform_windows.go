@@ -132,3 +132,16 @@ func artifactHasMultipleLinks(path string, _ fs.FileInfo) (bool, error) {
 	}
 	return info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || info.NumberOfLinks != 1, nil
 }
+
+// protocolLinkTarget rewrites a host-native link target into the protocol's
+// slash form.
+//
+// Windows cannot store the protocol bytes for a relative target: os.Symlink
+// applies FromSlash before the syscall, and os.Readlink returns the stored
+// reparse target verbatim, so a target the protocol publishes as "../bin/go"
+// always reads back as `..\bin\go`. Hashing those bytes would make the
+// toolchain content digest a property of the host that walked the tree rather
+// than of the tree, so the separators are converted back before anything
+// validates or hashes the target. A Windows filename cannot contain a
+// backslash, so this only ever undoes the platform's own substitution.
+func protocolLinkTarget(target string) string { return filepath.ToSlash(target) }
