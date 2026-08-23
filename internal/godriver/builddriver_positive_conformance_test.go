@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"testing"
@@ -58,10 +59,11 @@ type argvCase struct {
 }
 
 type positiveVectors struct {
-	FixedEnvironment map[string]string `json:"fixed_environment"`
-	Argv             []argvCase        `json:"argv"`
-	ToolchainCases   []toolchainCase   `json:"toolchain_cases"`
-	PositiveCases    []struct {
+	FixedEnvironment      map[string]string      `json:"fixed_environment"`
+	FixedEnvironmentCases []fixedEnvironmentCase `json:"fixed_environment_cases"`
+	Argv                  []argvCase             `json:"argv"`
+	ToolchainCases        []toolchainCase        `json:"toolchain_cases"`
+	PositiveCases         []struct {
 		Name    string `json:"name"`
 		Result  string `json:"result"`
 		Package struct {
@@ -76,6 +78,14 @@ type positiveVectors struct {
 			EmbeddedInputs    []string `json:"embedded_inputs"`
 		} `json:"package"`
 	} `json:"positive_cases"`
+}
+
+type fixedEnvironmentCase struct {
+	Name              string            `json:"name"`
+	GOOS              string            `json:"goos"`
+	GOARCH            string            `json:"goarch"`
+	Environment       map[string]string `json:"environment"`
+	OptionalVariables []string          `json:"optional_variables"`
 }
 
 func loadPositiveVectors(t *testing.T) positiveVectors {
@@ -170,20 +180,21 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 	}
 
 	t.Run("fixed environment", func(t *testing.T) {
-		if len(vectors.FixedEnvironment) == 0 {
+		expected, optional := fixedEnvironmentForHost(t, vectors, runtime.GOOS, runtime.GOARCH)
+		if len(expected) == 0 {
 			t.Skip("this conformance root publishes no fixed environment")
 		}
 		fixture := newSnapshotFixture(t)
 		fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
 		values := environmentMap(fixture.session.Environment())
 
-		published := make([]string, 0, len(vectors.FixedEnvironment))
-		for key := range vectors.FixedEnvironment {
+		published := make([]string, 0, len(expected))
+		for key := range expected {
 			published = append(published, key)
 		}
 		sort.Strings(published)
 		for _, key := range published {
-			want := vectors.FixedEnvironment[key]
+			want := expected[key]
 			got, present := values[key]
 			if !present {
 				t.Fatalf("Curator's closed environment omits %s", key)
@@ -198,11 +209,47 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 			}
 		}
 		for key := range values {
-			if _, ok := vectors.FixedEnvironment[key]; !ok {
+			if _, ok := expected[key]; !ok && !optional[key] {
 				t.Fatalf("Curator's closed environment carries %s, which the suite does not publish", key)
 			}
 		}
 	})
+}
+
+func fixedEnvironmentForHost(t *testing.T, vectors positiveVectors, goos, goarch string) (map[string]string, map[string]bool) {
+	t.Helper()
+	if len(vectors.FixedEnvironmentCases) == 0 {
+		return vectors.FixedEnvironment, nil
+	}
+	for _, testCase := range vectors.FixedEnvironmentCases {
+		if testCase.GOOS != goos || testCase.GOARCH != goarch {
+			continue
+		}
+		optional := make(map[string]bool, len(testCase.OptionalVariables))
+		for _, key := range testCase.OptionalVariables {
+			optional[key] = true
+		}
+		return testCase.Environment, optional
+	}
+	t.Fatalf("the suite publishes no fixed environment for native host %s/%s", goos, goarch)
+	return nil, nil
+}
+
+func TestFixedEnvironmentForHostSelectsNativeCase(t *testing.T) {
+	vectors := positiveVectors{
+		FixedEnvironment: map[string]string{"GOARCH": "arm64"},
+		FixedEnvironmentCases: []fixedEnvironmentCase{
+			{GOOS: "darwin", GOARCH: "arm64", Environment: map[string]string{"GOARCH": "arm64"}},
+			{GOOS: "windows", GOARCH: "amd64", Environment: map[string]string{"GOARCH": "amd64"}, OptionalVariables: []string{"SYSTEMROOT", "WINDIR"}},
+		},
+	}
+	environment, optional := fixedEnvironmentForHost(t, vectors, "windows", "amd64")
+	if environment["GOARCH"] != "amd64" {
+		t.Fatalf("selected GOARCH = %q", environment["GOARCH"])
+	}
+	if !optional["SYSTEMROOT"] || !optional["WINDIR"] {
+		t.Fatalf("optional variables = %#v", optional)
+	}
 }
 
 // TestToolchainIdentityVectors proves every authoritative toolchain identity
@@ -335,8 +382,13 @@ func materializeToolchain(t *testing.T, testCase toolchainCase) string {
 				t.Fatal(err)
 			}
 		case "symlink":
-			if err := os.Symlink(filepath.FromSlash(entry.Target), target); err != nil {
+			// The link payload is a protocol byte input. filepath.FromSlash would
+			// rewrite its separators on Windows and silently change the digest.
+			if err := os.Symlink(entry.Target, target); err != nil {
 				t.Skipf("this host cannot create the symbolic link the vector needs: %v", err)
+			}
+			if observed, err := os.Readlink(target); err != nil || observed != entry.Target {
+				t.Fatalf("materialized link target = %q, %v; want exact protocol target %q", observed, err, entry.Target)
 			}
 		default:
 			writeTestFile(t, target, decodeBase64(t, entry.Content), 0o755)
