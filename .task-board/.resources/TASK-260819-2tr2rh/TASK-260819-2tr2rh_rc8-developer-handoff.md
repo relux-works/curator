@@ -1,0 +1,11 @@
+Rc.8 developer handoff
+
+Normative prerequisite: TASK-260819-3kwd8g is done with accepted independent reviewer verdict on 993429e.
+Candidate: v1.0.0-rc.8; branch release/v1.0.0-rc.8; signed commit 4d8fda59edfc89367ea050732a414c265be288ed.
+PR: https://github.com/relux-works/curator-spec/pull/20. All eight specification, formatting, links, and implementation-conformance checks passed. CI runs: https://github.com/relux-works/curator-spec/actions/runs/32199272670 and https://github.com/relux-works/curator-spec/actions/runs/32199272746.
+Clean candidate gates, all exit 0: validator (49 schemas, 471 vectors); 86 Python tests; Go tests; gofmt; git diff check; deterministic regeneration diff; post-validation git status; release gate; signed commit verification. A signed annotated v1.0.0-rc.8-preflight tag was created only in an isolated clone and verified against maintainers.allowed_signers.
+Digests: conformance/v1/manifest.json sha256 d14e3a16bb4a01ff282791f08e3aefa269210234f41072beae6fe59b642595a1; release/1.0.0-rc.8.json sha256 293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede; immutable release/1.0.0-rc.7.json sha256 e5872ee4dd207bf6b190d8c8be15a9366d9c1e3638047ea983620b97c9f84d5d. Existing rc.7 tag object de704f2951e683d52ae8e475cb690b918a94d4c5 still targets merged commit 99f70947d6f2447366d6c996127b73eca37a9159 and verifies.
+Claims: verified_implementations=[] and verified_platform_claims=[]; no platform verified conformance claim is made.
+Workflow regression: top-level PYTHONDONTWRITEBYTECODE=1 prevents validation imports from creating untracked bytecode before the clean-checkout gate; regression test added.
+Anomaly: PR 19 was closed after GitHub reported conflicts caused by reusing the squash-merged rc.7 source branch. No force push or rewrite occurred. The exact patch was replayed as a signed commit on origin/main for PR 20.
+Pending reviewer acceptance: do not merge, create or push v1.0.0-rc.8, or publish assets before acceptance. Remote rc.8 tag is absent and GitHub release lookup currently returns release not found, as expected.

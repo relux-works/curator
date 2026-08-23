@@ -1,0 +1,68 @@
+{
+  "contract_version": "board-goal-v2",
+  "goal_id": "GOAL-260818-6be364",
+  "revision": 1,
+  "expected_previous_revision": 0,
+  "owner": {
+    "kind": "run",
+    "id": "RUN-260818-c42f94"
+  },
+  "kind": "role_handoff",
+  "objective": "Intent summary (non-authoritative): Autonomously finish the portable assurance implementation through producer handoff, independent Codex Sol/medium review, all required rework and re-review, accepted done status, complete security and repository gate evidence, and a valid synchronized board.\nReview-policy snapshot: TASK-260819-1cpbmc=required\n\nEnvironment contract: Act with maximum autonomy and keep progressing through recoverable work without asking for routine confirmation. After surfacing final board evidence for a satisfied success predicate, clear the provider goal through its successful-completion path; never early-clear it to evade acceptance. If the requested outcome objectively does not fit, never force it or fake a fit: make the next optimal assumption only when it is unambiguously derivable; otherwise invoke the repository's existing **Stop-The-Line: No Forced Fits** boundary, persist its evidence packet, and surface only the exact human-only decision or external input needed.\n\nKeep working on board scope TASK-260819-1cpbmc until every assigned item reaches the role end status `to-review` with all task acceptance criteria and checklist gates satisfied and a new or updated task-scoped outcome artifact, or the repository's existing **Stop-The-Line: No Forced Fits** boundary is evidenced. Routine failed checks, recoverable runtime errors, and rework remain continuation signals; they are not successful handoff.",
+  "scope": {
+    "requested_ids": [
+      "TASK-260819-1CPBMC"
+    ],
+    "resolved_leaf_items": [
+      {
+        "id": "TASK-260819-1cpbmc",
+        "title": "TASK-260819-1cpbmc: implement-explicit-portable-assurance-mode",
+        "review_policy": "required",
+        "baseline_status": "development"
+      }
+    ],
+    "excluded_terminal_ids": [
+      "TASK-260819-3KWD8G"
+    ]
+  },
+  "mutation_authority": "operator_acknowledged",
+  "success_predicate": "role_handoff",
+  "provider_condition": "Own the latest active revision of board goal **GOAL-260818-6be364** for run **RUN-260818-c42f94** through its board-defined success predicate. Before nested spawn, at every directive checkpoint, and before claiming success, run `task-board spawn goal RUN-260818-c42f94`; treat the returned objective, resolved scope, and revision as authoritative and surface them with the required board acceptance evidence. A stale revision, cancelled/superseded goal, or missing scoped acceptance evidence is not success.",
+  "native_reflection": "required",
+  "state": "active",
+  "legacy_refs": [
+    {
+      "contract": "board-goal-v1",
+      "id": "GOAL-260818-6be364",
+      "revision": 1
+    }
+  ],
+  "role_policy": {
+    "handoff_end_status": "to-review"
+  },
+  "delivery_owner": {
+    "role": {
+      "role": "developer",
+      "archetype": "implementer",
+      "start_status": "development",
+      "end_status": "to-review"
+    },
+    "agent": "[implementer] developer (codex)",
+    "run_id": "RUN-260818-c42f94"
+  },
+  "objective_intent": "Autonomously finish the portable assurance implementation through producer handoff, independent Codex Sol/medium review, all required rework and re-review, accepted done status, complete security and repository gate evidence, and a valid synchronized board.",
+  "stop_boundary_ref": "Stop-The-Line: No Forced Fits",
+  "mutation": {
+    "kind": "created",
+    "reason": "User explicitly requested an autonomous goal for completing this existing tracked run",
+    "actor_context": {
+      "kind": "operator",
+      "actor_id": "iv"
+    },
+    "authority": "operator_acknowledged"
+  },
+  "created_at": "2026-08-18T23:50:37.784167Z",
+  "updated_at": "2026-08-18T23:50:37.784167Z",
+  "created_by": "iv",
+  "reason": "User explicitly requested an autonomous goal for completing this existing tracked run"
+}

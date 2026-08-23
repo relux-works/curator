@@ -1,0 +1,46 @@
+{
+  "contract_version": "board-goal-v2",
+  "goal_id": "PRIMARY-GOAL-260811-1zl9m7",
+  "revision": 3,
+  "expected_previous_revision": 2,
+  "previous_ref": {
+    "id": "PRIMARY-GOAL-260811-1zl9m7",
+    "revision": 2
+  },
+  "owner": {
+    "kind": "parent",
+    "id": "primary"
+  },
+  "kind": "alignment",
+  "objective": "Autonomously complete the portable assurance delivery: drive TASK-260819-1cpbmc and RUN-260818-c42f94 through implementation, independent Codex Sol/medium review, rework, and acceptance; publish the reviewed curator-spec v1.0.0-rc.8 while preserving immutable rc.7 history; then implement and validate portable source-closure adapters for Rust, Node/TypeScript, Swift, and the SwiftPM-supported C family, excluding Kotlin. Keep portable mode the default, require verified mode to fail closed without a compatible trusted provider, and treat macOS, Linux, and Windows verified providers as a separate future epic rather than part of the current implementation. Continue enforcing the prohibition on vendored compiled binaries until Curator supports explicit signature and provenance verification. Keep the board, specification, tests, evidence, and plans synchronized, and stop only for a documented human-only decision or external blocker.",
+  "scope": {
+    "requested_ids": null,
+    "resolved_leaf_items": null
+  },
+  "mutation_authority": "agent_discretion",
+  "success_predicate": "alignment_handled",
+  "provider_condition": "The bound parent session has handled this exact alignment revision.",
+  "native_reflection": "required",
+  "state": "active",
+  "legacy_refs": [
+    {
+      "contract": "primary-goal-v1",
+      "id": "PRIMARY-GOAL-260811-1zl9m7",
+      "revision": 3
+    }
+  ],
+  "role_policy": {},
+  "mutation": {
+    "kind": "alignment_realigned",
+    "reason": "User requested replacement with the current portable, rc.8, adapter, and separate verified-provider architecture",
+    "actor_context": {
+      "kind": "agent",
+      "actor_id": "iv"
+    },
+    "authority": "agent_discretion"
+  },
+  "created_at": "2026-08-10T23:51:12.680862Z",
+  "updated_at": "2026-08-19T00:05:38.03969Z",
+  "created_by": "iv",
+  "reason": "User requested replacement with the current portable, rc.8, adapter, and separate verified-provider architecture"
+}
