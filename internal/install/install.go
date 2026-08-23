@@ -485,6 +485,13 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		result.failf("%v", err)
 		return result, nil
 	}
+	if !opts.DryRun {
+		commit, err = bindCommitPublisher(deps.Assurance, commit)
+		if err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
+	}
 
 	skillsDir := filepath.Join(projectRoot, ".agents", "skills")
 	binDir := filepath.Join(projectRoot, ".agents", "bin")
@@ -529,7 +536,7 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 		return result, nil
 	}
 	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), alias, alias, cfg.Home(), nodes,
-		buildRepositorySubstitutions, deps.Toolchain, opts.External, opts.DryRun)
+		buildRepositorySubstitutions, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
 	if externalPlanErr != nil {
 		result.failBuild(externalPlanErr)
 		return result, nil

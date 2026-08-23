@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 )
 
 // TestSweepRetainsUntrustedUnixState proves that ownership and permission
@@ -373,7 +374,7 @@ func TestSweepClassificationSurvivesACacheRootExchangedMidPass(t *testing.T) {
 	// opened now names the replacement, and the replacement classifies as a
 	// reusable hit. That is exactly the verdict the handle-bound classification
 	// refused to borrow for the entry it was about to remove.
-	control := store.inspectEntry(entryPathOf(store, key), Expectation{Input: testInput("tool")}, key)
+	control := store.inspectEntry(entryPathOf(store, key), Expectation{Input: testInput("tool"), Assurance: closureexec.PortableAssuranceBinding()}, key)
 	if control.Status != Hit {
 		t.Fatalf("the control did not reproduce the reopen hazard: %s: %s", control.Status, control.Reason)
 	}

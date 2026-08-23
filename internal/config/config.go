@@ -51,9 +51,11 @@ var LockableKeys = map[string]bool{
 }
 
 var (
-	revocationHashRE = regexp.MustCompile(`^(?:sha256:)?[A-Fa-f0-9]{64}$`)
-	registryHostRE   = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$`)
-	pinnedKeyRE      = regexp.MustCompile(`^(?:ed25519:)?[A-Za-z0-9+/]{43}=$`)
+	revocationHashRE  = regexp.MustCompile(`^(?:sha256:)?[A-Fa-f0-9]{64}$`)
+	canonicalSHA256RE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	providerIDRE      = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,126}[A-Za-z0-9])?$`)
+	registryHostRE    = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$`)
+	pinnedKeyRE       = regexp.MustCompile(`^(?:ed25519:)?[A-Za-z0-9+/]{43}=$`)
 )
 
 var managerKeys = map[string]bool{
@@ -61,6 +63,7 @@ var managerKeys = map[string]bool{
 	"preferred_locale": true, "adapter_mode": true, "worktree_alias_pattern": true,
 	"projects": true, "allowed_sources": true, "audit": true,
 	"audit_registries": true, "disable_builtin_registries": true,
+	"execution": true,
 }
 
 // Project is a registered project entry.
@@ -109,6 +112,16 @@ type Audit struct {
 	OfflineGraceSeconds      int
 }
 
+// Execution selects the manager assurance policy. Portable is the default;
+// verified is never inferred from provider availability.
+type Execution struct {
+	Mode                  string
+	ProviderID            string
+	ProviderVersion       string
+	ProviderBinarySHA256  string
+	ProviderTrustEvidence string
+}
+
 // Config is the effective machine configuration.
 type Config struct {
 	Path                     string
@@ -119,6 +132,7 @@ type Config struct {
 	WorktreeAliasPattern     string
 	Projects                 map[string]Project
 	Audit                    Audit
+	Execution                Execution
 	AllowedSources           []string
 	AuditRegistries          []Registry
 	DisableBuiltinRegistries bool
@@ -333,6 +347,10 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	execution, err := parseExecution(data["execution"])
+	if err != nil {
+		return nil, err
+	}
 
 	var allowedSources []string
 	if raw, present := data["allowed_sources"]; present {
@@ -428,10 +446,92 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		WorktreeAliasPattern:     worktreePattern,
 		Projects:                 projects,
 		Audit:                    audit,
+		Execution:                execution,
 		AllowedSources:           allowedSources,
 		AuditRegistries:          registries,
 		DisableBuiltinRegistries: disableBuiltin,
 	}, nil
+}
+
+func parseExecution(raw any) (Execution, error) {
+	execution := Execution{Mode: "portable"}
+	if raw == nil {
+		return execution, nil
+	}
+	obj, ok := raw.(map[string]any)
+	if !ok {
+		return Execution{}, verr.New("execution", "must be an object")
+	}
+	for key := range obj {
+		if key != "mode" && key != "provider_id" && key != "provider_version" && key != "provider_binary_sha256" && key != "provider_trust_evidence" {
+			return Execution{}, verr.New("execution", "has unsupported field %q", key)
+		}
+	}
+	if rawMode, present := obj["mode"]; present {
+		var ok bool
+		execution.Mode, ok = rawMode.(string)
+		if !ok {
+			return Execution{}, verr.New("execution.mode", "must be portable or verified")
+		}
+		if execution.Mode != "portable" && execution.Mode != "verified" {
+			return Execution{}, verr.New("execution.mode", "must be portable or verified")
+		}
+	}
+	if rawProvider, present := obj["provider_id"]; present {
+		var ok bool
+		execution.ProviderID, ok = rawProvider.(string)
+		if !ok || !providerIDRE.MatchString(execution.ProviderID) {
+			return Execution{}, verr.New("execution.provider_id", "must be a closed provider identifier")
+		}
+	}
+	if rawVersion, present := obj["provider_version"]; present {
+		var ok bool
+		execution.ProviderVersion, ok = rawVersion.(string)
+		if !ok || !validProviderText(execution.ProviderVersion, 128) {
+			return Execution{}, verr.New("execution.provider_version", "must be a non-empty single-line string")
+		}
+	}
+	if rawDigest, present := obj["provider_binary_sha256"]; present {
+		var ok bool
+		execution.ProviderBinarySHA256, ok = rawDigest.(string)
+		if !ok || !canonicalSHA256RE.MatchString(execution.ProviderBinarySHA256) {
+			return Execution{}, verr.New("execution.provider_binary_sha256", "must be a canonical SHA-256 identity")
+		}
+	}
+	if rawTrust, present := obj["provider_trust_evidence"]; present {
+		var ok bool
+		execution.ProviderTrustEvidence, ok = rawTrust.(string)
+		if !ok || !validProviderText(execution.ProviderTrustEvidence, 512) {
+			return Execution{}, verr.New("execution.provider_trust_evidence", "must be a non-empty single-line string")
+		}
+	}
+	if execution.Mode == "portable" && (execution.ProviderID != "" || execution.ProviderVersion != "" || execution.ProviderBinarySHA256 != "" || execution.ProviderTrustEvidence != "") {
+		return Execution{}, verr.New("execution.provider_id", "is forbidden in portable mode")
+	}
+	if execution.Mode == "verified" {
+		if execution.ProviderID == "" || execution.ProviderVersion == "" || execution.ProviderTrustEvidence == "" {
+			return Execution{}, verr.New("execution", "verified mode requires provider_id, provider_version, provider_binary_sha256, and provider_trust_evidence")
+		}
+		if !canonicalSHA256RE.MatchString(execution.ProviderBinarySHA256) {
+			return Execution{}, verr.New("execution.provider_binary_sha256", "must be a canonical SHA-256 identity")
+		}
+		if strings.ContainsAny(execution.ProviderVersion+execution.ProviderTrustEvidence, "\x00\r\n") {
+			return Execution{}, verr.New("execution", "provider version and trust evidence must be single-line strings")
+		}
+	}
+	return execution, nil
+}
+
+func validProviderText(value string, maximum int) bool {
+	if value == "" || len(value) > maximum || strings.TrimSpace(value) != value {
+		return false
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return false
+		}
+	}
+	return true
 }
 
 func parseAudit(raw any) (Audit, error) {

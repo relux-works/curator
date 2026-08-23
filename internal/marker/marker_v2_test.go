@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/hashing"
 )
 
@@ -434,10 +435,12 @@ func compiledFixture(t *testing.T) compiledFixtureState {
 		Toolchain: buildmeta.Toolchain{Algorithm: buildmeta.ToolchainAlgorithm, GoRelpath: buildmeta.ToolchainGoRelpath, GoVersion: "go version go1.25.5 darwin/arm64", ContentSHA256: "sha256:" + strings.Repeat("c", 64)},
 		Policy:    buildmeta.FixedPolicy(),
 	}
-	key, err := input.CacheKey()
+	binding := closureexec.PortableAssuranceBinding()
+	assuredID, err := (closureexec.AssuredBuildCacheInput{BuildInput: input, Binding: binding}).ID()
 	if err != nil {
 		t.Fatal(err)
 	}
+	key := buildmeta.CacheKey(assuredID)
 	artifact := buildmeta.Artifact{Path: "bin/tool", SHA256: "sha256:" + strings.Repeat("d", 64), Size: 7}
 	receipt, err := buildmeta.NewReceipt(input, artifact)
 	if err != nil {
@@ -461,14 +464,15 @@ func compiledFixture(t *testing.T) compiledFixtureState {
 	if err := Write(installed, m); err != nil {
 		t.Fatal(err)
 	}
-	result := buildcache.Result{Status: buildcache.Hit, Receipt: receipt, ReceiptBytes: receiptBytes, ReceiptHash: receiptHash, ArtifactPath: filepath.Join(t.TempDir(), "bin", "tool")}
+	result := buildcache.Result{Status: buildcache.Hit, CacheKey: key, Receipt: receipt, ReceiptBytes: receiptBytes, ReceiptHash: receiptHash, ArtifactPath: filepath.Join(t.TempDir(), "bin", "tool")}
 	options := BuildCurrentness{
 		RawSnapshot:  func() (*buildsource.Token, error) { return buildsource.Validate(raw) },
 		Inputs:       map[string]buildmeta.Input{"tool": input},
+		Assurance:    binding,
 		ContextFiles: []string{"SKILL.md"}, RuntimeFiles: []string{},
 	}
 	options.InspectCache = func(_ string, expectation buildcache.Expectation) buildcache.Result {
-		if !reflect.DeepEqual(expectation.Input, input) || expectation.ReceiptHash != receiptHash {
+		if !reflect.DeepEqual(expectation.Input, input) || !reflect.DeepEqual(expectation.Assurance, binding) || expectation.ReceiptHash != receiptHash {
 			return buildcache.Result{Status: buildcache.Corrupt}
 		}
 		return result

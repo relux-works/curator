@@ -18,6 +18,87 @@ func writeConfig(t *testing.T, dir, name, text string) string {
 
 const minimal = `{"schema_version": 1, "skills_root": "/tmp/skills", "projects": {}}`
 
+func TestExecutionAssuranceDefaultsPortableAndVerifiedIsExplicit(t *testing.T) {
+	config, err := Parse(map[string]any{"schema_version": float64(1), "skills_root": "/tmp/skills", "projects": map[string]any{}}, "config.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Execution.Mode != "portable" || config.Execution.ProviderID != "" {
+		t.Fatalf("default execution = %+v", config.Execution)
+	}
+	verified := map[string]any{"mode": "verified", "provider_id": "host.provider", "provider_version": "1.0.0", "provider_binary_sha256": "sha256:" + strings.Repeat("a", 64), "provider_trust_evidence": "system-signature-policy-v1"}
+	config, err = Parse(map[string]any{"schema_version": float64(1), "skills_root": "/tmp/skills", "projects": map[string]any{}, "execution": verified}, "config.json")
+	if err != nil || config.Execution.Mode != "verified" || config.Execution.ProviderID != "host.provider" {
+		t.Fatalf("verified execution = %+v, %v", config.Execution, err)
+	}
+}
+
+func TestExecutionAssuranceRejectsUnknownAndAliasedSelection(t *testing.T) {
+	tests := []map[string]any{
+		{"mode": "hardened"},
+		{"mode": "verified"},
+		{"mode": "portable", "provider_id": "host.provider"},
+		{"mode": "verified", "provider_id": "host.provider", "fallback": "portable"},
+	}
+	for _, execution := range tests {
+		_, err := Parse(map[string]any{"schema_version": float64(1), "skills_root": "/tmp/skills", "projects": map[string]any{}, "execution": execution}, "config.json")
+		if err == nil {
+			t.Fatalf("invalid execution config accepted: %#v", execution)
+		}
+	}
+}
+
+func TestExecutionAssuranceRejectsMalformedProviderFieldsInEveryMode(t *testing.T) {
+	valid := map[string]any{
+		"mode": "verified", "provider_id": "host.provider", "provider_version": "1.0.0",
+		"provider_binary_sha256":  "sha256:" + strings.Repeat("a", 64),
+		"provider_trust_evidence": "system-signature-policy-v1",
+	}
+	tests := []struct {
+		name  string
+		field string
+		value any
+	}{
+		{name: "mode null", field: "mode", value: nil},
+		{name: "provider id null", field: "provider_id", value: nil},
+		{name: "provider id wrong type", field: "provider_id", value: float64(1)},
+		{name: "provider id open shape", field: "provider_id", value: "host/provider"},
+		{name: "version null", field: "provider_version", value: nil},
+		{name: "version wrong type", field: "provider_version", value: true},
+		{name: "version multiline", field: "provider_version", value: "1.0\nchanged"},
+		{name: "digest null", field: "provider_binary_sha256", value: nil},
+		{name: "digest wrong type", field: "provider_binary_sha256", value: float64(1)},
+		{name: "trust null", field: "provider_trust_evidence", value: nil},
+		{name: "trust wrong type", field: "provider_trust_evidence", value: []any{}},
+		{name: "trust whitespace", field: "provider_trust_evidence", value: " evidence "},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			execution := make(map[string]any, len(valid))
+			for key, value := range valid {
+				execution[key] = value
+			}
+			execution[testCase.field] = testCase.value
+			_, err := Parse(map[string]any{"schema_version": float64(1), "skills_root": "/tmp/skills", "projects": map[string]any{}, "execution": execution}, "config.json")
+			if err == nil {
+				t.Fatalf("malformed execution config accepted: %#v", execution)
+			}
+		})
+	}
+
+	for _, field := range []string{"provider_id", "provider_version", "provider_binary_sha256", "provider_trust_evidence"} {
+		t.Run("portable present malformed "+field, func(t *testing.T) {
+			_, err := Parse(map[string]any{
+				"schema_version": float64(1), "skills_root": "/tmp/skills", "projects": map[string]any{},
+				"execution": map[string]any{"mode": "portable", field: float64(1)},
+			}, "config.json")
+			if err == nil {
+				t.Fatalf("portable malformed %s was silently erased", field)
+			}
+		})
+	}
+}
+
 func TestParseMinimalDefaults(t *testing.T) {
 	cfg, err := Load(writeConfig(t, t.TempDir(), "config.json", minimal), nil)
 	if err != nil {

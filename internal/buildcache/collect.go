@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 )
 
 // DefaultGrace is Curator's documented build-cache grace period. An
@@ -225,13 +226,22 @@ func (store *Store) inspectUnexpected(root *sweepRoot, name string, key buildmet
 	if err != nil {
 		return time.Time{}, Result{}, fmt.Errorf("invalid receipt: %w", err)
 	}
-	if receipt.CacheKey != key {
-		return time.Time{}, Result{}, fmt.Errorf("receipt cache key does not match the entry key")
+	executionBytes, err := readProtectedChild(opened.dir, ExecutionReceiptFilename)
+	if err != nil {
+		return time.Time{}, Result{}, err
+	}
+	execution, err := closureexec.DecodeBuildSessionReceipt(executionBytes)
+	if err != nil {
+		return time.Time{}, Result{}, fmt.Errorf("invalid execution receipt: %w", err)
+	}
+	assuredID, err := (closureexec.AssuredBuildCacheInput{BuildInput: receipt.Input, Binding: execution.Binding}).ID()
+	if err != nil || buildmeta.CacheKey(assuredID) != key {
+		return time.Time{}, Result{}, fmt.Errorf("assured cache input does not match the entry key")
 	}
 	if hook := beforeClassifyForTests; hook != nil {
 		hook()
 	}
-	return info.ModTime(), inspectProvenEntry(opened, entryPath, Expectation{Input: receipt.Input}, key), nil
+	return info.ModTime(), inspectProvenEntry(opened, entryPath, Expectation{Input: receipt.Input, Assurance: execution.Binding}, key), nil
 }
 
 func readProtectedChild(dir *os.File, name string) ([]byte, error) {

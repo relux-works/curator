@@ -12,24 +12,64 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/closureexec"
+	"github.com/relux-works/curator/internal/closuregraph"
 )
 
 type recordingGo struct {
-	events  *[]string
-	compile func(CompileRequest) error
+	events    *[]string
+	compile   func(CompileRequest) error
+	assurance closureexec.AssuranceBinding
 }
+
+func allowTestAssurance(context.Context) error { return nil }
 
 func (g recordingGo) Identity() ToolchainIdentity {
 	return ToolchainIdentity{ContentSHA256: "sha256:" + strings.Repeat("c", 64), GoVersion: "go version go1.26.1 test/arch", GoRelpath: "bin/go", GOOS: "test", GOARCH: "arch", Tuning: map[string]string{}}
 }
-func (g recordingGo) Compile(_ context.Context, request CompileRequest) ([]byte, error) {
+func (g recordingGo) BuildInput(request CompileRequest) (buildmeta.Input, error) {
+	token, err := buildsource.Validate(request.Root)
+	if err != nil {
+		return buildmeta.Input{}, err
+	}
+	defer func() { _ = token.Close() }()
+	identity := g.Identity()
+	input := buildmeta.Input{
+		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		BuildSource: token.Identity(), BuildRoot: "build", Command: request.Command, SourceDir: request.SourceDir,
+		Target:    buildmeta.Target{GOOS: identity.GOOS, GOARCH: identity.GOARCH, Tuning: identity.Tuning},
+		Toolchain: buildmeta.Toolchain{Algorithm: buildmeta.ToolchainAlgorithm, ContentSHA256: identity.ContentSHA256, GoVersion: identity.GoVersion, GoRelpath: identity.GoRelpath},
+		Policy:    buildmeta.FixedPolicy(),
+	}
+	return input, input.Validate()
+}
+func (g recordingGo) Compile(_ context.Context, request CompileRequest) (CompileResult, error) {
 	*g.events = append(*g.events, "compiler-call")
 	if g.compile != nil {
 		if err := g.compile(request); err != nil {
-			return nil, err
+			return CompileResult{}, err
 		}
 	}
-	return []byte("deterministic-artifact"), nil
+	artifact := []byte("deterministic-artifact")
+	input, err := g.BuildInput(request)
+	if err != nil {
+		return CompileResult{}, err
+	}
+	metadata := artifactMetadata(map[string]any{"command": request.Command, "target": map[string]any{"goos": g.Identity().GOOS}}, artifact)
+	binding := g.assurance
+	if binding.AssuranceMode == "" {
+		binding = closureexec.PortableAssuranceBinding()
+	}
+	var receipt closureexec.BuildSessionReceipt
+	if binding.AssuranceMode == closureexec.AssuranceVerified {
+		receipt, err = closureexec.NewVerifiedBuildSessionReceipt(binding, input, metadata, closuregraph.ID("sha256:"+strings.Repeat("e", 64)))
+	} else {
+		receipt, err = closureexec.NewPortableBuildSessionReceipt(input, metadata, nil)
+	}
+	return CompileResult{Artifact: artifact, ExecutionReceipt: receipt}, err
 }
 
 type recordingStore struct {
@@ -49,9 +89,9 @@ func (s recordingStore) LookupArtifact(key string, input map[string]any, mutate 
 	*s.events = append(*s.events, "cache-call")
 	return s.inner.LookupArtifact(key, input, mutate)
 }
-func (s recordingStore) StoreArtifact(key string, input map[string]any, command string, artifact []byte) ([]byte, error) {
+func (s recordingStore) StoreArtifact(key string, input map[string]any, command string, artifact, executionReceipt []byte) ([]byte, error) {
 	*s.events = append(*s.events, "artifact-store")
-	return s.inner.StoreArtifact(key, input, command, artifact)
+	return s.inner.StoreArtifact(key, input, command, artifact, executionReceipt)
 }
 
 func pipelineFixture(t *testing.T) (*Snapshot, DeclaredState, EffectiveState) {
@@ -111,7 +151,7 @@ func TestExternalPipelineOrderingAcrossOperations(t *testing.T) {
 		t.Run(string(operation), func(t *testing.T) {
 			events := []string{}
 			store := recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events}
-			request := PipelineRequest{Operation: operation, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events}, Trace: func(phase string) { events = append(events, phase) }}
+			request := PipelineRequest{Operation: operation, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events}, Trace: func(phase string) { events = append(events, phase) }}
 			request.Acquire = func(context.Context) (*Snapshot, error) {
 				events = append(events, "acquire-call")
 				return cloneSnapshot(snapshot), nil
@@ -150,6 +190,39 @@ func TestExternalPipelineOrderingAcrossOperations(t *testing.T) {
 	}
 }
 
+func TestExternalPipelineAssuranceDriftPreventsCacheLookupAndCompile(t *testing.T) {
+	snapshot, declared, effective := pipelineFixture(t)
+	events := []string{}
+	binding := testVerifiedBinding("fixture.provider", 'a', 'b')
+	assuranceChecks := 0
+	request := PipelineRequest{
+		Operation: OperationInstall, Assurance: binding,
+		AssuranceCheck: func(context.Context) error {
+			assuranceChecks++
+			if assuranceChecks == 1 {
+				return nil
+			}
+			return errors.New("verified_provider_unavailable: provider drifted")
+		},
+		Command: "tool", Target: "tool", Declared: declared, Effective: effective,
+		Store:   recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events},
+		Go:      recordingGo{events: &events, assurance: binding},
+		Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil },
+		Audit:   func(context.Context, AuditSubject) error { return nil },
+	}
+	if _, err := RunPipeline(t.Context(), request); err == nil || !strings.Contains(err.Error(), "verified_provider_unavailable") {
+		t.Fatalf("assurance drift error = %v", err)
+	}
+	if assuranceChecks != 2 || !contains(events, "snapshot-store") {
+		t.Fatalf("assurance checks=%d events=%v; want drift immediately before cache lookup", assuranceChecks, events)
+	}
+	for _, forbidden := range []string{"cache-call", "compiler-call", "artifact-store"} {
+		if contains(events, forbidden) {
+			t.Fatalf("assurance drift crossed %s: %v", forbidden, events)
+		}
+	}
+}
+
 func TestExternalPipelineCacheHitRepeatsAdmissionValidationAndAudit(t *testing.T) {
 	snapshot, declared, effective := pipelineFixture(t)
 	events := []string{}
@@ -157,7 +230,7 @@ func TestExternalPipelineCacheHitRepeatsAdmissionValidationAndAudit(t *testing.T
 	compiles, audits, acquires := 0, 0, 0
 	goSession := recordingGo{events: &events, compile: func(CompileRequest) error { compiles++; return nil }}
 	run := func() PipelineResult {
-		request := PipelineRequest{Operation: OperationInstall, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: goSession, Trace: func(p string) { events = append(events, p) }, Acquire: func(context.Context) (*Snapshot, error) { acquires++; return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { audits++; events = append(events, "audit-call"); return nil }}
+		request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: goSession, Trace: func(p string) { events = append(events, p) }, Acquire: func(context.Context) (*Snapshot, error) { acquires++; return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { audits++; events = append(events, "audit-call"); return nil }}
 		result, err := RunPipeline(context.Background(), request)
 		if err != nil {
 			t.Fatal(err)
@@ -175,6 +248,136 @@ func TestExternalPipelineCacheHitRepeatsAdmissionValidationAndAudit(t *testing.T
 		t.Fatalf("acquire=%d audit=%d compile=%d", acquires, audits, compiles)
 	}
 	assertBefore(t, events, "audit-call", "cache-call")
+}
+
+func TestExternalProtectedCacheSeparatesAssuranceModeProviderAndCapability(t *testing.T) {
+	snapshot, declared, effective := pipelineFixture(t)
+	events := []string{}
+	store := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}
+	base := PipelineRequest{
+		Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective,
+		Store: store, Go: recordingGo{events: &events},
+		Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil },
+		Audit:   func(context.Context, AuditSubject) error { return nil },
+	}
+	portable, err := RunPipeline(t.Context(), base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verified := base
+	verified.Assurance = testVerifiedBinding("fixture.provider", 'a', 'b')
+	verified.Go = recordingGo{events: &events, assurance: verified.Assurance}
+	verifiedResult, err := RunPipeline(t.Context(), verified)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verifiedResult.State == "cache-hit" || verifiedResult.CacheKey == portable.CacheKey {
+		t.Fatalf("portable entry satisfied verified lookup: portable=%+v verified=%+v", portable, verifiedResult)
+	}
+	for name, change := range map[string]func(*closureexec.AssuranceBinding){
+		"provider": func(value *closureexec.AssuranceBinding) {
+			identity := *value.Provider
+			identity.ProviderID = "other.provider"
+			value.Provider = &identity
+		},
+		"capability": func(value *closureexec.AssuranceBinding) {
+			id := closuregraph.ID("sha256:" + strings.Repeat("c", 64))
+			value.CapabilityReceiptID = &id
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			drifted := verified
+			drifted.Operation = OperationDryRun
+			drifted.Assurance = verified.Assurance
+			change(&drifted.Assurance)
+			drifted.Go = recordingGo{events: &events, assurance: drifted.Assurance}
+			result, err := RunPipeline(t.Context(), drifted)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.State == "cache-hit" || result.CacheKey == verifiedResult.CacheKey {
+				t.Fatalf("%s drift adopted verified cache: %+v", name, result)
+			}
+		})
+	}
+}
+
+func TestExternalProtectedCacheDoesNotAdoptLegacyAssuranceBlindEntry(t *testing.T) {
+	snapshot, declared, effective := pipelineFixture(t)
+	events := []string{}
+	store := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}
+	goSession := recordingGo{events: &events}
+	request := PipelineRequest{
+		Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance,
+		Command: "tool", Target: "tool", Declared: declared, Effective: effective,
+		Store: store, Go: goSession,
+		Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil },
+		Audit:   func(context.Context, AuditSubject) error { return nil },
+	}
+	target := Target{BuildRoot: "tools", SourceDir: "tools/cmd/tool"}
+	legacyInput := receiptInput(request, target, snapshot.Digest, goSession.Identity())
+	delete(legacyInput, "assurance")
+	legacyKey, err := cacheKey(legacyInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyArtifact := []byte("legacy artifact")
+	if _, err := store.StoreArtifact(legacyKey, legacyInput, "tool", legacyArtifact, testExecutionReceiptBytes(t, legacyInput, legacyArtifact)); err != nil {
+		t.Fatal(err)
+	}
+	result, err := RunPipeline(t.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.State == "cache-hit" || result.CacheKey == legacyKey {
+		t.Fatalf("legacy assurance-blind entry was adopted: %+v", result)
+	}
+}
+
+func testVerifiedBinding(providerID string, providerSeed, capabilitySeed byte) closureexec.AssuranceBinding {
+	contract := closureexec.VerifiedProviderContractID
+	provider := closureexec.ProviderIdentity{
+		Contract: contract, ProviderID: providerID, Version: "1.0.0",
+		BinarySHA256: closuregraph.ID("sha256:" + strings.Repeat(string(providerSeed), 64)), TrustEvidence: "fixture-trust-v1",
+	}
+	capability := closuregraph.ID("sha256:" + strings.Repeat(string(capabilitySeed), 64))
+	capabilities := []closureexec.CapabilityEvidence{
+		{CapabilityID: "total-network-denial-v1", Status: "established"},
+		{CapabilityID: "read-only-source-and-toolchain-v1", Status: "established"},
+		{CapabilityID: "exact-executable-allowlisting-v1", Status: "established"},
+		{CapabilityID: "private-build-root-only-writes-v1", Status: "established"},
+		{CapabilityID: "hard-aggregate-descendant-resource-bounds-v1", Status: "established"},
+		{CapabilityID: "fail-closed-capability-preflight-v1", Status: "established"},
+	}
+	return closureexec.AssuranceBinding{
+		AssuranceMode: closureexec.AssuranceVerified, PolicyID: closureexec.VerifiedPolicyID,
+		ExecutionPolicyID: closureexec.VerifiedExecutionPolicyID, ProviderContract: &contract,
+		Provider: &provider, CapabilityReceiptID: &capability, ActualCapabilities: capabilities,
+	}
+}
+
+func testExecutionReceiptBytes(t *testing.T, input map[string]any, artifact []byte) []byte {
+	t.Helper()
+	command, _ := input["command"].(string)
+	target, _ := input["target"].(map[string]any)
+	goos, _ := target["goos"].(string)
+	buildInput := buildmeta.Input{
+		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		BuildSource: buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: "sha256:" + strings.Repeat("b", 64)},
+		BuildRoot:   "build", Command: command, SourceDir: "build",
+		Target:    buildmeta.Target{GOOS: goos, GOARCH: "amd64", Tuning: map[string]string{"GOAMD64": "v1"}},
+		Toolchain: buildmeta.Toolchain{Algorithm: buildmeta.ToolchainAlgorithm, ContentSHA256: "sha256:" + strings.Repeat("c", 64), GoVersion: "go version go1.26.1 test/arch", GoRelpath: "bin/go"},
+		Policy:    buildmeta.FixedPolicy(),
+	}
+	receipt, err := closureexec.NewPortableBuildSessionReceipt(buildInput, artifactMetadata(input, artifact), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload, err := receipt.CanonicalBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return payload
 }
 
 func TestExternalPipelineOfflineProtectedSnapshotAndTagFailure(t *testing.T) {
@@ -195,7 +398,7 @@ func TestExternalPipelineOfflineProtectedSnapshotAndTagFailure(t *testing.T) {
 				d.Tag = "v1.0.0"
 			}
 			events := []string{}
-			request := PipelineRequest{Operation: OperationInstall, Command: "tool", Target: "tool", Declared: d, Effective: effective, OfflineSnapshotKey: key, Store: recordingStore{inner: disk, events: &events}, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return nil, errors.New("offline") }, Audit: func(context.Context, AuditSubject) error { events = append(events, "audit-call"); return nil }, Trace: func(p string) { events = append(events, p) }}
+			request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: d, Effective: effective, OfflineSnapshotKey: key, Store: recordingStore{inner: disk, events: &events}, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return nil, errors.New("offline") }, Audit: func(context.Context, AuditSubject) error { events = append(events, "audit-call"); return nil }, Trace: func(p string) { events = append(events, p) }}
 			result, runErr := RunPipeline(context.Background(), request)
 			if tagged {
 				if ErrorCode(runErr) != CodeSourceUnavailable || contains(events, "audit-call") {
@@ -218,40 +421,43 @@ func TestExternalPipelineCompilerSeesOnlySelectedBuildRoot(t *testing.T) {
 	snapshot, declared, effective := pipelineFixture(t)
 	events := []string{}
 	session := recordingGo{events: &events, compile: func(request CompileRequest) error {
-		if request.SourceDir != "cmd/tool" {
+		if request.SourceDir != "build/cmd/tool" {
 			return errors.New("wrong relative source dir")
 		}
 		if _, err := os.Stat(filepath.Join(request.Root, "outside-secret.txt")); !os.IsNotExist(err) {
 			return errors.New("outside snapshot file is compiler-visible")
 		}
-		if _, err := os.Stat(filepath.Join(request.Root, "go.mod")); err != nil {
+		if _, err := os.Stat(filepath.Join(request.Root, "build", "go.mod")); err != nil {
 			return err
 		}
 		return nil
 	}}
-	_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, Go: session, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }})
+	_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, Go: session, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }})
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestProtectedArtifactCorruptionQuarantinesAndRebuilds(t *testing.T) {
-	for _, kind := range []string{"receipt", "artifact"} {
+	for _, kind := range []string{"receipt", "execution-receipt", "artifact"} {
 		t.Run(kind, func(t *testing.T) {
 			snapshot, declared, effective := pipelineFixture(t)
 			root := filepath.Join(t.TempDir(), "cache")
 			store := &DiskProtectedStore{Root: root}
 			events := []string{}
 			compiles := 0
-			request := PipelineRequest{Operation: OperationInstall, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events, compile: func(CompileRequest) error { compiles++; return nil }}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
+			request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events, compile: func(CompileRequest) error { compiles++; return nil }}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
 			first, err := RunPipeline(context.Background(), request)
 			if err != nil {
 				t.Fatal(err)
 			}
 			entry := filepath.Join(root, "artifacts", strings.TrimPrefix(first.CacheKey, "sha256:"))
 			name := "artifact"
-			if kind == "receipt" {
+			switch kind {
+			case "receipt":
 				name = "receipt.json"
+			case "execution-receipt":
+				name = "execution-receipt.ccj.json"
 			}
 			if err = os.WriteFile(filepath.Join(entry, name), []byte("corrupt"), 0o600); err != nil {
 				t.Fatal(err)
@@ -284,7 +490,7 @@ func TestProtectedSnapshotCorruptionQuarantinesBeforeAudit(t *testing.T) {
 		t.Fatal(err)
 	}
 	audited := false
-	_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Command: "tool", Target: "tool", Declared: declared, Effective: effective, OfflineSnapshotKey: key, Store: store, Go: recordingGo{events: &[]string{}}, Acquire: func(context.Context) (*Snapshot, error) { return nil, errors.New("offline") }, Audit: func(context.Context, AuditSubject) error { audited = true; return nil }})
+	_, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, OfflineSnapshotKey: key, Store: store, Go: recordingGo{events: &[]string{}}, Acquire: func(context.Context) (*Snapshot, error) { return nil, errors.New("offline") }, Audit: func(context.Context, AuditSubject) error { audited = true; return nil }})
 	if ErrorCode(err) != CodeSourceUnavailable || audited {
 		t.Fatalf("err=%v audited=%v", err, audited)
 	}
@@ -297,7 +503,7 @@ func TestProtectedSnapshotCorruptionQuarantinesBeforeAudit(t *testing.T) {
 func TestSubstitutionCannotAliasDeclaredCacheKey(t *testing.T) {
 	snapshot, declared, effective := pipelineFixture(t)
 	events := []string{}
-	base := PipelineRequest{Operation: OperationDryRun, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
+	base := PipelineRequest{Operation: OperationDryRun, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
 	plain, err := RunPipeline(context.Background(), base)
 	if err != nil {
 		t.Fatal(err)
@@ -319,14 +525,14 @@ func TestSubstitutionCannotAliasDeclaredCacheKey(t *testing.T) {
 }
 
 func TestExternalReceiptV2CacheKeyVector(t *testing.T) {
-	request := PipelineRequest{Command: "golden-tool", Target: "golden-tool", Declared: DeclaredState{Repository: "golden-tools", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.4.0"}, Effective: EffectiveState{IdentityKind: "network-git", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567"}}
+	request := PipelineRequest{Assurance: closureexec.PortableAssuranceBinding(), Command: "golden-tool", Target: "golden-tool", Declared: DeclaredState{Repository: "golden-tools", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.4.0"}, Effective: EffectiveState{IdentityKind: "network-git", Identity: "github.com/example/golden-tools", Transport: "https", ObjectFormat: "sha1", Commit: "0123456789abcdef0123456789abcdef01234567"}}
 	target := Target{BuildRoot: ".", SourceDir: "cmd/golden-tool"}
 	tool := ToolchainIdentity{ContentSHA256: "sha256:" + strings.Repeat("c", 64), GoVersion: "go version go1.26.1 darwin/arm64", GoRelpath: "bin/go", GOOS: "darwin", GOARCH: "arm64", Tuning: map[string]string{"GOARM64": "v8.0"}}
 	key, err := cacheKey(receiptInput(request, target, "sha256:"+strings.Repeat("b", 64), tool))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if key != "sha256:4abc903bde7d8d9f65d32fd276f37dadccc88eb28bbaf693106dcebc4a19107a" {
+	if key != "sha256:6ca1b6b00f0ab343901daa1c90ee78ed417b3a258efeff706b41210dd702dbf2" {
 		t.Fatalf("cache key=%s", key)
 	}
 }
@@ -336,7 +542,7 @@ func TestDryRunCorruptionIsReportedWithoutMutation(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "cache")
 	store := &DiskProtectedStore{Root: root}
 	events := []string{}
-	base := PipelineRequest{Operation: OperationInstall, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
+	base := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
 	first, err := RunPipeline(context.Background(), base)
 	if err != nil {
 		t.Fatal(err)
@@ -363,7 +569,7 @@ func TestDryRunDoesNotCreateProtectedRoot(t *testing.T) {
 	parent := t.TempDir()
 	root := filepath.Join(parent, "absent-cache")
 	events := []string{}
-	result, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationDryRun, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: &DiskProtectedStore{Root: root}, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }})
+	result, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationDryRun, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: &DiskProtectedStore{Root: root}, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,7 +614,7 @@ func TestPipelineFailuresStopBeforeCacheAndCompiler(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			events := []string{}
 			value := cloneSnapshot(snapshot)
-			request := PipelineRequest{Operation: OperationInstall, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events}, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return value, nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
+			request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: recordingStore{inner: &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}, events: &events}, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return value, nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
 			testCase.alter(&request, value)
 			_, err := RunPipeline(context.Background(), request)
 			if ErrorCode(err) != testCase.code {
@@ -450,7 +656,7 @@ func TestExternalGCUsesMarkerAndJournalKeysAsOnlyRoots(t *testing.T) {
 	store := &DiskProtectedStore{Root: root}
 	events := []string{}
 	build := func(command string) PipelineResult {
-		result, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Command: command, Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }})
+		result, err := RunPipeline(context.Background(), PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: command, Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -479,7 +685,7 @@ func TestProtectedArtifactHardLinkAndBoundaryFailClosed(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "cache")
 	store := &DiskProtectedStore{Root: root}
 	events := []string{}
-	request := PipelineRequest{Operation: OperationInstall, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
+	request := PipelineRequest{Operation: OperationInstall, Assurance: closureexec.PortableAssuranceBinding(), AssuranceCheck: allowTestAssurance, Command: "tool", Target: "tool", Declared: declared, Effective: effective, Store: store, Go: recordingGo{events: &events}, Acquire: func(context.Context) (*Snapshot, error) { return cloneSnapshot(snapshot), nil }, Audit: func(context.Context, AuditSubject) error { return nil }}
 	first, err := RunPipeline(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)

@@ -33,14 +33,11 @@ func publishTestEntry(t *testing.T, store *Store, command, artifact string) buil
 	t.Helper()
 	input := testInput(command)
 	publication, _ := testPublication(t, store.Home(), input, []byte(artifact))
-	if _, err := store.Publish(publication, testHomeLock{}); err != nil {
-		t.Fatal(err)
-	}
-	key, err := input.CacheKey()
+	result, err := store.Publish(publication, testHomeLock{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return key
+	return result.CacheKey
 }
 
 func cacheRoot(store *Store) string {
@@ -236,7 +233,7 @@ func TestSweepRetainsUnprovableEntries(t *testing.T) {
 				other, _ := testPublication(t, store.Home(), testInput("other-tool"), []byte("other artifact"))
 				writeFile(t, filepath.Join(entryPath, ReceiptFilename), other.ReceiptBytes, 0o600)
 			},
-			warning: "receipt cache key does not match",
+			warning: "assured cache input does not match",
 		},
 	}
 	for _, test := range tests {

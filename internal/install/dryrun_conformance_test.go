@@ -24,6 +24,12 @@ type authoritativeDryRunCase struct {
 	Name                       string   `json:"name"`
 	Scope                      string   `json:"scope"`
 	ForbiddenPersistentEffects []string `json:"forbidden_persistent_effects"`
+	LogicalCacheKey            string   `json:"logical_cache_key"`
+	AllowedGoCommands          []string `json:"allowed_go_commands"`
+	ForbiddenGoCommands        []string `json:"forbidden_go_commands"`
+	ReportedBuildOutcomes      []string `json:"reported_build_outcomes"`
+	OperationPrivateStateAfter string   `json:"operation_private_state_after"`
+	ArtifactExecuted           bool     `json:"artifact_executed"`
 }
 
 func authoritativeDryRunCases(t *testing.T) []authoritativeDryRunCase {
@@ -163,12 +169,15 @@ func (baseline *dryRunBaseline) declareBoth(t *testing.T, root string) {
 // published forbidden effect individually. An effect with no binding fails the
 // test rather than passing unasserted.
 func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
-	t.Parallel()
 	for _, published := range authoritativeDryRunCases(t) {
 		published := published
 		t.Run(published.Name, func(t *testing.T) {
 			if len(published.ForbiddenPersistentEffects) == 0 {
 				t.Fatalf("published dry-run case %q forbids nothing", published.Name)
+			}
+			if published.Scope == "multi-project" {
+				runAuthoritativeCompiledDryRun(t, published)
+				return
 			}
 			baseline := armedDryRunEnv(t)
 			e := baseline.env
@@ -212,6 +221,107 @@ func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
 				baseline.assertNoEffect(t, effect)
 			}
 		})
+	}
+}
+
+// runAuthoritativeCompiledDryRun is the rc.8 compatibility mapping for the
+// compiled multi-project dry-run contract. The published logical key remains
+// the build receipt identity; Curator's protected cache address is separately
+// assurance-bound and must not replace it.
+func runAuthoritativeCompiledDryRun(t *testing.T, published authoritativeDryRunCase) {
+	t.Helper()
+	if published.Name != "compiled-cache-miss-is-read-only" || published.OperationPrivateStateAfter != "absent" || published.ArtifactExecuted {
+		t.Fatalf("unknown compiled dry-run contract: %+v", published)
+	}
+	if !sameStrings(published.AllowedGoCommands, []string{"telemetry-off", "version", "env"}) || !sameStrings(published.ForbiddenGoCommands, []string{"list", "build"}) {
+		t.Fatalf("compiled dry-run Go command contract drifted: allowed=%v forbidden=%v", published.AllowedGoCommands, published.ForbiddenGoCommands)
+	}
+	for _, effect := range published.ForbiddenPersistentEffects {
+		if !compiledDryRunEffectCovered(effect) {
+			t.Fatalf("published compiled dry-run effect %q has no executable assertion", effect)
+		}
+	}
+	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
+	expectedKeyBytes, err := os.ReadFile(filepath.Join(root, "expected", "build-driver", "cache-key.txt")) // #nosec G304 -- fixed path below the explicit conformance root
+	if err != nil {
+		t.Fatalf("read published build-driver cache key: %v", err)
+	}
+	expectedKey := strings.TrimSpace(string(expectedKeyBytes))
+	if published.LogicalCacheKey != expectedKey {
+		t.Fatalf("manager lifecycle logical cache key = %q, want build-driver identity %q", published.LogicalCacheKey, expectedKey)
+	}
+
+	e := newEnv(t)
+	e.buildSkill("build-skill", "alpha")
+	e.declare("build-skill")
+	base := isolateTempDir(t)
+	deps, toolchain, _, builder := newFakeDeps(t)
+	before := captureLiveState(t, e)
+
+	result := e.install(Options{DryRun: true, Build: deps})
+	if result.Status != "ok" || len(result.Builds) != 1 {
+		t.Fatalf("compiled dry run did not produce one plan: %+v", result)
+	}
+	planned := result.Builds[0]
+	if !validPublishedSHA256(published.LogicalCacheKey) || !validPublishedSHA256(string(planned.logicalKey)) || !validPublishedSHA256(string(planned.CacheKey())) {
+		t.Fatalf("invalid published, logical, or protected identity: published=%q logical=%q protected=%q", published.LogicalCacheKey, planned.logicalKey, planned.CacheKey())
+	}
+	if planned.logicalKey == planned.CacheKey() {
+		t.Fatal("assurance-bound protected cache address aliases the preserved logical receipt key")
+	}
+	if !containsString(published.ReportedBuildOutcomes, string(planned.Outcome())) {
+		t.Fatalf("dry-run outcome %q is not published in %v", planned.Outcome(), published.ReportedBuildOutcomes)
+	}
+	if toolchain.probes != 1 || toolchain.establishes != 0 || len(builder.calls) != 0 {
+		t.Fatalf("dry-run commands: probes=%d sessions=%d builds=%v", toolchain.probes, toolchain.establishes, builder.calls)
+	}
+	if planned.ArtifactPath() != "" {
+		t.Fatalf("dry run exposed an executable artifact: %s", planned.ArtifactPath())
+	}
+	requireTempDirEmpty(t, base, "the authoritative compiled dry run")
+	before.requireUnchanged(t, e, "the authoritative compiled dry run")
+	requireNoLocks(t, e.home)
+	requireNoLocks(t, e.project)
+}
+
+func sameStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func validPublishedSHA256(value string) bool {
+	if len(value) != len("sha256:")+64 || !strings.HasPrefix(value, "sha256:") {
+		return false
+	}
+	for _, char := range value[len("sha256:"):] {
+		if char < '0' || char > '9' {
+			if char < 'a' || char > 'f' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func compiledDryRunEffectCovered(effect string) bool {
+	switch effect {
+	case "source-checkout", "snapshot-cache", "response-cache", "toolchain-probe-memo",
+		"module-cache", "go-build-cache", "compiled-artifact-cache", "audit-state",
+		"registry-state", "revocation-state", "configuration", "project-lock",
+		"cache-build-lock", "manager-home-lock", "journal", "backup", "quarantine",
+		"permission-repair", "context-tree", "runtime-tree", "environment-file",
+		"install-marker", "command-shim", "adapter-ledger", "adapter-mirror",
+		"consumer-ledger", "gc-metadata":
+		return true
+	default:
+		return false
 	}
 }
 

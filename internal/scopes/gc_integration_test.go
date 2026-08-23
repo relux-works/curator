@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/marker"
 )
 
@@ -144,18 +145,15 @@ func backdateEntry(t *testing.T, home string, key buildmeta.CacheKey, age time.D
 func publishRealEntry(t *testing.T, store *buildcache.Store, command, artifact string) buildmeta.CacheKey {
 	t.Helper()
 	input := realBuildInput(command)
-	key, err := input.CacheKey()
-	if err != nil {
-		t.Fatal(err)
-	}
 	artifactPath, err := buildmeta.ArtifactPath(command, input.Target.GOOS)
 	if err != nil {
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256([]byte(artifact))
-	receipt, err := buildmeta.NewReceipt(input, buildmeta.Artifact{
+	artifactRecord := buildmeta.Artifact{
 		Path: artifactPath, SHA256: "sha256:" + hex.EncodeToString(digest[:]), Size: int64(len(artifact)),
-	})
+	}
+	receipt, err := buildmeta.NewReceipt(input, artifactRecord)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,8 +169,13 @@ func publishRealEntry(t *testing.T, store *buildcache.Store, command, artifact s
 	if err := os.WriteFile(source, []byte(artifact), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	executionReceipt, err := closureexec.NewPortableBuildSessionReceipt(input, artifactRecord, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	published, err := store.Publish(buildcache.Publication{
-		Input: input, ReceiptBytes: receiptBytes, ArtifactSource: source,
+		Input: input, ReceiptBytes: receiptBytes, Assurance: closureexec.PortableAssuranceBinding(),
+		ExecutionReceipt: executionReceipt, ArtifactSource: source,
 	}, testHomeLock{})
 	if err != nil {
 		t.Skipf("this platform cannot publish a protected cache entry: %v", err)
@@ -180,7 +183,7 @@ func publishRealEntry(t *testing.T, store *buildcache.Store, command, artifact s
 	if published.ArtifactPath == "" {
 		t.Fatalf("publication = %+v", published)
 	}
-	return key
+	return published.CacheKey
 }
 
 func realBuildInput(command string) buildmeta.Input {

@@ -233,6 +233,13 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.failf("%v", err)
 		return result, nil
 	}
+	if !opts.DryRun {
+		commit, err = bindCommitPublisher(deps.Assurance, commit)
+		if err != nil {
+			result.failf("%v", err)
+			return result, nil
+		}
+	}
 
 	skillsDir := filepath.Join(GlobalRoot(home), "skills")
 	binDir := filepath.Join(GlobalRoot(home), "bin")
@@ -275,7 +282,7 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.failBuild(planErr)
 		return result, nil
 	}
-	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, deps.Toolchain, opts.External, opts.DryRun)
+	externalPlan, externalPlanErr := planExternalBuilds(opts.context(), "global", "global", home, nodes, nil, deps.Toolchain, opts.External, deps.Assurance, opts.DryRun)
 	if externalPlanErr != nil {
 		result.failBuild(externalPlanErr)
 		return result, nil

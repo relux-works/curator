@@ -33,6 +33,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
+	"github.com/relux-works/curator/internal/rustsource"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/shell"
 	"github.com/relux-works/curator/internal/skillcheck"
@@ -76,6 +77,9 @@ Commands:
 `
 
 func main() {
+	if handled, code := rustsource.DispatchInternalWorker(os.Args[1:], os.Stdin, os.Stdout); handled {
+		os.Exit(code)
+	}
 	// The fixed hidden go-v1 build worker is an implementation boundary, not a
 	// user-visible command surface. It is dispatched before any other parsing,
 	// requires exactly this one manager-owned argument, and is never reachable
@@ -512,6 +516,12 @@ func cmdInstallMode(args []string, fetch bool) int {
 		cfgCopy.Audit.Mode = auditMode
 		cfg = &cfgCopy
 	}
+	authority, err := preflightCLIExecution(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	opts.Build.Assurance = authority
 	targets, targetErr := selectProjectTargets(cfg, rest, all)
 	if targetErr != nil {
 		fmt.Fprintln(os.Stderr, "curator:", targetErr)
@@ -613,6 +623,11 @@ func cmdStatus(args []string) int {
 	if code != exitOK {
 		return code
 	}
+	authority, err := preflightCLIExecution(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
 	targets, targetErr := selectProjectTargets(cfg, positional, *all)
 	if targetErr != nil {
 		fmt.Fprintln(os.Stderr, "curator:", targetErr)
@@ -637,7 +652,7 @@ func cmdStatus(args []string) int {
 		// verdict from a plan that was already stale.
 		scope := projectStatusScope(cfg, target.Root, target.Alias)
 		before := markerDigests(scope.stores...)
-		result := install.Project(cfg, target.Root, target.Alias, install.Options{DryRun: true, External: productionExternalDeps(cfg, true)})
+		result := install.Project(cfg, target.Root, target.Alias, install.Options{DryRun: true, Build: install.BuildDeps{Assurance: authority}, External: productionExternalDeps(cfg, true)})
 		if result.Status == "failed" {
 			// A read-only plan that refused, yet still described every compiled
 			// command it was asked about, has produced a currentness verdict — and
@@ -1152,7 +1167,14 @@ func cmdGlobalStatus(cfg *config.Config, args []string) int {
 	if code != exitOK {
 		return code
 	}
-	return reportGlobalStatus(cfg, opts, globalStatusPlan)
+	authority, err := preflightCLIExecution(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	return reportGlobalStatus(cfg, opts, func(cfg *config.Config) (install.Result, bool) {
+		return globalStatusPlanWithAuthority(cfg, authority)
+	})
 }
 
 // globalStatusOptions is the parsed request of one `curator global status`
@@ -1245,6 +1267,10 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
 // fail-closed input of `--check`. A scope with no machine-wide Skillfile is not
 // unprovable: it declares nothing and activates nothing.
 func globalStatusPlan(cfg *config.Config) (install.Result, bool) {
+	return globalStatusPlanWithAuthority(cfg, install.NewPortableBuildAuthority())
+}
+
+func globalStatusPlanWithAuthority(cfg *config.Config, authority *install.BuildAuthority) (install.Result, bool) {
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home()), Status: "failed"}
@@ -1252,7 +1278,7 @@ func globalStatusPlan(cfg *config.Config) (install.Result, bool) {
 			"could not resolve the user home the machine-wide scope mirrors into: %v", err))
 		return result, true
 	}
-	result := install.Global(cfg, userHome, install.Options{DryRun: true, External: productionExternalDeps(cfg, true)})
+	result := install.Global(cfg, userHome, install.Options{DryRun: true, Build: install.BuildDeps{Assurance: authority}, External: productionExternalDeps(cfg, true)})
 	return result, result.Status == "failed" && !result.BuildsComplete
 }
 
@@ -1276,6 +1302,12 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 		cfgCopy.Audit.Mode = auditMode
 		cfg = &cfgCopy
 	}
+	authority, err := preflightCLIExecution(context.Background(), cfg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	opts.Build.Assurance = authority
 	opts.Fetch = fetch && !opts.DryRun
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)

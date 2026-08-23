@@ -5,18 +5,20 @@ import (
 	"fmt"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 )
 
 // StagedBuild is one privately staged build output. Path stays inside the
 // operation-private session root: nothing here is published to the protected
 // cache, an install marker, a runtime target, or a shim.
 type StagedBuild struct {
-	skill    string
-	command  string
-	key      buildmeta.CacheKey
-	path     string
-	receipt  buildmeta.Receipt
-	artifact buildmeta.Artifact
+	skill            string
+	command          string
+	key              buildmeta.CacheKey
+	path             string
+	receipt          buildmeta.Receipt
+	executionReceipt closureexec.BuildSessionReceipt
+	artifact         buildmeta.Artifact
 }
 
 // Skill is the closure node that declared the command.
@@ -33,6 +35,12 @@ func (staged StagedBuild) Path() string { return staged.path }
 
 // Receipt is the complete CCJ-1 receipt for the staged output.
 func (staged StagedBuild) Receipt() buildmeta.Receipt { return staged.receipt }
+
+// ExecutionReceipt is the exact portable or verified build-session evidence
+// required before protected publication.
+func (staged StagedBuild) ExecutionReceipt() closureexec.BuildSessionReceipt {
+	return staged.executionReceipt
+}
 
 // Artifact is the verified artifact metadata of the staged output.
 func (staged StagedBuild) Artifact() buildmeta.Artifact { return staged.artifact }
@@ -114,17 +122,18 @@ func stageBuilds(ctx context.Context, plan BuildPlan, deps BuildDeps) (Staged, e
 		if err != nil {
 			return Staged{}, fmt.Errorf("%s.%s: %w", build.skill, build.command, err)
 		}
-		if receipt.CacheKey != build.key {
-			return Staged{}, fmt.Errorf("%s.%s: staged receipt key %s does not match the planned key %s",
-				build.skill, build.command, receipt.CacheKey, build.key)
+		if receipt.CacheKey != build.logicalKey {
+			return Staged{}, fmt.Errorf("%s.%s: staged receipt input key %s does not match the planned input key %s",
+				build.skill, build.command, receipt.CacheKey, build.logicalKey)
 		}
 		staged.builds = append(staged.builds, StagedBuild{
-			skill:    build.skill,
-			command:  build.command,
-			key:      build.key,
-			path:     artifact.Path,
-			receipt:  receipt,
-			artifact: artifact.Metadata,
+			skill:            build.skill,
+			command:          build.command,
+			key:              build.key,
+			path:             artifact.Path,
+			receipt:          receipt,
+			executionReceipt: artifact.ExecutionReceipt,
+			artifact:         artifact.Metadata,
 		})
 	}
 	if err := plan.Verify(ctx); err != nil {

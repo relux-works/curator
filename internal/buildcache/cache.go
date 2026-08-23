@@ -16,13 +16,17 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 )
 
 const (
 	// ReceiptFilename is deliberately Curator-local. It is not part of the
 	// portable receipt schema or logical cache identity.
 	ReceiptFilename = "curator-receipt.ccj.json"
-	maxReceiptBytes = 1 << 20
+	// ExecutionReceiptFilename binds the protected entry to the exact assurance
+	// strategy and compiler-session evidence that authorized publication.
+	ExecutionReceiptFilename = "curator-execution-receipt.ccj.json"
+	maxReceiptBytes          = 1 << 20
 )
 
 // Status is the reusable-cache outcome. Every non-Hit value fails closed.
@@ -43,17 +47,20 @@ const (
 type Expectation struct {
 	Input       buildmeta.Input
 	ReceiptHash buildmeta.ReceiptHash
+	Assurance   closureexec.AssuranceBinding
 }
 
 // Result describes a read-only cache inspection. ArtifactPath is returned only
 // for a protected, exact Hit and is never executed by this package.
 type Result struct {
-	Status       Status
-	Reason       string
-	Receipt      buildmeta.Receipt
-	ReceiptBytes []byte
-	ReceiptHash  buildmeta.ReceiptHash
-	ArtifactPath string
+	Status           Status
+	Reason           string
+	Receipt          buildmeta.Receipt
+	ReceiptBytes     []byte
+	ReceiptHash      buildmeta.ReceiptHash
+	ArtifactPath     string
+	CacheKey         buildmeta.CacheKey
+	ExecutionReceipt closureexec.BuildSessionReceipt
 }
 
 // DryRunOutcome maps a read-only inspection to the stable planner vocabulary.
@@ -108,10 +115,15 @@ func (store *Store) Inspect(expect Expectation) Result {
 	if store == nil || store.supported == nil || !store.supported() {
 		return Result{Status: Unsupported, Reason: "platform protection is unavailable"}
 	}
-	key, err := expect.Input.CacheKey()
+	logicalKey, err := expect.Input.CacheKey()
 	if err != nil {
 		return Result{Status: Corrupt, Reason: "invalid expected input: " + err.Error()}
 	}
+	assuredID, err := (closureexec.AssuredBuildCacheInput{BuildInput: expect.Input, Binding: expect.Assurance}).ID()
+	if err != nil {
+		return Result{Status: Corrupt, Reason: "invalid assurance cache input: " + err.Error()}
+	}
+	key := buildmeta.CacheKey(assuredID)
 	entryPath, _, err := store.paths(key)
 	if err != nil {
 		return Result{Status: Corrupt, Reason: err.Error()}
@@ -123,10 +135,17 @@ func (store *Store) Inspect(expect Expectation) Result {
 		return Result{Status: UntrustedProvenance, Reason: "inspect cache boundary: " + err.Error()}
 	}
 
-	return store.inspectEntry(entryPath, expect, key)
+	return store.inspectEntry(entryPath, expect, key, logicalKey)
 }
 
-func (store *Store) inspectEntry(entryPath string, expect Expectation, key buildmeta.CacheKey) Result {
+func (store *Store) inspectEntry(entryPath string, expect Expectation, key buildmeta.CacheKey, logicalKeys ...buildmeta.CacheKey) Result {
+	logicalKey, err := expect.Input.CacheKey()
+	if err != nil {
+		return Result{Status: Corrupt, Reason: "invalid expected input: " + err.Error()}
+	}
+	if len(logicalKeys) > 0 {
+		logicalKey = logicalKeys[0]
+	}
 	artifactRel, err := buildmeta.ArtifactPath(expect.Input.Command, expect.Input.Target.GOOS)
 	if err != nil {
 		return Result{Status: Corrupt, Reason: "derive artifact path: " + err.Error()}
@@ -136,7 +155,7 @@ func (store *Store) inspectEntry(entryPath string, expect Expectation, key build
 		return openFailure(err)
 	}
 	defer opened.close()
-	return classifyEntry(opened, artifactRel, entryPath, expect, key)
+	return classifyEntry(opened, artifactRel, entryPath, expect, key, logicalKey)
 }
 
 // inspectProvenEntry classifies the entry a maintenance sweep already resolved
@@ -150,6 +169,10 @@ func (store *Store) inspectEntry(entryPath string, expect Expectation, key build
 // otherwise let a planted replacement answer for the candidate that is about to
 // be removed: the sweep would validate one entry and retire another.
 func inspectProvenEntry(entry *protectedDir, entryPath string, expect Expectation, key buildmeta.CacheKey) Result {
+	logicalKey, err := expect.Input.CacheKey()
+	if err != nil {
+		return Result{Status: Corrupt, Reason: "invalid expected input: " + err.Error()}
+	}
 	artifactRel, err := buildmeta.ArtifactPath(expect.Input.Command, expect.Input.Target.GOOS)
 	if err != nil {
 		return Result{Status: Corrupt, Reason: "derive artifact path: " + err.Error()}
@@ -159,7 +182,7 @@ func inspectProvenEntry(entry *protectedDir, entryPath string, expect Expectatio
 		return openFailure(err)
 	}
 	defer opened.close()
-	return classifyEntry(opened, artifactRel, entryPath, expect, key)
+	return classifyEntry(opened, artifactRel, entryPath, expect, key, logicalKey)
 }
 
 func openFailure(err error) Result {
@@ -173,7 +196,7 @@ func openFailure(err error) Result {
 // classifyEntry is the one read-only decision procedure both entry points
 // share. It reads exclusively through the handles it is given; entryPath only
 // names the result for a caller that wants to launch the artifact later.
-func classifyEntry(opened *openedEntry, artifactRel, entryPath string, expect Expectation, key buildmeta.CacheKey) Result {
+func classifyEntry(opened *openedEntry, artifactRel, entryPath string, expect Expectation, key, logicalKey buildmeta.CacheKey) Result {
 	if err := exactEntryContents(opened, artifactRel); err != nil {
 		return Result{Status: Corrupt, Reason: err.Error()}
 	}
@@ -185,8 +208,8 @@ func classifyEntry(opened *openedEntry, artifactRel, entryPath string, expect Ex
 	if err != nil {
 		return Result{Status: Corrupt, Reason: "invalid receipt: " + err.Error()}
 	}
-	if receipt.CacheKey != key {
-		return Result{Status: Corrupt, Reason: "receipt cache key does not match entry key"}
+	if receipt.CacheKey != logicalKey {
+		return Result{Status: Corrupt, Reason: "receipt cache key does not match logical build input"}
 	}
 	receiptHash, err := buildmeta.HashReceiptBytes(receiptBytes)
 	if err != nil {
@@ -206,12 +229,24 @@ func classifyEntry(opened *openedEntry, artifactRel, entryPath string, expect Ex
 	if artifactHash != receipt.Artifact.SHA256 {
 		return Result{Status: Corrupt, Reason: "artifact hash mismatch"}
 	}
+	executionBytes, err := readExactFile(opened.executionReceipt)
+	if err != nil {
+		return Result{Status: Corrupt, Reason: "read execution receipt: " + err.Error()}
+	}
+	execution, err := closureexec.DecodeBuildSessionReceipt(executionBytes)
+	if err != nil {
+		return Result{Status: Corrupt, Reason: "invalid execution receipt: " + err.Error()}
+	}
+	if err := execution.ValidateFor(expect.Assurance, expect.Input, receipt.Artifact); err != nil {
+		return Result{Status: Corrupt, Reason: "execution receipt mismatch: " + err.Error()}
+	}
 	return Result{
 		Status:       Hit,
 		Receipt:      receipt,
 		ReceiptBytes: append([]byte(nil), receiptBytes...),
 		ReceiptHash:  receiptHash,
 		ArtifactPath: filepath.Join(entryPath, filepath.FromSlash(artifactRel)),
+		CacheKey:     key, ExecutionReceipt: execution,
 	}
 }
 
@@ -238,11 +273,12 @@ func pathWithin(root, path string) bool {
 }
 
 type openedEntry struct {
-	entryDir *os.File
-	binDir   *os.File
-	receipt  *os.File
-	artifact *os.File
-	extra    []io.Closer
+	entryDir         *os.File
+	binDir           *os.File
+	receipt          *os.File
+	executionReceipt *os.File
+	artifact         *os.File
+	extra            []io.Closer
 	// borrowedEntryDir marks entryDir as owned by the caller. A maintenance
 	// sweep classifies through the entry handle it already proved, and closing
 	// that handle here would drop the very proof the caller still relies on for
@@ -254,7 +290,7 @@ func (opened *openedEntry) close() {
 	if opened == nil {
 		return
 	}
-	closers := []io.Closer{opened.artifact, opened.receipt, opened.binDir}
+	closers := []io.Closer{opened.artifact, opened.executionReceipt, opened.receipt, opened.binDir}
 	if !opened.borrowedEntryDir {
 		closers = append(closers, opened.entryDir)
 	}
@@ -283,7 +319,7 @@ func exactEntryContents(opened *openedEntry, artifactRel string) error {
 	if err != nil {
 		return fmt.Errorf("list cache entry: %w", err)
 	}
-	if len(entryNames) != 2 || entryNames[0] != "bin" || entryNames[1] != ReceiptFilename {
+	if len(entryNames) != 3 || entryNames[0] != "bin" || entryNames[1] != ExecutionReceiptFilename || entryNames[2] != ReceiptFilename {
 		return fmt.Errorf("cache entry has unexpected contents")
 	}
 	binNames, err := directoryNames(opened.binDir)

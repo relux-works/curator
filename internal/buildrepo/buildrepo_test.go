@@ -8,12 +8,6 @@ import (
 	"testing"
 )
 
-func TestReleasedRC5Pin(t *testing.T) {
-	if ProtocolVersion != "1.0.0-rc.5" || ConformanceManifestSHA256 != "b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c" {
-		t.Fatal("rc.5 contract pin changed")
-	}
-}
-
 func TestReleasedSkillBuildSchemaCases(t *testing.T) {
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")
 	if root == "" {

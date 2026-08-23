@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/relux-works/curator/internal/closureexec"
 )
 
 // cachePositiveCase is one authoritative accepted cache-boundary vector.
@@ -68,7 +70,7 @@ func TestProtectedCacheHitVector(t *testing.T) {
 	if published.Status != Published {
 		t.Fatalf("publication status = %q", published.Status)
 	}
-	result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+	result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 	if result.Status != Hit {
 		t.Fatalf("exact protected entry = %+v", result)
 	}
@@ -116,7 +118,7 @@ func TestCompilerFreeDryRunMissVector(t *testing.T) {
 	store := newTestStore(t)
 	input := testInput("tool")
 	before := storeMembers(t, store.Home())
-	result := store.Inspect(Expectation{Input: input})
+	result := store.Inspect(Expectation{Input: input, Assurance: closureexec.PortableAssuranceBinding()})
 	if result.Status != Miss {
 		t.Fatalf("cold protected cache = %+v", result)
 	}

@@ -17,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/install"
@@ -1516,6 +1517,20 @@ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
 		}
 		if entries := publishedCacheEntries(t, home); len(entries) != 1 {
 			t.Fatalf("a covered platform published %d protected cache entries, want 1", len(entries))
+		} else {
+			payload, err := os.ReadFile(filepath.Join(entries[0], buildcache.ExecutionReceiptFilename))
+			if err != nil {
+				t.Fatalf("portable build published no execution receipt: %v", err)
+			}
+			receipt, err := closureexec.DecodeBuildSessionReceipt(payload)
+			if err != nil || receipt.Binding.AssuranceMode != closureexec.AssurancePortable || receipt.ProviderExecutionReceipt != nil {
+				t.Fatalf("portable execution receipt = %+v, %v", receipt, err)
+			}
+			for _, capability := range receipt.Binding.ActualCapabilities {
+				if strings.Contains(capability.CapabilityID, "lossless") || strings.Contains(capability.CapabilityID, "total-network") {
+					t.Fatalf("portable receipt inflated capability %q", capability.CapabilityID)
+				}
+			}
 		}
 		return
 	}

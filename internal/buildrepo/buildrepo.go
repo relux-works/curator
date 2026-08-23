@@ -27,9 +27,9 @@ const (
 	// DescriptorName is the closed schema-7 build descriptor filename.
 	DescriptorName = "skill-build.json"
 	// ProtocolVersion is the authoritative external-repository protocol release.
-	ProtocolVersion = "1.0.0-rc.5"
+	ProtocolVersion = "1.0.0-rc.8"
 	// ConformanceManifestSHA256 pins the released conformance manifest.
-	ConformanceManifestSHA256 = "b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c"
+	ConformanceManifestSHA256 = "d14e3a16bb4a01ff282791f08e3aefa269210234f41072beae6fe59b642595a1"
 )
 
 var (

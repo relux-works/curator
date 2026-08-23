@@ -15,6 +15,8 @@ import (
 
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/closureexec"
+	"github.com/relux-works/curator/internal/closuregraph"
 )
 
 type testHomeLock struct{ err error }
@@ -29,7 +31,7 @@ func TestInspectMissAndUnsupportedAreReadOnly(t *testing.T) {
 	store := newTestStore(t)
 	input := testInput("tool")
 	before := treeFingerprint(t, store.Home())
-	result := store.Inspect(Expectation{Input: input})
+	result := store.Inspect(Expectation{Input: input, Assurance: closureexec.PortableAssuranceBinding()})
 	if result.Status != Miss || result.DryRunOutcome() != "would-preflight-and-build" {
 		t.Fatalf("miss = %+v", result)
 	}
@@ -38,7 +40,7 @@ func TestInspectMissAndUnsupportedAreReadOnly(t *testing.T) {
 	}
 
 	store.supported = func() bool { return false }
-	result = store.Inspect(Expectation{Input: input})
+	result = store.Inspect(Expectation{Input: input, Assurance: closureexec.PortableAssuranceBinding()})
 	if result.Status != Unsupported || result.DryRunOutcome() != "unsupported" {
 		t.Fatalf("unsupported = %+v", result)
 	}
@@ -58,7 +60,7 @@ func TestPublishAndInspectExactProtectedHit(t *testing.T) {
 		t.Fatalf("publication = %+v", result)
 	}
 
-	hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+	hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 	if hit.Status != Hit || hit.DryRunOutcome() != "cache-hit" {
 		t.Fatalf("inspection = %+v", hit)
 	}
@@ -75,6 +77,103 @@ func TestPublishAndInspectExactProtectedHit(t *testing.T) {
 	}
 	if again.Status != ReusedWinner || again.ArtifactPath != hit.ArtifactPath {
 		t.Fatalf("identical publication = %+v", again)
+	}
+}
+
+func TestProtectedCacheSeparatesPortableVerifiedProviderAndCapabilityIdentity(t *testing.T) {
+	store := newTestStore(t)
+	input := testInput("tool")
+	portable, _ := testPublication(t, store.Home(), input, []byte("portable artifact"))
+	if _, err := store.Publish(portable, testHomeLock{}); err != nil {
+		t.Fatal(err)
+	}
+
+	verified := verifiedCacheBinding('a', 'b')
+	if hit := store.Inspect(Expectation{Input: input, Assurance: verified}); hit.Status != Miss {
+		t.Fatalf("portable entry satisfied verified lookup: %+v", hit)
+	}
+
+	verifiedPublication, _ := testPublication(t, store.Home(), input, []byte("verified artifact"))
+	decoded, err := buildmeta.DecodeExpectedReceipt(verifiedPublication.ReceiptBytes, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	providerReceipt := closuregraph.ID("sha256:" + strings.Repeat("e", 64))
+	verifiedPublication.Assurance = verified
+	verifiedPublication.ExecutionReceipt, err = closureexec.NewVerifiedBuildSessionReceipt(verified, input, decoded.Artifact, providerReceipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.Publish(verifiedPublication, testHomeLock{}); err != nil {
+		t.Fatal(err)
+	}
+	if hit := store.Inspect(Expectation{Input: input, Assurance: verified}); hit.Status != Hit {
+		t.Fatalf("exact verified entry was not reusable: %+v", hit)
+	}
+	for name, drifted := range map[string]closureexec.AssuranceBinding{
+		"provider":   verifiedCacheBinding('c', 'b'),
+		"capability": verifiedCacheBinding('a', 'd'),
+	} {
+		if hit := store.Inspect(Expectation{Input: input, Assurance: drifted}); hit.Status != Miss {
+			t.Fatalf("%s drift adopted verified entry: %+v", name, hit)
+		}
+	}
+}
+
+func TestProtectedCacheRejectsMissingAssuranceAndLegacyAddress(t *testing.T) {
+	store := newTestStore(t)
+	input := testInput("tool")
+	if result := store.Inspect(Expectation{Input: input}); result.Status != Corrupt || !strings.Contains(result.Reason, "execution_mode_unknown") {
+		t.Fatalf("missing assurance = %+v", result)
+	}
+
+	publication, _ := testPublication(t, store.Home(), input, []byte("portable artifact"))
+	published, err := store.Publish(publication, testHomeLock{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	logicalKey, err := input.CacheKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if published.CacheKey == logicalKey {
+		t.Fatal("typed portable cache key aliases the historical logical key")
+	}
+	typedEntry, _, err := store.paths(published.CacheKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyEntry, _, err := store.paths(logicalKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(typedEntry, legacyEntry); err != nil {
+		t.Fatal(err)
+	}
+	if hit := store.Inspect(Expectation{Input: input, Assurance: publication.Assurance}); hit.Status != Miss {
+		t.Fatalf("legacy assurance-blind entry was adopted: %+v", hit)
+	}
+}
+
+func verifiedCacheBinding(providerSeed, capabilitySeed byte) closureexec.AssuranceBinding {
+	contract := closureexec.VerifiedProviderContractID
+	capabilityID := closuregraph.ID("sha256:" + strings.Repeat(string(capabilitySeed), 64))
+	return closureexec.AssuranceBinding{
+		AssuranceMode: closureexec.AssuranceVerified, PolicyID: closureexec.VerifiedPolicyID,
+		ExecutionPolicyID: closureexec.VerifiedExecutionPolicyID, ProviderContract: &contract,
+		Provider: &closureexec.ProviderIdentity{
+			Contract: contract, ProviderID: "fixture.provider." + string(providerSeed), Version: "1.0.0",
+			BinarySHA256: closuregraph.ID("sha256:" + strings.Repeat(string(providerSeed), 64)), TrustEvidence: "fixture-signature",
+		},
+		CapabilityReceiptID: &capabilityID,
+		ActualCapabilities: []closureexec.CapabilityEvidence{
+			{CapabilityID: "total-network-denial-v1", Status: "established"},
+			{CapabilityID: "read-only-source-and-toolchain-v1", Status: "established"},
+			{CapabilityID: "exact-executable-allowlisting-v1", Status: "established"},
+			{CapabilityID: "private-build-root-only-writes-v1", Status: "established"},
+			{CapabilityID: "hard-aggregate-descendant-resource-bounds-v1", Status: "established"},
+			{CapabilityID: "fail-closed-capability-preflight-v1", Status: "established"},
+		},
 	}
 }
 
@@ -102,6 +201,28 @@ func TestInspectRejectsCorruptReceiptAndArtifactState(t *testing.T) {
 				if err := os.Remove(filepath.Join(filepath.Dir(hit.ArtifactPath), "..", ReceiptFilename)); err != nil {
 					t.Fatal(err)
 				}
+			},
+		},
+		{
+			name: "missing execution receipt",
+			mutate: func(t *testing.T, _ *Store, _ Publication, hit Result) {
+				if err := os.Remove(filepath.Join(filepath.Dir(hit.ArtifactPath), "..", ExecutionReceiptFilename)); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name: "portable claim inflation",
+			mutate: func(t *testing.T, _ *Store, publication Publication, hit Result) {
+				payload, err := publication.ExecutionReceipt.CanonicalBytes()
+				if err != nil {
+					t.Fatal(err)
+				}
+				inflated := strings.Replace(string(payload), `],"assurance_mode":"portable"`, `,{"capability_id":"total-network-denial-v1","status":"established"}],"assurance_mode":"portable"`, 1)
+				if inflated == string(payload) {
+					t.Fatal("execution receipt mutation did not apply")
+				}
+				writeFile(t, filepath.Join(filepath.Dir(hit.ArtifactPath), "..", ExecutionReceiptFilename), []byte(inflated), 0o600)
 			},
 		},
 		{
@@ -134,7 +255,7 @@ func TestInspectRejectsCorruptReceiptAndArtifactState(t *testing.T) {
 			if _, err := store.Publish(publication, testHomeLock{}); err != nil {
 				t.Fatal(err)
 			}
-			hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+			hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 			if hit.Status != Hit {
 				t.Fatalf("initial inspection = %+v", hit)
 			}
@@ -143,7 +264,7 @@ func TestInspectRejectsCorruptReceiptAndArtifactState(t *testing.T) {
 			if test.hash != nil {
 				wantHash = test.hash(receiptHash)
 			}
-			result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: wantHash})
+			result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: wantHash, Assurance: publication.Assurance})
 			if result.Status != Corrupt || result.DryRunOutcome() != "corrupt" {
 				t.Fatalf("corrupt inspection = %+v", result)
 			}
@@ -164,7 +285,7 @@ func TestPublicationRequiresHeldHomeLock(t *testing.T) {
 			t.Fatalf("rejected publication changed manager home\nbefore: %s\nafter:  %s", before, after)
 		}
 	}
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +310,7 @@ func TestPublishQuarantinesCorruptEntryBeforeReplacement(t *testing.T) {
 	if replaced.Status != Published {
 		t.Fatalf("replacement = %+v", replaced)
 	}
-	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); hit.Status != Hit {
+	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance}); hit.Status != Hit {
 		t.Fatalf("replacement inspection = %+v", hit)
 	}
 	base := filepath.Dir(filepath.Dir(replaced.ArtifactPath))
@@ -219,7 +340,7 @@ func TestPublishQuarantinesCorruptEntryBeforeReplacement(t *testing.T) {
 func TestRevertRestoresExactlyWhatAPublicationDisplaced(t *testing.T) {
 	store := newTestStore(t)
 	publication, receiptHash := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +358,7 @@ func TestRevertRestoresExactlyWhatAPublicationDisplaced(t *testing.T) {
 	if err := store.Revert(key, published, testHomeLock{}); err != nil {
 		t.Fatal(err)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Miss {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Miss {
 		t.Fatalf("withdrawn publication = %+v, want a miss", live)
 	}
 
@@ -248,7 +369,7 @@ func TestRevertRestoresExactlyWhatAPublicationDisplaced(t *testing.T) {
 	}
 	writeFile(t, first.ArtifactPath, []byte("corrupt"), 0o700)
 	corrupt := treeFingerprint(t, store.Home())
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Corrupt {
 		t.Fatalf("tampered entry = %+v, want corrupt", live)
 	}
 
@@ -263,14 +384,14 @@ func TestRevertRestoresExactlyWhatAPublicationDisplaced(t *testing.T) {
 	if replaced.Status != Published || replaced.Quarantined == "" {
 		t.Fatalf("replacement = %+v, want a published winner that reports its quarantine", replaced)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); live.Status != Hit {
+	if live := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance}); live.Status != Hit {
 		t.Fatalf("replacement inspection = %+v", live)
 	}
 
 	if err := store.Revert(key, replaced, testHomeLock{}); err != nil {
 		t.Fatal(err)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Corrupt {
 		t.Fatalf("reverted entry = %+v, want the corrupt predecessor back", live)
 	}
 	if readFile(t, first.ArtifactPath) != "corrupt" {
@@ -295,7 +416,7 @@ func TestRevertRestoresExactlyWhatAPublicationDisplaced(t *testing.T) {
 func TestRevertFailsClosed(t *testing.T) {
 	store := newTestStore(t)
 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +442,7 @@ func TestRevertFailsClosed(t *testing.T) {
 	if err := store.Revert(key, PublicationResult{Status: ReusedWinner}, testHomeLock{}); err != nil {
 		t.Fatalf("reverting a reused winner failed: %v", err)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Hit {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Hit {
 		t.Fatalf("a reused-winner reversal changed the cache: %+v", live)
 	}
 
@@ -342,7 +463,7 @@ func TestRevertFailsClosed(t *testing.T) {
 	}
 	// A refusal is not allowed to be half-applied: the entry it would have
 	// replaced is still exactly where the publication left it.
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Hit {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Hit {
 		t.Fatalf("a refused reversal withdrew the live entry anyway: %+v", live)
 	}
 }
@@ -385,7 +506,7 @@ func TestAtomicPublicationIdenticalRace(t *testing.T) {
 	if published != 1 {
 		t.Fatalf("published winners = %d, want 1", published)
 	}
-	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); hit.Status != Hit {
+	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance}); hit.Status != Hit {
 		t.Fatalf("race winner = %+v", hit)
 	}
 }
@@ -504,6 +625,10 @@ func testPublication(t *testing.T, root string, input buildmeta.Input, artifact 
 	if err != nil {
 		t.Fatal(err)
 	}
+	executionReceipt, err := closureexec.NewPortableBuildSessionReceipt(input, receipt.Artifact, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	sourceDir := filepath.Join(root, "private-builds")
 	if err := os.MkdirAll(sourceDir, 0o700); err != nil {
 		t.Fatal(err)
@@ -519,7 +644,12 @@ func testPublication(t *testing.T, root string, input buildmeta.Input, artifact 
 	if err := source.Close(); err != nil {
 		t.Fatal(err)
 	}
-	return Publication{Input: input, ReceiptBytes: receiptBytes, ArtifactSource: source.Name()}, receiptHash
+	return Publication{Input: input, ReceiptBytes: receiptBytes, Assurance: closureexec.PortableAssuranceBinding(), ExecutionReceipt: executionReceipt, ArtifactSource: source.Name()}, receiptHash
+}
+
+func testAssuredCacheKey(input buildmeta.Input, binding closureexec.AssuranceBinding) (buildmeta.CacheKey, error) {
+	id, err := (closureexec.AssuredBuildCacheInput{BuildInput: input, Binding: binding}).ID()
+	return buildmeta.CacheKey(id), err
 }
 
 func writeFile(t *testing.T, path string, payload []byte, mode os.FileMode) {

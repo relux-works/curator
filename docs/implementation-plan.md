@@ -1,6 +1,6 @@
 # Curator implementation plan
 
-This is the working plan for building Curator, an agent environment manager (AEM) in Go. Iterations consult this document and the task board; the plan is updated as decisions land. Protocol sections are cited as `Spec §N.M` against the 1.0.0-rc.2 [Curator Specification](https://github.com/relux-works/curator-spec).
+This is the working plan for building Curator, an agent environment manager (AEM) in Go. Iterations consult this document and the task board; the plan is updated as decisions land. Protocol sections are cited as `Spec §N.M` against the immutable 1.0.0-rc.8 [Curator Specification](https://github.com/relux-works/curator-spec/releases/tag/v1.0.0-rc.8).
 
 ## 1. Goal and definition of done
 

@@ -133,12 +133,12 @@ func TestUnixProtectedStateMatrix(t *testing.T) {
 			if _, err := store.Publish(publication, testHomeLock{}); err != nil {
 				t.Fatal(err)
 			}
-			hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+			hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 			if hit.Status != Hit {
 				t.Fatalf("initial inspection = %+v", hit)
 			}
 			test.mutate(t, store, hit)
-			result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+			result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 			if result.Status != UntrustedProvenance {
 				t.Fatalf("protected-state violation = %+v", result)
 			}
@@ -149,7 +149,7 @@ func TestUnixProtectedStateMatrix(t *testing.T) {
 func TestUnixForgedSelfConsistentEntryIsNeverAdopted(t *testing.T) {
 	store := newTestStore(t)
 	publication, receiptHash := testPublication(t, store.Home(), testInput("tool"), []byte("attacker-chosen-artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestUnixForgedSelfConsistentEntryIsNeverAdopted(t *testing.T) {
 	writeFile(t, filepath.Join(entry, filepath.FromSlash(artifactRel)), []byte("attacker-chosen-artifact"), 0o700)
 
 	before := treeFingerprint(t, store.Home())
-	result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+	result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 	if result.Status != UntrustedProvenance || result.DryRunOutcome() != "would-rebuild-untrusted-cache" {
 		t.Fatalf("forged inspection = %+v", result)
 	}
@@ -191,7 +191,7 @@ func TestUnixForgedSelfConsistentEntryIsNeverAdopted(t *testing.T) {
 	if rebuilt.Status != Published {
 		t.Fatalf("rebuilt publication = %+v", rebuilt)
 	}
-	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); hit.Status != Hit {
+	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance}); hit.Status != Hit {
 		t.Fatalf("rebuilt inspection = %+v", hit)
 	}
 }
@@ -216,7 +216,7 @@ func TestUnixRejectsManagerHomeSymlinkBoundary(t *testing.T) {
 	if _, err := realStore.Publish(publication, testHomeLock{}); err != nil {
 		t.Fatal(err)
 	}
-	result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+	result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 	if result.Status != UntrustedProvenance || !strings.Contains(result.Reason, "links") {
 		t.Fatalf("symlink boundary = %+v", result)
 	}
@@ -238,7 +238,7 @@ func TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot(t *testing.T) {
 		if err := os.Symlink(moved, entry); err != nil {
 			t.Fatal(err)
 		}
-		if got := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); got.Status != UntrustedProvenance {
+		if got := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance}); got.Status != UntrustedProvenance {
 			t.Fatalf("entry symlink = %+v", got)
 		}
 	})
@@ -290,7 +290,7 @@ func TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot(t *testing.T) {
 			t.Fatal(err)
 		}
 		writeFile(t, entry, []byte("not a directory"), 0o600)
-		if got := store.Inspect(Expectation{Input: publication.Input}); got.Status != UntrustedProvenance {
+		if got := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); got.Status != UntrustedProvenance {
 			t.Fatalf("regular entry = %+v", got)
 		}
 	})
@@ -307,7 +307,7 @@ func TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot(t *testing.T) {
 			t.Fatal(err)
 		}
 		writeFile(t, bin, []byte("not a directory"), 0o600)
-		if got := store.Inspect(Expectation{Input: publication.Input}); got.Status != UntrustedProvenance {
+		if got := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); got.Status != UntrustedProvenance {
 			t.Fatalf("regular bin = %+v", got)
 		}
 	})

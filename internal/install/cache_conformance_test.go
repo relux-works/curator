@@ -238,7 +238,10 @@ func runRefusedCacheEntry(t *testing.T, published authoritativeRejectionCase, st
 		t.Fatalf("the installation adopted the refused artifact %q", got)
 	}
 	for _, staged := range result.Staged {
-		if staged.Receipt().CacheKey != result.Builds[0].CacheKey() {
+		// Rc.8 receipts intentionally retain the logical build-input key. The
+		// protected cache address is the additive assurance-bound key and must
+		// not be written back into the preserved receipt wire format.
+		if staged.Receipt().CacheKey != result.Builds[0].logicalKey {
 			t.Fatalf("the rebuild published a receipt for another key: %+v", staged.Receipt())
 		}
 	}

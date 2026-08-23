@@ -134,7 +134,7 @@ func stageRuntimeAndShims(
 	role runtimestore.ShimRole,
 	platform string,
 	commit scopeCommit,
-	plannedInputs map[string]map[string]buildmeta.Input,
+	plannedInputs map[string]map[string]plannedBuildInput,
 	external map[string]map[string]externalEntry,
 	externalRoot string,
 ) (runtimeStaging, error) {
@@ -192,14 +192,11 @@ func stageRuntimeAndShims(
 				result.builds[node.Name][name] = entry.record
 				continue
 			}
-			input, known := plannedInputs[node.Name][name]
+			planned, known := plannedInputs[node.Name][name]
 			if !known {
 				return runtimeStaging{}, fmt.Errorf("%s.%s: the build was not planned", node.Name, name)
 			}
-			key, err := input.CacheKey()
-			if err != nil {
-				return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)
-			}
+			key := planned.key
 			hit, published := commit.artifacts[key]
 			if !published {
 				return runtimeStaging{}, failedBuildBoundary(
@@ -308,13 +305,17 @@ func stageStaleSkillRemovals(store, kind string, expected map[string]bool) (stag
 }
 
 // plannedInputs indexes the derived build inputs of a plan by node and command.
-func (plan BuildPlan) plannedInputs() map[string]map[string]buildmeta.Input {
-	inputs := map[string]map[string]buildmeta.Input{}
+type plannedBuildInput struct {
+	key buildmeta.CacheKey
+}
+
+func (plan BuildPlan) plannedInputs() map[string]map[string]plannedBuildInput {
+	inputs := map[string]map[string]plannedBuildInput{}
 	for _, build := range plan.builds {
 		if inputs[build.skill] == nil {
-			inputs[build.skill] = map[string]buildmeta.Input{}
+			inputs[build.skill] = map[string]plannedBuildInput{}
 		}
-		inputs[build.skill][build.command] = build.input
+		inputs[build.skill][build.command] = plannedBuildInput{key: build.key}
 	}
 	return inputs
 }

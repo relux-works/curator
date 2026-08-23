@@ -55,6 +55,12 @@ func openProtectedEntry(home, entryPath, artifactRel string) (*openedEntry, erro
 		return nil, err
 	}
 	opened.receipt = receipt
+	executionReceipt, err := openWindowsProtected(filepath.Join(entryPath, ExecutionReceiptFilename), false, false)
+	if err != nil {
+		opened.close()
+		return nil, err
+	}
+	opened.executionReceipt = executionReceipt
 	binDir, err := openWindowsProtected(filepath.Join(entryPath, "bin"), true, false)
 	if err != nil {
 		opened.close()
@@ -114,6 +120,12 @@ func openProtectedEntryFrom(entry *protectedDir, artifactRel string) (*openedEnt
 		return nil, err
 	}
 	opened.receipt = receipt
+	executionReceipt, err := openWindowsProtected(filepath.Join(base, ExecutionReceiptFilename), false, false)
+	if err != nil {
+		opened.close()
+		return nil, err
+	}
+	opened.executionReceipt = executionReceipt
 	binDir, err := openWindowsProtected(filepath.Join(base, "bin"), true, false)
 	if err != nil {
 		opened.close()
