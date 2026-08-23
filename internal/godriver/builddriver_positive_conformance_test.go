@@ -232,7 +232,10 @@ func fixedEnvironmentForHost(t *testing.T, vectors positiveVectors, goos, goarch
 		}
 		return testCase.Environment, optional
 	}
-	t.Fatalf("the suite publishes no fixed environment for native host %s/%s", goos, goarch)
+	// A suite that publishes host cases but stays silent about this one is
+	// saying nothing about this host rather than failing it, so a host outside
+	// the published set (an Intel Mac, linux/arm64) skips instead of going red.
+	t.Skipf("the suite publishes no fixed environment for native host %s/%s", goos, goarch)
 	return nil, nil
 }
 
@@ -437,13 +440,19 @@ func materializeToolchain(t *testing.T, testCase toolchainCase) string {
 				t.Fatal(err)
 			}
 		case "symlink":
-			// The link payload is a protocol byte input. filepath.FromSlash would
-			// rewrite its separators on Windows and silently change the digest.
+			// The link payload is a protocol byte input, and os.Symlink is
+			// handed it unconverted. Windows still stores its own separators —
+			// os.Symlink applies FromSlash itself before the syscall — so the
+			// round trip is asserted through the same normalizer the
+			// fingerprint hashes with. That still catches a materializer that
+			// mangles the target while tolerating the one substitution the
+			// platform is entitled to make.
 			if err := os.Symlink(entry.Target, target); err != nil {
 				t.Skipf("this host cannot create the symbolic link the vector needs: %v", err)
 			}
-			if observed, err := os.Readlink(target); err != nil || observed != entry.Target {
-				t.Fatalf("materialized link target = %q, %v; want exact protocol target %q", observed, err, entry.Target)
+			observed, err := os.Readlink(target)
+			if err != nil || protocolLinkTarget(observed) != entry.Target {
+				t.Fatalf("materialized link target = %q, %v; want protocol target %q", observed, err, entry.Target)
 			}
 		default:
 			writeTestFile(t, target, decodeBase64(t, entry.Content), 0o755)

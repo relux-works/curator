@@ -47,3 +47,11 @@ func artifactHasMultipleLinks(_ string, info fs.FileInfo) (bool, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	return ok && stat.Nlink != 1, nil
 }
+
+// protocolLinkTarget returns a link target already in the protocol's form.
+//
+// A unix host stores the target bytes exactly as they were written, and '/' is
+// the only separator, so the bytes Readlink returns are the protocol bytes. A
+// backslash here is an ordinary character in a filename rather than a
+// separator, so rewriting one would change a legitimate unix toolchain digest.
+func protocolLinkTarget(target string) string { return target }
