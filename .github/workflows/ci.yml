@@ -111,10 +111,19 @@ jobs:
       # launcher cases; the unix runners must execute the ownership, no-follow,
       # read-only-source, resource-policy and executable cases; and every skip
       # anywhere in the run is classified and recorded by name.
+      #
+      # The per-package deadline is a hosted-runner budget, not a behavioural
+      # bar: the Windows runner pays a real syscall and process-spawn cost that
+      # the unix runners do not. Measured on run 32648313266 (windows-latest):
+      # cmd/curator 1099s and internal/install/atomicity 1027s here against
+      # 454s and 125s for the same packages on macOS. 30m leaves those two
+      # under 40% headroom on the slowest runner, so Windows gets 60m and
+      # every other runner keeps 30m. A hang is still bounded and still fatal.
       - name: go test + platform-case gate
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '60m' || '30m' }}
         run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
 
       - name: Upload gate evidence
@@ -384,11 +393,21 @@ jobs:
       # The full candidate suite on every platform. The platform-case ledger is
       # enforced exactly as in the default lane, and CI_REQUIRE_FULL_ROOT=1
       # additionally forbids the package deferral the default lane permits.
+      # CI_REQUIRE_FULL_ROOT=1 also concentrates the load: the three long-pole
+      # packages the default lane splits across its served and deferred
+      # invocations -- cmd/curator, internal/install/atomicity and
+      # internal/install -- all run inside the single served invocation here
+      # and contend for the same four Windows cores. On run 32648313266 that put
+      # cmd/curator and internal/install/atomicity past 1800s with every
+      # executed case passing, which the ledger then read as two required
+      # Windows cases that never ran. Windows gets the same 60m as the default
+      # lane; the deadline is still fixed and still fatal.
       - name: Candidate suite + platform-case gate
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ steps.candidate.outputs.root }}
           CI_REQUIRE_FULL_ROOT: "1"
+          GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '60m' || '30m' }}
         run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
 
       - name: Upload candidate evidence
