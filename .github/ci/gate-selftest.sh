@@ -422,6 +422,78 @@ make_stub "$WANT_GO" local "$WORK/user.env"
 assert 'a per-user go env file is rejected'         1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
 
 echo ''
+echo '=== ci.yml: every windows lane that runs test-gate.sh buys the slower runner its own budget ==='
+
+# A per-package timeout is a hosted-runner budget, and the Windows runner needs
+# a bigger one than the unix runners for the same passing work. That budget
+# lives in the workflow, so a refactor can drop it without any gate noticing --
+# the run just dies at the old deadline and the ledger reports the truncated
+# cases as cases that never ran. These cases read the wiring back.
+#
+# Emits one "<job> <windows-lane?> <has-timeout?>" record per test-gate.sh step.
+gate_lane_records() {
+	awk '
+		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ { job = $1; sub(/:[ \t\r]*$/, "", job) }
+		/^[ \t]*os:[ \t]*\[/           { if ($0 ~ /windows-latest/) win[job] = 1 }
+		/^      - name:/               { timeout = 0 }
+		/^[ \t]*GO_TEST_TIMEOUT:/      { timeout = 1 }
+		/test-gate\.sh/ && /^[ \t]*run:/ {
+			printf "%s %d %d\n", job, (win[job] ? 1 : 0), timeout
+		}
+	' "$WORKFLOW"
+}
+
+lane_records="$(gate_lane_records)"
+if [ -z "$lane_records" ]; then
+	bad 'the workflow still runs test-gate.sh' 'no test-gate.sh step found in .github/workflows/ci.yml'
+else
+	unbudgeted=''
+	while read -r job is_win has_timeout; do
+		[ -n "$job" ] || continue
+		[ "$is_win" = '1' ] || continue
+		[ "$has_timeout" = '1' ] || unbudgeted="$unbudgeted $job"
+	done <<-RECORDS
+	$lane_records
+	RECORDS
+	if [ -z "$unbudgeted" ]; then
+		ok 'every windows test-gate.sh lane declares GO_TEST_TIMEOUT'
+	else
+		bad 'every windows test-gate.sh lane declares GO_TEST_TIMEOUT' \
+			"lanes running on windows-latest with no GO_TEST_TIMEOUT:$unbudgeted"
+	fi
+fi
+
+# minutes <duration>  -- "60m" and "1h" both answer 60; anything else answers -1.
+minutes() {
+	case "$1" in
+	*m) printf '%s\n' "${1%m}" ;;
+	*h) printf '%s\n' "$(( ${1%h} * 60 ))" ;;
+	*)  printf '%s\n' '-1' ;;
+	esac
+}
+
+GATE_DEFAULT_TIMEOUT="$(awk -F'-' '/^GO_TEST_TIMEOUT=/{print $2; exit}' "$HERE/test-gate.sh" | tr -d '}"')"
+win_timeout="$(awk -F"'" '/GO_TEST_TIMEOUT:.*Windows/{print $4; exit}' "$WORKFLOW")"
+other_timeout="$(awk -F"'" '/GO_TEST_TIMEOUT:.*Windows/{print $6; exit}' "$WORKFLOW")"
+win_minutes="$(minutes "$win_timeout")"
+other_minutes="$(minutes "$other_timeout")"
+default_minutes="$(minutes "$GATE_DEFAULT_TIMEOUT")"
+
+if [ "$win_minutes" -gt 0 ] && [ "$other_minutes" -gt 0 ] && [ "$win_minutes" -gt "$other_minutes" ]; then
+	ok 'the windows per-package budget is larger than the unix one'
+else
+	bad 'the windows per-package budget is larger than the unix one' \
+		"windows='$win_timeout' other='$other_timeout'"
+fi
+
+if [ "$default_minutes" -gt 0 ] && [ "$other_minutes" -eq "$default_minutes" ]; then
+	ok 'the unix per-package budget still matches the gate default'
+else
+	bad 'the unix per-package budget still matches the gate default' \
+		"workflow='$other_timeout' test-gate.sh default='$GATE_DEFAULT_TIMEOUT'"
+fi
+
+echo ''
 printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
 [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
 printf '\n'
