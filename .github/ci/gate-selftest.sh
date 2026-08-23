@@ -99,8 +99,8 @@ FAKEROOT="$WORK/root"
 mkdir -p "$FAKEROOT/vectors"
 printf '{\n  "protocol_version": "1.0.0-rc.5"\n}\n' >"$FAKEROOT/manifest.json"
 printf 'vector-a\n' >"$FAKEROOT/vectors/a.json"
-MANIFEST_SHA="$(shasum -a 256 "$FAKEROOT/manifest.json" 2>/dev/null | awk '{print $1}')"
-[ -n "$MANIFEST_SHA" ] || MANIFEST_SHA="$(sha256sum "$FAKEROOT/manifest.json" | awk '{print $1}')"
+MANIFEST_SHA="$(shasum -a 256 <"$FAKEROOT/manifest.json" 2>/dev/null | awk '{print $1}')"
+[ -n "$MANIFEST_SHA" ] || MANIFEST_SHA="$(sha256sum <"$FAKEROOT/manifest.json" | awk '{print $1}')"
 
 assert 'record rejects a nonexistent root'          1 bash "$CS" record "$WORK/absent" "$WORK/ev1"
 mkdir -p "$WORK/noman"
@@ -108,6 +108,35 @@ assert 'record rejects a root with no manifest.json' 1 bash "$CS" record "$WORK/
 assert 'record rejects a manifest digest mismatch'  1 env CANDIDATE_EXPECTED_MANIFEST_SHA256=deadbeef bash "$CS" record "$FAKEROOT" "$WORK/ev3"
 assert 'record rejects a candidate identical to the pin' 1 env PIN_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev4"
 assert 'record accepts a distinct candidate'        0 env CANDIDATE_EXPECTED_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev5"
+
+# Git for Windows shasum prefixes the entire output line with `\` when a
+# filename needs escaping. This shim emits that form only when given a path,
+# proving candidate-suite hashes through stdin and never consumes the escaped
+# filename form.
+WINDOWS_SHASUM_BIN="$WORK/windows-shasum-bin"
+mkdir -p "$WINDOWS_SHASUM_BIN"
+cat >"$WINDOWS_SHASUM_BIN/shasum" <<'EOF'
+#!/usr/bin/env bash
+if [ "$#" -gt 2 ]; then
+	printf '\\%s  %s\n' "$SIMULATED_SHA256" "${!#}"
+else
+	printf '%s  -\n' "$SIMULATED_SHA256"
+fi
+EOF
+chmod +x "$WINDOWS_SHASUM_BIN/shasum"
+assert 'record avoids Git for Windows shasum filename escaping' 0 env PATH="$WINDOWS_SHASUM_BIN:$PATH" SIMULATED_SHA256="$MANIFEST_SHA" CANDIDATE_EXPECTED_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev6"
+
+# A malformed hash tool must fail closed rather than persisting a textual
+# backslash-prefixed digest as candidate identity.
+PREFIXED_SHASUM_BIN="$WORK/prefixed-shasum-bin"
+mkdir -p "$PREFIXED_SHASUM_BIN"
+cat >"$PREFIXED_SHASUM_BIN/shasum" <<'EOF'
+#!/usr/bin/env bash
+printf '\\%s  -\n' "$SIMULATED_SHA256"
+EOF
+chmod +x "$PREFIXED_SHASUM_BIN/shasum"
+assert 'record rejects a backslash-prefixed digest' 1 env PATH="$PREFIXED_SHASUM_BIN:$PATH" SIMULATED_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev7"
+assert_contains 'prefixed digest rejection names non-canonical output' 'hash tool returned a non-canonical sha256 digest' "$WORK/out.txt"
 
 EV="$WORK/ev5/candidate-suite-identity.txt"
 if [ -f "$EV" ]; then
