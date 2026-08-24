@@ -38,6 +38,15 @@ func TestMain(m *testing.M) {
 }
 
 // capture runs one CLI invocation with both standard streams redirected.
+//
+// It replaces the process-global os.Stdout and os.Stderr for the duration of
+// the call, so every case that reaches the CLI through it must stay serial: a
+// case that calls capture, or a helper that does, must never call t.Parallel().
+// The same rule covers the cases that point run() at a fixture through the
+// process-global CURATOR_CONFIG environment variable, which the testing package
+// already refuses to combine with t.Parallel(). Go releases paused parallel
+// cases only after the whole serial pass has finished, so the parallel cases in
+// this package can never observe a swapped stream.
 func capture(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	outReader, outWriter, err := os.Pipe()

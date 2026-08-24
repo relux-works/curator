@@ -313,6 +313,7 @@ func TestCLIExecutionAssuranceSelectionIsPortableDefaultAndVerifiedFailClosed(t 
 }
 
 func TestProductionExternalDepsBindTrustedGitAndAudit(t *testing.T) {
+	t.Parallel()
 	deps := productionExternalDeps(&config.Config{}, true)
 	if err := buildrepo.ValidateGitTool(context.Background(), deps.GitTool); err != nil {
 		t.Fatalf("production Git dependency is unusable: %v", err)
@@ -331,6 +332,7 @@ func TestProductionExternalDepsBindTrustedGitAndAudit(t *testing.T) {
 }
 
 func TestProductionExternalAuditReturnsAdvisoryWarnings(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "scripts"), 0o700); err != nil {
 		t.Fatal(err)
@@ -350,6 +352,7 @@ func TestProductionExternalAuditReturnsAdvisoryWarnings(t *testing.T) {
 }
 
 func TestUsageEnumeratesDocumentedCommands(t *testing.T) {
+	t.Parallel()
 	for _, command := range []string{
 		"bootstrap", "init", "add", "remove", "install", "update", "upgrade",
 		"status", "list", "project", "config", "skill", "global", "hybrid",
@@ -362,24 +365,28 @@ func TestUsageEnumeratesDocumentedCommands(t *testing.T) {
 }
 
 func TestRunVersionExitsZero(t *testing.T) {
+	t.Parallel()
 	if code := run([]string{"--version"}); code != 0 {
 		t.Fatalf("run(--version) = %d, want 0", code)
 	}
 }
 
 func TestRunNoArgsPrintsUsage(t *testing.T) {
+	t.Parallel()
 	if code := run(nil); code != 2 {
 		t.Fatalf("run() = %d, want 2", code)
 	}
 }
 
 func TestRunUnknownCommand(t *testing.T) {
+	t.Parallel()
 	if code := run([]string{"frobnicate"}); code != 2 {
 		t.Fatalf("run(frobnicate) = %d, want 2", code)
 	}
 }
 
 func TestShellInitPrintsHooks(t *testing.T) {
+	t.Parallel()
 	for _, shellName := range []string{"auto", "zsh", "bash", "powershell"} {
 		if code := run([]string{"shell-init", shellName}); code != 0 {
 			t.Fatalf("shell-init %s = %d", shellName, code)
@@ -414,6 +421,7 @@ func TestShellInitInstallCachesHookWithoutConfig(t *testing.T) {
 }
 
 func TestSkillCheckOnTempDir(t *testing.T) {
+	t.Parallel()
 	// an empty directory fails validation (missing SKILL.md)
 	dir := t.TempDir()
 	if code := run([]string{"skill", "check", dir}); code != 1 {
@@ -425,6 +433,7 @@ func TestSkillCheckOnTempDir(t *testing.T) {
 }
 
 func TestInstallFlagsAcceptTrailingOptions(t *testing.T) {
+	t.Parallel()
 	opts, positional, all, auditMode, err := installFlags([]string{"project-a", "--dry-run", "--strict-tags", "--audit", "strict"})
 	if err != nil {
 		t.Fatal(err)
@@ -438,6 +447,7 @@ func TestInstallFlagsAcceptTrailingOptions(t *testing.T) {
 }
 
 func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
+	t.Parallel()
 	_, positional, _, auditMode, err := installFlags([]string{"--audit", "project-a"})
 	if err != nil || auditMode != "advisory" || len(positional) != 1 || positional[0] != "project-a" {
 		t.Fatalf("bare --audit: positional=%v mode=%q err=%v", positional, auditMode, err)
@@ -449,6 +459,7 @@ func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
 }
 
 func TestSelectProjectTargetsUsesAliasesAndStableAllOrder(t *testing.T) {
+	t.Parallel()
 	cfg := &config.Config{Projects: map[string]config.Project{
 		"zeta":  {Path: "/work/zeta"},
 		"alpha": {Path: "/work/alpha"},
@@ -464,6 +475,7 @@ func TestSelectProjectTargetsUsesAliasesAndStableAllOrder(t *testing.T) {
 }
 
 func TestStatusDriftDetectsContentTampering(t *testing.T) {
+	t.Parallel()
 	project := t.TempDir()
 	skillsRoot := t.TempDir()
 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(
@@ -690,6 +702,7 @@ func runGit(t *testing.T, dir string, args ...string) {
 // mode is dispatched before command parsing and never appears in the CLI
 // surface, so no package, manifest, or user option can reach it by name.
 func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
+	t.Parallel()
 	for _, mode := range []string{godriver.WorkerMode, "__curator_rust_git_oracle_v1"} {
 		if strings.Contains(usage, mode) {
 			t.Fatalf("hidden worker mode %q appears in the user-visible command surface", mode)
@@ -704,6 +717,7 @@ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
 }
 
 func TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery(t *testing.T) {
+	t.Parallel()
 	binary := filepath.Join(t.TempDir(), "curator")
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {

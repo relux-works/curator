@@ -5,6 +5,18 @@
 
 ## 2026-08-25
 
+### 0330 — cmd/curator cannot be parallelized: 98.7 % of its wall-clock is behind two process globals (TASK-260824-1kzj22)
+
+- SCOPE: test code only — `t.Parallel()` added to 36 cases in `builds_test.go`, `main_test.go`, `status_test.go`, `toolchain_host_test.go`, plus a doc comment on `capture` (`cmd/curator/status_test.go`). No production file touched.
+- FINDING: of 70 test functions, 36 are genuinely independent and hold **5.18 s**; the other 33 hold **381.03 s** (98.7 %). Every one of the 33 drives the CLI through `run()`, which resolves the manager config from the process-global `CURATOR_CONFIG` (`cmd/curator/main.go:94` → `config.Load("")`) and writes through process-global `os.Stdout`/`os.Stderr` via `capture`. Go panics both ways on `t.Setenv` + `t.Parallel()`, and two concurrent `capture` calls would cross streams. There is no in-process ordering that satisfies both.
+- FINDING: the 4-minute target is unreachable independent of machine speed — `TestCompiledProjectStatusRepairRollbackRecovery` alone measures 230–268 s (subtests 80.85 / 72.11 / 64.95 / 20.07 / 17.02 s) and its five subtests corrupt and repair **one shared installed fixture**, so they cannot be split either.
+- ROOT CAUSE of the cost: not test overhead, cold Go compilation. `godriver` gives every build session a hermetic `GOPATH`/`GOMODCACHE`/`GOCACHE` (`internal/godriver/session.go:411`) and `internal/godriver/guards_test.go:60` explicitly rejects a shared cache, so each compiled-command fixture pays a full stdlib compile.
+- DECISION: stop at the safe parallelization rather than exceed scope. Reaching ≤ 4 min needs one of: injectable config path + output streams on `run()` (production change), a subprocess CLI harness (no production change but collapses in-package coverage attribution unless the suite moves to `GOCOVERDIR`), relaxing the hermetic per-session `GOCACHE` (contradicts the guard that exists to enforce it), or sub-packaging (needs `run()` importable). Recommended: injectable `run()`.
+- FINDING: coverage is provably untouched — both trees report 57.1 %, and a block-level profile diff is exact: 778 blocks each side, 695 / 1218 statements covered on both, zero differing blocks.
+- ANOMALY: wall-clock measurement on this host was unusable during the window. Other agent sessions ran their own `go test` passes concurrently (up to nine foreign `*.test` processes, 1-min load 11 → 51); the same tree varied 305.6 s … 543.7 s. The per-test ratio above is taken from inside a single run and is therefore contention-independent; the absolute run numbers are not.
+- STATUS: ready for review. 3 consecutive `go test -timeout 30m -count=1 ./cmd/curator` runs exit 0 (543.7 / 374.0 / 470.3 s), focused `-race` on the 36 parallelized cases exit 0 with no data race, golangci-lint v2.12.2 `0 issues.`, gofmt/vet/`git diff --check` clean, `task-board validate` clean.
+
+
 ### 0100 — Cross-adapter integration: what one suite can honestly prove, and what it must delegate (TASK-260811-x611eq)
 
 - SCOPE: new `internal/crossconformance` (standard-library-only production files, guarded), `docs/source-closure-adapter-conformance.md`, README section and gates row. No accepted adapter production file touched.

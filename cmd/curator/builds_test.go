@@ -75,6 +75,7 @@ func markerRecording(build marker.Build) *marker.Marker {
 // planner vocabulary and the currentness vocabulary stay in exact
 // correspondence, and that a hit is the only code status accepts.
 func TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		string(install.BuildCacheHit):                   buildCurrent,
 		string(install.BuildWouldPreflightAndBuild):     buildMissingArtifact,
@@ -107,6 +108,7 @@ func TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode(t *testing.T) 
 // diagnostic keeps the stable go-v1 code as its machine-readable cause instead
 // of leaving an operator to parse prose.
 func TestUnusableToolchainRowsCarryTheDriverBoundaryCode(t *testing.T) {
+	t.Parallel()
 	facts := testFacts(string(install.BuildToolchainUnavailable))
 	facts.Diagnostic = "go_toolchain_missing"
 	facts.Reason = "go-v1 go_toolchain_missing: no trusted Go installation was selected"
@@ -122,6 +124,7 @@ func TestUnusableToolchainRowsCarryTheDriverBoundaryCode(t *testing.T) {
 }
 
 func TestClassifyBuildCommandDetectsRecordedIdentityDrift(t *testing.T) {
+	t.Parallel()
 	other := buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: testDigest(9)}
 	sourcelessMarker := func() *marker.Marker {
 		recorded := testRecordedMarker()
@@ -240,6 +243,7 @@ func keyOf(t *testing.T, input buildmeta.Input) buildmeta.CacheKey {
 // reported as a target change: the marker records no prior input, so those are
 // indistinguishable and are reported as unattributed.
 func TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves(t *testing.T) {
+	t.Parallel()
 	baseline := testInput()
 	baselineKey := keyOf(t, baseline)
 
@@ -361,6 +365,7 @@ func TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves(t *testing.T) {
 }
 
 func TestInputCausesAreDistinctAndDocumented(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	for _, cause := range inputCauses() {
 		if cause == "" || seen[cause] {
@@ -380,6 +385,7 @@ func TestInputCausesAreDistinctAndDocumented(t *testing.T) {
 }
 
 func TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation(t *testing.T) {
+	t.Parallel()
 	installed := t.TempDir()
 	state, rows := classifySkillBuilds(installed, testRecordedMarker(),
 		[]buildFacts{testFacts(string(install.BuildCacheHit))})
@@ -401,6 +407,7 @@ func TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation(t *testing.T
 }
 
 func TestClassifySkillBuildsWithoutCompiledStateStaysSilent(t *testing.T) {
+	t.Parallel()
 	recorded := testRecordedMarker()
 	recorded.Builds = map[string]marker.Build{}
 	recorded.BuildSource = nil
@@ -412,6 +419,7 @@ func TestClassifySkillBuildsWithoutCompiledStateStaysSilent(t *testing.T) {
 }
 
 func TestClassifySkillBuildsDetectsContextExposure(t *testing.T) {
+	t.Parallel()
 	t.Run("recorded context file inside a build root", func(t *testing.T) {
 		recorded := testRecordedMarker()
 		recorded.Files = append(recorded.Files, "assets/build-tool/go.mod")
@@ -435,6 +443,7 @@ func TestClassifySkillBuildsDetectsContextExposure(t *testing.T) {
 }
 
 func TestClassifySkillBuildsDetectsCommandDriftInBothDirections(t *testing.T) {
+	t.Parallel()
 	t.Run("closure activates a command the marker does not record", func(t *testing.T) {
 		recorded := testRecordedMarker()
 		facts := testFacts(string(install.BuildCacheHit))
@@ -460,6 +469,7 @@ func TestClassifySkillBuildsDetectsCommandDriftInBothDirections(t *testing.T) {
 }
 
 func TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild(t *testing.T) {
+	t.Parallel()
 	facts := []buildFacts{testFacts(string(install.BuildCacheHit))}
 
 	state, rows := classifySkillBuilds(t.TempDir(), nil, facts)
@@ -479,6 +489,7 @@ func TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild(t *testing.T)
 // operator: a document from a newer manager, a build driver outside the closed
 // set, and a document that is simply not a marker are three different codes.
 func TestMarkerRefusalSeparatesUnsupportedFromInvalid(t *testing.T) {
+	t.Parallel()
 	for name, testCase := range map[string]struct {
 		payload string
 		absent  bool
@@ -531,6 +542,7 @@ func TestMarkerRefusalSeparatesUnsupportedFromInvalid(t *testing.T) {
 }
 
 func TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	for _, code := range currentnessCodes() {
 		if code == "" {
@@ -572,6 +584,7 @@ func readDocumentation(t *testing.T) (string, bool) {
 // the reachable vocabulary in sync: a code nobody can look up is not a stable
 // interface.
 func TestEveryCurrentnessCodeIsDocumented(t *testing.T) {
+	t.Parallel()
 	documentation, ok := readDocumentation(t)
 	if !ok {
 		return
@@ -587,6 +600,7 @@ func TestEveryCurrentnessCodeIsDocumented(t *testing.T) {
 // for exactly current state, on both surfaces it consults: the declared-skill
 // map and the compiled-command rows a transitively resolved node produces.
 func TestCheckFailsForEveryNonCurrentCode(t *testing.T) {
+	t.Parallel()
 	for _, code := range currentnessCodes() {
 		want := !currentCode(code)
 		if failed := checkFailed(map[string]string{"skill-a": code}, nil); failed != want {
@@ -610,6 +624,7 @@ func TestCheckFailsForEveryNonCurrentCode(t *testing.T) {
 // cannot publish a manager-private location or drive a terminal through a
 // machine-readable diagnostic field, in free-standing, embedded, and URI form.
 func TestBuildReportsNeverPublishAnAbsolutePath(t *testing.T) {
+	t.Parallel()
 	for _, reason := range []string{
 		"inspect cache boundary: lstat /Users/operator/.curator/cache/build/go-v1/abcd: permission denied",
 		`open C:\Users\operator\AppData\curator\cache: access denied`,
@@ -638,6 +653,7 @@ func TestBuildReportsNeverPublishAnAbsolutePath(t *testing.T) {
 }
 
 func TestBuildReportDetailIsBounded(t *testing.T) {
+	t.Parallel()
 	facts := testFacts(string(install.BuildCorrupt))
 	facts.Reason = strings.Repeat("compiler noise ", 500)
 	state, cause, detail := classifyBuildCommand(testRecordedBuild(), testRecordedMarker(), facts)
@@ -651,6 +667,7 @@ func TestBuildReportDetailIsBounded(t *testing.T) {
 // operator guidance to the accepted selection mechanisms and the tested Go
 // release families, and proves it never suggests a PATH lookup or a download.
 func TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies(t *testing.T) {
+	t.Parallel()
 	if guidance := goToolchainGuidance(""); guidance != "" {
 		t.Fatalf("a run without a driver diagnostic produced guidance %q", guidance)
 	}
@@ -689,6 +706,7 @@ func TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies(t *testin
 }
 
 func TestRepairNoticesDistinguishRepairFromAPreservedInstallation(t *testing.T) {
+	t.Parallel()
 	hit := testFacts(string(install.BuildCacheHit))
 
 	for name, testCase := range map[string]struct {
@@ -747,6 +765,7 @@ func TestRepairNoticesDistinguishRepairFromAPreservedInstallation(t *testing.T) 
 }
 
 func TestMarkerDigestsDetectAConcurrentInstallMarkerChange(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	installed := filepath.Join(store, "build-skill")
 	if err := os.MkdirAll(installed, 0o755); err != nil {
@@ -779,6 +798,7 @@ func TestMarkerDigestsDetectAConcurrentInstallMarkerChange(t *testing.T) {
 // the run started with makes every verdict for that skill stale rather than
 // authoritative, and the scope fails --check.
 func TestStatusReportMarksCompiledStateThatMovedDuringTheCheck(t *testing.T) {
+	t.Parallel()
 	project := t.TempDir()
 	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "home", "config.json"), SkillsRoot: t.TempDir()}
 	installed := filepath.Join(project, ".agents", "skills", "build-skill")
@@ -809,6 +829,7 @@ func TestStatusReportMarksCompiledStateThatMovedDuringTheCheck(t *testing.T) {
 // dropped, which is what a transitively resolved provider looks like before its
 // first installation.
 func TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill(t *testing.T) {
+	t.Parallel()
 	project := t.TempDir()
 	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "home", "config.json"), SkillsRoot: t.TempDir()}
 	facts := []buildFacts{testFacts(string(install.BuildCacheHit))}
