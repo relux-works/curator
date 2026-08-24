@@ -94,3 +94,83 @@ func TestVerifyArtifactRejectsHardLinks(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+// TestInertGeneratorDirectiveIsExemptOnlyInsideTheVendorTree pins the profile's
+// `//go:generate` rule: the driver runs a fixed `go list`/`go build` vector and
+// never `go generate`, so the comment is inert and its presence in vendored
+// `GoFiles` does not fail preflight. The exemption is scoped by location alone,
+// so every case below that is not inside the vendor tree must still be refused
+// by validatePackageGraph, the preflight the build calls before `go build`.
+func TestInertGeneratorDirectiveIsExemptOnlyInsideTheVendorTree(t *testing.T) {
+	// Real vendored dependencies carry the directive unguarded --
+	// github.com/clipperhouse/displaywidth reaches every bubbletea consumer
+	// through charmbracelet/x/ansi with a bare `//go:generate` in gen.go --
+	// and a package cannot reasonably fork them.
+	const generator = "package value\nconst V = 1\n\n//go:generate go run ./internal/gen\n"
+
+	t.Run("audited vendored dependency is admitted", func(t *testing.T) {
+		validation, vendored, root := generatorGraphFixture(t)
+		writeTestFile(t, filepath.Join(vendored.Dir, "value.go"), []byte(generator), 0o644)
+		if err := validatePackageGraph(encodePackages(t, vendored, root), validation); err != nil {
+			t.Fatalf("an inert generator comment in a vendored GoFile failed preflight: %v", err)
+		}
+	})
+
+	t.Run("main package in the build root is refused", func(t *testing.T) {
+		validation, vendored, root := generatorGraphFixture(t)
+		writeTestFile(t, filepath.Join(root.Dir, "main.go"),
+			[]byte("package main\n\n//go:generate go run ./internal/gen\nfunc main() {}\n"), 0o644)
+		err := validatePackageGraph(encodePackages(t, vendored, root), validation)
+		if code := DiagnosticCode(err); code != "go_generator_forbidden" {
+			t.Fatalf("code = %q, want go_generator_forbidden (error %v)", code, err)
+		}
+	})
+
+	t.Run("first-party package below the build root is refused", func(t *testing.T) {
+		validation, vendored, root := generatorGraphFixture(t)
+		firstParty := filepath.Join(validation.BuildRoot, "internal", "value")
+		writeTestFile(t, filepath.Join(firstParty, "value.go"), []byte(generator), 0o644)
+		own := packageJSON{
+			Dir: firstParty, ImportPath: "example.test/build/internal/value", Name: "value", DepOnly: true,
+			GoFiles: []string{"value.go"}, Module: root.Module,
+		}
+		err := validatePackageGraph(encodePackages(t, vendored, own, root), validation)
+		if code := DiagnosticCode(err); code != "go_generator_forbidden" {
+			t.Fatalf("code = %q, want go_generator_forbidden (error %v)", code, err)
+		}
+	})
+
+	// The exemption covers exactly one directive. `//go:cgo_import_dynamic` is
+	// scoped by an import-path allowlist instead, so the same vendored package
+	// must still be refused for it.
+	t.Run("the exemption does not extend to cgo_import_dynamic", func(t *testing.T) {
+		validation, vendored, root := generatorGraphFixture(t)
+		writeTestFile(t, filepath.Join(vendored.Dir, "value.go"),
+			[]byte("package value\n\n//go:cgo_import_dynamic libc_x x \"/usr/lib/libSystem.dylib\"\n"), 0o644)
+		err := validatePackageGraph(encodePackages(t, vendored, root), validation)
+		if code := DiagnosticCode(err); code != "go_forbidden_compiler_directive" {
+			t.Fatalf("code = %q, want go_forbidden_compiler_directive (error %v)", code, err)
+		}
+	})
+}
+
+// generatorGraphFixture returns a snapshot whose single vendored dependency is
+// ready for a directive to be written into it.
+func generatorGraphFixture(t *testing.T) (graphValidation, packageJSON, packageJSON) {
+	t.Helper()
+	fixture := newSnapshotFixture(t)
+	vendorDir := filepath.Join(fixture.buildRoot, "vendor", "example.test", "dep", "value")
+	writeTestFile(t, filepath.Join(vendorDir, "value.go"), []byte("package value\nconst V = 1\n"), 0o644)
+	writeTestFile(t, filepath.Join(fixture.buildRoot, "vendor", "modules.txt"),
+		[]byte("# example.test/dep v1.0.0\n## explicit; go 1.23\nexample.test/dep/value\n"), 0o644)
+	vendored := packageJSON{
+		Dir: vendorDir, ImportPath: "example.test/dep/value", Name: "value", DepOnly: true,
+		GoFiles: []string{"value.go"},
+		Module:  &moduleJSON{Path: "example.test/dep", Version: "v1.0.0", GoVersion: "1.23"},
+	}
+	validation := graphValidation{
+		BuildRoot: fixture.buildRoot, SourceDir: fixture.sourceDir,
+		GOROOT: mustPhysical(t, t.TempDir()),
+	}
+	return validation, vendored, fixture.rootPackage()
+}

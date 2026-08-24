@@ -189,6 +189,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation, replace
 	// package declared, so §4.2.3 withholds from it every allowance a profile
 	// grants to audited third-party vendored code.
 	firstParty := item.Module != nil && item.Module.Replace != nil
+	vendored := strictlyBelow(item.Dir, filepath.Join(validation.BuildRoot, "vendor"))
 	if trustedStandard {
 		root = validation.GOROOT
 		if item.Module != nil {
@@ -228,8 +229,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation, replace
 			}
 		}
 		if len(item.SFiles) != 0 {
-			vendorRoot := filepath.Join(validation.BuildRoot, "vendor")
-			if firstParty || !strictlyBelow(item.Dir, vendorRoot) {
+			if firstParty || !vendored {
 				return diagnostic("go_assembly_forbidden", "package %q contains non-standard assembly", item.ImportPath)
 			}
 			for _, name := range item.SFiles {
@@ -267,7 +267,13 @@ func validatePackageInputs(item packageJSON, validation graphValidation, replace
 				item.ImportPath != "golang.org/x/sys" && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys/")) {
 				return diagnostic("go_forbidden_compiler_directive", "package %q contains //go:cgo_import_dynamic", item.ImportPath)
 			}
-			if matched == 2 {
+			// `//go:generate` is inert here: the driver runs a fixed
+			// `go list`/`go build` vector and never `go generate`, and a vendor
+			// tree is already materialized. The profile therefore exempts
+			// vendored `GoFiles` by location alone -- unlike the `SFiles` and
+			// `cgo_import_dynamic` allowances, the rules a replaced module is
+			// held to are enumerated and do not include this one.
+			if matched == 2 && !vendored {
 				return diagnostic("go_generator_forbidden", "package %q contains an active generator directive", item.ImportPath)
 			}
 		}
