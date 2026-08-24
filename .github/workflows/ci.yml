@@ -8,8 +8,9 @@ on:
     inputs:
       candidate_ref:
         description: >-
-          Full 40-character relux-works/curator-spec revision holding the schema v6
-          candidate suite. Branches, tags, short hashes and placeholders are rejected.
+          Full 40-character relux-works/curator-spec revision holding the candidate
+          suite. The lane is schema-agnostic: it qualifies whatever suite the revision
+          publishes. Branches, tags, short hashes and placeholders are rejected.
           Leave empty to use candidate_root instead.
         required: false
         default: ""
@@ -34,7 +35,7 @@ env:
   # It stays on the currently qualified released revision; promoting it is
   # owned by TASK-260720-38l1sy, after TASK-260720-25d05o qualifies the
   # release. This pin publishes protocol 1.0.0-rc.3 and claims no later
-  # revision. The schema v6 candidate never appears here -- it enters through
+  # revision. A candidate suite never appears here -- it enters through
   # the non-default `candidate-conformance` job below and nowhere else.
   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
   # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
@@ -297,7 +298,7 @@ jobs:
           echo "naming gate: clean (one README line)"
 
   # ---------------------------------------------------------------------------
-  # Schema v6 candidate qualification.
+  # Candidate suite qualification.
   #
   # Non-default by construction: it runs only on an explicit workflow_dispatch
   # that supplies a candidate, never on push or pull_request, and it never

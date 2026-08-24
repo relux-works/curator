@@ -206,6 +206,34 @@ cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	darwin,w
 internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwin,windows	-	-	an uncovered inventory platform (including linux) is rejected before the worker starts
 
 # ===========================================================================
+# Schema-8 suite consumption.
+#
+# Schema 8 is one shared bump carrying script-worker-v1 and first-party module
+# roots. The pinned implementation jobs of curator-spec pass against a schema-8
+# suite while consuming none of it (TASK-260823-omp8zt), so presence of the
+# families in the root is not evidence: `.github/ci/root-artifacts.tsv` makes a
+# root that stops publishing them defer the package, and the candidate lane's
+# CI_REQUIRE_FULL_ROOT=1 makes that deferral fatal.
+#
+# These rows are the other half. They name the cases that actually READ the
+# schema-8 families, so a rename, a deletion or a -run filter matching nothing
+# fails by name instead of shrinking the run. Every row is required on all
+# three runners and tolerates exactly one skip class: the one the case prints
+# when it ran without a root -- `root-unset` for the packages the artefact
+# table defers, `root-content` for the driver case that guards its own read.
+# `root-unset` is `deferred-only` in `.github/ci/skip-classes.tsv`, so in a
+# lane that requires a fully serving root there is no tolerated skip left.
+# ===========================================================================
+internal/skillspec	TestReleasedSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published agent-skill-v8 and csk-skill-v8 families are loaded, and every case in them is consumed
+internal/marker	TestReadAuthoritativeMarkerV4SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published install-marker-v4 family is read back through the marker reader
+internal/moduleroots	TestModuleRootVectors	linux,darwin,windows	linux,darwin,windows	root-unset	the published module-roots family drives declaration/containment and the replace bijection at their own failure boundaries
+internal/godriver	TestModuleRootVectorsDriveTheWholeBuild	linux,darwin,windows	linux,darwin,windows	root-content	the published module-roots family drives the go-v1 driver to the exact process state each case records
+internal/scriptpolicy	TestScriptHostExecutionPolicySectionsAreAllClassified	linux,darwin,windows	linux,darwin,windows	root-unset	every section of the published script-worker family is classified, so a new one cannot be ignored
+internal/scriptpolicy	TestScriptExecutionPolicyIdentityMatchesTheSuite	linux,darwin,windows	linux,darwin,windows	root-unset	the closed policy identity and interpreter set this build hard-codes are the suite's own
+internal/scriptpolicy	TestScriptExecutionOptInCases	linux,darwin,windows	linux,darwin,windows	root-unset	every published opt-in case decides manifest acceptance and enforced/declared-only classification
+internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is refused with script_execution_policy_unsupported before any worker surface
+
+# ===========================================================================
 # Opt-in developer probe -- never required, always tolerated.
 # ===========================================================================
 internal/hashing	TestCrossCheckTree	-	linux,darwin,windows	opt-in	cross-implementation tree digest probe, enabled by an explicit developer env var
