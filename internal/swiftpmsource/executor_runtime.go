@@ -381,13 +381,14 @@ type dumpProduct struct {
 }
 
 type dumpTarget struct {
-	Name         string                       `json:"name"`
-	Type         string                       `json:"type"`
-	Path         string                       `json:"path"`
-	Sources      []string                     `json:"sources"`
-	Exclude      []string                     `json:"exclude"`
-	Dependencies []map[string]json.RawMessage `json:"dependencies"`
-	Settings     []map[string]json.RawMessage `json:"settings"`
+	Name              string                       `json:"name"`
+	Type              string                       `json:"type"`
+	Path              string                       `json:"path"`
+	PublicHeadersPath string                       `json:"publicHeadersPath"`
+	Sources           []string                     `json:"sources"`
+	Exclude           []string                     `json:"exclude"`
+	Dependencies      []map[string]json.RawMessage `json:"dependencies"`
+	Settings          []map[string]json.RawMessage `json:"settings"`
 }
 
 func decodeDumpPackage(payload []byte, root string) (Manifest, error) {
@@ -414,7 +415,7 @@ func decodeDumpPackage(payload []byte, root string) (Manifest, error) {
 		if err != nil {
 			return Manifest{}, err
 		}
-		item := Target{Name: target.Name, Type: target.Type, Path: target.Path, Sources: sources}
+		item := Target{Name: target.Name, Type: target.Type, Path: target.Path, PublicHeadersPath: target.PublicHeadersPath, Sources: sources}
 		for _, raw := range target.Dependencies {
 			dependency, err := decodeTargetDependency(raw)
 			if err != nil {
@@ -458,14 +459,7 @@ func singletonKey(value map[string]json.RawMessage) (string, error) {
 }
 
 func enumerateTargetSources(root string, target dumpTarget) ([]string, error) {
-	targetPath := target.Path
-	if targetPath == "" {
-		base := "Sources"
-		if target.Type == "test" {
-			base = "Tests"
-		}
-		targetPath = filepath.ToSlash(filepath.Join(base, target.Name))
-	}
+	targetPath := targetSourceRoot(target.Name, target.Type, target.Path)
 	if filepath.IsAbs(targetPath) || filepath.Clean(targetPath) != filepath.FromSlash(targetPath) || targetPath == ".." || strings.HasPrefix(targetPath, "../") {
 		return nil, fail(CodeSourceInventoryDrift, "target path escapes package")
 	}
@@ -507,9 +501,15 @@ func enumerateTargetSources(root string, target dumpTarget) ([]string, error) {
 	return result, nil
 }
 
+// swiftPMSourceExtension admits the target-source suffixes SwiftPM enumerates.
+// Admission stays case-insensitive because the driver compiles `impl.C` and
+// `impl.M` as readily as `impl.c` and `impl.m` — it selects a *different*
+// language for the upper-case pair, which targetLanguages and the interop
+// stage record, but the bytes are target source either way and must be
+// admitted, hashed, and inventoried rather than silently dropped.
 func swiftPMSourceExtension(extension string) bool {
 	switch strings.ToLower(extension) {
-	case ".swift", ".c", ".cc", ".cpp", ".cxx", ".m", ".mm", ".s", ".S":
+	case ".swift", ".c", ".cc", ".cpp", ".cxx", ".m", ".mm", ".s":
 		return true
 	default:
 		return false

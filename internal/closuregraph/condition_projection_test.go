@@ -109,3 +109,31 @@ func multiConditionFixture(t *testing.T, reverse bool) (CaptureGraph, SelectionC
 	}
 	return capture, selection, binding, NewRecordTables(nodes, edges, []Node{platform}, []Edge{target}), want
 }
+
+// A conditional consumer side is the only way an adapter can declare an
+// interop boundary neutrally and still let the projector prune it: without the
+// condition the consumer action would keep the boundary — and, through the
+// reverse provides_interop traversal, its provider — reachable on every
+// destination.
+func TestConsumesInteropConditionIsProjected(t *testing.T) {
+	payload := ConsumesInteropPayload{Origin: fixtureOrigin("targets.App.dependencies"), Use: "compile", ABIExpectation: "c-abi-v1"}
+	if payload.condition() != nil {
+		t.Fatal("an unconditional consumer side reported a condition")
+	}
+	condition := Condition{EvaluatorID: "fixture-target-v1", Expression: "platform=macos"}
+	payload.Condition = &condition
+	if got := payload.condition(); got == nil || got.Expression != condition.Expression {
+		t.Fatalf("projected condition = %#v", got)
+	}
+	if _, present := payload.value()["condition"]; !present {
+		t.Fatal("canonical payload omitted the declared condition")
+	}
+	edge := Edge{Kind: EdgeConsumesInterop, EdgeKey: "edge:conditional-consumes", FromNodeID: testDigest('1'), ToNodeID: testDigest('2'), Payload: payload}
+	if err := edge.Validate(); err != nil {
+		t.Fatalf("valid conditional consumer side rejected: %v", err)
+	}
+	edge.Payload = ConsumesInteropPayload{Origin: payload.Origin, Use: payload.Use, ABIExpectation: payload.ABIExpectation, Condition: &Condition{EvaluatorID: "", Expression: "platform=macos"}}
+	if err := edge.Validate(); err == nil {
+		t.Fatal("a malformed consumer-side condition was accepted")
+	}
+}

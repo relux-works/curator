@@ -2,6 +2,7 @@ package swiftpmsource
 
 import (
 	"context"
+	"path"
 
 	"github.com/relux-works/curator/internal/artifactpolicy"
 	"github.com/relux-works/curator/internal/closureexec"
@@ -66,11 +67,38 @@ type BuildSetting struct {
 }
 
 // Target is the source-closure projection emitted by controlled dump-package.
+// PublicHeadersPath retains SwiftPM's declared C-family public-header
+// directory verbatim; an empty value means the target declared none and the
+// consumer applies SwiftPM's documented default.
 type Target struct {
-	Name, Type, Path string
-	Sources          []string
-	Dependencies     []TargetDependency
-	Settings         []BuildSetting
+	Name, Type, Path  string
+	PublicHeadersPath string
+	Sources           []string
+	Dependencies      []TargetDependency
+	Settings          []BuildSetting
+}
+
+// SourceRoot is the package-relative directory SwiftPM enumerates this
+// target's sources from. It is the declared path when the manifest gives one
+// and SwiftPM's documented convention default otherwise. SwiftPM's native
+// build system mirrors the source tree below this root into the target build
+// directory, so a consumer that must reconcile a produced object with its
+// declared source resolves the source against exactly this root.
+func (target Target) SourceRoot() string {
+	return targetSourceRoot(target.Name, target.Type, target.Path)
+}
+
+// targetSourceRoot applies the documented default exactly once so manifest
+// normalization and downstream reconciliation cannot disagree.
+func targetSourceRoot(name, kind, declared string) string {
+	if declared != "" {
+		return declared
+	}
+	base := "Sources"
+	if kind == "test" {
+		base = "Tests"
+	}
+	return path.Join(base, name)
 }
 
 // Product is one declared package product.

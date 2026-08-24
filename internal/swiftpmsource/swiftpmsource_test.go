@@ -547,6 +547,20 @@ func TestClosedRequirementDecoderAndLanguageBranches(t *testing.T) {
 	if want := []string{"c", "c++", "objective-c", "objective-c++", "swift"}; !reflect.DeepEqual(languages, want) {
 		t.Fatalf("languages = %v, want %v", languages, want)
 	}
+	// The Clang driver is case-sensitive on `.C` and `.M`: `clang -### -c up.C`
+	// selects `-x c++` and `clang -### -c up.M` selects `-x objective-c++`, so
+	// lowercasing them would publish C and Objective-C capture evidence for
+	// translation units the compiler compiles as C++ and Objective-C++.
+	if got := targetLanguages(Target{Sources: []string{"a.C", "b.M"}}); !reflect.DeepEqual(got, []string{"c++", "objective-c++"}) {
+		t.Fatalf("upper-case languages = %v", got)
+	}
+	// Both remain admitted target source: the driver compiles them, so their
+	// bytes must be hashed and inventoried rather than dropped.
+	for _, extension := range []string{".C", ".M", ".S"} {
+		if !swiftPMSourceExtension(extension) {
+			t.Fatalf("source extension %s was not admitted", extension)
+		}
+	}
 	if (&Failure{Code: CodeGraphIncomplete, Detail: "x"}).Error() != "closure_graph_incomplete: x" || (&Failure{Code: CodeGraphIncomplete}).Error() != "closure_graph_incomplete" {
 		t.Fatal("stable failure rendering drifted")
 	}

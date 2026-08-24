@@ -60,7 +60,7 @@ func TestEveryClosedNodeAndEdgeKindHasStrictRoundTripCodec(t *testing.T) {
 		{Kind: EdgeTargets, EdgeKey: "edge:targets", FromNodeID: from, ToNodeID: to, Payload: TargetsPayload{BindingRole: PlatformTarget, Origin: EvidenceOrigin{Field: "selection.platform_roles.target"}}},
 		{Kind: EdgeProduces, EdgeKey: "edge:produces", FromNodeID: from, ToNodeID: to, Payload: ProducesPayload{Path: "bin/codec", WriteSlot: "output", WriteClass: "native.executable"}},
 		{Kind: EdgeProvidesInterop, EdgeKey: "edge:provides", FromNodeID: from, ToNodeID: to, Payload: ProvidesInteropPayload{Origin: origin, EvidenceIDs: []ID{testDigest('b')}, ExportRole: "headers", LinkMode: "static"}},
-		{Kind: EdgeConsumesInterop, EdgeKey: "edge:consumes", FromNodeID: from, ToNodeID: to, Payload: ConsumesInteropPayload{Origin: origin, Use: "compile", ABIExpectation: "c-abi-v1"}},
+		{Kind: EdgeConsumesInterop, EdgeKey: "edge:consumes", FromNodeID: from, ToNodeID: to, Payload: ConsumesInteropPayload{Origin: origin, Use: "compile", ABIExpectation: "c-abi-v1", Condition: &condition}},
 		{Kind: EdgeInvokes, EdgeKey: "edge:invokes", FromNodeID: from, ToNodeID: to, Payload: InvokesPayload{ProtocolSchema: "json-v1", ExecutableResolution: "bundle-relative-v1", ArgumentsContract: "argv-v1", EnvironmentContract: "env-v1", WorkingDirectory: "work"}},
 		{Kind: EdgePublishes, EdgeKey: "edge:publishes", FromNodeID: from, ToNodeID: to, Payload: PublishesPayload{Destination: "bin/codec", EntryPoint: "codec"}},
 	}
@@ -146,6 +146,7 @@ func TestNodeAndEdgeCodecsRejectEveryWrongTypedOptionalField(t *testing.T) {
 		{edge: Edge{Kind: EdgeUsesTool, EdgeKey: "edge:strict-uses", FromNodeID: from, ToNodeID: to, Payload: UsesToolPayload{ExecutableRelativePath: "bin/compiler", ToolSlot: "compiler", InvocationRole: "compile"}}, paths: [][]string{{"payload", "invocation_role"}}},
 		{edge: Edge{Kind: EdgeProduces, EdgeKey: "edge:strict-produces", FromNodeID: from, ToNodeID: to, Payload: ProducesPayload{Path: "bin/output", WriteSlot: "output", WriteClass: "native.executable"}}, paths: [][]string{{"payload", "write_class"}}},
 		{edge: Edge{Kind: EdgeInvokes, EdgeKey: "edge:strict-invokes", FromNodeID: from, ToNodeID: to, Payload: InvokesPayload{ProtocolSchema: "json-v1", ExecutableResolution: "bundle-relative-v1", ArgumentsContract: "argv-v1", EnvironmentContract: "env-v1", WorkingDirectory: "work"}}, paths: [][]string{{"payload", "working_directory"}}},
+		{edge: Edge{Kind: EdgeConsumesInterop, EdgeKey: "edge:strict-consumes", FromNodeID: from, ToNodeID: to, Payload: ConsumesInteropPayload{Origin: origin, Use: "compile", ABIExpectation: "c-abi-v1", Condition: &condition}}, paths: [][]string{{"payload", "condition"}}},
 	}
 	for _, testCase := range edgeCases {
 		for _, path := range testCase.paths {

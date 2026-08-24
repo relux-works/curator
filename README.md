@@ -278,6 +278,25 @@ bijectively reconcile to those derived contexts, including Yarn's implicit
 optional `@types/*` peers. Extra, missing, retargeted, cross-context, or
 preseeded PnP/install state cannot become closure authority.
 
+### Cross-adapter source-closure conformance
+
+The four Node profiles above, the SwiftPM profile, and the `rust-source-v1`
+Cargo path are integrated by one suite in `internal/crossconformance`. Go
+remains the untouched compiled baseline and is not one of the six adapter
+paths. The suite proves that every delivered path keeps the same
+selection-neutral capture, the same binding-only target authority, the same
+deterministic projection, the same causal evidence chain, and the same shared
+artifact admission, and it drives a published rejection matrix through the
+adapters' own seams. It also independently canonicalizes and hashes the
+accepted 53-record CGP05/CGP10 corpus with its own CCJ-1 implementation, and
+exports the whole contract as committed canonical JSON for an independent
+implementation.
+
+Supported profiles, explicit unsupported cases, the stable diagnostic
+vocabulary, the conformance matrix, and migration steps for an existing command
+are in
+[docs/source-closure-adapter-conformance.md](docs/source-closure-adapter-conformance.md).
+
 ## Compiled-command status, diagnostics, and repair
 
 `curator status` is read-only. It reports one code per declared skill and, when
@@ -547,6 +566,7 @@ it.
 | Yarn Classic 1.22.22 profile harness | validates closed lock/workspace/config authority, private source mirror derivation, empty-cache frozen replay, exact staged Node/Yarn launch, lifecycle/native rejection, and poisoned ambient config/cache isolation | `go test -count=1 ./internal/yarnclassicsource` | Go test output and task evidence may be stored under `.temp/<TASK-ID>/` |
 | Modern Yarn 4.9.2 profile harness | validates lock v8, exact built-in plugins, `.yarnrc.yml`, patches, cache key/compression/checksums, linker/conditions, peer-context virtualization and PnP aliases, deterministic private ZIP cache, preseed-state isolation, lifecycle/native rejection, and immutable network-disabled skip-build replay | `npm install --prefix .temp/yarn-4.9.2 --no-save --ignore-scripts @yarnpkg/cli-dist@4.9.2`; then `CURATOR_TEST_YARN_MODERN_JS="$PWD/.temp/yarn-4.9.2/node_modules/@yarnpkg/cli-dist/bin/yarn.js" go test -count=1 ./internal/yarnmodernsource` | Task-local Yarn under `.temp/yarn-4.9.2/`; Go test output may be stored under `.temp/<TASK-ID>/` |
 | Swift / SwiftPM | validates `swiftpm-source-v1` lock, exact pin, tree-intake, manifest permit, kind-preserving mirror, selection-neutral capture, exact binding, extension/binary rejection, and offline replay contracts; runs real protected `swift package dump-package` and forced-lock `show-dependencies` mirror replay when Swift is installed | `go test -count=1 ./internal/swiftpmsource` | Go test output; task evidence may be stored under `.temp/<TASK-ID>/` |
+| Cross-adapter source-closure conformance | runs one normative semantic suite across Rust, npm, pnpm, Yarn Classic, modern Yarn, and SwiftPM/C-family; independently canonicalizes and hashes all 53 accepted CGP05/CGP10 records; drives the published rejection matrix; refuses an incomplete coverage matrix; and emits the committed protocol export for independent implementations | `go test -count=1 ./internal/crossconformance` | Go test output and `internal/crossconformance/testdata/cross-adapter-protocol-export.json`; task evidence may be stored under `.temp/<TASK-ID>/` |
 
 The released suite is pinned to curator-spec `v1.0.0-rc.8` at commit
 `f8c405aa3ad0a39d260c2ed93684e55c5a346359`. `curator-spec-pin` verifies the

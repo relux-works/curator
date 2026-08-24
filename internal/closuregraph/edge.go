@@ -208,11 +208,15 @@ type ProvidesInteropPayload struct {
 	LinkMode    string
 }
 
-// ConsumesInteropPayload attaches a consumer to an explicit boundary.
+// ConsumesInteropPayload attaches a consumer to an explicit boundary. A
+// consumer edge declared under a platform, configuration, or feature predicate
+// carries that predicate here so the boundary itself is captured neutrally and
+// the selected/pruned verdict is recorded by the active projection.
 type ConsumesInteropPayload struct {
 	Origin         EvidenceOrigin
 	Use            string
 	ABIExpectation string
+	Condition      *Condition
 }
 
 // InvokesPayload records a runtime executable/protocol relationship.
@@ -262,9 +266,10 @@ func (UsesToolPayload) condition() *Condition         { return nil }
 func (TargetsPayload) condition() *Condition          { return nil }
 func (ProducesPayload) condition() *Condition         { return nil }
 func (ProvidesInteropPayload) condition() *Condition  { return nil }
-func (ConsumesInteropPayload) condition() *Condition  { return nil }
 func (InvokesPayload) condition() *Condition          { return nil }
 func (PublishesPayload) condition() *Condition        { return nil }
+
+func (payload ConsumesInteropPayload) condition() *Condition { return payload.Condition }
 
 // Validate checks the closed edge schema independent of its endpoint table.
 func (edge Edge) Validate() error {
@@ -506,10 +511,19 @@ func (payload ConsumesInteropPayload) validate() error {
 	if err := payload.Origin.validate(); err != nil {
 		return err
 	}
+	if payload.Condition != nil {
+		if err := payload.Condition.Validate(); err != nil {
+			return err
+		}
+	}
 	return validatePortableTextFields(map[string]string{"use": payload.Use, "abi_expectation": payload.ABIExpectation}, false, false)
 }
 func (payload ConsumesInteropPayload) value() map[string]any {
-	return map[string]any{"origin": payload.Origin.value(), "use": payload.Use, "abi_expectation": payload.ABIExpectation}
+	value := map[string]any{"origin": payload.Origin.value(), "use": payload.Use, "abi_expectation": payload.ABIExpectation}
+	if payload.Condition != nil {
+		value["condition"] = payload.Condition.value()
+	}
+	return value
 }
 
 func (payload InvokesPayload) validate() error {
@@ -712,7 +726,7 @@ func decodeEdgePayload(kind EdgeKind, raw map[string]any) (EdgePayload, error) {
 		return ProvidesInteropPayload{Origin: origin, EvidenceIDs: ids, ExportRole: fields["export_role"], LinkMode: fields["link_mode"]}, nil
 	case EdgeConsumesInterop:
 		const context = "consumes_interop payload"
-		if err := exactFields(raw, context, []string{"origin", "use", "abi_expectation"}, nil); err != nil {
+		if err := exactFields(raw, context, []string{"origin", "use", "abi_expectation"}, []string{"condition"}); err != nil {
 			return nil, err
 		}
 		fields, err := decodeStringFields(raw, context, []string{"use", "abi_expectation"}, nil)
@@ -727,7 +741,19 @@ func decodeEdgePayload(kind EdgeKind, raw map[string]any) (EdgePayload, error) {
 		if err != nil {
 			return nil, err
 		}
-		return ConsumesInteropPayload{Origin: origin, Use: fields["use"], ABIExpectation: fields["abi_expectation"]}, nil
+		payload := ConsumesInteropPayload{Origin: origin, Use: fields["use"], ABIExpectation: fields["abi_expectation"]}
+		conditionRaw, present, err := optionalObject(raw, "condition", context)
+		if err != nil {
+			return nil, err
+		}
+		if present {
+			condition, conditionErr := decodeConditionObject(conditionRaw)
+			if conditionErr != nil {
+				return nil, conditionErr
+			}
+			payload.Condition = &condition
+		}
+		return payload, nil
 	case EdgeInvokes:
 		const context = "invokes payload"
 		if err := exactFields(raw, context, []string{"protocol_schema", "executable_resolution", "arguments_contract", "environment_contract"}, []string{"working_directory"}); err != nil {

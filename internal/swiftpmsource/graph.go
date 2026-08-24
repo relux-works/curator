@@ -269,9 +269,24 @@ func evidenceIDs(packages []PackageEvidence) (manifests, intakes, origins, handl
 func targetDeclarationDigest(pkg PackageEvidence, target Target) (closuregraph.ID, error) {
 	return closuregraph.DomainID("swiftpm-target-declaration-v1", map[string]any{"manifest_digest": string(pkg.ManifestDigest), "name": target.Name, "package": pkg.Identity, "path": target.Path, "sources": stringsAny(target.Sources), "type": target.Type})
 }
+
+// targetLanguages records the language the pinned Clang driver actually selects
+// for each declared source. `.C` and `.M` are matched case-sensitively because
+// the driver is: `clang -### -c up.C` selects `-x c++` and `clang -### -c up.M`
+// selects `-x objective-c++`, so lowercasing them would publish `c` and
+// `objective-c` capture evidence for translation units compiled as C++ and
+// Objective-C++.
 func targetLanguages(target Target) []string {
 	values := []string{}
 	for _, source := range target.Sources {
+		switch filepath.Ext(source) {
+		case ".C":
+			values = append(values, "c++")
+			continue
+		case ".M":
+			values = append(values, "objective-c++")
+			continue
+		}
 		switch strings.ToLower(filepath.Ext(source)) {
 		case ".swift":
 			values = append(values, "swift")

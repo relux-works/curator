@@ -112,7 +112,7 @@ func manifestDigest(manifest Manifest) (closuregraph.ID, error) {
 			}
 			settings[j] = map[string]any{"condition": condition, "kind": s.Kind, "unsafe": s.Unsafe, "value": s.Value}
 		}
-		targets[i] = map[string]any{"dependencies": deps, "name": t.Name, "path": t.Path, "settings": settings, "sources": stringsAny(t.Sources), "type": t.Type}
+		targets[i] = map[string]any{"dependencies": deps, "name": t.Name, "path": t.Path, "public_headers_path": t.PublicHeadersPath, "settings": settings, "sources": stringsAny(t.Sources), "type": t.Type}
 	}
 	return closuregraph.DomainID("swiftpm-normalized-manifest-v1", map[string]any{"dependencies": dependencies, "package_name": manifest.PackageName, "products": products, "selected_manifest": manifest.SelectedManifest, "targets": targets, "tools_version": manifest.ToolsVersion, "traits": stringsAny(manifest.Traits)})
 }
