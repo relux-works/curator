@@ -30,11 +30,23 @@ import (
 // mis-plumbed the parse-time check must not be able to hand the compiler a
 // directory nothing validated. Every declared directory the driver later
 // admits a replacement onto is a directory this call proved.
-func verifyModuleDeclaration(snapshot, buildRootRel string, modules, runtimeRoots []string) error {
+//
+// buildRootRel is the build root this command compiles; buildRoots is the
+// skill's whole declared set, which §4.2.3 is written against. The two are
+// unioned rather than substituted, so the command's own root is checked even
+// when a caller supplies no set at all — the backstop can only get stricter,
+// never weaker, than the single-root form it replaces.
+func verifyModuleDeclaration(snapshot, buildRootRel string, buildRoots, modules, runtimeRoots []string) error {
 	if len(modules) == 0 {
 		return nil
 	}
-	err := moduleroots.ValidateDeclaration(snapshot, "", modules, []string{buildRootRel}, runtimeRoots)
+	declared := []string{buildRootRel}
+	for _, root := range buildRoots {
+		if root != buildRootRel {
+			declared = append(declared, root)
+		}
+	}
+	err := moduleroots.ValidateDeclaration(snapshot, "", modules, declared, runtimeRoots)
 	return moduleRootDiagnostic(err)
 }
 
@@ -87,7 +99,10 @@ func readVendorModules(validation graphValidation) ([]byte, error) {
 	path := filepath.Join(validation.BuildRoot, "vendor", "modules.txt")
 	info, err := os.Lstat(path)
 	switch {
-	case err == nil && info.Mode().IsRegular() && info.Mode()&fs.ModeSymlink == 0:
+	// Lstat does not follow the final component, and IsRegular is false for
+	// every non-regular mode bit including ModeSymlink, so this one predicate
+	// already rejects a link standing where the metadata must be.
+	case err == nil && info.Mode().IsRegular():
 		payload, readErr := os.ReadFile(path) // #nosec G304 -- path is derived from the validated build root
 		if readErr != nil {
 			return nil, diagnosticErr("vendor_metadata_inconsistent", readErr, "cannot read vendor/modules.txt")

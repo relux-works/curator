@@ -4,6 +4,24 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Schema-8 first-party module roots for the `go-v1` driver: a build root may
+  replace declared module directories elsewhere in the snapshot, and those
+  directories join the directive, cgo, and assembly scan surface
+  (Protocol Core §4.2.3).
+
+### Changed
+
+- A `go-v1` build root whose `vendor/modules.txt` carries a directory
+  replacement the command does not declare is now refused with
+  `build_module_root_directive_undeclared`. §4.2.3 requires a command with an
+  absent or empty `modules` list to have an *empty* effective replace set, and
+  `go mod vendor` materialises an annotation for an **unused** `replace`
+  directive exactly as it does for a used one. A schema-6 or schema-7 skill
+  that carried an unused directory `replace` therefore built before and now
+  fails; declare the directory under `modules`, or drop the directive.
+
 ## 0.12.5 - 2026-07-14
 
 ### Added

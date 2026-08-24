@@ -57,8 +57,8 @@ type ResourceLimits struct {
 type BuildCommand map[string]any
 
 // BuildRequest identifies one already-validated command in a frozen source
-// snapshot. BuildRoot, SourceDir, Modules, and RuntimeRoots use protocol
-// (slash-separated) paths.
+// snapshot. BuildRoot, BuildRoots, SourceDir, Modules, and RuntimeRoots use
+// protocol (slash-separated) paths.
 type BuildRequest struct {
 	Session *Session
 	Source  *buildsource.Token
@@ -71,10 +71,16 @@ type BuildRequest struct {
 	// replaces (Spec §4.2.3), in declaration order. Empty is the schema-6 and
 	// schema-7 single-module build root.
 	Modules []string
-	// RuntimeRoots are the skill's declared runtime roots. The driver reads
-	// them for exactly one purpose: re-running the containment half of §4.2.3,
-	// which no declared module directory may equal, contain, or be contained
-	// by. They select nothing about the build.
+	// BuildRoots and RuntimeRoots are the skill's declared build roots and
+	// runtime roots. The driver reads them for exactly one purpose: re-running
+	// the containment half of §4.2.3, which no declared module directory may
+	// equal, contain, or be contained by. §4.2.3 names EVERY declared build
+	// root there, not only the one this command compiles, so a caller that
+	// supplies the whole set gets the whole rule re-verified; BuildRoot is
+	// always checked whether or not it appears in BuildRoots, so an
+	// unplumbed caller is never checked less than before. They select nothing
+	// about the build.
+	BuildRoots   []string
 	RuntimeRoots []string
 	Limits       ResourceLimits
 }
@@ -166,7 +172,7 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 	}
 	// Spec §4.2.3 puts declaration and containment validation before the fixed
 	// `go list`, so it runs here, before the worker exists.
-	if err := verifyModuleDeclaration(sourceRoot, request.BuildRoot, request.Modules, request.RuntimeRoots); err != nil {
+	if err := verifyModuleDeclaration(sourceRoot, request.BuildRoot, request.BuildRoots, request.Modules, request.RuntimeRoots); err != nil {
 		return Result{}, err
 	}
 

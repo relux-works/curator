@@ -73,6 +73,12 @@ func TestDeclaredModuleRootsReachTheBuilder(t *testing.T) {
 	if want := []string{"scripts"}; !reflect.DeepEqual(observed.RuntimeRoots, want) {
 		t.Fatalf("staged runtime roots = %q, want %q", observed.RuntimeRoots, want)
 	}
+	// §4.2.3's containment rule names every declared build root, not only the
+	// one this command compiles, so the whole declared set has to reach the
+	// driver alongside the runtime roots.
+	if want := []string{"src"}; !reflect.DeepEqual(observed.BuildRoots, want) {
+		t.Fatalf("staged build roots = %q, want %q", observed.BuildRoots, want)
+	}
 	// The command surface handed to the driver is the package's own, so the
 	// driver can refuse a modules list the manager never validated.
 	declared, ok := observed.CommandObject["modules"].([]string)

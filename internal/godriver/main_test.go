@@ -170,6 +170,11 @@ type workerFixture struct {
 	// sourceDir, so a fixture can move its build root out of "build".
 	buildRootRel string
 	sourceDirRel string
+	// buildRootsRel is the skill's whole declared build-root set, which
+	// §4.2.3's containment rule is written against. Empty means "the command's
+	// own build root is the only one declared", which is every fixture that
+	// does not say otherwise.
+	buildRootsRel []string
 }
 
 // newSnapshotFixture creates the frozen snapshot only, so a test can compute
@@ -229,6 +234,7 @@ func (fixture *workerFixture) request(limits ResourceLimits) BuildRequest {
 		SourceDir:     fixture.sourceDirRel,
 		Command:       "golden-tool",
 		Modules:       fixture.modules,
+		BuildRoots:    fixture.buildRootsRel,
 		RuntimeRoots:  fixture.runtimeRoots,
 		Limits:        limits,
 	}

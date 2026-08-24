@@ -58,10 +58,11 @@ type StageRequest struct {
 	BuildRoot     string
 	SourceDir     string
 	Command       string
-	// Modules and RuntimeRoots carry the schema-8 module-root declaration and
-	// the containment surface it must stay disjoint from (Spec §4.2.3). Both
-	// are empty for every schema-6 and schema-7 command.
+	// Modules carries the schema-8 module-root declaration, and BuildRoots /
+	// RuntimeRoots the whole containment surface it must stay disjoint from
+	// (Spec §4.2.3). Modules is empty for every schema-6 and schema-7 command.
 	Modules      []string
+	BuildRoots   []string
 	RuntimeRoots []string
 }
 
@@ -211,6 +212,7 @@ func (goBuilder) Stage(ctx context.Context, request StageRequest) (StagedArtifac
 		SourceDir:     request.SourceDir,
 		Command:       request.Command,
 		Modules:       request.Modules,
+		BuildRoots:    request.BuildRoots,
 		RuntimeRoots:  request.RuntimeRoots,
 	})
 	if err != nil {

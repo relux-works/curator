@@ -156,6 +156,40 @@ func TestModuleRootsRejectAContainmentCollisionWithARuntimeRoot(t *testing.T) {
 	}
 }
 
+// TestModuleRootsRejectAContainmentCollisionWithASiblingBuildRoot proves the
+// driver's containment backstop covers EVERY declared build root and not only
+// the one this command compiles, which is what §4.2.3 actually says. Both
+// directions are asserted from one fixture: the identical declaration builds
+// when `pkg` is not a declared build root and is refused before `go list` when
+// it is, so the test cannot pass by rejecting everything.
+func TestModuleRootsRejectAContainmentCollisionWithASiblingBuildRoot(t *testing.T) {
+	permitted := newModuleRootsFixture(t)
+	permitted.buildRootsRel = []string{"build"}
+	permitted.start(stubScript{
+		ListStdout: string(encodePackages(t, permitted.rootPackage(), permitted.replacedPackage())),
+		Artifact:   "multi module executable",
+	})
+	if _, err := Build(context.Background(), permitted.request(moduleRootLimits())); err != nil {
+		t.Fatalf("a declaration overlapping no declared build root was rejected: %v", err)
+	}
+
+	// `pkg` contains the declared module directory `pkg/board`, and the command
+	// still compiles `build`, so only the wider declared set can catch this.
+	refused := newModuleRootsFixture(t)
+	refused.buildRootsRel = []string{"build", "pkg"}
+	refused.start(stubScript{
+		ListStdout: string(encodePackages(t, refused.rootPackage(), refused.replacedPackage())),
+		Artifact:   "unreachable",
+	})
+	_, err := Build(context.Background(), refused.request(moduleRootLimits()))
+	if code := DiagnosticCode(err); code != "build_module_root_containment_invalid" {
+		t.Fatalf("code = %q, want build_module_root_containment_invalid (error %v)", code, err)
+	}
+	if calls := refused.sourceAwareCalls(); len(calls) != 0 {
+		t.Fatalf("go list ran %d source-aware commands, want the declaration half to fail before it", len(calls))
+	}
+}
+
 // TestModuleRootsCheckTheBijectionAfterGoListAndBeforeGoBuild pins the second
 // half of the failure boundary: every one of these rejections happens with the
 // `go list` stream in hand and no `go build` started.
@@ -244,6 +278,59 @@ func TestDeclaredModuleRootsRequireVendorMetadata(t *testing.T) {
 	_, err := Build(context.Background(), fixture.request(moduleRootLimits()))
 	if code := DiagnosticCode(err); code != "vendor_metadata_inconsistent" {
 		t.Fatalf("code = %q, want vendor_metadata_inconsistent (error %v)", code, err)
+	}
+}
+
+// TestVendorMetadataMustBeARegularFile pins the other half of that rule: the
+// replace set is read from the BYTES of vendor/modules.txt, so anything
+// standing in that path which is not a plain file is inconsistent metadata,
+// never an empty set. `os.Lstat` does not follow the final component and
+// `IsRegular` is false for every non-regular mode bit, so one predicate
+// decides every shape.
+func TestVendorMetadataMustBeARegularFile(t *testing.T) {
+	fixture := newModuleRootsFixture(t)
+	path := filepath.Join(fixture.buildRoot, "vendor", "modules.txt")
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "unreachable"})
+	_, err := Build(context.Background(), fixture.request(moduleRootLimits()))
+	if code := DiagnosticCode(err); code != "vendor_metadata_inconsistent" {
+		t.Fatalf("code = %q, want vendor_metadata_inconsistent (error %v)", code, err)
+	}
+	if calls := fixture.sourceAwareCalls(); len(calls) != 1 || calls[0].Argv[0] != "list" {
+		t.Fatalf("source-aware calls = %+v, want exactly one list and no build", calls)
+	}
+}
+
+// TestALinkStandingInForVendorMetadataNeverReachesTheDriver records WHY the
+// regular-file predicate above needs no separate symlink term: the frozen
+// build source is validated link-free before a session exists, so a link at
+// `vendor/modules.txt` is refused a whole layer earlier and the driver's own
+// check can never observe one. Asserting the earlier boundary is what keeps
+// that reasoning honest -- if the snapshot ever started tolerating the link,
+// this fails rather than the removed term silently mattering again.
+func TestALinkStandingInForVendorMetadataNeverReachesTheDriver(t *testing.T) {
+	fixture := newModuleRootsFixture(t)
+	path := filepath.Join(fixture.buildRoot, "vendor", "modules.txt")
+	target := filepath.Join(t.TempDir(), "modules.txt")
+	writeTestFile(t, target, []byte("# example.test/board => ../pkg/board\n"), 0o644)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		// Reported, not skipped: a skip would add a new class to the ledger for
+		// a rule the directory case already covers on every runner.
+		t.Logf("this host cannot create a symlink, so the snapshot boundary is unexercised here: %v", err)
+		return
+	}
+	if _, err := buildsource.Validate(fixture.root); err == nil {
+		t.Fatal("the frozen build source accepted a link at vendor/modules.txt")
+	} else if !strings.Contains(err.Error(), "link forbidden") {
+		t.Fatalf("build source error = %v, want a link refusal naming the path", err)
 	}
 }
 
@@ -627,6 +714,12 @@ func TestModuleRootVectorsDriveTheWholeBuild(t *testing.T) {
 // declaration to the driver. The build root doubles as the command's source
 // directory, which §4.2 permits, so the vector needs to describe no package
 // layout of its own.
+//
+// Both `build_root` and `build_roots` are presented: §4.2.3's containment rule
+// names every declared build root, and today every published case declares the
+// one it compiles. Reading the field rather than reconstructing it is what
+// makes a future case that declares a second root actually exercise the rule
+// instead of passing on the single-root form.
 func newVectorFixture(t *testing.T, testCase moduleRootVectorCase) *workerFixture {
 	t.Helper()
 	if len(testCase.Snapshot.LinkPaths) != 0 {
@@ -644,6 +737,16 @@ func newVectorFixture(t *testing.T, testCase moduleRootVectorCase) *workerFixtur
 		writeTestFile(t, filepath.Join(snapshot, filepath.FromSlash(file)), []byte("module fixture\n\ngo 1.23\n"), 0o644)
 	}
 	buildRootRel := testCase.Declaration.BuildRoot
+	if buildRootRel == "" {
+		t.Fatalf("vector %q declares no build_root", testCase.Name)
+	}
+	if !isListed(buildRootRel, testCase.Declaration.BuildRoots) {
+		// A vector whose compiled root is not in its own declared set would
+		// describe a manifest the parser rejects, so materialising it would
+		// prove nothing about §4.2.3.
+		t.Fatalf("vector %q declares build_root %q outside its build_roots %v",
+			testCase.Name, buildRootRel, testCase.Declaration.BuildRoots)
+	}
 	writeTestFile(t, filepath.Join(snapshot, filepath.FromSlash(buildRootRel), "main.go"),
 		[]byte("package main\n\nfunc main() {}\n"), 0o644)
 	writeTestFile(t, filepath.Join(snapshot, filepath.FromSlash(buildRootRel), "vendor", "modules.txt"),
@@ -651,11 +754,12 @@ func newVectorFixture(t *testing.T, testCase moduleRootVectorCase) *workerFixtur
 	snapshot = mustPhysical(t, snapshot)
 	return &workerFixture{
 		t: t, root: snapshot,
-		buildRoot:    filepath.Join(snapshot, filepath.FromSlash(buildRootRel)),
-		sourceDir:    filepath.Join(snapshot, filepath.FromSlash(buildRootRel)),
-		buildRootRel: buildRootRel,
-		sourceDirRel: buildRootRel,
-		modules:      testCase.Declaration.Modules,
-		runtimeRoots: testCase.Declaration.RuntimeRoots,
+		buildRoot:     filepath.Join(snapshot, filepath.FromSlash(buildRootRel)),
+		sourceDir:     filepath.Join(snapshot, filepath.FromSlash(buildRootRel)),
+		buildRootRel:  buildRootRel,
+		sourceDirRel:  buildRootRel,
+		buildRootsRel: testCase.Declaration.BuildRoots,
+		modules:       testCase.Declaration.Modules,
+		runtimeRoots:  testCase.Declaration.RuntimeRoots,
 	}
 }
