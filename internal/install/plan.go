@@ -67,16 +67,22 @@ type PlannedBuild struct {
 	commandObject map[string]any
 	buildRoot     string
 	sourceDir     string
-	source        buildsource.Identity
-	target        buildmeta.Target
-	input         buildmeta.Input
-	key           buildmeta.CacheKey
-	outcome       BuildOutcome
-	reason        string
-	diagnostic    string
-	artifactPath  string
-	receiptHash   buildmeta.ReceiptHash
-	artifact      buildmeta.Artifact
+	// modules are the schema-8 declared first-party module directories of the
+	// command, and runtimeRoots the declaring skill's runtime roots. Both are
+	// carried so the driver can re-run the containment half of Spec §4.2.3
+	// against the frozen snapshot it is about to compile from.
+	modules      []string
+	runtimeRoots []string
+	source       buildsource.Identity
+	target       buildmeta.Target
+	input        buildmeta.Input
+	key          buildmeta.CacheKey
+	outcome      BuildOutcome
+	reason       string
+	diagnostic   string
+	artifactPath string
+	receiptHash  buildmeta.ReceiptHash
+	artifact     buildmeta.Artifact
 }
 
 // Skill is the closure node that declared the command.
@@ -454,6 +460,8 @@ func toolchainInventory(
 			commandObject: commandObject(item.command),
 			buildRoot:     buildRoot,
 			sourceDir:     item.command.SourceDir,
+			modules:       append([]string(nil), item.command.Modules...),
+			runtimeRoots:  append([]string(nil), item.node.Spec.RuntimeRoots...),
 			source:        source,
 			// The driver is the closed go-v1 boundary the parser already admitted
 			// this command under; only the input it would have keyed is unknown.
@@ -514,6 +522,8 @@ func planOne(
 		commandObject: commandObject(item.command),
 		buildRoot:     buildRoot,
 		sourceDir:     item.command.SourceDir,
+		modules:       append([]string(nil), item.command.Modules...),
+		runtimeRoots:  append([]string(nil), item.node.Spec.RuntimeRoots...),
 		source:        input.BuildSource,
 		target:        target,
 		input:         input,
@@ -530,14 +540,20 @@ func planOne(
 }
 
 // commandObject reproduces the exact package-declared build-command surface.
-// The parser admits only these three fields for a build command, so anything
-// else in the manifest has already been rejected.
+// The parser admits only these fields for a build command, so anything else in
+// the manifest has already been rejected. `modules` appears only when the
+// schema-8 command declared a non-empty list: an absent and an empty list are
+// the same declaration, and a schema-6 or schema-7 command has neither.
 func commandObject(command skillspec.Command) map[string]any {
-	return map[string]any{
+	object := map[string]any{
 		"type":       "build",
 		"driver":     command.Driver,
 		"source_dir": command.SourceDir,
 	}
+	if len(command.Modules) != 0 {
+		object["modules"] = append([]string(nil), command.Modules...)
+	}
+	return object
 }
 
 // buildRootFor returns the single build root that contains the command's

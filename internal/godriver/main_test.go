@@ -160,6 +160,16 @@ type workerFixture struct {
 	goroot    string
 	token     *buildsource.Token
 	session   *Session
+
+	// modules and runtimeRoots are the schema-8 declaration the request
+	// carries. Both are empty for a schema-6 or schema-7 fixture, which is
+	// what every pre-existing test builds.
+	modules      []string
+	runtimeRoots []string
+	// buildRootRel and sourceDirRel are the protocol paths of buildRoot and
+	// sourceDir, so a fixture can move its build root out of "build".
+	buildRootRel string
+	sourceDirRel string
 }
 
 // newSnapshotFixture creates the frozen snapshot only, so a test can compute
@@ -174,8 +184,10 @@ func newSnapshotFixture(t *testing.T) *workerFixture {
 	snapshot = mustPhysical(t, snapshot)
 	return &workerFixture{
 		t: t, root: snapshot,
-		buildRoot: filepath.Join(snapshot, "build"),
-		sourceDir: filepath.Join(snapshot, "build", "cmd", "tool"),
+		buildRoot:    filepath.Join(snapshot, "build"),
+		sourceDir:    filepath.Join(snapshot, "build", "cmd", "tool"),
+		buildRootRel: "build",
+		sourceDirRel: "build/cmd/tool",
 	}
 }
 
@@ -205,13 +217,19 @@ func (fixture *workerFixture) start(script stubScript) *workerFixture {
 }
 
 func (fixture *workerFixture) request(limits ResourceLimits) BuildRequest {
+	object := BuildCommand{"type": "build", "driver": "go-v1", "source_dir": fixture.sourceDirRel}
+	if len(fixture.modules) != 0 {
+		object["modules"] = append([]string(nil), fixture.modules...)
+	}
 	return BuildRequest{
 		Session:       fixture.session,
 		Source:        fixture.token,
-		CommandObject: BuildCommand{"type": "build", "driver": "go-v1", "source_dir": "build/cmd/tool"},
-		BuildRoot:     "build",
-		SourceDir:     "build/cmd/tool",
+		CommandObject: object,
+		BuildRoot:     fixture.buildRootRel,
+		SourceDir:     fixture.sourceDirRel,
 		Command:       "golden-tool",
+		Modules:       fixture.modules,
+		RuntimeRoots:  fixture.runtimeRoots,
 		Limits:        limits,
 	}
 }
