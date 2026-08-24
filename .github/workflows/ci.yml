@@ -34,10 +34,14 @@ env:
   # The one immutable committed protocol-suite pin, referenced by every job.
   # It stays on the currently qualified released revision; promoting it is
   # owned by TASK-260720-38l1sy, after TASK-260720-25d05o qualifies the
-  # release. This pin publishes protocol 1.0.0-rc.3 and claims no later
-  # revision. A candidate suite never appears here -- it enters through
-  # the non-default `candidate-conformance` job below and nowhere else.
-  SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+  # release. This pin is the v1.0.0-rc.9 release commit on curator-spec main:
+  # it publishes protocol 1.0.0-rc.9, whose conformance/v1/manifest.json is
+  # sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403,
+  # byte-identical to the schema-8 candidate 6001dc33 this module qualified
+  # against. It claims no later revision. A candidate suite never appears here
+  # -- it enters through the non-default `candidate-conformance` job below and
+  # nowhere else.
+  SPEC_PIN: 0ed5c691e9208eea52f21db2fc05e226ce3516fd
   # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
   # workflow pins @v5, so without these two lines a job may download a
   # toolchain or read a per-user go env file. The identity step below reads
