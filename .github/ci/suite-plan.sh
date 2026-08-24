@@ -21,7 +21,7 @@
 #     tests implement, and the missing artefact is named in the report.
 #
 # `CI_REQUIRE_FULL_ROOT=1` makes any deferral fatal. The candidate lane sets
-# it, so an explicitly supplied schema v6 candidate must serve the entire
+# it, so an explicitly supplied candidate must serve the entire
 # package set or fail -- a candidate run can never be green while a package
 # silently ran without its vectors.
 #

@@ -3,7 +3,7 @@
 #
 # The committed `SPEC_PIN` in `.github/workflows/ci.yml` is the only default
 # protocol input and always stays on the currently qualified released
-# revision.  A schema v6 candidate suite is never committed and never becomes a
+# revision.  A candidate suite is never committed and never becomes a
 # default: it enters exactly one non-default job, through an explicit
 # caller-supplied full revision or a pre-materialised root, and everything it
 # produces is stamped as candidate evidence.
