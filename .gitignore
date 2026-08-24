@@ -2,7 +2,11 @@
 /bin/
 /dist/
 coverage.out
+# Go test binaries. This also matches the reserved `example.test` module paths
+# of the build-driver testdata fixtures, whose vendor trees are part of the
+# fixture and must stay in the repository, so those directories are re-included.
 *.test
+!**/testdata/**/example.test/
 
 # local workspace
 .temp/
