@@ -390,8 +390,29 @@ granularities, and neither is a silent omission:
 When the inventory gains a record for a platform, the guard stops skipping there
 on its own; only `must_run_on` in `platform-cases.tsv` needs widening.
 
+#### Suite consumption, not suite presence
+
+A conformance root that publishes a family proves nothing about whether this
+build reads it. The schema-8 impact analysis measured the difference: pinned
+implementation jobs returned exit 0 against a schema-8 suite while consuming
+none of it. Two tables answer the two halves, and a family needs both:
+
+* **presence** — [`root-artifacts.tsv`](.github/ci/root-artifacts.tsv) declares
+  the root artefacts a package's conformance tests read without a guard. A root
+  that stops publishing one defers that package, and `CI_REQUIRE_FULL_ROOT=1`
+  makes the deferral fatal in the candidate lane;
+* **consumption** — [`platform-cases.tsv`](.github/ci/platform-cases.tsv) names
+  the case that actually reads it, on each runner. A rename, a deletion or a
+  `-run` filter matching nothing then fails by name instead of shrinking the
+  run.
+
+For schema 8 that is `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`,
+`vectors/module-roots.json` and `vectors/script-host-execution-policy.json`,
+consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`,
+`internal/godriver` and `internal/scriptpolicy`.
+
 The committed protocol-suite pin is declared once, as `SPEC_PIN` in the workflow
-`env:` block, and every job reads it from there. A schema v6 candidate suite is
+`env:` block, and every job reads it from there. A candidate suite is
 never committed and never a default: it enters only through the
 `candidate-conformance` job, on an explicit `workflow_dispatch` that supplies a
 full 40-character revision or a pre-materialised root. That job sets
