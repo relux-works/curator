@@ -107,6 +107,7 @@ func stageBuilds(ctx context.Context, plan BuildPlan, deps BuildDeps) (Staged, e
 			SourceDir:     build.sourceDir,
 			Command:       build.command,
 			Modules:       build.modules,
+			BuildRoots:    build.buildRoots,
 			RuntimeRoots:  build.runtimeRoots,
 		})
 		if err != nil {

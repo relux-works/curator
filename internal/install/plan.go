@@ -68,10 +68,12 @@ type PlannedBuild struct {
 	buildRoot     string
 	sourceDir     string
 	// modules are the schema-8 declared first-party module directories of the
-	// command, and runtimeRoots the declaring skill's runtime roots. Both are
-	// carried so the driver can re-run the containment half of Spec §4.2.3
-	// against the frozen snapshot it is about to compile from.
+	// command, and buildRoots / runtimeRoots the declaring skill's whole
+	// declared containment surface. All three are carried so the driver can
+	// re-run the containment half of Spec §4.2.3 against the frozen snapshot
+	// it is about to compile from.
 	modules      []string
+	buildRoots   []string
 	runtimeRoots []string
 	source       buildsource.Identity
 	target       buildmeta.Target
@@ -461,6 +463,7 @@ func toolchainInventory(
 			buildRoot:     buildRoot,
 			sourceDir:     item.command.SourceDir,
 			modules:       append([]string(nil), item.command.Modules...),
+			buildRoots:    append([]string(nil), item.node.Spec.BuildRoots...),
 			runtimeRoots:  append([]string(nil), item.node.Spec.RuntimeRoots...),
 			source:        source,
 			// The driver is the closed go-v1 boundary the parser already admitted
@@ -523,6 +526,7 @@ func planOne(
 		buildRoot:     buildRoot,
 		sourceDir:     item.command.SourceDir,
 		modules:       append([]string(nil), item.command.Modules...),
+		buildRoots:    append([]string(nil), item.node.Spec.BuildRoots...),
 		runtimeRoots:  append([]string(nil), item.node.Spec.RuntimeRoots...),
 		source:        input.BuildSource,
 		target:        target,
