@@ -75,6 +75,25 @@ func TestPromptDefaultSelectionPinsTheAgentToTheFirstDiscoveredKey(t *testing.T)
 	}
 }
 
+func TestPromptThisRunOnlyReturnsSSHCredentialWithoutPersisting(t *testing.T) {
+	persisted, added, transcript, err := runPrompt(t, "\nr\n", []BuildSSHRequest{portalsRequest()}, promptCandidates())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(persisted) != 0 {
+		t.Fatalf("this-run-only SSH answer reached persistence: %+v", persisted)
+	}
+	want := config.BuildSSHCredential{
+		Scope: "git.example.test/portals", Agent: true, Identity: "~/.ssh/id_ed25519.pub",
+	}
+	if got := added[want.Scope]; got != want {
+		t.Fatalf("run-local SSH credential = %+v, want %+v", got, want)
+	}
+	if !strings.Contains(transcript, "using SSH credential for this run only") {
+		t.Fatalf("transcript did not mark the choice as run-only:\n%s", transcript)
+	}
+}
+
 func TestPromptNumberedSelectionAndAnExplicitScope(t *testing.T) {
 	persisted, _, _, err := runPrompt(t, "2\ngit.example.test\n", []BuildSSHRequest{portalsRequest()}, promptCandidates())
 	if err != nil {
