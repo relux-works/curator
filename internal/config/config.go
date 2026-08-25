@@ -63,7 +63,7 @@ var managerKeys = map[string]bool{
 	"preferred_locale": true, "adapter_mode": true, "worktree_alias_pattern": true,
 	"projects": true, "allowed_sources": true, "audit": true,
 	"audit_registries": true, "disable_builtin_registries": true,
-	"build_ssh": true,
+	"build_ssh": true, "build_https": true,
 }
 
 // Project is a registered project entry.
@@ -128,6 +128,10 @@ type Config struct {
 	// BuildSSH maps a credential scope to the operator SSH credentials that
 	// cover every external build repository below it (Spec §12.2).
 	BuildSSH map[string]BuildSSHCredential
+	// BuildHTTPS maps a credential scope to the operator HTTPS token
+	// selection that covers every external build repository below it
+	// (Spec §12.2).
+	BuildHTTPS map[string]BuildHTTPSCredential
 }
 
 // Home returns the directory holding the config file: the machine home for
@@ -365,6 +369,11 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		return nil, err
 	}
 
+	buildHTTPS, err := parseBuildHTTPS(data["build_https"])
+	if err != nil {
+		return nil, err
+	}
+
 	disableBuiltin := false
 	if raw, present := data["disable_builtin_registries"]; present {
 		disableBuiltin, ok = raw.(bool)
@@ -443,6 +452,7 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		AuditRegistries:          registries,
 		DisableBuiltinRegistries: disableBuiltin,
 		BuildSSH:                 buildSSH,
+		BuildHTTPS:               buildHTTPS,
 	}, nil
 }
 
