@@ -22,6 +22,25 @@ All notable implementation changes are recorded here.
   that carried an unused directory `replace` therefore built before and now
   fails; declare the directory under `modules`, or drop the directive.
 
+### Fixed
+
+- Status no longer reports a successfully installed schema-8 skill as
+  `needs-install`. Every reader that decides whether a recorded compiled
+  command is knowable now bands on the whole build-bearing marker schema set
+  (2, 3 and 4) instead of only the schema the release writes, so a schema-7 or
+  schema-8 installation is reported `current` on the marker it actually wrote.
+  The old remedy was self-contradictory as well: it told an operator holding a
+  marker v4 to reinstall so the manager would record marker schema 2, a schema
+  it would never write for that band.
+- Garbage collection no longer drops the live build references of a marker v4.
+  A schema-8 installation's recorded cache keys went unmarked, so a
+  maintenance pass could delete protected cache entries the installation was
+  still running from.
+- A marker document at a readable schema that is nonetheless invalid is now
+  reported as an invalid document rather than as one from a newer manager.
+  Schemas 3 and 4 are read by this release, so `upgrade the manager` was never
+  the remedy for them.
+
 ## 0.12.5 - 2026-07-14
 
 ### Added
