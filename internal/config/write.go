@@ -181,3 +181,72 @@ func buildSSHEntries(object map[string]any) (map[string]any, error) {
 	}
 	return entries, nil
 }
+
+// SetBuildHTTPS records one operator credential scope in the user
+// configuration, replacing whatever was recorded under the same scope, and
+// reports whether an existing entry was replaced. Unrelated user fields and
+// other scopes are left untouched.
+func SetBuildHTTPS(path string, credential BuildHTTPSCredential) (bool, error) {
+	if err := ValidateBuildHTTPS(credential); err != nil {
+		return false, err
+	}
+	object, err := readObject(path)
+	if err != nil {
+		return false, err
+	}
+	entries, err := buildHTTPSEntries(object)
+	if err != nil {
+		return false, err
+	}
+	_, replaced := entries[credential.Scope]
+	rendered := BuildHTTPSObject(map[string]BuildHTTPSCredential{credential.Scope: credential})
+	entries[credential.Scope] = rendered[credential.Scope]
+	object["build_https"] = entries
+	if _, err := Parse(object, path); err != nil {
+		return false, err
+	}
+	return replaced, writeObjectAtomic(path, object)
+}
+
+// RemoveBuildHTTPS drops one credential scope from the user configuration.
+// Removing a scope that is not recorded is an error: reporting success would
+// read as "that credential no longer applies" while it still does.
+func RemoveBuildHTTPS(path, scope string) error {
+	object, err := readObject(path)
+	if err != nil {
+		return err
+	}
+	entries, err := buildHTTPSEntries(object)
+	if err != nil {
+		return err
+	}
+	if _, present := entries[scope]; !present {
+		return fmt.Errorf("build_https scope %q is not configured in %s", scope, path)
+	}
+	delete(entries, scope)
+	// The last scope takes the whole field with it, so a config that selects
+	// no credential says so by omission rather than by an empty object.
+	if len(entries) == 0 {
+		delete(object, "build_https")
+	} else {
+		object["build_https"] = entries
+	}
+	if _, err := Parse(object, path); err != nil {
+		return err
+	}
+	return writeObjectAtomic(path, object)
+}
+
+// buildHTTPSEntries returns the raw build_https object, treating an absent
+// field as an empty one.
+func buildHTTPSEntries(object map[string]any) (map[string]any, error) {
+	raw, present := object["build_https"]
+	if !present || raw == nil {
+		return map[string]any{}, nil
+	}
+	entries, ok := raw.(map[string]any)
+	if !ok {
+		return nil, verr.New("build_https", "must be an object")
+	}
+	return entries, nil
+}

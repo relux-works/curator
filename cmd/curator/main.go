@@ -25,6 +25,7 @@ import (
 	"github.com/relux-works/curator/internal/closure"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/devsub"
+	"github.com/relux-works/curator/internal/gitcred"
 	"github.com/relux-works/curator/internal/gitignore"
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/godriver"
@@ -72,11 +73,14 @@ Commands:
   gc                       remove unreferenced runtime entries
   shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
   ui                       terminal view over installed state
-  config <subcommand>      show | build-ssh (see config build-ssh -h)
+  config <subcommand>      show | build-ssh | build-https (see config build-ssh -h, config build-https -h)
   --version                print the curator version
 `
 
 func main() {
+	if buildrepo.IsHTTPSBrokerInvocation(os.Args[0]) {
+		os.Exit(buildrepo.RunHTTPSCredentialBroker(os.Args[1:], os.Getenv, os.Stdout))
+	}
 	// The fixed hidden go-v1 build worker is an implementation boundary, not a
 	// user-visible command surface. It is dispatched before any other parsing,
 	// requires exactly this one manager-owned argument, and is never reachable
@@ -531,6 +535,7 @@ func cmdInstallMode(args []string, fetch bool) int {
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
 	opts.External.BuildSSH.Resolve = operatorBuildSSHResolver(cfg, opts.DryRun)
+	opts.External.BuildHTTPS.Resolve = operatorBuildHTTPSResolver(cfg, opts.DryRun)
 	exitCode := exitOK
 	for _, target := range targets {
 		result := install.Project(cfg, target.Root, target.Alias, opts)
@@ -1292,6 +1297,7 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
 	opts.External.BuildSSH.Resolve = operatorBuildSSHResolver(cfg, opts.DryRun)
+	opts.External.BuildHTTPS.Resolve = operatorBuildHTTPSResolver(cfg, opts.DryRun)
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
@@ -1329,6 +1335,37 @@ func operatorBuildSSHResolver(cfg *config.Config, dryRun bool) install.BuildSSHR
 		})
 }
 
+// operatorBuildHTTPSResolver offers unmatched HTTPS repositories an explicit
+// operator choice. A headless run keeps this nil and therefore continues over
+// anonymous HTTPS; a dry run remains read-only even on a terminal.
+func operatorBuildHTTPSResolver(cfg *config.Config, dryRun bool) install.BuildHTTPSResolver {
+	if dryRun || !attachedToTerminal(os.Stdin) || !attachedToTerminal(os.Stderr) {
+		return nil
+	}
+	access := gitcred.Access{}
+	return install.InteractiveBuildHTTPSResolver(os.Stdin, os.Stderr,
+		func() (string, error) { return readBuildHTTPSToken(os.Stdin, os.Stderr) },
+		persistPromptedBuildHTTPS(cfg, access))
+}
+
+func persistPromptedBuildHTTPS(cfg *config.Config, access gitcred.Access) install.PersistBuildHTTPS {
+	return func(ctx context.Context, credential config.BuildHTTPSCredential, secret string) error {
+		if credential.Token == config.TokenSourceKeyring {
+			host := gitcred.ScopeHost(credential.Scope)
+			if err := access.StoreScoped(ctx, credential.Scope, host, secret); err != nil {
+				return err
+			}
+			if _, err := config.SetBuildHTTPS(cfg.Path, credential); err != nil {
+				_ = access.DeleteScoped(ctx, credential.Scope, host)
+				return err
+			}
+			return nil
+		}
+		_, err := config.SetBuildHTTPS(cfg.Path, credential)
+		return err
+	}
+}
+
 // attachedToTerminal reports whether one standard stream is a real terminal.
 //
 // The character-device test alone is not enough: `< /dev/null` is a character
@@ -1347,6 +1384,7 @@ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDep
 	// Read-only surfaces get the environment and configured scopes; a command
 	// that also parses --build-ssh-* flags overrides this with them.
 	deps.BuildSSH = install.CaptureBuildSSHSelection(cfg, install.BuildSSHFlags{}, os.Getenv)
+	deps.BuildHTTPS = install.CaptureBuildHTTPSSelection(cfg, os.Getenv)
 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
 		candidate := audit.Subject{
 			Name: subject.Declared.Repository, Source: subject.Declared.Identity,
@@ -1395,11 +1433,8 @@ func productionGitTool() buildrepo.GitTool {
 		return buildrepo.GitTool{}
 	}
 	tool := buildrepo.GitTool{Executable: gitPath, ExecPath: execPath, AllowedVersions: []string{version}}
-	tool.AskPass = admittedOperatorFile(os.Getenv("GIT_ASKPASS"))
-	if tool.AskPass == "" {
-		if executable, executableErr := os.Executable(); executableErr == nil {
-			tool.AskPass = admittedOperatorFile(executable)
-		}
+	if executable, executableErr := os.Executable(); executableErr == nil {
+		tool.AskPass = admittedOperatorFile(executable)
 	}
 	tool.SSHWrapper = admittedOperatorFile(os.Getenv("GIT_SSH"))
 	return tool
@@ -1764,6 +1799,9 @@ Usage:
   curator config build-ssh <subcommand>
                                        operator SSH credentials for external
                                        build repositories (add | list | remove)
+  curator config build-https <subcommand>
+                                       operator HTTPS tokens for external
+                                       build repositories (add | login | list | remove)
 `
 
 const buildSSHUsage = `curator config build-ssh: operator SSH credentials for external build repositories
@@ -1811,6 +1849,8 @@ func cmdConfig(args []string) int {
 		return cmdConfigShow()
 	case "build-ssh":
 		return cmdConfigBuildSSH(args[1:])
+	case "build-https":
+		return cmdConfigBuildHTTPS(args[1:])
 	case "-h", "--help", "help":
 		fmt.Print(configUsage)
 		return exitOK
@@ -1976,6 +2016,304 @@ func formatBuildSSH(credential config.BuildSSHCredential) string {
 	}
 	if credential.KnownHosts != "" {
 		parts = append(parts, "known_hosts="+credential.KnownHosts)
+	}
+	return strings.Join(parts, " ")
+}
+
+const buildHTTPSUsage = `curator config build-https: operator HTTPS tokens for external build repositories
+
+Usage:
+  curator config build-https add <scope> (--git-credentials | --keyring | --token-env NAME) [--username NAME]
+  curator config build-https login <scope> [--username NAME]
+  curator config build-https list
+  curator config build-https remove <scope>
+
+A scope is a lowercase host optionally followed by '/'-separated path segments.
+It is matched against the canonical host/path identity of a build repository on
+whole-segment boundaries, and the longest matching scope wins: scope
+'git.example.com/portals' covers 'git.example.com/portals/app' and never
+'git.example.com/portals-other'.
+
+A token is never accepted as a command-line argument, and the config never
+stores one as a literal value. add names where the token is read from:
+  --git-credentials  the operator's own Git HTTPS credential for the scope's
+                      host, read through 'git credential fill'
+  --keyring           the token already stored for this scope by login
+  --token-env NAME    an environment variable read at process entry
+  --username NAME     sent alongside the resolved token; defaults to "token"
+
+login reads a token from a hidden prompt, or one line from stdin when it is
+not attached to a terminal, stores it through the operator's own Git
+credential machinery under a scope-namespaced entry, and selects it for the
+scope the same way 'add --keyring' would.
+
+add and login replace whatever was recorded under the same scope; remove
+reports a scope that is not configured as an error, and also deletes the
+scope's stored token when it selected one; list prints one line per scope,
+sorted, and reports whether the token it names actually resolves right now.
+
+Precedence: CURATOR_BUILD_HTTPS_TOKEN, optionally pinned to one host by
+CURATOR_BUILD_HTTPS_HOST, covers every repository on that host ahead of the
+scopes configured here; unset, or once that host is exhausted, the longest
+matching build_https scope applies; an HTTPS repository nothing covers is not
+an error, unlike SSH — it fetches anonymously. Credentials are operator-owned:
+no manifest, descriptor, repository, substitution, or marker can select them.
+
+Disclosure warning (Spec core §12.2): CURATOR_BUILD_HTTPS_TOKEN without
+CURATOR_BUILD_HTTPS_HOST is not bound to any one repository identity — it is
+offered to every private HTTPS build repository host this run reaches. Set
+CURATOR_BUILD_HTTPS_HOST to bind it to one host, or prefer a build_https
+scope, unless every one of those hosts is meant to receive that token.
+`
+
+func cmdConfigBuildHTTPS(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprint(os.Stderr, buildHTTPSUsage)
+		return exitUsage
+	}
+	switch args[0] {
+	case "add":
+		return cmdConfigBuildHTTPSAdd(args[1:])
+	case "login":
+		return cmdConfigBuildHTTPSLogin(args[1:])
+	case "list":
+		return cmdConfigBuildHTTPSList()
+	case "remove":
+		return cmdConfigBuildHTTPSRemove(args[1:])
+	case "-h", "--help", "help":
+		fmt.Print(buildHTTPSUsage)
+		return exitOK
+	}
+	fmt.Fprintf(os.Stderr, "curator: unknown config build-https subcommand %q\n\n%s", args[0], buildHTTPSUsage)
+	return exitUsage
+}
+
+func cmdConfigBuildHTTPSAdd(args []string) int {
+	flags := flag.NewFlagSet("config build-https add", flag.ContinueOnError)
+	gitCredentials := flags.Bool("git-credentials", false,
+		"use the operator's own Git HTTPS credential for this scope's host")
+	keyring := flags.Bool("keyring", false, "use the token already stored for this scope (see login)")
+	tokenEnv := flags.String("token-env", "", "environment variable read for the token at process entry")
+	username := flags.String("username", "", "username sent alongside the resolved token")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
+		return exitUsage
+	}
+	if len(positional) != 1 {
+		fmt.Fprintln(os.Stderr, "curator: config build-https add requires exactly one <scope>")
+		return exitUsage
+	}
+	token, envName, err := pickBuildHTTPSSource(*gitCredentials, *keyring, *tokenEnv)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitUsage
+	}
+	credential := config.BuildHTTPSCredential{
+		Scope: positional[0], Token: token, TokenEnv: envName, Username: *username,
+	}
+	// Checked before the config is read, so a malformed invocation is a usage
+	// error rather than a failure attributed to the config file.
+	if err := config.ValidateBuildHTTPS(credential); err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitUsage
+	}
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	replaced, err := config.SetBuildHTTPS(cfg.Path, credential)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	verb := "added"
+	if replaced {
+		verb = "replaced"
+	}
+	fmt.Printf("%s build_https scope %s: %s\n", verb, credential.Scope, formatBuildHTTPS(credential))
+	return exitOK
+}
+
+// pickBuildHTTPSSource resolves the add flags to exactly one config source, so
+// a request naming zero or several is a usage error rather than a silent
+// pick among them.
+func pickBuildHTTPSSource(gitCredentials, keyring bool, tokenEnv string) (token, env string, err error) {
+	count := 0
+	if gitCredentials {
+		token, count = config.TokenSourceGitCredentials, count+1
+	}
+	if keyring {
+		token, count = config.TokenSourceKeyring, count+1
+	}
+	if tokenEnv != "" {
+		env, count = tokenEnv, count+1
+	}
+	if count != 1 {
+		return "", "", errors.New(
+			"config build-https add requires exactly one of --git-credentials, --keyring, or --token-env")
+	}
+	return token, env, nil
+}
+
+func cmdConfigBuildHTTPSLogin(args []string) int {
+	flags := flag.NewFlagSet("config build-https login", flag.ContinueOnError)
+	username := flags.String("username", "", "username sent alongside the stored token")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil {
+		return exitUsage
+	}
+	if len(positional) != 1 {
+		fmt.Fprintln(os.Stderr, "curator: config build-https login requires exactly one <scope>")
+		return exitUsage
+	}
+	scope := positional[0]
+	if !config.ValidBuildSSHScope(scope) {
+		fmt.Fprintln(os.Stderr, "curator: scope", scope, config.BuildSSHScopeRule)
+		return exitUsage
+	}
+	// The scope is validated, and the config is loaded, before a token is
+	// read: a doomed invocation must not first make the operator type a
+	// secret into a hidden prompt for nothing.
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	token, err := readBuildHTTPSToken(os.Stdin, os.Stderr)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitUsage
+	}
+	access := gitcred.Access{}
+	if err := access.StoreScoped(context.Background(), scope, gitcred.ScopeHost(scope), token); err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	credential := config.BuildHTTPSCredential{Scope: scope, Token: config.TokenSourceKeyring, Username: *username}
+	replaced, err := config.SetBuildHTTPS(cfg.Path, credential)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	verb := "logged in and selected"
+	if replaced {
+		verb = "replaced the login for"
+	}
+	fmt.Printf("%s build_https scope %s: %s\n", verb, scope, formatBuildHTTPS(credential))
+	return exitOK
+}
+
+// readBuildHTTPSToken reads a token without ever accepting it as a
+// command-line argument, matching core 12.2: a hidden prompt when both ends
+// are a real terminal, otherwise one line from stdin, so a scripted login can
+// pipe a token in without echoing it to a terminal that is not there.
+func readBuildHTTPSToken(in, errOut *os.File) (string, error) {
+	var raw string
+	if attachedToTerminal(in) && attachedToTerminal(errOut) {
+		_, _ = fmt.Fprint(errOut, "token: ")
+		read, err := term.ReadPassword(in.Fd())
+		_, _ = fmt.Fprintln(errOut)
+		if err != nil {
+			return "", fmt.Errorf("reading token: %w", err)
+		}
+		raw = string(read)
+	} else {
+		scanner := bufio.NewScanner(in)
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				return "", fmt.Errorf("reading token: %w", err)
+			}
+		}
+		raw = scanner.Text()
+	}
+	token := strings.TrimRight(raw, "\r\n")
+	if token == "" {
+		return "", errors.New("token must be a non-empty single line")
+	}
+	return token, nil
+}
+
+func cmdConfigBuildHTTPSList() int {
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	scopes := cfg.BuildHTTPSScopes()
+	if len(scopes) == 0 {
+		// On stderr, so a caller parsing the listing sees an empty stdout
+		// rather than a line that names no scope.
+		fmt.Fprintln(os.Stderr, "curator: no build_https scopes are configured")
+		return exitOK
+	}
+	access := gitcred.Access{}
+	for _, scope := range scopes {
+		credential := cfg.BuildHTTPS[scope]
+		present := buildHTTPSPresent(context.Background(), access, credential)
+		fmt.Printf("%s\t%s present=%t\n", scope, formatBuildHTTPS(credential), present)
+	}
+	return exitOK
+}
+
+// buildHTTPSPresent reports whether the material one credential selection
+// names actually resolves right now: the stored token behind a keyring
+// selection can have been dropped by the operator's own credential store
+// since it was recorded, the same way the operator's own Git credential for a
+// git-credentials selection can have been removed, or a token_env variable
+// can have gone unset.
+func buildHTTPSPresent(ctx context.Context, access gitcred.Access, credential config.BuildHTTPSCredential) bool {
+	host := gitcred.ScopeHost(credential.Scope)
+	switch credential.Token {
+	case config.TokenSourceKeyring:
+		_, ok := access.ReadScoped(ctx, credential.Scope, host)
+		return ok
+	case config.TokenSourceGitCredentials:
+		_, ok := access.ReadHost(ctx, host)
+		return ok
+	default:
+		return credential.TokenEnv != "" && os.Getenv(credential.TokenEnv) != ""
+	}
+}
+
+func cmdConfigBuildHTTPSRemove(args []string) int {
+	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
+		fmt.Fprintln(os.Stderr, "curator: config build-https remove requires exactly one <scope>")
+		return exitUsage
+	}
+	cfg, code := loadConfig()
+	if code != exitOK {
+		return code
+	}
+	credential := cfg.BuildHTTPS[args[0]]
+	if err := config.RemoveBuildHTTPS(cfg.Path, args[0]); err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	if credential.Token == config.TokenSourceKeyring {
+		access := gitcred.Access{}
+		if !access.DeleteScoped(context.Background(), args[0], gitcred.ScopeHost(args[0])) {
+			fmt.Fprintf(os.Stderr,
+				"curator: warning: could not confirm the stored token for %s was removed\n", args[0])
+		}
+	}
+	fmt.Printf("removed build_https scope %s\n", args[0])
+	return exitOK
+}
+
+// formatBuildHTTPS renders one credential in the operator's own spelling —
+// where the token is read from, never the token itself — so a listed line
+// names the selection the config file carries rather than a resolved secret.
+func formatBuildHTTPS(credential config.BuildHTTPSCredential) string {
+	var parts []string
+	switch credential.Token {
+	case config.TokenSourceGitCredentials:
+		parts = append(parts, "source=git-credentials")
+	case config.TokenSourceKeyring:
+		parts = append(parts, "source=keyring")
+	}
+	if credential.TokenEnv != "" {
+		parts = append(parts, "token_env="+credential.TokenEnv)
+	}
+	if credential.Username != "" {
+		parts = append(parts, "username="+credential.Username)
 	}
 	return strings.Join(parts, " ")
 }

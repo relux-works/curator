@@ -6,6 +6,21 @@ All notable implementation changes are recorded here.
 
 ### Added
 
+- Scoped HTTPS credentials for external build repositories. A `build_https`
+  configuration section maps a source scope to a token source — the operator's
+  own Git credential for the host, a manager-namespaced keyring entry, or a
+  named environment variable — and the `curator config build-https` command
+  (`add`, `login`, `list`, `remove`) manages those selections. Selection is
+  resolved per repository by canonical source identity before the first fetch
+  and is never selectable by a package; a private HTTPS fetch is answered by a
+  manager-owned, host-pinned askpass broker, and an uncovered repository stays
+  anonymous (`Spec core §12.2`).
+- Operator documentation for scoped HTTPS build-repository token sources,
+  credential resolution, and the `curator config build-https` command.
+  `CURATOR_BUILD_HTTPS_TOKEN` without `CURATOR_BUILD_HTTPS_HOST` is
+  identity-unbound and may be offered to every HTTPS build-repository
+  host reached by the run; bind it to one host or use a `build_https` scope
+  (`Spec core §12.2`).
 - Schema-8 first-party module roots for the `go-v1` driver: a build root may
   replace declared module directories elsewhere in the snapshot, and those
   directories join the directive, cgo, and assembly scan surface
