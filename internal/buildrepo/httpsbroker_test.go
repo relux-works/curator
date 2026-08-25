@@ -178,7 +178,7 @@ func TestPrivateHTTPSBrokerAuthenticatesRealGitRepository(t *testing.T) {
 
 func TestSelectedHTTPSFetchEnvironmentIsScopedAndOverridesBothAskPassSurfaces(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("the fake HTTPS transport wrapper is POSIX-only")
+		t.Skip("the HTTPS test transport wrapper is POSIX-only")
 	}
 	fixture := makeGitFixture(t, "sha1", false)
 	tool, logPath := fakeHTTPGitTool(t, fixture.bare)

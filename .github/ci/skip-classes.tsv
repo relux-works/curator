@@ -54,6 +54,7 @@ platform-control	executes (a )?POSIX (launcher|skill commands)	allow	a POSIX lau
 platform-control	POSIX post-install launch fixture	allow	a POSIX post-install fixture, asserted on the unix runners
 platform-control	shell sentinel is Unix-only	allow	the sentinel exists on unix only
 platform-control	test transport wrapper is POSIX-only	allow	the fixture uses a POSIX shell wrapper; native admission remains covered on Windows
+platform-control	local TLS fixture relies on the platform Git shipped on Unix CI	allow	the fixture serves HTTPS from a local certificate the Unix CI Git trusts; the broker's own admission and prompt boundary stay asserted on Windows
 platform-control	controlled launcher symlink is a Unix regression fixture	allow	the launcher symlink fixture is asserted on unix runners
 platform-control	hard-link count is enforced by the native Windows protected-root backend	allow	the generic hard-link fixture is replaced by the native Windows backend case
 platform-control	an operator agent socket is a unix-domain rendezvous point	allow	the SSH agent-socket fixture is a POSIX unix-domain socket; Windows reaches an agent over a named pipe, so the shape is asserted on the unix runners
