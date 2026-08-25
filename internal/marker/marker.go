@@ -39,6 +39,10 @@ const (
 	// 8 and no other difference, so every marker-v3 build-record rule applies
 	// to it unchanged.
 	PolicySchemaVersion = 4
+	// NewestSchemaVersion is the highest marker schema this release reads. It
+	// is what an operator is told when a document from a newer manager is
+	// refused, so it must advance with every new readable schema.
+	NewestSchemaVersion = PolicySchemaVersion
 )
 
 var (
@@ -516,9 +520,15 @@ func rawObject(raw json.RawMessage) (map[string]json.RawMessage, bool) {
 	return object, true
 }
 
-// buildBearingSchema reports whether a marker of this schema carries the
+// BuildBearingSchema reports whether a marker of this schema carries the
 // build_roots/builds/build_source triple.
-func buildBearingSchema(version int) bool {
+//
+// Every reader that decides whether a recorded compiled command is knowable
+// asks this, so a new build-bearing schema is admitted in one place instead of
+// in each reader's own inequality. A reader that bands on a single schema
+// silently reports a perfectly current installation as needing reinstallation
+// the moment the written schema advances.
+func BuildBearingSchema(version int) bool {
 	return version == SchemaVersion || externalCapableSchema(version)
 }
 
@@ -529,10 +539,10 @@ func externalCapableSchema(version int) bool {
 	return version == ExternalSchemaVersion || version == PolicySchemaVersion
 }
 
-// supportedMarkerSchema reports whether version is a marker schema this
-// release reads. Every listed version stays readable for the whole of protocol
-// 1.x; only the written version advances with the manifest band.
-func supportedMarkerSchema(version int) bool {
+// SupportedSchema reports whether version is a marker schema this release
+// reads. Every listed version stays readable for the whole of protocol 1.x;
+// only the written version advances with the manifest band.
+func SupportedSchema(version int) bool {
 	return version == LegacySchemaVersion || version == SchemaVersion ||
 		version == ExternalSchemaVersion || version == PolicySchemaVersion
 }
@@ -610,14 +620,14 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if len(buildState) > 1 {
 		return false, errors.New("multiple build currentness values supplied")
 	}
-	if version, ok := markerSchemaVersion(installedDir); ok && !supportedMarkerSchema(version) {
+	if version, ok := markerSchemaVersion(installedDir); ok && !SupportedSchema(version) {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
 	}
 	recorded := Read(installedDir)
 	if recorded == nil {
 		return false, nil
 	}
-	if !supportedMarkerSchema(recorded.SchemaVersion) {
+	if !SupportedSchema(recorded.SchemaVersion) {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
 	}
 	if recorded.SchemaVersion == LegacySchemaVersion &&
@@ -645,7 +655,7 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if !reflect.DeepEqual(recorded.Attestation, expected.Attestation) {
 		return false, nil
 	}
-	if buildBearingSchema(recorded.SchemaVersion) {
+	if BuildBearingSchema(recorded.SchemaVersion) {
 		if !equalStrings(recorded.BuildRoots, normalizedStrings(expected.BuildRoots)) ||
 			!reflect.DeepEqual(recorded.Builds, normalizedBuilds(expected.Builds)) ||
 			!reflect.DeepEqual(recorded.BuildSource, expected.BuildSource) {
@@ -662,7 +672,7 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if len(recorded.Builds) == 0 {
 		return true, nil
 	}
-	if !buildBearingSchema(recorded.SchemaVersion) || len(buildState) != 1 {
+	if !BuildBearingSchema(recorded.SchemaVersion) || len(buildState) != 1 {
 		return false, nil
 	}
 	return currentBuilds(installedDir, recorded, buildState[0])
