@@ -14,6 +14,16 @@ import (
 
 var forbiddenCompilerDirective = []byte("//go:cgo_import_dynamic")
 
+var generatorDirective = []byte("//go:generate")
+
+// Severity codes returned by scanSourceDirectives, ordered so the strongest
+// rejection class wins when a file carries more than one directive.
+const (
+	directiveNone = iota
+	directiveCgoImportDynamic
+	directiveGenerate
+)
+
 type packageError struct {
 	ImportStack []string
 	Pos         string
@@ -263,7 +273,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation, replace
 			if readErr != nil {
 				return diagnosticErr("go_source_unreadable", readErr, "cannot read active Go file in %q", item.ImportPath)
 			}
-			if matched == 1 && (firstParty ||
+			if matched == directiveCgoImportDynamic && (firstParty ||
 				item.ImportPath != "golang.org/x/sys" && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys/")) {
 				return diagnostic("go_forbidden_compiler_directive", "package %q contains //go:cgo_import_dynamic", item.ImportPath)
 			}
@@ -272,7 +282,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation, replace
 			// in an already materialized vendor tree does not fail preflight.
 			// The build root and a replaced module are code the package itself
 			// declares, so both stay held to the unexceptioned rule.
-			if matched == 2 && (firstParty || !strictlyBelow(item.Dir, filepath.Join(validation.BuildRoot, "vendor"))) {
+			if matched == directiveGenerate && (firstParty || !strictlyBelow(item.Dir, filepath.Join(validation.BuildRoot, "vendor"))) {
 				return diagnostic("go_generator_forbidden", "package %q contains an active generator directive", item.ImportPath)
 			}
 		}
@@ -297,20 +307,29 @@ func validatePackageInputs(item packageJSON, validation graphValidation, replace
 	return nil
 }
 
+// scanSourceDirectives reports the highest-severity directive an active Go file
+// contains: directiveCgoImportDynamic, directiveGenerate, or directiveNone.
+//
+// Severity, not first hit, decides the result. //go:generate is exempt inside a
+// materialized vendor tree while //go:cgo_import_dynamic is not, so stopping the
+// scan at a //go:generate would let a cgo directive in any later window ride in
+// unread and turn the carve-out into a bypass. Only the cgo directive, which
+// nothing weaker can override, ends the scan early; a generate hit is recorded
+// and the file is still read to EOF.
 func scanSourceDirectives(path string) (int, error) {
-	needles := [][]byte{forbiddenCompilerDirective, []byte("//go:generate")}
-	matched := 0
+	matched := directiveNone
 	err := scanFileWindows(path, len(forbiddenCompilerDirective)-1, func(window []byte) bool {
-		for index, needle := range needles {
-			if bytes.Contains(window, needle) {
-				matched = index + 1
-				return true
-			}
+		if bytes.Contains(window, forbiddenCompilerDirective) {
+			matched = directiveCgoImportDynamic
+			return true
+		}
+		if matched == directiveNone && bytes.Contains(window, generatorDirective) {
+			matched = directiveGenerate
 		}
 		return false
 	})
 	if err != nil {
-		return 0, err
+		return directiveNone, err
 	}
 	return matched, nil
 }

@@ -94,3 +94,41 @@ func TestVerifyArtifactRejectsHardLinks(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+// TestDirectiveScanReportsTheStrongestDirectiveAcrossWindows pins that the scan
+// resolves by severity, not by which directive it reaches first. //go:generate
+// is exempt inside a materialized vendor tree and //go:cgo_import_dynamic never
+// is, so a scan that stopped at a generate hit would leave a cgo directive in
+// any later window unread and hand the carve-out a bypass.
+func TestDirectiveScanReportsTheStrongestDirectiveAcrossWindows(t *testing.T) {
+	// Each block is wider than one 64 KiB read, so a needle placed after it
+	// lands in a strictly later window than one placed before it.
+	pad := bytes.Repeat([]byte("// padding padding padding padding padding padding padding\n"), 2000)
+	cgo := []byte("//go:cgo_import_dynamic libc_x x \"/usr/lib/libSystem.B.dylib\"\n")
+	generate := []byte("//go:generate go run ./gen\n")
+	join := func(parts ...[]byte) []byte { return bytes.Join(parts, nil) }
+
+	for _, testCase := range []struct {
+		name    string
+		payload []byte
+		want    int
+	}{
+		{name: "generate before cgo", payload: join(generate, pad, cgo), want: directiveCgoImportDynamic},
+		{name: "cgo before generate", payload: join(cgo, pad, generate), want: directiveCgoImportDynamic},
+		{name: "generate only", payload: join(generate, pad, pad), want: directiveGenerate},
+		{name: "generate in a later window", payload: join(pad, generate), want: directiveGenerate},
+		{name: "neither", payload: join(pad, pad), want: directiveNone},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "main.go")
+			writeTestFile(t, path, append([]byte("package board\n"), testCase.payload...), 0o644)
+			matched, err := scanSourceDirectives(path)
+			if err != nil {
+				t.Fatalf("scan: %v", err)
+			}
+			if matched != testCase.want {
+				t.Fatalf("scan = %d, want %d", matched, testCase.want)
+			}
+		})
+	}
+}
