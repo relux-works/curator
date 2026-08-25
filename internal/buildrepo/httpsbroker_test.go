@@ -31,7 +31,7 @@ func TestHTTPSCredentialBrokerAnswersOnlyPinnedGitPrompts(t *testing.T) {
 		t.Fatal(err)
 	}
 	credentials := NewHTTPSCredentials("git.example.test", "oauth2", "broker-secret")
-	_, statePath, err := materializeHTTPSCredentialBroker(root, executable, credentials)
+	wrapper, statePath, err := materializeHTTPSCredentialBroker(root, executable, credentials)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,6 +70,7 @@ func TestHTTPSCredentialBrokerAnswersOnlyPinnedGitPrompts(t *testing.T) {
 			}
 		})
 	}
+	assertBrokerExecutableReleased(t, wrapper)
 }
 
 func TestHTTPSBrokerStateContainsHostAndUsernameOnly(t *testing.T) {
@@ -101,6 +102,14 @@ func TestHTTPSBrokerStateContainsHostAndUsernameOnly(t *testing.T) {
 		if strings.Contains(diagnostic, secret) || !strings.Contains(diagnostic, "<redacted>") {
 			t.Fatalf("credential diagnostic = %q", diagnostic)
 		}
+	}
+	assertBrokerExecutableReleased(t, wrapper)
+}
+
+func assertBrokerExecutableReleased(t *testing.T, wrapper string) {
+	t.Helper()
+	if err := os.Remove(wrapper); err != nil {
+		t.Fatalf("remove materialized HTTPS broker before TempDir cleanup: %v", err)
 	}
 }
 

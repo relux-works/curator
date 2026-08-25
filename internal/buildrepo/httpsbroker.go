@@ -159,8 +159,14 @@ func materializeHTTPSCredentialBroker(root, executable string, credentials HTTPS
 }
 
 func copyBrokerExecutable(source, destination string) (err error) {
-	if err := os.Link(source, destination); err == nil {
-		return nil
+	// A Windows hard link still names the running manager executable. Windows
+	// keeps that file identity locked until the manager exits, so a temporary
+	// wrapper created this way cannot be removed when the fetch workspace is
+	// cleaned up. Materialize independent bytes on Windows instead.
+	if runtime.GOOS != "windows" {
+		if err := os.Link(source, destination); err == nil {
+			return nil
+		}
 	}
 	input, err := os.Open(source) // #nosec G304 -- admitted absolute manager executable.
 	if err != nil {
