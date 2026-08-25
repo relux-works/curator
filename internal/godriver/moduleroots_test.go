@@ -375,6 +375,19 @@ func TestAuditedVendorAllowancesAreWithheldFromAReplacedModule(t *testing.T) {
 			},
 		},
 		{
+			// The motivating case: bubbletea reaches clipperhouse/displaywidth,
+			// whose gen.go carries a bare //go:generate that no released
+			// version drops. The directive is inert under -mod=vendor, so an
+			// audited vendored dependency may carry it and a replaced module
+			// may not.
+			name: "//go:generate in a vendored package", code: "go_generator_forbidden",
+			mark: func(t *testing.T, item *packageJSON) {
+				t.Helper()
+				writeTestFile(t, filepath.Join(item.Dir, "board.go"),
+					[]byte("package board\n\n//go:generate go run -C internal/gen .\n"), 0o644)
+			},
+		},
+		{
 			name: "cgo_import_dynamic under the golang.org/x/sys allowlist", code: "go_forbidden_compiler_directive",
 			mark: func(t *testing.T, item *packageJSON) {
 				t.Helper()

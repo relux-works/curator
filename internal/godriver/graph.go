@@ -267,7 +267,12 @@ func validatePackageInputs(item packageJSON, validation graphValidation, replace
 				item.ImportPath != "golang.org/x/sys" && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys/")) {
 				return diagnostic("go_forbidden_compiler_directive", "package %q contains //go:cgo_import_dynamic", item.ImportPath)
 			}
-			if matched == 2 {
+			// §2.3 words //go:generate as inert: managers never run generators
+			// and `go build -mod=vendor` does not execute them, so its presence
+			// in an already materialized vendor tree does not fail preflight.
+			// The build root and a replaced module are code the package itself
+			// declares, so both stay held to the unexceptioned rule.
+			if matched == 2 && (firstParty || !strictlyBelow(item.Dir, filepath.Join(validation.BuildRoot, "vendor"))) {
 				return diagnostic("go_generator_forbidden", "package %q contains an active generator directive", item.ImportPath)
 			}
 		}
