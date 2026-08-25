@@ -1,6 +1,7 @@
 package godriver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"go/build"
@@ -427,6 +428,51 @@ func TestAuditedVendorAllowancesAreWithheldFromAReplacedModule(t *testing.T) {
 					t.Fatalf("code = %q, want %s (error %v)", code, testCase.code, err)
 				}
 			})
+		})
+	}
+}
+
+// TestVendoredGeneratorCarveOutDoesNotHideACgoImportDynamic drives the real
+// Build entry point over the exact class the //go:generate carve-out serves — an
+// audited, non-replaced module below the build root vendor tree — and pins that
+// the carve-out did not open a hole for //go:cgo_import_dynamic. §2.3 is a
+// containment predicate: an active non-standard GoFiles file is scanned as exact
+// bytes and rejected if it *contains* the cgo directive, wherever it sits in the
+// file. The middle case is the regression: before the severity fix the scan
+// stopped at the generate hit in the first 64 KiB window and the build succeeded
+// with the cgo directive unread. The two controls prove the case is reachable
+// and that its only distinguishing feature is which window each directive is in.
+func TestVendoredGeneratorCarveOutDoesNotHideACgoImportDynamic(t *testing.T) {
+	pad := bytes.Repeat([]byte("// padding padding padding padding padding padding padding\n"), 2000) // > 64 KiB
+	cgo := []byte("//go:cgo_import_dynamic libc_x x \"/usr/lib/libSystem.B.dylib\"\n")
+	generate := []byte("//go:generate go run ./gen\n")
+	join := func(parts ...[]byte) []byte { return bytes.Join(parts, nil) }
+	header := []byte("package board\n\n")
+
+	for _, testCase := range []struct {
+		name    string
+		payload []byte
+	}{
+		{name: "cgo directive alone (control)", payload: join(header, pad, cgo)},
+		{name: "generate directive in an earlier window than the cgo directive", payload: join(header, generate, pad, cgo)},
+		{name: "both directives in the same window (control)", payload: join(header, generate, cgo)},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			fixture := newModuleRootsFixture(t)
+			fixture.modules = nil
+			writeTestFile(t, filepath.Join(fixture.buildRoot, "vendor", "modules.txt"),
+				[]byte("# example.test/vendored v1.0.0\n## explicit; go 1.23\nexample.test/vendored\n"), 0o644)
+			vendored := fixture.replacedPackage()
+			vendored.Module.Replace = nil
+			writeTestFile(t, filepath.Join(vendored.Dir, "board.go"), testCase.payload, 0o644)
+			fixture.start(stubScript{
+				ListStdout: string(encodePackages(t, fixture.rootPackage(), vendored)),
+				Artifact:   "audited third party executable",
+			})
+			_, err := Build(context.Background(), fixture.request(moduleRootLimits()))
+			if code := DiagnosticCode(err); code != "go_forbidden_compiler_directive" {
+				t.Fatalf("code = %q, want go_forbidden_compiler_directive (error %v)", code, err)
+			}
 		})
 	}
 }

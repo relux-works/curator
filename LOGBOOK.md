@@ -5,6 +5,17 @@
 
 ## 2026-08-25
 
+### 0640 — `BUG-260825-11nmd5`: relaxing one directive turned an early-exit scan into a bypass for another
+
+- CLASS: a byte scanner that stops at the *first* matching needle is only safe while every needle carries the *same* verdict. `scanSourceDirectives` (`internal/godriver/graph.go`) looked for `//go:cgo_import_dynamic` and `//go:generate` and returned on whichever it hit first. That was harmless for as long as both were rejected unconditionally.
+- REGRESSION INTRODUCED BY THE FIX ABOVE IT: PR 40 (`c9fe49c`) made `//go:generate` *exempt* inside a materialized vendor tree. The scan's early exit then became a hole — a `//go:generate` in the first 64 KiB window set `matched = 2` and terminated the read, so a `//go:cgo_import_dynamic` in any later window of the same file was never seen, and the carve-out admitted the package. Reproduced end to end through `Build()` on an audited, non-replaced vendored module: diagnostic code `""`, build succeeded.
+- THE GO COMPILER IS NOT A BACKSTOP HERE: `cmd/compile/internal/noder` permits `//go:cgo_import_dynamic` for general use (the comment names Solaris code in `golang.org/x/sys/unix`), and `/usr/lib/libSystem.B.dylib` satisfies its argument check. Preflight was the only thing standing there.
+- FIX: the scan now resolves by **severity, not by first hit**. Only `//go:cgo_import_dynamic` — which nothing weaker can override — ends the read early; a `//go:generate` hit is recorded and the file is still read to EOF. The three severities are named constants (`directiveNone` / `directiveCgoImportDynamic` / `directiveGenerate`) so the call site reads as a verdict rather than as `matched == 1` / `matched == 2`. Cost: files that carry `//go:generate` are read whole, bounded by the frozen build source.
+- FINDING, THE NARROWING MUTANT IS WHAT PROVES THE BOUND: reintroducing `return true` on the generate branch is delete-only and proves nothing about the class. The mutant that matters gates the cgo check on `matched == directiveNone`, i.e. keeps the "keep scanning" behavior but lets a recorded generate suppress a later cgo hit. It is killed by `TestDirectiveScanReportsTheStrongestDirectiveAcrossWindows/generate_before_cgo` and by the end-to-end case. Four mutants applied and reverted, all killed, including one that removes the carve-out entirely and reddens PR 40's own allowed-side test — proof the hardening did not quietly undo the relaxation.
+- SPEC BASIS: profiles/manager.md §2.3 is a *containment* predicate — an active non-standard `GoFiles` file is scanned as exact bytes and rejected if it **contains** the directive, wherever in the file it sits. An early-exit scan silently weakens containment to "contains, in the prefix before some other token". Worth reading every other early-exit byte scan in the tree with that sentence in hand.
+- SCOPE: `internal/godriver/graph.go`, `internal/godriver/graph_test.go`, `internal/godriver/moduleroots_test.go`. Branch `fix/BUG-260825-11nmd5-directive-scan-shortcircuit` off `680f6a6`.
+
+
 ### 0415 — Marker-schema banding: one predicate, or every reader drifts
 
 - ROOT CAUSE: three readers each carried their own inequality on the install-marker schema instead of asking the marker package. `classifySkillBuilds` (`cmd/curator/builds.go:365`) admitted only the written schema; `markerRefusal` (`builds.go:545`) admitted schemas 1-2; `marks.absorb` (`internal/scopes/gc.go:213`) admitted 2-3. Marker v4 failed all three.
