@@ -1,0 +1,4046 @@
+diff --git a/cmd/curator/builds.go b/cmd/curator/builds.go
+index a4a35ce..d9e7b22 100644
+--- a/cmd/curator/builds.go
++++ b/cmd/curator/builds.go
+@@ -684,9 +684,9 @@ func markerMoved(before, after map[string]string, installedDir string) bool {
+ // candidate bytes by changing permissions or rewriting a marker. These notices
+ // state which of the two happened, so an operator can see that a failed run
+ // left the previous installation in place.
+-func printRepairNotices(result install.Result) {
++func (c cli) printRepairNotices(result install.Result) {
+ 	for _, notice := range repairNotices(result.Alias, factsList(result.Builds), result.Status, result.BuildCacheRetained) {
+-		fmt.Println(notice)
++		_, _ = fmt.Fprintln(c.stdout, notice)
+ 	}
+ }
+ 
+diff --git a/cmd/curator/builds_test.go b/cmd/curator/builds_test.go
+index b56deaf..8627765 100644
+--- a/cmd/curator/builds_test.go
++++ b/cmd/curator/builds_test.go
+@@ -75,6 +75,7 @@ func markerRecording(build marker.Build) *marker.Marker {
+ // planner vocabulary and the currentness vocabulary stay in exact
+ // correspondence, and that a hit is the only code status accepts.
+ func TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode(t *testing.T) {
++	t.Parallel()
+ 	cases := map[string]string{
+ 		string(install.BuildCacheHit):                   buildCurrent,
+ 		string(install.BuildWouldPreflightAndBuild):     buildMissingArtifact,
+@@ -107,6 +108,7 @@ func TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode(t *testing.T)
+ // diagnostic keeps the stable go-v1 code as its machine-readable cause instead
+ // of leaving an operator to parse prose.
+ func TestUnusableToolchainRowsCarryTheDriverBoundaryCode(t *testing.T) {
++	t.Parallel()
+ 	facts := testFacts(string(install.BuildToolchainUnavailable))
+ 	facts.Diagnostic = "go_toolchain_missing"
+ 	facts.Reason = "go-v1 go_toolchain_missing: no trusted Go installation was selected"
+@@ -122,6 +124,7 @@ func TestUnusableToolchainRowsCarryTheDriverBoundaryCode(t *testing.T) {
+ }
+ 
+ func TestClassifyBuildCommandDetectsRecordedIdentityDrift(t *testing.T) {
++	t.Parallel()
+ 	other := buildsource.Identity{Algorithm: buildsource.Algorithm, ContentSHA256: testDigest(9)}
+ 	sourcelessMarker := func() *marker.Marker {
+ 		recorded := testRecordedMarker()
+@@ -240,6 +243,7 @@ func keyOf(t *testing.T, input buildmeta.Input) buildmeta.CacheKey {
+ // reported as a target change: the marker records no prior input, so those are
+ // indistinguishable and are reported as unattributed.
+ func TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves(t *testing.T) {
++	t.Parallel()
+ 	baseline := testInput()
+ 	baselineKey := keyOf(t, baseline)
+ 
+@@ -361,6 +365,7 @@ func TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves(t *testing.T) {
+ }
+ 
+ func TestInputCausesAreDistinctAndDocumented(t *testing.T) {
++	t.Parallel()
+ 	seen := map[string]bool{}
+ 	for _, cause := range inputCauses() {
+ 		if cause == "" || seen[cause] {
+@@ -380,6 +385,7 @@ func TestInputCausesAreDistinctAndDocumented(t *testing.T) {
+ }
+ 
+ func TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation(t *testing.T) {
++	t.Parallel()
+ 	installed := t.TempDir()
+ 	state, rows := classifySkillBuilds(installed, testRecordedMarker(),
+ 		[]buildFacts{testFacts(string(install.BuildCacheHit))})
+@@ -401,6 +407,7 @@ func TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation(t *testing.T
+ }
+ 
+ func TestClassifySkillBuildsWithoutCompiledStateStaysSilent(t *testing.T) {
++	t.Parallel()
+ 	recorded := testRecordedMarker()
+ 	recorded.Builds = map[string]marker.Build{}
+ 	recorded.BuildSource = nil
+@@ -412,6 +419,7 @@ func TestClassifySkillBuildsWithoutCompiledStateStaysSilent(t *testing.T) {
+ }
+ 
+ func TestClassifySkillBuildsDetectsContextExposure(t *testing.T) {
++	t.Parallel()
+ 	t.Run("recorded context file inside a build root", func(t *testing.T) {
+ 		recorded := testRecordedMarker()
+ 		recorded.Files = append(recorded.Files, "assets/build-tool/go.mod")
+@@ -435,6 +443,7 @@ func TestClassifySkillBuildsDetectsContextExposure(t *testing.T) {
+ }
+ 
+ func TestClassifySkillBuildsDetectsCommandDriftInBothDirections(t *testing.T) {
++	t.Parallel()
+ 	t.Run("closure activates a command the marker does not record", func(t *testing.T) {
+ 		recorded := testRecordedMarker()
+ 		facts := testFacts(string(install.BuildCacheHit))
+@@ -460,6 +469,7 @@ func TestClassifySkillBuildsDetectsCommandDriftInBothDirections(t *testing.T) {
+ }
+ 
+ func TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild(t *testing.T) {
++	t.Parallel()
+ 	facts := []buildFacts{testFacts(string(install.BuildCacheHit))}
+ 
+ 	state, rows := classifySkillBuilds(t.TempDir(), nil, facts)
+@@ -479,6 +489,7 @@ func TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild(t *testing.T)
+ // operator: a document from a newer manager, a build driver outside the closed
+ // set, and a document that is simply not a marker are three different codes.
+ func TestMarkerRefusalSeparatesUnsupportedFromInvalid(t *testing.T) {
++	t.Parallel()
+ 	for name, testCase := range map[string]struct {
+ 		payload string
+ 		absent  bool
+@@ -531,6 +542,7 @@ func TestMarkerRefusalSeparatesUnsupportedFromInvalid(t *testing.T) {
+ }
+ 
+ func TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass(t *testing.T) {
++	t.Parallel()
+ 	seen := map[string]bool{}
+ 	for _, code := range currentnessCodes() {
+ 		if code == "" {
+@@ -572,6 +584,7 @@ func readDocumentation(t *testing.T) (string, bool) {
+ // the reachable vocabulary in sync: a code nobody can look up is not a stable
+ // interface.
+ func TestEveryCurrentnessCodeIsDocumented(t *testing.T) {
++	t.Parallel()
+ 	documentation, ok := readDocumentation(t)
+ 	if !ok {
+ 		return
+@@ -587,6 +600,7 @@ func TestEveryCurrentnessCodeIsDocumented(t *testing.T) {
+ // for exactly current state, on both surfaces it consults: the declared-skill
+ // map and the compiled-command rows a transitively resolved node produces.
+ func TestCheckFailsForEveryNonCurrentCode(t *testing.T) {
++	t.Parallel()
+ 	for _, code := range currentnessCodes() {
+ 		want := !currentCode(code)
+ 		if failed := checkFailed(map[string]string{"skill-a": code}, nil); failed != want {
+@@ -610,6 +624,7 @@ func TestCheckFailsForEveryNonCurrentCode(t *testing.T) {
+ // cannot publish a manager-private location or drive a terminal through a
+ // machine-readable diagnostic field, in free-standing, embedded, and URI form.
+ func TestBuildReportsNeverPublishAnAbsolutePath(t *testing.T) {
++	t.Parallel()
+ 	for _, reason := range []string{
+ 		"inspect cache boundary: lstat /Users/operator/.curator/cache/build/go-v1/abcd: permission denied",
+ 		`open C:\Users\operator\AppData\curator\cache: access denied`,
+@@ -638,6 +653,7 @@ func TestBuildReportsNeverPublishAnAbsolutePath(t *testing.T) {
+ }
+ 
+ func TestBuildReportDetailIsBounded(t *testing.T) {
++	t.Parallel()
+ 	facts := testFacts(string(install.BuildCorrupt))
+ 	facts.Reason = strings.Repeat("compiler noise ", 500)
+ 	state, cause, detail := classifyBuildCommand(testRecordedBuild(), testRecordedMarker(), facts)
+@@ -651,6 +667,7 @@ func TestBuildReportDetailIsBounded(t *testing.T) {
+ // operator guidance to the accepted selection mechanisms and the tested Go
+ // release families, and proves it never suggests a PATH lookup or a download.
+ func TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies(t *testing.T) {
++	t.Parallel()
+ 	if guidance := goToolchainGuidance(""); guidance != "" {
+ 		t.Fatalf("a run without a driver diagnostic produced guidance %q", guidance)
+ 	}
+@@ -689,6 +706,7 @@ func TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies(t *testin
+ }
+ 
+ func TestRepairNoticesDistinguishRepairFromAPreservedInstallation(t *testing.T) {
++	t.Parallel()
+ 	hit := testFacts(string(install.BuildCacheHit))
+ 
+ 	for name, testCase := range map[string]struct {
+@@ -747,6 +765,7 @@ func TestRepairNoticesDistinguishRepairFromAPreservedInstallation(t *testing.T)
+ }
+ 
+ func TestMarkerDigestsDetectAConcurrentInstallMarkerChange(t *testing.T) {
++	t.Parallel()
+ 	store := t.TempDir()
+ 	installed := filepath.Join(store, "build-skill")
+ 	if err := os.MkdirAll(installed, 0o755); err != nil {
+@@ -779,6 +798,7 @@ func TestMarkerDigestsDetectAConcurrentInstallMarkerChange(t *testing.T) {
+ // the run started with makes every verdict for that skill stale rather than
+ // authoritative, and the scope fails --check.
+ func TestStatusReportMarksCompiledStateThatMovedDuringTheCheck(t *testing.T) {
++	t.Parallel()
+ 	project := t.TempDir()
+ 	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "home", "config.json"), SkillsRoot: t.TempDir()}
+ 	installed := filepath.Join(project, ".agents", "skills", "build-skill")
+@@ -809,6 +829,7 @@ func TestStatusReportMarksCompiledStateThatMovedDuringTheCheck(t *testing.T) {
+ // dropped, which is what a transitively resolved provider looks like before its
+ // first installation.
+ func TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill(t *testing.T) {
++	t.Parallel()
+ 	project := t.TempDir()
+ 	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "home", "config.json"), SkillsRoot: t.TempDir()}
+ 	facts := []buildFacts{testFacts(string(install.BuildCacheHit))}
+diff --git a/cmd/curator/gc_test.go b/cmd/curator/gc_test.go
+index 285a14a..6cdfb8b 100644
+--- a/cmd/curator/gc_test.go
++++ b/cmd/curator/gc_test.go
+@@ -2,6 +2,7 @@ package main
+ 
+ import (
+ 	"encoding/json"
++	"io"
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
+@@ -53,13 +54,13 @@ func gcHome(t *testing.T) string {
+ 	if err := os.WriteFile(configPath, payload, 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 	return home
+ }
+ 
+ // TestGCPrunesDeadConsumersUnderTheHomeLock proves the standalone command does
+ // the same serialized maintenance an install does.
+ func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
++	t.Parallel()
+ 	home := gcHome(t)
+ 	dead := filepath.Join(t.TempDir(), "gone")
+ 	if err := scopes.RecordConsumer(home, dead); err != nil {
+@@ -69,7 +70,7 @@ func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 
+-	if code := run([]string{"gc"}); code != exitOK {
++	if code := run([]string{"gc"}, fileConfigSource(filepath.Join(home, "config.json")), io.Discard, io.Discard); code != exitOK {
+ 		t.Fatalf("gc = %d", code)
+ 	}
+ 	if consumers := scopes.LoadConsumers(home); len(consumers) != 0 {
+@@ -83,6 +84,7 @@ func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
+ // TestGCWaitsForTheHomeLock proves maintenance serializes on the same lock
+ // install, rollback, and recovery take, instead of running beside them.
+ func TestGCWaitsForTheHomeLock(t *testing.T) {
++	t.Parallel()
+ 	home := gcHome(t)
+ 	dead := filepath.Join(t.TempDir(), "gone")
+ 	if err := scopes.RecordConsumer(home, dead); err != nil {
+@@ -104,7 +106,9 @@ func TestGCWaitsForTheHomeLock(t *testing.T) {
+ 	}()
+ 
+ 	finished := make(chan int, 1)
+-	go func() { finished <- run([]string{"gc"}) }()
++	go func() {
++		finished <- run([]string{"gc"}, fileConfigSource(filepath.Join(home, "config.json")), io.Discard, io.Discard)
++	}()
+ 
+ 	select {
+ 	case code := <-finished:
+@@ -136,6 +140,7 @@ func TestGCWaitsForTheHomeLock(t *testing.T) {
+ // passes over one home cannot lose a consumer update: each pass observes a
+ // complete registry, so the live consumer always survives.
+ func TestGCRunsSerializedAcrossConcurrentInvocations(t *testing.T) {
++	t.Parallel()
+ 	home := gcHome(t)
+ 	live := t.TempDir()
+ 	installTestMarker(t, filepath.Join(live, ".agents", "skills"), "skill-a")
+diff --git a/cmd/curator/global_status_test.go b/cmd/curator/global_status_test.go
+index abbcf27..2b09122 100644
+--- a/cmd/curator/global_status_test.go
++++ b/cmd/curator/global_status_test.go
+@@ -2,12 +2,12 @@ package main
+ 
+ import (
+ 	"encoding/json"
++	"errors"
+ 	"io"
+ 	"os"
+ 	"path/filepath"
+ 	"runtime"
+ 	"strings"
+-	"sync"
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/buildmeta"
+@@ -51,14 +51,11 @@ func globalScopeDeclaring(t *testing.T, declarations string) string {
+ 	if err := os.MkdirAll(userHome, 0o755); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Setenv("CURATOR_CONFIG", configPath)
+-	t.Setenv("HOME", userHome)
+-	t.Setenv("USERPROFILE", userHome)
+ 
+ 	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if code, stdout, stderr := capture(t, "global", "init"); code != exitOK {
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "init"); code != exitOK {
+ 		t.Fatalf("global init = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ 	writeFile(t, filepath.Join(install.GlobalRoot(home), manifest.Name),
+@@ -89,60 +86,36 @@ func legacyGlobalScope(t *testing.T) string {
+ 	return home
+ }
+ 
+-// captureReport runs one internal reporting phase with both standard streams
+-// redirected. It is the in-process counterpart of capture: capture proves the
+-// whole command path, this proves the same phase a command path reaches, driven
+-// from a plan the test already acquired.
+-func captureReport(t *testing.T, call func() int) (int, string, string) {
+-	t.Helper()
+-	outReader, outWriter, err := os.Pipe()
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	errReader, errWriter, err := os.Pipe()
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	realOut, realErr := os.Stdout, os.Stderr
+-	os.Stdout, os.Stderr = outWriter, errWriter
+-
+-	var stdout, stderr []byte
+-	var readers sync.WaitGroup
+-	readers.Add(2)
+-	go func() { defer readers.Done(); stdout, _ = io.ReadAll(outReader) }()
+-	go func() { defer readers.Done(); stderr, _ = io.ReadAll(errReader) }()
+-
+-	code := call()
+-
+-	os.Stdout, os.Stderr = realOut, realErr
+-	_ = outWriter.Close()
+-	_ = errWriter.Close()
+-	readers.Wait()
+-	return code, string(stdout), string(stderr)
+-}
+-
+ // globalPlan is one read-only machine-wide plan a test acquired for itself,
+ // through the exact acquisition phase a command run uses.
+ type globalPlan struct {
+ 	result     install.Result
+ 	unprovable bool
++	configPath string
++	userHome   string
+ }
+ 
+ // acquireGlobalPlan runs the read-only machine-wide plan once. Every plan is a
+ // full fingerprint of the trusted toolchain, so a test acquires one and replays
+ // every rendering of the same live state from it instead of deriving an
+ // identical plan per assertion.
+-func acquireGlobalPlan(t *testing.T) globalPlan {
++func acquireGlobalPlan(t *testing.T, home string) globalPlan {
+ 	t.Helper()
+-	cfg, code := loadConfig()
++	configPath := filepath.Join(home, "config.json")
++	userHome := filepath.Join(filepath.Dir(home), "user")
++	command := cli{
++		config: fileConfigSource(configPath), stdout: io.Discard, stderr: io.Discard,
++		userHome: func() (string, error) { return userHome, nil },
++	}
++	cfg, code := command.loadConfig()
+ 	if code != exitOK {
+ 		t.Fatalf("loading the manager configuration = %d", code)
+ 	}
+-	result, unprovable := globalStatusPlan(cfg)
++	result, unprovable := command.globalStatusPlan(cfg)
+ 	if len(result.Builds) == 0 {
+ 		t.Fatalf("the read-only global plan describes no compiled command: %+v", result)
+ 	}
+-	return globalPlan{result: result, unprovable: unprovable}
++	return globalPlan{result: result, unprovable: unprovable, configPath: configPath, userHome: userHome}
+ }
+ 
+ // replay renders one report from this plan through the same production
+@@ -150,15 +123,19 @@ func acquireGlobalPlan(t *testing.T) globalPlan {
+ // runs, so every replayed assertion is an assertion about production behaviour.
+ func (plan globalPlan) replay(t *testing.T, opts globalStatusOptions) (int, string, string) {
+ 	t.Helper()
+-	cfg, code := loadConfig()
++	var stdout, stderr strings.Builder
++	command := cli{
++		config: fileConfigSource(plan.configPath), stdout: &stdout, stderr: &stderr,
++		userHome: func() (string, error) { return plan.userHome, nil },
++	}
++	cfg, code := command.loadConfig()
+ 	if code != exitOK {
+ 		t.Fatalf("loading the manager configuration = %d", code)
+ 	}
+-	return captureReport(t, func() int {
+-		return reportGlobalStatus(cfg, opts, func(*config.Config) (install.Result, bool) {
+-			return plan.result, plan.unprovable
+-		})
++	code = command.reportGlobalStatus(cfg, opts, func(*config.Config) (install.Result, bool) {
++		return plan.result, plan.unprovable
+ 	})
++	return code, stdout.String(), stderr.String()
+ }
+ 
+ // restoreMarkerAfter copies one install marker aside and puts the exact bytes
+@@ -346,16 +323,17 @@ func assertGlobalDriftHuman(t *testing.T, want driftExpectation, code int, human
+ // while that state is live, because a replayed one would describe cache
+ // evidence that no longer exists.
+ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
++	t.Parallel()
+ 	requireNativeControlInventoryPlatform(t)
+ 	home := compiledGlobalScope(t)
+-	if code, stdout, stderr := capture(t, "global", "install"); code != exitOK {
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "install"); code != exitOK {
+ 		t.Fatalf("global install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ 	installed := filepath.Join(install.GlobalRoot(home), "skills", "build-skill")
+ 
+ 	// `--json` and `--check` are combined so one invocation proves the published
+ 	// document and the exit code it produced are the same run's verdict.
+-	code, stdout, stderr := capture(t, "global", "status", "--json", "--check")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
+ 	if code != exitOK {
+ 		t.Fatalf("clean compiled global status --json --check = %d\nstderr:\n%s", code, stderr)
+ 	}
+@@ -394,7 +372,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+ 
+ 	// One plan of the unchanged installation, acquired once and reused by every
+ 	// case below that cannot change what a plan derives.
+-	unchanged := acquireGlobalPlan(t)
++	unchanged := acquireGlobalPlan(t, home)
+ 
+ 	for _, testCase := range []struct {
+ 		name     string
+@@ -444,7 +422,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+ 			if testCase.endToEnd {
+ 				// One case in this group also runs the whole command path, so the
+ 				// replayed classification is pinned to what the CLI publishes.
+-				code, stdout, _ = capture(t, "global", "status", "--json", "--check")
++				code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
+ 				assertGlobalDriftDocument(t, testCase.want, code, stdout)
+ 			}
+ 
+@@ -481,7 +459,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+ 
+ 			// Protected cache evidence is read by planning itself, so this state is
+ 			// classified from a plan acquired while it is live.
+-			drifted := acquireGlobalPlan(t)
++			drifted := acquireGlobalPlan(t, home)
+ 			code, stdout, _ := drifted.replay(t, globalStatusOptions{jsonOut: true, check: true})
+ 			assertGlobalDriftDocument(t, testCase.want, code, stdout)
+ 
+@@ -507,7 +485,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+ 		// command path is run once here to pin that to what the CLI publishes.
+ 		code, stdout, _ := unchanged.replay(t, globalStatusOptions{jsonOut: true, check: true})
+ 		assertGlobalDriftDocument(t, want, code, stdout)
+-		code, stdout, _ = capture(t, "global", "status", "--json", "--check")
++		code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
+ 		assertGlobalDriftDocument(t, want, code, stdout)
+ 
+ 		code, human, _ := unchanged.replay(t, globalStatusOptions{})
+@@ -519,9 +497,11 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+ 	// identical one. The plan cannot be replayed here: refusing the toolchain is
+ 	// exactly what the acquisition phase has to report.
+ 	t.Run("trusted go toolchain cannot be resolved", func(t *testing.T) {
+-		t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
++		selected := map[string]string{
++			godriver.SelectionCuratorGo: filepath.Join(t.TempDir(), "nowhere", "bin", "go"),
++		}
+ 
+-		code, stdout, stderr := capture(t, "global", "status", "--json", "--check")
++		code, stdout, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "global", "status", "--json", "--check")
+ 		if code != exitFail {
+ 			t.Fatalf("global status --json --check with an unusable toolchain = %d, want %d\n%s",
+ 				code, exitFail, stderr)
+@@ -555,7 +535,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+ 		if refused.Skills["build-skill"] != buildUnusableToolchain {
+ 			t.Fatalf("skills = %v", refused.Skills)
+ 		}
+-		if code, human, _ := capture(t, "global", "status"); code != exitOK ||
++		if code, human, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "global", "status"); code != exitOK ||
+ 			!strings.Contains(human, "state="+buildUnusableToolchain) {
+ 			t.Fatalf("plain global status over an unusable toolchain = %d\n%s", code, human)
+ 		}
+@@ -569,6 +549,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+ // through a dependency must still be found, classified, and able to fail
+ // `--check` on its own.
+ func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
++	t.Parallel()
+ 	requireNativeControlInventoryPlatform(t)
+ 	home := globalScopeDeclaring(t, `{"name":"consumer","tag":"v1"}`)
+ 	skillsRoot := filepath.Join(filepath.Dir(home), "skills")
+@@ -594,11 +575,11 @@ func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+ 	runGit(t, consumer, "commit", "-qm", "initial consumer")
+ 	runGit(t, consumer, "tag", "v1")
+ 
+-	if code, stdout, stderr := capture(t, "global", "install"); code != exitOK {
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "install"); code != exitOK {
+ 		t.Fatalf("global install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ 
+-	code, stdout, stderr := capture(t, "global", "status", "--json", "--check")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
+ 	if code != exitOK {
+ 		t.Fatalf("clean transitive compiled global status --json --check = %d\nstderr:\n%s", code, stderr)
+ 	}
+@@ -618,7 +599,7 @@ func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+ 			t.Fatal(err)
+ 		}
+ 	}
+-	code, stdout, _ = capture(t, "global", "status", "--json", "--check")
++	code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
+ 	if code != exitFail {
+ 		t.Fatalf("transitive compiled drift passed global status --check: %d\n%s", code, stdout)
+ 	}
+@@ -633,12 +614,13 @@ func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+ // command prints exactly the lines it printed before this surface existed, adds
+ // no `builds` key to the machine-readable document, and still exits zero.
+ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *testing.T) {
++	t.Parallel()
+ 	home := legacyGlobalScope(t)
+-	if code, stdout, stderr := capture(t, "global", "install"); code != exitOK {
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "install"); code != exitOK {
+ 		t.Fatalf("global install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ 
+-	code, stdout, stderr := capture(t, "global", "status")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "status")
+ 	if code != exitOK {
+ 		t.Fatalf("global status = %d\nstderr:\n%s", code, stderr)
+ 	}
+@@ -648,11 +630,11 @@ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *test
+ 	if stderr != "" {
+ 		t.Fatalf("a clean global status wrote to standard error:\n%s", stderr)
+ 	}
+-	if code, _, _ := capture(t, "global", "status", "--check"); code != exitOK {
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "--check"); code != exitOK {
+ 		t.Fatalf("clean global status --check = %d, want %d", code, exitOK)
+ 	}
+ 
+-	code, stdout, _ = capture(t, "global", "status", "--json")
++	code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status", "--json")
+ 	if code != exitOK {
+ 		t.Fatalf("global status --json = %d", code)
+ 	}
+@@ -671,11 +653,11 @@ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *test
+ 	// fails the new fail-closed verdict.
+ 	installed := filepath.Join(install.GlobalRoot(home), "skills", "skill-a")
+ 	writeFile(t, filepath.Join(installed, "SKILL.md"), "tampered\n")
+-	code, stdout, _ = capture(t, "global", "status")
++	code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status")
+ 	if code != exitOK || stdout != "global: skill-a "+stateContentDrift+"\n" {
+ 		t.Fatalf("global status over tampered content = %d\n%s", code, stdout)
+ 	}
+-	if code, _, _ := capture(t, "global", "status", "--check"); code != exitFail {
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "--check"); code != exitFail {
+ 		t.Fatalf("global status --check over tampered content = %d, want %d", code, exitFail)
+ 	}
+ }
+@@ -684,15 +666,13 @@ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *test
+ // declares nothing keeps its historical behaviour: no output, exit zero, and
+ // nothing for the fail-closed verdict to refuse.
+ func TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent(t *testing.T) {
++	t.Parallel()
+ 	root := t.TempDir()
+ 	userHome := filepath.Join(root, "user")
+ 	if err := os.MkdirAll(userHome, 0o755); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	configPath := filepath.Join(root, "home", "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+-	t.Setenv("HOME", userHome)
+-	t.Setenv("USERPROFILE", userHome)
+ 	if err := config.Bootstrap(configPath, filepath.Join(root, "skills"), "", []string{"codex_cli"}, false); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -701,7 +681,7 @@ func TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent(t *testing.T) {
+ 		{"global", "status"},
+ 		{"global", "status", "--check"},
+ 	} {
+-		code, stdout, stderr := capture(t, args...)
++		code, stdout, stderr := capture(t, configPath, args...)
+ 		if code != exitOK {
+ 			t.Fatalf("%v = %d, want %d\nstderr:\n%s", args, code, exitOK, stderr)
+ 		}
+@@ -717,18 +697,14 @@ func TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent(t *testing.T) {
+ // Plain reporting keeps the historical zero exit; the fail-closed verdict does
+ // not.
+ func TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved(t *testing.T) {
++	t.Parallel()
+ 	root := t.TempDir()
+ 	configPath := filepath.Join(root, "home", "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+-	t.Setenv("HOME", "")
+-	t.Setenv("USERPROFILE", "")
+-	t.Setenv("HOMEDRIVE", "")
+-	t.Setenv("HOMEPATH", "")
+ 	if err := config.Bootstrap(configPath, filepath.Join(root, "skills"), "", []string{"codex_cli"}, false); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 
+-	code, stdout, stderr := capture(t, "global", "status")
++	code, stdout, stderr := captureWithUserHome(t, configPath, func() (string, error) { return "", errors.New("test user home unavailable") }, "global", "status")
+ 	if code != exitOK {
+ 		t.Fatalf("global status without a resolvable user home = %d, want %d", code, exitOK)
+ 	}
+@@ -739,7 +715,7 @@ func TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved(t *testing.T) {
+ 		!strings.Contains(stderr, "could not resolve the user home") {
+ 		t.Fatalf("global status did not explain the unprovable scope:\n%s", stderr)
+ 	}
+-	if code, _, _ := capture(t, "global", "status", "--check"); code != exitFail {
++	if code, _, _ := captureWithUserHome(t, configPath, func() (string, error) { return "", errors.New("test user home unavailable") }, "global", "status", "--check"); code != exitFail {
+ 		t.Fatalf("global status --check without a resolvable user home = %d, want %d", code, exitFail)
+ 	}
+ }
+@@ -749,8 +725,9 @@ func TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved(t *testing.T) {
+ // state still publishes the declared-skill report and still exits zero, but
+ // `--check` refuses to call an unprovable scope current.
+ func TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven(t *testing.T) {
++	t.Parallel()
+ 	home := legacyGlobalScope(t)
+-	if code, _, stderr := capture(t, "global", "install"); code != exitOK {
++	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "global", "install"); code != exitOK {
+ 		t.Fatalf("global install = %d\n%s", code, stderr)
+ 	}
+ 	// A declaration that cannot be resolved fails the read-only plan long before
+@@ -759,7 +736,7 @@ func TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven(t *testing.T) {
+ 	writeFile(t, filepath.Join(install.GlobalRoot(home), manifest.Name),
+ 		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"skill-a","tag":"v9"}]}`)
+ 
+-	code, stdout, stderr := capture(t, "global", "status")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "status")
+ 	if code != exitOK {
+ 		t.Fatalf("global status over an unresolvable declaration = %d, want %d", code, exitOK)
+ 	}
+@@ -769,7 +746,7 @@ func TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven(t *testing.T) {
+ 	if !strings.Contains(stderr, "warning:") {
+ 		t.Fatalf("global status did not report the refusal as a warning:\n%s", stderr)
+ 	}
+-	if code, _, _ := capture(t, "global", "status", "--check"); code != exitFail {
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "--check"); code != exitFail {
+ 		t.Fatalf("global status --check over an unprovable closure = %d, want %d", code, exitFail)
+ 	}
+ }
+@@ -778,8 +755,9 @@ func TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven(t *testing.T) {
+ // takes no target: it is one scope, and a stray path must not be silently
+ // ignored.
+ func TestGlobalStatusRejectsPositionalArguments(t *testing.T) {
+-	legacyGlobalScope(t)
+-	if code, _, _ := capture(t, "global", "status", "somewhere"); code != exitUsage {
++	t.Parallel()
++	home := legacyGlobalScope(t)
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "somewhere"); code != exitUsage {
+ 		t.Fatalf("global status with a positional argument = %d, want %d", code, exitUsage)
+ 	}
+ }
+diff --git a/cmd/curator/lifecycle_conformance_test.go b/cmd/curator/lifecycle_conformance_test.go
+index e67e0a6..b013616 100644
+--- a/cmd/curator/lifecycle_conformance_test.go
++++ b/cmd/curator/lifecycle_conformance_test.go
+@@ -62,6 +62,7 @@ const invalidConfigBytes = "this is intentionally not valid JSON\n"
+ // and the published outcome selects the assertion, so neither can drift from
+ // the suite without failing here.
+ func TestAuthoritativeBootstrapCasesAreExecutable(t *testing.T) {
++	t.Parallel()
+ 	document := authoritativeLifecycleDocument(t)
+ 	if len(document.BootstrapCases) == 0 {
+ 		t.Fatal("the authoritative suite publishes no bootstrap case to bind")
+@@ -87,7 +88,6 @@ func runBootstrapCase(t *testing.T, published authoritativeBootstrapCase, state
+ 	root := t.TempDir()
+ 	configPath := filepath.Join(root, "home", "config.json")
+ 	skillsRoot := filepath.Join(root, "skills")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 
+ 	switch state {
+ 	case "missing":
+@@ -109,7 +109,7 @@ func runBootstrapCase(t *testing.T, published authoritativeBootstrapCase, state
+ 	if published.Force {
+ 		arguments = append(arguments, "--force")
+ 	}
+-	code, stdout, stderr := capture(t, arguments...)
++	code, stdout, stderr := capture(t, configPath, arguments...)
+ 
+ 	switch published.Outcome {
+ 	case "created":
+@@ -188,7 +188,6 @@ func newUpgradeFixture(t *testing.T, projectAliases ...string) upgradeFixture {
+ 		skillsRoot: filepath.Join(root, "skills"),
+ 		projects:   map[string]string{},
+ 	}
+-	t.Setenv("CURATOR_CONFIG", fixture.configPath)
+ 
+ 	transitiveWorking := filepath.Join(fixture.skillsRoot, "transitive")
+ 	publishSkillRepo(t, filepath.Join(upstream, "transitive"), "transitive", "")
+@@ -299,6 +298,7 @@ func (fixture upgradeFixture) declareGlobal(t *testing.T, names ...string) {
+ // the published exclusion was never reached, and — where the case requires it —
+ // a repository shared by two selected scopes is fetched exactly once.
+ func TestAuthoritativeUpgradeCasesAreExecutable(t *testing.T) {
++	t.Parallel()
+ 	document := authoritativeLifecycleDocument(t)
+ 	if len(document.UpgradeCases) == 0 {
+ 		t.Fatal("the authoritative suite publishes no upgrade case to bind")
+@@ -327,7 +327,7 @@ func runSelectedProjectUpgrade(t *testing.T, published authoritativeUpgradeCase)
+ 	fixture.declare(t, "app", "direct")
+ 	fixture.declare(t, "other", "unrelated")
+ 
+-	code, stdout, stderr := capture(t, "upgrade", "app")
++	code, stdout, stderr := capture(t, fixture.configPath, "upgrade", "app")
+ 	if code != exitOK {
+ 		t.Fatalf("upgrade app = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+@@ -344,7 +344,7 @@ func runAllProjectsUpgrade(t *testing.T, published authoritativeUpgradeCase) {
+ 	fixture.declare(t, "app", "direct")
+ 	fixture.declare(t, "other", "direct")
+ 
+-	code, stdout, stderr := capture(t, "upgrade", "--all")
++	code, stdout, stderr := capture(t, fixture.configPath, "upgrade", "--all")
+ 	if code != exitOK {
+ 		t.Fatalf("upgrade --all = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+@@ -368,7 +368,7 @@ func runGlobalUpgrade(t *testing.T, published authoritativeUpgradeCase) {
+ 	fixture := newUpgradeFixture(t)
+ 	fixture.declareGlobal(t, "direct")
+ 
+-	code, stdout, stderr := capture(t, "global", "upgrade")
++	code, stdout, stderr := capture(t, fixture.configPath, "global", "upgrade")
+ 	if code != exitOK {
+ 		t.Fatalf("global upgrade = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 8b28ddd..9b57fc9 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -11,6 +11,7 @@ import (
+ 	"errors"
+ 	"flag"
+ 	"fmt"
++	"io"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+@@ -85,70 +86,109 @@ func main() {
+ 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
+ 		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
+ 	}
+-	os.Exit(run(os.Args[1:]))
++	// Resolve the environment-backed user path once at the process boundary.
++	// The command core receives an explicit source so independent invocations
++	// never consult CURATOR_CONFIG themselves.
++	os.Exit(run(os.Args[1:], fileConfigSource(config.UserPath()), os.Stdout, os.Stderr))
+ }
+ 
+-func run(args []string) int {
++// configSource is the injectable configuration seam used by one CLI invocation.
++// Path is also used by commands that create config before it can be loaded.
++type configSource interface {
++	Path() string
++	Load(warn func(string)) (*config.Config, error)
++}
++
++type fileConfigSource string
++
++func (source fileConfigSource) Path() string { return string(source) }
++
++func (source fileConfigSource) Load(warn func(string)) (*config.Config, error) {
++	return config.Load(source.Path(), warn)
++}
++
++type cli struct {
++	config   configSource
++	stdout   io.Writer
++	stderr   io.Writer
++	userHome func() (string, error)
++}
++
++func (c cli) newFlagSet(name string) *flag.FlagSet {
++	flags := flag.NewFlagSet(name, flag.ContinueOnError)
++	flags.SetOutput(c.stderr)
++	return flags
++}
++
++// run executes one isolated CLI invocation. Its configuration source and
++// output writers are explicit so callers can run concurrent invocations without
++// mutating CURATOR_CONFIG, os.Stdout, or os.Stderr.
++func run(args []string, source configSource, stdout, stderr io.Writer) int {
++	command := cli{config: source, stdout: stdout, stderr: stderr, userHome: os.UserHomeDir}
++	return command.run(args)
++}
++
++func (c cli) run(args []string) int {
+ 	if len(args) == 0 {
+-		fmt.Fprint(os.Stderr, usage)
++		_, _ = fmt.Fprint(c.stderr, usage)
+ 		return exitUsage
+ 	}
+ 	switch args[0] {
+ 	case "--version", "version":
+-		fmt.Println("curator " + version.String())
++		_, _ = fmt.Fprintln(c.stdout, "curator "+version.String())
+ 		return exitOK
+ 	case "init":
+-		return cmdInit(args[1:])
++		return c.cmdInit(args[1:])
+ 	case "bootstrap":
+-		return cmdBootstrap(args[1:])
++		return c.cmdBootstrap(args[1:])
+ 	case "add":
+-		return cmdAdd(args[1:])
++		return c.cmdAdd(args[1:])
+ 	case "remove":
+-		return cmdRemove(args[1:])
++		return c.cmdRemove(args[1:])
+ 	case "install":
+-		return cmdInstall(args[1:])
++		return c.cmdInstall(args[1:])
+ 	case "update":
+-		return cmdUpdate()
++		return c.cmdUpdate()
+ 	case "upgrade":
+-		return cmdInstallMode(args[1:], true)
++		return c.cmdInstallMode(args[1:], true)
+ 	case "status":
+-		return cmdStatus(args[1:])
++		return c.cmdStatus(args[1:])
+ 	case "list":
+-		return cmdList()
++		return c.cmdList()
+ 	case "project":
+-		return cmdProject(args[1:])
++		return c.cmdProject(args[1:])
+ 	case "skill":
+ 		if len(args) >= 2 && args[1] == "check" {
+-			return cmdSkillCheck(args[2:])
++			return c.cmdSkillCheck(args[2:])
+ 		}
+ 	case "global":
+-		return cmdGlobal(args[1:])
++		return c.cmdGlobal(args[1:])
+ 	case "hybrid":
+-		return cmdHybrid(args[1:])
++		return c.cmdHybrid(args[1:])
+ 	case "audit":
+-		return cmdAudit(args[1:])
++		return c.cmdAudit(args[1:])
+ 	case "gc":
+-		return cmdGC()
++		return c.cmdGC()
+ 	case "shell-init":
+-		return cmdShellInit(args[1:])
++		return c.cmdShellInit(args[1:])
+ 	case "ui":
+-		return cmdUI()
++		return c.cmdUI()
+ 	case "config":
+-		return cmdConfig(args[1:])
++		return c.cmdConfig(args[1:])
+ 	case "-h", "--help", "help":
+-		fmt.Print(usage)
++		_, _ = fmt.Fprint(c.stdout, usage)
+ 		return exitOK
+ 	}
+-	fmt.Fprintf(os.Stderr, "curator: unknown command %q\n\n%s", args[0], usage)
++	_, _ = fmt.Fprintf(c.stderr, "curator: unknown command %q\n\n%s", args[0], usage)
+ 	return exitUsage
+ }
+ 
+-func loadConfig() (*config.Config, int) {
+-	cfg, err := config.Load("", func(message string) {
+-		fmt.Fprintln(os.Stderr, "warning: "+message)
++func (c cli) loadConfig() (*config.Config, int) {
++	cfg, err := c.config.Load(func(message string) {
++		_, _ = fmt.Fprintln(c.stderr, "warning: "+message)
+ 	})
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return nil, exitFail
+ 	}
+ 	return cfg, exitOK
+@@ -305,8 +345,8 @@ func nearestProjectRoot(start string) string {
+ 	}
+ }
+ 
+-func cmdBootstrap(args []string) int {
+-	flags := flag.NewFlagSet("bootstrap", flag.ContinueOnError)
++func (c cli) cmdBootstrap(args []string) int {
++	flags := c.newFlagSet("bootstrap")
+ 	skillsRoot := flags.String("skills-root", "", "directory containing skill repositories")
+ 	preferredLocale := flags.String("preferred-locale", "", "preferred locale")
+ 	defaultAgents := flags.String("default-agents", "codex_cli", "comma-separated default agents")
+@@ -318,21 +358,21 @@ func cmdBootstrap(args []string) int {
+ 		return exitUsage
+ 	}
+ 	if *force && *ifMissing {
+-		fmt.Fprintln(os.Stderr, "curator: bootstrap --if-missing and --force are mutually exclusive")
++		_, _ = fmt.Fprintln(c.stderr, "curator: bootstrap --if-missing and --force are mutually exclusive")
+ 		return exitUsage
+ 	}
+-	path := config.UserPath()
++	path := c.config.Path()
+ 	if *ifMissing {
+ 		if _, statErr := os.Stat(path); statErr == nil {
+-			fmt.Println("kept existing config:", path)
++			_, _ = fmt.Fprintln(c.stdout, "kept existing config:", path)
+ 			return exitOK
+ 		} else if !os.IsNotExist(statErr) {
+-			fmt.Fprintln(os.Stderr, "curator:", statErr)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", statErr)
+ 			return exitFail
+ 		}
+ 	}
+ 	if *skillsRoot == "" && !*nonInteractive {
+-		fmt.Fprint(os.Stderr, "skills_root: ")
++		_, _ = fmt.Fprint(c.stderr, "skills_root: ")
+ 		reader := bufio.NewReader(os.Stdin)
+ 		value, readErr := reader.ReadString('\n')
+ 		if readErr == nil {
+@@ -340,16 +380,16 @@ func cmdBootstrap(args []string) int {
+ 		}
+ 	}
+ 	if *skillsRoot == "" {
+-		fmt.Fprintln(os.Stderr, "curator: bootstrap requires --skills-root")
++		_, _ = fmt.Fprintln(c.stderr, "curator: bootstrap requires --skills-root")
+ 		return exitUsage
+ 	}
+ 	if err := config.Bootstrap(path, *skillsRoot, *preferredLocale, splitNonEmpty(*defaultAgents), *force); err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	fmt.Println("wrote", path)
+-	fmt.Println("shell profile changes are not required: agent skills can invoke project and global command shims directly")
+-	fmt.Println("optional bare commands for interactive use: curator shell-init --install")
++	_, _ = fmt.Fprintln(c.stdout, "wrote", path)
++	_, _ = fmt.Fprintln(c.stdout, "shell profile changes are not required: agent skills can invoke project and global command shims directly")
++	_, _ = fmt.Fprintln(c.stdout, "optional bare commands for interactive use: curator shell-init --install")
+ 	return exitOK
+ }
+ 
+@@ -363,20 +403,20 @@ func splitNonEmpty(value string) []string {
+ 	return result
+ }
+ 
+-func cmdInit(args []string) int {
++func (c cli) cmdInit(args []string) int {
+ 	root := projectRootArg(args)
+ 	path, err := manifest.EnsureEmpty(root)
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+ 	entries := adapters.RequiredGitignoreEntries(sortedKnownAgents())
+ 	entries = append(entries, "Skillfile.dev.json")
+ 	if err := gitignore.Append(filepath.Join(root, ".gitignore"), entries); err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	fmt.Println("initialized", path)
++	_, _ = fmt.Fprintln(c.stdout, "initialized", path)
+ 	return exitOK
+ }
+ 
+@@ -390,8 +430,8 @@ func sortedKnownAgents() []string {
+ 	return agents
+ }
+ 
+-func cmdAdd(args []string) int {
+-	flags := flag.NewFlagSet("add", flag.ContinueOnError)
++func (c cli) cmdAdd(args []string) int {
++	flags := c.newFlagSet("add")
+ 	git := flags.String("git", "", "git clone URL")
+ 	source := flags.String("source", "", "source directory under skills_root")
+ 	tag := flags.String("tag", "", "git tag")
+@@ -403,7 +443,7 @@ func cmdAdd(args []string) int {
+ 		return exitUsage
+ 	}
+ 	if len(positional) < 1 {
+-		fmt.Fprintln(os.Stderr, "curator: add requires a skill name")
++		_, _ = fmt.Fprintln(c.stderr, "curator: add requires a skill name")
+ 		return exitUsage
+ 	}
+ 	name := positional[0]
+@@ -411,46 +451,46 @@ func cmdAdd(args []string) int {
+ 	for kind, value := range map[string]string{"tag": *tag, "branch": *branch, "revision": *revision} {
+ 		if value != "" {
+ 			if refKind != "" {
+-				fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
++				_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
+ 				return exitUsage
+ 			}
+ 			refKind, refValue = kind, value
+ 		}
+ 	}
+ 	if refKind == "" {
+-		fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
++		_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
+ 		return exitUsage
+ 	}
+ 	rootArgs := positional[1:]
+ 	if *project != "" {
+ 		rootArgs = []string{*project}
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	targets, targetErr := selectProjectTargets(cfg, rootArgs, false)
+ 	if targetErr != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", targetErr)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", targetErr)
+ 		return exitUsage
+ 	}
+ 	root := targets[0].Root
+ 	if err := manifest.AddDecl(root, name, refKind, refValue, *git, *source); err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	return cmdInstall([]string{root})
++	return c.cmdInstall([]string{root})
+ }
+ 
+-func cmdRemove(args []string) int {
+-	flags := flag.NewFlagSet("remove", flag.ContinueOnError)
++func (c cli) cmdRemove(args []string) int {
++	flags := c.newFlagSet("remove")
+ 	project := flags.String("project", "", "project alias or path")
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil || len(positional) < 1 {
+-		fmt.Fprintln(os.Stderr, "curator: remove requires a skill name")
++		_, _ = fmt.Fprintln(c.stderr, "curator: remove requires a skill name")
+ 		return exitUsage
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+@@ -460,19 +500,19 @@ func cmdRemove(args []string) int {
+ 	}
+ 	targets, targetErr := selectProjectTargets(cfg, rootArgs, false)
+ 	if targetErr != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", targetErr)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", targetErr)
+ 		return exitUsage
+ 	}
+ 	if err := manifest.RemoveDecl(targets[0].Root, positional[0]); err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	fmt.Println("removed", positional[0])
++	_, _ = fmt.Fprintln(c.stdout, "removed", positional[0])
+ 	return exitOK
+ }
+ 
+-func installFlags(args []string) (install.Options, []string, bool, string, error) {
+-	flags := flag.NewFlagSet("install", flag.ContinueOnError)
++func (c cli) installFlags(args []string) (install.Options, []string, bool, string, error) {
++	flags := c.newFlagSet("install")
+ 	all := flags.Bool("all", false, "operate on all configured projects")
+ 	dryRun := flags.Bool("dry-run", false, "plan work without modifying files")
+ 	fixGitignore := flags.Bool("fix-gitignore", false, "append missing managed gitignore entries")
+@@ -500,17 +540,17 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
+ 	}, positional, *all, auditMode.value, nil
+ }
+ 
+-func cmdInstall(args []string) int {
+-	return cmdInstallMode(args, false)
++func (c cli) cmdInstall(args []string) int {
++	return c.cmdInstallMode(args, false)
+ }
+ 
+-func cmdInstallMode(args []string, fetch bool) int {
+-	opts, rest, all, auditMode, err := installFlags(args)
++func (c cli) cmdInstallMode(args []string, fetch bool) int {
++	opts, rest, all, auditMode, err := c.installFlags(args)
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitUsage
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+@@ -523,20 +563,20 @@ func cmdInstallMode(args []string, fetch bool) int {
+ 	}
+ 	targets, targetErr := selectProjectTargets(cfg, rest, all)
+ 	if targetErr != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", targetErr)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", targetErr)
+ 		return exitUsage
+ 	}
+ 	opts.Fetch = fetch && !opts.DryRun
+ 	opts.FetchedRepos = map[string]bool{}
+ 	opts.External = productionExternalDeps(cfg, opts.DryRun)
+ 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
+-	opts.External.BuildSSH.Resolve = operatorBuildSSHResolver(cfg, opts.DryRun)
++	opts.External.BuildSSH.Resolve = c.operatorBuildSSHResolver(cfg, opts.DryRun)
+ 	exitCode := exitOK
+ 	for _, target := range targets {
+ 		result := install.Project(cfg, target.Root, target.Alias, opts)
+-		printResult(result)
++		c.printResult(result)
+ 		if !opts.DryRun {
+-			printRepairNotices(result)
++			c.printRepairNotices(result)
+ 		}
+ 		if result.Status == "failed" {
+ 			exitCode = exitFail
+@@ -545,19 +585,19 @@ func cmdInstallMode(args []string, fetch bool) int {
+ 	return exitCode
+ }
+ 
+-func printResult(result install.Result) {
++func (c cli) printResult(result install.Result) {
+ 	for _, message := range result.Messages {
+-		fmt.Println(message)
++		_, _ = fmt.Fprintln(c.stdout, message)
+ 	}
+-	printResultErrors(result)
++	c.printResultErrors(result)
+ }
+ 
+ // printResultErrors reports the failure surface of a result: the redacted
+ // failure text plus, when a go-v1 trust boundary refused, the operator guidance
+ // that belongs to it — which selection mechanisms exist and which release
+ // families this manager tested.
+-func printResultErrors(result install.Result) {
+-	printFailures(result, "error:")
++func (c cli) printResultErrors(result install.Result) {
++	c.printFailures(result, "error:")
+ }
+ 
+ // printStatusRefusal is the read-only reporting form of the same surface.
+@@ -565,27 +605,27 @@ func printResultErrors(result install.Result) {
+ // stable vocabulary: stdout stays one report document, and the same detail is
+ // a warning on standard error rather than an error, because the command did
+ // produce the report it was asked for.
+-func printStatusRefusal(result install.Result) {
+-	printFailures(result, "warning:")
++func (c cli) printStatusRefusal(result install.Result) {
++	c.printFailures(result, "warning:")
+ }
+ 
+-func printFailures(result install.Result, prefix string) {
++func (c cli) printFailures(result install.Result, prefix string) {
+ 	for _, message := range result.Errors {
+-		fmt.Fprintln(os.Stderr, prefix, message)
++		_, _ = fmt.Fprintln(c.stderr, prefix, message)
+ 	}
+ 	if guidance := goToolchainGuidance(result.BuildDiagnostic); guidance != "" {
+-		fmt.Fprintln(os.Stderr, prefix, guidance)
++		_, _ = fmt.Fprintln(c.stderr, prefix, guidance)
+ 	}
+ }
+ 
+-func cmdUpdate() int {
+-	cfg, code := loadConfig()
++func (c cli) cmdUpdate() int {
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	entries, err := os.ReadDir(cfg.SkillsRoot)
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+ 	failed := false
+@@ -598,11 +638,11 @@ func cmdUpdate() int {
+ 			continue
+ 		}
+ 		if err := gitops.Fetch(repo); err != nil {
+-			fmt.Fprintf(os.Stderr, "warning: %s: %v\n", entry.Name(), err)
++			_, _ = fmt.Fprintf(c.stderr, "warning: %s: %v\n", entry.Name(), err)
+ 			failed = true
+ 			continue
+ 		}
+-		fmt.Println("fetched", entry.Name())
++		_, _ = fmt.Fprintln(c.stdout, "fetched", entry.Name())
+ 	}
+ 	if failed {
+ 		return exitFail
+@@ -610,8 +650,8 @@ func cmdUpdate() int {
+ 	return exitOK
+ }
+ 
+-func cmdStatus(args []string) int {
+-	flags := flag.NewFlagSet("status", flag.ContinueOnError)
++func (c cli) cmdStatus(args []string) int {
++	flags := c.newFlagSet("status")
+ 	all := flags.Bool("all", false, "operate on all configured projects")
+ 	check := flags.Bool("check", false, "exit non-zero unless every skill is up to date")
+ 	jsonOut := flags.Bool("json", false, "machine-readable output")
+@@ -620,19 +660,19 @@ func cmdStatus(args []string) int {
+ 	if err != nil {
+ 		return exitUsage
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	targets, targetErr := selectProjectTargets(cfg, positional, *all)
+ 	if targetErr != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", targetErr)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", targetErr)
+ 		return exitUsage
+ 	}
+ 	if *attest {
+ 		exitCode := exitOK
+ 		for _, target := range targets {
+-			if code := cmdStatusAttest(cfg, target.Root, target.Alias, *jsonOut); code != exitOK {
++			if code := c.cmdStatusAttest(cfg, target.Root, target.Alias, *jsonOut); code != exitOK {
+ 				exitCode = code
+ 			}
+ 		}
+@@ -661,14 +701,14 @@ func cmdStatus(args []string) int {
+ 			// reports the error and exits non-zero rather than publishing a
+ 			// silently partial report.
+ 			if !result.BuildsComplete {
+-				printResult(result)
++				c.printResult(result)
+ 				exitCode = exitFail
+ 				continue
+ 			}
+-			printStatusRefusal(result)
++			c.printStatusRefusal(result)
+ 		}
+ 		if result.Status == "skipped" {
+-			printResult(result)
++			c.printResult(result)
+ 			if *check {
+ 				exitCode = exitFail
+ 			}
+@@ -689,10 +729,10 @@ func cmdStatus(args []string) int {
+ 			}
+ 			sort.Strings(names)
+ 			for _, name := range names {
+-				fmt.Printf("%s: %s %s\n", target.Alias, name, drift[name])
++				_, _ = fmt.Fprintf(c.stdout, "%s: %s %s\n", target.Alias, name, drift[name])
+ 			}
+ 			for _, build := range builds {
+-				fmt.Printf("%s: %s\n", target.Alias, build.Describe())
++				_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", target.Alias, build.Describe())
+ 			}
+ 		}
+ 		if *check && checkFailed(drift, builds) {
+@@ -705,7 +745,7 @@ func cmdStatus(args []string) int {
+ 			output = jsonResults[0]
+ 		}
+ 		payload, _ := json.MarshalIndent(output, "", "  ")
+-		fmt.Println(string(payload))
++		_, _ = fmt.Fprintln(c.stdout, string(payload))
+ 	}
+ 	return exitCode
+ }
+@@ -916,7 +956,7 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
+ 	return drift
+ }
+ 
+-func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool) int {
++func (c cli) cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool) int {
+ 	trusted := cfg.TrustedRegistries()
+ 	registries := make([]registry.Registry, 0, len(trusted))
+ 	for _, entry := range trusted {
+@@ -931,7 +971,7 @@ func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool
+ 	results := registry.AttestRoot(alias, filepath.Join(projectRoot, ".agents", "skills"), registries, fetch)
+ 	if jsonOut {
+ 		payload, _ := json.MarshalIndent(results, "", "  ")
+-		fmt.Println(string(payload))
++		_, _ = fmt.Fprintln(c.stdout, string(payload))
+ 	} else {
+ 		for _, item := range results {
+ 			suffix := ""
+@@ -941,7 +981,7 @@ func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool
+ 			if item.Detail != "" {
+ 				suffix += " (" + item.Detail + ")"
+ 			}
+-			fmt.Printf("%s: %-24s %s%s\n", item.Scope, item.Skill, item.Result, suffix)
++			_, _ = fmt.Fprintf(c.stdout, "%s: %-24s %s%s\n", item.Scope, item.Skill, item.Result, suffix)
+ 		}
+ 	}
+ 	if registry.HasRevocation(results) {
+@@ -950,8 +990,8 @@ func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool
+ 	return exitOK
+ }
+ 
+-func cmdList() int {
+-	cfg, code := loadConfig()
++func (c cli) cmdList() int {
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+@@ -962,31 +1002,31 @@ func cmdList() int {
+ 	sort.Strings(aliases)
+ 	for _, alias := range aliases {
+ 		project := cfg.Projects[alias]
+-		fmt.Printf("%s\t%s\n", alias, project.Path)
++		_, _ = fmt.Fprintf(c.stdout, "%s\t%s\n", alias, project.Path)
+ 		if projectManifest, err := manifest.Load(project.Path); err == nil && projectManifest != nil {
+ 			for _, decl := range projectManifest.Skills {
+-				fmt.Printf("  %s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
++				_, _ = fmt.Fprintf(c.stdout, "  %s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
+ 			}
+ 		}
+ 	}
+ 	return exitOK
+ }
+ 
+-func cmdProject(args []string) int {
++func (c cli) cmdProject(args []string) int {
+ 	if len(args) == 0 {
+-		fmt.Fprintln(os.Stderr, "curator: project requires a subcommand: add, resolve")
++		_, _ = fmt.Fprintln(c.stderr, "curator: project requires a subcommand: add, resolve")
+ 		return exitUsage
+ 	}
+ 	switch args[0] {
+ 	case "add":
+-		flags := flag.NewFlagSet("project add", flag.ContinueOnError)
++		flags := c.newFlagSet("project add")
+ 		agentsRaw := flags.String("agents", "", "comma-separated target agents")
+ 		positional, err := parseInterspersed(flags, args[1:])
+ 		if err != nil || len(positional) != 2 {
+-			fmt.Fprintln(os.Stderr, "curator: project add requires <alias> <path>")
++			_, _ = fmt.Fprintln(c.stderr, "curator: project add requires <alias> <path>")
+ 			return exitUsage
+ 		}
+-		cfg, code := loadConfig()
++		cfg, code := c.loadConfig()
+ 		if code != exitOK {
+ 			return code
+ 		}
+@@ -995,23 +1035,23 @@ func cmdProject(args []string) int {
+ 			agents = cfg.DefaultAgents
+ 		}
+ 		if err := config.AddProject(cfg.Path, positional[0], positional[1], agents); err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+ 		root, _ := filepath.Abs(positional[1])
+ 		if _, err := manifest.EnsureEmpty(root); err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+ 		entries := append(adapters.RequiredGitignoreEntries(agents), "Skillfile.dev.json")
+ 		if err := gitignore.Append(filepath.Join(root, ".gitignore"), entries); err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+-		fmt.Printf("added project %s: %s\n", positional[0], root)
++		_, _ = fmt.Fprintf(c.stdout, "added project %s: %s\n", positional[0], root)
+ 		return exitOK
+ 	case "resolve":
+-		cfg, code := loadConfig()
++		cfg, code := c.loadConfig()
+ 		if code != exitOK {
+ 			return code
+ 		}
+@@ -1021,25 +1061,25 @@ func cmdProject(args []string) int {
+ 		}
+ 		targets, err := selectProjectTargets(cfg, positional, false)
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitUsage
+ 		}
+ 		target := targets[0]
+ 		if _, err := os.Stat(filepath.Join(target.Root, manifest.Name)); err != nil {
+-			fmt.Fprintln(os.Stderr, "curator: Skillfile.json not found at or above", target.Root)
++			_, _ = fmt.Fprintln(c.stderr, "curator: Skillfile.json not found at or above", target.Root)
+ 			return exitFail
+ 		}
+-		fmt.Printf("alias: %s\npath: %s\nskillfile: %s\n", target.Alias, target.Root, filepath.Join(target.Root, manifest.Name))
+-		fmt.Printf("skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
++		_, _ = fmt.Fprintf(c.stdout, "alias: %s\npath: %s\nskillfile: %s\n", target.Alias, target.Root, filepath.Join(target.Root, manifest.Name))
++		_, _ = fmt.Fprintf(c.stdout, "skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
+ 		return exitOK
+ 	default:
+-		fmt.Fprintf(os.Stderr, "curator: unknown project subcommand %q\n", args[0])
++		_, _ = fmt.Fprintf(c.stderr, "curator: unknown project subcommand %q\n", args[0])
+ 		return exitUsage
+ 	}
+ }
+ 
+-func cmdSkillCheck(args []string) int {
+-	flags := flag.NewFlagSet("skill check", flag.ContinueOnError)
++func (c cli) cmdSkillCheck(args []string) int {
++	flags := c.newFlagSet("skill check")
+ 	localeValue := flags.String("locale", "", "validate against a locale")
+ 	jsonOut := flags.Bool("json", false, "machine-readable output")
+ 	positional, err := parseInterspersed(flags, args)
+@@ -1050,13 +1090,13 @@ func cmdSkillCheck(args []string) int {
+ 	issues := skillcheck.Validate(dir, *localeValue)
+ 	if *jsonOut {
+ 		payload, _ := json.MarshalIndent(issues, "", "  ")
+-		fmt.Println(string(payload))
++		_, _ = fmt.Fprintln(c.stdout, string(payload))
+ 	} else {
+ 		for _, issue := range issues {
+-			fmt.Println(skillcheck.Format(issue))
++			_, _ = fmt.Fprintln(c.stdout, skillcheck.Format(issue))
+ 		}
+ 		if len(issues) == 0 {
+-			fmt.Println(dir + ": ok")
++			_, _ = fmt.Fprintln(c.stdout, dir+": ok")
+ 		}
+ 	}
+ 	if skillcheck.HasErrors(issues) {
+@@ -1065,12 +1105,12 @@ func cmdSkillCheck(args []string) int {
+ 	return exitOK
+ }
+ 
+-func cmdGlobal(args []string) int {
++func (c cli) cmdGlobal(args []string) int {
+ 	if len(args) == 0 {
+-		fmt.Fprintln(os.Stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, update, upgrade")
++		_, _ = fmt.Fprintln(c.stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, update, upgrade")
+ 		return exitUsage
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+@@ -1078,13 +1118,13 @@ func cmdGlobal(args []string) int {
+ 	case "init":
+ 		path, err := install.GlobalInit(cfg.Home())
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+-		fmt.Println("initialized", path)
++		_, _ = fmt.Fprintln(c.stdout, "initialized", path)
+ 		return exitOK
+ 	case "add":
+-		flags := flag.NewFlagSet("global add", flag.ContinueOnError)
++		flags := c.newFlagSet("global add")
+ 		git := flags.String("git", "", "git clone URL")
+ 		tag := flags.String("tag", "", "git tag")
+ 		revision := flags.String("revision", "", "git revision")
+@@ -1096,43 +1136,43 @@ func cmdGlobal(args []string) int {
+ 		}
+ 		refKind, refValue := pickRef(*tag, *branch, *revision)
+ 		if refKind == "" {
+-			fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
++			_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
+ 			return exitUsage
+ 		}
+ 		if err := manifest.AddDecl(install.GlobalRoot(cfg.Home()), positional[0], refKind, refValue, *git, *source); err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+-		return runGlobalInstall(cfg, nil)
++		return c.runGlobalInstall(cfg, nil)
+ 	case "install":
+-		return runGlobalInstall(cfg, args[1:])
++		return c.runGlobalInstall(cfg, args[1:])
+ 	case "remove":
+ 		if len(args) < 2 {
+ 			return exitUsage
+ 		}
+ 		if err := manifest.RemoveDecl(install.GlobalRoot(cfg.Home()), args[1]); err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+ 		return exitOK
+ 	case "list":
+ 		globalManifest, err := manifest.Load(install.GlobalRoot(cfg.Home()))
+ 		if err != nil || globalManifest == nil {
+-			fmt.Println("no global Skillfile; run 'curator global init'")
++			_, _ = fmt.Fprintln(c.stdout, "no global Skillfile; run 'curator global init'")
+ 			return exitOK
+ 		}
+ 		for _, decl := range globalManifest.Skills {
+-			fmt.Printf("%s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
++			_, _ = fmt.Fprintf(c.stdout, "%s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
+ 		}
+ 		return exitOK
+ 	case "status":
+-		return cmdGlobalStatus(cfg, args[1:])
++		return c.cmdGlobalStatus(cfg, args[1:])
+ 	case "update":
+-		return cmdUpdate()
++		return c.cmdUpdate()
+ 	case "upgrade":
+-		return runGlobalInstallMode(cfg, args[1:], true)
++		return c.runGlobalInstallMode(cfg, args[1:], true)
+ 	}
+-	fmt.Fprintf(os.Stderr, "curator: unknown global subcommand %q\n", args[0])
++	_, _ = fmt.Fprintf(c.stderr, "curator: unknown global subcommand %q\n", args[0])
+ 	return exitUsage
+ }
+ 
+@@ -1158,12 +1198,12 @@ func cmdGlobal(args []string) int {
+ // The command is three phases — parse the request, acquire the plan once,
+ // classify and render from it — so the whole reporting contract can be driven
+ // from an already acquired plan without a second one being derived for it.
+-func cmdGlobalStatus(cfg *config.Config, args []string) int {
+-	opts, code := parseGlobalStatusOptions(args)
++func (c cli) cmdGlobalStatus(cfg *config.Config, args []string) int {
++	opts, code := c.parseGlobalStatusOptions(args)
+ 	if code != exitOK {
+ 		return code
+ 	}
+-	return reportGlobalStatus(cfg, opts, globalStatusPlan)
++	return c.reportGlobalStatus(cfg, opts, c.globalStatusPlan)
+ }
+ 
+ // globalStatusOptions is the parsed request of one `curator global status`
+@@ -1176,8 +1216,8 @@ type globalStatusOptions struct {
+ // parseGlobalStatusOptions is the first phase. The machine-wide scope takes no
+ // target: it is one scope, so a stray path is a usage error rather than
+ // something silently ignored.
+-func parseGlobalStatusOptions(args []string) (globalStatusOptions, int) {
+-	flags := flag.NewFlagSet("global status", flag.ContinueOnError)
++func (c cli) parseGlobalStatusOptions(args []string) (globalStatusOptions, int) {
++	flags := c.newFlagSet("global status")
+ 	check := flags.Bool("check", false, "exit non-zero unless every skill and compiled command is current")
+ 	jsonOut := flags.Bool("json", false, "machine-readable output")
+ 	positional, err := parseInterspersed(flags, args)
+@@ -1185,7 +1225,7 @@ func parseGlobalStatusOptions(args []string) (globalStatusOptions, int) {
+ 		return globalStatusOptions{}, exitUsage
+ 	}
+ 	if len(positional) > 0 {
+-		fmt.Fprintln(os.Stderr, "curator: global status accepts flags only")
++		_, _ = fmt.Fprintln(c.stderr, "curator: global status accepts flags only")
+ 		return globalStatusOptions{}, exitUsage
+ 	}
+ 	return globalStatusOptions{check: *check, jsonOut: *jsonOut}, exitOK
+@@ -1202,7 +1242,7 @@ type globalStatusAcquire func(*config.Config) (install.Result, bool)
+ // verdict. Acquisition is a parameter so the phase can be driven from a plan
+ // that was already acquired, without the classification, the rendering, or the
+ // verdict differing in any way from a command run.
+-func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire globalStatusAcquire) int {
++func (c cli) reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire globalStatusAcquire) int {
+ 	scope := globalStatusScope(cfg)
+ 	// Installed markers are fingerprinted before the read-only plan and again
+ 	// after classification, so compiled state that moved during the whole window
+@@ -1213,7 +1253,7 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
+ 		// The declared-skill report was still produced, so the refusal is a
+ 		// warning on standard error rather than an error, exactly as it is for a
+ 		// project status that still published every compiled row.
+-		printStatusRefusal(result)
++		c.printStatusRefusal(result)
+ 	}
+ 
+ 	drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
+@@ -1227,7 +1267,7 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
+ 			payload["builds"] = builds
+ 		}
+ 		document, _ := json.MarshalIndent(payload, "", "  ")
+-		fmt.Println(string(document))
++		_, _ = fmt.Fprintln(c.stdout, string(document))
+ 	} else {
+ 		names := make([]string, 0, len(drift))
+ 		for name := range drift {
+@@ -1235,10 +1275,10 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
+ 		}
+ 		sort.Strings(names)
+ 		for _, name := range names {
+-			fmt.Printf("%s: %s %s\n", scope.alias, name, drift[name])
++			_, _ = fmt.Fprintf(c.stdout, "%s: %s %s\n", scope.alias, name, drift[name])
+ 		}
+ 		for _, build := range builds {
+-			fmt.Printf("%s: %s\n", scope.alias, build.Describe())
++			_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", scope.alias, build.Describe())
+ 		}
+ 	}
+ 	if opts.check && (unprovable || checkFailed(drift, builds)) {
+@@ -1255,8 +1295,8 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
+ // has compiled state. It never suppresses the declared-skill report; it is the
+ // fail-closed input of `--check`. A scope with no machine-wide Skillfile is not
+ // unprovable: it declares nothing and activates nothing.
+-func globalStatusPlan(cfg *config.Config) (install.Result, bool) {
+-	userHome, err := os.UserHomeDir()
++func (c cli) globalStatusPlan(cfg *config.Config) (install.Result, bool) {
++	userHome, err := c.userHome()
+ 	if err != nil {
+ 		result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home()), Status: "failed"}
+ 		result.Errors = append(result.Errors, fmt.Sprintf(
+@@ -1267,17 +1307,17 @@ func globalStatusPlan(cfg *config.Config) (install.Result, bool) {
+ 	return result, result.Status == "failed" && !result.BuildsComplete
+ }
+ 
+-func runGlobalInstall(cfg *config.Config, args []string) int {
+-	return runGlobalInstallMode(cfg, args, false)
++func (c cli) runGlobalInstall(cfg *config.Config, args []string) int {
++	return c.runGlobalInstallMode(cfg, args, false)
+ }
+ 
+-func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
+-	opts, positional, all, auditMode, err := installFlags(args)
++func (c cli) runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
++	opts, positional, all, auditMode, err := c.installFlags(args)
+ 	if err != nil || len(positional) != 0 || all {
+ 		if err == nil {
+ 			err = fmt.Errorf("global install accepts flags only")
+ 		}
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitUsage
+ 	}
+ 	if auditMode != "" {
+@@ -1291,16 +1331,16 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
+ 	opts.FetchedRepos = map[string]bool{}
+ 	opts.External = productionExternalDeps(cfg, opts.DryRun)
+ 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
+-	opts.External.BuildSSH.Resolve = operatorBuildSSHResolver(cfg, opts.DryRun)
+-	userHome, err := os.UserHomeDir()
++	opts.External.BuildSSH.Resolve = c.operatorBuildSSHResolver(cfg, opts.DryRun)
++	userHome, err := c.userHome()
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+ 	result := install.Global(cfg, userHome, opts)
+-	printResult(result)
++	c.printResult(result)
+ 	if !opts.DryRun {
+-		printRepairNotices(result)
++		c.printRepairNotices(result)
+ 	}
+ 	if result.Status == "failed" {
+ 		return exitFail
+@@ -1316,13 +1356,14 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
+ // surface write. A non-interactive run never returns one either, which is the
+ // fail-closed path: the precheck then names every uncovered repository and the
+ // exact commands that would cover it.
+-func operatorBuildSSHResolver(cfg *config.Config, dryRun bool) install.BuildSSHResolver {
+-	if dryRun || !attachedToTerminal(os.Stdin) || !attachedToTerminal(os.Stderr) {
++func (c cli) operatorBuildSSHResolver(cfg *config.Config, dryRun bool) install.BuildSSHResolver {
++	stderrFile, terminalOutput := c.stderr.(*os.File)
++	if dryRun || !terminalOutput || !attachedToTerminal(os.Stdin) || !attachedToTerminal(stderrFile) {
+ 		return nil
+ 	}
+ 	// The prompt speaks on stderr so a caller redirecting stdout still sees
+ 	// the questions it is being asked.
+-	return install.InteractiveBuildSSHResolver(os.Stdin, os.Stderr,
++	return install.InteractiveBuildSSHResolver(os.Stdin, c.stderr,
+ 		func(credential config.BuildSSHCredential) error {
+ 			_, err := config.SetBuildSSH(cfg.Path, credential)
+ 			return err
+@@ -1420,18 +1461,18 @@ func admittedOperatorFile(name string) string {
+ 	return resolved
+ }
+ 
+-func cmdHybrid(args []string) int {
++func (c cli) cmdHybrid(args []string) int {
+ 	if len(args) == 0 {
+-		fmt.Fprintln(os.Stderr, "curator: hybrid requires a subcommand: add, remove, list")
++		_, _ = fmt.Fprintln(c.stderr, "curator: hybrid requires a subcommand: add, remove, list")
+ 		return exitUsage
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	switch args[0] {
+ 	case "add":
+-		flags := flag.NewFlagSet("hybrid add", flag.ContinueOnError)
++		flags := c.newFlagSet("hybrid add")
+ 		git := flags.String("git", "", "git clone URL")
+ 		tag := flags.String("tag", "", "git tag")
+ 		revision := flags.String("revision", "", "git revision")
+@@ -1440,12 +1481,12 @@ func cmdHybrid(args []string) int {
+ 		target := flags.String("target", "", "target alias, absolute path, or glob")
+ 		positional, err := parseInterspersed(flags, args[1:])
+ 		if err != nil || len(positional) < 1 || (*targets == "" && *target == "") {
+-			fmt.Fprintln(os.Stderr, "curator: hybrid add requires a name and --target or --targets")
++			_, _ = fmt.Fprintln(c.stderr, "curator: hybrid add requires a name and --target or --targets")
+ 			return exitUsage
+ 		}
+ 		refKind, refValue := pickRef(*tag, *branch, *revision)
+ 		if refKind == "" {
+-			fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
++			_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
+ 			return exitUsage
+ 		}
+ 		targetValues := []string{*target}
+@@ -1453,7 +1494,7 @@ func cmdHybrid(args []string) int {
+ 			targetValues = strings.Split(*targets, ",")
+ 		}
+ 		if err := scopes.AddHybridDecl(cfg.Home(), positional[0], refKind, refValue, *git, targetValues); err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+ 		return exitOK
+@@ -1462,24 +1503,24 @@ func cmdHybrid(args []string) int {
+ 			return exitUsage
+ 		}
+ 		if err := scopes.RemoveHybridDecl(cfg.Home(), args[1]); err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+ 		return exitOK
+ 	case "list":
+ 		decls, err := scopes.LoadHybridDecls(cfg.Home())
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+ 		for _, decl := range decls {
+-			fmt.Printf("%s %s %s targets=%s\n", decl.Decl.Name, decl.Decl.Ref.Kind, decl.Decl.Ref.Value, strings.Join(decl.Targets, ","))
++			_, _ = fmt.Fprintf(c.stdout, "%s %s %s targets=%s\n", decl.Decl.Name, decl.Decl.Ref.Kind, decl.Decl.Ref.Value, strings.Join(decl.Targets, ","))
+ 		}
+ 		return exitOK
+ 	case "status":
+ 		decls, err := scopes.LoadHybridDecls(cfg.Home())
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+ 		store := scopes.HybridSkillsRoot(cfg.Home())
+@@ -1494,16 +1535,16 @@ func cmdHybrid(args []string) int {
+ 					state = "installed"
+ 				}
+ 			}
+-			fmt.Printf("%s %s targets=%s\n", entry.Decl.Name, state, strings.Join(entry.Targets, ","))
++			_, _ = fmt.Fprintf(c.stdout, "%s %s targets=%s\n", entry.Decl.Name, state, strings.Join(entry.Targets, ","))
+ 		}
+ 		return exitOK
+ 	}
+-	fmt.Fprintf(os.Stderr, "curator: unknown hybrid subcommand %q\n", args[0])
++	_, _ = fmt.Fprintf(c.stderr, "curator: unknown hybrid subcommand %q\n", args[0])
+ 	return exitUsage
+ }
+ 
+-func cmdAudit(args []string) int {
+-	flags := flag.NewFlagSet("audit", flag.ContinueOnError)
++func (c cli) cmdAudit(args []string) int {
++	flags := c.newFlagSet("audit")
+ 	all := flags.Bool("all", false, "audit all configured projects and global skills")
+ 	global := flags.Bool("global", false, "audit global skills")
+ 	jsonOut := flags.Bool("json", false, "machine-readable output")
+@@ -1516,26 +1557,26 @@ func cmdAudit(args []string) int {
+ 	if err != nil {
+ 		return exitUsage
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	if *allow != "" {
+ 		if *reason == "" {
+-			fmt.Fprintln(os.Stderr, "curator: --allow requires --reason")
++			_, _ = fmt.Fprintln(c.stderr, "curator: --allow requires --reason")
+ 			return exitUsage
+ 		}
+ 		path, err := audit.Pin(cfg.Home(), *allow, *reason, os.Getenv("USER"))
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+-		fmt.Println("pinned audit trust:", path)
++		_, _ = fmt.Fprintln(c.stdout, "pinned audit trust:", path)
+ 		return exitOK
+ 	}
+ 	if *publish != "" {
+ 		if *registryURL == "" {
+-			fmt.Fprintln(os.Stderr, "curator: --publish requires --registry")
++			_, _ = fmt.Fprintln(c.stderr, "curator: --publish requires --registry")
+ 			return exitUsage
+ 		}
+ 		bearer := *token
+@@ -1543,20 +1584,20 @@ func cmdAudit(args []string) int {
+ 			bearer = os.Getenv("CURATOR_REGISTRY_TOKEN")
+ 		}
+ 		if bearer == "" {
+-			fmt.Fprintln(os.Stderr, "curator: --publish requires --token or CURATOR_REGISTRY_TOKEN")
++			_, _ = fmt.Fprintln(c.stderr, "curator: --publish requires --token or CURATOR_REGISTRY_TOKEN")
+ 			return exitUsage
+ 		}
+ 		payload, err := os.ReadFile(*publish) // #nosec G304 -- operator-supplied record path
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+ 		response, err := registry.Publish(*registryURL, bearer, payload)
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitFail
+ 		}
+-		fmt.Println(response)
++		_, _ = fmt.Fprintln(c.stdout, response)
+ 		return exitOK
+ 	}
+ 
+@@ -1567,25 +1608,25 @@ func cmdAudit(args []string) int {
+ 	var targets []projectTarget
+ 	if *all {
+ 		if len(positional) > 0 || *global {
+-			fmt.Fprintln(os.Stderr, "curator: --all cannot be combined with a target or --global")
++			_, _ = fmt.Fprintln(c.stderr, "curator: --all cannot be combined with a target or --global")
+ 			return exitUsage
+ 		}
+ 		targets, err = selectProjectTargets(cfg, nil, true)
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitUsage
+ 		}
+ 		targets = append(targets, projectTarget{Alias: "global", Root: install.GlobalRoot(cfg.Home())})
+ 	} else if *global {
+ 		if len(positional) > 0 {
+-			fmt.Fprintln(os.Stderr, "curator: --global cannot be combined with a project target")
++			_, _ = fmt.Fprintln(c.stderr, "curator: --global cannot be combined with a project target")
+ 			return exitUsage
+ 		}
+ 		targets = []projectTarget{{Alias: "global", Root: install.GlobalRoot(cfg.Home())}}
+ 	} else {
+ 		targets, err = selectProjectTargets(cfg, positional, false)
+ 		if err != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", err)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 			return exitUsage
+ 		}
+ 	}
+@@ -1605,19 +1646,19 @@ func cmdAudit(args []string) int {
+ 		}
+ 		if !*jsonOut {
+ 			for _, warning := range warnings {
+-				fmt.Printf("%s: %s\n", target.Alias, warning)
++				_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", target.Alias, warning)
+ 			}
+ 			for _, message := range errors {
+-				fmt.Fprintf(os.Stderr, "%s: %s\n", target.Alias, message)
++				_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", target.Alias, message)
+ 			}
+ 			if len(warnings) == 0 && len(errors) == 0 {
+-				fmt.Printf("%s: audit clean\n", target.Alias)
++				_, _ = fmt.Fprintf(c.stdout, "%s: audit clean\n", target.Alias)
+ 			}
+ 		}
+ 	}
+ 	if *jsonOut {
+ 		payload, _ := json.MarshalIndent(outputs, "", "  ")
+-		fmt.Println(string(payload))
++		_, _ = fmt.Fprintln(c.stdout, string(payload))
+ 	}
+ 	return exitCode
+ }
+@@ -1659,20 +1700,20 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string)
+ // transactions are recovered first, and their build references are marked, so
+ // an installation interrupted by a crash keeps the artifacts it will finish
+ // with.
+-func cmdGC() int {
+-	cfg, code := loadConfig()
++func (c cli) cmdGC() int {
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	home := cfg.Home()
+ 	manager, err := managerlock.New(home)
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+ 	lock, err := manager.AcquireHomeOnly(context.Background(), false)
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator: acquire the manager-home lock:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator: acquire the manager-home lock:", err)
+ 		return exitFail
+ 	}
+ 	result, err := collectUnderLock(home, lock)
+@@ -1680,19 +1721,19 @@ func cmdGC() int {
+ 		err = fmt.Errorf("release the manager-home lock: %w", closeErr)
+ 	}
+ 	for _, warning := range result.Warnings {
+-		fmt.Fprintln(os.Stderr, "curator: warning:", warning)
++		_, _ = fmt.Fprintln(c.stderr, "curator: warning:", warning)
+ 	}
+ 	for _, entry := range result.RemovedRuntime {
+-		fmt.Println("removed runtime", entry)
++		_, _ = fmt.Fprintln(c.stdout, "removed runtime", entry)
+ 	}
+ 	for _, key := range result.RemovedBuilds {
+-		fmt.Println("removed build", key)
++		_, _ = fmt.Fprintln(c.stdout, "removed build", key)
+ 	}
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	fmt.Printf("gc: %d runtime entr%s removed, %d build entr%s removed\n",
++	_, _ = fmt.Fprintf(c.stdout, "gc: %d runtime entr%s removed, %d build entr%s removed\n",
+ 		len(result.RemovedRuntime), pluralY(len(result.RemovedRuntime)),
+ 		len(result.RemovedBuilds), pluralY(len(result.RemovedBuilds)))
+ 	return exitOK
+@@ -1713,13 +1754,13 @@ func collectUnderLock(home string, lock *managerlock.HomeLock) (scopes.Maintenan
+ 	return scopes.Collect(scopes.MaintenanceRequest{Home: home, Lock: lock, JournalKeys: journalKeys})
+ }
+ 
+-func cmdShellInit(args []string) int {
+-	flags := flag.NewFlagSet("shell-init", flag.ContinueOnError)
++func (c cli) cmdShellInit(args []string) int {
++	flags := c.newFlagSet("shell-init")
+ 	noGlobal := flags.Bool("no-global", false, "skip global env sourcing")
+ 	installHook := flags.Bool("install", false, "cache the hook and print its optional profile source command")
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil || len(positional) > 1 {
+-		fmt.Fprintln(os.Stderr, "curator: shell-init accepts at most one shell: auto, zsh, bash, powershell")
++		_, _ = fmt.Fprintln(c.stderr, "curator: shell-init accepts at most one shell: auto, zsh, bash, powershell")
+ 		return exitUsage
+ 	}
+ 	shellName := "auto"
+@@ -1730,30 +1771,30 @@ func cmdShellInit(args []string) int {
+ 		shellName = shell.Detect(nil, "")
+ 	}
+ 	if shellName != "zsh" && shellName != "bash" && shellName != "powershell" {
+-		fmt.Fprintln(os.Stderr, "curator: unsupported shell:", shellName)
++		_, _ = fmt.Fprintln(c.stderr, "curator: unsupported shell:", shellName)
+ 		return exitUsage
+ 	}
+ 	if *installHook {
+-		hookPath, installErr := shell.InstallHook(shellName, filepath.Dir(config.UserPath()), !*noGlobal)
++		hookPath, installErr := shell.InstallHook(shellName, filepath.Dir(c.config.Path()), !*noGlobal)
+ 		if installErr != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", installErr)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", installErr)
+ 			return exitFail
+ 		}
+ 		source, sourceErr := shell.SourceCommand(shellName, hookPath)
+ 		if sourceErr != nil {
+-			fmt.Fprintln(os.Stderr, "curator:", sourceErr)
++			_, _ = fmt.Fprintln(c.stderr, "curator:", sourceErr)
+ 			return exitFail
+ 		}
+-		fmt.Println("wrote", hookPath)
+-		fmt.Println("optional shell profile line:", source)
++		_, _ = fmt.Fprintln(c.stdout, "wrote", hookPath)
++		_, _ = fmt.Fprintln(c.stdout, "optional shell profile line:", source)
+ 		return exitOK
+ 	}
+ 	hook, err := shell.Hook(shellName, !*noGlobal)
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitUsage
+ 	}
+-	fmt.Print(hook)
++	_, _ = fmt.Fprint(c.stdout, hook)
+ 	return exitOK
+ }
+ 
+@@ -1801,21 +1842,21 @@ no terminal, and on a dry run, it prints those same candidates as ready-to-run
+ add commands and fails with build_repository_ssh_credential_missing.
+ `
+ 
+-func cmdConfig(args []string) int {
++func (c cli) cmdConfig(args []string) int {
+ 	if len(args) == 0 {
+-		fmt.Fprint(os.Stderr, configUsage)
++		_, _ = fmt.Fprint(c.stderr, configUsage)
+ 		return exitUsage
+ 	}
+ 	switch args[0] {
+ 	case "show":
+-		return cmdConfigShow()
++		return c.cmdConfigShow()
+ 	case "build-ssh":
+-		return cmdConfigBuildSSH(args[1:])
++		return c.cmdConfigBuildSSH(args[1:])
+ 	case "-h", "--help", "help":
+-		fmt.Print(configUsage)
++		_, _ = fmt.Fprint(c.stdout, configUsage)
+ 		return exitOK
+ 	}
+-	fmt.Fprintf(os.Stderr, "curator: unknown config subcommand %q\n\n%s", args[0], configUsage)
++	_, _ = fmt.Fprintf(c.stderr, "curator: unknown config subcommand %q\n\n%s", args[0], configUsage)
+ 	return exitUsage
+ }
+ 
+@@ -1861,28 +1902,28 @@ func (*buildSSHAgentValue) AcceptsOptionalValue(raw string) bool {
+ 	return config.ValidBuildSSHPath(raw)
+ }
+ 
+-func cmdConfigBuildSSH(args []string) int {
++func (c cli) cmdConfigBuildSSH(args []string) int {
+ 	if len(args) == 0 {
+-		fmt.Fprint(os.Stderr, buildSSHUsage)
++		_, _ = fmt.Fprint(c.stderr, buildSSHUsage)
+ 		return exitUsage
+ 	}
+ 	switch args[0] {
+ 	case "add":
+-		return cmdConfigBuildSSHAdd(args[1:])
++		return c.cmdConfigBuildSSHAdd(args[1:])
+ 	case "list":
+-		return cmdConfigBuildSSHList()
++		return c.cmdConfigBuildSSHList()
+ 	case "remove":
+-		return cmdConfigBuildSSHRemove(args[1:])
++		return c.cmdConfigBuildSSHRemove(args[1:])
+ 	case "-h", "--help", "help":
+-		fmt.Print(buildSSHUsage)
++		_, _ = fmt.Fprint(c.stdout, buildSSHUsage)
+ 		return exitOK
+ 	}
+-	fmt.Fprintf(os.Stderr, "curator: unknown config build-ssh subcommand %q\n\n%s", args[0], buildSSHUsage)
++	_, _ = fmt.Fprintf(c.stderr, "curator: unknown config build-ssh subcommand %q\n\n%s", args[0], buildSSHUsage)
+ 	return exitUsage
+ }
+ 
+-func cmdConfigBuildSSHAdd(args []string) int {
+-	flags := flag.NewFlagSet("config build-ssh add", flag.ContinueOnError)
++func (c cli) cmdConfigBuildSSHAdd(args []string) int {
++	flags := c.newFlagSet("config build-ssh add")
+ 	agent := &buildSSHAgentValue{}
+ 	flags.Var(agent, "agent", "select an SSH agent, optionally by socket path")
+ 	identity := flags.String("identity", "", "identity file offered to the destination")
+@@ -1892,7 +1933,7 @@ func cmdConfigBuildSSHAdd(args []string) int {
+ 		return exitUsage
+ 	}
+ 	if len(positional) != 1 {
+-		fmt.Fprintln(os.Stderr, "curator: config build-ssh add requires exactly one <scope>")
++		_, _ = fmt.Fprintln(c.stderr, "curator: config build-ssh add requires exactly one <scope>")
+ 		return exitUsage
+ 	}
+ 	credential := config.BuildSSHCredential{
+@@ -1905,28 +1946,28 @@ func cmdConfigBuildSSHAdd(args []string) int {
+ 	// Checked before the config is read, so a malformed invocation is a usage
+ 	// error rather than a failure attributed to the config file.
+ 	if err := config.ValidateBuildSSH(credential); err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitUsage
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	replaced, err := config.SetBuildSSH(cfg.Path, credential)
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+ 	verb := "added"
+ 	if replaced {
+ 		verb = "replaced"
+ 	}
+-	fmt.Printf("%s build_ssh scope %s: %s\n", verb, credential.Scope, formatBuildSSH(credential))
++	_, _ = fmt.Fprintf(c.stdout, "%s build_ssh scope %s: %s\n", verb, credential.Scope, formatBuildSSH(credential))
+ 	return exitOK
+ }
+ 
+-func cmdConfigBuildSSHList() int {
+-	cfg, code := loadConfig()
++func (c cli) cmdConfigBuildSSHList() int {
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+@@ -1934,29 +1975,29 @@ func cmdConfigBuildSSHList() int {
+ 	if len(scopes) == 0 {
+ 		// On stderr, so a caller parsing the listing sees an empty stdout
+ 		// rather than a line that names no scope.
+-		fmt.Fprintln(os.Stderr, "curator: no build_ssh scopes are configured")
++		_, _ = fmt.Fprintln(c.stderr, "curator: no build_ssh scopes are configured")
+ 		return exitOK
+ 	}
+ 	for _, scope := range scopes {
+-		fmt.Printf("%s\t%s\n", scope, formatBuildSSH(cfg.BuildSSH[scope]))
++		_, _ = fmt.Fprintf(c.stdout, "%s\t%s\n", scope, formatBuildSSH(cfg.BuildSSH[scope]))
+ 	}
+ 	return exitOK
+ }
+ 
+-func cmdConfigBuildSSHRemove(args []string) int {
++func (c cli) cmdConfigBuildSSHRemove(args []string) int {
+ 	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
+-		fmt.Fprintln(os.Stderr, "curator: config build-ssh remove requires exactly one <scope>")
++		_, _ = fmt.Fprintln(c.stderr, "curator: config build-ssh remove requires exactly one <scope>")
+ 		return exitUsage
+ 	}
+-	cfg, code := loadConfig()
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	if err := config.RemoveBuildSSH(cfg.Path, args[0]); err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	fmt.Printf("removed build_ssh scope %s\n", args[0])
++	_, _ = fmt.Fprintf(c.stdout, "removed build_ssh scope %s\n", args[0])
+ 	return exitOK
+ }
+ 
+@@ -1980,17 +2021,17 @@ func formatBuildSSH(credential config.BuildSSHCredential) string {
+ 	return strings.Join(parts, " ")
+ }
+ 
+-func cmdConfigShow() int {
+-	cfg, code := loadConfig()
++func (c cli) cmdConfigShow() int {
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+ 	payload, err := json.MarshalIndent(cfg, "", "  ")
+ 	if err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+-	fmt.Println(string(payload))
++	_, _ = fmt.Fprintln(c.stdout, string(payload))
+ 	return exitOK
+ }
+ 
+@@ -2014,14 +2055,14 @@ func pluralY(n int) string {
+ 	return "ies"
+ }
+ 
+-func cmdUI() int {
+-	cfg, code := loadConfig()
++func (c cli) cmdUI() int {
++	cfg, code := c.loadConfig()
+ 	if code != exitOK {
+ 		return code
+ 	}
+-	program := tea.NewProgram(ui.NewModel(ui.LoadState(cfg)))
++	program := tea.NewProgram(ui.NewModel(ui.LoadState(cfg)), tea.WithOutput(c.stdout))
+ 	if _, err := program.Run(); err != nil {
+-		fmt.Fprintln(os.Stderr, "curator:", err)
++		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitFail
+ 	}
+ 	return exitOK
+diff --git a/cmd/curator/main_test.go b/cmd/curator/main_test.go
+index 6bd12a3..8181a9e 100644
+--- a/cmd/curator/main_test.go
++++ b/cmd/curator/main_test.go
+@@ -16,9 +16,44 @@ import (
+ 	"github.com/relux-works/curator/internal/install"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/version"
+ )
+ 
++type stubConfigSource struct {
++	path string
++	cfg  *config.Config
++	err  error
++}
++
++func (source stubConfigSource) Path() string { return source.path }
++
++func (source stubConfigSource) Load(func(string)) (*config.Config, error) {
++	return source.cfg, source.err
++}
++
++func TestRunUsesInjectedConfigSourceAndWriters(t *testing.T) {
++	t.Parallel()
++	project := t.TempDir()
++	source := stubConfigSource{
++		path: filepath.Join(t.TempDir(), "injected.json"),
++		cfg: &config.Config{Projects: map[string]config.Project{
++			"injected": {Path: project},
++		}},
++	}
++	var stdout, stderr strings.Builder
++	if code := run([]string{"list"}, source, &stdout, &stderr); code != exitOK {
++		t.Fatalf("list with injected config = %d\nstderr:\n%s", code, stderr.String())
++	}
++	if got, want := stdout.String(), "injected\t"+project+"\n"; got != want {
++		t.Fatalf("stdout = %q, want %q", got, want)
++	}
++	if stderr.Len() != 0 {
++		t.Fatalf("list wrote stderr: %q", stderr.String())
++	}
++}
++
+ func TestProductionExternalDepsBindTrustedGitAndAudit(t *testing.T) {
++	t.Parallel()
+ 	deps := productionExternalDeps(&config.Config{}, true)
+ 	if err := buildrepo.ValidateGitTool(context.Background(), deps.GitTool); err != nil {
+ 		t.Fatalf("production Git dependency is unusable: %v", err)
+@@ -37,6 +72,7 @@ func TestProductionExternalDepsBindTrustedGitAndAudit(t *testing.T) {
+ }
+ 
+ func TestProductionExternalAuditReturnsAdvisoryWarnings(t *testing.T) {
++	t.Parallel()
+ 	root := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(root, "scripts"), 0o700); err != nil {
+ 		t.Fatal(err)
+@@ -56,6 +92,7 @@ func TestProductionExternalAuditReturnsAdvisoryWarnings(t *testing.T) {
+ }
+ 
+ func TestUsageEnumeratesDocumentedCommands(t *testing.T) {
++	t.Parallel()
+ 	for _, command := range []string{
+ 		"bootstrap", "init", "add", "remove", "install", "update", "upgrade",
+ 		"status", "list", "project", "config", "skill", "global", "hybrid",
+@@ -68,45 +105,52 @@ func TestUsageEnumeratesDocumentedCommands(t *testing.T) {
+ }
+ 
+ func TestRunVersionExitsZero(t *testing.T) {
+-	if code := run([]string{"--version"}); code != 0 {
++	t.Parallel()
++	code, stdout, stderr := capture(t, filepath.Join(t.TempDir(), "config.json"), "--version")
++	if code != 0 || stdout != "curator "+version.String()+"\n" || stderr != "" {
+ 		t.Fatalf("run(--version) = %d, want 0", code)
+ 	}
+ }
+ 
+ func TestRunNoArgsPrintsUsage(t *testing.T) {
+-	if code := run(nil); code != 2 {
++	t.Parallel()
++	code, stdout, stderr := capture(t, filepath.Join(t.TempDir(), "config.json"))
++	if code != 2 || stdout != "" || stderr != usage {
+ 		t.Fatalf("run() = %d, want 2", code)
+ 	}
+ }
+ 
+ func TestRunUnknownCommand(t *testing.T) {
+-	if code := run([]string{"frobnicate"}); code != 2 {
++	t.Parallel()
++	code, _, stderr := capture(t, filepath.Join(t.TempDir(), "config.json"), "frobnicate")
++	if code != 2 || !strings.Contains(stderr, `curator: unknown command "frobnicate"`) {
+ 		t.Fatalf("run(frobnicate) = %d, want 2", code)
+ 	}
+ }
+ 
+ func TestShellInitPrintsHooks(t *testing.T) {
++	t.Parallel()
++	configPath := filepath.Join(t.TempDir(), "config.json")
+ 	for _, shellName := range []string{"auto", "zsh", "bash", "powershell"} {
+-		if code := run([]string{"shell-init", shellName}); code != 0 {
++		if code, _, _ := capture(t, configPath, "shell-init", shellName); code != 0 {
+ 			t.Fatalf("shell-init %s = %d", shellName, code)
+ 		}
+ 	}
+-	if code := run([]string{"shell-init"}); code != 0 {
++	if code, _, _ := capture(t, configPath, "shell-init"); code != 0 {
+ 		t.Fatalf("auto shell-init = %d", code)
+ 	}
+-	if code := run([]string{"shell-init", "fish"}); code != 2 {
++	if code, _, _ := capture(t, configPath, "shell-init", "fish"); code != 2 {
+ 		t.Fatalf("unsupported shell must be usage error")
+ 	}
+-	if code := run([]string{"shell-init", "fish", "--install"}); code != 2 {
++	if code, _, _ := capture(t, configPath, "shell-init", "fish", "--install"); code != 2 {
+ 		t.Fatalf("unsupported installed shell must be usage error")
+ 	}
+ }
+ 
+ func TestShellInitInstallCachesHookWithoutConfig(t *testing.T) {
++	t.Parallel()
+ 	configPath := filepath.Join(t.TempDir(), "manager home", "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+-	t.Setenv("SHELL", "/bin/bash")
+-	if code := run([]string{"shell-init", "--install", "--no-global"}); code != exitOK {
++	if code, _, _ := capture(t, configPath, "shell-init", "bash", "--install", "--no-global"); code != exitOK {
+ 		t.Fatalf("shell-init --install = %d", code)
+ 	}
+ 	hookPath := filepath.Join(filepath.Dir(configPath), "hooks", "curator.bash")
+@@ -120,18 +164,21 @@ func TestShellInitInstallCachesHookWithoutConfig(t *testing.T) {
+ }
+ 
+ func TestSkillCheckOnTempDir(t *testing.T) {
++	t.Parallel()
+ 	// an empty directory fails validation (missing SKILL.md)
+ 	dir := t.TempDir()
+-	if code := run([]string{"skill", "check", dir}); code != 1 {
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	if code, _, _ := capture(t, configPath, "skill", "check", dir); code != 1 {
+ 		t.Fatalf("skill check on empty dir = %d, want 1", code)
+ 	}
+-	if code := run([]string{"skill", "check", dir, "--json"}); code != 1 {
++	if code, _, _ := capture(t, configPath, "skill", "check", dir, "--json"); code != 1 {
+ 		t.Fatalf("skill check with trailing --json = %d, want 1", code)
+ 	}
+ }
+ 
+ func TestInstallFlagsAcceptTrailingOptions(t *testing.T) {
+-	opts, positional, all, auditMode, err := installFlags([]string{"project-a", "--dry-run", "--strict-tags", "--audit", "strict"})
++	t.Parallel()
++	opts, positional, all, auditMode, err := testInstallFlags([]string{"project-a", "--dry-run", "--strict-tags", "--audit", "strict"})
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -144,11 +191,12 @@ func TestInstallFlagsAcceptTrailingOptions(t *testing.T) {
+ }
+ 
+ func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
+-	_, positional, _, auditMode, err := installFlags([]string{"--audit", "project-a"})
++	t.Parallel()
++	_, positional, _, auditMode, err := testInstallFlags([]string{"--audit", "project-a"})
+ 	if err != nil || auditMode != "advisory" || len(positional) != 1 || positional[0] != "project-a" {
+ 		t.Fatalf("bare --audit: positional=%v mode=%q err=%v", positional, auditMode, err)
+ 	}
+-	_, positional, _, auditMode, err = installFlags([]string{"project-a", "--audit", "strict"})
++	_, positional, _, auditMode, err = testInstallFlags([]string{"project-a", "--audit", "strict"})
+ 	if err != nil || auditMode != "strict" || len(positional) != 1 || positional[0] != "project-a" {
+ 		t.Fatalf("strict --audit: positional=%v mode=%q err=%v", positional, auditMode, err)
+ 	}
+@@ -157,7 +205,8 @@ func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
+ // The run-wide SSH selection reaches an install from the command line, and the
+ // environment fills only what the command line left unsaid.
+ func TestInstallFlagsCarryTheRunWideBuildSSHSelection(t *testing.T) {
+-	opts, positional, _, _, err := installFlags([]string{
++	t.Parallel()
++	opts, positional, _, _, err := testInstallFlags([]string{
+ 		"project-a", "--build-ssh-agent", "auto", "--build-ssh-identity", "/operator/id.pub",
+ 		"--build-ssh-known-hosts", "/operator/known_hosts",
+ 	})
+@@ -191,6 +240,7 @@ func TestInstallFlagsCarryTheRunWideBuildSSHSelection(t *testing.T) {
+ }
+ 
+ func TestSelectProjectTargetsUsesAliasesAndStableAllOrder(t *testing.T) {
++	t.Parallel()
+ 	cfg := &config.Config{Projects: map[string]config.Project{
+ 		"zeta":  {Path: "/work/zeta"},
+ 		"alpha": {Path: "/work/alpha"},
+@@ -206,6 +256,7 @@ func TestSelectProjectTargetsUsesAliasesAndStableAllOrder(t *testing.T) {
+ }
+ 
+ func TestStatusDriftDetectsContentTampering(t *testing.T) {
++	t.Parallel()
+ 	project := t.TempDir()
+ 	skillsRoot := t.TempDir()
+ 	if err := os.WriteFile(filepath.Join(project, "Skillfile.json"), []byte(
+@@ -241,20 +292,20 @@ func TestStatusDriftDetectsContentTampering(t *testing.T) {
+ }
+ 
+ func TestBootstrapAndProjectCommands(t *testing.T) {
++	t.Parallel()
+ 	configPath := filepath.Join(t.TempDir(), "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 	skillsRoot := t.TempDir()
+-	if code := run([]string{"bootstrap", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
++	if code := runCode(t, configPath, []string{"bootstrap", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
+ 		t.Fatalf("bootstrap = %d", code)
+ 	}
+ 	project := t.TempDir()
+-	if code := run([]string{"project", "add", "app", project, "--agents", "codex_cli"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"project", "add", "app", project, "--agents", "codex_cli"}); code != exitOK {
+ 		t.Fatalf("project add = %d", code)
+ 	}
+ 	if _, err := os.Stat(filepath.Join(project, manifest.Name)); err != nil {
+ 		t.Fatalf("project manifest missing: %v", err)
+ 	}
+-	if code := run([]string{"project", "resolve", "app"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"project", "resolve", "app"}); code != exitOK {
+ 		t.Fatalf("project resolve = %d", code)
+ 	}
+ 	cfg, err := config.Load(configPath, nil)
+@@ -264,14 +315,14 @@ func TestBootstrapAndProjectCommands(t *testing.T) {
+ }
+ 
+ func TestBootstrapIfMissingKeepsExistingConfigWithoutParsing(t *testing.T) {
++	t.Parallel()
+ 	configPath := filepath.Join(t.TempDir(), "config.json")
+ 	original := []byte("this is intentionally not valid JSON\n")
+ 	if err := os.WriteFile(configPath, original, 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 
+-	if code := run([]string{"bootstrap", "--if-missing", "--non-interactive"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"bootstrap", "--if-missing", "--non-interactive"}); code != exitOK {
+ 		t.Fatalf("bootstrap --if-missing = %d", code)
+ 	}
+ 	payload, err := os.ReadFile(configPath)
+@@ -284,11 +335,11 @@ func TestBootstrapIfMissingKeepsExistingConfigWithoutParsing(t *testing.T) {
+ }
+ 
+ func TestBootstrapIfMissingCreatesAbsentConfig(t *testing.T) {
++	t.Parallel()
+ 	configPath := filepath.Join(t.TempDir(), "home", "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 	skillsRoot := filepath.Join(t.TempDir(), "skills")
+ 
+-	if code := run([]string{"bootstrap", "--if-missing", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
++	if code := runCode(t, configPath, []string{"bootstrap", "--if-missing", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
+ 		t.Fatalf("bootstrap --if-missing = %d", code)
+ 	}
+ 	loaded, err := config.Load(configPath, nil)
+@@ -301,13 +352,15 @@ func TestBootstrapIfMissingCreatesAbsentConfig(t *testing.T) {
+ }
+ 
+ func TestBootstrapIfMissingRejectsForce(t *testing.T) {
+-	t.Setenv("CURATOR_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+-	if code := run([]string{"bootstrap", "--if-missing", "--force"}); code != exitUsage {
++	t.Parallel()
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	if code := runCode(t, configPath, []string{"bootstrap", "--if-missing", "--force"}); code != exitUsage {
+ 		t.Fatalf("bootstrap --if-missing --force = %d, want %d", code, exitUsage)
+ 	}
+ }
+ 
+ func TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot(t *testing.T) {
++	t.Parallel()
+ 	root := t.TempDir()
+ 	configPath := filepath.Join(root, "home", "config.json")
+ 	skillsRoot := filepath.Join(root, "missing-skills")
+@@ -327,9 +380,8 @@ func TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot(t *testing.T) {
+ 	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 
+-	if code := run([]string{"upgrade", "app", "--dry-run"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"upgrade", "app", "--dry-run"}); code != exitOK {
+ 		t.Fatalf("upgrade --dry-run = %d", code)
+ 	}
+ 	if _, err := os.Stat(skillsRoot); !os.IsNotExist(err) {
+@@ -338,17 +390,17 @@ func TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot(t *testing.T) {
+ }
+ 
+ func TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot(t *testing.T) {
++	t.Parallel()
+ 	root := t.TempDir()
+ 	configPath := filepath.Join(root, "home", "config.json")
+ 	skillsRoot := filepath.Join(root, "missing-skills")
+ 	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	t.Setenv("CURATOR_CONFIG", configPath)
+-	if code := run([]string{"global", "init"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"global", "init"}); code != exitOK {
+ 		t.Fatalf("global init = %d", code)
+ 	}
+-	if code := run([]string{"global", "upgrade", "--dry-run"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"global", "upgrade", "--dry-run"}); code != exitOK {
+ 		t.Fatalf("global upgrade --dry-run = %d", code)
+ 	}
+ 	if _, err := os.Stat(skillsRoot); !os.IsNotExist(err) {
+@@ -357,9 +409,9 @@ func TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot(t *testing.T) {
+ }
+ 
+ func TestCLIEndToEndInstallStatusAndTamperCheck(t *testing.T) {
++	t.Parallel()
+ 	root := t.TempDir()
+ 	configPath := filepath.Join(root, "home", "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 	skillsRoot := filepath.Join(root, "skills")
+ 	project := filepath.Join(root, "project")
+ 	if err := os.MkdirAll(filepath.Join(skillsRoot, "skill-a"), 0o755); err != nil {
+@@ -393,20 +445,20 @@ func TestCLIEndToEndInstallStatusAndTamperCheck(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 
+-	if code := run([]string{"install", "app"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"install", "app"}); code != exitOK {
+ 		t.Fatalf("install = %d", code)
+ 	}
+ 	installedSkill := filepath.Join(project, ".agents", "skills", "skill-a", "SKILL.md")
+ 	if _, err := os.Stat(installedSkill); err != nil {
+ 		t.Fatalf("installed skill missing: %v", err)
+ 	}
+-	if code := run([]string{"status", "app", "--check"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"status", "app", "--check"}); code != exitOK {
+ 		t.Fatalf("clean status = %d", code)
+ 	}
+ 	if err := os.WriteFile(installedSkill, []byte("tampered\n"), 0o644); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if code := run([]string{"status", "app", "--check"}); code != exitFail {
++	if code := runCode(t, configPath, []string{"status", "app", "--check"}); code != exitFail {
+ 		t.Fatalf("tampered status = %d, want %d", code, exitFail)
+ 	}
+ }
+@@ -428,17 +480,29 @@ func runGit(t *testing.T, dir string, args ...string) {
+ 	}
+ }
+ 
++func runCode(t *testing.T, configPath string, args []string) int {
++	t.Helper()
++	code, _, _ := capture(t, configPath, args...)
++	return code
++}
++
++func testInstallFlags(args []string) (install.Options, []string, bool, string, error) {
++	return (cli{stderr: io.Discard}).installFlags(args)
++}
++
+ // TestHiddenWorkerModeIsNotAUserVisibleCommand proves the fixed go-v1 worker
+ // mode is dispatched before command parsing and never appears in the CLI
+ // surface, so no package, manifest, or user option can reach it by name.
+ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
++	t.Parallel()
++	configPath := filepath.Join(t.TempDir(), "config.json")
+ 	if strings.Contains(usage, godriver.WorkerMode) {
+ 		t.Fatal("the hidden worker mode appears in the user-visible command surface")
+ 	}
+-	if code := run([]string{godriver.WorkerMode}); code != exitUsage {
++	if code := runCode(t, configPath, []string{godriver.WorkerMode}); code != exitUsage {
+ 		t.Fatalf("run(%q) = %d, want the unknown-command usage exit", godriver.WorkerMode, code)
+ 	}
+-	if code := run([]string{godriver.WorkerMode, "extra"}); code != exitUsage {
++	if code := runCode(t, configPath, []string{godriver.WorkerMode, "extra"}); code != exitUsage {
+ 		t.Fatalf("run with an extra argument = %d, want the unknown-command usage exit", code)
+ 	}
+ }
+@@ -447,36 +511,24 @@ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
+ func bootstrapConfig(t *testing.T) string {
+ 	t.Helper()
+ 	configPath := filepath.Join(t.TempDir(), "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+-	if code := run([]string{"bootstrap", "--non-interactive", "--skills-root", t.TempDir()}); code != exitOK {
++	if code := runCode(t, configPath, []string{"bootstrap", "--non-interactive", "--skills-root", t.TempDir()}); code != exitOK {
+ 		t.Fatalf("bootstrap = %d", code)
+ 	}
+ 	return configPath
+ }
+ 
+-// captureStdout collects what a command prints, so a test can assert on the
+-// listing itself rather than only on its exit code.
+-func captureStdout(t *testing.T, body func()) string {
++// captureStdout collects one invocation's private stdout.
++func captureStdout(t *testing.T, configPath string, args ...string) string {
+ 	t.Helper()
+-	reader, writer, err := os.Pipe()
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	saved := os.Stdout
+-	os.Stdout = writer
+-	defer func() { os.Stdout = saved }()
+-	body()
+-	if err := writer.Close(); err != nil {
+-		t.Fatal(err)
++	code, stdout, stderr := capture(t, configPath, args...)
++	if code != exitOK {
++		t.Fatalf("%v = %d\nstderr:\n%s", args, code, stderr)
+ 	}
+-	output, err := io.ReadAll(reader)
+-	if err != nil {
+-		t.Fatal(err)
+-	}
+-	return string(output)
++	return stdout
+ }
+ 
+ func TestConfigBuildSSHAddListRemove(t *testing.T) {
++	t.Parallel()
+ 	configPath := bootstrapConfig(t)
+ 
+ 	for _, args := range [][]string{
+@@ -485,7 +537,7 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
+ 			"--identity", "~/.ssh/portals", "--known-hosts", "/etc/ssh/known_hosts_portals"},
+ 		{"config", "build-ssh", "add", "git.example.com", "--identity", "/keys/org"},
+ 	} {
+-		if code := run(args); code != exitOK {
++		if code := runCode(t, configPath, args); code != exitOK {
+ 			t.Fatalf("%v = %d, want %d", args, code, exitOK)
+ 		}
+ 	}
+@@ -504,11 +556,7 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
+ 
+ 	// A second add under the same scope replaces the entry rather than
+ 	// merging with it: the leftover agent selection would still authenticate.
+-	replaceOutput := captureStdout(t, func() {
+-		if code := run([]string{"config", "build-ssh", "add", "zeta.example.com", "--identity", "/keys/zeta"}); code != exitOK {
+-			t.Fatalf("replace add = %d", code)
+-		}
+-	})
++	replaceOutput := captureStdout(t, configPath, "config", "build-ssh", "add", "zeta.example.com", "--identity", "/keys/zeta")
+ 	if !strings.HasPrefix(replaceOutput, "replaced build_ssh scope zeta.example.com: identity=/keys/zeta") {
+ 		t.Fatalf("replace output = %q", replaceOutput)
+ 	}
+@@ -520,11 +568,7 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
+ 		t.Fatalf("replaced credential = %+v", replaced)
+ 	}
+ 
+-	listing := captureStdout(t, func() {
+-		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
+-			t.Fatalf("list = %d", code)
+-		}
+-	})
++	listing := captureStdout(t, configPath, "config", "build-ssh", "list")
+ 	wantListing := "git.example.com\tidentity=/keys/org\n" +
+ 		"git.example.com/portals\tagent=/run/portals.sock identity=~/.ssh/portals known_hosts=/etc/ssh/known_hosts_portals\n" +
+ 		"zeta.example.com\tidentity=/keys/zeta\n"
+@@ -532,7 +576,7 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
+ 		t.Fatalf("listing =\n%q\nwant\n%q", listing, wantListing)
+ 	}
+ 
+-	if code := run([]string{"config", "build-ssh", "remove", "git.example.com/portals"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"config", "build-ssh", "remove", "git.example.com/portals"}); code != exitOK {
+ 		t.Fatalf("remove = %d", code)
+ 	}
+ 	cfg, err = config.Load(configPath, nil)
+@@ -548,18 +592,16 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
+ }
+ 
+ func TestConfigBuildSSHListWithoutScopesPrintsNothing(t *testing.T) {
+-	bootstrapConfig(t)
+-	listing := captureStdout(t, func() {
+-		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
+-			t.Fatalf("empty list = %d", code)
+-		}
+-	})
++	t.Parallel()
++	configPath := bootstrapConfig(t)
++	listing := captureStdout(t, configPath, "config", "build-ssh", "list")
+ 	if listing != "" {
+ 		t.Fatalf("empty listing = %q, want no stdout", listing)
+ 	}
+ }
+ 
+ func TestConfigBuildSSHAddRejectsInvalidInvocations(t *testing.T) {
++	t.Parallel()
+ 	configPath := bootstrapConfig(t)
+ 	before, err := os.ReadFile(configPath)
+ 	if err != nil {
+@@ -580,7 +622,7 @@ func TestConfigBuildSSHAddRejectsInvalidInvocations(t *testing.T) {
+ 		"negated agent":       {"config", "build-ssh", "add", "git.example.com", "--agent=false"},
+ 		"unknown flag":        {"config", "build-ssh", "add", "git.example.com", "--agent", "--pin", "x"},
+ 	} {
+-		if code := run(args); code != exitUsage {
++		if code := runCode(t, configPath, args); code != exitUsage {
+ 			t.Fatalf("%s: %v = %d, want %d", name, args, code, exitUsage)
+ 		}
+ 	}
+@@ -594,11 +636,12 @@ func TestConfigBuildSSHAddRejectsInvalidInvocations(t *testing.T) {
+ }
+ 
+ func TestConfigBuildSSHAgentFlagKeepsScopePositional(t *testing.T) {
++	t.Parallel()
+ 	configPath := bootstrapConfig(t)
+-	if code := run([]string{"config", "build-ssh", "add", "--agent", "alpha.example.com"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"config", "build-ssh", "add", "--agent", "alpha.example.com"}); code != exitOK {
+ 		t.Fatalf("bare --agent before the scope = %d", code)
+ 	}
+-	if code := run([]string{"config", "build-ssh", "add", "beta.example.com", "--agent", "/run/beta.sock"}); code != exitOK {
++	if code := runCode(t, configPath, []string{"config", "build-ssh", "add", "beta.example.com", "--agent", "/run/beta.sock"}); code != exitOK {
+ 		t.Fatalf("--agent with a socket = %d", code)
+ 	}
+ 	cfg, err := config.Load(configPath, nil)
+@@ -616,11 +659,12 @@ func TestConfigBuildSSHAgentFlagKeepsScopePositional(t *testing.T) {
+ }
+ 
+ func TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets(t *testing.T) {
+-	bootstrapConfig(t)
+-	if code := run([]string{"config", "build-ssh", "add", "git.example.com", "--agent"}); code != exitOK {
++	t.Parallel()
++	configPath := bootstrapConfig(t)
++	if code := runCode(t, configPath, []string{"config", "build-ssh", "add", "git.example.com", "--agent"}); code != exitOK {
+ 		t.Fatalf("add = %d", code)
+ 	}
+-	if code := run([]string{"config", "build-ssh", "remove", "other.example.com"}); code != exitFail {
++	if code := runCode(t, configPath, []string{"config", "build-ssh", "remove", "other.example.com"}); code != exitFail {
+ 		t.Fatalf("remove of an unconfigured scope = %d, want %d", code, exitFail)
+ 	}
+ 	for _, args := range [][]string{
+@@ -628,13 +672,14 @@ func TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets(t *testing.T) {
+ 		{"config", "build-ssh", "remove", "a.example.com", "b.example.com"},
+ 		{"config", "build-ssh", "remove", "--agent"},
+ 	} {
+-		if code := run(args); code != exitUsage {
++		if code := runCode(t, configPath, args); code != exitUsage {
+ 			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
+ 		}
+ 	}
+ }
+ 
+ func TestConfigHelpDocumentsPrecedenceAndSubcommands(t *testing.T) {
++	t.Parallel()
+ 	for _, fragment := range []string{
+ 		"curator config build-ssh add <scope>",
+ 		"curator config build-ssh list",
+@@ -660,13 +705,14 @@ func TestConfigHelpDocumentsPrecedenceAndSubcommands(t *testing.T) {
+ }
+ 
+ func TestConfigSubcommandDispatch(t *testing.T) {
+-	bootstrapConfig(t)
++	t.Parallel()
++	configPath := bootstrapConfig(t)
+ 	for _, args := range [][]string{
+ 		{"config", "-h"},
+ 		{"config", "build-ssh", "-h"},
+ 		{"config", "show"},
+ 	} {
+-		if code := run(args); code != exitOK {
++		if code := runCode(t, configPath, args); code != exitOK {
+ 			t.Fatalf("%v = %d, want %d", args, code, exitOK)
+ 		}
+ 	}
+@@ -676,7 +722,7 @@ func TestConfigSubcommandDispatch(t *testing.T) {
+ 		{"config", "build-ssh"},
+ 		{"config", "build-ssh", "frobnicate"},
+ 	} {
+-		if code := run(args); code != exitUsage {
++		if code := runCode(t, configPath, args); code != exitUsage {
+ 			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
+ 		}
+ 	}
+@@ -687,11 +733,13 @@ func TestConfigSubcommandDispatch(t *testing.T) {
+ // terminal, so both cases here are the fail-closed one; the dry-run case is
+ // asserted separately because it must hold even in front of a real terminal.
+ func TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt(t *testing.T) {
++	t.Parallel()
+ 	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
+-	if resolver := operatorBuildSSHResolver(cfg, true); resolver != nil {
++	command := cli{stderr: io.Discard}
++	if resolver := command.operatorBuildSSHResolver(cfg, true); resolver != nil {
+ 		t.Fatal("a dry run offered to persist a credential")
+ 	}
+-	if resolver := operatorBuildSSHResolver(cfg, false); resolver != nil {
++	if resolver := command.operatorBuildSSHResolver(cfg, false); resolver != nil {
+ 		t.Fatal("a non-interactive process offered a prompt nobody can answer")
+ 	}
+ 	// `< /dev/null` is a character device. Treating that as a terminal would
+@@ -718,6 +766,7 @@ func TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt(t *testing.T)
+ // wiring records exactly what `curator config build-ssh add` would, so a
+ // prompted answer and a typed command leave the same configuration behind.
+ func TestThePromptPersistsThroughTheOrdinaryConfigWriter(t *testing.T) {
++	t.Parallel()
+ 	configPath := bootstrapConfig(t)
+ 	cfg, err := config.Load(configPath, nil)
+ 	if err != nil {
+@@ -754,11 +803,7 @@ func TestThePromptPersistsThroughTheOrdinaryConfigWriter(t *testing.T) {
+ 		t.Fatalf("persisted credential = %+v, want %+v", got, want)
+ 	}
+ 	// The same entry the CLI would have written, byte for byte in the listing.
+-	listing := captureStdout(t, func() {
+-		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
+-			t.Fatalf("list = %d", code)
+-		}
+-	})
++	listing := captureStdout(t, configPath, "config", "build-ssh", "list")
+ 	if listing != "git.example.test/portals\tagent identity=~/.ssh/id_ed25519.pub\n" {
+ 		t.Fatalf("listing = %q", listing)
+ 	}
+diff --git a/cmd/curator/status_test.go b/cmd/curator/status_test.go
+index 421d70f..e2cfb62 100644
+--- a/cmd/curator/status_test.go
++++ b/cmd/curator/status_test.go
+@@ -4,14 +4,15 @@ import (
+ 	"crypto/sha256"
+ 	"encoding/hex"
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
+ 	"runtime"
+ 	"sort"
+ 	"strings"
+-	"sync"
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/adapters"
+@@ -25,6 +26,11 @@ import (
+ 	"github.com/relux-works/curator/internal/scopes"
+ )
+ 
++const (
++	cliHelperProcess = "CURATOR_TEST_CLI_HELPER"
++	cliHelperConfig  = "CURATOR_TEST_CONFIG_PATH"
++)
++
+ // TestMain gives the test binary the same fixed hidden worker mode the
+ // installed manager dispatches before command parsing, so a compiled
+ // installation in these tests runs the real identity-verified process graph
+@@ -36,33 +42,72 @@ func TestMain(m *testing.M) {
+ 	os.Exit(m.Run())
+ }
+ 
+-// capture runs one CLI invocation with both standard streams redirected.
+-func capture(t *testing.T, args ...string) (int, string, string) {
+-	t.Helper()
+-	outReader, outWriter, err := os.Pipe()
+-	if err != nil {
+-		t.Fatal(err)
++func TestCLIHelperProcess(t *testing.T) {
++	if os.Getenv(cliHelperProcess) != "1" {
++		t.Parallel()
++		return
+ 	}
+-	errReader, errWriter, err := os.Pipe()
+-	if err != nil {
+-		t.Fatal(err)
++	separator := -1
++	for index, arg := range os.Args {
++		if arg == "--" {
++			separator = index
++			break
++		}
+ 	}
+-	realOut, realErr := os.Stdout, os.Stderr
+-	os.Stdout, os.Stderr = outWriter, errWriter
++	if separator < 0 {
++		os.Exit(exitUsage)
++	}
++	os.Exit(run(os.Args[separator+1:], fileConfigSource(os.Getenv(cliHelperConfig)), os.Stdout, os.Stderr))
++}
+ 
+-	var stdout, stderr []byte
+-	var readers sync.WaitGroup
+-	readers.Add(2)
+-	go func() { defer readers.Done(); stdout, _ = io.ReadAll(outReader) }()
+-	go func() { defer readers.Done(); stderr, _ = io.ReadAll(errReader) }()
++// capture runs one CLI invocation with a private config source and output
++// buffers. It never mutates process-global environment or standard streams.
++func capture(t *testing.T, configPath string, args ...string) (int, string, string) {
++	t.Helper()
++	userHome := filepath.Join(filepath.Dir(filepath.Dir(configPath)), "user")
++	return captureWithUserHome(t, configPath, func() (string, error) { return userHome, nil }, args...)
++}
+ 
+-	code := run(args)
++func captureWithUserHome(t *testing.T, configPath string, userHome func() (string, error), args ...string) (int, string, string) {
++	t.Helper()
++	var stdout, stderr strings.Builder
++	command := cli{config: fileConfigSource(configPath), stdout: &stdout, stderr: &stderr, userHome: userHome}
++	code := command.run(args)
++	return code, stdout.String(), stderr.String()
++}
+ 
+-	os.Stdout, os.Stderr = realOut, realErr
+-	_ = outWriter.Close()
+-	_ = errWriter.Close()
+-	readers.Wait()
+-	return code, string(stdout), string(stderr)
++// captureWithEnv drives the real CLI core in an isolated helper process for
++// cases whose contract is specifically about process environment selection.
++func captureWithEnv(t *testing.T, configPath string, environment map[string]string, args ...string) (int, string, string) {
++	t.Helper()
++	commandArgs := []string{"-test.run=^TestCLIHelperProcess$", "--"}
++	commandArgs = append(commandArgs, args...)
++	command := exec.Command(os.Args[0], commandArgs...)
++	overrides := map[string]string{cliHelperProcess: "1", cliHelperConfig: configPath}
++	for key, value := range environment {
++		overrides[key] = value
++	}
++	for _, entry := range os.Environ() {
++		key, _, _ := strings.Cut(entry, "=")
++		if _, replaced := overrides[key]; !replaced {
++			command.Env = append(command.Env, entry)
++		}
++	}
++	for key, value := range overrides {
++		command.Env = append(command.Env, key+"="+value)
++	}
++	var stdout, stderr strings.Builder
++	command.Stdout, command.Stderr = &stdout, &stderr
++	err := command.Run()
++	code := exitOK
++	if err != nil {
++		var exitError *exec.ExitError
++		if !errors.As(err, &exitError) {
++			t.Fatal(err)
++		}
++		code = exitError.ExitCode()
++	}
++	return code, stdout.String(), stderr.String()
+ }
+ 
+ // statusPayload is the machine-readable status document one project produces.
+@@ -98,7 +143,6 @@ func compiledProjectDeclaring(t *testing.T, declarations string) (string, string
+ 	root := t.TempDir()
+ 	home := filepath.Join(root, "home")
+ 	configPath := filepath.Join(home, "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 	skillsRoot := filepath.Join(root, "skills")
+ 	project := filepath.Join(root, "project")
+ 
+@@ -147,11 +191,10 @@ func writeCompiledSkillRepo(t *testing.T, skill string) {
+ 
+ // legacyProject creates a project that declares one script-only skill, so a
+ // test can pin the pre-compiled-command behaviour of the same surfaces.
+-func legacyProject(t *testing.T) string {
++func legacyProject(t *testing.T) (string, string) {
+ 	t.Helper()
+ 	root := t.TempDir()
+ 	configPath := filepath.Join(root, "home", "config.json")
+-	t.Setenv("CURATOR_CONFIG", configPath)
+ 	skillsRoot := filepath.Join(root, "skills")
+ 	project := filepath.Join(root, "project")
+ 
+@@ -175,14 +218,14 @@ func legacyProject(t *testing.T) string {
+ 	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	return project
++	return project, filepath.Dir(configPath)
+ }
+ 
+ // reinstall runs the ordinary reconciliation path, which is also the only
+ // repair path Curator has.
+-func reinstall(t *testing.T) {
++func reinstall(t *testing.T, home string) {
+ 	t.Helper()
+-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+ 		t.Fatalf("restoring install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ }
+@@ -400,7 +443,7 @@ type compiledProjectFixture struct {
+ func newInstalledCompiledProject(t *testing.T) compiledProjectFixture {
+ 	t.Helper()
+ 	project, home := compiledProject(t)
+-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+ 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ 	return compiledProjectFixture{
+@@ -416,29 +459,40 @@ func newInstalledCompiledProject(t *testing.T) compiledProjectFixture {
+ // that failed after a real publication, protected cache state that moves during
+ // a check, and the repair of cache bytes outside a provable boundary.
+ //
+-// The cases run sequentially and share live state deliberately, so each one
+-// re-reads the marker, cache, and plan evidence it asserts against instead of
+-// carrying a baseline in, and each returns the fixture to a current state
+-// before the next one opens its own window.
+-func TestCompiledProjectStatusRepairRollbackRecovery(t *testing.T) {
++// Each scenario owns an installed fixture so the expensive compiler sessions
++// can run concurrently without sharing mutable marker or cache state.
++func TestCompiledProjectStatusAndUntrustedRecovery(t *testing.T) {
++	t.Parallel()
+ 	requireNativeControlInventoryPlatform(t)
+ 	fixture := newInstalledCompiledProject(t)
++	assertCompiledCurrentnessAndFailedCheck(t, fixture)
++	assertProtectedCacheStateThatMovedDuringTheCheck(t, fixture)
++	assertUntrustedCompiledStateIsRepaired(t, fixture)
++}
+ 
+-	t.Run("status reports compiled currentness and fails check", func(t *testing.T) {
+-		assertCompiledCurrentnessAndFailedCheck(t, fixture)
+-	})
+-	t.Run("install and upgrade repair corrupt compiled state", func(t *testing.T) {
+-		assertCorruptCompiledStateIsRepaired(t, fixture)
+-	})
+-	t.Run("install and upgrade restore the cache when the commit fails", func(t *testing.T) {
+-		assertTheCacheIsRestoredWhenTheCommitFails(t, fixture)
+-	})
+-	t.Run("status reports protected cache state that moved during the check", func(t *testing.T) {
+-		assertProtectedCacheStateThatMovedDuringTheCheck(t, fixture)
+-	})
+-	t.Run("install repairs untrusted compiled state and preserves the old install", func(t *testing.T) {
+-		assertUntrustedCompiledStateIsRepaired(t, fixture)
+-	})
++func TestCompiledProjectRepairsCorruptCompiledState(t *testing.T) {
++	t.Parallel()
++	requireNativeControlInventoryPlatform(t)
++	for _, command := range []string{"install", "upgrade"} {
++		t.Run(command, func(t *testing.T) {
++			t.Parallel()
++			fixture := newInstalledCompiledProject(t)
++			for _, corrupt := range []func(t *testing.T, home string){corruptCacheReceipt, corruptCacheArtifact} {
++				assertCorruptCompiledStateIsRepaired(t, fixture, command, corrupt)
++			}
++		})
++	}
++}
++
++func TestCompiledProjectRestoresCacheWhenCommitFails(t *testing.T) {
++	t.Parallel()
++	requireNativeControlInventoryPlatform(t)
++	for _, command := range []string{"install", "upgrade"} {
++		t.Run(command, func(t *testing.T) {
++			t.Parallel()
++			assertTheCacheIsRestoredWhenTheCommitFails(t, newInstalledCompiledProject(t), command)
++		})
++	}
+ }
+ 
+ // assertCompiledCurrentnessAndFailedCheck is the end-to-end proof of the
+@@ -448,7 +502,7 @@ func TestCompiledProjectStatusRepairRollbackRecovery(t *testing.T) {
+ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProjectFixture) {
+ 	project, home, installed := fixture.project, fixture.home, fixture.installed
+ 
+-	code, stdout, stderr := capture(t, "status", "app", "--json")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
+ 	if code != exitOK {
+ 		t.Fatalf("status --json = %d\nstderr:\n%s", code, stderr)
+ 	}
+@@ -483,7 +537,7 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
+ 			t.Fatalf("build rows published the private location %q:\n%s", forbidden, stdout)
+ 		}
+ 	}
+-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
+ 		t.Fatalf("clean compiled status --check = %d, want %d", code, exitOK)
+ 	}
+ 
+@@ -672,7 +726,7 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
+ 			// `--json` and `--check` are combined so one invocation proves the
+ 			// published document and the fail-closed exit are the same run's
+ 			// verdict, rather than two classifications of drifting live state.
+-			code, stdout, stderr := capture(t, "status", "app", "--json", "--check")
++			code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json", "--check")
+ 			if code != exitFail {
+ 				t.Fatalf("status --json --check on %s = %d, want %d\nstdout:\n%s\nstderr:\n%s",
+ 					name, code, exitFail, stdout, stderr)
+@@ -718,7 +772,7 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
+ 			// pins the rendering above to the line the command really prints —
+ 			// and proves the plain report still exits zero, because reporting a
+ 			// verdict is not itself a failure.
+-			code, human, _ := capture(t, "status", "app")
++			code, human, _ := capture(t, filepath.Join(home, "config.json"), "status", "app")
+ 			if code != exitOK {
+ 				t.Fatalf("plain human status on %s = %d, want %d\n%s", name, code, exitOK, human)
+ 			}
+@@ -734,74 +788,64 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
+ // corrupt artifact bytes are rebuilt by install and by upgrade, only after
+ // every gate has passed, and a run that fails leaves the previous installation
+ // and the live cache exactly as they were.
+-func assertCorruptCompiledStateIsRepaired(t *testing.T, fixture compiledProjectFixture) {
+-	home, installed := fixture.home, fixture.installed
+-
+-	for _, command := range []string{"install", "upgrade"} {
+-		t.Run(command, func(t *testing.T) {
+-			for _, corruption := range []struct {
+-				name    string
+-				corrupt func(t *testing.T, home string)
+-			}{
+-				{"receipt bytes", corruptCacheReceipt},
+-				{"artifact bytes", corruptCacheArtifact},
+-			} {
+-				t.Run(corruption.name, func(t *testing.T) {
+-					// The shared fixture is current when this case starts, and a
+-					// preceding repair legitimately republished the entry the marker
+-					// names, so the compiled state every assertion below compares
+-					// against is re-read here instead of being carried in.
+-					before := marker.Read(installed)
+-					if before == nil || len(before.Builds) != 1 {
+-						t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
+-					}
++func assertCorruptCompiledStateIsRepaired(
++	t *testing.T,
++	fixture compiledProjectFixture,
++	command string,
++	corrupt func(t *testing.T, home string),
++) {
++	project, home, installed := fixture.project, fixture.home, fixture.installed
++	before := marker.Read(installed)
++	if before == nil || len(before.Builds) != 1 {
++		t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
++	}
+ 
+-					corruption.corrupt(t, home)
+-					if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+-						decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+-						t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
+-					}
++	corrupt(t, home)
++	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json"); code != exitOK ||
++		decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
++		t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
++	}
+ 
+-					// A gate that fails must refuse before the repair: the corrupt
+-					// entry, the installed marker, and the installed content are all
+-					// still exactly as this run found them.
+-					corruptedCache := cacheFingerprint(t, home)
+-					t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
+-					if code, stdout, _ := capture(t, command, "app"); code != exitFail {
+-						t.Fatalf("%s without a usable toolchain = %d, want %d\n%s", command, code, exitFail, stdout)
+-					}
+-					if cacheFingerprint(t, home) != corruptedCache {
+-						t.Fatal("a refused run changed the live build cache")
+-					}
+-					if refused := marker.Read(installed); refused == nil ||
+-						refused.Builds["build-tool"] != before.Builds["build-tool"] {
+-						t.Fatalf("a refused run changed the previous compiled state: %+v", refused)
+-					}
+-					if _, err := os.Stat(filepath.Join(installed, "SKILL.md")); err != nil {
+-						t.Fatalf("a refused run removed the previous installation: %v", err)
+-					}
+-					t.Setenv(godriver.SelectionCuratorGo, "")
++	corruptedCache := cacheFingerprint(t, home)
++	manifestPath := filepath.Join(project, manifest.Name)
++	declared, err := os.ReadFile(manifestPath) // #nosec G304 -- test fixture path
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeFile(t, manifestPath,
++		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"build-skill","tag":"missing"}]}`)
++	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), command, "app"); code != exitFail {
++		t.Fatalf("%s with an unresolvable declaration = %d, want %d\n%s", command, code, exitFail, stdout)
++	}
++	if cacheFingerprint(t, home) != corruptedCache {
++		t.Fatal("a refused run changed the live build cache")
++	}
++	if refused := marker.Read(installed); refused == nil || refused.Builds["build-tool"] != before.Builds["build-tool"] {
++		t.Fatalf("a refused run changed the previous compiled state: %+v", refused)
++	}
++	if _, err := os.Stat(filepath.Join(installed, "SKILL.md")); err != nil {
++		t.Fatalf("a refused run removed the previous installation: %v", err)
++	}
++	if err := os.WriteFile(manifestPath, declared, 0o644); err != nil {
++		t.Fatal(err)
++	}
+ 
+-					code, stdout, stderr := capture(t, command, "app")
+-					if code != exitOK {
+-						t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
+-					}
+-					if !strings.Contains(stdout, "rebuilt corrupt build cache state into a new protected entry") {
+-						t.Fatalf("%s did not report the repair:\n%s", command, stdout)
+-					}
+-					if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
+-						t.Fatalf("status --check after repairing %s = %d, want %d", corruption.name, code, exitOK)
+-					}
+-					after := marker.Read(installed)
+-					if after == nil || after.Builds["build-tool"].CacheKey != before.Builds["build-tool"].CacheKey {
+-						t.Fatalf("a repair changed the logical key: %+v", after)
+-					}
+-					if len(cacheEntries(t, home)) != 1 {
+-						t.Fatalf("repair left %d live protected entries, want 1", len(cacheEntries(t, home)))
+-					}
+-				})
+-			}
+-		})
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), command, "app")
++	if code != exitOK {
++		t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
++	}
++	if !strings.Contains(stdout, "rebuilt corrupt build cache state into a new protected entry") {
++		t.Fatalf("%s did not report the repair:\n%s", command, stdout)
++	}
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
++		t.Fatalf("status --check after repairing cache state = %d, want %d", code, exitOK)
++	}
++	after := marker.Read(installed)
++	if after == nil || after.Builds["build-tool"].CacheKey != before.Builds["build-tool"].CacheKey {
++		t.Fatalf("a repair changed the logical key: %+v", after)
++	}
++	if len(cacheEntries(t, home)) != 1 {
++		t.Fatalf("repair left %d live protected entries, want 1", len(cacheEntries(t, home)))
+ 	}
+ }
+ 
+@@ -819,95 +863,90 @@ func assertCorruptCompiledStateIsRepaired(t *testing.T, fixture compiledProjectF
+ // The commit is failed by taking away write access to the context store the
+ // first target class swaps in, which is the last moment a real installation can
+ // still fail without leaving a durable transaction behind.
+-func assertTheCacheIsRestoredWhenTheCommitFails(t *testing.T, fixture compiledProjectFixture) {
++func assertTheCacheIsRestoredWhenTheCommitFails(t *testing.T, fixture compiledProjectFixture, command string) {
+ 	project, home, installed := fixture.project, fixture.home, fixture.installed
++	// The shared fixture is current when this case starts, and a preceding
++	// repair legitimately republished the entry the marker names, so the
++	// compiled state this case must find unchanged is re-read here.
++	before := marker.Read(installed)
++	if before == nil || len(before.Builds) != 1 {
++		t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
++	}
+ 
+-	for _, command := range []string{"install", "upgrade"} {
+-		t.Run(command, func(t *testing.T) {
+-			// The shared fixture is current when this case starts, and a preceding
+-			// repair legitimately republished the entry the marker names, so the
+-			// compiled state this case must find unchanged is re-read here.
+-			before := marker.Read(installed)
+-			if before == nil || len(before.Builds) != 1 {
+-				t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
+-			}
+-
+-			corruptCacheArtifact(t, home)
+-			// A privileged process ignores the directory mode this case fails the
+-			// commit with, and skips below with the cache already corrupted. The
+-			// next case is handed a current fixture on that path too.
+-			t.Cleanup(func() {
+-				if t.Skipped() {
+-					reinstall(t)
+-				}
+-			})
+-			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+-				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+-				t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
+-			}
+-			corruptArtifact := liveArtifactBytes(t, home)
+-			installedBefore := installedFingerprint(t, project, home)
+-			// Withdrawn entries are never deleted, only collected by the ordinary
+-			// sweep, so a shared cache root still holds what earlier cases withdrew.
+-			// The count this case owns is therefore measured against what it found.
+-			withdrawnBefore := quarantinedEntries(t, home)
+-
+-			store := filepath.Join(project, ".agents", "skills")
+-			denyWrites(t, store)
+-			code, stdout, stderr := capture(t, command, "app")
+-			restoreWrites(t, store)
+-			if code != exitFail {
+-				t.Fatalf("%s over an unwritable context store = %d, want %d\nstdout:\n%s\nstderr:\n%s",
+-					command, code, exitFail, stdout, stderr)
+-			}
++	corruptCacheArtifact(t, home)
++	// A privileged process ignores the directory mode this case fails the
++	// commit with, and skips below with the cache already corrupted. The
++	// next case is handed a current fixture on that path too.
++	t.Cleanup(func() {
++		if t.Skipped() {
++			reinstall(t, home)
++		}
++	})
++	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json"); code != exitOK ||
++		decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
++		t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
++	}
++	corruptArtifact := liveArtifactBytes(t, home)
++	installedBefore := installedFingerprint(t, project, home)
++	// Withdrawn entries are never deleted, only collected by the ordinary
++	// sweep, so a shared cache root still holds what earlier cases withdrew.
++	// The count this case owns is therefore measured against what it found.
++	withdrawnBefore := quarantinedEntries(t, home)
++
++	store := filepath.Join(project, ".agents", "skills")
++	denyWrites(t, store)
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), command, "app")
++	restoreWrites(t, store)
++	if code != exitFail {
++		t.Fatalf("%s over an unwritable context store = %d, want %d\nstdout:\n%s\nstderr:\n%s",
++			command, code, exitFail, stdout, stderr)
++	}
+ 
+-			// The case only proves anything if the repair really did publish before
+-			// the commit failed. Publication quarantines the corrupt entry and the
+-			// reversal withdraws the replacement the same way, so exactly one
+-			// withdrawn entry is left behind for the ordinary sweep.
+-			if withdrawn := quarantinedEntries(t, home) - withdrawnBefore; withdrawn != 1 {
+-				t.Fatalf("withdrawn cache entries = %d, want exactly the one this run published", withdrawn)
+-			}
+-			// Nothing half-built survives in the shared cache root either: a
+-			// publication that failed or was reversed leaves no private staging
+-			// directory behind for the next run to trip over.
+-			if staged := stagedEntries(t, home); staged != 0 {
+-				t.Fatalf("private staging directories left in the shared cache root = %d, want 0", staged)
+-			}
++	// The case only proves anything if the repair really did publish before
++	// the commit failed. Publication quarantines the corrupt entry and the
++	// reversal withdraws the replacement the same way, so exactly one
++	// withdrawn entry is left behind for the ordinary sweep.
++	if withdrawn := quarantinedEntries(t, home) - withdrawnBefore; withdrawn != 1 {
++		t.Fatalf("withdrawn cache entries = %d, want exactly the one this run published", withdrawn)
++	}
++	// Nothing half-built survives in the shared cache root either: a
++	// publication that failed or was reversed leaves no private staging
++	// directory behind for the next run to trip over.
++	if staged := stagedEntries(t, home); staged != 0 {
++		t.Fatalf("private staging directories left in the shared cache root = %d, want 0", staged)
++	}
+ 
+-			// Exact restoration: the entry the run displaced is live again, with
+-			// the bytes it had, and the installation is untouched.
+-			if got := liveArtifactBytes(t, home); got != corruptArtifact {
+-				t.Fatal("a failed commit did not restore the build cache entry it replaced")
+-			}
+-			if len(cacheEntries(t, home)) != 1 {
+-				t.Fatalf("a failed commit left %d live protected entries, want 1", len(cacheEntries(t, home)))
+-			}
+-			if failed := marker.Read(installed); failed == nil ||
+-				failed.Builds["build-tool"] != before.Builds["build-tool"] {
+-				t.Fatalf("a failed commit changed the previous compiled state: %+v", failed)
+-			}
+-			// The marker is only one class of what an installation commits. The
+-			// launcher bytes the previous install placed, its adapter mirrors, the
+-			// machine runtime, and the consumer ledger all have to be at the exact
+-			// value the run found them at.
+-			if got := installedFingerprint(t, project, home); got != installedBefore {
+-				t.Fatalf("a failed commit changed installed state\nbefore:\n%s\nafter:\n%s",
+-					installedBefore, got)
+-			}
+-			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+-				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+-				t.Fatalf("the previous installation no longer reports the state it had:\n%s", stdout)
+-			}
++	// Exact restoration: the entry the run displaced is live again, with
++	// the bytes it had, and the installation is untouched.
++	if got := liveArtifactBytes(t, home); got != corruptArtifact {
++		t.Fatal("a failed commit did not restore the build cache entry it replaced")
++	}
++	if len(cacheEntries(t, home)) != 1 {
++		t.Fatalf("a failed commit left %d live protected entries, want 1", len(cacheEntries(t, home)))
++	}
++	if failed := marker.Read(installed); failed == nil ||
++		failed.Builds["build-tool"] != before.Builds["build-tool"] {
++		t.Fatalf("a failed commit changed the previous compiled state: %+v", failed)
++	}
++	// The marker is only one class of what an installation commits. The
++	// launcher bytes the previous install placed, its adapter mirrors, the
++	// machine runtime, and the consumer ledger all have to be at the exact
++	// value the run found them at.
++	if got := installedFingerprint(t, project, home); got != installedBefore {
++		t.Fatalf("a failed commit changed installed state\nbefore:\n%s\nafter:\n%s",
++			installedBefore, got)
++	}
++	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json"); code != exitOK ||
++		decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
++		t.Fatalf("the previous installation no longer reports the state it had:\n%s", stdout)
++	}
+ 
+-			// The ordinary reconciliation path still repairs it afterwards.
+-			if code, stdout, stderr := capture(t, command, "app"); code != exitOK {
+-				t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
+-			}
+-			if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
+-				t.Fatalf("status --check after the repair = %d, want %d", code, exitOK)
+-			}
+-		})
++	// The ordinary reconciliation path still repairs it afterwards.
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), command, "app"); code != exitOK {
++		t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
++	}
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
++		t.Fatalf("status --check after the repair = %d, want %d", code, exitOK)
+ 	}
+ }
+ 
+@@ -1113,6 +1152,7 @@ func restoreWrites(t *testing.T, dir string) {
+ // node the project reaches only through a dependency is reported, classified,
+ // and fails --check on its own, even though no declaration names it.
+ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
++	t.Parallel()
+ 	requireNativeControlInventoryPlatform(t)
+ 	project, home := compiledProjectDeclaring(t, `{"name":"consumer","tag":"v1"}`)
+ 	consumer := filepath.Join(filepath.Dir(project), "skills", "consumer")
+@@ -1135,11 +1175,11 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+ 	runGit(t, consumer, "commit", "-qm", "initial consumer")
+ 	runGit(t, consumer, "tag", "v1")
+ 
+-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+ 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ 
+-	code, stdout, stderr := capture(t, "status", "app", "--json")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
+ 	if code != exitOK {
+ 		t.Fatalf("status --json = %d\nstderr:\n%s", code, stderr)
+ 	}
+@@ -1151,7 +1191,7 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+ 	if _, declared := report.Skills["build-skill"]; declared {
+ 		t.Fatalf("the provider is a transitive node, not a declaration: %v", report.Skills)
+ 	}
+-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
+ 		t.Fatalf("clean transitive compiled status --check = %d, want %d", code, exitOK)
+ 	}
+ 
+@@ -1162,7 +1202,7 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+ 			t.Fatal(err)
+ 		}
+ 	}
+-	code, stdout, _ = capture(t, "status", "app", "--json")
++	code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
+ 	if code != exitOK {
+ 		t.Fatalf("status --json after the entry was removed = %d", code)
+ 	}
+@@ -1170,7 +1210,7 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+ 		drifted.Builds[0].State != buildMissingArtifact {
+ 		t.Fatalf("transitive drift was not reported:\n%s", stdout)
+ 	}
+-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitFail {
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitFail {
+ 		t.Fatalf("transitive compiled drift passed --check: %d", code)
+ 	}
+ }
+@@ -1180,16 +1220,19 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+ // compiled command still gets a machine-readable row carrying the stable
+ // go-v1 boundary code, and `status --check` fails.
+ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
++	t.Parallel()
+ 	requireNativeControlInventoryPlatform(t)
+-	compiledProject(t)
+-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
++	_, home := compiledProject(t)
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+ 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+-	t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
++	selected := map[string]string{
++		godriver.SelectionCuratorGo: filepath.Join(t.TempDir(), "nowhere", "bin", "go"),
++	}
+ 
+ 	// Reporting a refusal is not itself a failure: the row carries the verdict
+ 	// and `--check` is what turns a non-current verdict into a non-zero exit.
+-	code, stdout, stderr := capture(t, "status", "app", "--json")
++	code, stdout, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app", "--json")
+ 	if code != exitOK {
+ 		t.Fatalf("status --json with an unusable toolchain = %d, want %d\n%s", code, exitOK, stderr)
+ 	}
+@@ -1223,7 +1266,7 @@ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
+ 		t.Fatalf("skills = %v", report.Skills)
+ 	}
+ 
+-	code, human, _ := capture(t, "status", "app")
++	code, human, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app")
+ 	if code != exitOK || !strings.Contains(human, "state="+buildUnusableToolchain) ||
+ 		!strings.Contains(human, "cause="+row.Cause) {
+ 		t.Fatalf("human status = %d and does not report the toolchain row:\n%s", code, human)
+@@ -1247,7 +1290,7 @@ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
+ 			t.Fatalf("human status published %q for a command nothing was derived for:\n%s", absent, human)
+ 		}
+ 	}
+-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitFail {
++	if code, _, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app", "--check"); code != exitFail {
+ 		t.Fatalf("status --check with an unusable toolchain = %d, want %d", code, exitFail)
+ 	}
+ }
+@@ -1268,7 +1311,8 @@ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
+ func assertProtectedCacheStateThatMovedDuringTheCheck(t *testing.T, fixture compiledProjectFixture) {
+ 	project, home := fixture.project, fixture.home
+ 
+-	cfg, code := loadConfig()
++	command := cli{config: fileConfigSource(filepath.Join(home, "config.json")), stderr: io.Discard}
++	cfg, code := command.loadConfig()
+ 	if code != exitOK {
+ 		t.Fatalf("loading the configuration = %d", code)
+ 	}
+@@ -1371,8 +1415,9 @@ func assertProtectedCacheStateThatMovedDuringTheCheck(t *testing.T, fixture comp
+ // compatibility boundary of the change above: a failure that derived no
+ // compiled command still reports exactly the historical error and nothing else.
+ func TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands(t *testing.T) {
+-	project := legacyProject(t)
+-	if code, _, stderr := capture(t, "install", "app"); code != exitOK {
++	t.Parallel()
++	project, home := legacyProject(t)
++	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+ 		t.Fatalf("install = %d\n%s", code, stderr)
+ 	}
+ 	// A declaration that cannot be resolved fails the read-only plan long
+@@ -1380,7 +1425,7 @@ func TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands(t *test
+ 	writeFile(t, filepath.Join(project, manifest.Name),
+ 		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"skill-a","tag":"v9"}]}`)
+ 
+-	code, stdout, stderr := capture(t, "status", "app", "--json")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
+ 	if code != exitFail {
+ 		t.Fatalf("status over an unresolvable declaration = %d, want %d", code, exitFail)
+ 	}
+@@ -1396,7 +1441,7 @@ func TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands(t *test
+ // path: install rebuilds candidate bytes that are outside a provable protected
+ // boundary instead of adopting them.
+ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjectFixture) {
+-	home, installed := fixture.home, fixture.installed
++	project, home, installed := fixture.project, fixture.home, fixture.installed
+ 
+ 	// The shared fixture is current when this case starts, and a preceding
+ 	// repair legitimately republished the entry the marker names, so the
+@@ -1409,7 +1454,7 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
+ 		breakCacheProtection(t, entry)
+ 	}
+ 
+-	code, dryRun, _ := capture(t, "install", "app", "--dry-run")
++	code, dryRun, _ := capture(t, filepath.Join(home, "config.json"), "install", "app", "--dry-run")
+ 	if code != exitOK {
+ 		t.Fatalf("dry run over untrusted cache state = %d\n%s", code, dryRun)
+ 	}
+@@ -1420,14 +1465,14 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
+ 		t.Fatalf("dry run claimed a completed repair:\n%s", dryRun)
+ 	}
+ 
+-	code, stdout, stderr := capture(t, "install", "app")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app")
+ 	if code != exitOK {
+ 		t.Fatalf("repairing install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ 	if !strings.Contains(stdout, "rebuilt untrusted build cache state into a new protected entry") {
+ 		t.Fatalf("install did not report the repair:\n%s", stdout)
+ 	}
+-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
+ 		t.Fatalf("status --check after repair = %d, want %d", code, exitOK)
+ 	}
+ 	after := marker.Read(installed)
+@@ -1439,11 +1484,20 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
+ 			before.Builds["build-tool"].CacheKey, after.Builds["build-tool"].CacheKey)
+ 	}
+ 
+-	// A run that cannot pass the toolchain gate repairs nothing and leaves the
++	// A run that cannot resolve its declaration repairs nothing and leaves the
+ 	// durable installation exactly as the successful run left it.
+-	t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
+-	if code, stdout, _ := capture(t, "install", "app"); code != exitFail {
+-		t.Fatalf("install without a usable toolchain = %d, want %d\n%s", code, exitFail, stdout)
++	manifestPath := filepath.Join(project, manifest.Name)
++	declared, err := os.ReadFile(manifestPath) // #nosec G304 -- test fixture path
++	if err != nil {
++		t.Fatal(err)
++	}
++	writeFile(t, manifestPath,
++		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"build-skill","tag":"missing"}]}`)
++	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitFail {
++		t.Fatalf("install with an unresolvable declaration = %d, want %d\n%s", code, exitFail, stdout)
++	}
++	if err := os.WriteFile(manifestPath, declared, 0o644); err != nil {
++		t.Fatal(err)
+ 	}
+ 	failed := marker.Read(installed)
+ 	if failed == nil || failed.Builds["build-tool"] != after.Builds["build-tool"] {
+@@ -1458,9 +1512,10 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
+ // surface: a cache entry a live marker references is neither removed nor
+ // reported as removed.
+ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
++	t.Parallel()
+ 	requireNativeControlInventoryPlatform(t)
+ 	_, home := compiledProject(t)
+-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
++	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+ 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+ 	entries := cacheEntries(t, home)
+@@ -1468,7 +1523,7 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
+ 		t.Fatalf("protected build cache holds %d entries, want 1", len(entries))
+ 	}
+ 
+-	code, stdout, stderr := capture(t, "gc")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "gc")
+ 	if code != exitOK {
+ 		t.Fatalf("gc = %d\nstderr:\n%s", code, stderr)
+ 	}
+@@ -1481,7 +1536,7 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
+ 	if _, err := os.Stat(entries[0]); err != nil {
+ 		t.Fatalf("gc removed a referenced protected entry: %v", err)
+ 	}
+-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
++	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
+ 		t.Fatalf("status --check after gc = %d, want %d", code, exitOK)
+ 	}
+ }
+@@ -1506,8 +1561,9 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
+ // recorded boundary rather than a quiet omission: the uncovered runner still
+ // proves the refusal it is carved out by.
+ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
++	t.Parallel()
+ 	_, home := compiledProject(t)
+-	code, stdout, stderr := capture(t, "install", "app")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app")
+ 
+ 	if godriver.InventoryPlatform(runtime.GOOS) != "" {
+ 		if code != exitOK {
+@@ -1542,7 +1598,7 @@ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
+ 	}
+ 	// And the status surface fails closed rather than reporting the command as
+ 	// current on a platform that cannot produce it.
+-	if checkCode, checkOut, _ := capture(t, "status", "app", "--check"); checkCode == exitOK {
++	if checkCode, checkOut, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); checkCode == exitOK {
+ 		t.Fatalf("status --check passed after a refused compiled install:\n%s", checkOut)
+ 	}
+ }
+@@ -1550,8 +1606,9 @@ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
+ // TestDryRunNeverClaimsACompletedCompilerCheck pins the compiler-free dry-run
+ // vocabulary: a miss is planned, never reported as preflighted or built.
+ func TestDryRunNeverClaimsACompletedCompilerCheck(t *testing.T) {
+-	compiledProject(t)
+-	code, stdout, stderr := capture(t, "install", "app", "--dry-run")
++	t.Parallel()
++	_, home := compiledProject(t)
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app", "--dry-run")
+ 	if code != exitOK {
+ 		t.Fatalf("dry run = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+ 	}
+@@ -1571,7 +1628,7 @@ func TestDryRunNeverClaimsACompletedCompilerCheck(t *testing.T) {
+ 
+ 	// upgrade shares the install phase, so it reports the same compiler-free
+ 	// planning vocabulary.
+-	code, upgraded, stderr := capture(t, "upgrade", "app", "--dry-run")
++	code, upgraded, stderr := capture(t, filepath.Join(home, "config.json"), "upgrade", "app", "--dry-run")
+ 	if code != exitOK {
+ 		t.Fatalf("upgrade --dry-run = %d\nstdout:\n%s\nstderr:\n%s", code, upgraded, stderr)
+ 	}
+@@ -1584,10 +1641,13 @@ func TestDryRunNeverClaimsACompletedCompilerCheck(t *testing.T) {
+ // toolchain diagnostic names every accepted selection mechanism and the tested
+ // release families, on any host, without suggesting a PATH lookup or download.
+ func TestStatusExplainsAnUnusableGoToolchain(t *testing.T) {
+-	compiledProject(t)
+-	t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
++	t.Parallel()
++	_, home := compiledProject(t)
++	selected := map[string]string{
++		godriver.SelectionCuratorGo: filepath.Join(t.TempDir(), "nowhere", "bin", "go"),
++	}
+ 
+-	code, _, stderr := capture(t, "status", "app")
++	code, _, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app")
+ 	if code != exitOK {
+ 		t.Fatalf("status with an unusable toolchain = %d, want %d\n%s", code, exitOK, stderr)
+ 	}
+@@ -1599,10 +1659,10 @@ func TestStatusExplainsAnUnusableGoToolchain(t *testing.T) {
+ 			t.Fatalf("toolchain diagnostic does not name %q:\n%s", want, stderr)
+ 		}
+ 	}
+-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitFail {
++	if code, _, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app", "--check"); code != exitFail {
+ 		t.Fatalf("status --check with an unusable toolchain = %d, want %d", code, exitFail)
+ 	}
+-	if code, _, _ := capture(t, "install", "app"); code != exitFail {
++	if code, _, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "install", "app"); code != exitFail {
+ 		t.Fatalf("install with an unusable toolchain = %d, want %d", code, exitFail)
+ 	}
+ }
+@@ -1611,12 +1671,13 @@ func TestStatusExplainsAnUnusableGoToolchain(t *testing.T) {
+ // compatibility: a closure with no build command produces exactly the
+ // historical document, with no build key at all.
+ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
+-	legacyProject(t)
+-	if code, _, stderr := capture(t, "install", "app"); code != exitOK {
++	t.Parallel()
++	_, home := legacyProject(t)
++	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+ 		t.Fatalf("install = %d\n%s", code, stderr)
+ 	}
+ 
+-	code, stdout, _ := capture(t, "status", "app", "--json")
++	code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
+ 	if code != exitOK {
+ 		t.Fatalf("status --json = %d", code)
+ 	}
+@@ -1637,8 +1698,9 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
+ // marker below the current schema still describes a current schema 1 through 5
+ // installation and must not be reported as unsupported.
+ func TestStatusAcceptsAnUnchangedLegacyMarkerSchema(t *testing.T) {
+-	project := legacyProject(t)
+-	if code, _, stderr := capture(t, "install", "app"); code != exitOK {
++	t.Parallel()
++	project, home := legacyProject(t)
++	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
+ 		t.Fatalf("install = %d\n%s", code, stderr)
+ 	}
+ 
+@@ -1650,7 +1712,7 @@ func TestStatusAcceptsAnUnchangedLegacyMarkerSchema(t *testing.T) {
+ 		delete(object, "builds")
+ 	})
+ 
+-	code, stdout, stderr := capture(t, "status", "app", "--check")
++	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check")
+ 	if code != exitOK {
+ 		t.Fatalf("legacy marker status --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
+ 	}
+diff --git a/cmd/curator/toolchain_host_test.go b/cmd/curator/toolchain_host_test.go
+index 34b6e78..738cb96 100644
+--- a/cmd/curator/toolchain_host_test.go
++++ b/cmd/curator/toolchain_host_test.go
+@@ -27,6 +27,7 @@ import (
+ // GOROOT the boundary cannot accept is diagnosed once, here, rather than seven
+ // times in cases that are about status reporting.
+ func TestHostGoToolchainIsSelectableOnAnInventoryPlatform(t *testing.T) {
++	t.Parallel()
+ 	requireNativeControlInventoryPlatform(t)
+ 	snapshot, err := godriver.Probe(context.Background(), godriver.ConfigFromEnvironment(t.TempDir()))
+ 	if err != nil {
+diff --git a/cmd/curator/toolchain_remedy_test.go b/cmd/curator/toolchain_remedy_test.go
+index 07dc735..03782f9 100644
+--- a/cmd/curator/toolchain_remedy_test.go
++++ b/cmd/curator/toolchain_remedy_test.go
+@@ -18,7 +18,8 @@ import (
+ // it. A remedy is only worth attaching if it survives all three, so the
+ // assertion is on what stderr actually says.
+ func TestInstallPrintsTheRemedyAVersionManagerSelectionEarns(t *testing.T) {
+-	compiledProject(t)
++	t.Parallel()
++	_, home := compiledProject(t)
+ 
+ 	realRoot := build.Default.GOROOT
+ 	if realRoot == "" {
+@@ -39,9 +40,9 @@ func TestInstallPrintsTheRemedyAVersionManagerSelectionEarns(t *testing.T) {
+ 	if err := os.Symlink(filepath.Join(realRoot, "bin", launcher), wrapper); err != nil {
+ 		t.Skipf("this host cannot create the symbolic link the case needs: %v", err)
+ 	}
+-	t.Setenv(godriver.SelectionCuratorGo, wrapper)
+-
+-	code, _, stderr := capture(t, "install", "app")
++	code, _, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), map[string]string{
++		godriver.SelectionCuratorGo: wrapper,
++	}, "install", "app")
+ 	if code != exitFail {
+ 		t.Fatalf("install with a version-manager selection = %d, want %d\n%s", code, exitFail, stderr)
+ 	}
+diff --git a/docs/authoring-language-adapters.md b/docs/authoring-language-adapters.md
+new file mode 100644
+index 0000000..4e5ead4
+--- /dev/null
++++ b/docs/authoring-language-adapters.md
+@@ -0,0 +1,367 @@
++# Authoring a language source-closure adapter
++
++This guide is for contributors adding a new language-utility source-closure
++adapter to Curator. It describes tested behaviour only. It is not a support
++matrix or a migration guide: use [Cross-adapter source-closure
++conformance](source-closure-adapter-conformance.md) for supported profiles,
++unsupported cases, diagnostics, and migration of an existing command.
++
++The delivery requirements originate in [`.spec/skill-facing-cli-source-closure.md`](../.spec/skill-facing-cli-source-closure.md),
++especially **Source closure invariant**, **Vendored compiled artifact
++prohibition**, and **Delivery completion**. The canonical record and checkpoint
++implementation is [`internal/closuregraph`](../internal/closuregraph), the
++process authority is [`internal/closureexec`](../internal/closureexec), recursive
++byte admission is [`internal/artifactpolicy`](../internal/artifactpolicy), and
++the integration contract is
++[`internal/crossconformance`](../internal/crossconformance). Do not create an
++adapter-local substitute for any of those authorities.
++
++## The contract to implement
++
++An adapter supports a build only when it establishes the complete predicate:
++
++```text
++supported_build(selection) =
++    immutable_recursive_capture(selection)
++    AND complete_recursive_artifact_admission
++    AND closed_selection_and_build_graph
++    AND trusted_toolchain_and_target_binding
++    AND authorized_declared_execution_only
++    AND offline_replay_from_empty_ambient_state
++    AND causally_receipted_protected_outputs
++```
++
++False, unknown, unsupported, partially inspected, or non-reproducible evidence
++fails before the affected step. A lock entry, checksum, package-manager cache,
++installed tree, filename suffix, or successful unmanaged build is not a proxy
++for a missing conjunct. This is the predicate in
++[the conformance document's **The one predicate** section](source-closure-adapter-conformance.md#the-one-predicate),
++proved by the shared services in `internal/artifactpolicy`,
++`internal/closuregraph`, and `internal/closureexec`.
++
++### C0-C7 is the adapter lifecycle
++
++Implement the closed checkpoint chain through the interfaces and payloads in
++[`internal/closuregraph/adapter.go`](../internal/closuregraph/adapter.go) and
++[`internal/closuregraph/checkpoint.go`](../internal/closuregraph/checkpoint.go).
++Each successful checkpoint hashes its canonical payload and exact predecessor;
++a failed checkpoint is not issued and cannot seed downstream identity.
++`ValidateCheckpointChain` in `internal/closuregraph/checkpoint.go` proves the
++sequence and permits Cargo's additional C3a/C3b admission gates.
++
++| Checkpoint | What the adapter must establish | Identity and evidence carried forward |
++| --- | --- | --- |
++| `C0.profile` | Select the adapter profile, schemas, artifact policy, source grammars, limits, configuration policy, capabilities, platform roles, and every external tool allowed to derive evidence before C5. | `selection_context_id`, exact platform nodes, and evidence-toolchain nodes. Proof: `closuregraph.C0ProfilePayload`. |
++| `C1.resolve` | Freeze root/workspace declarations, the authoritative lock candidate, unevaluated conditions and their evaluator identities, candidate records, and the causal derivation journal. | Lock candidate, selection context, candidate graph records, and journal entries. Proof: `closuregraph.C1ResolvePayload`. |
++| `C2.capture` | Protect every immutable origin input before interpretation or derivation. | Intake receipts, immutable origin IDs, protected handles, and broker receipts. Proof: `closuregraph.C2CapturePayload` and `closureexec.CaptureStore`. |
++| `C3.admit` | Recursively classify and admit every captured dependency byte through the shared policy. | Intake receipts, artifact-manifest IDs, and any permitted derivation receipts. Cargo additionally uses `C3a.origin-admission` and `C3b.derived-admission`. Proof: `closuregraph.C3AdmitPayload`, `internal/artifactpolicy`, and `internal/rustsource`. |
++| `C4.close` | Reconcile the unchanged capture with one exact selection overlay and its active projection. | `captured_graph_id`, `selection_context_id`, `selection_binding_id`, and `active_graph_id`. Proof: `closuregraph.C4ClosePayload` and `closuregraph.GraphBundle.Validate`. |
++| `C5.plan` | Derive one immutable, deterministic, acyclic build plan from the active graph. C5 does not add or repair graph records. | `build_plan_id`. Proof: `closuregraph.C5PlanPayload` and `internal/closuregraph/plan.go`. |
++| `C6.offline` | Execute only the committed plan with empty ambient state and reconcile the observed process, reads, writes, network result, tools, and produced artifacts. | A separate `execution_receipt_id` and immutable produced-artifact observations. Proof: `closuregraph.C6OfflinePayload`, `closuregraph.ExecutionReceipt`, and `internal/closureexec`. |
++| `C7.publish` | Publish only causally produced, reinspected outputs through the protected store; exact reuse requires an independently derived expected cache input. | `publication_receipt_id`. Proof: `closuregraph.C7PublishPayload`, `closuregraph.PublicationReceipt`, and `internal/artifactpolicy` local-output admission. |
++
++### Capture first; bind the exact target later
++
++Implement `closuregraph.CaptureAdapter` so capture is selection-neutral. It may
++contain immutable declarations, the conservative lock/resolution superset,
++conditions, abstract action/tool/platform slots, and artifact-manifest
++references. It must not contain an exact target platform, a concrete external
++toolchain component, a `targets` or `uses_tool` edge, requested target values,
++or selected/pruned results. The interface contract is in
++[`internal/closuregraph/adapter.go`](../internal/closuregraph/adapter.go), and
++the negative shape is enforced by
++`crossconformance.CheckSelectionNeutralCapture` in
++[`internal/crossconformance/suite.go`](../internal/crossconformance/suite.go).
++
++Implement `closuregraph.SelectionAdapter` as the only authority that introduces
++the exact target and concrete tool identities. Its binding overlay may add only
++the binding node and edge kinds accepted by `closuregraph.GraphBundle.Validate`;
++exact destination must resolve once and be reached by an explicit `targets`
++edge wherever the path emits binding records. It may not replace a capture
++record or add a package, source, target unit, action, generated artifact,
++interop declaration, or expected output. These restrictions are proved by
++`internal/closuregraph/validation.go` and
++`crossconformance.CheckBindingOwnsTargetAuthority`.
++
++For the same source inputs, two destinations must reuse one exact capture while
++their selection-bound identity, active projection, plan, and downstream
++checkpoint identities diverge. `crossconformance.CheckTargetDivergence` is the
++shared proof. This is why an adapter publishes one capture and a target matrix
++of bindings, plans, executions, and receipts rather than recapturing sources
++per destination.
++
++## Scaffold the package in causal order
++
++1. Define a versioned profile ID, accepted manager/lock schemas, source
++   grammars, capability set, stable diagnostic constants, and the narrow
++   supported boundary. Reuse shared diagnostic codes without renaming their
++   cause. Existing shapes are demonstrated by `internal/rustsource/errors.go`,
++   the four `internal/*source/errors.go` Node-manager packages, and
++   `internal/swiftpmsource/errors.go`; the global vocabulary is documented in
++   [**Diagnostics**](source-closure-adapter-conformance.md#diagnostics).
++2. Parse only an authoritative committed lock or frozen resolution record. Bind
++   every recursive instance to immutable origin and integrity evidence, and
++   reject missing, stale, unsupported, mutable, ambiguous, or incomplete
++   authority. The worked implementations are `internal/rustsource/parse.go`,
++   `internal/npmsource/lock.go`, `internal/pnpmsource/lock.go`,
++   `internal/yarnclassicsource/lock.go`,
++   `internal/yarnmodernsource/lock.go`, and
++   `internal/swiftpmsource/lock.go`.
++3. Intake raw origins into `closureexec.CaptureStore` before executing a
++   manifest, vendor transform, mirror replay, or manager metadata query. Run
++   recursive byte and structure admission through `artifactpolicy.Service`;
++   never infer admission from a manager's installed layout. The intake-before-
++   interpretation contract is proved by `internal/closureexec/intake.go` and by
++   the capture paths in `internal/rustsource`, the four Node manager packages,
++   and `internal/swiftpmsource`.
++4. Emit the selection-neutral capture, exact binding overlay, active graph, and
++   deterministic plan with `internal/closuregraph`. Preserve selected and
++   pruned conditions in evidence, reject unresolved references and execution
++   cycles, and bind every action slot exactly once. The record validation and
++   projection rules live in `internal/closuregraph/validation.go`,
++   `projection.go`, and `plan.go`.
++5. Declare every executable step, including generators. A generator declaration
++   binds its tool, configuration, input set, output paths/classes, target, and
++   producer-before-consumer edges; generated bytes without that lineage reject.
++   The action and generated/output record contracts are in
++   `internal/closuregraph/action_template.go`, `node.go`, and `edge.go`; the
++   Node example is `internal/nodesource` generated-output planning.
++6. Issue the C0-C7 chain and retain all permits, receipts, observations, and
++   protected publication evidence needed to reproduce each identity. The
++   checkpoint codecs in `internal/closuregraph/checkpoint.go` and execution
++   models in `internal/closureexec/models.go` are the normative schemas.
++
++## Process seams and guards
++
++Adapter production code must contain zero direct `exec.Command*` calls and
++must not import `os/exec`. The only production files permitted to launch a
++child process are
++[`internal/closureexec/acquisition.go`](../internal/closureexec/acquisition.go)
++and
++[`internal/closureexec/portable_runner.go`](../internal/closureexec/portable_runner.go).
++Those manager-owned seams commit an acquisition or derivation permit before
++start and return the corresponding receipt. The permit/receipt validation is
++implemented by `internal/closureexec` and exercised from the accepted adapter
++packages.
++
++When adding a package, extend guard *coverage*, not the allowlist. Add the new
++production directory to an adapter-level guard modelled on
++[`internal/swiftpmbuild/guard_test.go`](../internal/swiftpmbuild/guard_test.go),
++[`internal/swiftpminterop/guard_test.go`](../internal/swiftpminterop/guard_test.go),
++or `internal/rustsource/build_test.go`. Scan the new surface together with
++`internal/closureexec`; keep the allowlist exactly
++`acquisition.go` and `portable_runner.go`. Also keep
++[`internal/crossconformance/guard_test.go`](../internal/crossconformance/guard_test.go)
++green: its integration oracle starts no process and its production files import
++only the standard library.
++
++Tests may launch real fixtures, but a test-only launch is not adapter authority.
++Production behavior must still drive one of the two shared seams and reconcile
++the returned receipt. This boundary is proved by the guard tests above and by
++`closureexec.Executor` receipt reconciliation in
++`internal/closureexec/executor.go`.
++
++## Source-text analysis: reject by default
++
++Do not emulate a language toolchain frontend to claim a complete source
++closure. A source scanner may admit only constructs for which its accepted
++grammar proves that every dependency-bearing interpretation is visible; every
++other construct fails closed. This follows **Source closure invariant 4 and 6**
++in `.spec/skill-facing-cli-source-closure.md` and is exercised most
++adversarially by `internal/swiftpminterop`.
++
++The SwiftPM C-family work exposed four independent axes that a source-text
++analyzer must close:
++
++- **Spelling:** alternative preprocessing spellings, line splices, stringized
++  and pasted tokens, directive channels, and any other accepted spelling must
++  be proven equivalent or rejected. Proof:
++  `internal/swiftpminterop/headers.go` and its parser/module-map tests.
++- **Position:** every syntactic position where expansion can change dependency
++  meaning must be enumerated; the accepted SwiftPM analyzer includes Objective-C
++  `@` keyword positions and expanded module-import names. Proof:
++  `internal/swiftpminterop/headers.go` and
++  `internal/swiftpminterop/parser_test.go`.
++- **Build-setting kind:** source text is not the only frontend input. Enumerate
++  every supported build-setting kind, reject unknown kinds, and reject any kind
++  whose effect on macro, include, link, language, or isolation behavior cannot
++  be proved safe. Proof: `internal/swiftpminterop/buildsettings.go` and
++  `buildsettings_test.go`.
++- **Macro-oracle input:** close every route that can define a macro, including
++  both source `#define` directives and build settings that become compiler
++  `-D` arguments; analyze both the macro name and replacement body through the
++  same rejection logic. Proof: `internal/swiftpminterop/headers.go`,
++  `buildsettings.go`, and the H24/R12 vectors in their tests.
++
++Closing only one axis is not evidence for the others. If a contributor cannot
++state and test the complete spelling × position × build-setting-kind ×
++macro-oracle-input surface for the pinned frontend, the safe result is a stable
++unsupported or undeclared-input diagnostic, not another heuristic. The
++reject-by-default outcome is preserved by the portable path in
++`internal/swiftpminterop/readset_test.go`.
++
++### Boundary with observed reads
++
++Static rejection and observed-read evidence have different authority.
++`swiftpminterop.ReadSetProvider` reports `not-observed` in portable assurance;
++it starts no process and does not upgrade compiler dependency output into proof.
++Verified mode requires an observed read set plus the issued derivation receipt,
++and rejects missing or incomplete observer authority. This separation is
++implemented in `internal/swiftpminterop/boundaries.go` and proved by
++`internal/swiftpminterop/readset_test.go`.
++
++[`internal/swiftpmbuild/readset.go`](../internal/swiftpmbuild/readset.go) is the
++accepted OBSERVED-READ provider. It performs a permitted, isolated, network-
++denied offline build, consumes the selected compilers' dependency files, maps
++work-copy reads back to admitted protected roots, separates derived build-tree
++reads, and leaves all other reads for the binding resolver to classify. Its
++verified path is proof only when `internal/closureexec` supplies the required
++provider capability and causal receipt; portable mode remains reject-by-default.
++The build and reconciliation boundary is proved by
++`internal/swiftpmbuild/conformance_test.go` and
++`internal/swiftpmbuild/swiftpmbuild_test.go`.
++
++Do not use an observed-read provider to excuse an incomplete static contract.
++The static adapter defines what may be attempted and the verified provider
++supplies adversarial completeness for what the selected toolchain actually
++read. Both authorities must agree before C4/C5. This ordering is implemented by
++`internal/swiftpminterop` consuming the provider before closure and by
++`internal/swiftpmbuild` refusing verified planning without observed reads.
++
++## What a new path publishes
++
++### Canonical vectors
++
++Publish the adapter's projection of both accepted canonical vectors without
++inventing a new encoding:
++
++- **CGP05, two targets:** fixed source inputs produce one byte-identical
++  selection-neutral capture. Concrete platform nodes and `targets` edges appear
++  only in each binding overlay. Platform, selection, binding, active graph,
++  plan, C4, and C5 identities diverge between destinations. The exact record
++  family is checked by `internal/crossconformance/corpus.go` and
++  `validate.go`; see [the conformance corpus description](source-closure-adapter-conformance.md#the-cross-adapter-conformance-suite).
++- **CGP10, two observation branches:** artifact manifest, action/output nodes,
++  graph edges, capture, binding, active graph, plan, C4, C5, closure, and
++  expected-cache-input records stay fixed. Produced observations and execution
++  and publication receipts diverge for the distinct output bytes; an
++  observation never rewrites a graph node. The independent verification is in
++  `internal/crossconformance/ccj.go`, `corpus.go`, and `validate.go`.
++
++The independent CCJ-1 scanner/emitter in `internal/crossconformance` must derive
++the same identities without importing `internal/closuregraph` or any adapter.
++Regenerate and commit
++[`internal/crossconformance/testdata/cross-adapter-protocol-export.json`](../internal/crossconformance/testdata/cross-adapter-protocol-export.json)
++when the accepted corpus, delivered paths, obligations, or rejection matrix
++changes. `internal/crossconformance/export.go`, `export_test.go`, and
++`guard_test.go` prove this publication boundary.
++
++### Seven obligations
++
++Add the path to `crossconformance.DeliveredPaths` and make its real production
++entry points discharge all seven obligations in
++[`internal/crossconformance/suite.go`](../internal/crossconformance/suite.go):
++
++| Obligation | Author evidence to provide |
++| --- | --- |
++| `capture.selection_neutral` | A capture census with no selection-only node or edge kind. |
++| `capture.stable_across_targets` | Two exact destinations over one input set reuse the same capture identity. |
++| `binding.target_authority` | Only the overlay introduces the exact target and tools, with an explicit `targets` edge where records are emitted. |
++| `binding.diverges_per_target` | Selection-bound identity, active projection, and plan all differ between destinations. |
++| `records.deterministic` | Fresh repeated capture/projection reproduces every identity. |
++| `evidence.causal_chain` | Every checkpoint names its predecessor, C5 adds no graph record, and each pre-C5 executable derivation returns a causal receipt. |
++| `artifact.shared_admission` | The shared deny payload has the same class, decision, primary diagnostic, and leaf digest; the new profile admits only its declared source grammars. |
++
++`crossconformance.Coverage` must remain complete; never mark an obligation as
++covered without driving the adapter's production API. The consumer-oriented
++meaning and current path matrix stay in [**The cross-adapter conformance
++suite**](source-closure-adapter-conformance.md#the-cross-adapter-conformance-suite)
++rather than being duplicated here.
++
++### Rejection matrix
++
++Drive every applicable cross-drivable entry returned by
++`crossconformance.RejectionVectors` through the new adapter. Each outcome must
++return a code from the vector's closed set, start no affected process, and
++publish nothing; `crossconformance.CheckRejection` enforces all three facts.
++In particular, recognized compiled dependency bytes must retain the primary
++`artifact_compiled_dependency_forbidden` result even when the package also
++declares an unsupported hook or native build. That precedence is implemented by
++`internal/artifactpolicy` and asserted by the adapter conformance suites.
++
++Do not copy or fork the matrix. Its graph, artifact, identity, execution, and
++output vectors—and the delegated `network-attempted`, `undeclared-write`, and
++`output-drift` ownership—are listed in
++[the conformance document's rejection matrix](source-closure-adapter-conformance.md#the-cross-adapter-conformance-suite)
++and defined once in `internal/crossconformance/suite.go`. If a new ecosystem
++cannot construct a delegated vector without forging sealed evidence, add its
++owning package's negative suite and compile-time diagnostic reference following
++`internal/crossconformance/guard_test.go`; do not mint fake receipts in the
++integration harness.
++
++## Ecosystem-specific work
++
++The shared contract does not make manager formats interchangeable. Use these
++packages as worked examples and keep the new ecosystem's authority explicit.
++
++| Concern | Author requirement and proof |
++| --- | --- |
++| Rust/Cargo | Require the committed `Cargo.lock`, admit raw registry/Git/path origins before the pinned vendor transform, and bind the native target plus Cargo/rustc identities. Rust v1 rejects build scripts, build dependencies, proc macros, native links, package Cargo config, and cross/custom targets. Proof: `internal/rustsource/parse.go`, `manager_vendor.go`, `graph.go`, and `build_conformance_test.go`. |
++| npm | Parse only the supported `package-lock.json` or `npm-shrinkwrap.json` schemas, verify every tarball against lock SRI, and materialize from the private cache with `--offline --ignore-scripts`. Reject lifecycle dependencies and implicit `binding.gyp`/`node-gyp`. Proof: `internal/npmsource/lock.go`, `capture.go`, `materialize.go`, and `conformance_test.go`. |
++| pnpm | Preserve importer, peer-instance, patch, integrity, and private-store semantics from the supported `pnpm-lock.yaml`; disable scripts and reject `.pnpmfile.*`, side-effects cache, and unbound patches. Proof: `internal/pnpmsource/lock.go`, `patch.go`, `materialize.go`, and `conformance_test.go`. |
++| Yarn Classic | Require the root Yarn v1 lock plus the exact accepted Yarn/config identity; populate and replay only the captured offline mirror with scripts disabled. Proof: `internal/yarnclassicsource/lock.go`, `capture.go`, `materialize.go`, and `conformance_test.go`. |
++| Modern Yarn | Bind the supported modern lock, `.yarnrc.yml`, cache key/compression, linker, and built-in plugin set; disable lifecycle scripts and reject unapproved plugins, custom fetchers/resolvers/linkers, or mutable cache semantics. Proof: `internal/yarnmodernsource/lock.go`, `capture.go`, `materialize.go`, and `conformance_test.go`. |
++| SwiftPM and C family | Freeze top-level `Package.resolved`, capture kind-preserving mirrors, evaluate every package manifest through a permit/receipt, keep Swift and Clang targets separate, and bind SwiftPM, Swift, Clang, linker, SDK, and exact destination identities. Reject binary targets, active plugins/macros, unsafe settings, escaping headers/module maps, and untrusted system libraries. Proof: `internal/swiftpmsource`, `internal/swiftpminterop`, and `internal/swiftpmbuild` conformance suites. |
++
++Across ecosystems, dependency payloads are source-only under the profile and
++are recursively inspected by `internal/artifactpolicy`; lifecycle scripts and
++manager extensions are disabled or rejected by the manager package; every
++generator is an explicit `closuregraph` action; and every destination gets its
++own binding, plan, execution, and publication receipt over the shared capture.
++The consumer support boundary and unsupported cases remain authoritative in
++[**Supported profiles**](source-closure-adapter-conformance.md#supported-profiles)
++and [**Explicit unsupported cases**](source-closure-adapter-conformance.md#explicit-unsupported-cases).
++
++## Tests and evidence
++
++Before proposing a path, provide all of the following evidence:
++
++1. A package-local normative suite named like the existing
++   `internal/{rustsource,npmsource,pnpmsource,yarnclassicsource,yarnmodernsource,swiftpmsource,swiftpminterop,swiftpmbuild}/conformance_test.go`
++   suites. Drive the real capture, bind, plan, materialize/build, and publish
++   entry points. Include positive fixtures and negative fixtures for lock,
++   integrity, artifact, graph, target/toolchain, hook/generator, offline I/O,
++   and receipt failures applicable to the profile. Those package suites prove
++   the current profile-specific behavior.
++2. Negative proof for every gate. Narrow or mutate the gate so the relevant
++   test fails; do not rely on a delete-only mutant or a helper that production
++   never calls. This expectation is embodied by the negative adapter suites and
++   by `crossconformance.CheckRejection`, which requires a real error, zero
++   affected starts, and zero publication.
++3. Cross-adapter coverage for the seven obligations, CGP05/CGP10 projections,
++   every applicable rejection vector, guard coverage, and a byte-exact protocol
++   export. The normative entry point is `go test -count=1
++   ./internal/crossconformance`; its completeness and committed-export checks
++   are in `suite_test.go`, `rejection_test.go`, and `export_test.go`.
++4. Focused package coverage and race evidence, followed by the repository CI
++   gates. The repository's tested gates are `make ci-test`, `make race`,
++   `make ledger-check`, `make gate-selftest`, `go vet ./...`, the `gofmt` check,
++   and `golangci-lint run`; their exact platform planning and evidence outputs
++   are defined by [`.github/workflows/ci.yml`](../.github/workflows/ci.yml),
++   [`.github/ci/test-gate.sh`](../.github/ci/test-gate.sh), and the `Makefile`.
++   Record the actual command and exit code. A coverage measurement is evidence,
++   not permission to leave an unproved gate; no repository-wide percentage can
++   replace the obligations and negative vectors above.
++5. Store raw local logs under `.temp/<TASK-ID>/`, attach a task-scoped developer
++   outcome and material artifacts to the board, and commit only protocol
++   artifacts that are part of the public contract. The repository workflow and
++   evidence location are defined in [`CONTRIBUTING.md`](../CONTRIBUTING.md),
++   while the committed independent interface is the cross-adapter protocol
++   export named above.
++
++If any required property remains unknown, report it as unknown and reject the
++profile shape. Do not add an allow flag, synthetic receipt, local parser
++exception, or test-only authority to make `supported_build` appear true. That
++fail-closed rule comes from `.spec/skill-facing-cli-source-closure.md` **Source
++closure invariant 6** and is enforced end to end by the package suites and
++`internal/crossconformance`.

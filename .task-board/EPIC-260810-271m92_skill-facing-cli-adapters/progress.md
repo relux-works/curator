@@ -1,5 +1,5 @@
 ## Status
-backlog
+to-review
 
 ## Review
 required
@@ -659,7 +659,7 @@ spawn run completed: codex (run=RUN-260817-ffcba9, pid=0, exit=1)
 2026-08-10T11:03:40Z
 
 ## Last Update
-2026-08-24T23:50:43Z
+2026-08-26T22:44:12Z
 
 ## Assigned To
 [analyst] orchestrator (codex)
