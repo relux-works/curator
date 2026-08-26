@@ -64,13 +64,13 @@ func TestWindowsMissingHomeCaseAliasesShareIdentityAndContention(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := runHelper(t, "try-home", lowerHome, ""); got != "blocked" {
+	if got := runHelper(t, "try-home", lowerHome, "", "blocked"); got != "blocked" {
 		t.Fatalf("case-alias subprocess = %q, want blocked", got)
 	}
 	if err := homeLock.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if got := runHelper(t, "try-home", lowerHome, ""); got != "acquired" {
+	if got := runHelper(t, "try-home", lowerHome, "", "acquired"); got != "acquired" {
 		t.Fatalf("released case-alias subprocess = %q, want acquired", got)
 	}
 
@@ -194,7 +194,7 @@ func TestWindowsCaseSensitivePrefixMultiComponentFirstUse(t *testing.T) {
 	if after.Home() != first.Home() {
 		t.Fatalf("multi-component identity changed after first use: before %q, after %q", first.Home(), after.Home())
 	}
-	if got := runHelper(t, "try-home", alias, ""); got != "blocked" {
+	if got := runHelper(t, "try-home", alias, "", "blocked"); got != "blocked" {
 		t.Fatalf("multi-component alias subprocess = %q, want blocked", got)
 	}
 	if err := second.prepare(); err != nil {

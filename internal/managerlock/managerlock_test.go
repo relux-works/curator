@@ -17,10 +17,16 @@ import (
 )
 
 const (
-	helperModeEnv    = "CURATOR_MANAGERLOCK_HELPER_MODE"
-	helperHomeEnv    = "CURATOR_MANAGERLOCK_HELPER_HOME"
-	helperProjectEnv = "CURATOR_MANAGERLOCK_HELPER_PROJECT"
-	helperKeyEnv     = "CURATOR_MANAGERLOCK_HELPER_KEY"
+	helperModeEnv     = "CURATOR_MANAGERLOCK_HELPER_MODE"
+	helperHomeEnv     = "CURATOR_MANAGERLOCK_HELPER_HOME"
+	helperProjectEnv  = "CURATOR_MANAGERLOCK_HELPER_PROJECT"
+	helperKeyEnv      = "CURATOR_MANAGERLOCK_HELPER_KEY"
+	helperDeadlineEnv = "CURATOR_MANAGERLOCK_HELPER_DEADLINE"
+)
+
+const (
+	blockedHelperDeadline  = 200 * time.Millisecond
+	acquiredHelperDeadline = 30 * time.Second
 )
 
 func TestCanonicalProjectIdentitiesAndOrder(t *testing.T) {
@@ -215,13 +221,13 @@ func TestMissingHomeBelowSymlinkKeepsIdentityAndContends(t *testing.T) {
 	if after.Home() != before.Home() {
 		t.Fatalf("aliased home identity changed after lock-state creation: before %q, after %q", before.Home(), after.Home())
 	}
-	if got := runHelper(t, "try-home", home, ""); got != "blocked" {
+	if got := runHelper(t, "try-home", home, "", "blocked"); got != "blocked" {
 		t.Fatalf("same physical home helper = %q, want blocked", got)
 	}
 	if err := homeLock.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if got := runHelper(t, "try-home", home, ""); got != "acquired" {
+	if got := runHelper(t, "try-home", home, "", "acquired"); got != "acquired" {
 		t.Fatalf("released physical home helper = %q, want acquired", got)
 	}
 }
@@ -458,16 +464,16 @@ func TestSubprocessContentionAndIndependentProjects(t *testing.T) {
 	if _, err := operation.AcquireProjects(context.Background(), projectA); err != nil {
 		t.Fatal(err)
 	}
-	if got := runHelper(t, "try-project", home, projectA); got != "blocked" {
+	if got := runHelper(t, "try-project", home, projectA, "blocked"); got != "blocked" {
 		t.Fatalf("same project helper = %q, want blocked", got)
 	}
-	if got := runHelper(t, "try-project", home, projectB); got != "acquired" {
+	if got := runHelper(t, "try-project", home, projectB, "acquired"); got != "acquired" {
 		t.Fatalf("independent project helper = %q, want acquired", got)
 	}
 	if err := operation.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if got := runHelper(t, "try-project", home, projectA); got != "acquired" {
+	if got := runHelper(t, "try-project", home, projectA, "acquired"); got != "acquired" {
 		t.Fatalf("released project helper = %q, want acquired", got)
 	}
 
@@ -475,13 +481,13 @@ func TestSubprocessContentionAndIndependentProjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := runHelper(t, "try-home", home, ""); got != "blocked" {
+	if got := runHelper(t, "try-home", home, "", "blocked"); got != "blocked" {
 		t.Fatalf("same home helper = %q, want blocked", got)
 	}
 	if err := homeLock.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if got := runHelper(t, "try-home", home, ""); got != "acquired" {
+	if got := runHelper(t, "try-home", home, "", "acquired"); got != "acquired" {
 		t.Fatalf("released home helper = %q, want acquired", got)
 	}
 }
@@ -502,17 +508,28 @@ func TestSubprocessBuildKeyDeduplicationAcrossProjects(t *testing.T) {
 	if err := operation.AcquireBuildKey(context.Background(), "sha256:shared"); err != nil {
 		t.Fatal(err)
 	}
-	if got := runKeyHelper(t, home, projectB, "sha256:shared"); got != "blocked" {
+	if got := runKeyHelper(t, home, projectB, "sha256:shared", "blocked"); got != "blocked" {
 		t.Fatalf("same build key helper = %q, want blocked", got)
 	}
-	if got := runKeyHelper(t, home, projectB, "sha256:independent"); got != "acquired" {
+	if got := runKeyHelper(t, home, projectB, "sha256:independent", "acquired"); got != "acquired" {
 		t.Fatalf("independent build key helper = %q, want acquired", got)
 	}
 	if err := operation.ReleaseBuildKey(); err != nil {
 		t.Fatal(err)
 	}
-	if got := runKeyHelper(t, home, projectB, "sha256:shared"); got != "acquired" {
+	if got := runKeyHelper(t, home, projectB, "sha256:shared", "acquired"); got != "acquired" {
 		t.Fatalf("released build key helper = %q, want acquired", got)
+	}
+}
+
+func TestSubprocessExpectedAcquiredWithTinyDeadlineReportsBlocked(t *testing.T) {
+	if acquiredHelperDeadline <= blockedHelperDeadline {
+		t.Fatalf("acquired helper deadline %v must exceed blocked helper deadline %v", acquiredHelperDeadline, blockedHelperDeadline)
+	}
+	home := t.TempDir()
+	project := t.TempDir()
+	if got := runHelperWithDeadline(t, "try-project", home, project, "", time.Nanosecond); got != "blocked" {
+		t.Fatalf("uncontended helper with tiny deadline = %q, want blocked", got)
 	}
 }
 
@@ -561,24 +578,39 @@ func TestAbnormalChildExitReleasesOSLock(t *testing.T) {
 	}
 }
 
-func runHelper(t *testing.T, mode, home, project string) string {
+func runHelper(t *testing.T, mode, home, project, expected string) string {
+	t.Helper()
+	return runHelperWithDeadline(t, mode, home, project, "", helperDeadline(t, expected))
+}
+
+func runKeyHelper(t *testing.T, home, project, key, expected string) string {
+	t.Helper()
+	return runHelperWithDeadline(t, "try-key", home, project, key, helperDeadline(t, expected))
+}
+
+func helperDeadline(t *testing.T, expected string) time.Duration {
+	t.Helper()
+	switch expected {
+	case "blocked":
+		return blockedHelperDeadline
+	case "acquired":
+		return acquiredHelperDeadline
+	default:
+		t.Fatalf("unknown expected helper outcome %q", expected)
+		return 0
+	}
+}
+
+func runHelperWithDeadline(t *testing.T, mode, home, project, key string, deadline time.Duration) string {
 	t.Helper()
 	command := helperCommand(mode, home, project)
+	command.Env = append(command.Env, helperDeadlineEnv+"="+deadline.String())
+	if key != "" {
+		command.Env = append(command.Env, helperKeyEnv+"="+key)
+	}
 	output, err := command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("helper %s failed: %v\n%s", mode, err, output)
-	}
-	line, _, _ := strings.Cut(strings.TrimSpace(string(output)), "\n")
-	return line
-}
-
-func runKeyHelper(t *testing.T, home, project, key string) string {
-	t.Helper()
-	command := helperCommand("try-key", home, project)
-	command.Env = append(command.Env, helperKeyEnv+"="+key)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("build-key helper failed: %v\n%s", err, output)
 	}
 	line, _, _ := strings.Cut(strings.TrimSpace(string(output)), "\n")
 	return line
@@ -603,36 +635,48 @@ func TestManagerLockHelper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	if mode == "hold-project" {
+		operation := manager.NewOperation(false)
+		cleanupOperation(t, operation)
+		if _, err := operation.AcquireProjects(context.Background(), os.Getenv(helperProjectEnv)); err != nil {
+			t.Fatalf("hold project lock: %v", err)
+		}
+		fmt.Println("ready")
+		_ = os.Stdout.Sync()
+		_, _ = io.Copy(io.Discard, os.Stdin)
+		return
+	}
+	deadline, err := time.ParseDuration(os.Getenv(helperDeadlineEnv))
+	if err != nil || deadline <= 0 {
+		t.Fatalf("invalid helper deadline %q: %v", os.Getenv(helperDeadlineEnv), err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
+	var release func() error
 	switch mode {
 	case "try-project":
 		operation := manager.NewOperation(false)
-		cleanupOperation(t, operation)
+		release = operation.Close
 		_, err = operation.AcquireProjects(ctx, os.Getenv(helperProjectEnv))
 	case "try-home":
 		var lock *HomeLock
 		lock, err = manager.AcquireHomeOnly(ctx, false)
 		if lock != nil {
-			cleanupHomeLock(t, lock)
+			release = lock.Close
 		}
 	case "try-key":
 		operation := manager.NewOperation(false)
-		cleanupOperation(t, operation)
+		release = operation.Close
 		if _, err = operation.AcquireProjects(ctx, os.Getenv(helperProjectEnv)); err == nil {
 			err = operation.AcquireBuildKey(ctx, os.Getenv(helperKeyEnv))
 		}
-	case "hold-project":
-		operation := manager.NewOperation(false)
-		cleanupOperation(t, operation)
-		if _, err = operation.AcquireProjects(context.Background(), os.Getenv(helperProjectEnv)); err == nil {
-			fmt.Println("ready")
-			_ = os.Stdout.Sync()
-			_, _ = io.Copy(io.Discard, os.Stdin)
-			return
-		}
 	default:
 		t.Fatalf("unknown helper mode %q", mode)
+	}
+	if release != nil {
+		if releaseErr := release(); releaseErr != nil {
+			t.Fatalf("release helper lock: %v", releaseErr)
+		}
 	}
 	if err == nil {
 		fmt.Println("acquired")
@@ -650,15 +694,6 @@ func cleanupOperation(t *testing.T, operation *Operation) {
 	t.Cleanup(func() {
 		if err := operation.Close(); err != nil {
 			t.Errorf("release manager operation locks: %v", err)
-		}
-	})
-}
-
-func cleanupHomeLock(t *testing.T, lock *HomeLock) {
-	t.Helper()
-	t.Cleanup(func() {
-		if err := lock.Close(); err != nil {
-			t.Errorf("release manager-home lock: %v", err)
 		}
 	})
 }
