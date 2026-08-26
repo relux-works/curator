@@ -338,6 +338,33 @@ func TestKnownHostsFallBackFromScopeToRunWideToOperator(t *testing.T) {
 	}
 }
 
+// Requesting the operator's live agent is one protocol condition regardless
+// of whether the request came from run-wide flags/env or a configured scope.
+func TestAgentUnsetDiagnosticIsIdenticalForRunWideAndScopedSelections(t *testing.T) {
+	rows := []plannedExternal{sshRow("portals", "build", "git.example.test/portals/app")}
+	selections := map[string]BuildSSHSelection{
+		"run-wide": {RunWide: BuildSSHFlags{Agent: BuildSSHAgentAuto}},
+		"scope": {
+			Scopes: map[string]config.BuildSSHCredential{
+				"git.example.test": {Scope: "git.example.test", Agent: true},
+			},
+		},
+	}
+	want := buildrepo.CodeSSHCredentialMissing +
+		": an SSH agent was requested but " + envAgentSocket + " is not set"
+	for name, selection := range selections {
+		t.Run(name, func(t *testing.T) {
+			_, _, err := resolveBuildSSH(selection, rows)
+			if err == nil {
+				t.Fatal("agent selection without a live socket was admitted")
+			}
+			if got := err.Error(); got != want {
+				t.Fatalf("diagnostic = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
 // "agent": true records the operator's choice of an agent, not a socket path:
 // a macOS agent socket is per login session and a persisted path goes stale.
 func TestConfiguredAgentResolvesToTheLiveSocket(t *testing.T) {
