@@ -30,6 +30,10 @@ const (
 	envAgentSocket = "SSH_AUTH_SOCK"
 )
 
+var errBuildSSHAgentUnset = fmt.Errorf(
+	"%s: an SSH agent was requested but %s is not set",
+	buildrepo.CodeSSHCredentialMissing, envAgentSocket)
+
 // BuildSSHFlags is one run-wide operator SSH selection as a command line
 // spells it. An empty field means the operator named nothing there.
 type BuildSSHFlags struct {
@@ -226,6 +230,9 @@ func (s BuildSSHSelection) matchScope(scopes map[string]config.BuildSSHCredentia
 	}
 	selected, err := s.scopeCredentials(scope)
 	if err != nil {
+		if errors.Is(err, errBuildSSHAgentUnset) {
+			return buildrepo.OperatorSSHCredentials{}, "", false, err
+		}
 		return buildrepo.OperatorSSHCredentials{}, "", false, fmt.Errorf(
 			"build_ssh scope %q selected for %s: %w", scope.Scope, row.effective.Identity, err)
 	}
@@ -276,9 +283,7 @@ func (s BuildSSHSelection) runWideCredentials() (buildrepo.OperatorSSHCredential
 	if s.RunWide.Agent == BuildSSHAgentAuto {
 		credentials.AgentSocket = s.AgentSocket
 		if credentials.AgentSocket == "" {
-			return buildrepo.OperatorSSHCredentials{}, fmt.Errorf(
-				"%s: an SSH agent was requested but %s is not set",
-				buildrepo.CodeSSHCredentialMissing, envAgentSocket)
+			return buildrepo.OperatorSSHCredentials{}, errBuildSSHAgentUnset
 		}
 	}
 	credentials.KnownHosts = s.knownHosts(credentials.KnownHosts)
@@ -312,8 +317,7 @@ func (s BuildSSHSelection) scopeCredentials(scope config.BuildSSHCredential) (bu
 			credentials.AgentSocket = s.AgentSocket
 		}
 		if credentials.AgentSocket == "" {
-			return buildrepo.OperatorSSHCredentials{}, fmt.Errorf(
-				"an SSH agent was requested but %s is not set", envAgentSocket)
+			return buildrepo.OperatorSSHCredentials{}, errBuildSSHAgentUnset
 		}
 	}
 	credentials.KnownHosts = s.knownHosts(credentials.KnownHosts)
