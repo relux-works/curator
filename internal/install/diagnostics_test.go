@@ -1,10 +1,16 @@
 package install
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/godriver"
 )
 
 func TestRedactDiagnosticReplacesEveryAbsoluteLocation(t *testing.T) {
@@ -156,5 +162,60 @@ func TestBuildFailuresAreRedactedInTheResult(t *testing.T) {
 	if utf8.RuneCountInString(bounded.Errors[0]) != maxDiagnosticRunes {
 		t.Fatalf("build failure is %d runes, want exactly %d",
 			utf8.RuneCountInString(bounded.Errors[0]), maxDiagnosticRunes)
+	}
+}
+
+// TestGoToolchainRemedyReachesTheOperatorIntact proves the half of the
+// version-manager remedy this package owns: the go-v1 boundary renders it
+// behind the protocol detail of a toolchain_executable_mismatch, and the
+// failure surface an operator reads goes through RedactDiagnostic, whose job is
+// to remove locations. The remedy names a shell assignment rather than a
+// location, so it must survive that rendering verbatim — a remedy that reaches
+// the operator as `<path>` or as a truncated fragment is not a remedy.
+//
+// The diagnostic is taken from the driver rather than written out here, so the
+// case fails if either side of the boundary changes without the other.
+func TestGoToolchainRemedyReachesTheOperatorIntact(t *testing.T) {
+	t.Parallel()
+	const remedy = `; put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
+
+	launcher := "go"
+	if runtime.GOOS == "windows" {
+		launcher = "go.exe"
+	}
+	// The shape of a version-manager selection: the launcher named by the
+	// trusted selection variable resolves to a real launcher under a different
+	// root, so the boundary refuses it and says what to do about it.
+	wrapperRoot, realRoot := t.TempDir(), t.TempDir()
+	for _, dir := range []string{wrapperRoot, realRoot} {
+		if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(realRoot, "bin", launcher), []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(realRoot, "bin", launcher), filepath.Join(wrapperRoot, "bin", launcher)); err != nil {
+		t.Skipf("this host cannot create the symbolic link the case needs: %v", err)
+	}
+
+	_, err := godriver.Probe(context.Background(), godriver.Config{
+		PrivateBase: t.TempDir(),
+		CuratorGo:   filepath.Join(wrapperRoot, "bin", launcher),
+	})
+	if code := godriver.DiagnosticCode(err); code != "toolchain_executable_mismatch" {
+		t.Fatalf("error = %v, code = %q, want %q", err, code, "toolchain_executable_mismatch")
+	}
+	if !strings.Contains(err.Error(), remedy) {
+		t.Fatalf("driver diagnostic carries no operator remedy: %q", err)
+	}
+
+	var result Result
+	result.failBuild(err)
+	if len(result.Errors) != 1 {
+		t.Fatalf("result = %+v", result)
+	}
+	if !strings.Contains(result.Errors[0], remedy) {
+		t.Fatalf("rendered failure lost the operator remedy: %q", result.Errors[0])
 	}
 }
