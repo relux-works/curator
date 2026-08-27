@@ -15,6 +15,8 @@ key happened to be loaded in the operator agent is a fetch nobody authorized.
 An SSH build repository the operator has not covered stops the run with
 `build_repository_ssh_credential_missing` before the first fetch.
 
+For external build repositories fetched over HTTPS, see [docs/build-https.md](build-https.md).
+
 Contents:
 
 - [What needs a selection](#what-needs-a-selection)

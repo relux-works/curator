@@ -3,6 +3,16 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-08-27
+
+### 05:45 — `TASK-260827-2232c0`: readme-restructure and docs compilation
+
+- SCOPE: `README.md`, `docs/compiled-commands.md` (new), `docs/implementation-plan.md` header.
+- RESTRUCTURING: `README.md` reduced from 409 lines to 116 lines (under the 220-line requirement). Sections "Compiled-command status, diagnostics, and repair" and "Maintenance and the build-cache grace period" moved out wholesale to `docs/compiled-commands.md` with every fact and command preserved. One-paragraph summaries and markdown links added to `README.md` at their former locations.
+- INSTALLATION BLOCKS: Platform installation options structured into `<details>` collapsible blocks with Homebrew open by default (`<details open>`). Verification command `gh attestation verify` included.
+- HISTORICAL HEADER: Added two-line historical header to `docs/implementation-plan.md`.
+- VERIFICATION & PROSE STYLE: Verified subcommands against `go run ./cmd/curator ... --help`. Applied CocoaSkills prose style guide: active voice, no em-dashes or en-dashes, code-style literals for flags and identifiers, colon introductions before code blocks, zero marketing register.
+
 ## 2026-08-23
 
 ### 0216 — `TASK-260822-4p3dcq`: the build_ssh docs surface, and the scope-grammar finding that does not reproduce as filed
@@ -3038,3 +3048,10 @@ PR #22 merged as 1f55f1b4e: six signed commits assembled from the accepted patch
 - SPEC EVIDENCE: local validate and rc.9 release-check passed; both vector families regenerated twice byte-identically. Specification CI run `32633567102` passed on the exact candidate SHA across Linux, macOS, and Windows.
 - STOP-THE-LINE: Curator candidate-conformance run `32633572039` is red. Ubuntu records the exact candidate identity then exposes the unlanded multi-project dry-run binding defect (fix remains on open PR #14); Windows exposes a `shasum` path-escaping portability defect in candidate identity normalization. Neither gate nor digest was weakened to manufacture green evidence. Downstream implementation qualification and the later atomic landing remain required; `SPEC_PIN` is unchanged.
 - EVIDENCE: board outcome `TASK-260822-c0rxj7_results.md` plus task-scoped identity, regeneration inventories, and CI logs under `.temp/TASK-260822-c0rxj7/`.
+
+
+### 0052 — TASK-260827-2gmk4c: English prose style guide created for Curator
+
+- DELIVERABLE: created `docs/prose-style.md` porting English prose rules and generated-text blacklist from CocoaSkills precondition resource, adapted to Curator (`curator install`, `Skillfile.json`, `.agents/skills/`, `.agents/bin/`, compiled commands, `curator repair`). Russian engineering prose section dropped. Total 106 lines (under 200-line ceiling).
+- GATES: `make gate-selftest` passed at 0 (75 passed, 0 failed); `make no-broad-suppression` passed at 0.
+- EVIDENCE: outcome resource `TASK-260827-2gmk4c_results.md` attached to board task `TASK-260827-2gmk4c`.

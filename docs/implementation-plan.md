@@ -1,3 +1,6 @@
+> Historical document: plan of record for v0.1 against protocol 1.0.0-rc.2.
+> The task board is the live plan.
+
 # Curator implementation plan
 
 This is the working plan for building Curator, an agent environment manager (AEM) in Go. Iterations consult this document and the task board; the plan is updated as decisions land. Protocol sections are cited as `Spec §N.M` against the 1.0.0-rc.2 [Curator Specification](https://github.com/relux-works/curator-spec).
