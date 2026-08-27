@@ -24,6 +24,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // TestMain gives the test binary the same fixed hidden worker mode the
@@ -97,6 +98,7 @@ func decodeStatus(t *testing.T, payload string) statusPayload {
 // declares it. It returns the project root and the manager home.
 func compiledProject(t *testing.T) (string, string) {
 	t.Helper()
+	testtoolchain.LockHostGOROOT(t)
 	return compiledProjectDeclaring(t, `{"name":"build-skill","tag":"v1"}`)
 }
 

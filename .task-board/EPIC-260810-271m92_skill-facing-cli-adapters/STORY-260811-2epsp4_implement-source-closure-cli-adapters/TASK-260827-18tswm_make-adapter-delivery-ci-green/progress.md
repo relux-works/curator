@@ -78,6 +78,13 @@ RUN-260827-8ea88a stop-the-line: two macOS reproductions falsify the prior trans
 agent completed: [implementer] developer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260827-8ea88a, pid=89597, exit=0)
 No Change Request revision was published for TASK-260827-18tswm (handoff_unsatisfied): the board is not at to-review
+spawn agent resolution: Agent selection: codex via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260827-34685e, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260827-34685e)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260827-34685e, pid=15143, exit=0)
+No Change Request revision was published for TASK-260827-18tswm (handoff_unsatisfied): the board is not at to-review
 
 ## Precondition Resources
 (none)
@@ -95,12 +102,14 @@ No Change Request revision was published for TASK-260827-18tswm (handoff_unsatis
 - [TASK-260827-18tswm_change-request_rev1.patch](file://TASK-260827-18tswm/TASK-260827-18tswm_change-request_rev1.patch) — Change Request CR-TASK-260827-18tswm-1 revision 1 candidate patch (repository_delta=present, 17 changed paths)
 - [TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-8ea88a.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-8ea88a.log) — System spawn log captured by task-board
 - [TASK-260827-18tswm_diagnostic-outcome_RUN-260827-8ea88a.md](file://TASK-260827-18tswm/TASK-260827-18tswm_diagnostic-outcome_RUN-260827-8ea88a.md) — Diagnostic patch, proven failure boundary, local validation, and exact remote rerun blocker
+- [TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-34685e.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-34685e.log) — System spawn log captured by task-board
+- [TASK-260827-18tswm_host-goroot-isolation_RUN-260827-34685e.md](file://TASK-260827-18tswm/TASK-260827-18tswm_host-goroot-isolation_RUN-260827-34685e.md) — Proven macOS host-GOROOT collision, scoped isolation fix, validation, and remote-CI lifecycle blocker
 
 ## Created
 2026-08-27T02:58:38Z
 
 ## Last Update
-2026-08-27T04:49:30Z
+2026-08-27T05:31:54Z
 
 ## Assigned To
 [implementer] developer (codex)

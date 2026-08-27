@@ -24,6 +24,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // authoritativeDryRunCase is the published no-mutation contract. Only the field
@@ -260,6 +261,7 @@ func (baseline *dryRunBaseline) declareEvery(t *testing.T, root string, extra ..
 // parallel ancestor. Nothing about the assertions depends on it: the cases run
 // in sequence and each still arms, plans, and measures its own machine.
 func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
+	testtoolchain.LockHostGOROOT(t)
 	document := authoritativeLifecycle(t)
 	for _, published := range document.DryRunCases {
 		published := published

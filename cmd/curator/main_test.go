@@ -28,6 +28,7 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/rustsource"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 func writeAssuranceCLIConfig(t *testing.T, mode string) string {
@@ -759,6 +760,7 @@ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
 
 func TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery(t *testing.T) {
 	t.Parallel()
+	testtoolchain.LockHostGOROOT(t)
 	binary := filepath.Join(t.TempDir(), "curator")
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
