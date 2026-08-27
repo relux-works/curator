@@ -1,5 +1,5 @@
 ## Status
-to-dev
+done
 
 ## Review
 required
@@ -61,7 +61,7 @@ spawn run completed: codex (run=RUN-260826-7c7100, pid=593, exit=0)
 2026-08-26T20:46:30Z
 
 ## Last Update
-2026-08-26T22:55:10Z
+2026-08-26T22:55:34Z
 
 ## Assigned To
 [reviewer] reviewer (codex)
