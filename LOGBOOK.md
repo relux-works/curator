@@ -3038,3 +3038,17 @@ PR #22 merged as 1f55f1b4e: six signed commits assembled from the accepted patch
 - SPEC EVIDENCE: local validate and rc.9 release-check passed; both vector families regenerated twice byte-identically. Specification CI run `32633567102` passed on the exact candidate SHA across Linux, macOS, and Windows.
 - STOP-THE-LINE: Curator candidate-conformance run `32633572039` is red. Ubuntu records the exact candidate identity then exposes the unlanded multi-project dry-run binding defect (fix remains on open PR #14); Windows exposes a `shasum` path-escaping portability defect in candidate identity normalization. Neither gate nor digest was weakened to manufacture green evidence. Downstream implementation qualification and the later atomic landing remain required; `SPEC_PIN` is unchanged.
 - EVIDENCE: board outcome `TASK-260822-c0rxj7_results.md` plus task-scoped identity, regeneration inventories, and CI logs under `.temp/TASK-260822-c0rxj7/`.
+
+### 0057 — TASK-260825-2fy132: HTTPS credential operator documentation
+
+- DOCUMENTATION BOUNDARY: HTTPS selection is resolved for the whole planned closure before its first repository fetch, but an uncovered HTTPS repository remains anonymous. The delivered surface has no install-time HTTPS credential discovery or interactive candidate prompt; only explicitly configured sources and the `login` command can select a token. The operator page states this boundary instead of borrowing the SSH prompt behaviour.
+- SECURITY: `CURATOR_BUILD_HTTPS_TOKEN` without `CURATOR_BUILD_HTTPS_HOST` is identity-unbound and can reach every HTTPS build-repository host in the run. The same plain-language warning is present in the operator page and the CHANGELOG entry, with `Spec core §12.2` cited.
+- EVIDENCE: delivery-checkout `go run ./cmd/curator config build-https --help`, `add`, and replacement transcripts all exited 0; primary-checkout `make lint` exited 0. The isolated docs worktree lacks the untracked `agents/skills/skill-go-testing-tools/tuitestkit` Go replacement, so its `make lint` exited 2 before linting the changed documentation.
+- CORRECTION TO THE DOCUMENTATION BOUNDARY: the previous boundary incorrectly
+  denied the shipped terminal candidate prompt. Before the first fetch,
+  an operator-terminal run offers every uncovered HTTPS repository the
+  presence-only detected Git host credential (when available) or entry of a
+  token now. The operator explicitly selects a candidate and then either
+  persists its scope or uses it for this run only; abort stops the run. Only
+  headless, non-terminal, and dry-run runs leave an uncovered repository
+  anonymous. The operator page now states the shipped behaviour.

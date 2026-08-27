@@ -4,6 +4,15 @@ All notable implementation changes are recorded here.
 
 ## Unreleased
 
+### Added
+
+- Operator documentation for scoped HTTPS build-repository token sources,
+  credential resolution, and the `curator config build-https` command.
+  `CURATOR_BUILD_HTTPS_TOKEN` without `CURATOR_BUILD_HTTPS_HOST` is
+  identity-unbound and may be offered to every HTTPS build-repository
+  host reached by the run; bind it to one host or use a `build_https` scope
+  (`Spec core §12.2`).
+
 ## 0.12.5 - 2026-07-14
 
 ### Added
