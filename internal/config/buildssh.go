@@ -151,8 +151,20 @@ func (c *Config) BuildSSHFor(canonical string) (BuildSSHCredential, bool) {
 // the operator's scopes without the whole config: the run-wide selection of an
 // install already has to travel that way.
 func MatchBuildSSH(scopes map[string]BuildSSHCredential, canonical string) (BuildSSHCredential, bool) {
-	if !identity.ValidCanonical(canonical) {
+	scope, ok := longestScope(scopes, canonical)
+	if !ok {
 		return BuildSSHCredential{}, false
+	}
+	return scopes[scope], true
+}
+
+// longestScope returns the key of scopes selected by the longest segment-aware
+// prefix match against a canonical repository identity (Spec §6.3), shared by
+// every credential surface keyed on a build_ssh-grammar scope so the matching
+// rule lives in exactly one place.
+func longestScope[T any](scopes map[string]T, canonical string) (string, bool) {
+	if !identity.ValidCanonical(canonical) {
+		return "", false
 	}
 	best := ""
 	for scope := range scopes {
@@ -161,9 +173,9 @@ func MatchBuildSSH(scopes map[string]BuildSSHCredential, canonical string) (Buil
 		}
 	}
 	if best == "" {
-		return BuildSSHCredential{}, false
+		return "", false
 	}
-	return scopes[best], true
+	return best, true
 }
 
 // BuildSSHScopes returns the configured scopes in sorted order.

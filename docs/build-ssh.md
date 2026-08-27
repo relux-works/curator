@@ -346,7 +346,7 @@ build_repository_ssh_credential_missing: git.example.test/portals/app needs SSH 
   4) identity ~/.ssh/work.pub
   m) enter an identity path
   q) abort
-credential [1-4, m, q] (default 1): scope [git.example.test/portals] (q to abort): recorded build_ssh scope git.example.test/portals
+credential [1-4, m, q] (default 1): scope [git.example.test/portals] (r for this run only, q to abort): recorded build_ssh scope git.example.test/portals
 ```
 
 - Entry 1 is the default and is the pinned-agent shape, the only one that both
@@ -363,14 +363,18 @@ credential [1-4, m, q] (default 1): scope [git.example.test/portals] (q to abort
   hand. In the transcript above there were two uncovered repositories under
   `git.example.test/portals`; the scope chosen for the first covered the second,
   which is why only one question pair appears.
+- `r` uses the selected credential for this run only. It returns the same
+  repository-namespace scope to the current precheck but never calls the
+  configuration writer.
 - Nothing is persisted before both questions are answered. The operator
   authorizes a scope, not just a key.
 - `q` at either question, and end of input, abort with
   `build_repository_ssh_credential_missing`. An abort is a refusal to
   authenticate, not a licence to fall back on ambient SSH state.
 
-A recorded answer is written through the same writer `curator config build-ssh
+A saved answer is written through the same writer `curator config build-ssh
 add` uses, so it lands in the machine configuration in exactly the same shape.
+A this-run-only answer never reaches that writer.
 
 ### Without a terminal, and on a dry run
 
@@ -485,9 +489,9 @@ rejects, for example `git.example.com/team+infra/app`, because the HTTPS path
 keeps the wider Unicode grammar of `Spec §6.3`. That never reaches the scope
 suggestion: HTTPS repositories need no SSH selection.
 
-**A prompted credential is not folded back into the in-memory configuration.**
-The prompt writes to the configuration file, but the loaded configuration a run
-holds is not updated. `curator install --all` captures the selection once and
+**A saved prompted credential is not folded back into the in-memory configuration.**
+The saved path writes to the configuration file, but the loaded configuration a
+run holds is not updated; the this-run-only path writes nothing. `curator install --all` captures the selection once and
 loops over targets, so a repository covered by an answer given for target 1 is
 asked about again for target 2. Answering twice is harmless, since the same
 scope is simply replaced, but the "one scope covers every sibling" property

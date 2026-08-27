@@ -40,7 +40,7 @@ gh attestation verify <artifact> --owner relux-works
 - **Scopes**: project, global, and hybrid (machine-stored, per-project activation).
 - **MCP requirements**: read-only verification of declared MCP servers against agent configuration surfaces.
 - **Security**: source allowlists, declared capabilities, no code execution at install time, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
-- **Operator credentials**: per-repository SSH selection for external build repositories, matched by canonical source identity and never selectable by a package. See [docs/build-ssh.md](docs/build-ssh.md).
+- **Operator credentials**: per-repository SSH selection and scoped HTTPS token selection for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS remains anonymous. See [docs/build-ssh.md](docs/build-ssh.md).
 
 ## Registry client guarantees
 

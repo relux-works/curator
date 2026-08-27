@@ -61,14 +61,21 @@ func InteractiveBuildSSHResolver(in io.Reader, out io.Writer, persist func(confi
 				// question.
 				continue
 			}
-			credential, err := promptBuildSSHCredential(reader, out, request, candidates)
+			credential, save, err := promptBuildSSHCredential(reader, out, request, candidates)
 			if err != nil {
 				return nil, err
 			}
-			if err := persist(credential); err != nil {
-				return nil, err
+			if save {
+				if persist == nil {
+					return nil, fmt.Errorf("build_ssh persistence is unavailable")
+				}
+				if err := persist(credential); err != nil {
+					return nil, err
+				}
+				say(out, "recorded build_ssh scope %s\n", credential.Scope)
+			} else {
+				say(out, "using SSH credential for this run only\n")
 			}
-			say(out, "recorded build_ssh scope %s\n", credential.Scope)
 			added[credential.Scope] = credential
 		}
 		return added, nil
@@ -84,24 +91,24 @@ func say(out io.Writer, format string, args ...any) {
 
 // promptBuildSSHCredential runs the two questions one repository needs
 // answered: what to authenticate with, and how widely that answer applies.
-func promptBuildSSHCredential(reader *bufio.Reader, out io.Writer, request BuildSSHRequest, candidates BuildSSHCandidates) (config.BuildSSHCredential, error) {
+func promptBuildSSHCredential(reader *bufio.Reader, out io.Writer, request BuildSSHRequest, candidates BuildSSHCandidates) (config.BuildSSHCredential, bool, error) {
 	say(out, "\n%s: %s needs SSH credentials (command %q of skill %q)\n",
 		buildrepo.CodeSSHCredentialMissing, request.Identity, request.Command, request.Skill)
 	options := buildSSHOptions(candidates)
 	writeBuildSSHMenu(out, options, candidates)
 	credential, err := readBuildSSHChoice(reader, out, options)
 	if err != nil {
-		return config.BuildSSHCredential{}, err
+		return config.BuildSSHCredential{}, false, err
 	}
-	scope, err := readBuildSSHScope(reader, out, request.DefaultScope)
+	scope, save, err := readCredentialScope(reader, out, request.DefaultScope, request.Identity)
 	if err != nil {
-		return config.BuildSSHCredential{}, err
+		return config.BuildSSHCredential{}, false, err
 	}
 	credential.Scope = scope
 	if err := config.ValidateBuildSSH(credential); err != nil {
-		return config.BuildSSHCredential{}, err
+		return config.BuildSSHCredential{}, false, err
 	}
-	return credential, nil
+	return credential, save, nil
 }
 
 // buildSSHOption is one menu entry: a label the operator reads and the
@@ -210,27 +217,42 @@ func readBuildSSHManualIdentity(reader *bufio.Reader, out io.Writer) (config.Bui
 	}
 }
 
-// readBuildSSHScope reads how widely the chosen credential applies. Nothing is
-// persisted before this question is answered: the operator authorizes a scope,
-// not just a key.
-func readBuildSSHScope(reader *bufio.Reader, out io.Writer, fallback string) (string, error) {
+// runOnlyToken selects a credential for this process without writing config.
+const runOnlyToken = "r"
+
+// readCredentialScope reads how widely a chosen credential applies and
+// whether that selection is saved. The empty answer is the narrowest useful
+// persistent scope. A run-only answer returns that same scope for in-memory
+// matching but never authorizes the persistence callback.
+func readCredentialScope(reader *bufio.Reader, out io.Writer, fallback, identity string) (string, bool, error) {
 	for {
 		answer, err := ask(reader, out,
-			fmt.Sprintf("scope [%s] (%s to abort)", fallback, abortToken))
+			fmt.Sprintf("scope [%s] (%s for this run only, %s to abort)", fallback, runOnlyToken, abortToken))
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		if answer == abortToken {
-			return "", ErrBuildSSHAborted
+			return "", false, ErrBuildSSHAborted
+		}
+		if answer == runOnlyToken {
+			return fallback, false, nil
 		}
 		if answer == "" {
 			answer = fallback
 		}
-		if config.ValidBuildSSHScope(answer) {
-			return answer, nil
+		if !config.ValidBuildSSHScope(answer) {
+			say(out, "curator: scope %s\n", config.BuildSSHScopeRule)
+			continue
 		}
-		say(out, "curator: scope %s\n", config.BuildSSHScopeRule)
+		if credentialScopeCovers(answer, identity) {
+			return answer, true, nil
+		}
+		say(out, "curator: scope must cover %s\n", identity)
 	}
+}
+
+func credentialScopeCovers(scope, identity string) bool {
+	return identity == scope || strings.HasPrefix(identity, scope+"/")
 }
 
 // ask writes one prompt and reads one trimmed answer. End of input is an

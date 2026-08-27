@@ -95,6 +95,9 @@ type GitTool struct {
 	AllowedVersions []string
 	AskPass         string
 	SSHWrapper      string
+	// HTTPSCredentials is resolved for exactly one fetch. Its secret is only
+	// copied into that fetch process tree.
+	HTTPSCredentials HTTPSCredentials
 	// SSHCredentials is the operator selection for the one repository this
 	// tool is about to reach. It is bound per repository rather than per run
 	// so a closure that spans two hosts cannot offer either host the other's
@@ -321,8 +324,26 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
 		}
 	}
 	refspec := sourceRef + ":" + destination
-	fetchArgs := strictFetchArgs(paths.repo, paths.hooks, request.Tool.AskPass, request.Source.Transport, request.Source.Git, refspec)
-	if err := runGit(ctx, request.Tool.Executable, paths.work, env, fetchArgs...); err != nil {
+	askPass := request.Tool.AskPass
+	fetchEnv := env
+	if request.Source.Transport == "https" && request.Tool.HTTPSCredentials.Selected() {
+		host := strings.SplitN(request.Source.Identity, "/", 2)[0]
+		if request.Tool.HTTPSCredentials.Host != host {
+			return nil, admissionError(CodeIdentityInvalid, "HTTPS credential host does not match protected source")
+		}
+		var state string
+		askPass, state, err = materializeHTTPSCredentialBroker(root, request.Tool.AskPass, request.Tool.HTTPSCredentials)
+		if err != nil {
+			return nil, admissionError(CodeSourceUnavailable, "cannot materialize HTTPS credential broker")
+		}
+		fetchEnv = append([]string{}, env...)
+		fetchEnv = setEnvironmentValue(fetchEnv, "GIT_ASKPASS", askPass)
+		fetchEnv = append(fetchEnv,
+			EnvHTTPSBrokerState+"="+state,
+			EnvHTTPSBrokerSecret+"="+request.Tool.HTTPSCredentials.secret)
+	}
+	fetchArgs := strictFetchArgs(paths.repo, paths.hooks, askPass, request.Source.Transport, request.Source.Git, refspec)
+	if err := runGit(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...); err != nil {
 		return nil, admissionError(CodeSourceUnavailable, "exact source fetch failed")
 	}
 	if err := validatePrivateRepository(paths.repo, request.Lock.ObjectFormat); err != nil {
@@ -387,6 +408,17 @@ func cleanDiscoveryEnvironment() []string {
 		}
 	}
 	return env
+}
+
+func setEnvironmentValue(environment []string, name, value string) []string {
+	prefix := name + "="
+	for index := range environment {
+		if strings.HasPrefix(environment[index], prefix) {
+			environment[index] = prefix + value
+			return environment
+		}
+	}
+	return append(environment, prefix+value)
 }
 
 func cleanGitEnvironment(p privatePaths, tool GitTool, transport string) []string {

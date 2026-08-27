@@ -35,6 +35,8 @@ type ExternalDeps struct {
 	// explicit flags/env values and the configured build_ssh scopes they take
 	// precedence over.
 	BuildSSH BuildSSHSelection
+	// BuildHTTPS is the operator's captured HTTPS selection for this run.
+	BuildHTTPS BuildHTTPSSelection
 }
 
 // ExternalSource is the exact declared/effective source passed to an injected
@@ -64,6 +66,9 @@ type externalPlan struct {
 	// credentials holds the operator SSH selection of every repository that
 	// is actually fetched over SSH. A repository absent from it needs none.
 	credentials map[buildSSHKey]buildrepo.OperatorSSHCredentials
+	// httpsCredentials carries resolved per-repository material for the
+	// manager credential broker. The fetch wiring consumes it in a later layer.
+	httpsCredentials map[buildHTTPSKey]BuildHTTPSCredentials
 	// messages report where each selection came from. Populated on a dry run,
 	// where the provenance is the whole point of the report.
 	messages []string
@@ -72,6 +77,10 @@ type externalPlan struct {
 // credentialsFor returns the operator SSH selection of one planned repository.
 func (p externalPlan) credentialsFor(row plannedExternal) buildrepo.OperatorSSHCredentials {
 	return p.credentials[buildSSHKey{skill: row.node.Name, command: row.command.Name}]
+}
+
+func (p externalPlan) httpsCredentialsFor(row plannedExternal) BuildHTTPSCredentials {
+	return p.httpsCredentials[buildHTTPSKeyFor(row)]
 }
 
 type stagedExternal struct {
@@ -128,12 +137,17 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
 		return plan, err
 	}
 	plan.credentials = credentials
+	httpsCredentials, httpsProvenance, err := resolveBuildHTTPS(ctx, plan.deps.BuildHTTPS, plan.rows)
+	if err != nil {
+		return plan, err
+	}
+	plan.httpsCredentials = httpsCredentials
 	if dryRun {
-		plan.messages = provenance
+		plan.messages = append(provenance, httpsProvenance...)
 	}
 	for index, row := range plan.rows {
 		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
-		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain}, buildrepo.OperationDryRun)
+		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain}, buildrepo.OperationDryRun)
 		if err != nil {
 			return plan, err
 		}
@@ -182,7 +196,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 		}
 		// A verified final hit is copied into operation-private staging so the
 		// transaction and shim path are identical for hits and misses.
-		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall)
+		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall)
 		if err != nil {
 			return stagedExternal{}, err
 		}
@@ -237,15 +251,14 @@ func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
 	return plan
 }
 
-func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, command skillspec.Command, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation) (buildrepo.PipelineRequest, error) {
+func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials, command skillspec.Command, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation) (buildrepo.PipelineRequest, error) {
 	if deps.Audit == nil && deps.AuditWarnings == nil {
 		return buildrepo.PipelineRequest{}, fmt.Errorf("build_repository_audit_blocked: independent external repository audit is not configured")
 	}
 	// The tool is bound per repository so each fetch offers exactly the
 	// credentials selected for the identity it is about to reach, and nothing
 	// selected for a different host in the same closure.
-	tool := deps.GitTool
-	tool.SSHCredentials = credentials
+	tool := externalGitTool(deps.GitTool, source, credentials, httpsCredentials)
 	acquire := deps.Acquire
 	if acquire == nil {
 		acquire = func(ctx context.Context, selected ExternalSource) (*buildrepo.Snapshot, error) {
@@ -267,6 +280,15 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentia
 		}
 	}
 	return buildrepo.PipelineRequest{Operation: operation, Command: command.Name, Target: command.Target, Declared: source.Declared, Effective: source.Effective, Acquire: func(ctx context.Context) (*buildrepo.Snapshot, error) { return acquire(ctx, source) }, Audit: deps.Audit, AuditWarnings: deps.AuditWarnings, Store: store, Go: goSession, SigningPolicy: deps.SigningPolicy}, nil
+}
+
+func externalGitTool(tool buildrepo.GitTool, source ExternalSource, sshCredentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials) buildrepo.GitTool {
+	tool.SSHCredentials = sshCredentials
+	if httpsCredentials.Selected() {
+		tool.HTTPSCredentials = buildrepo.NewHTTPSCredentials(
+			buildHTTPSHost(source.Effective.Identity), httpsCredentials.Username, httpsCredentials.Secret())
+	}
+	return tool
 }
 
 type identityOnlyExternalGo struct{ identity buildrepo.ToolchainIdentity }

@@ -647,6 +647,11 @@ func fakeHTTPGitTool(t *testing.T, repository string) (GitTool, string) {
 	logPath := filepath.Join(root, "argv.log")
 	script := fmt.Sprintf(`#!/bin/sh
 {
+	secret_present=0
+	state_present=0
+	[ -n "${%s-}" ] && secret_present=1
+	[ -n "${%s-}" ] && state_present=1
+	printf ' secret=%%s state=%%s askpass=%%s' "$secret_present" "$state_present" "${GIT_ASKPASS-}"
   for arg in "$@"; do printf ' %%s' "$arg"; done
   printf '\n'
 } >> %s
@@ -666,7 +671,7 @@ IFS='
 set -- $args
 IFS=$oldifs
 exec %s "$@"
-`, shellQuote(logPath), shellQuote("file://"+repository), shellQuote(realTool.Executable))
+`, EnvHTTPSBrokerSecret, EnvHTTPSBrokerState, shellQuote(logPath), shellQuote("file://"+repository), shellQuote(realTool.Executable))
 	if err := os.WriteFile(wrapper, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
