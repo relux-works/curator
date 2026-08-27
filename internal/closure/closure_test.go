@@ -6,11 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/skillspec"
 )
 
 // harness builds skill repositories under a skills root and a machine home.
@@ -76,6 +78,73 @@ func (h *harness) skill(name string, commands []string, requirements map[string]
 		h.t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "csk-skill.json"), payload, 0o644); err != nil {
+		h.t.Fatal(err)
+	}
+	h.git(dir, "add", ".")
+	h.git(dir, "commit", "-qm", "init")
+	h.git(dir, "tag", "v1")
+	return dir
+}
+
+func (h *harness) skillV6(name string, commands map[string]map[string]any, requirements map[string]map[string]any) string {
+	h.t.Helper()
+	dir := filepath.Join(h.skillsRoot, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		h.t.Fatal(err)
+	}
+	h.git(dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# "+name), 0o644); err != nil {
+		h.t.Fatal(err)
+	}
+	hasScripts := false
+	hasBuilds := false
+	for _, command := range commands {
+		switch command["type"] {
+		case "script":
+			hasScripts = true
+			for _, field := range []string{"unix_path", "win_path"} {
+				relative, _ := command[field].(string)
+				if relative == "" {
+					continue
+				}
+				path := filepath.Join(dir, filepath.FromSlash(relative))
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					h.t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o755); err != nil {
+					h.t.Fatal(err)
+				}
+			}
+		case "build":
+			hasBuilds = true
+			sourceDir, _ := command["source_dir"].(string)
+			path := filepath.Join(dir, filepath.FromSlash(sourceDir), "main.go")
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				h.t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte("package main\nfunc main() {}\n"), 0o644); err != nil {
+				h.t.Fatal(err)
+			}
+		}
+	}
+	spec := map[string]any{"schema_version": 6, "capabilities": map[string]any{}, "commands": commands}
+	if hasScripts {
+		spec["runtime_roots"] = []string{"scripts"}
+	}
+	if hasBuilds {
+		spec["build_roots"] = []string{"build"}
+		if err := os.WriteFile(filepath.Join(dir, "build", "go.mod"), []byte("module example.com/"+name+"\n"), 0o644); err != nil {
+			h.t.Fatal(err)
+		}
+	}
+	if requirements != nil {
+		spec["dependencies"] = map[string]any{"skills": requirements}
+	}
+	payload, err := json.MarshalIndent(spec, "", "  ")
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), payload, 0o644); err != nil {
 		h.t.Fatal(err)
 	}
 	h.git(dir, "add", ".")
@@ -257,6 +326,59 @@ func TestActivationModesAndNarrowing(t *testing.T) {
 	}
 }
 
+func TestBuildCommandsActivateLikeScriptsButSystemCommandsDoNot(t *testing.T) {
+	h := newHarness(t)
+	h.skillV6("provider", map[string]map[string]any{
+		"build-tool":  {"type": "build", "driver": "go-v1", "source_dir": "build/cmd/tool"},
+		"script-tool": {"type": "script", "unix_path": "scripts/tool"},
+		"system-tool": {"type": "system", "command": "sh"},
+	}, nil)
+	h.skillV6("consumer", map[string]map[string]any{}, map[string]map[string]any{
+		"provider": requirement("provider", "runtime", "build-tool"),
+	})
+
+	nodes, err := h.build([]manifest.Decl{decl("consumer")}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var provider *Node
+	for _, node := range nodes {
+		if node.Name == "provider" {
+			provider = node
+		}
+	}
+	if provider == nil {
+		t.Fatal("provider missing from closure")
+	}
+	if got, want := provider.ActiveCommandNames(), []string{"build-tool"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("narrowed active commands = %v, want %v", got, want)
+	}
+
+	nodes, err = h.build([]manifest.Decl{decl("provider")}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := nodes[0].ActiveCommandNames(), []string{"build-tool", "script-tool"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("full active commands = %v, want %v", got, want)
+	}
+}
+
+func TestBuildCommandNamesUseBytewiseLexicalOrder(t *testing.T) {
+	node := &Node{
+		Spec: &skillspec.Spec{Commands: map[string]skillspec.Command{
+			"é-tool":     {Name: "é-tool", Type: "build"},
+			"zeta-tool":  {Name: "zeta-tool", Type: "build"},
+			"alpha-tool": {Name: "alpha-tool", Type: "build"},
+			"system":     {Name: "system", Type: "system"},
+		}},
+		Edges: []Edge{{Consumer: ProjectEdge, Mode: "full"}},
+	}
+	want := []string{"alpha-tool", "zeta-tool", "é-tool"}
+	if got := node.ActiveCommandNames(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("active command order = %v, want %v", got, want)
+	}
+}
+
 func TestNarrowingUnknownCommandFails(t *testing.T) {
 	h := newHarness(t)
 	h.skill("provider", []string{"alpha"}, nil)
@@ -264,7 +386,21 @@ func TestNarrowingUnknownCommandFails(t *testing.T) {
 		"provider": requirement("provider", "runtime", "missing"),
 	})
 	_, err := h.build([]manifest.Decl{decl("consumer")}, nil)
-	if err == nil || !strings.Contains(err.Error(), "does not export a script command") {
+	if err == nil || !strings.Contains(err.Error(), "does not export a script or build command") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestNarrowingSystemCommandFails(t *testing.T) {
+	h := newHarness(t)
+	h.skillV6("provider", map[string]map[string]any{
+		"system-tool": {"type": "system", "command": "sh"},
+	}, nil)
+	h.skillV6("consumer", map[string]map[string]any{}, map[string]map[string]any{
+		"provider": requirement("provider", "runtime", "system-tool"),
+	})
+	_, err := h.build([]manifest.Decl{decl("consumer")}, nil)
+	if err == nil || !strings.Contains(err.Error(), "does not export a script or build command") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -279,6 +415,33 @@ func TestCommandCollisions(t *testing.T) {
 	}
 	if err := DetectActiveCommandCollisions(nodes); err == nil || !strings.Contains(err.Error(), `command collision for "tool"`) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestBuildCommandCollisions(t *testing.T) {
+	tests := []struct {
+		name      string
+		leftType  string
+		rightType string
+	}{
+		{name: "build versus build", leftType: "build", rightType: "build"},
+		{name: "build versus script", leftType: "build", rightType: "script"},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			nodes := []*Node{
+				{Name: "one", Spec: &skillspec.Spec{Commands: map[string]skillspec.Command{
+					"tool": {Name: "tool", Type: testCase.leftType},
+				}}, Edges: []Edge{{Consumer: ProjectEdge, Mode: "full"}}},
+				{Name: "two", Spec: &skillspec.Spec{Commands: map[string]skillspec.Command{
+					"tool": {Name: "tool", Type: testCase.rightType},
+				}}, Edges: []Edge{{Consumer: ProjectEdge, Mode: "full"}}},
+			}
+			if err := DetectActiveCommandCollisions(nodes); err == nil ||
+				!strings.Contains(err.Error(), `command collision for "tool": exported by one and two`) {
+				t.Fatalf("err = %v", err)
+			}
+		})
 	}
 }
 

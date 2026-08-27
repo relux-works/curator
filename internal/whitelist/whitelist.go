@@ -2,7 +2,8 @@
 // (Spec §4.2).
 //
 // Only whitelisted roots are copied; developer-facing files are excluded at
-// any depth; runtime roots stay out of context even under whitelisted roots.
+// any depth; runtime and build roots stay out of context even under
+// whitelisted roots.
 // Staging is atomic: the destination directory is replaced only on success.
 package whitelist
 
@@ -32,7 +33,7 @@ var AlwaysExcluded = []string{
 // CopyContext copies the whitelisted context of snapshot into destination
 // and returns the sorted list of copied POSIX-relative paths.
 // includeScripts adds the scripts/ root (used for command-less skills);
-// excludeRoots removes runtime roots from context.
+// excludeRoots removes validated runtime and build roots from context.
 func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots []string) ([]string, error) {
 	if info, err := os.Stat(filepath.Join(snapshot, "SKILL.md")); err != nil || info.IsDir() {
 		return nil, fmt.Errorf("required SKILL.md not found in skill snapshot: %s", snapshot)
@@ -57,13 +58,10 @@ func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots
 		if err != nil {
 			continue
 		}
-		if excludedName(root) {
+		if PathExcluded(root, excludeRoots) {
 			continue
 		}
 		if !info.IsDir() {
-			if excludedByRoot(root, excludeRoots) {
-				continue
-			}
 			if err := copyFile(src, filepath.Join(destination, root)); err != nil {
 				return nil, err
 			}
@@ -74,15 +72,18 @@ func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots
 			if err != nil {
 				return err
 			}
-			if entry.IsDir() {
-				return nil
-			}
 			rel, relErr := filepath.Rel(snapshot, path)
 			if relErr != nil {
 				return relErr
 			}
 			posix := filepath.ToSlash(rel)
-			if excludedByRoot(posix, excludeRoots) || excludedPath(posix) {
+			if entry.IsDir() {
+				if path != src && PathExcluded(posix, excludeRoots) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if PathExcluded(posix, excludeRoots) {
 				return nil
 			}
 			if err := copyFile(path, filepath.Join(destination, rel)); err != nil {
@@ -97,6 +98,31 @@ func CopyContext(snapshot, destination string, includeScripts bool, excludeRoots
 	}
 	sort.Strings(copied)
 	return copied, nil
+}
+
+// ContextExcludedRoots returns the sorted union of runtime and build roots
+// used by static context selection. It is independent of command activation,
+// cache state, locale selection, and compiler execution.
+func ContextExcludedRoots(runtimeRoots, buildRoots []string) []string {
+	seen := make(map[string]bool, len(runtimeRoots)+len(buildRoots))
+	for _, root := range runtimeRoots {
+		seen[root] = true
+	}
+	for _, root := range buildRoots {
+		seen[root] = true
+	}
+	roots := make([]string, 0, len(seen))
+	for root := range seen {
+		roots = append(roots, root)
+	}
+	sort.Strings(roots)
+	return roots
+}
+
+// PathExcluded reports whether a POSIX-relative snapshot path is excluded
+// from static prompt context by a declared root or a fixed excluded pattern.
+func PathExcluded(posix string, excludeRoots []string) bool {
+	return excludedByRoot(posix, excludeRoots) || excludedPath(posix)
 }
 
 func copyFile(src, dst string) error {

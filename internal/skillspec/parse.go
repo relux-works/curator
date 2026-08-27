@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -117,6 +118,9 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 		if schema >= 3 {
 			allowed["capabilities"] = true
 		}
+		if schema >= 6 {
+			allowed["build_roots"] = true
+		}
 		if err := rejectUnknown(data, allowed, sourceFile); err != nil {
 			return nil, nil, err
 		}
@@ -143,10 +147,24 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 			}
 		}
 	}
+	var buildRoots []string
+	if schema >= 6 {
+		if raw, present := data["build_roots"]; present {
+			buildRoots, err = parseBuildRoots(raw, snapshot, runtimeRoots)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
 
 	commands, err := parseCommands(data["commands"], schema, snapshot, runtimeRoots)
 	if err != nil {
 		return nil, nil, err
+	}
+	if schema >= 6 {
+		if err := validateBuildLayout(snapshot, buildRoots, commands); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	dependencies, requirements, mcpServers, err := parseDependencies(data["dependencies"], schema)
@@ -158,6 +176,7 @@ func loadSkillManifest(filePath, sourceFile string) (*Spec, map[string]any, erro
 		SchemaVersion: schema,
 		SourceFile:    sourceFile,
 		RuntimeRoots:  runtimeRoots,
+		BuildRoots:    buildRoots,
 		Capabilities:  caps,
 		Commands:      commands,
 		Dependencies:  dependencies,
@@ -213,35 +232,35 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 		return nil, verr.New("commands", "must be an object")
 	}
 	commands := map[string]Command{}
-	for name, rawEntry := range obj {
+	parseEntry := func(name string, rawEntry any) error {
 		label := "commands." + name
 		if name == "" {
-			return nil, verr.New("commands", "command names must be non-empty strings")
+			return verr.New("commands", "command names must be non-empty strings")
 		}
 		if !identifiers.Valid(name) {
-			return nil, verr.New(label, "command name %s", identifiers.Rule)
+			return verr.New(label, "command name %s", identifiers.Rule)
 		}
 		entry, ok := rawEntry.(map[string]any)
 		if !ok {
-			return nil, verr.New(label, "must be an object")
+			return verr.New(label, "must be an object")
 		}
 		switch entry["type"] {
 		case "script":
 			if schema >= 2 {
 				if err := rejectUnknown(entry, map[string]bool{"type": true, "unix_path": true, "win_path": true}, label); err != nil {
-					return nil, err
+					return err
 				}
 			}
 			unixPath, unixSet, err := optionalPath(entry, "unix_path", label, schema >= 2)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			winPath, winSet, err := optionalPath(entry, "win_path", label, schema >= 2)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if schema >= 2 && !unixSet && !winSet {
-				return nil, verr.New(label, "script command requires 'unix_path' or 'win_path'")
+				return verr.New(label, "script command requires 'unix_path' or 'win_path'")
 			}
 			if schema >= 2 {
 				for field, rel := range map[string]string{"unix_path": unixPath, "win_path": winPath} {
@@ -249,7 +268,7 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 						continue
 					}
 					if err := validateScriptFile(snapshot, rel, runtimeRoots, label+"."+field); err != nil {
-						return nil, err
+						return err
 					}
 				}
 			}
@@ -257,20 +276,68 @@ func parseCommands(raw any, schema int, snapshot string, runtimeRoots []string) 
 		case "system":
 			if schema >= 2 {
 				if err := rejectUnknown(entry, map[string]bool{"type": true, "command": true, "hint": true}, label); err != nil {
-					return nil, err
+					return err
 				}
 			}
 			binary, ok := entry["command"].(string)
 			if !ok || binary == "" {
-				return nil, verr.New(label, "system command requires non-empty 'command'")
+				return verr.New(label, "system command requires non-empty 'command'")
+			}
+			if schema >= 6 && !identifiers.Valid(binary) {
+				return verr.New(label+".command", "system command %s", identifiers.Rule)
 			}
 			hint, err := optionalString(entry, "hint", label)
 			if err != nil {
-				return nil, err
+				return err
+			}
+			if schema >= 6 {
+				if _, present := entry["hint"]; present && hint == "" {
+					return verr.New(label+".hint", "must be a non-empty string")
+				}
 			}
 			commands[name] = Command{Name: name, Type: "system", Command: binary, Hint: hint}
+		case "build":
+			if schema < 6 {
+				return verr.New(label, "has unsupported type %v", entry["type"])
+			}
+			if err := rejectUnknownBuildFields(entry, label); err != nil {
+				return err
+			}
+			driver, ok := entry["driver"].(string)
+			if !ok || driver != "go-v1" {
+				return verr.New(label+".driver", "must be 'go-v1'")
+			}
+			rawSource, present := entry["source_dir"]
+			sourceDir, ok := rawSource.(string)
+			if !present || !ok || sourceDir == "" {
+				return verr.New(label+".source_dir", "must be a non-empty string")
+			}
+			sourceDir, err := validateRelativePath(sourceDir, label+".source_dir", true)
+			if err != nil {
+				return err
+			}
+			commands[name] = Command{Name: name, Type: "build", Driver: driver, SourceDir: sourceDir}
 		default:
-			return nil, verr.New(label, "has unsupported type %v", entry["type"])
+			return verr.New(label, "has unsupported type %v", entry["type"])
+		}
+		return nil
+	}
+	if schema >= 6 {
+		names := make([]string, 0, len(obj))
+		for name := range obj {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			if err := parseEntry(name, obj[name]); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		for name, rawEntry := range obj {
+			if err := parseEntry(name, rawEntry); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return commands, nil
@@ -559,6 +626,161 @@ func parseRuntimeRoots(raw any, snapshot string) ([]string, error) {
 		}
 	}
 	return roots, nil
+}
+
+// parseBuildRoots validates the schema v6 module roots without invoking a Go
+// toolchain. Filesystem validation uses lstat on every package-controlled path
+// component so links cannot redirect checks outside the immutable snapshot.
+func parseBuildRoots(raw any, snapshot string, runtimeRoots []string) ([]string, error) {
+	list, ok := raw.([]any)
+	if !ok {
+		return nil, verr.New("build_roots", "must be a list")
+	}
+	roots := make([]string, 0, len(list))
+	for index, item := range list {
+		field := fmt.Sprintf("build_roots[%d]", index)
+		text, ok := item.(string)
+		if !ok {
+			return nil, verr.New(field, "must be a non-empty string")
+		}
+		root, err := validateRelativePath(text, field, true)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateLinkFreeDirectory(snapshot, root, field, "build root"); err != nil {
+			return nil, err
+		}
+		roots = append(roots, root)
+	}
+	seen := map[string]bool{}
+	for _, root := range roots {
+		if seen[root] {
+			return nil, verr.New("build_roots", "must be unique")
+		}
+		seen[root] = true
+	}
+	if left, right, overlaps := overlappingRoots(roots); overlaps {
+		return nil, verr.New("build_roots", "must be disjoint: %s overlaps %s", left, right)
+	}
+	for _, buildRoot := range roots {
+		for _, runtimeRoot := range runtimeRoots {
+			if pathContains(buildRoot, runtimeRoot) || pathContains(runtimeRoot, buildRoot) {
+				return nil, verr.New("build_roots", "must not overlap runtime_roots: %s overlaps %s", buildRoot, runtimeRoot)
+			}
+		}
+	}
+	return roots, nil
+}
+
+func overlappingRoots(roots []string) (string, string, bool) {
+	sorted := append([]string(nil), roots...)
+	sort.Strings(sorted)
+	for index, left := range sorted {
+		for _, right := range sorted[index+1:] {
+			if pathContains(left, right) || pathContains(right, left) {
+				return left, right, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+func rejectUnknownBuildFields(entry map[string]any, label string) error {
+	allowed := map[string]bool{"type": true, "driver": true, "source_dir": true}
+	unknown := make([]string, 0)
+	for field := range entry {
+		if !allowed[field] {
+			unknown = append(unknown, field)
+		}
+	}
+	if len(unknown) == 0 {
+		return nil
+	}
+	sort.Strings(unknown)
+	return verr.New(label+"."+unknown[0], "field is not supported for build commands")
+}
+
+func validateBuildLayout(snapshot string, buildRoots []string, commands map[string]Command) error {
+	used := make(map[string]bool, len(buildRoots))
+	names := make([]string, 0, len(commands))
+	for name := range commands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		command := commands[name]
+		if command.Type != "build" {
+			continue
+		}
+		field := "commands." + name + ".source_dir"
+		var containing []string
+		for _, root := range buildRoots {
+			if pathContains(root, command.SourceDir) {
+				containing = append(containing, root)
+			}
+		}
+		if len(containing) != 1 {
+			return verr.New(field, "must be below exactly one build_roots entry")
+		}
+		if err := validateLinkFreeDirectory(snapshot, command.SourceDir, field, "source directory"); err != nil {
+			return err
+		}
+		if err := validateNearestGoMod(snapshot, containing[0], command.SourceDir, field); err != nil {
+			return err
+		}
+		used[containing[0]] = true
+	}
+	for index, root := range buildRoots {
+		if !used[root] {
+			return verr.New(fmt.Sprintf("build_roots[%d]", index), "build root is not used by any build command: %s", root)
+		}
+	}
+	return nil
+}
+
+func validateLinkFreeDirectory(snapshot, rel, field, noun string) error {
+	current := snapshot
+	for _, component := range strings.Split(rel, "/") {
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return verr.New(field, "%s does not exist: %s", noun, rel)
+			}
+			return verr.New(field, "cannot inspect %s %s: %v", noun, rel, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return verr.New(field, "%s must be link-free: %s", noun, rel)
+		}
+		if !info.IsDir() {
+			return verr.New(field, "%s must be a directory: %s", noun, rel)
+		}
+	}
+	return nil
+}
+
+func validateNearestGoMod(snapshot, buildRoot, sourceDir, field string) error {
+	current := sourceDir
+	for {
+		modPath := filepath.Join(snapshot, filepath.FromSlash(current), "go.mod")
+		info, err := os.Lstat(modPath)
+		switch {
+		case err == nil:
+			if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+				return verr.New(field, "nearest go.mod must be a real regular file in build root %s", buildRoot)
+			}
+			if current != buildRoot {
+				return verr.New(field, "intervening module %s/go.mod is below build root %s", current, buildRoot)
+			}
+			return nil
+		case !os.IsNotExist(err):
+			return verr.New(field, "cannot inspect nearest go.mod: %v", err)
+		}
+		if current == buildRoot {
+			return verr.New(field, "build root %s must contain the nearest go.mod directly", buildRoot)
+		}
+		current = path.Dir(current)
+	}
 }
 
 func validateScriptFile(snapshot, rel string, runtimeRoots []string, label string) error {

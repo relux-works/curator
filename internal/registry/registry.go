@@ -20,6 +20,7 @@ import (
 
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/identity"
+	"github.com/relux-works/curator/internal/protocoljson"
 )
 
 // Record statuses (Spec §13.1).
@@ -108,117 +109,7 @@ func CanonicalBytesChecked(record map[string]any) ([]byte, error) {
 			body[key] = value
 		}
 	}
-	return compactSortedJSON(body)
-}
-
-func compactSortedJSON(value any) ([]byte, error) {
-	switch typed := value.(type) {
-	case map[string]any:
-		keys := make([]string, 0, len(typed))
-		for key := range typed {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		var buffer strings.Builder
-		buffer.WriteByte('{')
-		for index, key := range keys {
-			if index > 0 {
-				buffer.WriteByte(',')
-			}
-			keyJSON, err := bytesNoEscape(key)
-			if err != nil {
-				return nil, err
-			}
-			buffer.Write(keyJSON)
-			buffer.WriteByte(':')
-			item, err := compactSortedJSON(typed[key])
-			if err != nil {
-				return nil, err
-			}
-			buffer.Write(item)
-		}
-		buffer.WriteByte('}')
-		return []byte(buffer.String()), nil
-	case []any:
-		var buffer strings.Builder
-		buffer.WriteByte('[')
-		for index, item := range typed {
-			if index > 0 {
-				buffer.WriteByte(',')
-			}
-			encoded, err := compactSortedJSON(item)
-			if err != nil {
-				return nil, err
-			}
-			buffer.Write(encoded)
-		}
-		buffer.WriteByte(']')
-		return []byte(buffer.String()), nil
-	case string:
-		return bytesNoEscape(typed)
-	case nil:
-		return []byte("null"), nil
-	case bool:
-		if typed {
-			return []byte("true"), nil
-		}
-		return []byte("false"), nil
-	case int:
-		return safeInteger(int64(typed))
-	case int64:
-		return safeInteger(typed)
-	case json.Number:
-		value, err := strconv.ParseInt(string(typed), 10, 64)
-		if err != nil || strconv.FormatInt(value, 10) != string(typed) {
-			return nil, fmt.Errorf("CCJ-1 numbers must be base-10 integers: %q", typed)
-		}
-		return safeInteger(value)
-	default:
-		return nil, fmt.Errorf("CCJ-1 does not support %T", value)
-	}
-}
-
-func safeInteger(value int64) ([]byte, error) {
-	const maximum = int64(9007199254740991)
-	if value < -maximum || value > maximum {
-		return nil, fmt.Errorf("CCJ-1 integer outside safe range: %d", value)
-	}
-	return []byte(strconv.FormatInt(value, 10)), nil
-}
-
-// bytesNoEscape implements the CCJ-1 minimal string escaping rules.
-func bytesNoEscape(value string) ([]byte, error) {
-	if !utf8.ValidString(value) {
-		return nil, fmt.Errorf("CCJ-1 string is not valid UTF-8")
-	}
-	var buffer strings.Builder
-	buffer.WriteByte('"')
-	for _, r := range value {
-		switch r {
-		case '"':
-			buffer.WriteString(`\"`)
-		case '\\':
-			buffer.WriteString(`\\`)
-		case '\b':
-			buffer.WriteString(`\b`)
-		case '\f':
-			buffer.WriteString(`\f`)
-		case '\n':
-			buffer.WriteString(`\n`)
-		case '\r':
-			buffer.WriteString(`\r`)
-		case '\t':
-			buffer.WriteString(`\t`)
-		default:
-			if r < 0x20 {
-				fmt.Fprintf(&buffer, `\u%04x`, r)
-			} else {
-				buffer.WriteRune(r)
-			}
-		}
-	}
-	buffer.WriteByte('"')
-	return []byte(buffer.String()), nil
+	return protocoljson.MarshalCanonical(body)
 }
 
 // ParsePublicKey decodes a pinned key "ed25519:<base64>" (prefix optional)
