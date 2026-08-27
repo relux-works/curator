@@ -96,6 +96,54 @@ start Curator during later shell launches. Curator never edits a profile
 automatically. Set `CURATOR_AUTO_ENV=0` to retain global activation while
 disabling project-directory scans.
 
+## Maintenance and the build-cache grace period
+
+`curator gc` runs one serialized maintenance pass. It acquires the exclusive
+manager-home mutation lock, recovers any incomplete install transaction, and
+only then marks and sweeps, so it cannot race an install, a rollback, or a
+recovery, and cannot lose a consumer registry update. The same pass runs at the
+end of every installation, under the lock that installation already holds.
+
+Marking reads the live project, global, and hybrid scopes once. Runtime store
+entries are marked from every supported install marker schema; compiled build
+cache entries are marked from marker v2 build state and from every in-flight
+transaction journal.
+
+Anything the pass cannot prove keeps its artifacts, and keeps them across
+passes. A consumer registry that exists but does not match the exact shape
+Curator writes is reported and left untouched rather than rewritten; a
+registered checkout is unregistered only once its scope is proven absent or
+proven valid and empty. An *ambiguous* registry counts as unreadable: a document
+that states `schema_version` or `consumers` more than once does not say what it
+means, so it is refused by every reader and writer rather than resolved to
+whichever value happens to come last. A skills directory or installed skill that
+is a symbolic link or a reparse point is refused instead of followed, and any
+marker that exists but cannot be read or validated blocks the build sweep. A
+later pass therefore sees the same uncertainty and makes the same refusal,
+instead of inheriting a registry the earlier pass had quietly emptied.
+
+The sweep removes a protected build cache entry only when all of the following
+hold: no marker and no journal references it, the cache root and the entry are
+still verifiable manager-protected state, the entry is structurally exact and
+self-consistent with the logical key its directory encodes, and it was
+published more than **24 hours** ago — Curator's documented grace period.
+Everything else is retained and reported as a maintenance warning, including
+corrupt receipts, untrusted roots, symlink or reparse escapes, and ownership or
+DACL failures. Entry content is never executed, adopted, or permission-repaired,
+and a receipt alone is never treated as proof of provenance or of a live
+consumer. Retaining an unreferenced entry is always safe: the only cost of a
+removal is one rebuild.
+
+Every decision and every removal is bound to the directory object the pass
+proved, not to the pathname it proved it under. The decisive classification of a
+candidate — its exact members, its receipt, its artifact bytes and size — is
+read through the descriptor of the entry the pass resolved, and the rename that
+retires it and the deletion behind it resolve through the proven cache root; an
+entry whose parent is no longer that object is retained and reported. Exchanging
+the cache-root path after validation can therefore neither redirect a removal
+outside the Curator cache root nor let a planted replacement supply the verdict
+for the entry that is actually being removed.
+
 ## An open protocol
 
 The specification is an open protocol, not an internal contract: any manager

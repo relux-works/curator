@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"bufio"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -21,14 +22,17 @@ import (
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/gitignore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/install"
+	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/scopes"
 	"github.com/relux-works/curator/internal/shell"
 	"github.com/relux-works/curator/internal/skillcheck"
+	"github.com/relux-works/curator/internal/transaction"
 	"github.com/relux-works/curator/internal/ui"
 	"github.com/relux-works/curator/internal/version"
 )
@@ -68,6 +72,14 @@ Commands:
 `
 
 func main() {
+	// The fixed hidden go-v1 build worker is an implementation boundary, not a
+	// user-visible command surface. It is dispatched before any other parsing,
+	// requires exactly this one manager-owned argument, and is never reachable
+	// through a package file, manifest value, environment value, PATH lookup,
+	// shell, or user option.
+	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
+		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
+	}
 	os.Exit(run(os.Args[1:]))
 }
 
@@ -162,7 +174,7 @@ func projectRootArg(args []string) string {
 func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
 	var flagArgs, positional []string
 	for index := 0; index < len(args); index++ {
-		arg := args[index]
+		arg := args[index] // #nosec G602 -- index is bounded by the loop condition and only advanced after an explicit bounds check
 		if arg == "--" {
 			for trailing := index + 1; trailing < len(args); trailing++ {
 				positional = append(positional, args[trailing])
@@ -1175,21 +1187,63 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string) 
 	return audit.Gate(cfg, subjects)
 }
 
+// cmdGC runs maintenance under the exclusive manager-home mutation lock, so it
+// serializes with every install, rollback, and recovery. Incomplete
+// transactions are recovered first, and their build references are marked, so
+// an installation interrupted by a crash keeps the artifacts it will finish
+// with.
 func cmdGC() int {
 	cfg, code := loadConfig()
 	if code != exitOK {
 		return code
 	}
-	removed, err := scopes.CollectRuntime(cfg.Home())
+	home := cfg.Home()
+	manager, err := managerlock.New(home)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
 		return exitFail
 	}
-	for _, entry := range removed {
+	lock, err := manager.AcquireHomeOnly(context.Background(), false)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator: acquire the manager-home lock:", err)
+		return exitFail
+	}
+	result, err := collectUnderLock(home, lock)
+	if closeErr := lock.Close(); closeErr != nil && err == nil {
+		err = fmt.Errorf("release the manager-home lock: %w", closeErr)
+	}
+	for _, warning := range result.Warnings {
+		fmt.Fprintln(os.Stderr, "curator: warning:", warning)
+	}
+	for _, entry := range result.RemovedRuntime {
 		fmt.Println("removed runtime", entry)
 	}
-	fmt.Printf("gc: %d runtime entr%s removed\n", len(removed), pluralY(len(removed)))
+	for _, key := range result.RemovedBuilds {
+		fmt.Println("removed build", key)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "curator:", err)
+		return exitFail
+	}
+	fmt.Printf("gc: %d runtime entr%s removed, %d build entr%s removed\n",
+		len(result.RemovedRuntime), pluralY(len(result.RemovedRuntime)),
+		len(result.RemovedBuilds), pluralY(len(result.RemovedBuilds)))
 	return exitOK
+}
+
+func collectUnderLock(home string, lock *managerlock.HomeLock) (scopes.MaintenanceResult, error) {
+	engine, err := transaction.New(home)
+	if err != nil {
+		return scopes.MaintenanceResult{}, fmt.Errorf("open the install transaction journal: %w", err)
+	}
+	if err := engine.Recover(lock); err != nil {
+		return scopes.MaintenanceResult{}, fmt.Errorf("recover incomplete install transactions: %w", err)
+	}
+	journalKeys, err := engine.ReferencedBuildKeys(lock)
+	if err != nil {
+		return scopes.MaintenanceResult{}, fmt.Errorf("read in-flight build references: %w", err)
+	}
+	return scopes.Collect(scopes.MaintenanceRequest{Home: home, Lock: lock, JournalKeys: journalKeys})
 }
 
 func cmdShellInit(args []string) int {
