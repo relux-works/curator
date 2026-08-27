@@ -5,7 +5,6 @@ package adapters
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -83,132 +82,24 @@ func UnknownAgents(agents []string) []string {
 }
 
 // Group is one canonical root with the skill names it holds.
+//
+// Sources overrides where a skill's content is read from while it is being
+// staged. An installation mirrors the state it is about to commit, which does
+// not exist at the canonical root yet, so it maps each name to the staged
+// directory instead. A skill that is already current is left out and read from
+// the canonical root.
 type Group struct {
-	Root   string
-	Skills []string
+	Root    string
+	Skills  []string
+	Sources map[string]string
 }
 
-// RefreshProject mirrors groups of canonical roots into the project-level
-// adapter directories of the selected agents. All groups share one ledger
-// per adapter root, so entries falling out of every group are removed in
-// the same pass. Native-discovery agents get no project mirror.
-func RefreshProject(projectRoot string, agents []string, groups []Group, mode string) error {
-	roots := map[string]string{}
-	for _, agent := range agents {
-		if rel, known := AgentPaths[agent]; known {
-			roots[agent] = filepath.Join(projectRoot, filepath.FromSlash(rel))
-		}
+// source resolves where the content of one skill is read from.
+func (group Group) source(name string) string {
+	if staged, overridden := group.Sources[name]; overridden {
+		return staged
 	}
-	return refresh(roots, groups, mode)
-}
-
-// RefreshGlobal mirrors the global canonical root into home-level adapter
-// directories, including the native-discovery mirror.
-func RefreshGlobal(home string, userHome string, agents []string, skills []string, mode string) error {
-	canonical := filepath.Join(home, "global", "skills")
-	roots := map[string]string{}
-	for _, agent := range agents {
-		if rel, known := AgentPaths[agent]; known {
-			roots[agent] = filepath.Join(userHome, filepath.FromSlash(rel))
-		}
-		if NativeDiscoveryAgents[agent] {
-			roots[agent] = filepath.Join(userHome, filepath.FromSlash(NativeDiscoveryHomePath))
-		}
-	}
-	return refresh(roots, []Group{{Root: canonical, Skills: skills}}, mode)
-}
-
-func refresh(adapterRoots map[string]string, groups []Group, mode string) error {
-	expected := map[string]bool{}
-	for _, group := range groups {
-		for _, name := range group.Skills {
-			expected[name] = true
-		}
-	}
-	agents := make([]string, 0, len(adapterRoots))
-	for agent := range adapterRoots {
-		agents = append(agents, agent)
-	}
-	sort.Strings(agents)
-	for _, agent := range agents {
-		adapterRoot := adapterRoots[agent]
-		if err := os.MkdirAll(adapterRoot, 0o755); err != nil {
-			return err
-		}
-		managed := readLedger(adapterRoot)
-		// remove managed entries that fell out of every group
-		var stale []string
-		for name := range managed {
-			if !expected[name] {
-				stale = append(stale, name)
-			}
-		}
-		sort.Strings(stale)
-		for _, name := range stale {
-			if err := removePath(filepath.Join(adapterRoot, name)); err != nil {
-				return err
-			}
-		}
-		for _, group := range groups {
-			names := append([]string(nil), group.Skills...)
-			sort.Strings(names)
-			for _, name := range names {
-				source := filepath.Join(group.Root, name)
-				if _, err := os.Stat(source); err != nil {
-					continue
-				}
-				target := filepath.Join(adapterRoot, name)
-				conflict, err := unmanagedConflict(target, managed[name], source)
-				if err != nil {
-					return err
-				}
-				if conflict {
-					return fmt.Errorf("adapter target already exists and is not managed: %s", target)
-				}
-				if err := refreshEntry(source, target, mode); err != nil {
-					return err
-				}
-			}
-		}
-		if err := writeLedger(adapterRoot, expected); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func refreshEntry(source, target, mode string) error {
-	switch mode {
-	case "copy":
-		if err := removePath(target); err != nil {
-			return err
-		}
-		return copyTree(source, target)
-	case "symlink":
-		if err := removePath(target); err != nil {
-			return err
-		}
-		return symlinkRel(source, target)
-	default: // auto: symlink with copy fallback
-		if err := removePath(target); err != nil {
-			return err
-		}
-		if err := symlinkRel(source, target); err != nil {
-			if err := removePath(target); err != nil {
-				return err
-			}
-			return copyTree(source, target)
-		}
-		return nil
-	}
-}
-
-func symlinkRel(source, target string) error {
-	rel, err := filepath.Rel(filepath.Dir(target), source)
-	if err != nil {
-		rel = source
-	}
-	return os.Symlink(rel, target)
+	return filepath.Join(group.Root, name)
 }
 
 // unmanagedConflict reports whether target exists but is neither in the
@@ -266,10 +157,13 @@ func readLedger(adapterRoot string) map[string]bool {
 	return entries
 }
 
-func writeLedger(adapterRoot string, entries map[string]bool) error {
+// ledgerPayload renders the canonical ownership ledger bytes.
+func ledgerPayload(entries map[string]bool) ([]byte, error) {
 	var names []string
-	for name := range entries {
-		names = append(names, name)
+	for name, present := range entries {
+		if present {
+			names = append(names, name)
+		}
 	}
 	sort.Strings(names)
 	if names == nil {
@@ -280,20 +174,9 @@ func writeLedger(adapterRoot string, entries map[string]bool) error {
 		"entries":        names,
 	}, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return os.WriteFile(filepath.Join(adapterRoot, LedgerName), append(payload, '\n'), 0o644)
-}
-
-func removePath(path string) error {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return nil
-	}
-	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
-		return os.Remove(path)
-	}
-	return os.RemoveAll(path)
+	return append(payload, '\n'), nil
 }
 
 func copyTree(src, dst string) error {

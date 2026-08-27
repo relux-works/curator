@@ -39,6 +39,14 @@ func LoadHybridDecls(home string) ([]HybridDecl, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ParseHybridDecls(payload, path)
+}
+
+// ParseHybridDecls parses one hybrid manifest payload that a caller already
+// read. It is the byte-level entry point LoadHybridDecls itself is built from,
+// so a caller that has to bind a generation digest to the exact activation bytes
+// its closure was resolved from can read the file once and parse those bytes.
+func ParseHybridDecls(payload []byte, path string) ([]HybridDecl, error) {
 	if err := protocoljson.Validate(payload); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", path, err)
 	}
@@ -131,12 +139,14 @@ func AppliesToProject(decl HybridDecl, aliases []string, projectPath string) boo
 func AddHybridDecl(home, name, refKind, refValue, git string, targets []string) error {
 	path := HybridManifestPath(home)
 	obj := map[string]any{"schema_version": float64(manifest.SchemaVersion), "skills": []any{}}
-	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- machine home
-		if err := protocoljson.Validate(payload); err != nil {
+	// #nosec G304 -- the path is derived from the manager home, not user input.
+	recorded, readErr := os.ReadFile(path)
+	if readErr == nil {
+		if err := protocoljson.Validate(recorded); err != nil {
 			return fmt.Errorf("malformed JSON in %s: %w", path, err)
 		}
 		var raw any
-		if err := json.Unmarshal(payload, &raw); err != nil {
+		if err := json.Unmarshal(recorded, &raw); err != nil {
 			return fmt.Errorf("malformed JSON in %s: %w", path, err)
 		}
 		if existing, ok := raw.(map[string]any); ok {

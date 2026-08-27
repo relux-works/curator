@@ -5,6 +5,7 @@ package marker
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/relux-works/curator/internal/buildcache"
+	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/buildsource"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -22,8 +26,12 @@ import (
 // Name is the marker file name inside an installed skill directory.
 const Name = ".csk-install.json"
 
-// SchemaVersion is the supported marker schema.
-const SchemaVersion = 1
+const (
+	// LegacySchemaVersion is the historical marker schema retained for reads.
+	LegacySchemaVersion = 1
+	// SchemaVersion is the marker schema written by every installation mutation.
+	SchemaVersion = 2
+)
 
 var (
 	markerCommitRE = regexp.MustCompile(`^[0-9a-f]{40}(?:[0-9a-f]{24})?$`)
@@ -44,30 +52,56 @@ type Attestation struct {
 	KeyID    string `json:"key_id,omitempty"`
 }
 
+// Build records the portable identities needed to revalidate one compiled
+// command without persisting any manager-home path.
+type Build struct {
+	Driver         string                `json:"driver"`
+	CacheKey       buildmeta.CacheKey    `json:"cache_key"`
+	ReceiptSHA256  buildmeta.ReceiptHash `json:"receipt_sha256"`
+	ArtifactSHA256 string                `json:"artifact_sha256"`
+	ArtifactPath   string                `json:"artifact_path"`
+}
+
 // Marker is the install marker payload (Spec §8.5).
 type Marker struct {
-	SchemaVersion      int                 `json:"schema_version"`
-	Name               string              `json:"name"`
-	Source             string              `json:"source"`
-	RefKind            string              `json:"ref_kind"`
-	Ref                string              `json:"ref"`
-	Commit             string              `json:"commit"`
-	ContentSHA256      string              `json:"content_sha256"`
-	Locale             string              `json:"locale,omitempty"`
-	Agents             []string            `json:"agents"`
-	Commands           []string            `json:"commands"`
-	Dependencies       []string            `json:"dependencies"`
-	SkillSchemaVersion int                 `json:"skill_schema_version"`
-	RuntimeRoots       []string            `json:"runtime_roots"`
-	InstalledAt        string              `json:"installed_at"`
-	Files              []string            `json:"files"`
-	Git                string              `json:"git,omitempty"`
-	Requirements       []string            `json:"requirements,omitempty"`
-	McpServers         map[string][]string `json:"mcp_servers,omitempty"`
-	Attestation        *Attestation        `json:"attestation,omitempty"`
-	Activation         *Activation         `json:"activation,omitempty"`
-	Requirers          []string            `json:"requirers,omitempty"`
-	Substituted        string              `json:"substituted,omitempty"`
+	SchemaVersion      int                   `json:"schema_version"`
+	Name               string                `json:"name"`
+	Source             string                `json:"source"`
+	RefKind            string                `json:"ref_kind"`
+	Ref                string                `json:"ref"`
+	Commit             string                `json:"commit"`
+	ContentSHA256      string                `json:"content_sha256"`
+	Locale             string                `json:"locale,omitempty"`
+	Agents             []string              `json:"agents"`
+	Commands           []string              `json:"commands"`
+	Dependencies       []string              `json:"dependencies"`
+	SkillSchemaVersion int                   `json:"skill_schema_version"`
+	RuntimeRoots       []string              `json:"runtime_roots"`
+	BuildRoots         []string              `json:"build_roots"`
+	BuildSource        *buildsource.Identity `json:"build_source,omitempty"`
+	InstalledAt        string                `json:"installed_at"`
+	Files              []string              `json:"files"`
+	Builds             map[string]Build      `json:"builds"`
+	Git                string                `json:"git,omitempty"`
+	Requirements       []string              `json:"requirements,omitempty"`
+	McpServers         map[string][]string   `json:"mcp_servers,omitempty"`
+	Attestation        *Attestation          `json:"attestation,omitempty"`
+	Activation         *Activation           `json:"activation,omitempty"`
+	Requirers          []string              `json:"requirers,omitempty"`
+	Substituted        string                `json:"substituted,omitempty"`
+}
+
+// BuildCurrentness supplies independently derived build state. RawSnapshot
+// must return a validated token for the immutable package snapshot; returning
+// nil, nil means the snapshot is absent. InspectCache must perform a read-only
+// protected-cache inspection. ContextFiles and RuntimeFiles are complete
+// relative file sets proving static build-root exclusion; nil means unknown.
+type BuildCurrentness struct {
+	RawSnapshot  func() (*buildsource.Token, error)
+	InspectCache func(command string, expectation buildcache.Expectation) buildcache.Result
+	Inputs       map[string]buildmeta.Input
+	ContextFiles []string
+	RuntimeFiles []string
 }
 
 // MarshalJSON keeps the marker object compatible with the protocol wire
@@ -85,6 +119,11 @@ func (m Marker) MarshalJSON() ([]byte, error) {
 	}
 	if m.Locale == "" {
 		object["locale"] = nil
+	}
+	if m.SchemaVersion == LegacySchemaVersion {
+		delete(object, "build_roots")
+		delete(object, "build_source")
+		delete(object, "builds")
 	}
 	return json.Marshal(object)
 }
@@ -113,33 +152,50 @@ func Read(installedDir string) *Marker {
 }
 
 func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
-	required := []string{
+	commonRequired := []string{
 		"schema_version", "name", "source", "ref_kind", "ref", "commit", "content_sha256", "locale",
 		"agents", "commands", "dependencies", "skill_schema_version", "runtime_roots", "installed_at", "files",
+	}
+	commonOptional := []string{
+		"git", "requirements", "mcp_servers", "attestation", "activation", "requirers", "substituted",
+	}
+	required := append([]string(nil), commonRequired...)
+	allowed := append(append([]string(nil), commonRequired...), commonOptional...)
+	switch m.SchemaVersion {
+	case LegacySchemaVersion:
+	case SchemaVersion:
+		required = append(required, "build_roots", "builds")
+		allowed = append(allowed, "build_roots", "build_source", "builds")
+	default:
+		return false
 	}
 	for _, field := range required {
 		if _, present := raw[field]; !present {
 			return false
 		}
 	}
-	if m.SchemaVersion != SchemaVersion || !identifiers.Valid(m.Name) || !identifiers.PortablePath(m.Source) ||
+	if !onlyFields(raw, allowed) || !identifiers.Valid(m.Name) || !identifiers.PortablePath(m.Source) ||
 		(m.RefKind != "tag" && m.RefKind != "branch" && m.RefKind != "revision") ||
 		m.Ref == "" || utf8.RuneCountInString(m.Ref) > 8192 || !markerCommitRE.MatchString(m.Commit) ||
-		!markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 || m.SkillSchemaVersion > 5 {
+		!markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
+		(m.SchemaVersion == LegacySchemaVersion && m.SkillSchemaVersion > 5) ||
+		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) {
 		return false
 	}
+	setsSorted := m.SchemaVersion == SchemaVersion
 	if !validNullableLocale(raw["locale"], m.Locale) || !validTimestamp(m.InstalledAt) ||
-		!validIdentifierSet(m.Agents) || !validIdentifierSet(m.Commands) || !validIdentifierSet(m.Dependencies) ||
-		!validPathSet(m.RuntimeRoots) || !validPathSet(m.Files) {
+		!validIdentifierSet(m.Agents, setsSorted) || !validIdentifierSet(m.Commands, setsSorted) ||
+		!validIdentifierSet(m.Dependencies, setsSorted) || !validPathSet(m.RuntimeRoots, setsSorted) ||
+		!validPathSet(m.Files, setsSorted) {
 		return false
 	}
 	if !validOptionalNonEmptyString(raw, "git", m.Git) || !validOptionalNonEmptyString(raw, "substituted", m.Substituted) {
 		return false
 	}
-	if _, present := raw["requirements"]; present && !validIdentifierSet(m.Requirements) {
+	if _, present := raw["requirements"]; present && !validIdentifierSet(m.Requirements, setsSorted) {
 		return false
 	}
-	if _, present := raw["requirers"]; present && !validStringSet(m.Requirers) {
+	if _, present := raw["requirers"]; present && !validStringSet(m.Requirers, setsSorted) {
 		return false
 	}
 	if _, present := raw["mcp_servers"]; present {
@@ -147,7 +203,7 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 			return false
 		}
 		for name, consumers := range m.McpServers {
-			if !identifiers.Valid(name) || !validIdentifierSet(consumers) {
+			if !identifiers.Valid(name) || !validIdentifierSet(consumers, setsSorted) {
 				return false
 			}
 		}
@@ -169,7 +225,51 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 	if activationRaw, present := raw["activation"]; present {
 		object, ok := rawObject(activationRaw)
 		if !ok || m.Activation == nil || object["context"] == nil || object["commands"] == nil ||
-			!validBooleanRaw(object["context"]) || !validIdentifierSet(m.Activation.Commands) {
+			!validBooleanRaw(object["context"]) || !validIdentifierSet(m.Activation.Commands, setsSorted) {
+			return false
+		}
+	}
+	if m.SchemaVersion == SchemaVersion && !validBuildState(m, raw) {
+		return false
+	}
+	return true
+}
+
+func onlyFields(raw map[string]json.RawMessage, allowed []string) bool {
+	fields := make(map[string]bool, len(allowed))
+	for _, field := range allowed {
+		fields[field] = true
+	}
+	for field := range raw {
+		if !fields[field] {
+			return false
+		}
+	}
+	return true
+}
+
+func validBuildState(m *Marker, raw map[string]json.RawMessage) bool {
+	if !validPathSet(m.BuildRoots, true) || m.Builds == nil {
+		return false
+	}
+	_, sourcePresent := raw["build_source"]
+	if len(m.Builds) == 0 {
+		return !sourcePresent && m.BuildSource == nil
+	}
+	if len(m.BuildRoots) == 0 || !sourcePresent || m.BuildSource == nil || m.BuildSource.Algorithm != buildsource.Algorithm ||
+		!markerSHA256RE.MatchString(m.BuildSource.ContentSHA256) {
+		return false
+	}
+	for command, build := range m.Builds {
+		if !identifiers.Valid(command) || !containsString(m.Commands, command) || build.Driver != buildmeta.DriverGoV1 ||
+			!markerSHA256RE.MatchString(string(build.CacheKey)) ||
+			!markerSHA256RE.MatchString(string(build.ReceiptSHA256)) ||
+			!markerSHA256RE.MatchString(build.ArtifactSHA256) || !identifiers.PortablePath(build.ArtifactPath) {
+			return false
+		}
+		unixPath, unixErr := buildmeta.ArtifactPath(command, "linux")
+		windowsPath, windowsErr := buildmeta.ArtifactPath(command, "windows")
+		if unixErr != nil || windowsErr != nil || (build.ArtifactPath != unixPath && build.ArtifactPath != windowsPath) {
 			return false
 		}
 	}
@@ -181,7 +281,7 @@ func validNullableLocale(raw json.RawMessage, decoded string) bool {
 		return true
 	}
 	var value string
-	return json.Unmarshal(raw, &value) == nil && value == decoded && value != "" && utf8.RuneCountInString(value) <= 64
+	return json.Unmarshal(raw, &value) == nil && value == decoded && identifiers.ValidLocale(value)
 }
 
 func validOptionalNonEmptyString(raw map[string]json.RawMessage, field, decoded string) bool {
@@ -198,27 +298,16 @@ func validTimestamp(value string) bool {
 	return err == nil && parsed.UTC().Format("2006-01-02T15:04:05Z") == value
 }
 
-func validIdentifierSet(values []string) bool {
+func validIdentifierSet(values []string, sorted bool) bool {
 	if values == nil {
 		return false
 	}
 	seen := map[string]bool{}
-	for _, value := range values {
+	for index, value := range values {
 		if !identifiers.Valid(value) || seen[value] {
 			return false
 		}
-		seen[value] = true
-	}
-	return true
-}
-
-func validPathSet(values []string) bool {
-	if values == nil {
-		return false
-	}
-	seen := map[string]bool{}
-	for _, value := range values {
-		if !identifiers.PortablePath(value) || seen[value] {
+		if sorted && index > 0 && values[index-1] >= value {
 			return false
 		}
 		seen[value] = true
@@ -226,13 +315,33 @@ func validPathSet(values []string) bool {
 	return true
 }
 
-func validStringSet(values []string) bool {
+func validPathSet(values []string, sorted bool) bool {
 	if values == nil {
 		return false
 	}
 	seen := map[string]bool{}
-	for _, value := range values {
-		if seen[value] {
+	for index, value := range values {
+		if !identifiers.PortablePath(value) || seen[value] {
+			return false
+		}
+		if sorted && index > 0 && values[index-1] >= value {
+			return false
+		}
+		seen[value] = true
+	}
+	return true
+}
+
+func validStringSet(values []string, sorted bool) bool {
+	if values == nil {
+		return false
+	}
+	seen := map[string]bool{}
+	for index, value := range values {
+		if !utf8.ValidString(value) || seen[value] {
+			return false
+		}
+		if sorted && index > 0 && values[index-1] >= value {
 			return false
 		}
 		seen[value] = true
@@ -255,16 +364,24 @@ func rawObject(raw json.RawMessage) (map[string]json.RawMessage, bool) {
 
 // Write stores the marker inside dir with sorted keys and a trailing newline.
 func Write(dir string, m *Marker) error {
+	if m == nil {
+		return errors.New("install marker is nil")
+	}
 	m.SchemaVersion = SchemaVersion
 	m.Agents = nonNilStrings(m.Agents)
 	m.Commands = nonNilStrings(m.Commands)
 	m.Dependencies = nonNilStrings(m.Dependencies)
 	m.RuntimeRoots = nonNilStrings(m.RuntimeRoots)
+	m.BuildRoots = nonNilStrings(m.BuildRoots)
 	m.Files = nonNilStrings(m.Files)
+	if m.Builds == nil {
+		m.Builds = map[string]Build{}
+	}
 	sort.Strings(m.Agents)
 	sort.Strings(m.Commands)
 	sort.Strings(m.Dependencies)
 	sort.Strings(m.RuntimeRoots)
+	sort.Strings(m.BuildRoots)
 	sort.Strings(m.Files)
 	if m.Requirements != nil {
 		sort.Strings(m.Requirements)
@@ -283,6 +400,13 @@ func Write(dir string, m *Marker) error {
 	if err != nil {
 		return err
 	}
+	if protocoljson.Validate(payload) != nil {
+		return errors.New("install marker cannot be encoded as strict JSON")
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil || !validMarker(m, raw) {
+		return errors.New("install marker is invalid for schema 2")
+	}
 	return os.WriteFile(filepath.Join(dir, Name), append(payload, '\n'), 0o644)
 }
 
@@ -294,20 +418,29 @@ func nonNilStrings(values []string) []string {
 }
 
 // Current reports whether the installed directory is up to date for the
-// expected marker (Spec §8.5): ref kind and value, commit, locale, agents,
-// activation, substitution, MCP findings, and attestation must match, and
-// the content hash recomputed from disk must equal the recorded one. An
-// unsupported marker schema is an error.
-func Current(installedDir string, expected *Marker) (bool, error) {
-	if version, ok := markerSchemaVersion(installedDir); ok && version != SchemaVersion {
+// effective marker. Schema 1 remains eligible for schema 1 through 5 installs.
+// A build-enabled schema-2 marker additionally requires one BuildCurrentness
+// value; missing validation evidence fails closed as non-current.
+func Current(installedDir string, expected *Marker, buildState ...BuildCurrentness) (bool, error) {
+	if expected == nil {
+		return false, errors.New("expected install marker is nil")
+	}
+	if len(buildState) > 1 {
+		return false, errors.New("multiple build currentness values supplied")
+	}
+	if version, ok := markerSchemaVersion(installedDir); ok && version != LegacySchemaVersion && version != SchemaVersion {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
 	}
 	recorded := Read(installedDir)
 	if recorded == nil {
 		return false, nil
 	}
-	if recorded.SchemaVersion != SchemaVersion {
+	if recorded.SchemaVersion != LegacySchemaVersion && recorded.SchemaVersion != SchemaVersion {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
+	}
+	if recorded.SchemaVersion == LegacySchemaVersion &&
+		(expected.SkillSchemaVersion > 5 || len(expected.BuildRoots) != 0 || len(expected.Builds) != 0 || expected.BuildSource != nil) {
+		return false, nil
 	}
 	if recorded.RefKind != expected.RefKind || recorded.Ref != expected.Ref || recorded.Commit != expected.Commit {
 		return false, nil
@@ -330,11 +463,167 @@ func Current(installedDir string, expected *Marker) (bool, error) {
 	if !reflect.DeepEqual(recorded.Attestation, expected.Attestation) {
 		return false, nil
 	}
+	if recorded.SchemaVersion == SchemaVersion {
+		if !equalStrings(recorded.BuildRoots, normalizedStrings(expected.BuildRoots)) ||
+			!reflect.DeepEqual(recorded.Builds, normalizedBuilds(expected.Builds)) ||
+			!reflect.DeepEqual(recorded.BuildSource, expected.BuildSource) {
+			return false, nil
+		}
+	}
 	actual, err := hashing.ContentSHA256(installedDir, nil)
 	if err != nil {
 		return false, err
 	}
-	return recorded.ContentSHA256 == actual, nil
+	if recorded.ContentSHA256 != actual {
+		return false, nil
+	}
+	if len(recorded.Builds) == 0 {
+		return true, nil
+	}
+	if recorded.SchemaVersion != SchemaVersion || len(buildState) != 1 {
+		return false, nil
+	}
+	return currentBuilds(installedDir, recorded, buildState[0])
+}
+
+func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness) (bool, error) {
+	if state.RawSnapshot == nil || state.InspectCache == nil || state.Inputs == nil ||
+		state.ContextFiles == nil || state.RuntimeFiles == nil || recorded.BuildSource == nil {
+		return false, nil
+	}
+	contextFiles := normalizedStrings(state.ContextFiles)
+	if !equalStrings(contextFiles, recorded.Files) || pathsUnderRoots(contextFiles, recorded.BuildRoots) ||
+		pathsUnderRoots(state.RuntimeFiles, recorded.BuildRoots) {
+		return false, nil
+	}
+	for _, root := range recorded.BuildRoots {
+		if _, err := os.Lstat(filepath.Join(installedDir, filepath.FromSlash(root))); err == nil {
+			return false, nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return false, err
+		}
+	}
+	if !sameBuildCommands(recorded.Builds, state.Inputs) {
+		return false, nil
+	}
+
+	token, err := state.RawSnapshot()
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, buildsource.ErrInvalidSnapshot) {
+			return false, nil
+		}
+		return false, err
+	}
+	if token == nil {
+		return false, nil
+	}
+	current := true
+	useErr := token.Use(func(token *buildsource.Token) error {
+		identity := token.Identity()
+		if identity != *recorded.BuildSource {
+			current = false
+			return nil
+		}
+		commands := make([]string, 0, len(recorded.Builds))
+		for command := range recorded.Builds {
+			commands = append(commands, command)
+		}
+		sort.Strings(commands)
+		for _, command := range commands {
+			build := recorded.Builds[command]
+			input := state.Inputs[command]
+			if input.Command != command || input.Driver != build.Driver || input.BuildSource != identity ||
+				!containsString(recorded.BuildRoots, input.BuildRoot) || input.Validate() != nil {
+				current = false
+				return nil
+			}
+			key, keyErr := input.CacheKey()
+			artifactPath, pathErr := buildmeta.ArtifactPath(command, input.Target.GOOS)
+			if keyErr != nil || pathErr != nil || key != build.CacheKey || artifactPath != build.ArtifactPath {
+				current = false
+				return nil
+			}
+			result := state.InspectCache(command, buildcache.Expectation{Input: input, ReceiptHash: build.ReceiptSHA256})
+			if !validCacheResult(result, input, build) {
+				current = false
+				return nil
+			}
+		}
+		return nil
+	})
+	return buildCurrentnessResult(current, useErr, token.Close())
+}
+
+func buildCurrentnessResult(current bool, useErr, closeErr error) (bool, error) {
+	if closeErr != nil {
+		return false, errors.Join(useErr, closeErr)
+	}
+	if useErr != nil {
+		if errors.Is(useErr, buildsource.ErrSnapshotMutated) || errors.Is(useErr, buildsource.ErrInvalidSnapshot) {
+			return false, nil
+		}
+		return false, useErr
+	}
+	return current, nil
+}
+
+func validCacheResult(result buildcache.Result, input buildmeta.Input, build Build) bool {
+	if result.Status != buildcache.Hit || result.ArtifactPath == "" ||
+		!reflect.DeepEqual(result.Receipt.Input, input) || result.Receipt.CacheKey != build.CacheKey ||
+		result.ReceiptHash != build.ReceiptSHA256 || result.Receipt.Artifact.Path != build.ArtifactPath ||
+		result.Receipt.Artifact.SHA256 != build.ArtifactSHA256 {
+		return false
+	}
+	hash, err := buildmeta.HashReceiptBytes(result.ReceiptBytes)
+	if err != nil || hash != build.ReceiptSHA256 {
+		return false
+	}
+	receipt, err := buildmeta.DecodeExpectedReceipt(result.ReceiptBytes, input)
+	return err == nil && reflect.DeepEqual(receipt, result.Receipt)
+}
+
+func sameBuildCommands(builds map[string]Build, inputs map[string]buildmeta.Input) bool {
+	if len(builds) != len(inputs) {
+		return false
+	}
+	for command := range builds {
+		if _, present := inputs[command]; !present {
+			return false
+		}
+	}
+	return true
+}
+
+func pathsUnderRoots(paths, roots []string) bool {
+	for _, path := range paths {
+		for _, root := range roots {
+			if path == root || len(path) > len(root) && path[:len(root)] == root && path[len(root)] == '/' {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func containsString(values []string, want string) bool {
+	index := sort.SearchStrings(values, want)
+	return index < len(values) && values[index] == want
+}
+
+func normalizedStrings(values []string) []string {
+	result := append([]string(nil), values...)
+	if result == nil {
+		result = []string{}
+	}
+	sort.Strings(result)
+	return result
+}
+
+func normalizedBuilds(values map[string]Build) map[string]Build {
+	if values == nil {
+		return map[string]Build{}
+	}
+	return values
 }
 
 func markerSchemaVersion(installedDir string) (int, bool) {
