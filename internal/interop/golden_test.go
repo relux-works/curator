@@ -47,9 +47,21 @@ func suiteRoot(t *testing.T) string {
 }
 
 func TestGoldenMarkerObject(t *testing.T) {
-	dir := t.TempDir()
+	legacyDir := t.TempDir()
 	wantContextHash := readGolden(t, "expected/context_sha256.txt")
 	wantFiles := []string{".skill_triggers/en.md", "SKILL.md", "references/notes.md"}
+	wantPayload, err := os.ReadFile(golden(t, "expected/marker.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(legacyDir, marker.Name), wantPayload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if recorded := marker.Read(legacyDir); recorded == nil || recorded.SchemaVersion != marker.LegacySchemaVersion {
+		t.Fatalf("legacy golden marker was not readable: %+v", recorded)
+	}
+
+	dir := t.TempDir()
 	generated := &marker.Marker{
 		Name: "golden-skill", Source: "golden-skill",
 		RefKind: "revision", Ref: "0123456789abcdef0123456789abcdef01234567",
@@ -67,17 +79,19 @@ func TestGoldenMarkerObject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPayload, err := os.ReadFile(golden(t, "expected/marker.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var actual, want any
+	var actual, want map[string]any
 	if err := json.Unmarshal(actualPayload, &actual); err != nil {
 		t.Fatal(err)
 	}
 	if err := json.Unmarshal(wantPayload, &want); err != nil {
 		t.Fatal(err)
 	}
+	if actual["schema_version"] != float64(marker.SchemaVersion) || !reflect.DeepEqual(actual["build_roots"], []any{}) || !reflect.DeepEqual(actual["builds"], map[string]any{}) {
+		t.Fatalf("mutation did not write canonical marker v2: %s", actualPayload)
+	}
+	delete(actual, "build_roots")
+	delete(actual, "builds")
+	actual["schema_version"] = float64(marker.LegacySchemaVersion)
 	if !reflect.DeepEqual(actual, want) {
 		t.Fatalf("marker object diverges from golden:\n got %s\nwant %s", actualPayload, wantPayload)
 	}
@@ -116,7 +130,8 @@ func TestGoldenContextCopy(t *testing.T) {
 	}
 	dest := filepath.Join(t.TempDir(), "ctx")
 	includeScripts := len(spec.Commands) == 0
-	files, err := whitelist.CopyContext(fixture, dest, includeScripts, spec.RuntimeRoots)
+	excludeRoots := whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
+	files, err := whitelist.CopyContext(fixture, dest, includeScripts, excludeRoots)
 	if err != nil {
 		t.Fatal(err)
 	}
