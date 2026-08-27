@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/relux-works/curator/internal/verr"
 )
 
 // Bootstrap writes a minimal schema 1 user configuration. Existing files are
@@ -109,4 +111,73 @@ func toFloatJSON(value any) map[string]any {
 	var object map[string]any
 	_ = json.Unmarshal(payload, &object)
 	return object
+}
+
+// SetBuildSSH records one operator credential scope in the user
+// configuration, replacing whatever was recorded under the same scope, and
+// reports whether an existing entry was replaced. Unrelated user fields and
+// other scopes are left untouched.
+func SetBuildSSH(path string, credential BuildSSHCredential) (bool, error) {
+	if err := ValidateBuildSSH(credential); err != nil {
+		return false, err
+	}
+	object, err := readObject(path)
+	if err != nil {
+		return false, err
+	}
+	entries, err := buildSSHEntries(object)
+	if err != nil {
+		return false, err
+	}
+	_, replaced := entries[credential.Scope]
+	rendered := BuildSSHObject(map[string]BuildSSHCredential{credential.Scope: credential})
+	entries[credential.Scope] = rendered[credential.Scope]
+	object["build_ssh"] = entries
+	if _, err := Parse(object, path); err != nil {
+		return false, err
+	}
+	return replaced, writeObjectAtomic(path, object)
+}
+
+// RemoveBuildSSH drops one credential scope from the user configuration.
+// Removing a scope that is not recorded is an error: reporting success would
+// read as "that credential no longer applies" while it still does.
+func RemoveBuildSSH(path, scope string) error {
+	object, err := readObject(path)
+	if err != nil {
+		return err
+	}
+	entries, err := buildSSHEntries(object)
+	if err != nil {
+		return err
+	}
+	if _, present := entries[scope]; !present {
+		return fmt.Errorf("build_ssh scope %q is not configured in %s", scope, path)
+	}
+	delete(entries, scope)
+	// The last scope takes the whole field with it, so a config that selects
+	// no credential says so by omission rather than by an empty object.
+	if len(entries) == 0 {
+		delete(object, "build_ssh")
+	} else {
+		object["build_ssh"] = entries
+	}
+	if _, err := Parse(object, path); err != nil {
+		return err
+	}
+	return writeObjectAtomic(path, object)
+}
+
+// buildSSHEntries returns the raw build_ssh object, treating an absent field
+// as an empty one.
+func buildSSHEntries(object map[string]any) (map[string]any, error) {
+	raw, present := object["build_ssh"]
+	if !present || raw == nil {
+		return map[string]any{}, nil
+	}
+	entries, ok := raw.(map[string]any)
+	if !ok {
+		return nil, verr.New("build_ssh", "must be an object")
+	}
+	return entries, nil
 }
