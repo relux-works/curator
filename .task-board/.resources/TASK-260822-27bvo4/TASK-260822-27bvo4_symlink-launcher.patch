@@ -1,0 +1,671 @@
+diff --git a/.github/ci/platform-cases.tsv b/.github/ci/platform-cases.tsv
+index a9d1428..9355634 100644
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -105,6 +105,31 @@ internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	darwin	p
+ # Executable identity and executable behaviour
+ # ===========================================================================
+ internal/godriver	TestExecutableIdentityRejectsSubstitutionAndMutation	darwin,windows	-	-	the toolchain executable identity rejects substitution and mutation
++
++# The manager resolves its own executable to the canonical installed file
++# BEFORE the substitution battery above runs, so the launch shape an operator
++# used -- a shim link on PATH, a chain of them, a linked install directory, a
++# Windows directory junction -- is not itself a fault. That ordering is a
++# Windows-only behaviour change (`physicalPath` rather than
++# `filepath.EvalSymlinks`, which since Go 1.23 does not follow a junction), so
++# the two junction cases below are the only ones that catch a regression of it
++# and a runner must be REQUIRED to execute them by name.
++#
++# The tolerated skip is narrow and classified: creating a file symbolic link on
++# Windows needs SeCreateSymbolicLinkPrivilege and creating a junction needs
++# `mklink /J` to work, neither of which a hosted runner is obliged to grant.
++# Every such skip is recorded in `skips-observed.tsv` against
++# `host-capability`, and a skip for any other reason -- or any skip at all on
++# darwin, which creates both -- is fatal.
++internal/godriver	TestExecutableIdentityResolvesALauncherLink	darwin,windows	windows	host-capability	the manager resolves its own executable through a package-manager launcher link, and every launch shape yields the one installed identity
++internal/godriver	TestExecutableIdentityResolvesALauncherLink/*	-	windows	host-capability	a launch-shape subtest may skip only where the Windows host forbids unprivileged symlink creation; the case itself must still pass
++internal/godriver	TestExecutableIdentityRejectsSubstitutionThroughALauncherLink	darwin,windows	windows	host-capability	resolving the launch shape does not trust what it reaches: substitution of the installed file still fails closed
++internal/godriver	TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/*	-	windows	host-capability	a substitution subtest may skip only where the Windows host forbids unprivileged symlink creation; the case itself must still pass
++internal/godriver	TestExecutableIdentityResolvesARealSymlinkedProcessLaunch	darwin,windows	windows	host-capability	a process really started through a launcher link resolves the installed identity, so what os.Executable reports for this platform is observed rather than assumed
++internal/godriver	TestBuildAcceptsAManagerStartedThroughALauncherLink	darwin,windows	windows	host-capability	the whole identity handshake completes for a manager whose own path is a launcher link
++internal/godriver	TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink	darwin,windows	windows	host-capability	a worker process started from a launcher link proves the installed identity back over the protocol
++internal/godriver	TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction	windows	windows	host-capability	a manager installed under a directory junction resolves instead of being refused as a non-canonical file -- the shape EvalSymlinks alone cannot follow
++internal/godriver	TestExecutableIdentityStillRejectsSubstitutionBehindAJunction	windows	windows	host-capability	a retargeted, dangling or hard-linked install behind a junction cannot move a recorded manager identity or pass as it
+ internal/runtimestore	TestUnixPostInstallShimPropagatesSignal	linux,darwin	-	-	the installed unix shim is executable and propagates signals
+ internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	linux,darwin	windows	platform-control	executes the POSIX shell hook end to end
+ internal/shell	TestPowerShellHookRunsOnEveryPrompt	windows	linux,darwin	platform-control	executes the PowerShell prompt hook end to end
+diff --git a/internal/godriver/identity.go b/internal/godriver/identity.go
+index 620731a..24828b4 100644
+--- a/internal/godriver/identity.go
++++ b/internal/godriver/identity.go
+@@ -28,6 +28,23 @@ type ExecutableIdentity struct {
+ // resolveExecutableIdentity canonicalizes path to a real installed regular
+ // file, rejects symlink, reparse-point, and hard-link substitution, records
+ // strong file identity, and hashes the bytes.
++//
++// Resolution comes first and rejection comes second, so the shape the operator
++// launched the manager through is never itself the fault. A package manager
++// that publishes a shim on PATH -- a Homebrew or Linuxbrew symlink in bin, a
++// junction the Windows tool cache lays over the install directory -- names the
++// same installed file through a link, and what the checks below reject is
++// substitution of that file, not the link the process was started through.
++// os.Executable reports the launch path verbatim on macOS and Windows, so
++// without this step an ordinary linked install would be read as a non-regular
++// executable and rejected.
++//
++// physicalPath rather than filepath.EvalSymlinks: this is the same rule the
++// selected GOROOT and its launcher are resolved by, and on Windows EvalSymlinks
++// leaves a directory junction untouched and fails outright on a path that
++// descends through one. Resolving here makes the checks below stricter, not
++// more lenient: they are applied to the physical file, so retargeting the link
++// afterwards cannot move the identity this manager and its worker agree on.
+ func resolveExecutableIdentity(path string) (ExecutableIdentity, error) {
+ 	if path == "" {
+ 		return ExecutableIdentity{}, diagnostic(CodeWorkerIdentityInvalid, "manager executable path is empty")
+@@ -36,7 +53,7 @@ func resolveExecutableIdentity(path string) (ExecutableIdentity, error) {
+ 	if err != nil {
+ 		return ExecutableIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err, "cannot resolve the manager executable")
+ 	}
+-	canonical, err := filepath.EvalSymlinks(filepath.Clean(absolute))
++	canonical, err := physicalPath(absolute)
+ 	if err != nil {
+ 		return ExecutableIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err, "cannot canonicalize the manager executable")
+ 	}
+diff --git a/internal/godriver/identity_test.go b/internal/godriver/identity_test.go
+new file mode 100644
+index 0000000..9095cd4
+--- /dev/null
++++ b/internal/godriver/identity_test.go
+@@ -0,0 +1,355 @@
++package godriver
++
++import (
++	"context"
++	"encoding/json"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"testing"
++	"time"
++)
++
++// linkLauncherForTest creates a launcher link named link that points at the
++// installed file target, which is the shape a package manager publishes on
++// PATH. On Windows a file symbolic link needs SeCreateSymbolicLinkPrivilege,
++// which a plain local account may not hold; the directory-junction form of the
++// same launch shape is covered without any privilege in
++// identity_windows_test.go.
++//
++// The skip reason is the exact phrasing `.github/ci/skip-classes.tsv`
++// classifies as `host-capability` -- the same one
++// internal/buildcache/protection_windows_test.go uses for this situation. A
++// Windows runner without the privilege must degrade on a recorded class, not
++// fail the platform-case gate on an unrecognised reason, so reword it only
++// together with that table.
++func linkLauncherForTest(t *testing.T, target, link string) {
++	t.Helper()
++	if err := os.Symlink(target, link); err != nil {
++		if runtime.GOOS == "windows" {
++			t.Skipf("creating Windows symlink requires host support: %v", err)
++		}
++		t.Fatal(err)
++	}
++}
++
++// writeTestExecutable writes a native-looking installed file so a resolved
++// identity is exercised against the same byte shape a real manager has.
++func writeTestExecutable(t *testing.T, path string, tail string) string {
++	t.Helper()
++	writeTestFile(t, path, append(testExecutableBytes(), []byte(tail)...), 0o755)
++	return mustPhysical(t, path)
++}
++
++// TestExecutableIdentityResolvesALauncherLink pins the ordering the manager
++// profile requires: the running executable is resolved to the canonical
++// installed file first, and only then is substitution of that file rejected.
++// The launch shape an operator used -- a shim symlink on PATH, a chain of them,
++// a link to the install directory -- is not itself a fault, and every shape must
++// produce the one identity of the one installed file.
++func TestExecutableIdentityResolvesALauncherLink(t *testing.T) {
++	install := t.TempDir()
++	installed := writeTestExecutable(t, filepath.Join(install, "curator"), "installed manager bytes")
++	direct, err := resolveExecutableIdentity(installed)
++	if err != nil {
++		t.Fatalf("the installed file was not accepted directly: %v", err)
++	}
++
++	for _, testCase := range []struct {
++		name    string
++		launch  func(t *testing.T, shim string) string
++		skipWin bool
++	}{
++		{
++			name: "shim symlink on PATH",
++			launch: func(t *testing.T, shim string) string {
++				link := filepath.Join(shim, "curator")
++				linkLauncherForTest(t, installed, link)
++				return link
++			},
++		},
++		{
++			name: "chain of shim symlinks",
++			launch: func(t *testing.T, shim string) string {
++				first := filepath.Join(shim, "curator-1")
++				second := filepath.Join(shim, "curator-2")
++				linkLauncherForTest(t, installed, first)
++				linkLauncherForTest(t, first, second)
++				return second
++			},
++		},
++		{
++			name: "symlinked install directory",
++			launch: func(t *testing.T, shim string) string {
++				link := filepath.Join(shim, "opt")
++				linkLauncherForTest(t, install, link)
++				return filepath.Join(link, "curator")
++			},
++		},
++		{
++			name: "unclean relative spelling of the link",
++			launch: func(t *testing.T, shim string) string {
++				link := filepath.Join(shim, "curator")
++				linkLauncherForTest(t, installed, link)
++				return filepath.Join(shim, "nested", "..", "curator")
++			},
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			shim := t.TempDir()
++			identity, err := resolveExecutableIdentity(testCase.launch(t, shim))
++			if err != nil {
++				t.Fatalf("a manager launched through this shape was refused: %v", err)
++			}
++			if identity.Path != direct.Path || identity.SHA256 != direct.SHA256 || identity.Size != direct.Size {
++				t.Fatalf("identity = %+v, want the installed file %+v", identity, direct)
++			}
++			// The recorded path is the physical file, so the worker the
++			// manager re-executes resolves the same identity and the protocol
++			// proof compares like with like.
++			if err := identity.matches(direct.Path, direct.SHA256, direct.Size); err != nil {
++				t.Fatalf("the worker proof did not match the manager identity: %v", err)
++			}
++			if err := identity.Verify(); err != nil {
++				t.Fatalf("re-proving the resolved identity failed: %v", err)
++			}
++		})
++	}
++}
++
++// TestExecutableIdentityRejectsSubstitutionThroughALauncherLink keeps the
++// second half of the rule honest: resolving the launch shape is not trusting
++// whatever it reaches. Every substitution of the installed file still fails
++// closed with the one stable diagnostic, and an identity already recorded stays
++// pinned to the physical file it named.
++func TestExecutableIdentityRejectsSubstitutionThroughALauncherLink(t *testing.T) {
++	for _, testCase := range []struct {
++		name  string
++		build func(t *testing.T, directory string) string
++	}{
++		{
++			name: "dangling launcher link",
++			build: func(t *testing.T, directory string) string {
++				link := filepath.Join(directory, "curator")
++				linkLauncherForTest(t, filepath.Join(directory, "missing"), link)
++				return link
++			},
++		},
++		{
++			name: "launcher link to a directory",
++			build: func(t *testing.T, directory string) string {
++				target := filepath.Join(directory, "elsewhere")
++				if err := os.MkdirAll(target, 0o755); err != nil {
++					t.Fatal(err)
++				}
++				link := filepath.Join(directory, "curator")
++				linkLauncherForTest(t, target, link)
++				return link
++			},
++		},
++		{
++			name: "launcher link to an empty file",
++			build: func(t *testing.T, directory string) string {
++				target := filepath.Join(directory, "empty")
++				writeTestFile(t, target, nil, 0o755)
++				link := filepath.Join(directory, "curator")
++				linkLauncherForTest(t, target, link)
++				return link
++			},
++		},
++		{
++			name: "launcher link loop",
++			build: func(t *testing.T, directory string) string {
++				first, second := filepath.Join(directory, "curator"), filepath.Join(directory, "curator-next")
++				linkLauncherForTest(t, second, first)
++				linkLauncherForTest(t, first, second)
++				return first
++			},
++		},
++		{
++			name: "launcher link to a hard-linked file",
++			build: func(t *testing.T, directory string) string {
++				target := writeTestExecutable(t, filepath.Join(directory, "curator-real"), "hard linked")
++				if err := os.Link(target, filepath.Join(directory, "curator-alias")); err != nil {
++					t.Skipf("this host cannot create a hard link: %v", err)
++				}
++				link := filepath.Join(directory, "curator")
++				linkLauncherForTest(t, target, link)
++				return link
++			},
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			path := testCase.build(t, t.TempDir())
++			if code := DiagnosticCode(mustFail(resolveExecutableIdentity(path))); code != CodeWorkerIdentityInvalid {
++				t.Fatalf("substitution code = %q, want %q", code, CodeWorkerIdentityInvalid)
++			}
++		})
++	}
++
++	// A recorded identity anchors on the physical file. Retargeting the shim
++	// afterwards cannot move it, and the file it now reaches cannot pass as the
++	// same manager.
++	directory := t.TempDir()
++	installed := writeTestExecutable(t, filepath.Join(directory, "curator-real"), "installed manager bytes")
++	other := writeTestExecutable(t, filepath.Join(directory, "curator-other"), "attacker bytes")
++	link := filepath.Join(directory, "curator")
++	linkLauncherForTest(t, installed, link)
++	identity, err := resolveExecutableIdentity(link)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if identity.Path != installed {
++		t.Fatalf("identity path = %q, want the physical installed file %q", identity.Path, installed)
++	}
++	if err := os.Remove(link); err != nil {
++		t.Fatal(err)
++	}
++	linkLauncherForTest(t, other, link)
++	if err := identity.Verify(); err != nil {
++		t.Fatalf("retargeting the shim moved a recorded identity: %v", err)
++	}
++	substituted, err := resolveExecutableIdentity(link)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if code := DiagnosticCode(identity.matches(substituted.Path, substituted.SHA256, substituted.Size)); code != CodeWorkerIdentityInvalid {
++		t.Fatalf("substituted proof code = %q, want %q", code, CodeWorkerIdentityInvalid)
++	}
++	// Replacing the bytes of the physical file is still caught by the re-proof
++	// that runs at the launch boundary and again before publication.
++	writeTestFile(t, installed, append(testExecutableBytes(), []byte("replaced bytes")...), 0o755)
++	if code := DiagnosticCode(identity.Verify()); code != CodeWorkerIdentityInvalid {
++		t.Fatalf("mutated executable code = %q, want %q", code, CodeWorkerIdentityInvalid)
++	}
++
++	// Swapping the physical file itself for a link is substitution of the
++	// installed file rather than a launch shape, so the re-proof that runs at
++	// the launch boundary must refuse it even though resolution reached the
++	// original file through a link in the first place.
++	swap := t.TempDir()
++	physical := writeTestExecutable(t, filepath.Join(swap, "curator-real"), "installed manager bytes")
++	shim := filepath.Join(swap, "curator")
++	linkLauncherForTest(t, physical, shim)
++	pinned, err := resolveExecutableIdentity(shim)
++	if err != nil {
++		t.Fatal(err)
++	}
++	elsewhere := writeTestExecutable(t, filepath.Join(swap, "curator-elsewhere"), "attacker bytes")
++	if err := os.Remove(physical); err != nil {
++		t.Fatal(err)
++	}
++	linkLauncherForTest(t, elsewhere, physical)
++	if code := DiagnosticCode(pinned.Verify()); code != CodeWorkerIdentityInvalid {
++		t.Fatalf("physical file swapped for a link code = %q, want %q", code, CodeWorkerIdentityInvalid)
++	}
++}
++
++// TestExecutableIdentityResolvesARealSymlinkedProcessLaunch is the case the
++// unit resolutions above cannot prove on their own: it starts this binary
++// through a shim link and reads back what that process resolved for itself, so
++// whatever os.Executable reports for this platform's launch shape is observed
++// rather than assumed.
++func TestExecutableIdentityResolvesARealSymlinkedProcessLaunch(t *testing.T) {
++	self, err := resolveExecutableIdentity(managerExecutable())
++	if err != nil {
++		t.Fatalf("this test binary is not an acceptable manager executable: %v", err)
++	}
++	launcher := filepath.Join(t.TempDir(), "curator")
++	if runtime.GOOS == "windows" {
++		launcher += ".exe"
++	}
++	linkLauncherForTest(t, self.Path, launcher)
++
++	probe := probeIdentityThrough(t, launcher)
++	if probe.Error != "" {
++		t.Fatalf("a manager started through %q refused its own identity: %s", launcher, probe.Error)
++	}
++	// Evidence for the platform, recorded either way: Linux reports the
++	// already-resolved /proc/self/exe, while darwin and Windows report the path
++	// the process was started with, so on those hosts canonicalization is what
++	// makes the manager and the worker agree on one identity.
++	if probe.Reported == self.Path {
++		t.Logf("evidence: on %s os.Executable already reports the physical path %q for a launch through %q",
++			runtime.GOOS, probe.Reported, launcher)
++	} else {
++		t.Logf("evidence: on %s os.Executable reports the launch path %q rather than the physical %q, so resolution is load-bearing here",
++			runtime.GOOS, probe.Reported, self.Path)
++	}
++	if probe.Path != self.Path || probe.SHA256 != self.SHA256 || probe.Size != self.Size {
++		t.Fatalf("identity resolved by the started process = %+v, want %+v", probe, self)
++	}
++}
++
++// TestBuildAcceptsAManagerStartedThroughALauncherLink drives the whole
++// identity handshake for a manager whose own path is a shim link: the manager
++// resolves and hashes itself, re-executes the canonical file as the worker, and
++// the worker proves the same identity back over the protocol.
++func TestBuildAcceptsAManagerStartedThroughALauncherLink(t *testing.T) {
++	self, err := resolveExecutableIdentity(managerExecutable())
++	if err != nil {
++		t.Fatal(err)
++	}
++	launcher := filepath.Join(t.TempDir(), "curator")
++	if runtime.GOOS == "windows" {
++		launcher += ".exe"
++	}
++	linkLauncherForTest(t, self.Path, launcher)
++
++	restore := managerExecutable
++	managerExecutable = func() string { return launcher }
++	t.Cleanup(func() { managerExecutable = restore })
++
++	fixture := newSnapshotFixture(t)
++	fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
++	result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 60 * time.Second}))
++	if err != nil {
++		t.Fatalf("a build by a manager started through a shim link was refused: %v", err)
++	}
++	if result.Artifact.StagedPath == "" {
++		t.Fatalf("result = %+v, want a staged artifact", result)
++	}
++}
++
++// TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink covers the half
++// TestBuildAcceptsAManagerStartedThroughALauncherLink cannot reach: there the
++// manager resolves a link but still re-executes the physical file, so the
++// worker's own resolution never sees one. Here the worker process itself is
++// started from a link and still has to prove the installed identity back over
++// the protocol, which is the boundary at workerserver.go's accept.
++func TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink(t *testing.T) {
++	scenario := newWorkerScenario(t)
++	launcher := filepath.Join(t.TempDir(), "curator")
++	if runtime.GOOS == "windows" {
++		launcher += ".exe"
++	}
++	linkLauncherForTest(t, scenario.identity.Path, launcher)
++	scenario.launchPath = launcher
++
++	worker := scenario.start()
++	message := worker.receive()
++	if message.Kind != kindReady || message.Ready == nil {
++		t.Fatalf("a worker started through %q sent %q, want ready", launcher, message.Kind)
++	}
++	if err := scenario.identity.matches(message.Ready.ExecutablePath, message.Ready.ExecutableSHA256, message.Ready.ExecutableSize); err != nil {
++		t.Fatalf("a worker started through a launcher link did not prove the installed identity: %v", err)
++	}
++}
++
++// probeIdentityThrough starts this binary at path in the test-only identity
++// probe mode and returns what the started process resolved for itself.
++func probeIdentityThrough(t *testing.T, path string) identityProbe {
++	t.Helper()
++	command := exec.Command(path, identityProbeMode) // #nosec G204 -- test-owned launcher link to this test binary
++	command.Stderr = os.Stderr
++	output, err := command.Output()
++	if err != nil {
++		t.Fatalf("cannot start the identity probe through %q: %v", path, err)
++	}
++	var probe identityProbe
++	if err := json.Unmarshal(output, &probe); err != nil {
++		t.Fatalf("cannot decode the identity probe output %q: %v", output, err)
++	}
++	return probe
++}
+diff --git a/internal/godriver/identity_windows_test.go b/internal/godriver/identity_windows_test.go
+new file mode 100644
+index 0000000..0264991
+--- /dev/null
++++ b/internal/godriver/identity_windows_test.go
+@@ -0,0 +1,124 @@
++//go:build windows
++
++package godriver
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++// TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction pins
++// the Windows launch shape that has no unix counterpart: the manager is
++// installed under a directory the host publishes as a junction, which is how a
++// tool cache and several package managers put an install directory on PATH.
++//
++// A junction is a link, but since Go 1.23 os.Lstat reports it as ModeIrregular
++// rather than ModeSymlink, so filepath.EvalSymlinks does not follow it, and for
++// a junction that is not the last component walkSymlinks refuses to descend at
++// all. Canonicalizing the running executable with EvalSymlinks therefore refused
++// the operator's own working install with worker_identity_invalid before any
++// substitution check ran. physicalPath resolves every link kind in one call, so
++// resolution comes first and the substitution checks below apply to the physical
++// file.
++func TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction(t *testing.T) {
++	install := t.TempDir()
++	installed := writeTestExecutable(t, filepath.Join(install, "curator.exe"), "installed manager bytes")
++	direct, err := resolveExecutableIdentity(installed)
++	if err != nil {
++		t.Fatalf("the installed file was not accepted directly: %v", err)
++	}
++
++	junction := filepath.Join(t.TempDir(), "current")
++	makeTestJunction(t, junction, install)
++	info, err := os.Lstat(junction)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if info.IsDir() {
++		t.Skip("this host cannot create a junction os.Lstat reports as a non-directory")
++	}
++
++	launcher := filepath.Join(junction, "curator.exe")
++	// The shape really is the one EvalSymlinks alone cannot canonicalize.
++	if resolved, evalErr := filepath.EvalSymlinks(launcher); evalErr == nil && resolved == direct.Path {
++		t.Logf("this host's EvalSymlinks already resolved %q; the junction case is covered by physicalPath either way", launcher)
++	} else {
++		t.Logf("EvalSymlinks(%q) = %q, %v", launcher, resolved, evalErr)
++	}
++
++	identity, err := resolveExecutableIdentity(launcher)
++	if err != nil {
++		t.Fatalf("a manager launched through a directory junction was refused: %v", err)
++	}
++	if identity.Path != direct.Path || identity.SHA256 != direct.SHA256 || identity.Size != direct.Size {
++		t.Fatalf("identity = %+v, want the installed file %+v", identity, direct)
++	}
++	if err := identity.matches(direct.Path, direct.SHA256, direct.Size); err != nil {
++		t.Fatalf("the worker proof did not match the manager identity: %v", err)
++	}
++	if err := identity.Verify(); err != nil {
++		t.Fatalf("re-proving the resolved identity failed: %v", err)
++	}
++}
++
++// TestExecutableIdentityStillRejectsSubstitutionBehindAJunction keeps the
++// rejection half honest for the junction shape: resolving the link is not
++// trusting what it reaches, and a recorded identity stays anchored on the
++// physical file rather than on the junction.
++func TestExecutableIdentityStillRejectsSubstitutionBehindAJunction(t *testing.T) {
++	install := t.TempDir()
++	installed := writeTestExecutable(t, filepath.Join(install, "curator.exe"), "installed manager bytes")
++	junction := filepath.Join(t.TempDir(), "current")
++	makeTestJunction(t, junction, install)
++
++	launcher := filepath.Join(junction, "curator.exe")
++	identity, err := resolveExecutableIdentity(launcher)
++	if err != nil {
++		t.Fatalf("a manager launched through a directory junction was refused: %v", err)
++	}
++	if identity.Path != mustPhysical(t, installed) {
++		t.Fatalf("identity path = %q, want the physical installed file %q", identity.Path, installed)
++	}
++
++	// A junction retargeted at another install cannot move the recorded
++	// identity, and the file it now reaches cannot pass as the same manager.
++	other := t.TempDir()
++	substituted := writeTestExecutable(t, filepath.Join(other, "curator.exe"), "attacker bytes")
++	if err := os.Remove(junction); err != nil {
++		t.Fatal(err)
++	}
++	makeTestJunction(t, junction, other)
++	if err := identity.Verify(); err != nil {
++		t.Fatalf("retargeting the junction moved a recorded identity: %v", err)
++	}
++	reached, err := resolveExecutableIdentity(launcher)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if reached.Path != mustPhysical(t, substituted) {
++		t.Fatalf("retargeted launcher resolved to %q, want %q", reached.Path, substituted)
++	}
++	if code := DiagnosticCode(identity.matches(reached.Path, reached.SHA256, reached.Size)); code != CodeWorkerIdentityInvalid {
++		t.Fatalf("substituted proof code = %q, want %q", code, CodeWorkerIdentityInvalid)
++	}
++
++	// A junction whose target is gone is a launch that names nothing, and a
++	// hard-linked file behind a junction is still a substitution.
++	if err := os.RemoveAll(other); err != nil {
++		t.Fatal(err)
++	}
++	if code := DiagnosticCode(mustFail(resolveExecutableIdentity(launcher))); code != CodeWorkerIdentityInvalid {
++		t.Fatalf("dangling junction code = %q, want %q", code, CodeWorkerIdentityInvalid)
++	}
++	if err := os.Link(installed, filepath.Join(install, "curator-alias.exe")); err != nil {
++		t.Skipf("this host cannot create a hard link: %v", err)
++	}
++	if err := os.Remove(junction); err != nil {
++		t.Fatal(err)
++	}
++	makeTestJunction(t, junction, install)
++	if code := DiagnosticCode(mustFail(resolveExecutableIdentity(launcher))); code != CodeWorkerIdentityInvalid {
++		t.Fatalf("hard-linked executable behind a junction code = %q, want %q", code, CodeWorkerIdentityInvalid)
++	}
++}
+diff --git a/internal/godriver/main_test.go b/internal/godriver/main_test.go
+index e5ffe23..deae4ea 100644
+--- a/internal/godriver/main_test.go
++++ b/internal/godriver/main_test.go
+@@ -5,6 +5,7 @@ import (
+ 	"context"
+ 	"encoding/json"
+ 	"go/build"
++	"io"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+@@ -15,6 +16,12 @@ import (
+ 	"github.com/relux-works/curator/internal/buildsource"
+ )
+ 
++// identityProbeMode is a test-only second hidden mode. It exists so a test can
++// start this binary through a launcher link and read back the identity the
++// started process resolves for itself, which is the only way to observe what
++// os.Executable reports for a real launch shape rather than to assume it.
++const identityProbeMode = "-curator-test-identity-probe"
++
+ // TestMain gives the test binary the same fixed hidden worker mode the
+ // installed manager has, so every worker test launches a real identity-verified
+ // process instead of an in-process mock.
+@@ -22,9 +29,35 @@ func TestMain(m *testing.M) {
+ 	if len(os.Args) == 2 && os.Args[1] == WorkerMode {
+ 		os.Exit(RunWorker(os.Stdin, os.Stdout))
+ 	}
++	if len(os.Args) == 2 && os.Args[1] == identityProbeMode {
++		os.Exit(runIdentityProbe(os.Stdout))
++	}
+ 	os.Exit(m.Run())
+ }
+ 
++// identityProbe is what a started process reports about itself.
++type identityProbe struct {
++	Reported string `json:"reported"`
++	Path     string `json:"path"`
++	SHA256   string `json:"sha256"`
++	Size     int64  `json:"size"`
++	Error    string `json:"error"`
++}
++
++func runIdentityProbe(out io.Writer) int {
++	probe := identityProbe{Reported: managerExecutable()}
++	identity, err := resolveExecutableIdentity(probe.Reported)
++	if err != nil {
++		probe.Error = err.Error()
++	} else {
++		probe.Path, probe.SHA256, probe.Size = identity.Path, identity.SHA256, identity.Size
++	}
++	if err := json.NewEncoder(out).Encode(probe); err != nil {
++		return 1
++	}
++	return 0
++}
++
+ // stubScript mirrors the manager-owned script consumed by testdata/stubgo.
+ type stubScript struct {
+ 	Version string `json:"version"`
+diff --git a/internal/godriver/worker_test.go b/internal/godriver/worker_test.go
+index a3ae732..9898b64 100644
+--- a/internal/godriver/worker_test.go
++++ b/internal/godriver/worker_test.go
+@@ -28,7 +28,16 @@ type rawWorker struct {
+ // controls rather than an unconstrained process.
+ func startRawWorker(t *testing.T, identity ExecutableIdentity, limits ResourceLimits, probes []ControlProbe) *rawWorker {
+ 	t.Helper()
+-	command := exec.Command(identity.Path, WorkerMode) // #nosec G204 -- identity-verified re-execution of the test binary
++	return startRawWorkerFrom(t, identity.Path, limits, probes)
++}
++
++// startRawWorkerFrom launches the worker from launchPath, which is the physical
++// executable for every ordinary test and a package-manager link naming that
++// same installed file when a test reproduces an operator launch shape. The
++// worker resolves its own identity from whatever path it was started through.
++func startRawWorkerFrom(t *testing.T, launchPath string, limits ResourceLimits, probes []ControlProbe) *rawWorker {
++	t.Helper()
++	command := exec.Command(launchPath, WorkerMode) // #nosec G204 -- identity-verified re-execution of the test binary
+ 	command.Env = workerEnvironment()
+ 	command.SysProcAttr = workerSysProcAttr()
+ 	stdin, err := command.StdinPipe()
+@@ -120,6 +129,10 @@ type workerScenario struct {
+ 	stage    string
+ 	limits   ResourceLimits
+ 	probes   []ControlProbe
++
++	// launchPath is the path the worker is started from. Empty means the
++	// physical executable, which is what the production parent uses.
++	launchPath string
+ }
+ 
+ func newWorkerScenario(t *testing.T) *workerScenario {
+@@ -192,7 +205,11 @@ func newWorkerScenario(t *testing.T) *workerScenario {
+ // start launches a worker inside the real control domain and sends the
+ // (possibly mutated) request.
+ func (scenario *workerScenario) start() *rawWorker {
+-	worker := startRawWorker(scenario.fixture.t, scenario.identity, scenario.limits, scenario.probes)
++	launchPath := scenario.launchPath
++	if launchPath == "" {
++		launchPath = scenario.identity.Path
++	}
++	worker := startRawWorkerFrom(scenario.fixture.t, launchPath, scenario.limits, scenario.probes)
+ 	request := scenario.request
+ 	worker.send(workerMessage{Kind: kindRequest, Nonce: scenario.nonce, Request: &request})
+ 	return worker

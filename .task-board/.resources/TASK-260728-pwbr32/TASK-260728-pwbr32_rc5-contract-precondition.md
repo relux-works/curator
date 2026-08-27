@@ -1,0 +1,1 @@
+Consume the accepted curator-spec rc.5 release produced by STORY-260728-10wxx2. Security intent remains bound to architecture-v6 SHA-256 2abae77d80eba6789f9911db7e9722595b4f21ba47391ca9eafd0064af03d67e and review-v6. Preserve the completed local schema-6/go-v1 behavior; do not reinterpret its receipts or markers.

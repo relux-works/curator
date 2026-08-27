@@ -1,0 +1,58 @@
+@startuml
+!theme plain
+!pragma layout smetana
+
+title TASK-260720-1zntv0 — go-v1 execution and isolation boundary
+top to bottom direction
+skinparam componentStyle rectangle
+
+package "Curator manager process" #LightBlue {
+  [Install build plan] as Plan
+  [Trusted Go session\nTASK-260720-6i3cya] as Session
+  [go-v1 preflight and build\nTASK-260720-1zntv0] as Driver
+  [Host execution policy\nplatform adapter] as Policy
+  [Verified artifact metadata] as Metadata
+}
+
+package "Read-only trusted or frozen inputs" #LightGray {
+  folder "Validated skill snapshot\nmodule + vendor tree" as Snapshot
+  folder "Fingerprint-verified GOROOT" as GOROOT
+  [GOROOT/pkg/tool/<host>\nallowed transitive tools] as GoTools
+}
+
+package "Operation-private writable state" #LightGreen {
+  folder "Telemetry/config probe" as Probe
+  folder "GOCACHE + GOMODCACHE\nGOTMPDIR + temp" as GoState
+  folder "Staged output" as Staging
+}
+
+package "Denied process and data surfaces" #MistyRose {
+  [Shells and user PATH] as Shell
+  [VCS, network, proxy,\nworkspace, toolchain download] as Network
+  [Host compiler/linker, plugins,\ngenerators, package executables] as HostTools
+  [Built output during install] as OutputExec
+}
+
+Plan --> Session : establish package-independent identity
+Session --> Driver : fixed executable, target, environment
+Driver --> Snapshot : read only; mutation aborts
+Driver --> GOROOT : read and revalidate
+Driver --> Probe : telemetry off, then delete
+Driver --> GoState : only Go-writable roots
+Driver --> Staging : one bounded regular executable
+Driver --> Metadata : path, size, SHA-256; never execute
+
+Policy --> Driver : deadline, output, disk/artifact,\nmemory and process controls where supported
+Driver --> GoTools : only permitted transitive children
+Policy ..> Shell : reject
+Policy ..> Network : deny by fixed environment\nand host control where supported
+Policy ..> HostTools : reject unexpected child
+Policy ..> OutputExec : prohibit during install
+
+note right of Driver
+  Direct argv is limited to the fixed go list
+  and go build forms. Source-aware commands run
+  only on a cache miss after every trust gate.
+end note
+
+@enduml

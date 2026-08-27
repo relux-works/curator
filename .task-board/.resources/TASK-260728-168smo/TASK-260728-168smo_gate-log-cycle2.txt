@@ -1,0 +1,36 @@
+TASK-260728-168smo gate transcript — rework cycle 2
+
+curator-spec, baseline 57c1f56 (clean worktree at .temp/TASK-260728-168smo/spec-baseline)
+  /tmp/specvenv/bin/python tools/validate.py                       exit 0
+    validated 30 schemas and 93 vector files
+
+curator-spec, task worktree (.temp/TASK-260728-168smo/curator-spec-worktree)
+  /tmp/specvenv/bin/python tools/validate.py                       exit 1   EXPECTED-RED
+    validation failed: docs/external-build-repositories.md: broken local link: ../release/1.0.0-rc.5.json
+  full link sweep of the worktree: 42 local links, 3 broken, all pre-existing:
+    docs/external-build-repositories.md  -> ../release/1.0.0-rc.5.json
+    docs/portable-go-execution-policy.md -> ../conformance/v1/vectors/go-host-execution-policy.json  (x2)
+  Both files are copied-in in-flight records owned by sibling tasks, not authored here.
+  link sweep scoped to the two documents authored by this task
+    decisions/0010-kotlin-native-driver-pair.md
+    docs/kotlin-native-build-drivers.md                            exit 0
+    6 local links checked, 0 broken
+
+  python -m unittest discover -s tools -p test_*.py                exit 0   8 tests
+  go test ./tools/...                                              exit 0
+
+curator (main working copy, unmodified by this task)
+  go build ./...                                                   exit 0
+  go vet ./...                                                     exit 0
+  gofmt -l ./cmd ./internal                                        exit 0   0 files
+  go test ./...                                                    exit 0
+
+NOT RUN
+  golangci-lint — not installed on this host.
+
+ATTRIBUTION
+  This task authored two Markdown documents and no Go, schema, vector, or release
+  file. The single red gate is attributable entirely to two sibling in-flight
+  documents present in the shared worktree; 0 broken links originate here.
+  jsonschema is absent from the system interpreter, so validate.py was run from a
+  throwaway venv built from the repo requirements-dev.txt (jsonschema 4.25.1).

@@ -1,0 +1,84 @@
+diff --git a/internal/install/buildssh.go b/internal/install/buildssh.go
+index 712d080..c215780 100644
+--- a/internal/install/buildssh.go
++++ b/internal/install/buildssh.go
+@@ -30,6 +30,10 @@ const (
+ 	envAgentSocket = "SSH_AUTH_SOCK"
+ )
+ 
++var errBuildSSHAgentUnset = fmt.Errorf(
++	"%s: an SSH agent was requested but %s is not set",
++	buildrepo.CodeSSHCredentialMissing, envAgentSocket)
++
+ // BuildSSHFlags is one run-wide operator SSH selection as a command line
+ // spells it. An empty field means the operator named nothing there.
+ type BuildSSHFlags struct {
+@@ -226,6 +230,9 @@ func (s BuildSSHSelection) matchScope(scopes map[string]config.BuildSSHCredentia
+ 	}
+ 	selected, err := s.scopeCredentials(scope)
+ 	if err != nil {
++		if errors.Is(err, errBuildSSHAgentUnset) {
++			return buildrepo.OperatorSSHCredentials{}, "", false, err
++		}
+ 		return buildrepo.OperatorSSHCredentials{}, "", false, fmt.Errorf(
+ 			"build_ssh scope %q selected for %s: %w", scope.Scope, row.effective.Identity, err)
+ 	}
+@@ -276,9 +283,7 @@ func (s BuildSSHSelection) runWideCredentials() (buildrepo.OperatorSSHCredential
+ 	if s.RunWide.Agent == BuildSSHAgentAuto {
+ 		credentials.AgentSocket = s.AgentSocket
+ 		if credentials.AgentSocket == "" {
+-			return buildrepo.OperatorSSHCredentials{}, fmt.Errorf(
+-				"%s: an SSH agent was requested but %s is not set",
+-				buildrepo.CodeSSHCredentialMissing, envAgentSocket)
++			return buildrepo.OperatorSSHCredentials{}, errBuildSSHAgentUnset
+ 		}
+ 	}
+ 	credentials.KnownHosts = s.knownHosts(credentials.KnownHosts)
+@@ -312,8 +317,7 @@ func (s BuildSSHSelection) scopeCredentials(scope config.BuildSSHCredential) (bu
+ 			credentials.AgentSocket = s.AgentSocket
+ 		}
+ 		if credentials.AgentSocket == "" {
+-			return buildrepo.OperatorSSHCredentials{}, fmt.Errorf(
+-				"an SSH agent was requested but %s is not set", envAgentSocket)
++			return buildrepo.OperatorSSHCredentials{}, errBuildSSHAgentUnset
+ 		}
+ 	}
+ 	credentials.KnownHosts = s.knownHosts(credentials.KnownHosts)
+diff --git a/internal/install/buildssh_test.go b/internal/install/buildssh_test.go
+index 77533e6..220e904 100644
+--- a/internal/install/buildssh_test.go
++++ b/internal/install/buildssh_test.go
+@@ -338,6 +338,33 @@ func TestKnownHostsFallBackFromScopeToRunWideToOperator(t *testing.T) {
+ 	}
+ }
+ 
++// Requesting the operator's live agent is one protocol condition regardless
++// of whether the request came from run-wide flags/env or a configured scope.
++func TestAgentUnsetDiagnosticIsIdenticalForRunWideAndScopedSelections(t *testing.T) {
++	rows := []plannedExternal{sshRow("portals", "build", "git.example.test/portals/app")}
++	selections := map[string]BuildSSHSelection{
++		"run-wide": {RunWide: BuildSSHFlags{Agent: BuildSSHAgentAuto}},
++		"scope": {
++			Scopes: map[string]config.BuildSSHCredential{
++				"git.example.test": {Scope: "git.example.test", Agent: true},
++			},
++		},
++	}
++	want := buildrepo.CodeSSHCredentialMissing +
++		": an SSH agent was requested but " + envAgentSocket + " is not set"
++	for name, selection := range selections {
++		t.Run(name, func(t *testing.T) {
++			_, _, err := resolveBuildSSH(selection, rows)
++			if err == nil {
++				t.Fatal("agent selection without a live socket was admitted")
++			}
++			if got := err.Error(); got != want {
++				t.Fatalf("diagnostic = %q, want %q", got, want)
++			}
++		})
++	}
++}
++
+ // "agent": true records the operator's choice of an agent, not a socket path:
+ // a macOS agent socket is per login session and a persisted path goes stale.
+ func TestConfiguredAgentResolvesToTheLiveSocket(t *testing.T) {

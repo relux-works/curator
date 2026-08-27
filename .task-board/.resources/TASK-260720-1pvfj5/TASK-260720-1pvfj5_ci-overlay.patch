@@ -1,0 +1,2361 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -4,11 +4,59 @@
+   push:
+     branches: [main]
+   pull_request:
++  workflow_dispatch:
++    inputs:
++      candidate_ref:
++        description: >-
++          Full 40-character relux-works/curator-spec revision holding the schema v6
++          candidate suite. Branches, tags, short hashes and placeholders are rejected.
++          Leave empty to use candidate_root instead.
++        required: false
++        default: ""
++      candidate_root:
++        description: >-
++          Absolute path to a conformance/v1 root already materialised on the runner.
++          Use instead of candidate_ref when the candidate has no published revision.
++        required: false
++        default: ""
++      candidate_manifest_sha256:
++        description: >-
++          Expected sha256 of <root>/manifest.json. When set, a mismatch aborts the run
++          rather than silently re-baselining onto a different candidate.
++        required: false
++        default: ""
+ 
+ permissions:
+   contents: read
+ 
++env:
++  # The one immutable committed protocol-suite pin, referenced by every job.
++  # It stays on the currently qualified released revision; promoting it is
++  # owned by TASK-260720-38l1sy, after TASK-260720-25d05o qualifies the
++  # release. This pin publishes protocol 1.0.0-rc.3 and claims no later
++  # revision. The schema v6 candidate never appears here -- it enters through
++  # the non-default `candidate-conformance` job below and nowhere else.
++  SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
++  # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
++  # workflow pins @v5, so without these two lines a job may download a
++  # toolchain or read a per-user go env file. The identity step below reads
++  # both back rather than trusting this block.
++  GOTOOLCHAIN: "local"
++  # Quoted deliberately: bare `off` is a YAML 1.1 boolean and would reach the
++  # runner as "false", which is a real per-user go env file path, not "off".
++  GOENV: "off"
++
+ jobs:
++  # ---------------------------------------------------------------------------
++  # The default lane, against the committed released pin, on all three runners.
++  #
++  # `test-gate.sh` plans the run from that root alone: packages whose vectors
++  # the pin does not publish run with CURATOR_CONFORMANCE_ROOT unset and are
++  # named in the report, and `internal/godriver` -- which implements
++  # rc5-native-control-inventory-v1, defined for macOS and Windows only -- is
++  # excluded on linux with its fail-closed rejection asserted there. Nothing is
++  # dropped without appearing in the uploaded evidence.
++  # ---------------------------------------------------------------------------
+   test:
+     name: Test (${{ matrix.os }})
+     runs-on: ${{ matrix.os }}
+@@ -25,15 +73,20 @@
+         uses: actions/checkout@v4
+         with:
+           repository: relux-works/curator-spec
+-          ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
++          ref: ${{ env.SPEC_PIN }}
+           path: protocol-spec
+ 
+       - uses: actions/setup-go@v5
+         with:
+           go-version-file: go.mod
+ 
++      - name: Verify Go toolchain identity
++        shell: bash
++        run: bash .github/ci/toolchain-identity.sh
++
+       - name: gofmt check
+         if: runner.os != 'Windows'
++        shell: bash
+         run: |
+           unformatted="$(gofmt -l cmd internal)"
+           if [ -n "$unformatted" ]; then
+@@ -45,11 +98,94 @@
+       - name: go vet
+         run: go vet ./...
+ 
+-      - name: go test
++      # Proves the ledger's platform claims against the real per-GOOS builds:
++      # a case required on windows must actually compile into the windows
++      # build, and a case compiled into a build the ledger never mentions is a
++      # coverage gap rather than a silent pass.
++      - name: Ledger consistency
++        shell: bash
++        run: bash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger
++
++      # Runs the planned package set and enforces .github/ci/platform-cases.tsv:
++      # the Windows runner must execute the DACL, reparse-point and `.cmd`
++      # launcher cases; the unix runners must execute the ownership, no-follow,
++      # read-only-source, resource-policy and executable cases; and every skip
++      # anywhere in the run is classified and recorded by name.
++      - name: go test + platform-case gate
++        shell: bash
+         env:
+           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+-        run: go test ./...
++        run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
+ 
++      - name: Upload gate evidence
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: test-evidence-${{ matrix.os }}
++          path: .temp/ci-evidence/
++          if-no-files-found: warn
++
++  # ---------------------------------------------------------------------------
++  # Race.
++  #
++  # macos-latest is an inventory platform, so `-race` there covers the whole
++  # package set including internal/godriver, satisfying the acceptance
++  # criteria's race gate on a supported runner. ubuntu-latest satisfies the
++  # "supported race job on at least Linux" clause and covers transaction,
++  # buildcache, install, install/atomicity and interop; godriver is excluded
++  # there by the protocol's own qualification, with the exclusion asserted
++  # rather than assumed.
++  #
++  # windows-latest is deliberately absent: the Go race detector needs a C
++  # toolchain there and this repository has no measurement that the hosted
++  # image satisfies it. Recorded, not silently dropped.
++  # ---------------------------------------------------------------------------
++  race:
++    name: Race (${{ matrix.os }})
++    runs-on: ${{ matrix.os }}
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, macos-latest]
++    steps:
++      - uses: actions/checkout@v4
++        with:
++          submodules: true
++
++      - name: Checkout authoritative protocol suite
++        uses: actions/checkout@v4
++        with:
++          repository: relux-works/curator-spec
++          ref: ${{ env.SPEC_PIN }}
++          path: protocol-spec
++
++      - uses: actions/setup-go@v5
++        with:
++          go-version-file: go.mod
++
++      - name: Verify Go toolchain identity
++        shell: bash
++        run: bash .github/ci/toolchain-identity.sh
++
++      # internal/install/atomicity is the long pole under -race: 115.687s on
++      # the accepted candidate's macOS measurement, against a 480s acceptance
++      # bar. The 30m per-package timeout is headroom for a slower hosted
++      # runner, not a licence for an unbounded test.
++      - name: go test -race + platform-case gate
++        shell: bash
++        env:
++          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
++          GO_TEST_FLAGS: -race
++        run: bash .github/ci/test-gate.sh .temp/ci-evidence/race
++
++      - name: Upload race evidence
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: race-evidence-${{ matrix.os }}
++          path: .temp/ci-evidence/
++          if-no-files-found: warn
++
+   lint:
+     name: Lint
+     runs-on: ubuntu-latest
+@@ -62,10 +198,41 @@
+         with:
+           go-version-file: go.mod
+ 
++      - name: Verify Go toolchain identity
++        shell: bash
++        run: bash .github/ci/toolchain-identity.sh
++
++      # `version: latest` is a mutable supply-chain input: a new golangci-lint
++      # release can turn this job red with no repository change. Pinned to the
++      # version `latest` resolved to when this gate was written.
+       - uses: golangci/golangci-lint-action@v7
+         with:
+-          version: latest
++          version: v2.12.2
+ 
++      # Security findings may be suppressed narrowly and by name; they may not
++      # be suppressed wholesale. A suppression that names no rule silences
++      # every rule, including ones written after the comment.
++      - name: No broad suppression
++        shell: bash
++        run: bash .github/ci/no-broad-suppression.sh
++
++  # The gates are only worth their exit codes if they reject what they claim
++  # to reject. This runs on all three runners because the gate scripts must
++  # behave identically under Git Bash on Windows.
++  gate-selftest:
++    name: Gate self-test (${{ matrix.os }})
++    runs-on: ${{ matrix.os }}
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, macos-latest, windows-latest]
++    steps:
++      - uses: actions/checkout@v4
++
++      - name: Self-test the CI gates
++        shell: bash
++        run: bash .github/ci/gate-selftest.sh
++
+   interop:
+     name: Interop conformance gate
+     runs-on: ubuntu-latest
+@@ -78,17 +245,21 @@
+         uses: actions/checkout@v4
+         with:
+           repository: relux-works/curator-spec
+-          ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
++          ref: ${{ env.SPEC_PIN }}
+           path: protocol-spec
+ 
+       - uses: actions/setup-go@v5
+         with:
+           go-version-file: go.mod
+ 
++      - name: Verify Go toolchain identity
++        shell: bash
++        run: bash .github/ci/toolchain-identity.sh
++
+       - name: Shared protocol suite
+         env:
+           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+-        run: go test ./internal/interop/ -v
++        run: go test -count=1 -timeout 30m ./internal/interop/ -v
+ 
+   naming-gate:
+     name: Naming gate
+@@ -115,3 +286,105 @@
+             exit 1
+           fi
+           echo "naming gate: clean (one README line)"
++
++  # ---------------------------------------------------------------------------
++  # Schema v6 candidate qualification.
++  #
++  # Non-default by construction: it runs only on an explicit workflow_dispatch
++  # that supplies a candidate, never on push or pull_request, and it never
++  # touches SPEC_PIN. `CI_REQUIRE_FULL_ROOT=1` makes any deferral fatal, so a
++  # candidate must serve the whole package set -- this run cannot be green
++  # while a package quietly executed without its vectors. Its output is
++  # candidate evidence, stamped in the artifact itself as neither a published
++  # release nor a conformance claim.
++  # ---------------------------------------------------------------------------
++  candidate-conformance:
++    name: Candidate suite (${{ matrix.os }})
++    if: >-
++      github.event_name == 'workflow_dispatch' &&
++      (inputs.candidate_ref != '' || inputs.candidate_root != '')
++    runs-on: ${{ matrix.os }}
++    strategy:
++      fail-fast: false
++      matrix:
++        os: [ubuntu-latest, macos-latest, windows-latest]
++    steps:
++      - uses: actions/checkout@v4
++        with:
++          submodules: true
++
++      - name: Reject a non-immutable candidate revision
++        if: inputs.candidate_ref != ''
++        shell: bash
++        env:
++          CANDIDATE_REF: ${{ inputs.candidate_ref }}
++        run: bash .github/ci/candidate-suite.sh verify-ref "$CANDIDATE_REF"
++
++      - name: Check out the candidate suite
++        if: inputs.candidate_ref != ''
++        uses: actions/checkout@v4
++        with:
++          repository: relux-works/curator-spec
++          ref: ${{ inputs.candidate_ref }}
++          path: candidate-spec
++
++      # The committed released pin is checked out here only so the candidate
++      # can be proved to differ from it. This job never runs against it and
++      # never modifies it.
++      - name: Checkout the committed released pin for comparison
++        uses: actions/checkout@v4
++        with:
++          repository: relux-works/curator-spec
++          ref: ${{ env.SPEC_PIN }}
++          path: protocol-spec
++
++      - uses: actions/setup-go@v5
++        with:
++          go-version-file: go.mod
++
++      - name: Verify Go toolchain identity
++        shell: bash
++        run: bash .github/ci/toolchain-identity.sh
++
++      - name: Resolve and record the candidate suite identity
++        id: candidate
++        shell: bash
++        env:
++          CANDIDATE_REF: ${{ inputs.candidate_ref }}
++          CANDIDATE_ROOT_INPUT: ${{ inputs.candidate_root }}
++          CANDIDATE_EXPECTED_MANIFEST_SHA256: ${{ inputs.candidate_manifest_sha256 }}
++        run: |
++          set -u
++          if [ -n "$CANDIDATE_ROOT_INPUT" ]; then
++            root="$CANDIDATE_ROOT_INPUT"
++          else
++            root="$GITHUB_WORKSPACE/candidate-spec/conformance/v1"
++          fi
++          echo "root=$root" >>"$GITHUB_OUTPUT"
++
++          pin_manifest="$GITHUB_WORKSPACE/protocol-spec/conformance/v1/manifest.json"
++          if command -v shasum >/dev/null 2>&1; then
++            PIN_MANIFEST_SHA256="$(shasum -a 256 "$pin_manifest" | awk '{print $1}')"
++          else
++            PIN_MANIFEST_SHA256="$(sha256sum "$pin_manifest" | awk '{print $1}')"
++          fi
++          export PIN_MANIFEST_SHA256
++          bash .github/ci/candidate-suite.sh record "$root" .temp/ci-evidence/candidate
++
++      # The full candidate suite on every platform. The platform-case ledger is
++      # enforced exactly as in the default lane, and CI_REQUIRE_FULL_ROOT=1
++      # additionally forbids the package deferral the default lane permits.
++      - name: Candidate suite + platform-case gate
++        shell: bash
++        env:
++          CURATOR_CONFORMANCE_ROOT: ${{ steps.candidate.outputs.root }}
++          CI_REQUIRE_FULL_ROOT: "1"
++        run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
++
++      - name: Upload candidate evidence
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: candidate-evidence-${{ matrix.os }}
++          path: .temp/ci-evidence/
++          if-no-files-found: warn
+--- a/Makefile
++++ b/Makefile
+@@ -2,8 +2,19 @@
+ VERSION ?= dev
+ LDFLAGS := -X github.com/relux-works/curator/internal/version.value=$(VERSION)
+ 
+-.PHONY: build test fmt lint vet check
++# Compiled-build CI gates. EVIDENCE is where each gate writes its raw
++# `go test -json` stream, its suite plan and its platform-case report, so a
++# claim about a gate can always be checked against the run that produced it.
++EVIDENCE ?= .temp/ci-evidence
++GO_TEST_TIMEOUT ?= 30m
++TEST_GATE := .github/ci/test-gate.sh
++CANDIDATE := .github/ci/candidate-suite.sh
+ 
++.PHONY: build test fmt lint vet check \
++	require-pin-root ci-test race race-full check-ci \
++	gate-selftest ledger-check no-broad-suppression \
++	candidate-verify-ref candidate-record candidate-test
++
+ build:
+ 	$(GO) build -ldflags '$(LDFLAGS)' -o bin/curator ./cmd/curator
+ 
+@@ -21,3 +32,76 @@
+ 
+ check: vet test
+ 	@test -z "$$(gofmt -l .)" || { echo 'gofmt: files need formatting:'; gofmt -l .; exit 1; }
++
++# --- CI gates ---------------------------------------------------------------
++#
++# These targets are the local mirror of the workflow. CI calls the scripts
++# directly rather than through `make`, because `make` is not a guaranteed tool
++# on windows-latest; the recipes below invoke exactly the same scripts with
++# exactly the same environment, so a green `make check-ci` means the same thing
++# the job does.
++#
++# Every gate consumes a protocol suite root. CI exports it from the committed
++# pin; a local run must supply it explicitly, because a gate that quietly runs
++# with the conformance suite unset is a smaller gate wearing the same name.
++require-pin-root:
++	@test -n "$(CURATOR_CONFORMANCE_ROOT)" || { \
++		echo 'CURATOR_CONFORMANCE_ROOT is required by this gate.'; \
++		echo 'CI exports it from the committed SPEC_PIN checkout; locally, point it'; \
++		echo 'at a materialised <curator-spec>/conformance/v1 directory.'; \
++		exit 1; }
++
++# Mirrors the `test` job's gate step: plan from the root, run the planned
++# package set, enforce the platform-case ledger.
++ci-test: require-pin-root
++	GO='$(GO)' GO_TEST_TIMEOUT='$(GO_TEST_TIMEOUT)' \
++		bash $(TEST_GATE) '$(EVIDENCE)/test'
++
++# Mirrors the `race` job. The package set is not narrowed by hand: the same
++# plan decides it, so no maintained list can drift out of coverage.
++race: require-pin-root
++	GO='$(GO)' GO_TEST_TIMEOUT='$(GO_TEST_TIMEOUT)' GO_TEST_FLAGS='-race' \
++		bash $(TEST_GATE) '$(EVIDENCE)/race'
++
++race-full: race
++
++# Proves the ledger's per-platform claims against the real per-GOOS builds.
++ledger-check:
++	bash .github/ci/ledger-consistency.sh '$(EVIDENCE)/ledger'
++
++no-broad-suppression:
++	bash .github/ci/no-broad-suppression.sh
++
++# Proves the gates reject what they claim to reject. Needs no conformance
++# root, no network and no Go build.
++gate-selftest:
++	bash .github/ci/gate-selftest.sh
++
++# Mirrors the `test` job end to end, in order, over the same paths CI checks
++# (`check` keeps its wider `.` scope, which additionally walks the skills
++# submodule).
++check-ci: require-pin-root
++	@test -z "$$(gofmt -l cmd internal)" || { echo 'gofmt: files need formatting:'; gofmt -l cmd internal; exit 1; }
++	$(GO) vet ./...
++	$(MAKE) ledger-check
++	$(MAKE) ci-test
++
++# --- Candidate protocol suite ----------------------------------------------
++#
++# Non-default by construction: nothing here reads or writes the committed pin.
++# `candidate-test` sets CI_REQUIRE_FULL_ROOT=1, exactly as the workflow's
++# candidate job does, so a candidate root that cannot serve a package fails
++# instead of quietly deferring it.
++candidate-verify-ref:
++	@test -n "$(CANDIDATE_REF)" || { echo 'CANDIDATE_REF is required'; exit 1; }
++	bash $(CANDIDATE) verify-ref '$(CANDIDATE_REF)'
++
++candidate-record:
++	@test -n "$(CANDIDATE_ROOT)" || { echo 'CANDIDATE_ROOT is required'; exit 1; }
++	bash $(CANDIDATE) record '$(CANDIDATE_ROOT)' '$(EVIDENCE)/candidate'
++
++candidate-test:
++	@test -n "$(CANDIDATE_ROOT)" || { echo 'CANDIDATE_ROOT is required'; exit 1; }
++	CURATOR_CONFORMANCE_ROOT='$(CANDIDATE_ROOT)' CI_REQUIRE_FULL_ROOT=1 \
++	GO='$(GO)' GO_TEST_TIMEOUT='$(GO_TEST_TIMEOUT)' \
++		bash $(TEST_GATE) '$(EVIDENCE)/candidate-test'
+--- a/README.md
++++ b/README.md
+@@ -334,7 +334,44 @@
+ ## Development
+ 
+ The repository uses an in-repo task board (`.task-board/`, epics, stories, and tasks as files) and the agent tooling connected under `agents/`. Go testing follows the closed-loop tooling of `skill-go-testing-tools` (including `tuitestkit` for terminal UI phases).
++
++### Gates and tooling
++
++Every gate below is a script under `.github/ci/`, called directly by
++[.github/workflows/ci.yml](.github/workflows/ci.yml) and mirrored by a `make`
++target for local use. CI calls the scripts rather than `make` because `make` is
++not a guaranteed tool on the Windows runner. Each gate writes its raw stream and
++its report under `EVIDENCE` (default `.temp/ci-evidence/`), which CI uploads per
++runner, so any claim about a gate can be checked against the run that produced
++it.
+ 
++| Tool | What it gates | How to run it | Where its output goes |
++| --- | --- | --- | --- |
++| `test-gate.sh` | plans the run from the supplied conformance root, executes it, then enforces the platform-case ledger; every status is fatal | `make ci-test` | `$EVIDENCE/test/` — `go-test*.json`, `suite-plan.txt`, `platform-cases.txt`, `skips-observed.tsv` |
++| `test-gate.sh` (`-race`) | the same gate under the race detector | `make race` | `$EVIDENCE/race/` |
++| `suite-plan.sh` | decides, from the root alone, which packages it serves, which it cannot, and which this platform does not qualify | called by `test-gate.sh` | `$EVIDENCE/*/suite-plan.txt`, `plan-*.txt` |
++| `platform-case-gate.sh` | requires every case [`platform-cases.tsv`](.github/ci/platform-cases.tsv) names on this runner, and classifies every skip against [`skip-classes.tsv`](.github/ci/skip-classes.tsv) | called by `test-gate.sh` | `$EVIDENCE/*/platform-cases.txt`, `skips-observed.tsv` |
++| `ledger-consistency.sh` | proves each ledger row against the real per-GOOS builds via `go list` — no runner needed | `make ledger-check` | `$EVIDENCE/ledger/ledger-consistency.txt` |
++| `excluded-packages.sh` | the one resolver of "which packages does this platform not execute, and on whose authority" | called by the two gates above | stdout (TSV) |
++| `candidate-suite.sh` | rejects a non-immutable candidate revision; records a candidate root's identity as candidate-only evidence | `make candidate-verify-ref CANDIDATE_REF=…` / `make candidate-record CANDIDATE_ROOT=…` | `$EVIDENCE/candidate/candidate-suite-identity.txt` |
++| `toolchain-identity.sh` | asserts the resolved Go toolchain is exactly `go.mod`'s, with `GOTOOLCHAIN=local` and `GOENV=off` read back | run by every Go-consuming job | job log |
++| `no-broad-suppression.sh` | rejects bare `//nolint`, bare `//#nosec`, production-path lint exclusions, wholesale disabling, and unrecorded `gosec` exclusions | `make no-broad-suppression` | job log |
++| `gate-selftest.sh` | drives every gate above against synthetic inputs and asserts a real exit code for each negative case | `make gate-selftest` | job log |
++
++`make ci-test`, `make race` and `make check-ci` require `CURATOR_CONFORMANCE_ROOT`
++to point at a materialised `<curator-spec>/conformance/v1`; they refuse to run
++without it, because a gate that runs with the conformance suite unset is a
++smaller gate wearing the same name.
++
++The committed protocol-suite pin is declared once, as `SPEC_PIN` in the workflow
++`env:` block, and every job reads it from there. A schema v6 candidate suite is
++never committed and never a default: it enters only through the
++`candidate-conformance` job, on an explicit `workflow_dispatch` that supplies a
++full 40-character revision or a pre-materialised root. That job sets
++`CI_REQUIRE_FULL_ROOT=1`, so a candidate must serve the whole package set, and
++everything it emits is stamped in the artifact itself as candidate-only evidence
++— neither a published release nor a conformance claim.
++
+ ## Contributing
+ 
+ See [CONTRIBUTING.md](CONTRIBUTING.md) for the working agreements: board-first workflow, discrete signed commits, spec-first rule.
+--- a/.github/ci/candidate-suite.sh
++++ b/.github/ci/candidate-suite.sh
+@@ -0,0 +1,153 @@
++#!/usr/bin/env bash
++# Candidate protocol-suite identity and evidence recorder.
++#
++# The committed `SPEC_PIN` in `.github/workflows/ci.yml` is the only default
++# protocol input and always stays on the currently qualified released
++# revision.  A schema v6 candidate suite is never committed and never becomes a
++# default: it enters exactly one non-default job, through an explicit
++# caller-supplied full revision or a pre-materialised root, and everything it
++# produces is stamped as candidate evidence.
++#
++# This script:
++#   * rejects any candidate input that is not immutable -- a branch, a tag, a
++#     short hash, a placeholder or a guess;
++#   * refuses a candidate root that is byte-identical to the committed pin's
++#     root, so candidate evidence can never be passed off as pin evidence;
++#   * records the exact revision, the manifest digest, the whole-tree digest
++#     and the file count;
++#   * verifies those against caller-supplied expected digests when given;
++#   * writes an evidence file whose header states, in the artifact itself, that
++#     it is neither a published release nor a conformance claim.
++#
++# Usage:
++#   candidate-suite.sh verify-ref  <revision>
++#   candidate-suite.sh record      <root> <evidence-dir>
++#
++# Environment (optional, all fail-closed when set and mismatched):
++#   CANDIDATE_REF                     full 40-hex revision the root came from
++#   CANDIDATE_EXPECTED_MANIFEST_SHA256  expected sha256 of <root>/manifest.json
++#   CANDIDATE_EXPECTED_TREE_SHA256      expected aggregate digest of the tree
++#   SPEC_PIN                          committed released pin, for the anti-confusion check
++
++set -u
++
++die() { echo "candidate-suite: $*" >&2; exit 1; }
++
++sha256_of() {
++	if command -v shasum >/dev/null 2>&1; then
++		shasum -a 256 "$1" | awk '{print $1}'
++	elif command -v sha256sum >/dev/null 2>&1; then
++		sha256sum "$1" | awk '{print $1}'
++	else
++		die 'neither shasum nor sha256sum is available'
++	fi
++}
++
++# A candidate revision must be a full, lowercase, 40-hex commit id.  Branches,
++# tags, `HEAD`, short hashes and placeholders are all rejected by shape, before
++# anything is fetched.
++verify_ref() {
++	ref="$1"
++	[ -n "$ref" ] || die 'candidate revision is empty'
++	case "$ref" in
++		*[!0-9a-f]*) die "candidate revision is not lowercase hex: '$ref' (a branch, tag or placeholder is never a valid candidate pin)" ;;
++	esac
++	[ "${#ref}" -eq 40 ] || die "candidate revision must be a full 40-character commit id, got ${#ref} characters: '$ref'"
++	case "$ref" in
++		0000000000000000000000000000000000000000) die 'candidate revision is the null commit' ;;
++	esac
++	if [ -n "${SPEC_PIN:-}" ] && [ "$ref" = "$SPEC_PIN" ]; then
++		die "candidate revision equals the committed released pin $SPEC_PIN; a candidate run must not impersonate the qualified pin"
++	fi
++	echo "candidate-suite: revision accepted (immutable, full 40-hex): $ref"
++}
++
++record() {
++	root="$1"
++	evidence="$2"
++	[ -d "$root" ] || die "candidate root is not a directory: $root"
++	[ -f "$root/manifest.json" ] || die "candidate root has no manifest.json: $root"
++	mkdir -p "$evidence" || die "cannot create evidence directory: $evidence"
++
++	manifest_sha="$(sha256_of "$root/manifest.json")" || exit 1
++
++	# Whole-tree identity.  Enumerated in three separately status-checked
++	# stages: a partial-then-failing `find` piped into a digest would produce
++	# a short but internally consistent answer, and that answer is exactly
++	# the thing this digest exists to make impossible.
++	paths="$evidence/candidate-paths.txt"
++	sorted="$evidence/candidate-paths.sorted.txt"
++	digests="$evidence/candidate-file-digests.txt"
++
++	( cd "$root" && find . -type f -print ) >"$paths" || die 'candidate enumeration failed (find)'
++	sort "$paths" >"$sorted" || die 'candidate enumeration failed (sort)'
++	files="$(wc -l <"$sorted" | tr -d ' ')"
++	[ "$files" -gt 0 ] || die 'candidate root enumerated zero files'
++
++	: >"$digests"
++	while IFS= read -r rel; do
++		printf '%s  %s\n' "$(sha256_of "$root/$rel")" "$rel" >>"$digests" || die "digest failed for $rel"
++	done <"$sorted"
++	[ "$(wc -l <"$digests" | tr -d ' ')" -eq "$files" ] || die 'digest count does not match the enumerated file count'
++
++	tree_sha="$(sha256_of "$digests")" || exit 1
++
++	protocol="$(awk -F'"' '/"protocol_version"[ \t]*:/{print $4; exit}' "$root/manifest.json")"
++	[ -n "$protocol" ] || protocol='<unreadable>'
++
++	ref="${CANDIDATE_REF:-<pre-materialised root, no revision supplied>}"
++
++	# Anti-confusion: a candidate whose manifest is byte-identical to the
++	# committed pin's manifest is the pin, not a candidate.
++	if [ -n "${PIN_MANIFEST_SHA256:-}" ] && [ "$manifest_sha" = "$PIN_MANIFEST_SHA256" ]; then
++		die "candidate manifest digest equals the committed pin's manifest digest ($manifest_sha); this is the released suite, not a candidate"
++	fi
++
++	if [ -n "${CANDIDATE_EXPECTED_MANIFEST_SHA256:-}" ]; then
++		exp="${CANDIDATE_EXPECTED_MANIFEST_SHA256#sha256:}"
++		[ "$manifest_sha" = "$exp" ] || die "candidate manifest digest mismatch: expected $exp, measured $manifest_sha -- this is a different candidate, never re-baseline it silently"
++		echo "candidate-suite: manifest digest matches the supplied expectation"
++	fi
++	if [ -n "${CANDIDATE_EXPECTED_TREE_SHA256:-}" ]; then
++		exp="${CANDIDATE_EXPECTED_TREE_SHA256#sha256:}"
++		[ "$tree_sha" = "$exp" ] || die "candidate tree digest mismatch: expected $exp, measured $tree_sha"
++		echo "candidate-suite: tree digest matches the supplied expectation"
++	fi
++
++	out="$evidence/candidate-suite-identity.txt"
++	{
++		echo '# CANDIDATE PROTOCOL SUITE EVIDENCE -- NOT A RELEASE'
++		echo '#'
++		echo '# This file records the identity of an explicitly supplied, non-default'
++		echo '# candidate protocol suite. It is NOT a published release, NOT a release'
++		echo '# claim and NOT a conformance claim, and it must not be cited as any of'
++		echo '# them. The committed default pin is unchanged by this run; promoting it'
++		echo '# is owned by TASK-260720-38l1sy after TASK-260720-25d05o qualifies the'
++		echo '# release.'
++		echo '#'
++		echo "candidate_revision      $ref"
++		echo "candidate_root          $root"
++		echo "protocol_version        $protocol"
++		echo "manifest_sha256         sha256:$manifest_sha"
++		echo "tree_sha256             sha256:$tree_sha"
++		echo "file_count              $files"
++		echo "committed_released_pin  ${SPEC_PIN:-<unset>}"
++		echo "runner_goos             $(go env GOOS 2>/dev/null || echo '<unknown>')"
++		echo "runner_goarch           $(go env GOARCH 2>/dev/null || echo '<unknown>')"
++		echo 'evidence_class          candidate-only'
++		echo 'release_claim           none'
++		echo 'conformance_claim       none'
++	} >"$out" || die "cannot write $out"
++
++	cat "$out"
++	echo "candidate-suite: identity recorded at $out"
++}
++
++[ "$#" -ge 1 ] || die 'usage: candidate-suite.sh verify-ref <revision> | record <root> <evidence-dir>'
++cmd="$1"
++shift
++case "$cmd" in
++	verify-ref) [ "$#" -eq 1 ] || die 'usage: candidate-suite.sh verify-ref <revision>'; verify_ref "$1" ;;
++	record)     [ "$#" -eq 2 ] || die 'usage: candidate-suite.sh record <root> <evidence-dir>'; record "$1" "$2" ;;
++	*)          die "unknown subcommand: $cmd" ;;
++esac
+--- a/.github/ci/excluded-packages.sh
++++ b/.github/ci/excluded-packages.sh
+@@ -0,0 +1,79 @@
++#!/usr/bin/env bash
++# Which packages this platform does not execute, and why.
++#
++# One implementation, used by both `suite-plan.sh` (which decides what to run)
++# and `ledger-consistency.sh` (which decides what the ledger must declare).
++# Two implementations of this rule would eventually disagree, and the
++# disagreement would look like a coverage gap in whichever gate was checked
++# second.
++#
++# The supplied conformance root's own
++# `vectors/conformance-claim-v3-qualification.json` is authoritative when it
++# exists. `default_excluded_on` in `.github/ci/platform-exclusions.tsv` applies
++# only to a root that predates that vector -- the committed released pin is
++# such a root.
++#
++# Usage:
++#   excluded-packages.sh <goos> [conformance-root]
++#
++# Prints one TAB separated line per excluded package:
++#   package  assertion_case  source_of_truth
++#
++# Prints nothing and exits 0 when this platform excludes nothing.
++#
++# Environment:
++#   CI_PLATFORM_EXCLUSIONS  default: .github/ci/platform-exclusions.tsv
++
++set -u
++
++EXCLUSIONS="${CI_PLATFORM_EXCLUSIONS:-.github/ci/platform-exclusions.tsv}"
++QUALIFICATION_VECTOR='vectors/conformance-claim-v3-qualification.json'
++
++if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
++	echo 'excluded-packages: usage: excluded-packages.sh <goos> [conformance-root]' >&2
++	exit 2
++fi
++GOOS_WANT="$1"
++ROOT="${2:-}"
++[ -f "$EXCLUSIONS" ] || { echo "excluded-packages: exclusion table not found: $EXCLUSIONS" >&2; exit 2; }
++
++QV=''
++[ -n "$ROOT" ] && [ -f "$ROOT/$QUALIFICATION_VECTOR" ] && QV="$ROOT/$QUALIFICATION_VECTOR"
++
++vector_excludes_this_goos=0
++if [ -n "$QV" ]; then
++	# The vector spells macOS `macos`; the other two names match their GOOS.
++	if awk '
++		/"name"[ \t]*:/   { name = $0; sub(/^.*"name"[ \t]*:[ \t]*"/, "", name); sub(/".*$/, "", name) }
++		/"status"[ \t]*:/ {
++			status = $0; sub(/^.*"status"[ \t]*:[ \t]*"/, "", status); sub(/".*$/, "", status)
++			if (status == "excluded" && name != "") {
++				goos = (name == "macos") ? "darwin" : name
++				print goos
++			}
++			name = ""
++		}
++	' "$QV" | grep -qx "$GOOS_WANT"; then
++		vector_excludes_this_goos=1
++	fi
++fi
++
++while IFS="$(printf '\t')" read -r pkg assertcase defaults _note; do
++	case "$pkg" in ''|\#*) continue ;; esac
++	[ -n "$assertcase" ] || continue
++
++	if [ -n "$QV" ]; then
++		[ "$vector_excludes_this_goos" -eq 1 ] || continue
++		source_of_truth="the root's own $QUALIFICATION_VECTOR"
++	else
++		case ",${defaults:-}," in
++			*",$GOOS_WANT,"*) ;;
++			*) continue ;;
++		esac
++		source_of_truth="default_excluded_on (this root publishes no $QUALIFICATION_VECTOR)"
++	fi
++
++	printf '%s\t%s\t%s\n' "$pkg" "$assertcase" "$source_of_truth"
++done <"$EXCLUSIONS"
++
++exit 0
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -0,0 +1,379 @@
++#!/usr/bin/env bash
++# Gate self-test.
++#
++# Every gate in this directory is only worth its exit code if it rejects what
++# it claims to reject. This drives each one against synthetic inputs and
++# asserts a REAL exit code for every case -- including the negative cases,
++# which are the ones a gate silently loses when it is refactored.
++#
++# It needs no conformance root, no network and no Go build. The handful of
++# cases that need a `go` launcher are named and reported when one is absent,
++# never quietly dropped.
++#
++# Usage:
++#   gate-selftest.sh
++
++set -u
++
++HERE="$(cd "$(dirname "$0")" && pwd)"
++ROOTDIR="$(cd "$HERE/../.." && pwd)"
++cd "$ROOTDIR" || exit 2
++
++WORK="$(mktemp -d "${TMPDIR:-/tmp}/gate-selftest.XXXXXX")" || exit 2
++trap 'rm -rf "$WORK"' EXIT
++
++PASS=0; FAIL=0; SKIPPED=0
++
++# Read the committed pin out of the workflow rather than duplicating it, so
++# these cases also assert that the pin CI actually uses is itself a full,
++# immutable, lowercase 40-hex revision -- the same shape a candidate must have.
++PIN="$(awk '/^[ \t]*SPEC_PIN:[ \t]*/{print $2; exit}' .github/workflows/ci.yml)"
++
++ok()   { PASS=$((PASS + 1)); printf 'ok    %s\n' "$1"; }
++bad()  { FAIL=$((FAIL + 1)); printf 'FAIL  %s\n      %s\n' "$1" "$2"; }
++skip() { SKIPPED=$((SKIPPED + 1)); printf 'skip  %s\n      %s\n' "$1" "$2"; }
++
++# assert <name> <want-exit> <command...>
++assert() {
++	name="$1"; want="$2"; shift 2
++	out="$WORK/out.txt"
++	"$@" >"$out" 2>&1
++	got=$?
++	if [ "$got" -eq "$want" ]; then ok "$name"
++	else bad "$name" "exit $got, want $want; output: $(tr '\n' ' ' <"$out" | cut -c1-200)"
++	fi
++}
++
++# assert_contains <name> <needle> <file>
++assert_contains() {
++	if grep -qF "$2" "$3"; then ok "$1"
++	else bad "$1" "expected to find: $2"
++	fi
++}
++
++echo '=== candidate-suite.sh verify-ref: only a full immutable revision is a candidate ==='
++CS="$HERE/candidate-suite.sh"
++if [ -z "$PIN" ]; then
++	bad 'the workflow declares a SPEC_PIN' 'no SPEC_PIN: line in .github/workflows/ci.yml'
++	PIN='0000000000000000000000000000000000000001'
++else
++	# The committed pin must satisfy the same immutability shape a candidate
++	# does: a branch or a mutable tag committed as the default pin is exactly
++	# what `verify-ref` exists to make impossible.
++	assert 'the committed SPEC_PIN is itself a full immutable revision' 0 env -u SPEC_PIN bash "$CS" verify-ref "$PIN"
++fi
++export SPEC_PIN="$PIN"
++assert 'verify-ref rejects a branch'                1 bash "$CS" verify-ref 'main'
++assert 'verify-ref rejects a tag'                   1 bash "$CS" verify-ref 'v1.0.0-rc.5'
++assert 'verify-ref rejects HEAD'                    1 bash "$CS" verify-ref 'HEAD'
++assert 'verify-ref rejects a short hash'            1 bash "$CS" verify-ref '00b1688'
++assert 'verify-ref rejects uppercase hex'           1 bash "$CS" verify-ref '00B1688A9B2457CA397A0BB550ACF47CAD8EE967'
++assert 'verify-ref rejects a placeholder'           1 bash "$CS" verify-ref '<candidate-revision>'
++assert 'verify-ref rejects the empty string'        1 bash "$CS" verify-ref ''
++assert 'verify-ref rejects the null commit'         1 bash "$CS" verify-ref '0000000000000000000000000000000000000000'
++assert 'verify-ref rejects a revision equal to the pin' 1 bash "$CS" verify-ref "$PIN"
++assert 'verify-ref accepts a full 40-hex revision'  0 bash "$CS" verify-ref '1234567890abcdef1234567890abcdef12345678'
++
++echo ''
++echo '=== candidate-suite.sh record: identity, anti-confusion, evidence wording ==='
++FAKEROOT="$WORK/root"
++mkdir -p "$FAKEROOT/vectors"
++printf '{\n  "protocol_version": "1.0.0-rc.5"\n}\n' >"$FAKEROOT/manifest.json"
++printf 'vector-a\n' >"$FAKEROOT/vectors/a.json"
++MANIFEST_SHA="$(shasum -a 256 "$FAKEROOT/manifest.json" 2>/dev/null | awk '{print $1}')"
++[ -n "$MANIFEST_SHA" ] || MANIFEST_SHA="$(sha256sum "$FAKEROOT/manifest.json" | awk '{print $1}')"
++
++assert 'record rejects a nonexistent root'          1 bash "$CS" record "$WORK/absent" "$WORK/ev1"
++mkdir -p "$WORK/noman"
++assert 'record rejects a root with no manifest.json' 1 bash "$CS" record "$WORK/noman" "$WORK/ev2"
++assert 'record rejects a manifest digest mismatch'  1 env CANDIDATE_EXPECTED_MANIFEST_SHA256=deadbeef bash "$CS" record "$FAKEROOT" "$WORK/ev3"
++assert 'record rejects a candidate identical to the pin' 1 env PIN_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev4"
++assert 'record accepts a distinct candidate'        0 env CANDIDATE_EXPECTED_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev5"
++
++EV="$WORK/ev5/candidate-suite-identity.txt"
++if [ -f "$EV" ]; then
++	assert_contains 'evidence states it is NOT A RELEASE'    'NOT A RELEASE'         "$EV"
++	assert_contains 'evidence claims no release'             'release_claim           none'    "$EV"
++	assert_contains 'evidence claims no conformance'         'conformance_claim       none'    "$EV"
++	assert_contains 'evidence is stamped candidate-only'     'evidence_class          candidate-only' "$EV"
++	assert_contains 'evidence records the manifest digest'   "manifest_sha256         sha256:$MANIFEST_SHA" "$EV"
++	assert_contains 'evidence records a tree digest'         'tree_sha256             sha256:'  "$EV"
++	assert_contains 'evidence records the file count'        'file_count              2'        "$EV"
++	assert_contains 'evidence records the protocol version'  '1.0.0-rc.5'            "$EV"
++	assert_contains 'evidence records the committed pin'     "committed_released_pin  $PIN"     "$EV"
++else
++	bad 'record wrote its evidence file' "missing: $EV"
++fi
++unset SPEC_PIN
++
++echo ''
++echo '=== platform-case-gate.sh: the ledger is enforced, not decorated ==='
++GATE="$HERE/platform-case-gate.sh"
++LEDGER="$WORK/ledger.tsv"
++CLASSES="$HERE/skip-classes.tsv"
++{
++	printf '# package\ttest\tmust_run_on\tskip_allowed_on\tclass\tbehaviour\n'
++	printf 'internal/buildcache\tTestWindowsProtectedStateMatrix\twindows\t-\t-\tWindows DACL matrix\n'
++	printf 'internal/buildcache\tTestWindowsProtectedStateMatrix/*\t-\twindows\thost-capability\ta symlink subtest may skip\n'
++	printf 'internal/shell\tTestPowerShellHookRunsOnEveryPrompt\twindows\tlinux,darwin\tplatform-control\tPowerShell prompt hook\n'
++	printf 'internal/godriver\tTestProbeRejectsAnUncoveredPlatformBeforeTheWorker\tlinux,darwin,windows\t-\t-\tuncovered platform rejected\n'
++} >"$LEDGER"
++
++# minimal test2json event builders
++ev() { printf '{"Time":"2026-07-29T00:00:00Z","Action":"%s","Package":"github.com/relux-works/curator/%s","Test":"%s"}\n' "$1" "$2" "$3"; }
++evout() { printf '{"Time":"2026-07-29T00:00:00Z","Action":"output","Package":"github.com/relux-works/curator/%s","Test":"%s","Output":"    x_test.go:1: %s\\n"}\n' "$1" "$2" "$3"; }
++
++run_gate() {
++	stream="$1"; shift
++	CI_PLATFORM_CASES="$LEDGER" CI_SKIP_CLASSES="$CLASSES" CI_GATE_MODULE='github.com/relux-works/curator' \
++		"$@" bash "$GATE" "$stream" "$WORK/gate-ev"
++}
++
++S="$WORK/s.json"
++{ ev pass internal/buildcache TestWindowsProtectedStateMatrix
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker; } >"$S"
++assert 'a complete windows run passes'              0 run_gate "$S" env CI_GATE_GOOS=windows
++
++{ evout internal/buildcache TestWindowsProtectedStateMatrix 'creating Windows symlink requires host support: nope'
++  ev skip internal/buildcache TestWindowsProtectedStateMatrix
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker; } >"$S"
++assert 'a required DACL case that skips fails'      1 run_gate "$S" env CI_GATE_GOOS=windows
++
++{ ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker; } >"$S"
++assert 'a required case that never runs fails'      1 run_gate "$S" env CI_GATE_GOOS=windows
++
++{ ev fail internal/buildcache TestWindowsProtectedStateMatrix
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker; } >"$S"
++assert 'a required case that fails, fails the gate' 1 run_gate "$S" env CI_GATE_GOOS=windows
++
++{ ev pass internal/buildcache TestWindowsProtectedStateMatrix
++  evout internal/buildcache 'TestWindowsProtectedStateMatrix/symlink' 'creating Windows symlink requires host support: nope'
++  ev skip internal/buildcache 'TestWindowsProtectedStateMatrix/symlink'
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker; } >"$S"
++assert 'a declared subtest skip is tolerated'       0 run_gate "$S" env CI_GATE_GOOS=windows
++
++{ ev pass internal/buildcache TestWindowsProtectedStateMatrix
++  evout internal/buildcache 'TestWindowsProtectedStateMatrix/symlink' 'this conformance root publishes no symlink cases'
++  ev skip internal/buildcache 'TestWindowsProtectedStateMatrix/symlink'
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker; } >"$S"
++assert 'a declared subtest skip for the WRONG class fails' 1 run_gate "$S" env CI_GATE_GOOS=windows
++
++{ ev pass internal/buildcache TestWindowsProtectedStateMatrix
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
++  evout internal/registry TestSomethingElse 'because I felt like it'
++  ev skip internal/registry TestSomethingElse; } >"$S"
++assert 'a skip with an unrecognised reason fails'   1 run_gate "$S" env CI_GATE_GOOS=windows
++
++{ ev pass internal/buildcache TestWindowsProtectedStateMatrix
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
++  evout internal/registry TestSomethingElse 'symlink unavailable: operation not permitted'
++  ev skip internal/registry TestSomethingElse; } >"$S"
++assert 'a host-capability skip is recorded and allowed' 0 run_gate "$S" env CI_GATE_GOOS=windows
++
++{ ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
++  evout internal/marker TestAuthoritativeThing 'CURATOR_CONFORMANCE_ROOT is not set'
++  ev skip internal/marker TestAuthoritativeThing
++  evout internal/shell TestPowerShellHookRunsOnEveryPrompt 'PowerShell prompt integration is exercised on Windows'
++  ev skip internal/shell TestPowerShellHookRunsOnEveryPrompt; } >"$S"
++assert 'a root-unset skip in a SERVED package fails' 1 run_gate "$S" env CI_GATE_GOOS=linux
++assert 'a root-unset skip in a DEFERRED package passes' 0 run_gate "$S" env CI_GATE_GOOS=linux CI_DEFERRED_PKGS=internal/marker
++
++{ ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
++  evout internal/shell TestPowerShellHookRunsOnEveryPrompt 'PowerShell prompt integration is exercised on Windows'
++  ev skip internal/shell TestPowerShellHookRunsOnEveryPrompt; } >"$S"
++assert 'a tolerated platform-control skip passes'   0 run_gate "$S" env CI_GATE_GOOS=linux
++
++{ ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt; } >"$S"
++assert 'an excluded package is not demanded'        0 run_gate "$S" env CI_GATE_GOOS=windows CI_EXCLUDED_PKGS=internal/buildcache
++
++# test output that looks like a result event must not be read as one
++{ ev pass internal/buildcache TestWindowsProtectedStateMatrix
++  ev pass internal/shell TestPowerShellHookRunsOnEveryPrompt
++  printf '{"Time":"2026-07-29T00:00:00Z","Action":"output","Package":"github.com/relux-works/curator/internal/godriver","Test":"TestProbeRejectsAnUncoveredPlatformBeforeTheWorker","Output":"    got {\\"Action\\":\\"skip\\",\\"Test\\":\\"TestWindowsProtectedStateMatrix\\"}\\n"}\n'
++  ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker; } >"$S"
++assert 'output text mimicking a result event is not counted' 0 run_gate "$S" env CI_GATE_GOOS=windows
++
++echo ''
++echo '=== platform-case-gate.sh: the SHIPPED ledger is satisfiable on each runner ==='
++SHIPPED="${CI_PLATFORM_CASES:-.github/ci/platform-cases.tsv}"
++for goos in linux darwin windows; do
++	stream="$WORK/shipped-$goos.json"
++	excluded=''
++	[ "$goos" = linux ] && excluded='internal/godriver'
++	awk -F'\t' -v goos="$goos" -v excl="$excluded" '
++		function listed(set, want,   n, i, a) {
++			if (set == "-" || set == "") return 0
++			n = split(set, a, ",")
++			for (i = 1; i <= n; i++) if (a[i] == want) return 1
++			return 0
++		}
++		/^[ \t]*#/ || /^[ \t]*$/ { next }
++		{
++			if ($2 ~ /\/\*$/) next
++			if (!listed($3, goos)) next
++			if ($1 == excl && $2 != "TestProbeRejectsAnUncoveredPlatformBeforeTheWorker") next
++			printf "{\"Action\":\"pass\",\"Package\":\"github.com/relux-works/curator/%s\",\"Test\":\"%s\"}\n", $1, $2
++		}
++	' "$SHIPPED" >"$stream"
++	if [ -s "$stream" ]; then
++		CI_SKIP_CLASSES="$CLASSES" CI_GATE_MODULE='github.com/relux-works/curator' \
++		assert "the shipped ledger is satisfiable on $goos" 0 \
++			env CI_GATE_GOOS="$goos" CI_EXCLUDED_PKGS="$excluded" CI_SKIP_CLASSES="$CLASSES" \
++			    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$stream" "$WORK/shipped-ev-$goos"
++	else
++		bad "the shipped ledger is satisfiable on $goos" 'the ledger required nothing at all on this platform'
++	fi
++done
++
++echo ''
++echo '=== suite-plan.sh: the plan comes from the root, not from the lane ==='
++PLAN="$HERE/suite-plan.sh"
++assert 'suite-plan rejects a nonexistent root'      2 bash "$PLAN" "$WORK/absent" "$WORK/planev"
++
++if command -v go >/dev/null 2>&1 && go list ./... >/dev/null 2>&1; then
++	SERVING="$WORK/serving"; PARTIAL="$WORK/partial"
++	for r in "$SERVING" "$PARTIAL"; do
++		mkdir -p "$r/vectors" "$r/schema-cases" "$r/expected/build-driver" "$r/fixtures"
++		printf '{"protocol_version":"1.0.0-rc.5"}\n' >"$r/manifest.json"
++	done
++	# a root that serves every declared artefact
++	while IFS="$(printf '\t')" read -r _pkg artefacts _note; do
++		case "$_pkg" in ''|\#*) continue ;; esac
++		oldifs="$IFS"; IFS=','
++		for a in $artefacts; do mkdir -p "$SERVING/$(dirname "$a")"; : >"$SERVING/$a"; done
++		IFS="$oldifs"
++	done <"$HERE/root-artifacts.tsv"
++	# ...and one that serves none of them
++	printf '{"platforms":[{"name":"linux","status":"excluded","until_task":"T"}]}\n' >"$SERVING/vectors/conformance-claim-v3-qualification.json"
++
++	assert 'a fully serving root defers nothing, even under CI_REQUIRE_FULL_ROOT' 0 \
++		env CI_GATE_GOOS=darwin CI_REQUIRE_FULL_ROOT=1 bash "$PLAN" "$SERVING" "$WORK/plan-serving"
++	assert 'a partial root defers, and that is fatal under CI_REQUIRE_FULL_ROOT' 1 \
++		env CI_GATE_GOOS=darwin CI_REQUIRE_FULL_ROOT=1 bash "$PLAN" "$PARTIAL" "$WORK/plan-partial-strict"
++	assert 'a partial root defers and is tolerated without it' 0 \
++		env CI_GATE_GOOS=darwin bash "$PLAN" "$PARTIAL" "$WORK/plan-partial"
++
++	if [ -f "$WORK/plan-partial/plan-deferred.txt" ]; then
++		assert_contains 'the partial root defers internal/marker' 'internal/marker' "$WORK/plan-partial/plan-deferred.txt"
++	else
++		bad 'the partial plan wrote a deferred list' 'missing plan-deferred.txt'
++	fi
++
++	assert 'a root excluding linux excludes godriver there' 0 \
++		env CI_GATE_GOOS=linux bash "$PLAN" "$SERVING" "$WORK/plan-linux"
++	assert_contains 'godriver is excluded on linux' 'internal/godriver' "$WORK/plan-linux/plan-excluded.txt"
++	assert_contains 'the exclusion is asserted by a case' 'TestProbeRejectsAnUncoveredPlatformBeforeTheWorker' "$WORK/plan-linux/plan-assert.txt"
++
++	assert 'the same root does NOT exclude godriver on darwin' 0 \
++		env CI_GATE_GOOS=darwin bash "$PLAN" "$SERVING" "$WORK/plan-darwin"
++	if [ -s "$WORK/plan-darwin/plan-excluded.txt" ]; then
++		bad 'darwin excludes nothing under a linux-only exclusion' "excluded: $(tr '\n' ' ' <"$WORK/plan-darwin/plan-excluded.txt")"
++	else
++		ok 'darwin excludes nothing under a linux-only exclusion'
++	fi
++
++	# a root that predates the qualification vector falls back to the recorded default
++	rm -f "$PARTIAL/vectors/conformance-claim-v3-qualification.json"
++	assert 'a pre-vector root still excludes godriver on linux' 0 \
++		env CI_GATE_GOOS=linux bash "$PLAN" "$PARTIAL" "$WORK/plan-prevector"
++	assert_contains 'the fallback exclusion is recorded as such' 'default_excluded_on' "$WORK/plan-prevector/suite-plan.txt"
++
++	echo ''
++	echo '=== ledger-consistency.sh: a ledger claim is checked against the real builds ==='
++	BADLEDGER="$WORK/bad-ledger.tsv"
++	printf 'internal/godriver\tTestThisCaseDoesNotExist\tlinux,darwin,windows\t-\t-\tinvented\n' >"$BADLEDGER"
++	assert 'a ledger row naming a nonexistent case fails' 1 \
++		env CI_PLATFORM_CASES="$BADLEDGER" bash "$HERE/ledger-consistency.sh" "$WORK/lc-bad"
++	printf 'internal/nosuchpackage\tTestX\tlinux\t-\t-\tinvented\n' >"$BADLEDGER"
++	assert 'a ledger row naming a nonexistent package fails' 1 \
++		env CI_PLATFORM_CASES="$BADLEDGER" bash "$HERE/ledger-consistency.sh" "$WORK/lc-badpkg"
++	assert 'the shipped ledger is consistent with every build' 0 \
++		env CI_EXCLUDED_PKGS=internal/godriver CI_EXCLUDED_GOOS=linux bash "$HERE/ledger-consistency.sh" "$WORK/lc-shipped"
++else
++	skip 'suite-plan and ledger-consistency cases' 'no usable `go list` on this runner; these gates need the module graph'
++fi
++
++echo ''
++echo '=== no-broad-suppression.sh: narrow and named, or not at all ==='
++NBS="$HERE/no-broad-suppression.sh"
++SRC="$WORK/src"; mkdir -p "$SRC/pkg"
++printf 'package pkg\n\nfunc A() {}\n' >"$SRC/pkg/a.go"
++CFG_OK="$WORK/ok.yml"
++printf 'version: "2"\nlinters:\n  exclusions:\n    rules:\n      - path: _test\\.go\n        linters:\n          - gosec\n' >"$CFG_OK"
++assert 'a clean tree passes'                        0 env CI_GOLANGCI_CONFIG="$CFG_OK" CI_GOSEC_ALLOWED='' bash "$NBS" "$SRC"
++
++printf 'package pkg\n\n//nolint\nfunc B() {}\n' >"$SRC/pkg/b.go"
++assert 'a bare //nolint is rejected'                1 env CI_GOLANGCI_CONFIG="$CFG_OK" CI_GOSEC_ALLOWED='' bash "$NBS" "$SRC"
++printf 'package pkg\n\n//nolint:all\nfunc B() {}\n' >"$SRC/pkg/b.go"
++assert 'a //nolint:all is rejected'                 1 env CI_GOLANGCI_CONFIG="$CFG_OK" CI_GOSEC_ALLOWED='' bash "$NBS" "$SRC"
++printf 'package pkg\n\n//nolint:gosec // G304: the path is protocol-validated\nfunc B() {}\n' >"$SRC/pkg/b.go"
++assert 'a named //nolint with a reason is accepted' 0 env CI_GOLANGCI_CONFIG="$CFG_OK" CI_GOSEC_ALLOWED='' bash "$NBS" "$SRC"
++printf 'package pkg\n\n//#nosec\nfunc B() {}\n' >"$SRC/pkg/b.go"
++assert 'a bare //#nosec is rejected'                1 env CI_GOLANGCI_CONFIG="$CFG_OK" CI_GOSEC_ALLOWED='' bash "$NBS" "$SRC"
++rm -f "$SRC/pkg/b.go"
++
++CFG_PROD="$WORK/prod.yml"
++printf 'version: "2"\nlinters:\n  exclusions:\n    rules:\n      - path: internal/install\n        linters:\n          - gosec\n' >"$CFG_PROD"
++assert 'a production-path lint exclusion is rejected' 1 env CI_GOLANGCI_CONFIG="$CFG_PROD" CI_GOSEC_ALLOWED='' bash "$NBS" "$SRC"
++
++CFG_OFF="$WORK/off.yml"
++printf 'version: "2"\nlinters:\n  default: none\n' >"$CFG_OFF"
++assert 'wholesale linter disabling is rejected'     1 env CI_GOLANGCI_CONFIG="$CFG_OFF" CI_GOSEC_ALLOWED='' bash "$NBS" "$SRC"
++
++CFG_SEC="$WORK/sec.yml"
++printf 'version: "2"\nlinters:\n  settings:\n    gosec:\n      excludes:\n        - G306\n        - G999\n' >"$CFG_SEC"
++assert 'an unrecorded gosec exclusion is rejected'  1 env CI_GOLANGCI_CONFIG="$CFG_SEC" CI_GOSEC_ALLOWED='G306' bash "$NBS" "$SRC"
++assert 'a recorded gosec exclusion is accepted'     0 env CI_GOLANGCI_CONFIG="$CFG_SEC" CI_GOSEC_ALLOWED='G306 G999' bash "$NBS" "$SRC"
++assert 'the shipped .golangci.yml passes the gate'  0 bash "$NBS"
++
++echo ''
++echo '=== toolchain-identity.sh: the toolchain is read back, never assumed ==='
++TI="$HERE/toolchain-identity.sh"
++STUBROOT="$WORK/goroot"
++mkdir -p "$STUBROOT/bin" "$WORK/bin"
++make_stub() {
++	version="$1"; toolchain="$2"; goenv="$3"
++	cat >"$WORK/bin/go" <<STUB
++#!/bin/sh
++case "\$1" in
++  version) echo "go version $version \$(uname -s)/\$(uname -m)" ;;
++  env)
++    case "\$2" in
++      GOROOT) echo '$STUBROOT' ;;
++      GOTOOLCHAIN) echo '$toolchain' ;;
++      GOENV) echo '$goenv' ;;
++      *) echo '' ;;
++    esac ;;
++  *) exit 0 ;;
++esac
++STUB
++	chmod +x "$WORK/bin/go"
++	cp "$WORK/bin/go" "$STUBROOT/bin/go"
++	printf '#!/bin/sh\nexit 0\n' >"$WORK/bin/gofmt"; chmod +x "$WORK/bin/gofmt"
++	cp "$WORK/bin/gofmt" "$STUBROOT/bin/gofmt"
++}
++WANT_GO="go$(awk '/^go[ \t]/{print $2; exit}' go.mod)"
++make_stub "$WANT_GO" local off
++assert 'a healthy toolchain passes'                 0 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
++make_stub 'go1.25.1' local off
++assert 'a toolchain that is not go.mod'"'"'s version is rejected' 1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
++make_stub "$WANT_GO" auto off
++assert 'GOTOOLCHAIN=auto is rejected'               1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
++make_stub "$WANT_GO" local "$WORK/user.env"
++assert 'a per-user go env file is rejected'         1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
++
++echo ''
++printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
++[ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
++printf '\n'
++[ "$FAIL" -eq 0 ] || exit 1
++exit 0
+--- a/.github/ci/ledger-consistency.sh
++++ b/.github/ci/ledger-consistency.sh
+@@ -0,0 +1,172 @@
++#!/usr/bin/env bash
++# Ledger consistency check.
++#
++# `platform-cases.tsv` claims, per case, which platforms must execute it. That
++# claim is only worth something if the case is actually compiled into those
++# platforms' builds. This script proves it WITHOUT running anything on those
++# platforms: `go list` reports the exact test file set for a target GOOS, and a
++# case exists on that GOOS iff it is declared in one of those files.
++#
++# It fails when:
++#   * a row names a package that is not in the module;
++#   * a row requires a case on a GOOS whose build does not compile that case
++#     (a stale name, a moved build tag, a deleted test);
++#   * a case IS compiled in on a GOOS that the row neither requires nor
++#     tolerates, and that GOOS is not excluded for the package by the supplied
++#     conformance root -- i.e. an undeclared platform.
++#
++# Usage:
++#   ledger-consistency.sh <evidence-dir>
++#
++# The per-platform exclusion set comes from `excluded-packages.sh`, the same
++# helper `suite-plan.sh` uses, so this gate and the run it describes can never
++# disagree about what this platform executes.
++#
++# Environment:
++#   CI_PLATFORM_CASES        ledger path      (default: .github/ci/platform-cases.tsv)
++#   CI_LEDGER_GOOS           platforms to check (default: "linux darwin windows")
++#   CURATOR_CONFORMANCE_ROOT optional; when set, its qualification vector is
++#                            authoritative for the exclusions
++#   GO                       go launcher      (default: go)
++
++set -u
++
++GO="${GO:-go}"
++LEDGER="${CI_PLATFORM_CASES:-.github/ci/platform-cases.tsv}"
++PLATFORMS="${CI_LEDGER_GOOS:-linux darwin windows}"
++
++if [ "$#" -ne 1 ]; then
++	echo 'ledger-consistency: usage: ledger-consistency.sh <evidence-dir>' >&2
++	exit 2
++fi
++EVIDENCE="$1"
++[ -f "$LEDGER" ] || { echo "ledger-consistency: ledger not found: $LEDGER" >&2; exit 2; }
++mkdir -p "$EVIDENCE" || exit 2
++
++MODULE="$(awk '/^module[ \t]/{print $2; exit}' go.mod 2>/dev/null)"
++[ -n "$MODULE" ] || { echo 'ledger-consistency: cannot determine the module path' >&2; exit 2; }
++
++INVENTORY="$EVIDENCE/case-inventory.tsv"
++: >"$INVENTORY" || exit 2
++
++# --- build the per-GOOS case inventory -------------------------------------
++for goos in $PLATFORMS; do
++	listing="$EVIDENCE/go-list-$goos.txt"
++	GOOS="$goos" "$GO" list -e -f '{{.ImportPath}}	{{range .TestGoFiles}}{{.}} {{end}}{{range .XTestGoFiles}}{{.}} {{end}}' ./... >"$listing" 2>"$EVIDENCE/go-list-$goos.err"
++	rc=$?
++	if [ "$rc" -ne 0 ]; then
++		echo "ledger-consistency: go list failed for GOOS=$goos (exit $rc)" >&2
++		sed -n '1,20p' "$EVIDENCE/go-list-$goos.err" >&2
++		exit 2
++	fi
++	[ -s "$listing" ] || { echo "ledger-consistency: go list produced nothing for GOOS=$goos" >&2; exit 2; }
++
++	while IFS="$(printf '\t')" read -r importpath files; do
++		[ -n "$importpath" ] || continue
++		pkg="$importpath"
++		if [ "$pkg" = "$MODULE" ]; then pkg="."
++		else pkg="${pkg#"$MODULE"/}"
++		fi
++		dir=".${importpath#"$MODULE"}"
++		for f in $files; do
++			[ -f "$dir/$f" ] || continue
++			# Top-level `func TestXxx(` declarations only; that is exactly what
++			# `go test` turns into a case name.
++			sed -n 's/^func \(Test[A-Za-z0-9_]*\)(.*/\1/p' "$dir/$f" |
++				while IFS= read -r name; do
++					[ -n "$name" ] && printf '%s\t%s\t%s\n' "$pkg" "$name" "$goos"
++				done
++		done
++	done <"$listing" >>"$INVENTORY"
++done
++
++sort -u -o "$INVENTORY" "$INVENTORY" || exit 2
++[ -s "$INVENTORY" ] || { echo 'ledger-consistency: empty case inventory' >&2; exit 2; }
++
++# --- the per-platform exclusion set, from the shared helper ----------------
++EXCLUSIONS_TSV="$EVIDENCE/exclusions.tsv"
++: >"$EXCLUSIONS_TSV" || exit 2
++for goos in $PLATFORMS; do
++	bash "$(dirname "$0")/excluded-packages.sh" "$goos" "${CURATOR_CONFORMANCE_ROOT:-}" |
++		while IFS="$(printf '\t')" read -r xpkg _case _src; do
++			[ -n "$xpkg" ] && printf '%s\t%s\n' "$xpkg" "$goos"
++		done
++done >>"$EXCLUSIONS_TSV"
++
++REPORT="$EVIDENCE/ledger-consistency.txt"
++
++awk -v ledger="$LEDGER" -v inventory="$INVENTORY" -v platforms="$PLATFORMS" \
++    -v exclusions="$EXCLUSIONS_TSV" '
++function listed(set, want,   n, i, a) {
++	if (set == "-" || set == "") return 0
++	n = split(set, a, ",")
++	for (i = 1; i <= n; i++) if (a[i] == want) return 1
++	return 0
++}
++BEGIN {
++	fail = 0
++	np = split(platforms, P, " ")
++
++	while ((getline line < exclusions) > 0) {
++		split(line, e, "\t")
++		if (e[1] != "") isexcluded[e[1] "\t" e[2]] = 1
++	}
++	close(exclusions)
++
++	while ((getline line < inventory) > 0) {
++		split(line, c, "\t")
++		exists[c[1] "\t" c[2] "\t" c[3]] = 1
++		pkgseen[c[1]] = 1
++	}
++	close(inventory)
++
++	while ((getline line < ledger) > 0) {
++		if (line ~ /^[ \t]*#/ || line ~ /^[ \t]*$/) continue
++		split(line, f, "\t")
++		pkg = f[1]; test = f[2]; must = f[3] ""; skipok = f[4] ""
++		rows++
++
++		# `Parent/*` and `Parent/child` rows describe a subtest of a case that
++		# has its own row; only the parent name is checkable against the source.
++		base = test
++		sub("/.*$", "", base)
++		subtest = (base != test)
++
++		if (!(pkg in pkgseen)) {
++			printf "FAIL  ledger row names a package that is not in the module: %s :: %s\n", pkg, test
++			fail = 1
++			continue
++		}
++
++		for (i = 1; i <= np; i++) {
++			goos = P[i]
++			here = exists[pkg "\t" base "\t" goos]
++
++			if (listed(must, goos) && !here) {
++				printf "FAIL  required on %s but not compiled into that build: %s :: %s\n", goos, pkg, test
++				print  "      a rename, a moved build tag or a deleted test looks exactly like this."
++				fail = 1
++			}
++
++			if (here && !listed(must, goos) && !listed(skipok, goos) && !subtest) {
++				if (!isexcluded[pkg "\t" goos]) {
++					printf "FAIL  compiled into the %s build but undeclared there: %s :: %s\n", goos, pkg, test
++					print  "      add the platform to must_run_on, or to skip_allowed_on with a class and a reason."
++					fail = 1
++				} else {
++					printf "excl  %s :: %s (package excluded on %s by the supplied root)\n", pkg, test, goos
++				}
++			}
++		}
++		if (!fail || 1) printf "ok    %s :: %s [must=%s skip=%s]\n", pkg, test, must, skipok
++	}
++	close(ledger)
++
++	printf "\nledger-consistency: %d rows checked across %s\n", rows, platforms
++	print (fail ? "ledger-consistency: FAILED" : "ledger-consistency: ok")
++	exit fail
++}
++' </dev/null >"$REPORT" 2>&1
++RC=$?
++cat "$REPORT"
++exit "$RC"
+--- a/.github/ci/no-broad-suppression.sh
++++ b/.github/ci/no-broad-suppression.sh
+@@ -0,0 +1,74 @@
++#!/usr/bin/env bash
++# No broad suppression.
++#
++# Security findings may be suppressed narrowly and by name; they may not be
++# suppressed wholesale. A suppression that names no rule silences every rule,
++# including ones written after the comment -- which is how a finding in new
++# security code disappears without anyone deciding that it should.
++#
++# Lives in a script rather than inline in the workflow so `gate-selftest.sh`
++# can prove it rejects what it claims to reject.
++#
++# Usage:
++#   no-broad-suppression.sh [source-dir...]      (default: cmd internal)
++#
++# Environment:
++#   CI_GOLANGCI_CONFIG  golangci config path     (default: .golangci.yml)
++
++set -u
++
++CONFIG="${CI_GOLANGCI_CONFIG:-.golangci.yml}"
++[ "$#" -gt 0 ] || set -- cmd internal
++
++rc=0
++
++# A `//nolint` with no linter named, or an explicit `//nolint:all`.
++if grep -rInE '//[[:space:]]*nolint([[:space:]]|$|:all)' --include='*.go' "$@"; then
++	echo 'lint: bare or all-linter //nolint is not allowed; name the linter and the reason.'
++	rc=1
++fi
++# A `//#nosec` with no gosec rule named.
++if grep -rInE '//[[:space:]]*#nosec([[:space:]]*$)' --include='*.go' "$@"; then
++	echo 'lint: bare //#nosec is not allowed; name the gosec rule and the reason.'
++	rc=1
++fi
++
++if [ -f "$CONFIG" ]; then
++	# The config may exclude linters for test files only. A rule that exempts a
++	# production path is a broad suppression by another name.
++	if grep -nE '^[[:space:]]*-[[:space:]]*path:' "$CONFIG" \
++	     | grep -vE 'path:[[:space:]]*.*_test\\?\.go'; then
++		echo "lint: $CONFIG exclusion rules may only target _test.go paths."
++		rc=1
++	fi
++	if grep -nE 'disable-all|default:[[:space:]]*none' "$CONFIG"; then
++		echo "lint: wholesale linter disabling is not allowed in $CONFIG."
++		rc=1
++	fi
++
++	# The gosec exclusion set is narrow and each entry carries a recorded
++	# reason. Pinning it here means new security code cannot quietly acquire a
++	# new blanket exemption: adding a rule to the config without adding it to
++	# this list, with a reason, fails the gate.
++	allowed="${CI_GOSEC_ALLOWED:-G306 G301 G122 G703}"
++	excludes="$(awk '
++		/^[[:space:]]*excludes:[[:space:]]*$/ { inlist = 1; next }
++		inlist && /^[[:space:]]*-[[:space:]]*G[0-9]+[[:space:]]*$/ {
++			line = $0; sub(/^[^G]*/, "", line); sub(/[[:space:]]*$/, "", line); print line; next
++		}
++		inlist && /^[[:space:]]*[A-Za-z_-]+:/ { inlist = 0 }
++	' "$CONFIG")"
++	for rule in $excludes; do
++		case " $allowed " in
++			*" $rule "*) ;;
++			*)
++				echo "lint: $CONFIG excludes gosec rule $rule, which is not in the recorded allowlist ($allowed)."
++				echo 'lint: a new blanket gosec exemption needs a recorded reason, not a quiet addition.'
++				rc=1
++				;;
++		esac
++	done
++fi
++
++if [ "$rc" -eq 0 ]; then echo 'no-broad-suppression: ok'; fi
++exit "$rc"
+--- a/.github/ci/platform-case-gate.sh
++++ b/.github/ci/platform-case-gate.sh
+@@ -0,0 +1,285 @@
++#!/usr/bin/env bash
++# Platform case gate.
++#
++# Enforces two tiers against a real `go test -json` stream, so a green
++# `go test` can never mean a smaller suite than the one that was asked for.
++#
++#   TIER 1 -- `.github/ci/platform-cases.tsv`
++#     The compiled-build behaviour the acceptance criteria require this runner
++#     to execute. Every row listing this GOOS in `must_run_on` must be observed
++#     PASSING. A rename, a deletion, a `-run` filter matching nothing, a missing
++#     interpreter or a package that stopped being built all fail here BY NAME
++#     rather than shrinking the run. A skip of a listed case -- or of any of its
++#     subtests -- is fatal unless the row tolerates it on this GOOS, and then
++#     only if the reason the test actually printed carries the class the row
++#     declared.
++#
++#   TIER 2 -- `.github/ci/skip-classes.tsv`
++#     Every OTHER skip anywhere in the run must have a reason matching a
++#     declared class, and that class must be allowed in this lane. An
++#     unrecognised reason is fatal: a newly-introduced skip is caught the first
++#     time it runs. `root-unset` is allowed only for a package `suite-plan.sh`
++#     deferred, so a lane demanding a fully-serving root cannot pass while a
++#     package quietly ran without its vectors.
++#
++# Every skip, tolerated or not, is written to `skips-observed.tsv` with its
++# class and verbatim reason. "No case silently skipped" is therefore a property
++# of the attached evidence, not of a promise.
++#
++# Usage:
++#   platform-case-gate.sh <go-test-json> <evidence-dir>
++#
++# Environment:
++#   CI_PLATFORM_CASES  ledger path         (default: .github/ci/platform-cases.tsv)
++#   CI_SKIP_CLASSES    class table         (default: .github/ci/skip-classes.tsv)
++#   CI_DEFERRED_PKGS   space separated packages running without the root
++#   CI_EXCLUDED_PKGS   space separated packages this platform does not execute
++#   CI_GATE_GOOS       GOOS to enforce     (default: `go env GOOS`)
++#   CI_GATE_MODULE     module path         (default: the `module` line of go.mod)
++#
++# The last two overrides exist so `gate-selftest.sh` can drive this gate against
++# synthetic streams for platforms the current host is not.
++
++set -u
++
++LEDGER="${CI_PLATFORM_CASES:-.github/ci/platform-cases.tsv}"
++CLASSES="${CI_SKIP_CLASSES:-.github/ci/skip-classes.tsv}"
++
++if [ "$#" -ne 2 ]; then
++	echo 'platform-case-gate: usage: platform-case-gate.sh <go-test-json> <evidence-dir>' >&2
++	exit 2
++fi
++JSON="$1"
++EVIDENCE="$2"
++
++[ -f "$JSON" ]    || { echo "platform-case-gate: no such stream: $JSON" >&2; exit 2; }
++[ -f "$LEDGER" ]  || { echo "platform-case-gate: ledger not found: $LEDGER" >&2; exit 2; }
++[ -f "$CLASSES" ] || { echo "platform-case-gate: skip-class table not found: $CLASSES" >&2; exit 2; }
++mkdir -p "$EVIDENCE" || exit 2
++
++GOOS="${CI_GATE_GOOS:-$(go env GOOS)}"
++[ -n "$GOOS" ] || { echo 'platform-case-gate: cannot determine GOOS' >&2; exit 2; }
++MODULE="${CI_GATE_MODULE:-$(awk '/^module[ \t]/{print $2; exit}' go.mod 2>/dev/null)}"
++[ -n "$MODULE" ] || { echo 'platform-case-gate: cannot determine the module path' >&2; exit 2; }
++
++OBSERVED="$EVIDENCE/observed-cases.tsv"
++SKIPS="$EVIDENCE/skips-observed.tsv"
++REPORT="$EVIDENCE/platform-cases.txt"
++
++# ---------------------------------------------------------------------------
++# Extract (action, package, test, reason) from the test2json stream.
++#
++# test2json emits keys in a fixed order -- Time, Action, Package, Test, Output --
++# so the FIRST occurrence of a key is always the real field, even when an
++# `output` event carries JSON-looking test output inside its Output string.
++#
++# The skip reason is the last `file.go:NN: ...` line the case printed before its
++# result event, which is exactly where testing writes a Skip message.
++# ---------------------------------------------------------------------------
++awk -v module="$MODULE" '
++function jstr(line, key,   i, n, out, c, esc) {
++	i = index(line, "\"" key "\":\"")
++	if (i == 0) return ""
++	i += length(key) + 4
++	out = ""; esc = 0
++	for (n = i; n <= length(line); n++) {
++		c = substr(line, n, 1)
++		if (esc) {
++			if      (c == "n") out = out "\n"
++			else if (c == "t") out = out "\t"
++			else if (c == "r") out = out "\r"
++			else               out = out c
++			esc = 0
++			continue
++		}
++		if (c == "\\") { esc = 1; continue }
++		if (c == "\"") break
++		out = out c
++	}
++	return out
++}
++{
++	act = jstr($0, "Action")
++	if (act != "output" && act != "skip" && act != "pass" && act != "fail") next
++	tst = jstr($0, "Test")
++	if (tst == "") next                 # package-level event, not a case
++	pkg = jstr($0, "Package")
++	if (pkg == module) pkg = "."
++	else if (substr(pkg, 1, length(module) + 1) == module "/") pkg = substr(pkg, length(module) + 2)
++	key = pkg "\t" tst
++
++	if (act == "output") {
++		out = jstr($0, "Output")
++		# the message testing prints for Skip/Log: "    file.go:12: reason"
++		if (match(out, /[^ \t]+\.go:[0-9]+: /)) {
++			reason = substr(out, RSTART + RLENGTH)
++			sub(/[\r\n]+$/, "", reason)
++			gsub(/\t/, " ", reason)
++			if (reason != "") last[key] = reason
++		}
++		next
++	}
++	print act "\t" key "\t" (act == "skip" ? last[key] : "")
++}
++' "$JSON" | sort -u >"$OBSERVED" || { echo 'platform-case-gate: stream extraction failed' >&2; exit 2; }
++
++# ---------------------------------------------------------------------------
++# Enforce both tiers.
++# ---------------------------------------------------------------------------
++awk -v goos="$GOOS" -v ledger="$LEDGER" -v classes="$CLASSES" -v observed="$OBSERVED" \
++    -v skipsout="$SKIPS" -v deferred="${CI_DEFERRED_PKGS:-}" -v excluded="${CI_EXCLUDED_PKGS:-}" '
++function listed(set, want,   n, i, a) {
++	if (set == "-" || set == "") return 0
++	n = split(set, a, ",")
++	for (i = 1; i <= n; i++) if (a[i] == want) return 1
++	return 0
++}
++function classify(reason,   i) {
++	for (i = 1; i <= nclass; i++)
++		if (reason ~ cregex[i]) return i
++	return 0
++}
++BEGIN {
++	FS = "\t"; fail = 0
++
++	n = split(deferred, d, " "); for (i = 1; i <= n; i++) isdeferred[d[i]] = 1
++	n = split(excluded, x, " "); for (i = 1; i <= n; i++) isexcluded[x[i]] = 1
++
++	while ((getline line < classes) > 0) {
++		if (line ~ /^[ \t]*#/ || line ~ /^[ \t]*$/) continue
++		split(line, f, "\t")
++		nclass++
++		cclass[nclass]  = f[1]
++		cregex[nclass]  = f[2]
++		cpolicy[nclass] = f[3]
++	}
++	close(classes)
++	if (nclass == 0) { print "FAIL  the skip-class table is empty"; exit 1 }
++
++	while ((getline line < ledger) > 0) {
++		if (line ~ /^[ \t]*#/ || line ~ /^[ \t]*$/) continue
++		split(line, f, "\t")
++		key = f[1] "\t" f[2]
++		mustrun[key]   = f[3]
++		skipok[key]    = f[4]
++		wantclass[key] = f[5]
++		behaviour[key] = f[6]
++		order[++rows]  = key
++		if (f[2] ~ /\/\*$/) {
++			g = f[2]; sub(/\/\*$/, "", g)
++			wildkey = f[1] "\t" g
++			wildskip[wildkey]  = f[4]
++			wildclass[wildkey] = f[5]
++		}
++	}
++	close(ledger)
++
++	while ((getline line < observed) > 0) {
++		split(line, o, "\t")
++		act = o[1]; key = o[2] "\t" o[3]; reason = o[4]
++		seen[act "\t" key] = 1
++		parent = o[3]
++		if (sub("/.*$", "", parent)) seen[act "\t" o[2] "\t" parent] = 1
++		if (act == "skip") {
++			skiporder[++skips] = key
++			skipreason[key] = reason
++			skippkg[key] = o[2]
++			skiptest[key] = o[3]
++		}
++	}
++	close(observed)
++
++	print "platform-case gate: GOOS=" goos
++	print "platform-case gate: ledger=" ledger
++	if (deferred != "") print "platform-case gate: deferred packages (root unset): " deferred
++	if (excluded != "") print "platform-case gate: excluded packages (not run here): " excluded
++	print ""
++
++	# ---- every skip is recorded, then judged --------------------------------
++	printf "package\ttest\tclass\tverdict\treason\n" >skipsout
++	for (i = 1; i <= skips; i++) {
++		key = skiporder[i]
++		reason = skipreason[key]
++		ci = classify(reason)
++		cls = (ci ? cclass[ci] : "UNCLASSIFIED")
++
++		# Tier 1: a ledger case, or a subtest of one, has its own rule.
++		parent = skiptest[key]; hassub = sub("/.*$", "", parent)
++		wkey = skippkg[key] "\t" parent
++		tol = ""; want = ""
++		if (key in skipok)        { tol = skipok[key];   want = wantclass[key] }
++		else if (hassub && (wkey in wildskip)) { tol = wildskip[wkey]; want = wildclass[wkey] }
++		else if (!hassub && (wkey in skipok)) { tol = skipok[wkey];   want = wantclass[wkey] }
++
++		verdict = ""
++		if (tol != "") {
++			if (!listed(tol, goos)) {
++				printf "FAIL  ledger case skipped where the ledger does not tolerate it (%s): %s :: %s\n", goos, skippkg[key], skiptest[key]
++				printf "      reason: %s\n", reason
++				printf "      required behaviour: %s\n", behaviour[skippkg[key] "\t" parent]
++				fail = 1; verdict = "FATAL-not-tolerated"
++			} else if (want != "-" && want != "" && want != cls) {
++				printf "FAIL  ledger case skipped for the wrong reason on %s: %s :: %s\n", goos, skippkg[key], skiptest[key]
++				printf "      the ledger tolerates a %s skip here; this one classified as %s\n", want, cls
++				printf "      reason: %s\n", reason
++				fail = 1; verdict = "FATAL-wrong-class"
++			} else {
++				verdict = "tolerated-by-ledger"
++			}
++		} else if (ci == 0) {
++			printf "FAIL  skip with an unrecognised reason on %s: %s :: %s\n", goos, skippkg[key], skiptest[key]
++			printf "      reason: %s\n", reason
++			print  "      add it to .github/ci/skip-classes.tsv with a class, or fix the case."
++			fail = 1; verdict = "FATAL-unclassified"
++		} else if (cpolicy[ci] == "deferred-only" && !(skippkg[key] in isdeferred)) {
++			printf "FAIL  %s skip in a package this lane serves: %s :: %s\n", cls, skippkg[key], skiptest[key]
++			printf "      reason: %s\n", reason
++			print  "      this lane supplies a root that must serve this package; it ran without one."
++			fail = 1; verdict = "FATAL-served-package"
++		} else {
++			verdict = "allowed-" cls
++		}
++		printf "%s\t%s\t%s\t%s\t%s\n", skippkg[key], skiptest[key], cls, verdict, reason >skipsout
++	}
++	close(skipsout)
++
++	# ---- Tier 1: every required case observed passing -----------------------
++	for (i = 1; i <= rows; i++) {
++		key = order[i]
++		split(key, k, "\t")
++		if (k[2] ~ /\/\*$/) continue
++		if (!listed(mustrun[key], goos)) continue
++		if (k[1] in isexcluded) {
++			printf "excl  %s :: %s (package not executed on %s)\n", k[1], k[2], goos
++			continue
++		}
++		if (seen["pass\t" key]) { printf "ok    %s :: %s\n", k[1], k[2]; continue }
++		# A row may both require a case and tolerate its skip here -- "run it
++		# whenever this runner and this root can". The skip pass above has
++		# already checked the reason carried the class the row declared, so a
++		# tolerated skip is a recorded outcome, not a silent one.
++		if (seen["skip\t" key] && listed(skipok[key], goos)) {
++			printf "tol   %s :: %s (tolerated skip: %s)\n", k[1], k[2], wantclass[key]
++			continue
++		}
++		if (seen["fail\t" key]) {
++			printf "FAIL  required case failed: %s :: %s\n", k[1], k[2]
++		} else if (seen["skip\t" key]) {
++			printf "FAIL  required case skipped on %s: %s :: %s\n", goos, k[1], k[2]
++			printf "      required behaviour: %s\n", behaviour[key]
++		} else {
++			printf "FAIL  required case never ran on %s: %s :: %s\n", goos, k[1], k[2]
++			printf "      required behaviour: %s\n", behaviour[key]
++			print  "      a rename, a deleted test or a -run filter matching nothing all look like this."
++		}
++		fail = 1
++	}
++
++	printf "\nplatform-case gate: %d skips recorded in %s\n", skips, skipsout
++	print (fail ? "platform-case gate: FAILED" : "platform-case gate: ok")
++	exit fail
++}
++' </dev/null >"$REPORT" 2>&1
++GATE_RC=$?
++cat "$REPORT"
++exit "$GATE_RC"
+--- a/.github/ci/platform-cases.tsv
++++ b/.github/ci/platform-cases.tsv
+@@ -0,0 +1,145 @@
++# Tier-1 platform case ledger for the compiled-build CI gates.
++#
++# This table names the compiled-build behaviour the task acceptance criteria
++# require each runner to execute.  `.github/ci/platform-case-gate.sh` enforces
++# it against a real `go test -json` stream:
++#
++#   * every row listing this GOOS in `must_run_on` must be observed PASSING.
++#     A rename, a deletion, a `-run` filter matching nothing, a missing
++#     interpreter or an unset conformance root all fail here by name instead
++#     of quietly shrinking the run.
++#   * a skip of a listed case -- or of any of its subtests -- is FATAL unless
++#     a row tolerates it on this GOOS.
++#   * `.github/ci/ledger-consistency.sh` separately proves, from `go list` on
++#     each target GOOS, that every case a row requires is actually compiled
++#     into that platform's build, and that no platform where a case IS
++#     compiled in is left undeclared.
++#
++# Columns are TAB separated:
++#   package  test  must_run_on  skip_allowed_on  class  behaviour
++#
++# `test` may name a subtest (`Parent/child`) or use the `Parent/*` form, which
++# tolerates a skip of any subtest of `Parent` while still requiring `Parent`
++# itself to pass.  `must_run_on` / `skip_allowed_on` take a comma separated
++# subset of {linux,darwin,windows}, or `-` for the empty set.
++#
++# `class` records WHY a tolerated skip is legitimate and is checked against
++# the reason text the test actually printed:
++#   platform-control  a control rc5-native-control-inventory-v1 defines for
++#                     another platform only -- the AC's explicit carve-out
++#   host-capability   the runner filesystem cannot create the artefact the
++#                     vector needs (symlink, hard link, reparse point, FIFO,
++#                     non-UTF-8 name)
++#   root-content      the supplied conformance root publishes no such vector
++#                     group
++#   opt-in            an explicit developer environment variable
++#
++# A GOOS on which the case's package is excluded by the supplied conformance
++# root's own qualification vector (see `.github/ci/suite-plan.sh`) is neither
++# required nor an omission: the exclusion is asserted positively by the
++# rejection case at the bottom of this file.
++#
++# package	test	must_run_on	skip_allowed_on	class	behaviour
++
++# ===========================================================================
++# Windows DACL / security descriptor
++# ===========================================================================
++internal/buildcache	TestWindowsProtectedStateMatrix	windows	-	-	Windows DACL protected-state matrix for the build cache
++internal/buildcache	TestWindowsProtectedStateMatrix/*	-	windows	host-capability	a subtest needing a Windows symlink may skip where the host forbids it; the matrix itself must still pass
++internal/buildcache	TestValidateWindowsSecurityPolicy	windows	-	-	validates the Windows security-descriptor policy on cache state
++
++# ===========================================================================
++# Windows reparse points
++# ===========================================================================
++internal/buildcache	TestSweepDoesNotFollowAReparsedEntry	windows	windows	host-capability	cache sweep refuses to traverse a reparse point inside an entry
++internal/buildcache	TestSweepDoesNotFollowAReparsedCacheRoot	windows	windows	host-capability	cache sweep refuses to traverse a reparsed cache root
++internal/scopes	TestCollectStaysFailSafeOnRedirectedWindowsScopes	windows	windows	host-capability	GC stays fail-safe when a Windows scope is redirected by a reparse point
++
++# ===========================================================================
++# Windows `.cmd` launchers
++# ===========================================================================
++internal/runtimestore	TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode	windows	-	-	the installed `.cmd` wrapper forwards arguments, PATH and exit code through cmd.exe
++internal/runtimestore	TestInstallSingleCommandAndShims	linux,darwin,windows	-	-	writes the `run.cmd` Windows launcher and asserts its `@echo off` payload
++internal/runtimestore	TestRuntimeCommandPath	linux,darwin,windows	-	-	maps a `tool.cmd` Windows launcher back to its command name
++internal/runtimestore	TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly	linux,darwin	windows	platform-control	compiled shims stage without launching, then forward exactly (POSIX post-install fixture)
++
++# ===========================================================================
++# Unix ownership and permission
++# ===========================================================================
++internal/buildcache	TestUnixProtectedStateMatrix	linux,darwin	-	-	unix ownership and mode matrix for protected cache state
++internal/buildcache	TestUnixProtectionHelperFailuresFailClosed	linux,darwin	-	-	unix protection helpers fail closed rather than degrading the boundary
++internal/config	TestBootstrapAndAddProject	linux,darwin,windows	-	-	asserts the manager config is written with private (0o600) ownership bits on unix
++
++# ===========================================================================
++# No-follow: link traversal is refused, never followed
++# ===========================================================================
++internal/buildcache	TestSweepDoesNotFollowSymlinkedEntries	linux,darwin	-	-	cache sweep refuses to traverse symlinked entries
++internal/buildcache	TestSweepDoesNotFollowASymlinkedCacheRoot	linux,darwin	-	-	cache sweep refuses to traverse a symlinked cache root
++internal/buildcache	TestRetireEntryRemovesLinksWithoutFollowingThem	linux,darwin	-	-	entry retirement removes links without following them
++internal/buildcache	TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot	linux,darwin	-	-	rejects a symlinked entry and an unprotected cache root
++internal/scopes	TestCollectStaysFailSafeOnRedirectedUnixScopes	linux,darwin	-	-	GC stays fail-safe when a unix scope is redirected by a link
++internal/buildsource	TestRejectsSpecialFile	linux,darwin	-	-	build source enumeration rejects a non-regular file
++internal/gitops	TestArchiveRejectsLinks	linux,darwin	windows	host-capability	archiving refuses a tree containing links (needs `ln`, absent from the Windows job PATH)
++
++# ===========================================================================
++# Read-only build source
++# ===========================================================================
++internal/buildsource	TestFrozenTokenRejectsMutation	linux,darwin,windows	-	-	a frozen build source rejects mutation of the source tree
++internal/buildsource	TestFrozenTokenRejectsMutation/*	-	linux,darwin,windows	host-capability	a link-dependent subtest may skip where the host forbids symlinks
++internal/buildsource	TestFrozenTokenRejectsRootReplacement	linux,darwin,windows	-	-	a frozen build source rejects replacement of its root
++internal/buildsource	TestWithValidatedOrdersCallbackAndRejectsMutation	linux,darwin,windows	-	-	validated enumeration is ordered and refuses mutation during the callback
++internal/buildsource	TestWithValidatedOrdersCallbackAndRejectsMutation/*	-	linux,darwin,windows	host-capability	a link-dependent subtest may skip where the host forbids symlinks
++internal/install	TestDryRunTouchesNothing	linux,darwin,windows	-	-	proves a dry run leaves the source and target trees unwritten
++internal/whitelist	TestRuntimeRootsExcludedFromContext	linux,darwin,windows	-	-	proves runtime roots stay outside the copied agent context
++
++# ===========================================================================
++# Resource policy -- rc5-native-control-inventory-v1
++# ===========================================================================
++internal/godriver	TestResourceLimitsStayInsideManagerBounds	darwin,windows	-	-	worker resource limits stay inside the manager's declared bounds
++internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	darwin,windows	-	-	the probed native control set matches rc5-native-control-inventory-v1 exactly
++internal/godriver	TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes	darwin,windows	-	-	every native control seam failure rejects before the worker executes
++internal/godriver	TestPerFileSizeLimitIsReallyApplied	darwin	windows	platform-control	per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS only
++internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	darwin	platform-control	active-process-count-limit refuses the compiler natively; the inventory defines it for Windows only
++
++# ===========================================================================
++# Executable identity and executable behaviour
++# ===========================================================================
++internal/godriver	TestExecutableIdentityRejectsSubstitutionAndMutation	darwin,windows	-	-	the toolchain executable identity rejects substitution and mutation
++internal/runtimestore	TestUnixPostInstallShimPropagatesSignal	linux,darwin	-	-	the installed unix shim is executable and propagates signals
++internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	linux,darwin	windows	platform-control	executes the POSIX shell hook end to end
++internal/shell	TestPowerShellHookRunsOnEveryPrompt	windows	linux,darwin	platform-control	executes the PowerShell prompt hook end to end
++internal/envfiles	TestWriteProjectShapesAndSourcing	linux,darwin,windows	-	-	sources the generated env file through a real shell on unix; shape-only on Windows
++internal/install	TestEndToEndInstall	linux,darwin,windows	-	-	materialises the executable shim and env files of a full install
++internal/adapters	TestSymlinkModeStagesRelativeLinkTargets	linux,darwin,windows	-	-	creates a link (Windows: a reparse point) and asserts its target stays relative
++
++# ===========================================================================
++# Transaction journal and install atomicity
++# ===========================================================================
++internal/transaction	TestValidateIndependentTargetNamespacesRejectsOverlappingPaths	linux,darwin,windows	linux,darwin,windows	host-capability	independent target namespaces reject overlapping paths (link-capability guarded)
++internal/transaction	TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves	linux,darwin,windows	linux,darwin,windows	host-capability	a namespace alias introduced between saves is rejected (link-capability guarded)
++internal/transaction	TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped	linux,darwin,windows	linux,darwin,windows	host-capability	recovery rejects target namespaces aliased while stopped (link-capability guarded)
++internal/install/atomicity	TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder	linux,darwin,windows	-	-	a failure at every target class restores the prior state in reverse order
++internal/install/atomicity	TestStaleAdapterRemovalRollsBackToTheExactPriorEntry	linux,darwin,windows	-	-	a stale adapter removal rolls back to the exact prior entry
++internal/install/atomicity	TestAdapterMirrorLinksAreJournaledAndRestoredExactly	linux,darwin,windows	linux,darwin,windows	host-capability	adapter mirror links are journaled and restored exactly (link-capability guarded)
++
++# ===========================================================================
++# Interop / conformance consumer
++# ===========================================================================
++internal/interop	TestGoldenContextCopy	linux,darwin,windows	-	-	the agent context copied for a skill matches the authoritative golden file list
++internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
++
++# ===========================================================================
++# Protocol platform exclusion -- asserted, never merely omitted.
++#
++# The rc.5 qualification vector marks linux `excluded` (until_task
++# TASK-260728-1skseh), so `internal/godriver` does not execute there.  This
++# case proves the exclusion is real fail-closed behaviour: an uncovered
++# platform is refused BEFORE the worker starts.  It is required on every
++# runner, including the one where the package is otherwise excluded.
++# ===========================================================================
++internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwin,windows	-	-	an uncovered inventory platform (including linux) is rejected before the worker starts
++
++# ===========================================================================
++# Opt-in developer probe -- never required, always tolerated.
++# ===========================================================================
++internal/hashing	TestCrossCheckTree	-	linux,darwin,windows	opt-in	cross-implementation tree digest probe, enabled by an explicit developer env var
+--- a/.github/ci/platform-exclusions.tsv
++++ b/.github/ci/platform-exclusions.tsv
+@@ -0,0 +1,32 @@
++# Packages governed by the protocol's own platform qualification.
++#
++# When the SUPPLIED conformance root publishes
++# `vectors/conformance-claim-v3-qualification.json`, that vector -- not this
++# file -- decides which platforms are excluded. This table then only says which
++# packages the exclusion reaches, and which case must still run and pass there
++# to prove the exclusion is real fail-closed behaviour rather than a quiet
++# omission.
++#
++# `default_excluded_on` is the fallback for a root that predates the vector.
++# The committed released pin is such a root: it publishes no qualification
++# vector at all, so without a fallback the default lane would lose an exclusion
++# that is a property of the implementation rather than of the root.
++# `internal/godriver` implements rc5-native-control-inventory-v1, which defines
++# control records for macOS and Windows only, so linux is excluded under any
++# root; the rc.5 vector states the same thing normatively, with
++# `until_task: TASK-260728-1skseh`. A root that publishes the vector always
++# wins, so the fallback can never contradict a live protocol statement, and
++# when the vector stops excluding a platform the package returns to the full
++# run there automatically.
++#
++# The exclusion is never taken on trust. The assertion case drives
++# `probeNativeControlsFor("")` and `probeNativeControlsFor("linux")` and
++# requires `build_execution_control_unavailable` from both -- the manager
++# refuses BEFORE any worker starts. It is pure and compiles everywhere, so the
++# excluded runner still proves the boundary it is excluded by.
++#
++# Columns are TAB separated:
++#   package  assertion_case  default_excluded_on  note
++#
++# package	assertion_case	default_excluded_on	note
++internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux	an uncovered inventory platform is refused before the worker starts
+--- a/.github/ci/root-artifacts.tsv
++++ b/.github/ci/root-artifacts.tsv
+@@ -0,0 +1,36 @@
++# Which conformance-root artefacts each package's conformance tests require.
++#
++# `.github/ci/suite-plan.sh` reads this table and the root it is given, and
++# partitions the package set:
++#
++#   served    every declared artefact is present in the root -- the package
++#             runs WITH `CURATOR_CONFORMANCE_ROOT` exported;
++#   deferred  at least one declared artefact is absent -- the package runs
++#             with the variable UNSET, taking the `CURATOR_CONFORMANCE_ROOT is
++#             not set` path its own tests already implement, and the exact
++#             missing artefact is named in the gate report.
++#
++# The partition is DERIVED FROM THE ROOT, never from the lane. Against a root
++# that publishes the whole schema v6 surface the deferred set is empty and the
++# entire module runs with the root exported; that is what `CI_REQUIRE_FULL_ROOT=1`
++# asserts in the candidate lane, so a candidate run can never report success
++# while a package quietly ran without its vectors.
++#
++# Only packages whose conformance tests FAIL rather than skip on a missing
++# artefact need a row: a package that already guards with `t.Skipf("%s
++# publishes no ... vector", root)` is safe under any root and is deliberately
++# absent from this table. A package that later gains an unguarded read and is
++# not listed here goes RED with the open() error naming the missing file --
++# loud, not silent.
++#
++# Columns are TAB separated:
++#   package  artefact[,artefact...]  note
++#
++# package	artefacts	note
++internal/buildsource	vectors/build-drivers.json	TestBuildSourceConformanceVectors reads the vector directly
++internal/buildcache	vectors/build-drivers.json	TestCandidateCacheOutcomeVocabulary reads the vector directly
++internal/scopes	vectors/external-repository-lifecycle.json	TestAuthoritativeGarbageCollectionRootsAreRetained reads the vector directly
++internal/marker	schema-cases/install-marker-v2,expected/build-driver/marker.json	the marker v2 schema cases and the authoritative compiled marker
++internal/whitelist	fixtures/go-build-skill,expected/build-driver/context_files.json	the build-root context exclusion fixture and its expected file list
++internal/skillspec	schema-cases/agent-skill-v6,fixtures/go-build-skill	the schema v6 cases and the go-build skill fixture
++internal/install	vectors/build-drivers.json	TestAuthoritativeCacheOutcomesDriveInstallation reads the vector directly
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -0,0 +1,86 @@
++# The complete vocabulary of legitimate skip reasons, and what each one means.
++#
++# `.github/ci/platform-case-gate.sh` matches the reason text a skipped test
++# actually printed against these patterns. A skip whose reason matches NOTHING
++# here is fatal: that is how a newly-introduced skip is caught the first time it
++# runs, instead of quietly shrinking the suite.
++#
++# Every skip -- tolerated or not -- is written to `skips-observed.tsv` with its
++# package, case name, class and verbatim reason, so "no case silently skipped"
++# is a property of the evidence and not of a promise.
++#
++# policy:
++#   allow          legitimate under any root
++#   deferred-only  legitimate only for a package `suite-plan.sh` deferred
++#                  because the supplied root does not publish its artefacts.
++#                  In a lane that requires a fully-serving root there are no
++#                  deferred packages, so this class becomes fatal there --
++#                  which is exactly what stops a candidate run from passing
++#                  while a package ran without its vectors.
++#
++# class meanings:
++#   platform-control  a control or fixture the protocol/runtime defines for
++#                     another platform only. This is the acceptance criteria's
++#                     "protocol-defined unsupported platform controls" carve-out
++#                     and the ONLY class that may hide a whole platform's
++#                     behaviour.
++#   host-capability   the runner cannot create the artefact the case needs
++#                     (symlink, hard link, reparse point, FIFO, named pipe,
++#                     non-UTF-8 name, case sensitivity, mode-000 semantics).
++#   root-content      the supplied conformance root publishes no such vector
++#                     group. Recorded against the root's identity in the
++#                     candidate evidence.
++#   root-unset        the package ran with CURATOR_CONFORMANCE_ROOT unset.
++#   opt-in            an explicit developer environment variable or a probe
++#                     that hashes the host toolchain.
++#   helper-process    the `go test` helper-process re-exec pattern.
++#
++# Columns are TAB separated. `regex` is an extended regular expression matched
++# against the reason text, anchored nowhere -- it may match anywhere in it.
++#
++# class	regex	policy	note
++
++# --- the conformance root ---------------------------------------------------
++root-unset	CURATOR_CONFORMANCE_ROOT is not set	deferred-only	the package was deferred by suite-plan.sh
++root-content	publishes no 	allow	the supplied root does not publish this vector group
++root-content	is a pre-revision root	allow	the supplied root predates this artefact
++
++# --- protocol / platform-defined controls -----------------------------------
++platform-control	available only on (Windows|macOS) in rc5-native-control-inventory-v1	allow	the inventory defines this control for one platform only
++platform-control	(is|are) exercised (on|by) 	allow	the behaviour is asserted on its own platform's runner
++platform-control	is covered by PowerShell on Windows	allow	the behaviour is asserted on the Windows runner
++platform-control	executes (a )?POSIX (launcher|skill commands)	allow	a POSIX launcher fixture, asserted on the unix runners
++platform-control	POSIX post-install launch fixture	allow	a POSIX post-install fixture, asserted on the unix runners
++platform-control	shell sentinel is Unix-only	allow	the sentinel exists on unix only
++
++# --- host capability --------------------------------------------------------
++host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
++host-capability	filesystem does not support (hard|symbolic) links	allow	the runner filesystem provides no such link
++host-capability	this host cannot create	allow	the runner cannot create the artefact the vector needs
++host-capability	creating Windows symlink requires host support	allow	the Windows runner forbids unprivileged symlink creation
++host-capability	no ln on this platform	allow	the `ln` tool is absent from this runner's PATH
++host-capability	no bash	allow	no POSIX shell on this runner
++host-capability	(bash|zsh|PowerShell) is unavailable	allow	that interpreter is absent from this runner
++host-capability	filesystem rejects invalid UTF-8 names	allow	the runner filesystem enforces UTF-8 names
++host-capability	this host folds the alias	allow	the runner filesystem folds the alias into one member
++host-capability	hard links across the staging filesystem are unavailable	allow	no hard links across the staging filesystem
++host-capability	mode did not produce a link on this filesystem	allow	the runner filesystem produced no link for this mode
++host-capability	(is unsupported|cannot publish a protected cache entry) 	allow	the platform provides no persistent protection primitive
++host-capability	persistent protection is unsupported on this platform	allow	the platform provides no persistent protection primitive
++host-capability	this environment can (inspect|read) a mode-000 directory	allow	the runner ignores mode-000 directory permissions
++host-capability	root ignores directory permissions	allow	the runner ignores directory permissions
++host-capability	this process can write through a read-only directory	allow	the runner ignores read-only directory permissions
++host-capability	(per-directory )?case sensitivity	allow	the runner filesystem case semantics differ
++host-capability	test filesystem (is case-sensitive|distinguishes canonical Unicode spellings)	allow	the runner filesystem case/normalisation semantics differ
++host-capability	temporary directory uses case-sensitive Windows path semantics	allow	the runner temporary directory case semantics differ
++host-capability	no trusted Go toolchain is resolvable here	allow	no trusted toolchain is resolvable on this runner
++host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
++
++# --- opt-in probes ----------------------------------------------------------
++opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable
++opt-in	cross-check env not set	allow	enabled by an explicit developer environment variable
++opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
++
++# --- go test plumbing -------------------------------------------------------
++helper-process	helper process	allow	the go test helper-process re-exec pattern
++helper-process	is not reachable from this test binary	allow	the go test helper-process re-exec pattern
+--- a/.github/ci/suite-plan.sh
++++ b/.github/ci/suite-plan.sh
+@@ -0,0 +1,171 @@
++#!/usr/bin/env bash
++# Suite plan: decides, from the supplied conformance root alone, how this
++# runner's package set is executed.
++#
++# Two questions, both answered by the root and never by a hand-maintained
++# per-lane list:
++#
++#  1. PLATFORM EXCLUSION. `vectors/conformance-claim-v3-qualification.json` is
++#     the protocol's own statement of which platforms it qualifies. A platform
++#     it marks `excluded` does not execute the packages listed in
++#     `.github/ci/platform-exclusions.tsv` there -- and the exclusion is
++#     ASSERTED, not merely obeyed: the named rejection case must still run and
++#     pass on that runner, proving the package fails closed rather than being
++#     quietly dropped. When the root stops excluding the platform, the packages
++#     come back automatically; nothing here needs editing.
++#
++#  2. ROOT COVERAGE. `.github/ci/root-artifacts.tsv` declares which root
++#     artefacts each package's conformance tests read without a guard. A
++#     package whose artefacts the root does not publish runs with
++#     CURATOR_CONFORMANCE_ROOT unset, taking the "root is not set" path its own
++#     tests implement, and the missing artefact is named in the report.
++#
++# `CI_REQUIRE_FULL_ROOT=1` makes any deferral fatal. The candidate lane sets
++# it, so an explicitly supplied schema v6 candidate must serve the entire
++# package set or fail -- a candidate run can never be green while a package
++# silently ran without its vectors.
++#
++# Usage:
++#   suite-plan.sh <conformance-root> <evidence-dir>
++#
++# Writes into <evidence-dir>:
++#   plan-served.txt    packages to run WITH the root exported
++#   plan-deferred.txt  packages to run with the root UNSET
++#   plan-excluded.txt  packages this platform does not execute
++#   plan-assert.txt    `package<TAB>case` rejection assertions to run instead
++#   suite-plan.txt     the human-readable report (also echoed to stdout)
++#
++# Environment:
++#   CI_GATE_GOOS          GOOS to plan for   (default: `go env GOOS`)
++#   CI_ROOT_ARTIFACTS     default: .github/ci/root-artifacts.tsv
++#   CI_PLATFORM_EXCLUSIONS default: .github/ci/platform-exclusions.tsv
++#   CI_REQUIRE_FULL_ROOT  1 = a deferral is fatal
++#   GO                    go launcher        (default: go)
++
++set -u
++
++GO="${GO:-go}"
++ARTEFACTS="${CI_ROOT_ARTIFACTS:-.github/ci/root-artifacts.tsv}"
++EXCLUSIONS="${CI_PLATFORM_EXCLUSIONS:-.github/ci/platform-exclusions.tsv}"
++QUALIFICATION_VECTOR='vectors/conformance-claim-v3-qualification.json'
++
++if [ "$#" -ne 2 ]; then
++	echo 'suite-plan: usage: suite-plan.sh <conformance-root> <evidence-dir>' >&2
++	exit 2
++fi
++ROOT="$1"
++EVIDENCE="$2"
++
++[ -d "$ROOT" ]     || { echo "suite-plan: conformance root is not a directory: $ROOT" >&2; exit 2; }
++[ -f "$ARTEFACTS" ]  || { echo "suite-plan: artefact table not found: $ARTEFACTS" >&2; exit 2; }
++[ -f "$EXCLUSIONS" ] || { echo "suite-plan: exclusion table not found: $EXCLUSIONS" >&2; exit 2; }
++mkdir -p "$EVIDENCE" || exit 2
++
++GOOS="${CI_GATE_GOOS:-$("$GO" env GOOS)}"
++[ -n "$GOOS" ] || { echo 'suite-plan: cannot determine GOOS' >&2; exit 2; }
++
++MODULE="$(awk '/^module[ \t]/{print $2; exit}' go.mod 2>/dev/null)"
++[ -n "$MODULE" ] || { echo 'suite-plan: cannot determine the module path' >&2; exit 2; }
++
++SERVED="$EVIDENCE/plan-served.txt"
++DEFERRED="$EVIDENCE/plan-deferred.txt"
++EXCLUDED="$EVIDENCE/plan-excluded.txt"
++ASSERT="$EVIDENCE/plan-assert.txt"
++REPORT="$EVIDENCE/suite-plan.txt"
++: >"$SERVED"; : >"$DEFERRED"; : >"$EXCLUDED"; : >"$ASSERT"
++
++# --- the module's real package set -----------------------------------------
++ALL="$EVIDENCE/plan-all-packages.txt"
++"$GO" list ./... >"$ALL" 2>"$EVIDENCE/plan-go-list.err"
++rc=$?
++[ "$rc" -eq 0 ] || { echo "suite-plan: go list ./... failed (exit $rc)" >&2; sed -n '1,20p' "$EVIDENCE/plan-go-list.err" >&2; exit 2; }
++[ -s "$ALL" ]   || { echo 'suite-plan: go list ./... produced no packages' >&2; exit 2; }
++
++# --- which packages does this platform not execute? ------------------------
++# Resolved by the one helper both this gate and `ledger-consistency.sh` use,
++# so the two can never disagree about what is excluded here.
++QV="$ROOT/$QUALIFICATION_VECTOR"
++EXCLUSION_SET="$EVIDENCE/plan-exclusion-set.tsv"
++bash "$(dirname "$0")/excluded-packages.sh" "$GOOS" "$ROOT" >"$EXCLUSION_SET"
++rc=$?
++[ "$rc" -eq 0 ] || { echo "suite-plan: cannot resolve the platform exclusions (exit $rc)" >&2; exit 2; }
++
++{
++	echo "suite-plan: GOOS=$GOOS"
++	echo "suite-plan: root=$ROOT"
++	if [ -f "$QV" ]; then
++		echo "suite-plan: platform qualification read from the root's own $QUALIFICATION_VECTOR"
++	else
++		echo "suite-plan: the root publishes no $QUALIFICATION_VECTOR; the recorded default_excluded_on applies"
++	fi
++	echo ''
++} >"$REPORT"
++
++# --- partition -------------------------------------------------------------
++FAIL=0
++while IFS= read -r importpath; do
++	[ -n "$importpath" ] || continue
++	pkg="$importpath"
++	if [ "$pkg" = "$MODULE" ]; then pkg="."
++	else pkg="${pkg#"$MODULE"/}"
++	fi
++
++	# 1. platform exclusion, as resolved by excluded-packages.sh
++	excl_case=''; source_of_truth=''
++	while IFS="$(printf '\t')" read -r xpkg xcase xsource; do
++		[ "$xpkg" = "$pkg" ] || continue
++		excl_case="$xcase"; source_of_truth="$xsource"
++	done <"$EXCLUSION_SET"
++
++	if [ -n "$excl_case" ]; then
++		printf '%s\n' "$importpath" >>"$EXCLUDED"
++		printf '%s\t%s\n' "$importpath" "$excl_case" >>"$ASSERT"
++		{
++			echo "excl  $pkg"
++			echo "      excluded on $GOOS by $source_of_truth"
++			echo "      the exclusion is asserted by $excl_case, which still runs and must pass"
++		} >>"$REPORT"
++		continue
++	fi
++
++	# 2. root coverage
++	missing=''
++	while IFS="$(printf '\t')" read -r apkg artefacts _note; do
++		case "$apkg" in ''|\#*) continue ;; esac
++		[ "$apkg" = "$pkg" ] || continue
++		oldifs="$IFS"; IFS=','
++		for artefact in $artefacts; do
++			[ -e "$ROOT/$artefact" ] || missing="$missing $artefact"
++		done
++		IFS="$oldifs"
++	done <"$ARTEFACTS"
++
++	if [ -n "$missing" ]; then
++		printf '%s\n' "$importpath" >>"$DEFERRED"
++		{
++			echo "defer $pkg"
++			echo "      the supplied root publishes none of:$missing"
++			echo "      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement"
++		} >>"$REPORT"
++		if [ "${CI_REQUIRE_FULL_ROOT:-0}" = 1 ]; then
++			echo "FAIL  $pkg was deferred, but this lane requires a root that serves the whole module" >>"$REPORT"
++			echo "      missing:$missing" >>"$REPORT"
++			FAIL=1
++		fi
++		continue
++	fi
++
++	printf '%s\n' "$importpath" >>"$SERVED"
++done <"$ALL"
++
++{
++	echo ''
++	echo "suite-plan: served=$(wc -l <"$SERVED" | tr -d ' ') deferred=$(wc -l <"$DEFERRED" | tr -d ' ') excluded=$(wc -l <"$EXCLUDED" | tr -d ' ')"
++	if [ "${CI_REQUIRE_FULL_ROOT:-0}" = 1 ]; then
++		echo 'suite-plan: CI_REQUIRE_FULL_ROOT=1 -- every package must be served by this root'
++	fi
++	echo $([ "$FAIL" -eq 0 ] && echo 'suite-plan: ok' || echo 'suite-plan: FAILED')
++} >>"$REPORT"
++
++cat "$REPORT"
++exit "$FAIL"
+--- a/.github/ci/test-gate.sh
++++ b/.github/ci/test-gate.sh
+@@ -0,0 +1,145 @@
++#!/usr/bin/env bash
++# Compiled-build test gate.
++#
++# One entry point for every lane. It plans the run from the supplied
++# conformance root, executes it, and enforces the platform-case ledger against
++# the real `go test -json` stream. Every status is reported and every status is
++# fatal: a green ledger never masks a red `go test`, and a green `go test` never
++# masks a case that stopped running on this platform.
++#
++# The run is up to three `go test` invocations, decided by
++# `.github/ci/suite-plan.sh` from the root alone:
++#
++#   served    packages whose conformance artefacts the root publishes, run WITH
++#             CURATOR_CONFORMANCE_ROOT exported;
++#   deferred  packages the root cannot serve, run with the variable UNSET so
++#             their own `root is not set` path is taken -- named in the report,
++#             and fatal in a lane that sets CI_REQUIRE_FULL_ROOT=1;
++#   excluded  packages the root's qualification vector does not qualify on this
++#             platform. These are not skipped quietly: the rejection case named
++#             in `.github/ci/platform-exclusions.tsv` is run on this very runner
++#             and must pass, proving the exclusion is fail-closed behaviour.
++#
++# Usage:
++#   test-gate.sh <evidence-dir>
++#
++# Environment:
++#   GO                       go launcher             (default: go)
++#   GO_TEST_TIMEOUT          per-package timeout     (default: 30m)
++#   GO_TEST_FLAGS            extra flags, word split (e.g. "-race")
++#   CURATOR_CONFORMANCE_ROOT required; forwarded to the served packages untouched
++#   CI_REQUIRE_FULL_ROOT     1 = the root must serve every package
++#
++# The gate never rewrites, relaxes or retries a failing run.
++
++set -u
++
++GO="${GO:-go}"
++GO_TEST_TIMEOUT="${GO_TEST_TIMEOUT:-30m}"
++HERE="$(cd "$(dirname "$0")" && pwd)"
++
++if [ "$#" -ne 1 ]; then
++	echo 'test-gate: usage: test-gate.sh <evidence-dir>' >&2
++	exit 2
++fi
++EVIDENCE="$1"
++
++# A gate that runs with the conformance suite unset is a smaller gate wearing
++# the same name. Refuse up front rather than reporting a green partial run.
++if [ -z "${CURATOR_CONFORMANCE_ROOT:-}" ]; then
++	echo 'test-gate: CURATOR_CONFORMANCE_ROOT is required.' >&2
++	echo 'test-gate: CI exports it from the committed SPEC_PIN checkout; locally, point' >&2
++	echo 'test-gate: it at a materialised <curator-spec>/conformance/v1 directory.' >&2
++	exit 2
++fi
++if [ ! -f "${CURATOR_CONFORMANCE_ROOT}/manifest.json" ]; then
++	echo "test-gate: CURATOR_CONFORMANCE_ROOT has no manifest.json: $CURATOR_CONFORMANCE_ROOT" >&2
++	exit 2
++fi
++
++mkdir -p "$EVIDENCE" || exit 2
++ROOT="$CURATOR_CONFORMANCE_ROOT"
++MODULE="$(awk '/^module[ \t]/{print $2; exit}' go.mod 2>/dev/null)"
++[ -n "$MODULE" ] || { echo 'test-gate: cannot determine the module path' >&2; exit 2; }
++
++echo "test-gate: flags=${GO_TEST_FLAGS:-<none>} timeout=$GO_TEST_TIMEOUT"
++echo "test-gate: conformance root=$ROOT"
++echo ''
++
++# --- plan ------------------------------------------------------------------
++bash "$HERE/suite-plan.sh" "$ROOT" "$EVIDENCE"
++PLAN_RC=$?
++if [ "$PLAN_RC" -ne 0 ]; then
++	echo "test-gate: suite-plan exit=$PLAN_RC -- refusing to run a suite whose shape is already wrong" >&2
++	exit "$PLAN_RC"
++fi
++
++SERVED="$EVIDENCE/plan-served.txt"
++DEFERRED="$EVIDENCE/plan-deferred.txt"
++EXCLUDED="$EVIDENCE/plan-excluded.txt"
++ASSERT="$EVIDENCE/plan-assert.txt"
++JSON="$EVIDENCE/go-test.json"
++: >"$JSON"
++
++short_names() { sed -e "s#^$MODULE/##" -e "s#^$MODULE\$#.#" "$1" | tr '\n' ' '; }
++
++run_stage() {
++	stage="$1"; shift
++	out="$EVIDENCE/go-test-$stage.json"
++	# The gate command runs as its own process, unpiped, so $? is its real status.
++	# shellcheck disable=SC2086
++	"$@" >"$out" 2>&1
++	rc=$?
++	cat "$out" >>"$JSON"
++	echo "test-gate: stage $stage exit=$rc (stream: $out)"
++	return $rc
++}
++
++TEST_RC=0
++
++# --- served: the root is exported ------------------------------------------
++if [ -s "$SERVED" ]; then
++	# shellcheck disable=SC2046,SC2086
++	run_stage served env CURATOR_CONFORMANCE_ROOT="$ROOT" \
++		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${GO_TEST_FLAGS:-} $(cat "$SERVED")
++	rc=$?; [ "$rc" -ne 0 ] && TEST_RC="$rc"
++else
++	echo 'test-gate: no served packages' >&2
++	exit 2
++fi
++
++# --- deferred: the root is unset, deliberately and visibly -----------------
++if [ -s "$DEFERRED" ]; then
++	# shellcheck disable=SC2046,SC2086
++	run_stage deferred env -u CURATOR_CONFORMANCE_ROOT \
++		"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${GO_TEST_FLAGS:-} $(cat "$DEFERRED")
++	rc=$?; [ "$rc" -ne 0 ] && TEST_RC="$rc"
++fi
++
++# --- excluded: the exclusion is asserted, not assumed ----------------------
++if [ -s "$ASSERT" ]; then
++	while IFS="$(printf '\t')" read -r importpath assertcase; do
++		[ -n "$importpath" ] || continue
++		# shellcheck disable=SC2086
++		run_stage "assert-$(basename "$importpath")" env CURATOR_CONFORMANCE_ROOT="$ROOT" \
++			"$GO" test -json -count=1 -timeout "$GO_TEST_TIMEOUT" ${GO_TEST_FLAGS:-} \
++			-run "^${assertcase}\$" "$importpath"
++		rc=$?; [ "$rc" -ne 0 ] && TEST_RC="$rc"
++	done <"$ASSERT"
++fi
++
++echo ''
++echo "test-gate: go test overall exit=$TEST_RC (merged stream: $JSON)"
++echo ''
++
++# --- ledger ----------------------------------------------------------------
++CI_DEFERRED_PKGS="$(short_names "$DEFERRED")" \
++CI_EXCLUDED_PKGS="$(short_names "$EXCLUDED")" \
++	bash "$HERE/platform-case-gate.sh" "$JSON" "$EVIDENCE"
++GATE_RC=$?
++
++echo ''
++echo "test-gate: go test exit=$TEST_RC, platform-case gate exit=$GATE_RC"
++
++if [ "$TEST_RC" -ne 0 ]; then exit "$TEST_RC"; fi
++exit "$GATE_RC"
+--- a/.github/ci/toolchain-identity.sh
++++ b/.github/ci/toolchain-identity.sh
+@@ -0,0 +1,64 @@
++#!/usr/bin/env bash
++# Go toolchain identity assertion, run by every Go-consuming CI job immediately
++# after actions/setup-go and before any other Go command.
++#
++# Setting GOTOOLCHAIN/GOENV in the workflow `env:` block states an intent; a
++# shim, a wrapper or a later setup-go change can override it. This script reads
++# the values back from the toolchain that is actually on PATH, so "which Go
++# produced this result" is answerable from the job log alone.
++#
++# The required version is derived from go.mod rather than duplicated here:
++# setup-go resolves the toolchain from `go-version-file: go.mod`, so go.mod is
++# the single source of truth and a bump needs one edit, not two. What this
++# script asserts is that the resolved toolchain is EXACTLY that version -- not
++# merely the same major.minor family.
++
++set -u
++
++fail() { echo "toolchain: $*" >&2; exit 1; }
++
++want="$(awk '/^go[ \t]/{print $2; exit}' go.mod)" || fail 'cannot read go.mod'
++[ -n "$want" ] || fail 'go.mod declares no go directive'
++required="go$want"
++
++goexe="$(command -v go)"     || fail 'no go on PATH after setup-go'
++fmtexe="$(command -v gofmt)" || fail 'no gofmt on PATH after setup-go'
++
++v="$(go version)" || fail 'go version failed'
++printf '%s\n' "toolchain: $v"
++case "$v" in
++	*" $required "*) ;;
++	*) fail "expected $required (from go.mod), got: $v" ;;
++esac
++
++# Absolute reported root. Under git-bash on windows-latest `go env GOROOT`
++# reports C:\hostedtoolcache\... while `command -v` reports
++# /c/hostedtoolcache/.../go.exe; MSYS accepts C:/..., so swapping separators
++# makes both spellings nameable without weakening the comparison.
++r="$(go env GOROOT)" || fail 'go env GOROOT failed'
++printf '%s\n' "toolchain: GOROOT=$r"
++rp="$(printf '%s' "$r" | tr '\\' '/')"
++[ -n "$rp" ] || fail 'go env GOROOT is empty'
++case "$rp" in
++	[A-Za-z]:/*|/*) ;;
++	*) fail "reported GOROOT is not absolute: $r" ;;
++esac
++
++# The launcher IS this root's go and the formatter IS this root's gofmt.
++# Textual first, then -ef (device+inode), which is what survives /c/... vs
++# C:/... and the .exe suffix without accepting a different toolchain.
++same() { [ "$1" = "$2" ] || [ "$1" = "$2.exe" ] || [ "$1" -ef "$2" ] || [ "$1" -ef "$2.exe" ]; }
++same "$goexe"  "$rp/bin/go"    || fail "launcher $goexe is not $r/bin/go"
++same "$fmtexe" "$rp/bin/gofmt" || fail "formatter $fmtexe is not $r/bin/gofmt"
++
++# No implicit toolchain download, and no per-user go env file in the loop.
++# Read back, never assume the workflow env: block took effect.
++tc="$(go env GOTOOLCHAIN)" || fail 'go env GOTOOLCHAIN failed'
++printf '%s\n' "toolchain: GOTOOLCHAIN=$tc"
++[ "$tc" = local ] || fail "GOTOOLCHAIN=$tc, not local"
++
++ge="$(go env GOENV)" || fail 'go env GOENV failed'
++printf '%s\n' "toolchain: GOENV=$ge"
++[ "$ge" = off ] || fail "GOENV=$ge, not off"
++
++echo 'ci-toolchain-identity: ok'

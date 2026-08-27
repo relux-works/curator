@@ -1,0 +1,9 @@
+# TASK-260720-wajgn8 rework evidence
+
+Applied the reviewer-required public fragment rename in the isolated curator-spec branch agent/manifest-v6-schemas rooted at 57c1f56846d221ecc55786bd3c2467ec32f11730: common.schema.json now publishes $defs/buildCommandV6, commandV6 references #/$defs/buildCommandV6, and generator tests assert buildCommandV6. No other product-file changes were needed during recovery.
+
+The schemas and generated schema-case directories for versions 1 through 5 remain byte-identical to the required base; an explicit git diff --exit-code across all canonical and legacy v1-v5 schema and case paths passed.
+
+The rework run passed the required gates: go test ./tools/generate-vectors; go vet ./tools/...; gofmt cleanliness; go build; git diff --check; make regenerate; make validate using the pinned requirements-dev.txt environment with 32 schemas, 127 vector files, 8 Python tests, and all Go tests; and make regenerate-check against an isolated alternate Git index seeded from the intended uncommitted conformance baseline. Two conformance regenerations matched byte-for-byte at SHA-256 bf8a4b30dc44bade3a5ead8fa00bfd60ea5b30286396a13fae8787b9831bd004. This recovery also reran go test ./tools/generate-vectors, go vet ./tools/..., go build ./tools/generate-vectors, git diff --check, and the full v1-v5 freeze comparison successfully.
+
+Recorded hashes: common.schema.json 51b41c2edfa1a9d1a64ac21a99d38516739cf2a5c69bce0fc20e2dd7c70d70ea; agent-skill-v6.schema.json 982832e410f85e415e16e8f9104c3b9af23f6d846bbfbe5497ff170dde947f6f; csk-skill-v6.schema.json 2148eafc4fa110311b52f528651424e2f53c69042235338fb2c8b414035eab9c; schema-case index 7eb769182020171c0cd8394cee5d94caf446b201b30b8b70e8d1e54b922e8856; conformance manifest 87caa3ba9fd88a24c77c618c3ddf15d943fb5d97d926371d9599cfd4f09527c4.

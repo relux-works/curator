@@ -1,0 +1,1510 @@
+{
+  "fixture_version": "toolchain-probe-fixture-v1",
+  "task": "TASK-260729-rhjxtx",
+  "host": {
+    "operating_system": "macos",
+    "architecture": "arm64",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "os_version": "26.5",
+    "native_target": "macos/arm64",
+    "probe_go_version": "go1.25.5"
+  },
+  "toolchains": [
+    {
+      "toolchain_id": "rust",
+      "availability": "available",
+      "declaration": {
+        "channel": "probe_explicit_root",
+        "root": "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin",
+        "primary_relpath": "bin/cargo",
+        "primary_present": true,
+        "path_was_searched": false
+      },
+      "version_probe": {
+        "argv": [
+          "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+          "-vV"
+        ],
+        "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+        "exit_code": 0,
+        "stdout": "rustc 1.91.0 (f8297e351 2025-10-28)\nbinary: rustc\ncommit-hash: f8297e351a40c1439a467bbbb6879088047f50b3\ncommit-date: 2025-10-28\nhost: aarch64-apple-darwin\nrelease: 1.91.0\nLLVM version: 21.1.2\n",
+        "stderr": ""
+      },
+      "normalization": {
+        "rule_id": "rust.rustc.vV.release",
+        "stream": "stdout",
+        "pattern": "^release: (0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$",
+        "canonical": {
+          "major": 1,
+          "minor": 91,
+          "patch": 0,
+          "prerelease": false,
+          "native": "release: 1.91.0"
+        },
+        "verified_against_real_output": true
+      },
+      "target_probe": {
+        "argv": [
+          "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+          "--print",
+          "host-tuple"
+        ],
+        "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+        "exit_code": 0,
+        "stdout": "aarch64-apple-darwin\n",
+        "stderr": ""
+      },
+      "native_target": {
+        "reported": "aarch64-apple-darwin",
+        "stable_form": "aarch64-apple-darwin",
+        "source": "rustc --print host-tuple"
+      },
+      "metadata_sources": [
+        {
+          "file": "Cargo.toml",
+          "fields": [
+            {
+              "name": "package.rust-version",
+              "disposition": "compared",
+              "rationale": "an MSRV assertion about the resolved toolchain; surfaced by cargo metadata as packages[].rust_version without compiling anything",
+              "measured": true
+            },
+            {
+              "name": "workspace.package.rust-version",
+              "disposition": "compared",
+              "rationale": "same assertion inherited through a workspace; the reader command resolves the inheritance",
+              "measured": false
+            }
+          ],
+          "readable_without_execution": true,
+          "reader_command": "cargo metadata --no-deps --format-version 1 --offline"
+        },
+        {
+          "file": "rust-toolchain.toml",
+          "fields": [
+            {
+              "name": "toolchain.path",
+              "disposition": "forbidden",
+              "rationale": "names where a toolchain comes from; measured to change which rustc runs",
+              "measured": true
+            },
+            {
+              "name": "toolchain.channel",
+              "disposition": "compared",
+              "rationale": "a version literal or `stable` is an assertion and is never honored; `nightly`, `beta` and dated channels assert a prerelease host, which is never resolved",
+              "measured": true
+            },
+            {
+              "name": "toolchain.components",
+              "disposition": "ignored",
+              "rationale": "selects distribution contents, which the trusted root already fixes",
+              "measured": false
+            },
+            {
+              "name": "toolchain.targets",
+              "disposition": "ignored",
+              "rationale": "selects installable targets; target admission is manager-owned",
+              "measured": false
+            },
+            {
+              "name": "toolchain.profile",
+              "disposition": "ignored",
+              "rationale": "selects distribution contents",
+              "measured": false
+            }
+          ],
+          "readable_without_execution": true,
+          "reader_command": "read the file; never hand it to a shim"
+        },
+        {
+          "file": "rust-toolchain",
+          "fields": [
+            {
+              "name": "\u003cbare channel string\u003e",
+              "disposition": "compared",
+              "rationale": "the legacy one-line form of toolchain.channel; the same classifier applies",
+              "measured": false
+            }
+          ],
+          "readable_without_execution": true,
+          "reader_command": "read the file"
+        }
+      ],
+      "companions": [],
+      "notes": [
+        "`rustc -vV` also carries `host:`, identical to `--print host-tuple` on the probed toolchain; `--print host-tuple` is the narrower surface and is preferred.",
+        "The Rust host tuple carries no platform-version component, so unlike the Swift target triple it is directly usable as a native-target identity.",
+        "Measured: cargo resolves `rustc` by name and fails with \"could not execute process `rustc -vV` (never executed)\" under a minimal PATH that excludes the trusted root's bin directory. The driver MUST pass RUSTC explicitly, or the second node of its process graph is chosen by PATH order rather than by the fingerprinted closure."
+      ]
+    },
+    {
+      "toolchain_id": "swift",
+      "availability": "available",
+      "declaration": {
+        "channel": "probe_explicit_root",
+        "root": "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain",
+        "primary_relpath": "usr/bin/swift",
+        "primary_present": true,
+        "path_was_searched": false
+      },
+      "version_probe": {
+        "argv": [
+          "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+          "-print-target-info"
+        ],
+        "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+        "exit_code": 0,
+        "stdout": "{\n  \"compilerVersion\": \"Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)\",\n  \"swiftCompilerTag\": \"swiftlang-6.3.2.1.108\",\n  \"target\": {\n    \"triple\": \"arm64-apple-macosx26.0\",\n    \"unversionedTriple\": \"arm64-apple-macosx\",\n    \"moduleTriple\": \"arm64-apple-macos\",\n    \"platform\": \"macosx\",\n    \"arch\": \"arm64\",\n    \"pointerWidthInBits\": 64,\n    \"pointerWidthInBytes\": 8,\n    \"swiftRuntimeCompatibilityVersion\": \"6.2\",\n    \"compatibilityLibraries\": [ ],\n    \"openbsdBTCFIEnabled\": false,\n    \"librariesRequireRPath\": false\n  },\n  \"paths\": {\n    \"runtimeLibraryPaths\": [\n      \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx\",\n      \"/usr/lib/swift\"\n    ],\n    \"runtimeLibraryImportPaths\": [\n      \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx\"\n    ],\n    \"runtimeResourcePath\": \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift\"\n  }\n}\n",
+        "stderr": ""
+      },
+      "normalization": {
+        "rule_id": "swift.print-target-info.compilerVersion",
+        "stream": "stdout",
+        "pattern": "^(?:Apple )?Swift version (0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*))?(-[0-9A-Za-z.]+)? \\([^()]*\\)$",
+        "canonical": {
+          "major": 6,
+          "minor": 3,
+          "patch": 2,
+          "prerelease": false,
+          "native": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)"
+        },
+        "verified_against_real_output": true
+      },
+      "target_probe": {
+        "argv": [
+          "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+          "-print-target-info"
+        ],
+        "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+        "exit_code": 0,
+        "stdout": "{\n  \"compilerVersion\": \"Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)\",\n  \"swiftCompilerTag\": \"swiftlang-6.3.2.1.108\",\n  \"target\": {\n    \"triple\": \"arm64-apple-macosx26.0\",\n    \"unversionedTriple\": \"arm64-apple-macosx\",\n    \"moduleTriple\": \"arm64-apple-macos\",\n    \"platform\": \"macosx\",\n    \"arch\": \"arm64\",\n    \"pointerWidthInBits\": 64,\n    \"pointerWidthInBytes\": 8,\n    \"swiftRuntimeCompatibilityVersion\": \"6.2\",\n    \"compatibilityLibraries\": [ ],\n    \"openbsdBTCFIEnabled\": false,\n    \"librariesRequireRPath\": false\n  },\n  \"paths\": {\n    \"runtimeLibraryPaths\": [\n      \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx\",\n      \"/usr/lib/swift\"\n    ],\n    \"runtimeLibraryImportPaths\": [\n      \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx\"\n    ],\n    \"runtimeResourcePath\": \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift\"\n  }\n}\n",
+        "stderr": ""
+      },
+      "native_target": {
+        "reported": "arm64-apple-macosx26.0",
+        "stable_form": "arm64-apple-macosx",
+        "host_varying_components": [
+          "platform version 26.0"
+        ],
+        "source": "swiftc -print-target-info, target.triple and target.unversionedTriple"
+      },
+      "metadata_sources": [
+        {
+          "file": "Package.swift (// swift-tools-version header)",
+          "fields": [
+            {
+              "name": "swift-tools-version",
+              "disposition": "compared",
+              "rationale": "an assertion about the resolved toolchain; SwiftPM normalizes it to major.minor.patch on stdout",
+              "measured": true
+            }
+          ],
+          "readable_without_execution": true,
+          "reader_command": "swift package tools-version",
+          "evidence": "measured: returns exit 0 and the normalized tools version for a manifest carrying a Swift syntax error and for a manifest whose body is a fatalError, so it reads the header line and neither compiles nor runs the manifest"
+        },
+        {
+          "file": "Package.swift (body)",
+          "fields": [
+            {
+              "name": "\u003centire manifest program\u003e",
+              "disposition": "forbidden",
+              "rationale": "reading it is package-selected code execution; no driver admitted by decision 0008 may invoke it",
+              "measured": true
+            }
+          ],
+          "readable_without_execution": false,
+          "reader_command": "swift package dump-package",
+          "evidence": "measured: dump-package compiles Package.swift with swiftc into a `\u003cname\u003e-manifest` executable and runs it; the fatalError fixture reports `Fatal error: PROBE-MANIFEST-EXECUTED`"
+        },
+        {
+          "file": ".swift-version",
+          "fields": [
+            {
+              "name": "\u003cbare version string\u003e",
+              "disposition": "compared",
+              "rationale": "an assertion about which toolchain the author expected; never honored, because resolution is operator-owned",
+              "measured": true
+            }
+          ],
+          "readable_without_execution": true,
+          "reader_command": "read the file",
+          "evidence": "measured: the Xcode-provided swift driver ignores it; it is honored by the swiftly version manager, which the trusted-resolution rule already forbids"
+        }
+      ],
+      "companions": [],
+      "notes": [
+        "`swift --version` splits one banner across two streams: stderr carries \"swift-driver version: 1.148.6 \" and stdout carries the version line. A normalization rule that reads the merged stream sees them concatenated into a single line, so the rule must name its stream.",
+        "`target.triple` carries a platform-version component supplied by the selected SDK, so it is not stable across hosts with different SDKs; `target.unversionedTriple` is the form a native-target identity should bind.",
+        "SwiftPM compiles the manifest with a different platform version than the compiler reports for the host, which is a second reason the versioned triple is not an identity."
+      ]
+    },
+    {
+      "toolchain_id": "kotlin",
+      "availability": "unavailable",
+      "reason": "no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs",
+      "guidance_id": "toolchain.kotlin-native.absent.primary-source",
+      "declaration": {
+        "channel": "probe_explicit_root",
+        "primary_relpath": "bin/kotlinc-native",
+        "primary_present": false,
+        "path_was_searched": false
+      },
+      "metadata_sources": [
+        {
+          "file": "(none defined by the Kotlin/Native compiler-only path)",
+          "fields": [
+            {
+              "name": "\u003cno legal field\u003e",
+              "disposition": "forbidden",
+              "rationale": "the only source-tree surface the ecosystem offers for this slot is a program; whether a curator-owned metadata file is minted instead is TASK-260728-168smo's decision under section 10's retirement clause",
+              "measured": false
+            }
+          ],
+          "readable_without_execution": false,
+          "evidence": "no candidate is proposed. Decision 0008 section 4 requires exactly one closed driver-defined project-metadata file directly in the build root, as go-v1 binds go.mod. kotlinc-native consumes .kt sources and an output path and defines no manifest, and the ecosystem's manifest is a Gradle script, which the entry below measures as executable code. Naming a candidate without a qualified Kotlin/Native host would be a fabricated platform claim, so this probe supplies the boundary rather than a file: UNVERIFIED against a real Kotlin/Native distribution: the branch is implemented and unit-tested against a synthetic root, and has never seen output from a real konan compiler"
+        },
+        {
+          "file": "build.gradle / build.gradle.kts / settings.gradle*",
+          "fields": [
+            {
+              "name": "\u003centire build script\u003e",
+              "disposition": "forbidden",
+              "rationale": "a Gradle build script is a program; no driver admitted by decision 0008 may invoke it, and the Gradle wrapper additionally downloads its own distribution",
+              "measured": true
+            }
+          ],
+          "readable_without_execution": false,
+          "reader_command": "gradle properties (measured only to establish the cost of reading it; never a driver command)",
+          "evidence": "measured by case kotlin.negative.metadata-is-a-program: Measured on this host: answering a pure metadata query (`gradle properties`) compiled the build script as a program source unit (true) and ran it to completion (false). The build-script compilation is the finding; whether it then finishes is incidental, and on this host it did not, because the installed JDK is newer than the Gradle distribution accepts. A Gradle script therefore cannot be the closed project-metadata file decision 0008 section 4 requires, and SECURITY.md already forbids invoking it. The Kotlin/Native compiler-only path defines no manifest of its own, so TASK-260728-168smo must either name a curator-owned metadata file for the build root or accept that section 10's retirement clause applies. The Kotlin DSL form (build.gradle.kts) was NOT measured: resolving it requires network fetches this probe refuses to perform."
+        }
+      ],
+      "companions": [],
+      "notes": [
+        "The Kotlin compiler present on this host reports backend \"jvm\" on stderr with an `info:` prefix and an empty stdout. A version probe that reads stdout gets nothing, and a probe that accepts any `kotlinc` banner would admit a front end that cannot produce a native executable. The Kotlin entry's probe must name the stderr stream and its normalization must require the backend token."
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "kotlin.negative.backend-is-not-native",
+      "language": "kotlin",
+      "kind": "negative",
+      "title": "a Kotlin compiler on the host is a JVM front end, not Kotlin/Native",
+      "expected_gate_class": "backend_identity",
+      "observed_gate_class": "backend_identity",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false,
+        "backend": "jvm"
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "runs": [
+        {
+          "argv": [
+            "/opt/homebrew/bin/kotlinc",
+            "-version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": "info: kotlinc-jvm 2.4.10 (JRE 26.0.1)\n"
+        }
+      ],
+      "manager_obligation": "The Kotlin compiler present on this host reports backend \"jvm\" on stderr with an `info:` prefix and an empty stdout. A version probe that reads stdout gets nothing, and a probe that accepts any `kotlinc` banner would admit a front end that cannot produce a native executable. The Kotlin entry's probe must name the stderr stream and its normalization must require the backend token.",
+      "consumers": [
+        "TASK-260728-168smo"
+      ]
+    },
+    {
+      "id": "kotlin.negative.metadata-is-a-program",
+      "language": "kotlin",
+      "kind": "negative",
+      "title": "reading Kotlin project metadata compiles package-authored code as a program",
+      "expected_gate_class": "package_selector",
+      "observed_gate_class": "package_selector",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": true,
+        "selector_shim_exit": 1,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": true
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "kt/gradle/build.gradle",
+          "sha256": "431705861fa23e895980e52d512a44bfa619e8918bd030bbb1cb5bef1fd329e5",
+          "bytes": 39
+        },
+        {
+          "path": "kt/gradle/settings.gradle",
+          "sha256": "7ced54d57b3d9568262505f0dfed27d8c474d989d7163eea2358a35fe2d85953",
+          "bytes": 27
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/opt/homebrew/bin/gradle",
+            "--offline",
+            "--no-daemon",
+            "--console=plain",
+            "properties"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/kt/gradle",
+          "env_delta": [
+            "GRADLE_USER_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/gradle-home"
+          ],
+          "exit_code": 1,
+          "stdout": "\nWelcome to Gradle 9.2.1!\n\nHere are the highlights of this release:\n - Windows ARM support\n - Improved publishing APIs\n - Better guidance for dependency verification failures\n\nFor more details see https://docs.gradle.org/9.2.1/release-notes.html\n\nTo honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.\nDaemon will be stopped at the end of the build \n",
+          "stderr": "\nFAILURE: Build failed with an exception.\n\n* What went wrong:\nBUG! exception in phase 'semantic analysis' in source unit '_BuildScript_' Unsupported class file major version 70\n\u003e Unsupported class file major version 70\n\n* Try:\n\u003e Run with --stacktrace option to get the stack trace.\n\u003e Run with --info or --debug option to get more log output.\n\u003e Run with --scan to generate a Build Scan (powered by Develocity).\n\u003e Get more help at https://help.gradle.org.\n\nBUILD FAILED in 2s\n"
+        }
+      ],
+      "manager_obligation": "Measured on this host: answering a pure metadata query (`gradle properties`) compiled the build script as a program source unit (true) and ran it to completion (false). The build-script compilation is the finding; whether it then finishes is incidental, and on this host it did not, because the installed JDK is newer than the Gradle distribution accepts. A Gradle script therefore cannot be the closed project-metadata file decision 0008 section 4 requires, and SECURITY.md already forbids invoking it. The Kotlin/Native compiler-only path defines no manifest of its own, so TASK-260728-168smo must either name a curator-owned metadata file for the build root or accept that section 10's retirement clause applies. The Kotlin DSL form (build.gradle.kts) was NOT measured: resolving it requires network fetches this probe refuses to perform.",
+      "consumers": [
+        "TASK-260728-168smo"
+      ]
+    },
+    {
+      "id": "kotlin.negative.target-not-listed",
+      "language": "kotlin",
+      "kind": "negative",
+      "title": "legal Kotlin/Native target this distribution does not serve",
+      "expected_gate_class": "target_host",
+      "observed_gate_class": "",
+      "verdict": "not_run",
+      "not_run_reason": "no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": false,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "consumers": [
+        "TASK-260728-168smo"
+      ]
+    },
+    {
+      "id": "kotlin.negative.target-unknown",
+      "language": "kotlin",
+      "kind": "negative",
+      "title": "target the Kotlin/Native compiler does not know",
+      "expected_gate_class": "target_representability",
+      "observed_gate_class": "",
+      "verdict": "not_run",
+      "not_run_reason": "no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": false,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "consumers": [
+        "TASK-260728-168smo"
+      ]
+    },
+    {
+      "id": "kotlin.positive.version-and-target",
+      "language": "kotlin",
+      "kind": "positive",
+      "title": "Kotlin/Native version normalizes and the host target is one the distribution serves",
+      "expected_gate_class": "none",
+      "observed_gate_class": "",
+      "verdict": "not_run",
+      "not_run_reason": "no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": false,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "consumers": [
+        "TASK-260728-168smo"
+      ]
+    },
+    {
+      "id": "rust.negative.msrv-future",
+      "language": "rust",
+      "kind": "negative",
+      "title": "Cargo.toml rust-version above the resolved toolchain",
+      "expected_gate_class": "host_version",
+      "observed_gate_class": "host_version",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": true,
+        "metadata_exit": 0,
+        "metadata_extracted_value": "1.99",
+        "build_ran": true,
+        "build_exit": 101,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "rs/probe-future/Cargo.toml",
+          "sha256": "2f38217fc65154984af134cb059478c9d8b034f5cb68f1c63d0a7bb2e10880d4",
+          "bytes": 89
+        },
+        {
+          "path": "rs/probe-future/src/main.rs",
+          "sha256": "536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4",
+          "bytes": 13
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+            "metadata",
+            "--no-deps",
+            "--format-version",
+            "1",
+            "--offline"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-future",
+          "env_delta": [
+            "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/cargo-target/probe-future",
+            "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc"
+          ],
+          "exit_code": 0,
+          "stdout": "{\"packages\":[{\"name\":\"probe-future\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-future#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-future\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-future/src/main.rs\",\"edition\":\"2021\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-future/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2021\",\"links\":null,\"default_run\":null,\"rust_version\":\"1.99\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-future#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-future#0.1.0\"],\"resolve\":null,\"target_directory\":\"/Users/iv/Devel",
+          "stderr": "",
+          "truncated": true
+        },
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+            "build",
+            "--offline"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-future",
+          "env_delta": [
+            "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/cargo-target/probe-future",
+            "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc"
+          ],
+          "exit_code": 101,
+          "stdout": "",
+          "stderr": "error: rustc 1.91.0 is not supported by the following package:\n  probe-future@0.1.0 requires rustc 1.99\n\n"
+        }
+      ],
+      "manager_obligation": "Read packages[].rust_version from `cargo metadata --no-deps` in the graph phase and compare it against the resolved toolchain identity. Cargo's own rejection is a build-time error, so a driver that waits for it has already entered the compile phase.",
+      "consumers": [
+        "TASK-260728-12pnm1"
+      ]
+    },
+    {
+      "id": "rust.negative.msrv-malformed",
+      "language": "rust",
+      "kind": "negative",
+      "title": "Cargo.toml rust-version that is not a version",
+      "expected_gate_class": "representability",
+      "observed_gate_class": "representability",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": true,
+        "metadata_exit": 101,
+        "build_ran": true,
+        "build_exit": 101,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "rs/probe-malformed/Cargo.toml",
+          "sha256": "ed862e4156a4bdff8619378916837cca406a53d51c1d6e9f74b4d61220abf892",
+          "bytes": 101
+        },
+        {
+          "path": "rs/probe-malformed/src/main.rs",
+          "sha256": "536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4",
+          "bytes": 13
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+            "metadata",
+            "--no-deps",
+            "--format-version",
+            "1",
+            "--offline"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-malformed",
+          "env_delta": [
+            "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/cargo-target/probe-malformed",
+            "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc"
+          ],
+          "exit_code": 101,
+          "stdout": "",
+          "stderr": "error: unexpected prerelease field, expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"not-a-version\"\n  |                ^^^^^^^^^^^^^^^\n"
+        },
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+            "build",
+            "--offline"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-malformed",
+          "env_delta": [
+            "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/cargo-target/probe-malformed",
+            "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc"
+          ],
+          "exit_code": 101,
+          "stdout": "",
+          "stderr": "error: unexpected prerelease field, expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"not-a-version\"\n  |                ^^^^^^^^^^^^^^^\n"
+        }
+      ],
+      "manager_obligation": "No comparison is needed: the graph command already refuses the manifest, so this is a Stage B file-shape rejection with no host input.",
+      "consumers": [
+        "TASK-260728-12pnm1"
+      ]
+    },
+    {
+      "id": "rust.negative.selector-toolchain-nightly",
+      "language": "rust",
+      "kind": "negative",
+      "title": "rust-toolchain.toml channel makes the shim attempt an install",
+      "expected_gate_class": "package_selector",
+      "observed_gate_class": "package_selector",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": true,
+        "selector_shim_exit": 1,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": true
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "rs/probe-tc-nightly/Cargo.toml",
+          "sha256": "f2392621e6e8c2eda6aecfa883f6c1ea0b2561dafd37cb18ceddf3d6b079501e",
+          "bytes": 93
+        },
+        {
+          "path": "rs/probe-tc-nightly/rust-toolchain.toml",
+          "sha256": "2ce1c1fe5e79a52424c9d88d99f5a2c95dcf5b4f4a82431bb9e5710cfb39e184",
+          "bytes": 32
+        },
+        {
+          "path": "rs/probe-tc-nightly/src/main.rs",
+          "sha256": "536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4",
+          "bytes": 13
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Users/iv/.cargo/bin/rustc",
+            "--version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-tc-nightly",
+          "env_delta": [
+            "RUSTUP_DIST_SERVER=http://127.0.0.1:1",
+            "RUSTUP_UPDATE_ROOT=http://127.0.0.1:1"
+          ],
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "info: syncing channel updates for 'nightly-aarch64-apple-darwin'\nerror: failed to download file error=Reqwest(reqwest::Error { kind: Request, url: \"http://127.0.0.1:1/dist/channel-rust-nightly.toml.sha256\", source: hyper_util::client::legacy::Error(Connect, ConnectError(\"tcp connect error\", Os { code: 61, kind: ConnectionRefused, message: \"Connection refused\" })) })\nerror: could not download file from 'http://127.0.0.1:1/dist/channel-rust-nightly.toml.sha256' to '/Users/iv/.rustup/tmp/d3dqy25wkbv84qpb_file': error downloading file: error sending request for url (http://127.0.0.1:1/dist/channel-rust-nightly.toml.sha256): client error (Connect): tcp connect error: Connection refused (os error 61): Connection refused (os error 61)\n"
+        },
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+            "--version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-tc-nightly",
+          "exit_code": 0,
+          "stdout": "rustc 1.91.0 (f8297e351 2025-10-28)\n",
+          "stderr": ""
+        }
+      ],
+      "manager_obligation": "Resolve the concrete toolchain root directly and never through a version-manager shim. rust-toolchain.toml is then inert: the same directory that redirects the shim leaves a directly resolved rustc unchanged.",
+      "consumers": [
+        "TASK-260728-12pnm1"
+      ]
+    },
+    {
+      "id": "rust.negative.selector-toolchain-path",
+      "language": "rust",
+      "kind": "negative",
+      "title": "rust-toolchain.toml path selects the compiler through the shim",
+      "expected_gate_class": "package_selector",
+      "observed_gate_class": "package_selector",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": true,
+        "selector_shim_exit": 1,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "rs/probe-tc-path/Cargo.toml",
+          "sha256": "9aae2e72bec511880e07e0c8ae2ce1d7fb09b49e06227f16785aace7879fab05",
+          "bytes": 90
+        },
+        {
+          "path": "rs/probe-tc-path/rust-toolchain.toml",
+          "sha256": "ac02a418a16f26158e6dd36df3b3ca1b663c7912bd1604e10b63e88f046a2514",
+          "bytes": 47
+        },
+        {
+          "path": "rs/probe-tc-path/src/main.rs",
+          "sha256": "536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4",
+          "bytes": 13
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Users/iv/.cargo/bin/rustc",
+            "--version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-tc-path",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "error: invalid toolchain: the path '/nonexistent/trusted/root' has no bin/ directory\n"
+        },
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+            "--version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-tc-path",
+          "exit_code": 0,
+          "stdout": "rustc 1.91.0 (f8297e351 2025-10-28)\n",
+          "stderr": ""
+        }
+      ],
+      "manager_obligation": "Resolve the concrete toolchain root directly and never through a version-manager shim. rust-toolchain.toml is then inert: the same directory that redirects the shim leaves a directly resolved rustc unchanged.",
+      "consumers": [
+        "TASK-260728-12pnm1"
+      ]
+    },
+    {
+      "id": "rust.negative.target-std-absent",
+      "language": "rust",
+      "kind": "negative",
+      "title": "known target triple whose standard library is not in the trusted tree",
+      "expected_gate_class": "target_host",
+      "observed_gate_class": "target_host",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": true,
+        "build_exit": 101,
+        "build_started_compilation": true,
+        "build_compilation_evidence": "   Compiling probe-positive v0.1.0 (/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive)",
+        "target_print_ran": true,
+        "target_print_exit": 0,
+        "target_std_checked": true,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": true,
+      "expect_decidable_before_compiler_work": true,
+      "runs": [
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+            "--print",
+            "target-libdir",
+            "--target",
+            "x86_64-unknown-linux-gnu"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+          "exit_code": 0,
+          "stdout": "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/x86_64-unknown-linux-gnu/lib\n",
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+            "build",
+            "--offline",
+            "--target",
+            "x86_64-unknown-linux-gnu"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive",
+          "env_delta": [
+            "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/cargo-target/target-x86_64-unknown-linux-gnu",
+            "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc"
+          ],
+          "exit_code": 101,
+          "stdout": "",
+          "stderr": "   Compiling probe-positive v0.1.0 (/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive)\nerror[E0463]: can't find crate for `std`\n  |\n  = note: the `x86_64-unknown-linux-gnu` target may not be installed\n  = help: consider downloading the target with `rustup target add x86_64-unknown-linux-gnu`\n\nFor more information about this error, try `rustc --explain E0463`.\nerror: could not compile `probe-positive` (bin \"probe-positive\") due to 1 previous error\n"
+        }
+      ],
+      "manager_obligation": "Membership in `rustc --print target-list` is representability only. Admission requires the manager to stat \u003croot\u003e/lib/rustlib/\u003ctarget\u003e/lib inside the fingerprinted tree; `rustc --print target-libdir` returns exit 0 and a path for a target whose standard library is absent.",
+      "consumers": [
+        "TASK-260728-12pnm1"
+      ]
+    },
+    {
+      "id": "rust.negative.target-unknown",
+      "language": "rust",
+      "kind": "negative",
+      "title": "target triple the compiler does not know",
+      "expected_gate_class": "target_representability",
+      "observed_gate_class": "target_representability",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": true,
+        "build_exit": 101,
+        "build_started_compilation": false,
+        "target_print_ran": true,
+        "target_print_exit": 1,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "runs": [
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+            "--print",
+            "target-libdir",
+            "--target",
+            "not-a-real-target"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "error: error loading target specification: could not find specification for target \"not-a-real-target\"\n  |\n  = help: run `rustc --print target-list` for a list of built-in targets\n\n"
+        },
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+            "build",
+            "--offline",
+            "--target",
+            "not-a-real-target"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive",
+          "env_delta": [
+            "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/cargo-target/target-not-a-real-target",
+            "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc"
+          ],
+          "exit_code": 101,
+          "stdout": "",
+          "stderr": "error: failed to run `rustc` to learn about target-specific information\n\nCaused by:\n  process didn't exit successfully: `/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc - --crate-name ___ --print=file-names --target not-a-real-target --crate-type bin --crate-type rlib --crate-type dylib --crate-type cdylib --crate-type staticlib --crate-type proc-macro --print=sysroot --print=split-debuginfo --print=crate-name --print=cfg -Wwarnings` (exit status: 1)\n  --- stderr\n  error: error loading target specification: could not find specification for target \"not-a-real-target\"\n    |\n    = help: run `rustc --print target-list` for a list of built-in targets\n\n"
+        }
+      ],
+      "manager_obligation": "An unknown triple is refused by `rustc --print target-libdir --target \u003ct\u003e` with a non-zero exit before any compilation, so representability needs no extra manager check.",
+      "consumers": [
+        "TASK-260728-12pnm1"
+      ]
+    },
+    {
+      "id": "rust.positive.msrv-below-host",
+      "language": "rust",
+      "kind": "positive",
+      "title": "valid Cargo.toml whose rust-version is below the resolved toolchain",
+      "expected_gate_class": "none",
+      "observed_gate_class": "none",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": true,
+        "metadata_exit": 0,
+        "metadata_extracted_value": "1.85",
+        "build_ran": true,
+        "build_exit": 0,
+        "build_started_compilation": true,
+        "build_compilation_evidence": "   Compiling probe-positive v0.1.0 (/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive)",
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "rs/probe-positive/Cargo.toml",
+          "sha256": "25a3d22da1073c708ecea201aa53fd7df59c23af8a7fc1d514f463ed9d07b6c1",
+          "bytes": 91
+        },
+        {
+          "path": "rs/probe-positive/src/main.rs",
+          "sha256": "536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4",
+          "bytes": 13
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+            "metadata",
+            "--no-deps",
+            "--format-version",
+            "1",
+            "--offline"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive",
+          "env_delta": [
+            "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/cargo-target/probe-positive",
+            "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc"
+          ],
+          "exit_code": 0,
+          "stdout": "{\"packages\":[{\"name\":\"probe-positive\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-positive\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive/src/main.rs\",\"edition\":\"2021\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2021\",\"links\":null,\"default_run\":null,\"rust_version\":\"1.85\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive#0.1.0\"],\"resolve\":null,\"target_directory\":\"/",
+          "stderr": "",
+          "truncated": true
+        },
+        {
+          "argv": [
+            "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+            "build",
+            "--offline"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive",
+          "env_delta": [
+            "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/cargo-target/probe-positive",
+            "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc"
+          ],
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": "   Compiling probe-positive v0.1.0 (/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/rs/probe-positive)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s\n"
+        }
+      ],
+      "consumers": [
+        "TASK-260728-12pnm1"
+      ]
+    },
+    {
+      "id": "swift.negative.manifest-is-a-program",
+      "language": "swift",
+      "kind": "negative",
+      "title": "reading the manifest body executes package-authored code",
+      "expected_gate_class": "package_selector",
+      "observed_gate_class": "package_selector",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": true,
+        "selector_shim_exit": 1,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": true
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "sw/fatal/Package.swift",
+          "sha256": "37f4458b9288f771b46ea299b9eb8b83e3acf303809fc3d2caef5baf707ab8c2",
+          "bytes": 173
+        },
+        {
+          "path": "sw/fatal/Sources/probe/main.swift",
+          "sha256": "3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4",
+          "bytes": 11
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "package",
+            "tools-version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/fatal",
+          "exit_code": 0,
+          "stdout": "6.0.0\n",
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "package",
+            "dump-package"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/fatal",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "error: 'fatal': Invalid manifest (compiled with: [\"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc\", \"-vfsoverlay\", \"/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TemporaryDirectory.p30V2k/vfs.yaml\", \"-L\", \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-lPackageDescription\", \"-Xlinker\", \"-rpath\", \"-Xlinker\", \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/pm/ManifestAPI\", \"-target\", \"arm64-apple-macosx14.0\", \"-plugin-path\", \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing\", \"-sdk\", \"/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk\", \"-F\", \"/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks\", \"-I\", \"/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-L\", \"/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib\", \"-swift-version\", \"6\", \"-I\", \"/Applications/Xc",
+          "truncated": true
+        }
+      ],
+      "manager_obligation": "Never invoke `swift package dump-package`, `describe`, `resolve`, or `build` to learn what a package declares. Measured on this host: dump-package compiled the manifest (true) and executed it (true), while `swift package tools-version` returned the header from the same directory without doing either. A Swift driver's graph phase is therefore limited to the header, and the target/product set must come from the manager-owned wire surface rather than from the manifest.",
+      "consumers": [
+        "TASK-260728-1yhuqi"
+      ]
+    },
+    {
+      "id": "swift.negative.selector-swift-version-file",
+      "language": "swift",
+      "kind": "negative",
+      "title": ".swift-version does not redirect a directly resolved toolchain",
+      "expected_gate_class": "none",
+      "observed_gate_class": "none",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": false,
+        "build_exit": 0,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": true,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "sw/swiftver/.swift-version",
+          "sha256": "a3cd6b827c4a4e7e7601c9aace0a77a7915cfa18b8b039139b1dcbb1c4b22c0d",
+          "bytes": 6
+        },
+        {
+          "path": "sw/swiftver/Package.swift",
+          "sha256": "625be46dfe855fb169e194dd257cc862e2e099224ea9ea743571f7388f552cc1",
+          "bytes": 135
+        },
+        {
+          "path": "sw/swiftver/Sources/probe/main.swift",
+          "sha256": "3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4",
+          "bytes": 11
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "--version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/swiftver",
+          "exit_code": 0,
+          "stdout": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)\nTarget: arm64-apple-macosx26.0\n",
+          "stderr": "swift-driver version: 1.148.6 "
+        },
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "--version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+          "exit_code": 0,
+          "stdout": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)\nTarget: arm64-apple-macosx26.0\n",
+          "stderr": "swift-driver version: 1.148.6 "
+        }
+      ],
+      "manager_obligation": "`.swift-version` is honored by the swiftly version manager, not by a directly resolved toolchain. Measured on this host the file changed nothing, which is the property that lets the driver classify the field `compared` rather than `forbidden`: it is an assertion the manager reads and never honors.",
+      "consumers": [
+        "TASK-260728-1yhuqi"
+      ]
+    },
+    {
+      "id": "swift.negative.target-stdlib-absent",
+      "language": "swift",
+      "kind": "negative",
+      "title": "known target triple whose standard library this toolchain cannot load",
+      "expected_gate_class": "target_host",
+      "observed_gate_class": "target_host",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": true,
+        "build_exit": 1,
+        "build_started_compilation": true,
+        "build_compilation_evidence": "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/target/main.swift -targ…",
+        "target_print_ran": true,
+        "target_print_exit": 0,
+        "target_std_checked": true,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": true,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "sw/target/main.swift",
+          "sha256": "3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4",
+          "bytes": 11
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+            "-print-target-info",
+            "-target",
+            "x86_64-unknown-linux-gnu"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+          "exit_code": 0,
+          "stdout": "{\n  \"compilerVersion\": \"Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)\",\n  \"swiftCompilerTag\": \"swiftlang-6.3.2.1.108\",\n  \"target\": {\n    \"triple\": \"x86_64-unknown-linux-gnu\",\n    \"unversionedTriple\": \"x86_64-unknown-linux-gnu\",\n    \"moduleTriple\": \"x86_64-unknown-linux-gnu\",\n    \"platform\": \"linux\",\n    \"arch\": \"x86_64\",\n    \"pointerWidthInBits\": 64,\n    \"pointerWidthInBytes\": 8,\n    \"compatibilityLibraries\": [ ],\n    \"openbsdBTCFIEnabled\": false,\n    \"librariesRequireRPath\": false\n  },\n  \"paths\": {\n    \"runtimeLibraryPaths\": [\n      \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/linux\"\n    ],\n    \"runtimeLibraryImportPaths\": [\n      \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/linux\",\n      \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/linux/x86_64\"\n    ],\n    \"runtimeResourcePath\": \"/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift\"\n  }\n}\n",
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+            "-v",
+            "-target",
+            "x86_64-unknown-linux-gnu",
+            "-c",
+            "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/target/main.swift",
+            "-o",
+            "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/target/main.o"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+          "exit_code": 1,
+          "stdout": "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/target/main.swift -target x86_64-unknown-linux-gnu -disable-objc-interop -no-color-diagnostics -Xcc -fno-color-diagnostics -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-driver -empty-abi-descriptor -no-auto-bridging-header-chaining -module-name main -disable-clang-spi -in-process-plugin-server-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/libSwiftInProcPluginServer.dylib -plugin-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins -plugin-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/lib/swift/host/plugins -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/target/main.o\n",
+          "stderr": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)\nTarget: x86_64-unknown-linux-gnu\n\u003cunknown\u003e:0: warning: libc not found for 'x86_64-unknown-linux-gnu'; C stdlib may be unavailable\n\u003cunknown\u003e:0: error: unable to load standard library for target 'x86_64-unknown-linux-gnu'\n"
+        }
+      ],
+      "manager_obligation": "A triple accepted by `-print-target-info` is only representable. Measured on this host, `-print-target-info -target x86_64-unknown-linux-gnu` exits 0 while compiling for it fails with `unable to load standard library for target`. The early gate is to stat the paths.runtimeLibraryPaths that the same command reports: for a target this toolchain cannot serve, they do not exist inside the trusted tree.",
+      "consumers": [
+        "TASK-260728-1yhuqi"
+      ]
+    },
+    {
+      "id": "swift.negative.target-unknown",
+      "language": "swift",
+      "kind": "negative",
+      "title": "target triple the compiler does not know",
+      "expected_gate_class": "target_representability",
+      "observed_gate_class": "target_representability",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": false,
+        "metadata_exit": 0,
+        "build_ran": true,
+        "build_exit": 1,
+        "build_started_compilation": false,
+        "target_print_ran": true,
+        "target_print_exit": 1,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "sw/target/main.swift",
+          "sha256": "3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4",
+          "bytes": 11
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+            "-print-target-info",
+            "-target",
+            "not-a-real-triple"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "error: unknown target 'not-a-real-triple'\n"
+        },
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+            "-v",
+            "-target",
+            "not-a-real-triple",
+            "-c",
+            "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/target/main.swift",
+            "-o",
+            "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/target/main.o"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "error: unknown target 'not-a-real-triple'\n"
+        }
+      ],
+      "manager_obligation": "An unknown triple is refused by `-print-target-info` with a non-zero exit and `unknown target`, before any compilation. The measured -v job trace carries no frontend job, so the driver rejects the triple without starting a compiler.",
+      "consumers": [
+        "TASK-260728-1yhuqi"
+      ]
+    },
+    {
+      "id": "swift.negative.tools-version-future",
+      "language": "swift",
+      "kind": "negative",
+      "title": "Package.swift tools version above the resolved toolchain",
+      "expected_gate_class": "host_version",
+      "observed_gate_class": "host_version",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": true,
+        "metadata_exit": 0,
+        "metadata_extracted_value": "99.0.0",
+        "build_ran": true,
+        "build_exit": 1,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "sw/future/Package.swift",
+          "sha256": "9b46ee62d61f8c864b61373ab9684e83f889b7a66153891d588f4989582e2fa1",
+          "bytes": 136
+        },
+        {
+          "path": "sw/future/Sources/probe/main.swift",
+          "sha256": "3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4",
+          "bytes": 11
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "package",
+            "tools-version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/future",
+          "exit_code": 0,
+          "stdout": "99.0.0\n",
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "build"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/future",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "error: 'future': package 'future' is using Swift tools version 99.0.0 but the installed version is 6.3.2\nerror: 'future': package 'future' is using Swift tools version 99.0.0 but the installed version is 6.3.2\n"
+        }
+      ],
+      "manager_obligation": "Read the tools version with `swift package tools-version` in the graph phase and compare it against the resolved toolchain identity. Unlike cargo, SwiftPM also rejects it itself before compiling, so this preflight removes a wasted process rather than a security gap.",
+      "consumers": [
+        "TASK-260728-1yhuqi"
+      ]
+    },
+    {
+      "id": "swift.negative.tools-version-malformed",
+      "language": "swift",
+      "kind": "negative",
+      "title": "Package.swift tools version that is not a version",
+      "expected_gate_class": "representability",
+      "observed_gate_class": "representability",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": true,
+        "metadata_exit": 1,
+        "build_ran": true,
+        "build_exit": 1,
+        "build_started_compilation": false,
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "sw/malformed/Package.swift",
+          "sha256": "908b0f8e54562c7cf7826c7198d1626f38c68b49376dccd6c37eab163c203202",
+          "bytes": 145
+        },
+        {
+          "path": "sw/malformed/Sources/probe/main.swift",
+          "sha256": "3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4",
+          "bytes": 11
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "package",
+            "tools-version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/malformed",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "error: the Swift tools version 'not-a-version' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project\n"
+        },
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "build"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/malformed",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "error: 'malformed': the Swift tools version 'not-a-version' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project\nerror: 'malformed': the Swift tools version 'not-a-version' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project\nerror: the Swift tools version 'not-a-version' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project\n"
+        }
+      ],
+      "manager_obligation": "The header is refused by the reader command itself, with no host input, so this is a Stage B file-shape rejection.",
+      "consumers": [
+        "TASK-260728-1yhuqi"
+      ]
+    },
+    {
+      "id": "swift.positive.tools-version-below-host",
+      "language": "swift",
+      "kind": "positive",
+      "title": "Package.swift tools version below the resolved toolchain",
+      "expected_gate_class": "none",
+      "observed_gate_class": "none",
+      "verdict": "match",
+      "observation": {
+        "metadata_ran": true,
+        "metadata_exit": 0,
+        "metadata_extracted_value": "6.0.0",
+        "build_ran": true,
+        "build_exit": 0,
+        "build_started_compilation": true,
+        "build_compilation_evidence": "[4/8] Compiling probe main.swift",
+        "target_print_ran": false,
+        "target_print_exit": 0,
+        "target_std_checked": false,
+        "target_std_present": false,
+        "selector_measured": false,
+        "selector_shim_exit": 0,
+        "selector_root_exit": 0,
+        "selector_shim_attempted_install": false
+      },
+      "decidable_before_compiler_work": true,
+      "upstream_rejects_after_compilation": false,
+      "expect_decidable_before_compiler_work": true,
+      "fixtures": [
+        {
+          "path": "sw/positive/Package.swift",
+          "sha256": "625be46dfe855fb169e194dd257cc862e2e099224ea9ea743571f7388f552cc1",
+          "bytes": 135
+        },
+        {
+          "path": "sw/positive/Sources/probe/main.swift",
+          "sha256": "3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4",
+          "bytes": 11
+        }
+      ],
+      "runs": [
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "package",
+            "tools-version"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/positive",
+          "exit_code": 0,
+          "stdout": "6.0.0\n",
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift",
+            "build"
+          ],
+          "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work/sw/positive",
+          "exit_code": 0,
+          "stdout": "Building for debugging...\n[0/6] Write sources\n[1/6] Write probe-entitlement.plist\n[2/6] Write swift-version-45881B103DA9D485.txt\n[4/8] Compiling probe main.swift\n[5/8] Emitting module probe\n[5/8] Write Objects.LinkFileList\n[6/8] Linking probe\n[7/8] Applying probe\nBuild complete! (0.61s)\n",
+          "stderr": ""
+        }
+      ],
+      "consumers": [
+        "TASK-260728-1yhuqi"
+      ]
+    }
+  ],
+  "summary": {
+    "total": 19,
+    "matched": 16,
+    "divergences": 0,
+    "not_run": 3,
+    "unavailable_toolchains": 1,
+    "wrong_backend_toolchains": 0
+  },
+  "installation_guidance_inputs": [
+    {
+      "id": "toolchain.rust.absent.primary-source",
+      "toolchain_id": "rust",
+      "reason": "build_toolchain_unavailable",
+      "primary_source_url": "https://www.rust-lang.org/tools/install",
+      "primary_source_owner": "Rust Project (rust-lang.org)",
+      "operator_action": "The operator installs a Rust release toolchain from the Rust Project's own distribution and then configures the concrete toolchain root in manager-owned configuration. The root is the directory carrying bin/rustc and bin/cargo, never a rustup shim directory and never a PATH entry.",
+      "auto_install": false
+    },
+    {
+      "id": "toolchain.swift.absent.primary-source",
+      "toolchain_id": "swift",
+      "reason": "build_toolchain_unavailable",
+      "primary_source_url": "https://www.swift.org/install/",
+      "primary_source_owner": "Swift Project (swift.org)",
+      "operator_action": "The operator installs a Swift release toolchain from the Swift Project's own distribution, or on macOS uses the toolchain inside an installed Xcode, and then configures the concrete toolchain root in manager-owned configuration. The root is the directory carrying usr/bin/swiftc, never a swiftly shim and never DEVELOPER_DIR or TOOLCHAINS.",
+      "auto_install": false
+    },
+    {
+      "id": "toolchain.kotlin-native.absent.primary-source",
+      "toolchain_id": "kotlin",
+      "reason": "build_toolchain_unavailable",
+      "primary_source_url": "https://github.com/JetBrains/kotlin/releases",
+      "primary_source_owner": "JetBrains (Kotlin release distribution)",
+      "operator_action": "The operator installs a Kotlin/Native release distribution published by JetBrains and configures its concrete root in manager-owned configuration. The Kotlin compiler shipped by a general package manager is normally the JVM front end and does not satisfy this requirement; a JVM front end is reported as wrong_backend rather than accepted.",
+      "auto_install": false
+    }
+  ]
+}

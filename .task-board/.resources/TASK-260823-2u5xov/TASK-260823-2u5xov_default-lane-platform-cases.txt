@@ -1,0 +1,15 @@
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.temp/ci-evidence/local-default/rows.tsv
+platform-case gate: deferred packages (root unset): internal/skillspec internal/marker internal/moduleroots internal/scriptpolicy
+
+tol   internal/skillspec :: TestReleasedSchemaCases (tolerated skip: root-unset)
+tol   internal/marker :: TestReadAuthoritativeMarkerV4SchemaCases (tolerated skip: root-unset)
+tol   internal/moduleroots :: TestModuleRootVectors (tolerated skip: root-unset)
+tol   internal/godriver :: TestModuleRootVectorsDriveTheWholeBuild (tolerated skip: root-content)
+tol   internal/scriptpolicy :: TestScriptHostExecutionPolicySectionsAreAllClassified (tolerated skip: root-unset)
+tol   internal/scriptpolicy :: TestScriptExecutionPolicyIdentityMatchesTheSuite (tolerated skip: root-unset)
+tol   internal/scriptpolicy :: TestScriptExecutionOptInCases (tolerated skip: root-unset)
+tol   internal/scriptpolicy :: TestARefusalPrecedesEveryWorkerSurface (tolerated skip: root-unset)
+
+platform-case gate: 32 skips recorded in .temp/ci-evidence/local-default/gate2/skips-observed.tsv
+platform-case gate: ok

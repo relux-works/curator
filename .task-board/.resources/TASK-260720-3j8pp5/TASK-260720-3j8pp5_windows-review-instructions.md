@@ -1,0 +1,3 @@
+# Independent review instructions
+
+Review the current uncommitted two-file diff in `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3j8pp5/worktree`. Do not edit product files, stage, commit, push, or bulk-format. Verify the fresh `os.lstat` strategy closes GitHub Windows failures without weakening file/directory mutation detection. Re-run the deterministic fake-DirEntry regression, focused toolchain tests, full pytest with both fixture roots, strict mypy, diff check, package build, and Twine check. Map the fix explicitly to run 30503926948 / Windows job 90749459882. Treat GitHub Windows CI on an exact committed candidate as still required after local acceptance. Record exact hashes and a verdict outcome.

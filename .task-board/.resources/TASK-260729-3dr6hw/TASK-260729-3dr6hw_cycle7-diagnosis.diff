@@ -1,0 +1,506 @@
+--- .temp/TASK-260729-3dr6hw/cycle6-board-copy.md	2026-07-29 20:03:52
++++ .research/260729_install-race-timeouts.md	2026-07-29 20:13:00
+@@ -2,13 +2,37 @@
+ 
+ Date: 2026-07-29
+ Role: researcher
+-Revision: **cycle 6** (addresses reviewer verdict cycle 5)
++Revision: **cycle 7** (addresses reviewer verdict cycle 6)
+ Verdict: **test-only rework is viable for `internal/install` and confirmed green there
+-(226.191–235.124s under race). For `internal/install/atomicity` the test-only boundary is
+-EXHAUSTED**: the specified patch runs green at 560.828–591.280s but cannot reach the 480s pass
+-condition, and no remaining test-only lever closes the gap. See §10 (measured), §11 (why the last
+-candidate lever is insufficient) and §12 (conclusion and routing).
++(226.191–235.124s under race). For `internal/install/atomicity` the specified patch runs green at
++560.828–591.280s, and Patch B plus the §4.3 fixture trim measured 492.231s on one valid race gate —
++neither reaches the 480s pass condition, so the task's own test-only margin acceptance criterion is
++UNSATISFIED.** Cycle 6's claim that the trim was bounded below the requirement was arithmetically
++invalid and is withdrawn in §11: the *measured* reduction is **14.55–17.14 %**, inside the band cycle
++6 said was required, and the trim fails on wall clock by 12.231s rather than on work reduction.
++Cycle 6's "the test-only boundary is exhausted" is withdrawn with it. The higher-leverage path is the
++production-side fix, already open and in `development` as **`TASK-260729-365r5r`**. See §10 (Patch A
++and B measured), §11 (corrected save-count model + the `TASK-260729-2afulh` measurement) and §12
++(conclusion and routing).
+ 
++## What changed in cycle 7
++
++Cycle 7 executes the cycle-6 verdict's required rework and changes nothing else. **§1–§10 are
++byte-identical to the cycle-6 board copy** (SHA-256
++`c4ba2c0ffb1c6206a1615a7fdf35242a84bd6ecaf8d325c9f4e1a38b47a09722`); only §11, §12 and this header
++are edited.
++
++| Reviewer item (cycle 6) | Resolution |
++| --- | --- |
++| R6-1 — §11's save-count bound is invalid: `saveJournal` fires per **staging entry**, not per target; the removed `references/` **directory** is a staging entry too; and `3 × targets + 5 × files` is not the source formula | **§11 rebuilt from `staging.go`/`journal.go` semantics.** Every point the verdict makes is confirmed against source and adopted: `stageTarget` iterates `target.StagingEntries` (`staging.go:18-19`) with saves at `:26, :33, :56`; `copyStagingFile` adds two per 32 KiB chunk (`:141, :161`); `captureRemovalEntries` (`journal.go:507-533`) records the walk **root**, every subdirectory and every regular file. The corrected numerator is **8 saves per affected context target** (`3 × 2 entries + 2 × 1 chunk`), exactly as the verdict computes. Cycle 6's `3 × targets + 5 × files` model, its 15-save numerator, its 120–210 denominator and its **7.1–12.5% ceiling are all withdrawn**. |
++| R6-1, required item 3 — until the evidence exists, keep the fixture trim explicitly unmeasured and withdraw both the "bounded below the requirement" and "test-only boundary is exhausted" claims | **The evidence exists.** `LOGBOOK.md` (2026-07-29, 1947) led to **`TASK-260729-2afulh`** (`prototype-atomicity-fixture-trim`, `STORY-260720-3plyvy`, status **`done`**, review **accepted**), which applied exactly this trim as a declared 14th file, instrumented the staging inventory in both arms, and ran the focused gates. Measured: staging-path saves `100→84`, `140→116`, `110→94`, `107→91` — a **14.55–17.14 %** reduction, *inside* the 14.4–18.8 % cycle 6 called required — and one valid `-count=1 -race` gate at real exit **0**, **492.231s**: 12.231s over §7's bar, 107.769s under the 600s alarm. Its `MANIFEST` dump reproduces this cycle's derived 5-entry → 3-entry context tree element for element. §11.4 reports it, including that repetition 2 produced no exit file and repetition 3 was never run. Both cycle-6 claims are withdrawn; the exhaustion claim is replaced by the narrower, evidential statement in §12. |
++| R6-2 — the production successor is misidentified as a "new story" | Fixed. It is **task `TASK-260729-365r5r`**, `prototype-savejournal-namespace-validation`, parent `STORY-260720-3plyvy`, status **`development`** at the time of writing, working in `.temp/TASK-260729-365r5r/worktree` off the rfrdfo prototype state. Named exactly in §12, §12.1 and §11.4. |
++| Required rework 1 — preserve the accepted inventory, Patch A evidence, all six measured race results, integrity protocol, assertion map, and the "no safe `./...` margin" finding | Preserved. §1–§10 untouched, byte-for-byte. |
++| Required rework 4 — state that the original test-only margin AC remains unsatisfied | Stated in the header above and in §12. |
++| Required rework 5 — keep "Tests green" unchecked | Kept unchecked. No Go command was executed in this or any prior cycle of this task. |
++| — (new, found in cycle 7) | Cycle 6's §11.1 said each fixture skill "contributes four files" to a context target and that the trim removes "three files". Both are **wrong in the other direction**: `csk-skill.json` is not in `whitelist.IncludeRoots` (`whitelist.go:20-23`) and `scripts/` is excluded, so a context target holds **`SKILL.md`, `references/info.md`, `.csk-install.json`** — and the trim removes **one file plus one directory** from **each** context target, in **every** install of a chain, not three files once. Confirmed verbatim by `TASK-260729-2afulh`'s `MANIFEST` dump. §11.2 gives the corrected and measured counts. |
++| — (process note, cycle 7) | This cycle's first pass concluded the trim was **unmeasured**, before reading `LOGBOOK.md`. It is not: `TASK-260729-2afulh` had already measured and closed it. That is the *third* time this task has produced work that a prior artifact already settled (LOGBOOK 2026-07-29 1935, `ANOMALY`). The correction is recorded here rather than quietly overwritten, and the standing instruction stands: **read `LOGBOOK.md` and the task's own prior outcomes before deriving anything on this task.** |
++
+ ## What changed in cycle 6
+ 
+ Cycle 6 answers the cycle-5 verdict's binary question and changes nothing else.
+@@ -17,8 +41,8 @@
+ | --- | --- |
+ | 1 — update §10 with all six completed package lines and real exit codes | Done. §10.2 now carries all six race gates, each `.exit` and `.seconds` read directly from `.temp/TASK-260729-rfrdfo/gates/`. Patch A: **232.088s / 235.124s / 226.191s**. Patch B: **591.280s / 560.828s / 564.022s**. All exit **0**; no `DATA RACE` marker in any log. |
+ | 2 — preserve the accepted inventory, censored-bound repair, hot-path evidence, 88/19 split, assertion map, integrity protocol, validation commands | Done. **§1–§9 are byte-identical to the cycle-5 board copy.** Only §10 was edited; §11 and §12 are new and additive. |
+-| 3 — promote §4.3 only with a literal allowlist, invariant map and defensible ≤480s expectation | **Not promoted**, with the arithmetic in §11. §4.3 is assertion-neutral and does save real work, but it removes 3 files from a context target without changing the target count `N`, so it cannot touch the quadratic factor. Bounded at **7.1–12.5%** against a required **14.4–18.8%**; the best case still lands at 490.7–517.4s. |
+-| 4 — if the fixture reduction cannot supply the margin, say so and route the production `saveJournal` fix | Done, explicitly. §12 concludes the test-only boundary is exhausted for `atomicity` and routes §6 as a new blocking story. §11.3 gives the structural reason: the package is **contention-bound**, not chain-bound, so no rearrangement of the tests moves the number — only reducing total CPU work does. |
++| 3 — promote §4.3 only with a literal allowlist, invariant map and defensible ≤480s expectation | **~~Not promoted, with the arithmetic in §11. §4.3 is assertion-neutral and does save real work, but it removes 3 files from a context target without changing the target count `N`, so it cannot touch the quadratic factor. Bounded at 7.1–12.5% against a required 14.4–18.8%; the best case still lands at 490.7–517.4s.~~** — **WITHDRAWN IN CYCLE 7.** The bound was invalid (R6-1) and the "3 files" count was wrong. §4.3 is still not promoted, but now because its effect is **unmeasured**, not because it is bounded below the requirement. See the cycle-7 table above and §11. |
++| 4 — if the fixture reduction cannot supply the margin, say so and route the production `saveJournal` fix | **Partly withdrawn in cycle 7.** The routing stands, but §6 is **not** "a new blocking story" — it is task **`TASK-260729-365r5r`**, already in `development` (R6-2) — and the "test-only boundary is exhausted" conclusion is **withdrawn** with the §11 arithmetic that supported it. §11.3's structural observation survives: the package is **contention-bound**, not chain-bound, so no *rearrangement* of the tests moves the number — only reducing total work does. |
+ | 5 — keep "Tests green" unchecked | Kept unchecked. No Go command was run in any cycle, and §12 records that exit 0 under the raw alarm is not the required margin. |
+ 
+ ## What changed in cycle 5
+@@ -1527,98 +1551,258 @@
+ wrote `DRIVER-DONE`, and reports them as completed.
+ 
+ ---
+-
+-## 11. Cycle-6 decision — can §4.3 supply the missing margin? **No.**
+ 
+-The cycle-5 verdict (item 3) requires that §4.3 be promoted from optional contingency to a required
+-test-only follow-up **only if** it can be supported with a literal allowlist, an invariant map, and a
+-*defensible expected ≤480s focused result*. It cannot supply the third. This section shows the
+-arithmetic that rules it out, so the decision is checkable rather than asserted.
++## 11. Cycle-7 rebuild — what the `references/info.md` trim actually removes, and what it measured
+ 
+-### 11.1 What §4.3 would remove
++Cycle 6 answered "can §4.3 supply the missing margin?" with **No**, on arithmetic the cycle-6 verdict
++correctly rejected as invalid. This section does two things:
++
++1. Replaces that arithmetic with the model the source actually implements (§11.1–§11.2).
++2. Reports the **measurement**, which already exists. A sibling task, **`TASK-260729-2afulh`**
++   (`prototype-atomicity-fixture-trim`, parent `STORY-260720-3plyvy`, status **`done`**), applied
++   exactly this trim, instrumented the staging inventory before and after, and ran the focused race
++   gate. Its result and its own accepted review verdict are in §11.4.
+ 
+-`atomicity/fixture_test.go:83` writes `references/info.md` (content `"ref"`, 3 bytes) into every
+-fixture skill. Grep over the whole `atomicity` package finds **exactly one occurrence** — the write
+-itself. Nothing asserts on it, so removing it is assertion-neutral. That part of §4.3 stands.
++The short version: **cycle 6's conclusion — the trim does not reach the 480s bar — survives
++measurement, but its arithmetic was wrong in the direction that understated the trim.** The measured
++staging-work reduction is **14.5–17.1 %**, not 7.1–12.5 %, and the measured race result is
++**492.231s** — 12.231s above the 480s bar, and **107.8s below the 600s alarm** where Patch B alone
++had 8.72s.
+ 
+-It removes **one file from each installed skill context tree**. Each fixture skill
+-(`fixture_test.go:75-100`) contributes four files: `SKILL.md`, `references/info.md`,
+-`scripts/<name>-tool`, `csk-skill.json`. The project scenario installs three skill contexts
+-(`skill-a` and `skill-b` into the project store, the active hybrid skill into the hybrid store), so
+-**three files disappear**. `runtime_roots` is `["scripts"]`, so the runtime tree never carried
+-`references/info.md` and gains nothing.
++### 11.1 The save-count model, read off the source
+ 
+-### 11.2 Why the saving is bounded at ~12.5%, and the required saving is 14.4–18.8%
++Three call sites in `stageTarget` (`internal/transaction/staging.go:16-61`) fire **once per staging
++entry**, not once per target:
+ 
+-The dominant cost is `(number of saveJournal calls) × O((7N)²)`, where `N` is the **target** count.
+-`references/info.md` is a *file inside* a context target, not a target of its own — so **`N` is
+-unchanged at 19–20** and the quadratic factor does not move at all. Only the save count shrinks.
++```go
++for target.StagingIndex < len(target.StagingEntries) {   // staging.go:18-19
++        …
++        engine.saveJournal(journal)                      // staging.go:26   before create
++        engine.createStagingEntry(journal, targetIndex, entry)
++        engine.saveJournal(journal)                      // staging.go:33   after create
++        if entry.Kind == "file" { engine.copyStagingFile(journal, targetIndex, entry) }
++        …
++        engine.saveJournal(journal)                      // staging.go:56   after advance
++}
++```
+ 
+-Using the §2.2 save model (`3` saves per staging entry at `staging.go:26,33,56`, plus `2` per 32 KiB
+-chunk at `:141,161`; every fixture file is far under 32 KiB, so one chunk each ⇒ 5 saves per file,
+-3 per target):
++`copyStagingFile` (`staging.go:118-176`) adds **two more per 32 KiB chunk actually read** — `:141`
++write-ahead, `:161` chunk-commit — both inside `if count > 0`. A zero-byte file therefore adds
++**nothing**: its first `Read` returns `0, io.EOF` and the branch never runs.
+ 
+-| Quantity | Value | Note |
+-| --- | ---: | --- |
+-| targets `N` | 20 | read off the alarm frame `0x14` (§1.3) |
+-| saves from targets | `3 × 20 = 60` | |
+-| staged files `F` | 12 (floor: context files only) – 30 (ceiling: + runtime, shims, env, ledgers) | statically bounded, not measured |
+-| saves from files | `5F` = 60 – 150 | |
+-| total saves | **120 – 210** | |
+-| saves removed by §4.3 | `3 files × 5 = 15` | |
+-| **reduction** | **15/120 = 12.5%** (best case) → **15/210 = 7.1%** (worst case) | |
++One staged target `t` therefore costs
+ 
+-Applying the **best case, 12.5%**, to the measured baseline — and treating the wall as proportional
+-to total CPU work, which §10.4 establishes is the right model for this contention-bound package:
++> **`3 · E_t + 2 · C_t`** journal saves,
+ 
+-| Measured run | ×0.875 (best case) | ×0.93 (worst case) | ≤480s? |
+-| --- | ---: | ---: | :---: |
+-| 560.828s (best) | **490.7s** | 521.6s | **no** |
+-| 564.022s | **493.5s** | 524.5s | **no** |
+-| 591.280s (worst) | **517.4s** | 549.9s | **no** |
++where `E_t = len(target.StagingEntries)` and `C_t = Σ ⌈size / 32 KiB⌉` over the *file* entries of `t`.
+ 
+-**Even the most favourable assumption on every free parameter leaves the best run at ~491s and the
+-worst at ~517s — above the 480s bar in all six cells.** And the predicted 7.1–12.5% gain is only
+-1.3–2.3× the measurement's own 5.4% run-to-run spread, so a single post-patch run landing under 480s
+-would not be distinguishable from noise.
++`StagingEntries` is produced by `captureRemovalEntries(target.Kind, source, desiredDigest)`
++(`engine.go:201`). For a directory target that is a `filepath.Walk` of the staged source
++(`journal.go:507-533`) and it records **the walk root itself** (its relative path is normalised to
++`""` at `journal.go:518-522`), **every subdirectory**, and **every regular file**. For a `KindEntry`
++symlink it is `captureLinkRemovalEntries` (`journal.go:553-…`) — exactly one `link` entry, three
++saves.
+ 
+-### 11.3 The structural reason no test-only lever remains
++Every other `saveJournal` call site is per-phase or per-target, never per-file:
+ 
+-§10.4's verbose evidence settles this. In the patched tree the twelve per-class outer subtests span
+-**196.25s–247.78s** while a chain's *isolated* cost is **78.02s** — roughly **×3 self-contention
+-inflation**. Effective concurrency is **×9.6** on an **Apple M3 Max with 12 performance cores**
+-(`sysctl hw.perflevel0.physicalcpu` = 12, `hw.perflevel1.physicalcpu` = 4). The package is
+-**contention-bound, not chain-bound**: every chain finishes within 51s of every other.
++| Site | Frequency |
++| --- | --- |
++| `engine.go:64`, `:105` | once each per `Prepare` |
++| `engine.go:325`, `:339` | once each per `commit` |
++| `engine.go:359`, `:443` | ≤ 2 per target that reaches backup / install |
++| `engine.go:332`, `:401`, `:413`, `:538`, `:547`, `:588`, `:658` | failure, rollback and cleanup phases |
++| `engine.go:772`, `:823` | 2 per removed sidecar — **independent of `len(RemovalEntries)`** (`removeRecordedSidecar` / `finishRecordedRemoval`) |
++| `staging.go:218`, `:244` | preparation discard |
+ 
+-That closes the remaining test-only options:
++So the total per installation is
+ 
+-- **More partitioning is impossible.** Each chain is already `baseline + 1 injection + final` — the
+-  minimum that preserves the §5 assertion set. There is nothing left to split.
+-- **More parallelism cannot help.** The 12 performance cores are already oversubscribed 19 ways.
+-  Adding concurrency lengthens each chain by exactly what it saves.
+-- **Less parallelism cannot help either.** Fewer concurrent chains means a longer serial tail.
+-- Patch B already bought its ×9.6 concurrency by spending **+125% more total CPU** (twelve baseline
+-  rebuilds instead of two). That trade is spent; it does not repeat.
++> **`saves(install) = O(phases) + O(targets) + Σ_t (3 · E_t + 2 · C_t)`**
+ 
+-The only lever that still moves the number is **reducing total CPU work**, and the sole test-only
+-instance of that is §4.3 at ≤12.5% — §11.2. Everything else that would reduce work (fewer skills,
+-fewer agents, fewer classes, a shorter sweep) is a coverage cut that §5 and the §4.0 allowlist exist
+-to forbid.
++and the fixture trim can only move the last term. It does **not** move `N`, the target count, so it
++does not touch the `O((7N)²)` pairwise work *inside* each surviving save (§2.2). That part of cycle
++6's reasoning is correct and survives.
+ 
+-### 11.4 Disposition
++**Cycle 6's `3 × targets + 5 × files` formula is withdrawn.** It charged three saves per *target*
++where the source charges three per *entry*; it treated files as the only entries, where the source
++also walks directories and the root; and it therefore had no term at all for the directory entry the
++trim removes. `TASK-260729-2afulh`'s reviewer independently confirmed the corrected formula:
++*"source inspection confirms `stageTarget` calls `saveJournal` three times per staging entry and
++`copyStagingFile` calls it twice per copied chunk, so `3*entries + 2*chunks` reproduces every row."*
+ 
+-**§4.3 is NOT promoted to a required patch target.** It stays exactly where §4.3 already puts it:
+-assertion-neutral, genuinely a saving, not counted in any margin, and not worth widening the 13-file
+-allowlist to a 14th file for a gain that cannot reach the pass condition. A producer may still adopt
+-it opportunistically *after* the §6 fix lands, with a `StagingEntries` before/after measurement
+-attached, but it must not be presented as the thing that closes this gate.
++### 11.2 What the trim removes, exactly — derived, then measured
+ 
+----
++**Derived from source.** `stageNode` (`internal/install/targets.go:39-90`) builds a context target
++with `whitelist.CopyContext` (`targets.go:66`) and then `marker.Write` (`targets.go:85`):
+ 
+-## 12. Cycle-6 conclusion — the test-only boundary is exhausted
++- `whitelist.IncludeRoots` (`whitelist.go:20-23`) is
++  `SKILL.md, agents, references, .skill_triggers, assets, templates, examples, data`. The fixture
++  skill (`atomicity/fixture_test.go:75-100`) supplies exactly two of them: **`SKILL.md`** and
++  **`references/`**.
++- **`csk-skill.json` never enters context** — it is not in `IncludeRoots`. Cycle 6's §11.1 said a
++  context target carries all four fixture files. It does not.
++- **`scripts/` never enters context** either: `Commands` is non-empty (`fixture_test.go:84-92`), so
++  `includeScripts` is false (`targets.go:59-62`), and `runtime_roots: ["scripts"]` also places it in
++  `excludeRoots` (`targets.go:65`, `whitelist.go:106-120`).
++- `marker.Write` adds exactly one file, `.csk-install.json` (`marker.go:27`).
++- `locale.Render` (`targets.go:70`) adds **no** file for this fixture: the snapshot has no `locales/`
++  tree, so `analysis.LocaleToRender == ""` and it returns before writing anything
++  (`locale.go:114`, `:123-125`).
+ 
+-This is the cycle-5 verdict's required item 4, taken deliberately.
++| Context target | Staging entries `E` | Non-empty file chunks `C` | Staging saves `3E + 2C` |
++| --- | ---: | ---: | ---: |
++| **Now** — `""`, `SKILL.md`, `references`, `references/info.md`, `.csk-install.json` | 5 | 3 | **21** |
++| **After the trim** — `""`, `SKILL.md`, `.csk-install.json` | 3 | 2 | **13** |
++| **Delta** | **−2** | **−1** | **−8** |
+ 
++That is the verdict's `3 × 2 entries + 2 × 1 file chunk = 8`, confirmed. The `references/` directory
++disappears together with its only child because the fixture creates it only implicitly, through
++`e.write`'s `os.MkdirAll` of the parent (`fixture_test.go:63-73`), and `CopyContext` skips an include
++root whose `os.Stat` fails (`whitelist.go:57-59`). **−8 saves is 38.1 % of that target's own staging
++saves.**
++
++**Measured, independently.** `TASK-260729-2afulh` instrumented both arms with a measurement-only test
++file (`zz_measure_test.go`, byte-identical in both arms, absent from its deliverable) and dumped the
++staging manifest of a context target. From `evidence/measurement-raw.txt`, verbatim:
++
++```
++before: MANIFEST scenario=project entries=directory:,directory:references,file:.csk-install.json,file:SKILL.md,file:references/info.md
++after:  MANIFEST scenario=project entries=directory:,file:.csk-install.json,file:SKILL.md
++```
++
++**That is the derived 5-entry and 3-entry trees exactly**, including the absence of `csk-skill.json`
++and `scripts/` and the presence of the walk root as its own `directory:` entry. The static derivation
++above is confirmed element by element, not merely in total.
++
++**How many context targets are affected — derived, then measured.** Cycle 6 counted three, once. The
++trim applies to *every* context target of *every* installation. Deriving from the scenarios
++(`commit_atomicity_test.go:41-93`, `:131-215`) and then checking against the measured per-phase save
++deltas:
++
++| Scenario / phase | Context targets (derived) | Measured entries | Measured chunks | Measured staging saves | Δ saves | = 8 × contexts? |
++| --- | ---: | ---: | ---: | ---: | ---: | :---: |
++| project, baseline (`skill-a`, `skill-h`) | 2 | 24 → 20 | 14 → 12 | 100 → 84 | **−16** | ✔ 8×2 |
++| project, upgrade (`skill-a`, `skill-b`, `skill-h2`) | 3 | 34 → 28 | 19 → 16 | 140 → 116 | **−24** | ✔ 8×3 |
++| global, baseline (`skill-a`, `skill-drop`) | 2 | 26 → 22 | 16 → 14 | 110 → 94 | **−16** | ✔ 8×2 |
++| global, upgrade (`skill-a`, `skill-b`) | 2 | 25 → 21 | 16 → 14 | 107 → 91 | **−16** | ✔ 8×2 |
++
++Every row agrees with the derivation. The **measured per-installation reduction in staging-path
++journal saves is 14.55 %–17.14 %**; `TASK-260729-2afulh`'s reviewer quotes the same span as
++"12.5–17.6 %" over a slightly different set of shapes.
++
++Aggregating over one patched chain (`baseline → injection → final`, where the injection and final
++installations both have the upgrade shape — this step is *derived*, not separately measured):
++
++| Chain | Staging saves before | after | Δ | Reduction |
++| --- | ---: | ---: | ---: | ---: |
++| project-hybrid | 100 + 140 + 140 = **380** | 84 + 116 + 116 = **316** | −64 | **16.84 %** |
++| global | 110 + 107 + 107 = **324** | 94 + 91 + 91 = **276** | −48 | **14.81 %** |
++
++Removal-class targets are excluded throughout: their `StagedSource` is empty (`engine.go:182`), so
++`StagedPath` is empty, so `Prepare` skips `stageTarget` for them (`engine.go:75-77`), and
++`removeRecordedSidecar` saves twice regardless of how many entries the removal walk found.
++
++### 11.3 How wrong cycle 6 was, and in which direction
++
++| Quantity | Cycle 6 (withdrawn) | Cycle 7 derived | `TASK-260729-2afulh` measured | Direction of the cycle-6 error |
++| --- | ---: | ---: | ---: | --- |
++| saves removed, project upgrade installation | 15 | 24 | **24** | understated ×1.6 |
++| staging-save reduction per installation | 7.1–12.5 % | — | **14.55–17.14 %** | understated |
++| files in a fixture context target | 4 | 3 | **3** (`SKILL.md`, `references/info.md`, `.csk-install.json`) | overstated |
++| entries removed per context target | 3 files | 1 file + 1 directory | **1 file + 1 directory** | wrong kind |
++
++Cycle 6's ceiling was below the requirement it stated (14.4–18.8 %); the measured reduction is
++**inside** that band. Its conclusion happened to hold, but not for the reason it gave: the trim fails
++on **wall clock by 12.2s**, not because its work reduction is too small.
++
++### 11.4 The measured result — `TASK-260729-2afulh`
++
++Scope: the accepted 13-file rfrdfo state plus exactly one 14th path,
++`internal/install/atomicity/fixture_test.go`. Integrity checker over freshly regenerated manifests:
++`modified=14 added=0 deleted=0 unexpected=0 forbidden_touched=0`, `INTEGRITY_OK`, independently
++re-run by its reviewer. Assertion, test, subtest, `t.Parallel`, `t.TempDir`, `t.Setenv`, skip and
++timeout-token counts are all **unchanged**; the only mechanical change is `e.write(` 8 → 7.
++
++| Gate | Real exit | Wall | Against |
++| --- | ---: | ---: | --- |
++| `gate-gofmt` | 0 | 0s | |
++| `gate-build` | 0 | 1s | |
++| `gate-vet` | 0 | 0s | |
++| `gate-atomicity-nonrace` (`-count=1`) | 0 | 273s (`ok … 272.580s`) | control 285.434s ⇒ **−4.50 %** |
++| `gate-race-atomicity-1` (`-count=1 -race`) | **0** | 493s (`ok … 492.231s`) | controls 560.828 / 564.022 / 591.280s ⇒ **−12.23 % / −12.73 % / −16.75 %** |
++| `gate-race-atomicity-2` | **no exit file** | — | driver received SIGTERM mid-run; partial log correctly excluded from evidence |
++| `gate-race-atomicity-3` | **not run** | — | stopped by orchestrator directive once the strict predicate was already false |
++
++No `DATA RACE` marker in either race log. Every executed gate carries its own two-scan `BARRIER_OK`.
++`DRIVER-DONE` was written manually at a cooperative stop and says so.
++
++**Reading the number honestly.**
++
++- **It misses §7's 480s bar by 12.231s** (2.5 %). That is the disqualifying fact and it is why
++  `TASK-260729-2afulh`'s reviewer rejected the fixture-only patch as the timeout solution.
++- **It clears the 600s alarm by 107.769s**, where Patch B alone cleared it by **8.72s**. That is a
++  materially different risk posture, and §7's bar exists precisely to absorb the focused-versus-`./...`
++  gap that 8.72s cannot survive and ~108s might.
++- **It is one repetition.** §10.3 measured a 30.45s (5.4 %) run-to-run spread on this package, so a
++  single 492.231s observation sits in a band of roughly **465–520s**. It neither demonstrates the bar
++  is cleared nor demonstrates it cannot be. Repetitions 2 and 3 do not exist.
++- The saving is **larger under `-race` (12.2–16.8 %) than without it (4.5 %)**, which is what §2.2
++  predicts: the removed work is in-process Go that the race detector instruments, not syscall time.
++
++### 11.5 Disposition of §4.3
++
++**Measured, and not promoted.** The reasons are now evidential rather than arithmetical:
++
++1. Its one valid focused race gate is **492.231s**, above §7's 480s pass condition.
++2. It costs a **14th file**, widening the §4.0 allowlist and touching
++   `atomicity/fixture_test.go`, which §4.0 explicitly excludes.
++3. `TASK-260729-2afulh` is `done` with an **accepted** review verdict that reproduces and adjudicates
++   exactly this, and routes onward to the production fix.
++
++**What is withdrawn from cycle 6, and stays withdrawn:** the `3 × targets + 5 × files` model, the
++15-save numerator, the 120–210 denominator, the 7.1–12.5 % ceiling, the 490.7–517.4 s projection
++table, and the claim that the trim is *bounded below* the required saving. Measurement puts the
++reduction at 14.55–17.14 %, inside the band cycle 6 said was required.
++
++**What should not be claimed either way:** that one repetition at 492.231s proves the trim cannot
++reach 480s. If `TASK-260729-365r5r` is rejected or lands short, the cheapest remaining evidence is
++**repetitions 2 and 3 of the gate `TASK-260729-2afulh` already built**, on the tree it already
++produced — not a new prototype:
++
++```sh
++CURATOR_CONFORMANCE_ROOT=<immutable rc.5 root> GOTMPDIR=<task-owned> \
++  go test -count=1 -race ./internal/install/atomicity/
++```
++
++run twice more in `.temp/TASK-260729-2afulh/worktree`, each as a standalone process behind the §7
++two-scan barrier, each exit code recorded, no `tee`, no `-timeout`, no `./...`. Promote the trim only
++if **all three** repetitions land at or below 480s. Combining it with the production fix is the
++better bet regardless: the two levers are independent — the trim reduces the *number* of saves, the
++production fix reduces the *cost* of each one.
++
++### 11.6 One further candidate, examined and rejected on protocol grounds
++
++Per-save cost is dominated by **path canonicalisation**, and that cost is linear in path **depth**:
++`canonicalNamespaceTargetPath` (`namespace.go:121`) calls `filepath.EvalSymlinks`, which walks one
++`lstat` per component, and `namespaceCaseInsensitive` / `namespaceNormalizationInsensitive`
++(`namespace_case_darwin.go:13`, `:25`) each walk `existingNamespaceAncestor` (`namespace.go:245`)
++over the same path again. Every fixture path is rooted at `t.TempDir()`, which is rooted at
++`GOTMPDIR`; the alarm frames quoted in §1.3 show live paths of **198–216 bytes**. Shortening that
++root would reduce every save's cost without touching a single assertion.
++
++**Rejected, and it should stay rejected.** `GOTMPDIR` is set by the *gate command*, not by the tests,
++and the verifier protocol pins it to a task-owned directory whose post-run size and removal are
++themselves integrity gates (verifier-3 ledger rows "Task-owned GOTMPDIR size" and "Exact GOTMPDIR
++removal", both exit 0). A test that reached outside it for a shorter root would break that gate and
++give up `testing.T`'s automatic cleanup and per-test isolation. It is recorded here as
++examined-and-refused, not as available headroom.
++
++---
++
++## 12. Cycle-7 conclusion — the test-only margin AC is unsatisfied; the decision is production-side
++
++This is the cycle-5 verdict's required item 4, retaken on the cycle-6 verdict's corrected basis and
++on evidence that did not exist when cycle 6 was written.
++
+ **Patch A is done.** `internal/install` under `-race` is **226.191–235.124s** across three runs, all
+ exit 0, against a 600s alarm. §4.1's 88/19 split is confirmed correct and should be kept as the
+ recommended patch for that package. Nothing further is needed there.
+@@ -1626,43 +1810,94 @@
+ **Patch B is a real improvement that does not reach the bar.** It takes
+ `internal/install/atomicity` from a hard timeout (`FAIL 603.701s`) to three green runs at
+ **560.828–591.280s**. But every run misses §7's 480s pass condition, the worst-case margin against
+-the 600s alarm (**8.72s**) is inside the measurement's own 5.4% spread, and §7's bar exists precisely
++the 600s alarm (**8.72s**) is inside the measurement's own 5.4 % spread, and §7's bar exists precisely
+ because focused single-package numbers read optimistically against
+ `go test -count=1 -race ./...`, where `cmd/curator` (**557.779s** under race) overlaps for nearly the
+-whole run. **On this evidence the patched atomicity package should still be expected to time out
+-under the real gate.**
++whole run. **The current 13-file Patch B has no safe `./...` margin, and on this evidence the patched
++package should still be expected to time out under the real gate.**
+ 
+-**No remaining test-only lever closes the gap.** §11.2 bounds the only candidate at ≤12.5% against a
+-required 14.4–18.8%; §11.3 shows why the package's contention-bound shape leaves nothing else.
++**Patch B plus the §4.3 fixture trim is better, and still misses.** `TASK-260729-2afulh` measured it:
++one valid `-count=1 -race` gate, real exit **0**, **492.231s**, no `DATA RACE`, with a measured
++14.55–17.14 % reduction in staging-path journal saves (§11.2, §11.4). It misses §7's bar by
++**12.231s** and clears the 600s alarm by **107.769s**. That task is `done` with an **accepted**
++review verdict which reproduced the measurement, rejected the fixture-only patch as the timeout
++solution, and routed onward.
+ 
+-**Therefore: the required next work is the production-side fix in §6**, opened as its own story —
+-hoist the target-namespace independence validation out of `Engine.saveJournal`, or memoise it per
+-journal. §6 already states the design, the two options, and why it needs its own review and
+-conformance pass. Expected effect is an order of magnitude on the same hot path, which also protects
+-`cmd/curator` — currently at **557.779s** of a 600s alarm and the next package in line to fail.
++**Therefore this task's own acceptance criterion — "expected margin below 10 minutes for both
++packages under race", operationalised as §7's 480s focused pass condition — remains UNSATISFIED for
++`internal/install/atomicity`.** It is satisfied for `internal/install`.
+ 
++**Cycle 6's "the test-only boundary is exhausted" claim is withdrawn**, together with the arithmetic
++that supported it (§11.1, §11.5). What replaces it is narrower and evidential: **the best measured
++test-only configuration is 492.231s on a single repetition, 2.5 % above the bar and inside the
++package's own 5.4 % run-to-run spread.** That is not a demonstration that no test-only path exists;
++it is a demonstration that none of the identified ones has been shown to clear the bar. §11.5 names
++the cheapest evidence that would settle it — repetitions 2 and 3 of the gate `TASK-260729-2afulh`
++already built, on the tree it already produced.
++
++**The higher-leverage work is already open.** The production-side fix described in §6 is **not** a
++new story: it exists as task **`TASK-260729-365r5r`**,
++`prototype-savejournal-namespace-validation`, parent **`STORY-260720-3plyvy`**, status
++**`development`** at the time of writing. Its acceptance criteria already require that every
++`saveJournal` still revalidates current filesystem namespace facts but performs at most `O(P)`
++identity/resolution reads per pass instead of repeating them for `O(P²)` pairs, that fail-closed
++validation is preserved before any mutation, and that focused non-race and race evidence either
++demonstrates a defensible atomicity margin at or below 480s **or explicitly rejects the prototype**.
++It is working in `.temp/TASK-260729-365r5r/worktree`, built from the rfrdfo prototype state so the
++480s bar is quoted against the same tree that produced the 560.828–591.280s baseline. Expected effect
++is on the same hot path that also protects `cmd/curator`, currently at **557.779s** of a 600s alarm
++and the next package in line to fail.
++
++**The two levers are independent and compose.** The trim reduces the *number* of `saveJournal` calls
++by 14.6–17.1 %; the production fix reduces the *cost* of each surviving call from `O(P²)` filesystem
++reads to `O(P)`. If the production fix lands but needs help, the trim is the obvious partner and its
++evidence is already built.
++
+ **Explicitly not sanctioned, at any point on this ladder:** a `-timeout` override, a build tag that
+-excludes the sweep, skipping cases, weakening assertions, or reporting an 8.72s focused margin as a
+-solved race gate.
++excludes the sweep, skipping cases, weakening assertions, or reporting an 8.72s — or a single-run
++492.231s — focused margin as a solved race gate.
+ 
+ ### 12.1 Recommended routing
+ 
+ | Item | Where it goes |
+ | --- | --- |
+-| Patch A (`internal/install`, 88 × `t.Parallel()`, 11 files) | keep in the current test-only task; measured green with 245s+ of margin |
+-| Patch B (atomicity sweep partition, 2 files) | keep — it is strictly better than the timeout it replaces — but **do not claim it satisfies the race gate** |
+-| §6 production `saveJournal` namespace-revalidation fix | **new story**, blocking the `./...` race gate |
+-| §4.3 `references/info.md` fixture trim | remains optional; revisit only after §6, with a `StagingEntries` measurement |
++| Patch A (`internal/install`, 88 × `t.Parallel()`, 11 files) | keep in the current test-only task; measured green with 244.9–253.8s of margin under §7's bar |
++| Patch B (atomicity sweep partition, 2 files) | keep — it is strictly better than the timeout it replaces — but **do not claim it satisfies the race gate**; this task's margin AC stays unsatisfied for this package |
++| §6 production `saveJournal` namespace-revalidation fix | **already open**: task **`TASK-260729-365r5r`** (`prototype-savejournal-namespace-validation`), parent `STORY-260720-3plyvy`, status `development`. Not a new story. It is the blocking work for the `./...` race gate. |
++| §4.3 `references/info.md` fixture trim (14th file) | **measured and not promoted**: `TASK-260729-2afulh`, `done`, review **accepted**, one valid race gate at **492.231s** — 12.231s over §7's bar, 107.769s under the alarm. Archived, not discarded. Revisit as a *partner* to `TASK-260729-365r5r`, or settle it with repetitions 2 and 3 per §11.5, only if that task is rejected or lands short. |
+ 
+ ### 12.2 Evidence-honesty statement for §11–§12
+ 
+-No Go command was executed in this or any cycle of this task. §11's target count (20) is read from
+-the alarm frame quoted in §1.3; the save model is read from `staging.go` and `journal.go` line
+-numbers quoted in §2.2; the file inventory is read from `atomicity/fixture_test.go:75-100`. The
+-staged-file count `F` is **statically bounded, not measured** — which is stated as a range, and the
+-conclusion is taken from the *best* case of that range so that the uncertainty cannot flip it. The
+-core-count split is from `sysctl`, a non-Go read-only command. All six gate results are read from
+-`.temp/TASK-260729-rfrdfo/gates/*.exit` and `*.seconds`, each verified independently this cycle.
+-Checklist item 15 ("Tests green") stays **unchecked**: no Go command was run here, and §12 records
+-that the downstream producer's atomicity gates, while exiting 0, do not meet this diagnosis's own
+-pass condition.
++**No Go command, build, vet, test, or tooling invocation was executed by this task in any cycle,
++including cycle 7.** Every measured number in §11.4 and §12 is read from files another task wrote.
++
++- §11's save-count model is read from `internal/transaction/staging.go:16-61` and `:118-176`,
++  `internal/transaction/journal.go:71`, `:344-357` and `:507-533`, and the `saveJournal` call-site
++  inventory already verified in §2.2. Each line reference was re-read from the candidate worktree
++  this cycle.
++- §11.2's context-tree derivation is read from `internal/install/targets.go:39-90`,
++  `internal/whitelist/whitelist.go:20-23`, `:37-99` and `:106-120`, `internal/locale/locale.go:114`
++  and `:123-125`, `internal/marker/marker.go:27`, and
++  `internal/install/atomicity/fixture_test.go:63-100`. Its chain and context-target counts are read
++  from `internal/install/atomicity/commit_atomicity_test.go:41-93` (the two scenario constructors and
++  their class lists) and `:131-215` (the sweep body).
++- §11.2's **measured** rows and both `MANIFEST` lines are quoted verbatim from
++  `.temp/TASK-260729-2afulh/evidence/measurement-raw.txt`. The derivation and the measurement were
++  produced independently and agree on every row; the derivation was written before the measurement
++  was located.
++- §11.4's gate table is read from `.temp/TASK-260729-2afulh/gates/*.exit`, `*.seconds` and `*.log`,
++  and from `gates/DRIVER-STOP-REASON`. **`gate-race-atomicity-2` has no `.exit` file and is reported
++  as having produced no evidence; `gate-race-atomicity-3` is reported as not run.** Neither is
++  presented as a result. The single valid repetition is stated as a single repetition, with the
++  package's own 5.4 % spread attached.
++- The per-chain aggregation in §11.2 (380 → 316 and 324 → 276) is **derived** from the measured
++  per-phase rows on the assumption that the injection and final installations share the upgrade
++  shape; it is labelled as derived and no conclusion rests on it alone.
++- All six Patch A / Patch B gate results in §10 are read from `.temp/TASK-260729-rfrdfo/gates/*.exit`
++  and `*.seconds`.
++- `TASK-260729-2afulh`'s and `TASK-260729-365r5r`'s identity, parent and status were read from the
++  board this cycle. `TASK-260729-365r5r`'s in-flight gate results are deliberately **not** quoted,
++  because they were still being written while this section was authored.
++- Checklist item "Tests green" stays **unchecked**: no Go command was run here, and §12 records that
++  the downstream producers' atomicity gates, while exiting 0, do not meet this diagnosis's own pass
++  condition.

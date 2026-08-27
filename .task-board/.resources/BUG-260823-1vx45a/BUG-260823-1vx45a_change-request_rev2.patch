@@ -1,0 +1,282 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 22820cb..6e8a08d 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3038,3 +3038,9 @@ PR #22 merged as 1f55f1b4e: six signed commits assembled from the accepted patch
+ - SPEC EVIDENCE: local validate and rc.9 release-check passed; both vector families regenerated twice byte-identically. Specification CI run `32633567102` passed on the exact candidate SHA across Linux, macOS, and Windows.
+ - STOP-THE-LINE: Curator candidate-conformance run `32633572039` is red. Ubuntu records the exact candidate identity then exposes the unlanded multi-project dry-run binding defect (fix remains on open PR #14); Windows exposes a `shasum` path-escaping portability defect in candidate identity normalization. Neither gate nor digest was weakened to manufacture green evidence. Downstream implementation qualification and the later atomic landing remain required; `SPEC_PIN` is unchanged.
+ - EVIDENCE: board outcome `TASK-260822-c0rxj7_results.md` plus task-scoped identity, regeneration inventories, and CI logs under `.temp/TASK-260822-c0rxj7/`.
++
++### 0052 — BUG-260823-1vx45a: managerlock helper deadline conflated slowness with contention
++
++- ROOT CAUSE: `TestManagerLockHelper` used one 200ms context for lock-state directory creation, lock-file opening, retries, and, in build-key mode, two sequential acquisitions. Any deadline expiry was serialized as `blocked`, so an uncontended lock on a slow Windows runner was indistinguishable from a lock held by another process. Native Windows reproduction with a deliberately tiny deadline returned the same false `blocked` outcome without contention; no lock-handle or `t.TempDir` cleanup failure was involved.
++- FIX AND REGRESSION SHAPE: parent call sites now state whether they expect `blocked` or `acquired`. Blocked probes retain the bounded 200ms contention window, while expected-acquired probes receive a 30s deadline that has no fast-path cost. A deterministic subprocess regression gives an uncontended expected-acquired shape a 1ns deadline and requires `blocked`, while also asserting the acquired deadline remains strictly wider than the blocked deadline. Helper lock release errors are checked independently before acquisition errors are classified, so a failed close cannot be reported as ordinary contention. The separate 50ms timeout in `TestCancellationReleasesPartialAcquisition` remains intentionally short because the test holds the second lock and expects cancellation; host slowness cannot turn that negative assertion into a false acquisition.
++- CURRENT-BYTE EVIDENCE: macOS subprocess tests passed 20 consecutive runs, the managerlock package passed 5 consecutive runs, and the subprocess race gate passed 3 consecutive runs. Linux/arm64 Go 1.25.5 and native Windows/amd64 Go 1.25.5 each passed all `TestSubprocess*` cases 20 consecutive times. `go vet ./...`, `golangci-lint run`, and `go build ./...` exited 0. A broad `go test ./...` produced no package output and was terminated at approximately seven minutes before the single-call ceiling (exit 143); it is recorded as interrupted, not passing, and the scope-specific package and platform gates are the acceptance evidence.
+diff --git a/internal/managerlock/identity_windows_test.go b/internal/managerlock/identity_windows_test.go
+index 8c0f6cc..7d956f0 100644
+--- a/internal/managerlock/identity_windows_test.go
++++ b/internal/managerlock/identity_windows_test.go
+@@ -64,13 +64,13 @@ func TestWindowsMissingHomeCaseAliasesShareIdentityAndContention(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runHelper(t, "try-home", lowerHome, ""); got != "blocked" {
++	if got := runHelper(t, "try-home", lowerHome, "", "blocked"); got != "blocked" {
+ 		t.Fatalf("case-alias subprocess = %q, want blocked", got)
+ 	}
+ 	if err := homeLock.Close(); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runHelper(t, "try-home", lowerHome, ""); got != "acquired" {
++	if got := runHelper(t, "try-home", lowerHome, "", "acquired"); got != "acquired" {
+ 		t.Fatalf("released case-alias subprocess = %q, want acquired", got)
+ 	}
+ 
+@@ -194,7 +194,7 @@ func TestWindowsCaseSensitivePrefixMultiComponentFirstUse(t *testing.T) {
+ 	if after.Home() != first.Home() {
+ 		t.Fatalf("multi-component identity changed after first use: before %q, after %q", first.Home(), after.Home())
+ 	}
+-	if got := runHelper(t, "try-home", alias, ""); got != "blocked" {
++	if got := runHelper(t, "try-home", alias, "", "blocked"); got != "blocked" {
+ 		t.Fatalf("multi-component alias subprocess = %q, want blocked", got)
+ 	}
+ 	if err := second.prepare(); err != nil {
+diff --git a/internal/managerlock/managerlock_test.go b/internal/managerlock/managerlock_test.go
+index 2bffe50..d7c84a1 100644
+--- a/internal/managerlock/managerlock_test.go
++++ b/internal/managerlock/managerlock_test.go
+@@ -17,10 +17,16 @@ import (
+ )
+ 
+ const (
+-	helperModeEnv    = "CURATOR_MANAGERLOCK_HELPER_MODE"
+-	helperHomeEnv    = "CURATOR_MANAGERLOCK_HELPER_HOME"
+-	helperProjectEnv = "CURATOR_MANAGERLOCK_HELPER_PROJECT"
+-	helperKeyEnv     = "CURATOR_MANAGERLOCK_HELPER_KEY"
++	helperModeEnv     = "CURATOR_MANAGERLOCK_HELPER_MODE"
++	helperHomeEnv     = "CURATOR_MANAGERLOCK_HELPER_HOME"
++	helperProjectEnv  = "CURATOR_MANAGERLOCK_HELPER_PROJECT"
++	helperKeyEnv      = "CURATOR_MANAGERLOCK_HELPER_KEY"
++	helperDeadlineEnv = "CURATOR_MANAGERLOCK_HELPER_DEADLINE"
++)
++
++const (
++	blockedHelperDeadline  = 200 * time.Millisecond
++	acquiredHelperDeadline = 30 * time.Second
+ )
+ 
+ func TestCanonicalProjectIdentitiesAndOrder(t *testing.T) {
+@@ -215,13 +221,13 @@ func TestMissingHomeBelowSymlinkKeepsIdentityAndContends(t *testing.T) {
+ 	if after.Home() != before.Home() {
+ 		t.Fatalf("aliased home identity changed after lock-state creation: before %q, after %q", before.Home(), after.Home())
+ 	}
+-	if got := runHelper(t, "try-home", home, ""); got != "blocked" {
++	if got := runHelper(t, "try-home", home, "", "blocked"); got != "blocked" {
+ 		t.Fatalf("same physical home helper = %q, want blocked", got)
+ 	}
+ 	if err := homeLock.Close(); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runHelper(t, "try-home", home, ""); got != "acquired" {
++	if got := runHelper(t, "try-home", home, "", "acquired"); got != "acquired" {
+ 		t.Fatalf("released physical home helper = %q, want acquired", got)
+ 	}
+ }
+@@ -458,16 +464,16 @@ func TestSubprocessContentionAndIndependentProjects(t *testing.T) {
+ 	if _, err := operation.AcquireProjects(context.Background(), projectA); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runHelper(t, "try-project", home, projectA); got != "blocked" {
++	if got := runHelper(t, "try-project", home, projectA, "blocked"); got != "blocked" {
+ 		t.Fatalf("same project helper = %q, want blocked", got)
+ 	}
+-	if got := runHelper(t, "try-project", home, projectB); got != "acquired" {
++	if got := runHelper(t, "try-project", home, projectB, "acquired"); got != "acquired" {
+ 		t.Fatalf("independent project helper = %q, want acquired", got)
+ 	}
+ 	if err := operation.Close(); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runHelper(t, "try-project", home, projectA); got != "acquired" {
++	if got := runHelper(t, "try-project", home, projectA, "acquired"); got != "acquired" {
+ 		t.Fatalf("released project helper = %q, want acquired", got)
+ 	}
+ 
+@@ -475,13 +481,13 @@ func TestSubprocessContentionAndIndependentProjects(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runHelper(t, "try-home", home, ""); got != "blocked" {
++	if got := runHelper(t, "try-home", home, "", "blocked"); got != "blocked" {
+ 		t.Fatalf("same home helper = %q, want blocked", got)
+ 	}
+ 	if err := homeLock.Close(); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runHelper(t, "try-home", home, ""); got != "acquired" {
++	if got := runHelper(t, "try-home", home, "", "acquired"); got != "acquired" {
+ 		t.Fatalf("released home helper = %q, want acquired", got)
+ 	}
+ }
+@@ -502,20 +508,31 @@ func TestSubprocessBuildKeyDeduplicationAcrossProjects(t *testing.T) {
+ 	if err := operation.AcquireBuildKey(context.Background(), "sha256:shared"); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runKeyHelper(t, home, projectB, "sha256:shared"); got != "blocked" {
++	if got := runKeyHelper(t, home, projectB, "sha256:shared", "blocked"); got != "blocked" {
+ 		t.Fatalf("same build key helper = %q, want blocked", got)
+ 	}
+-	if got := runKeyHelper(t, home, projectB, "sha256:independent"); got != "acquired" {
++	if got := runKeyHelper(t, home, projectB, "sha256:independent", "acquired"); got != "acquired" {
+ 		t.Fatalf("independent build key helper = %q, want acquired", got)
+ 	}
+ 	if err := operation.ReleaseBuildKey(); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runKeyHelper(t, home, projectB, "sha256:shared"); got != "acquired" {
++	if got := runKeyHelper(t, home, projectB, "sha256:shared", "acquired"); got != "acquired" {
+ 		t.Fatalf("released build key helper = %q, want acquired", got)
+ 	}
+ }
+ 
++func TestSubprocessExpectedAcquiredWithTinyDeadlineReportsBlocked(t *testing.T) {
++	if acquiredHelperDeadline <= blockedHelperDeadline {
++		t.Fatalf("acquired helper deadline %v must exceed blocked helper deadline %v", acquiredHelperDeadline, blockedHelperDeadline)
++	}
++	home := t.TempDir()
++	project := t.TempDir()
++	if got := runHelperWithDeadline(t, "try-project", home, project, "", time.Nanosecond); got != "blocked" {
++		t.Fatalf("uncontended helper with tiny deadline = %q, want blocked", got)
++	}
++}
++
+ func TestAbnormalChildExitReleasesOSLock(t *testing.T) {
+ 	home := t.TempDir()
+ 	project := t.TempDir()
+@@ -561,24 +578,39 @@ func TestAbnormalChildExitReleasesOSLock(t *testing.T) {
+ 	}
+ }
+ 
+-func runHelper(t *testing.T, mode, home, project string) string {
++func runHelper(t *testing.T, mode, home, project, expected string) string {
+ 	t.Helper()
+-	command := helperCommand(mode, home, project)
+-	output, err := command.CombinedOutput()
+-	if err != nil {
+-		t.Fatalf("helper %s failed: %v\n%s", mode, err, output)
++	return runHelperWithDeadline(t, mode, home, project, "", helperDeadline(t, expected))
++}
++
++func runKeyHelper(t *testing.T, home, project, key, expected string) string {
++	t.Helper()
++	return runHelperWithDeadline(t, "try-key", home, project, key, helperDeadline(t, expected))
++}
++
++func helperDeadline(t *testing.T, expected string) time.Duration {
++	t.Helper()
++	switch expected {
++	case "blocked":
++		return blockedHelperDeadline
++	case "acquired":
++		return acquiredHelperDeadline
++	default:
++		t.Fatalf("unknown expected helper outcome %q", expected)
++		return 0
+ 	}
+-	line, _, _ := strings.Cut(strings.TrimSpace(string(output)), "\n")
+-	return line
+ }
+ 
+-func runKeyHelper(t *testing.T, home, project, key string) string {
++func runHelperWithDeadline(t *testing.T, mode, home, project, key string, deadline time.Duration) string {
+ 	t.Helper()
+-	command := helperCommand("try-key", home, project)
+-	command.Env = append(command.Env, helperKeyEnv+"="+key)
++	command := helperCommand(mode, home, project)
++	command.Env = append(command.Env, helperDeadlineEnv+"="+deadline.String())
++	if key != "" {
++		command.Env = append(command.Env, helperKeyEnv+"="+key)
++	}
+ 	output, err := command.CombinedOutput()
+ 	if err != nil {
+-		t.Fatalf("build-key helper failed: %v\n%s", err, output)
++		t.Fatalf("helper %s failed: %v\n%s", mode, err, output)
+ 	}
+ 	line, _, _ := strings.Cut(strings.TrimSpace(string(output)), "\n")
+ 	return line
+@@ -603,37 +635,49 @@ func TestManagerLockHelper(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
++	if mode == "hold-project" {
++		operation := manager.NewOperation(false)
++		cleanupOperation(t, operation)
++		if _, err := operation.AcquireProjects(context.Background(), os.Getenv(helperProjectEnv)); err != nil {
++			t.Fatalf("hold project lock: %v", err)
++		}
++		fmt.Println("ready")
++		_ = os.Stdout.Sync()
++		_, _ = io.Copy(io.Discard, os.Stdin)
++		return
++	}
++	deadline, err := time.ParseDuration(os.Getenv(helperDeadlineEnv))
++	if err != nil || deadline <= 0 {
++		t.Fatalf("invalid helper deadline %q: %v", os.Getenv(helperDeadlineEnv), err)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), deadline)
+ 	defer cancel()
++	var release func() error
+ 	switch mode {
+ 	case "try-project":
+ 		operation := manager.NewOperation(false)
+-		cleanupOperation(t, operation)
++		release = operation.Close
+ 		_, err = operation.AcquireProjects(ctx, os.Getenv(helperProjectEnv))
+ 	case "try-home":
+ 		var lock *HomeLock
+ 		lock, err = manager.AcquireHomeOnly(ctx, false)
+ 		if lock != nil {
+-			cleanupHomeLock(t, lock)
++			release = lock.Close
+ 		}
+ 	case "try-key":
+ 		operation := manager.NewOperation(false)
+-		cleanupOperation(t, operation)
++		release = operation.Close
+ 		if _, err = operation.AcquireProjects(ctx, os.Getenv(helperProjectEnv)); err == nil {
+ 			err = operation.AcquireBuildKey(ctx, os.Getenv(helperKeyEnv))
+ 		}
+-	case "hold-project":
+-		operation := manager.NewOperation(false)
+-		cleanupOperation(t, operation)
+-		if _, err = operation.AcquireProjects(context.Background(), os.Getenv(helperProjectEnv)); err == nil {
+-			fmt.Println("ready")
+-			_ = os.Stdout.Sync()
+-			_, _ = io.Copy(io.Discard, os.Stdin)
+-			return
+-		}
+ 	default:
+ 		t.Fatalf("unknown helper mode %q", mode)
+ 	}
++	if release != nil {
++		if releaseErr := release(); releaseErr != nil {
++			t.Fatalf("release helper lock: %v", releaseErr)
++		}
++	}
+ 	if err == nil {
+ 		fmt.Println("acquired")
+ 		return
+@@ -653,12 +697,3 @@ func cleanupOperation(t *testing.T, operation *Operation) {
+ 		}
+ 	})
+ }
+-
+-func cleanupHomeLock(t *testing.T, lock *HomeLock) {
+-	t.Helper()
+-	t.Cleanup(func() {
+-		if err := lock.Close(); err != nil {
+-			t.Errorf("release manager-home lock: %v", err)
+-		}
+-	})
+-}

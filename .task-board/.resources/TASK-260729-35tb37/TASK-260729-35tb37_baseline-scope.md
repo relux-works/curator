@@ -1,0 +1,3 @@
+# CocoaSkills baseline refresh
+
+Repository: /Users/iv/Developer/intranet/cocoaskills. Read accepted TASK-260729-1t1z2l_curator-go-to-csk-parity-delta.md first. Re-resolve git status, current local HEAD, origin/main via read-only remote metadata, Python/package layout, CLI entry points, install/global/project flows, environment and PATH handling, transaction/locking primitives, test fixtures, CI workflows, supported Python versions, pytest/mypy/build commands, and existing platform abstractions. Do not pull, checkout, edit, install, or run broad tests. Produce exact file/function plans for TASK-260720-z9j4c9 and TASK-260720-z2z795, with narrow initial test commands and known adaptation boundaries.

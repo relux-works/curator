@@ -1,0 +1,21 @@
+# Review cycle 2 verdict: CHANGES REQUESTED
+
+Route: to-dev. Reviewer run: RUN-260728-39001c. No product/spec files were edited.
+
+## Blocking finding R2-1: hardened TCB identity is structurally incomplete
+
+The profile says every identity that determines whether a guarantee holds is hashed and that hardened-tcb-v1 names the concrete trusted computing base. The threat model explicitly trusts the manager parent, capability probes and enforcement adapters, operating-system or hypervisor primitives, source/build canonicalization, artifact publication, and cache/receipt/marker/claim canonicalization. The closed TCB schema, however, requires only profile, execution policy, platform label, backend label, supervisor hash, worker hash, and Go toolchain identity. It has no manager-parent identity, no observed OS or hypervisor identity/version/configuration, and additional_trusted_components is only an array of unconstrained non-empty strings rather than cryptographic component identities. It also does not bind platform to the one backend declared for that platform.
+
+Independent in-memory adversarial probes against the real schemas produced: mismatched platform/backend receipt schema errors = 0; after recomputing the TCB digest and cache key, both consistency checks remained true; a receipt naming mutable-interpreter-with-no-cryptographic-identity had schema errors = 0; a claim with a Windows backend in a macOS TCB had schema errors = 0. The existing semantic validator checks target/platform and toolchain equality but does not reject these cases. Existing identity vectors rotate only worker_sha256, so they prove hashing of the present record, not completeness of the record.
+
+Impact: two materially different trusted bases can produce the same valid hardened TCB digest and therefore the same cache key, receipt binding, marker state, and claim identity. This contradicts the concrete-TCB and per-host binding claims and fails the task acceptance criterion that hardened TCB identity bind reusable state.
+
+Required rework: define cryptographic identities for the manager parent and every additional mutable trusted component; bind the observed OS/hypervisor/backend version and required configuration that the qualification depends on, or narrow the normative TCB claim consistently if a different architecture is intended; enforce the platform-to-backend and target-to-platform relations; add receipt, marker, and claim mutants for each mismatch/omission; rotate each newly bound identity and prove cache-key divergence plus receipt/marker/claim rejection. Preserve portable rc.5 bytes.
+
+## Cycle-1 findings rechecked
+
+The profile and current TCB record digest are now carried in the hardened build input; receipts, marker, and claim use separate hardened schemas. The 17-phase list in protocol/hardened-execution.md section 7.2 is the sole ordering authority, manager-hardened is phase-keyed, domain-entry precedes the in-domain self-test, and go-list is the first package-exposure phase. Package influence exclusions cover executables, paths, argv, environment, hooks, network policy, trust roots, bounds, permits, and publication. All platforms remain unqualified; qualified_platforms and claims_emitted are empty and native_evidence is absent.
+
+## Mechanical evidence
+
+Default make validate exited 2 before validation because system Python lacked jsonschema. With the task venv on PATH, make validate exited 0: 42 portable schemas, 422 portable vector files, 6 hardened schemas, 48 hardened suite files, 87 Python tests, and both Go tool packages passed. go test -count=1 ./tools/... exited 0. gofmt -l tools was empty. git diff --check exited 0. Exact comparisons against the accepted rc.5 predecessor found no difference in conformance/v1 or schemas/v1 and cmp confirmed release/1.0.0-rc.5.json identical; portable manifest SHA-256 remains 9ba9b8ecf6f06cafda1425aed3539dee8d12af43dabd36f803f4f420dbb1dacf. An independent ephemeral clean probe passed make regenerate-check, make regenerate-hardened-check, and the rc.5 release gate. The first scratch commit attempt was blocked by global signing-key passphrase; the second disabled signing only inside the ephemeral probe and passed.

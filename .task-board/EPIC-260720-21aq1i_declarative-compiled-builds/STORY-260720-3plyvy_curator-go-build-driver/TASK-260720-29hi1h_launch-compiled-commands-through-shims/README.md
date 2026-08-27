@@ -1,0 +1,10 @@
+# Launch compiled commands through managed shims
+
+## Description
+Define typed script and compiled runtime targets plus staged Unix and Windows shim materialization so active build commands resolve to immutable cache artifacts without copying build roots or mutating live install targets.
+
+## Scope
+Own internal/runtimestore target models, validation, staging helpers, and focused shim or global-bin integration tests. Add a typed runtime target for script versus immutable build artifact rather than overloading source paths. Validate every required active runtime root and script path before reuse; an incomplete commit-keyed runtime yields a staged replacement target. Build roots are never copied. For build commands, generate staged project, global canonical, and safe-forwarding shims that point directly to the validated marker-selected cache artifact while preserving system dependency PATH entries and inherited PATH behavior. Emit deterministic desired and managed-removal targets for script-to-build, build-to-script, and removal transitions. Do not replace live paths, compile, publish cache entries, write markers, or commit multi-target installs; TASK-260720-2284br owns the live transaction.
+
+## Acceptance Criteria
+Unix staged shims exec the immutable artifact with all forwarded arguments and return its signal or exit status; Windows wrappers call the .exe with %* and return ERRORLEVEL; spaces, quotes, percent signs, Unicode paths, and empty inherited PATH are covered. Project, global canonical, and safe-forwarding shims resolve the same selected artifact. Build artifacts and build roots never appear under runtime/<skill>/<commit>. An incomplete existing script runtime produces a validated staged replacement instead of blind reuse. Transition planning emits only manager-owned desired or removal targets and does not touch live project or global paths. Unit tests plus explicit post-install launch fixtures on Unix and Windows prove argument and exit propagation, while install-time tests prove no built artifact is launched.
