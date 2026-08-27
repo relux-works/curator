@@ -21,6 +21,7 @@ import (
 	"github.com/relux-works/curator/internal/devsub"
 	"github.com/relux-works/curator/internal/gitignore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
@@ -68,6 +69,14 @@ Commands:
 `
 
 func main() {
+	// The fixed hidden go-v1 build worker is an implementation boundary, not a
+	// user-visible command surface. It is dispatched before any other parsing,
+	// requires exactly this one manager-owned argument, and is never reachable
+	// through a package file, manifest value, environment value, PATH lookup,
+	// shell, or user option.
+	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
+		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
+	}
 	os.Exit(run(os.Args[1:]))
 }
 
@@ -162,7 +171,7 @@ func projectRootArg(args []string) string {
 func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
 	var flagArgs, positional []string
 	for index := 0; index < len(args); index++ {
-		arg := args[index]
+		arg := args[index] // #nosec G602 -- index is bounded by the loop condition and only advanced after an explicit bounds check
 		if arg == "--" {
 			for trailing := index + 1; trailing < len(args); trailing++ {
 				positional = append(positional, args[trailing])

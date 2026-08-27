@@ -50,20 +50,33 @@ func ReplaceConsumers(home string, consumers []string) error {
 }
 
 func writeConsumers(home string, set map[string]bool) error {
+	payload, err := ConsumersPayload(set)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(home, ConsumersName), payload, 0o644)
+}
+
+// ConsumersPayload renders the canonical registry bytes for one consumer set.
+// Staging and direct writes share it so a staged ledger is byte-identical to
+// the one a direct write would have produced.
+func ConsumersPayload(set map[string]bool) ([]byte, error) {
 	var list []string
-	for entry := range set {
-		list = append(list, entry)
+	for entry, present := range set {
+		if present {
+			list = append(list, entry)
+		}
 	}
 	sort.Strings(list)
 	if list == nil {
 		list = []string{}
 	}
-	if err := os.MkdirAll(home, 0o755); err != nil {
-		return err
-	}
 	payload, err := json.MarshalIndent(map[string]any{"schema_version": 1, "consumers": list}, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return os.WriteFile(filepath.Join(home, ConsumersName), append(payload, '\n'), 0o644)
+	return append(payload, '\n'), nil
 }
