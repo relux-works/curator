@@ -28,6 +28,23 @@ type ExecutableIdentity struct {
 // resolveExecutableIdentity canonicalizes path to a real installed regular
 // file, rejects symlink, reparse-point, and hard-link substitution, records
 // strong file identity, and hashes the bytes.
+//
+// Resolution comes first and rejection comes second, so the shape the operator
+// launched the manager through is never itself the fault. A package manager
+// that publishes a shim on PATH -- a Homebrew or Linuxbrew symlink in bin, a
+// junction the Windows tool cache lays over the install directory -- names the
+// same installed file through a link, and what the checks below reject is
+// substitution of that file, not the link the process was started through.
+// os.Executable reports the launch path verbatim on macOS and Windows, so
+// without this step an ordinary linked install would be read as a non-regular
+// executable and rejected.
+//
+// physicalPath rather than filepath.EvalSymlinks: this is the same rule the
+// selected GOROOT and its launcher are resolved by, and on Windows EvalSymlinks
+// leaves a directory junction untouched and fails outright on a path that
+// descends through one. Resolving here makes the checks below stricter, not
+// more lenient: they are applied to the physical file, so retargeting the link
+// afterwards cannot move the identity this manager and its worker agree on.
 func resolveExecutableIdentity(path string) (ExecutableIdentity, error) {
 	if path == "" {
 		return ExecutableIdentity{}, diagnostic(CodeWorkerIdentityInvalid, "manager executable path is empty")
@@ -36,7 +53,7 @@ func resolveExecutableIdentity(path string) (ExecutableIdentity, error) {
 	if err != nil {
 		return ExecutableIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err, "cannot resolve the manager executable")
 	}
-	canonical, err := filepath.EvalSymlinks(filepath.Clean(absolute))
+	canonical, err := physicalPath(absolute)
 	if err != nil {
 		return ExecutableIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err, "cannot canonicalize the manager executable")
 	}

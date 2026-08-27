@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"go/build"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,12 @@ import (
 	"github.com/relux-works/curator/internal/buildsource"
 )
 
+// identityProbeMode is a test-only second hidden mode. It exists so a test can
+// start this binary through a launcher link and read back the identity the
+// started process resolves for itself, which is the only way to observe what
+// os.Executable reports for a real launch shape rather than to assume it.
+const identityProbeMode = "-curator-test-identity-probe"
+
 // TestMain gives the test binary the same fixed hidden worker mode the
 // installed manager has, so every worker test launches a real identity-verified
 // process instead of an in-process mock.
@@ -22,7 +29,33 @@ func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == WorkerMode {
 		os.Exit(RunWorker(os.Stdin, os.Stdout))
 	}
+	if len(os.Args) == 2 && os.Args[1] == identityProbeMode {
+		os.Exit(runIdentityProbe(os.Stdout))
+	}
 	os.Exit(m.Run())
+}
+
+// identityProbe is what a started process reports about itself.
+type identityProbe struct {
+	Reported string `json:"reported"`
+	Path     string `json:"path"`
+	SHA256   string `json:"sha256"`
+	Size     int64  `json:"size"`
+	Error    string `json:"error"`
+}
+
+func runIdentityProbe(out io.Writer) int {
+	probe := identityProbe{Reported: managerExecutable()}
+	identity, err := resolveExecutableIdentity(probe.Reported)
+	if err != nil {
+		probe.Error = err.Error()
+	} else {
+		probe.Path, probe.SHA256, probe.Size = identity.Path, identity.SHA256, identity.Size
+	}
+	if err := json.NewEncoder(out).Encode(probe); err != nil {
+		return 1
+	}
+	return 0
 }
 
 // stubScript mirrors the manager-owned script consumed by testdata/stubgo.
