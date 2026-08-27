@@ -1,0 +1,213 @@
+package transaction
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+
+	"golang.org/x/text/unicode/norm"
+)
+
+type targetNamespacePath struct {
+	owner           string
+	kind            string
+	path            string
+	key             string
+	caseInsensitive bool
+	normInsensitive bool
+}
+
+func validateIndependentTargetNamespaces(targets []TargetRecord, reserved ...targetNamespacePath) error {
+	paths := make([]targetNamespacePath, 0, len(targets)*7+len(reserved))
+	for index := range targets {
+		target := &targets[index]
+		for _, candidate := range []struct {
+			kind string
+			path string
+		}{
+			{kind: "live", path: target.LivePath},
+			{kind: "staged", path: target.StagedPath},
+			{kind: "backup", path: target.BackupPath},
+			{kind: "rollback", path: target.RollbackPath},
+		} {
+			if candidate.path == "" {
+				continue
+			}
+			key, err := canonicalNamespacePath(candidate.path)
+			if err != nil {
+				return fmt.Errorf("target %d %s path: %w", index, candidate.kind, err)
+			}
+			caseInsensitive, err := namespaceCaseInsensitive(key)
+			if err != nil {
+				return fmt.Errorf("target %d %s path: determine filesystem case behavior: %w", index, candidate.kind, err)
+			}
+			normInsensitive, err := namespaceNormalizationInsensitive(key)
+			if err != nil {
+				return fmt.Errorf("target %d %s path: determine filesystem normalization behavior: %w", index, candidate.kind, err)
+			}
+			paths = append(paths, targetNamespacePath{
+				owner:           fmt.Sprintf("target %d", index),
+				kind:            candidate.kind,
+				path:            candidate.path,
+				key:             key,
+				caseInsensitive: caseInsensitive,
+				normInsensitive: normInsensitive,
+			})
+			if candidate.kind != "live" {
+				tombPath := candidate.path + ".delete"
+				tombKey, err := canonicalNamespacePath(tombPath)
+				if err != nil {
+					return fmt.Errorf("target %d %s tomb path: %w", index, candidate.kind, err)
+				}
+				paths = append(paths, targetNamespacePath{
+					owner:           fmt.Sprintf("target %d", index),
+					kind:            candidate.kind + " cleanup tomb",
+					path:            tombPath,
+					key:             tombKey,
+					caseInsensitive: caseInsensitive,
+					normInsensitive: normInsensitive,
+				})
+			}
+		}
+	}
+	for _, candidate := range reserved {
+		key, err := canonicalNamespacePath(candidate.path)
+		if err != nil {
+			return fmt.Errorf("%s %s path: %w", candidate.owner, candidate.kind, err)
+		}
+		caseInsensitive, err := namespaceCaseInsensitive(key)
+		if err != nil {
+			return fmt.Errorf("%s %s path: determine filesystem case behavior: %w", candidate.owner, candidate.kind, err)
+		}
+		candidate.key = key
+		candidate.caseInsensitive = caseInsensitive
+		normInsensitive, err := namespaceNormalizationInsensitive(key)
+		if err != nil {
+			return fmt.Errorf("%s %s path: determine filesystem normalization behavior: %w", candidate.owner, candidate.kind, err)
+		}
+		candidate.normInsensitive = normInsensitive
+		paths = append(paths, candidate)
+	}
+	for leftIndex := range paths {
+		for rightIndex := leftIndex + 1; rightIndex < len(paths); rightIndex++ {
+			left := paths[leftIndex]
+			right := paths[rightIndex]
+			overlap, err := namespacePathsOverlap(left, right)
+			if err != nil {
+				return err
+			}
+			if overlap {
+				return fmt.Errorf("%s %s path %q overlaps %s %s path %q", left.owner, left.kind, left.path, right.owner, right.kind, right.path)
+			}
+		}
+	}
+	return nil
+}
+
+func canonicalNamespacePath(path string) (string, error) {
+	if path == "" || !validText(path) || !filepath.IsAbs(path) {
+		return "", fmt.Errorf("path is not valid absolute filesystem text")
+	}
+	absolute := filepath.Clean(path)
+	resolved, err := filepath.EvalSymlinks(absolute)
+	if err == nil {
+		return filepath.Clean(resolved), nil
+	}
+	if !os.IsNotExist(err) {
+		return "", fmt.Errorf("resolve symlinks for %q: %w", path, err)
+	}
+
+	prefix := absolute
+	missing := make([]string, 0, 4)
+	for {
+		parent := filepath.Dir(prefix)
+		if parent == prefix {
+			return "", fmt.Errorf("resolve existing prefix for %q: %w", path, err)
+		}
+		missing = append(missing, filepath.Base(prefix))
+		prefix = parent
+		resolved, err = filepath.EvalSymlinks(prefix)
+		if err == nil {
+			for index := len(missing) - 1; index >= 0; index-- {
+				resolved = filepath.Join(resolved, missing[index])
+			}
+			return filepath.Clean(resolved), nil
+		}
+		if !os.IsNotExist(err) {
+			return "", fmt.Errorf("resolve symlinks for %q: %w", path, err)
+		}
+	}
+}
+
+func namespacePathsOverlap(left, right targetNamespacePath) (bool, error) {
+	caseInsensitive := left.caseInsensitive || right.caseInsensitive
+	normInsensitive := left.normInsensitive || right.normInsensitive
+	if namespaceContains(left.key, right.key, caseInsensitive, normInsensitive) || namespaceContains(right.key, left.key, caseInsensitive, normInsensitive) {
+		return true, nil
+	}
+	leftInfo, leftErr := os.Stat(left.path)
+	rightInfo, rightErr := os.Stat(right.path)
+	if leftErr != nil && !os.IsNotExist(leftErr) {
+		return false, fmt.Errorf("inspect %s %s path: %w", left.owner, left.kind, leftErr)
+	}
+	if rightErr != nil && !os.IsNotExist(rightErr) {
+		return false, fmt.Errorf("inspect %s %s path: %w", right.owner, right.kind, rightErr)
+	}
+	return leftErr == nil && rightErr == nil && os.SameFile(leftInfo, rightInfo), nil
+}
+
+func namespaceContains(parent, child string, caseInsensitive, normInsensitive bool) bool {
+	parentVolume, parentParts := namespaceComponents(parent)
+	childVolume, childParts := namespaceComponents(child)
+	if !namespaceComponentEqual(parentVolume, childVolume, caseInsensitive, normInsensitive) || len(parentParts) > len(childParts) {
+		return false
+	}
+	for index := range parentParts {
+		if !namespaceComponentEqual(parentParts[index], childParts[index], caseInsensitive, normInsensitive) {
+			return false
+		}
+	}
+	return true
+}
+
+func namespaceComponents(path string) (string, []string) {
+	clean := filepath.Clean(path)
+	volume := filepath.VolumeName(clean)
+	remainder := clean[len(volume):]
+	parts := strings.FieldsFunc(remainder, func(value rune) bool {
+		if value == rune(filepath.Separator) {
+			return true
+		}
+		return runtime.GOOS == "windows" && (value == '/' || value == '\\')
+	})
+	return volume, parts
+}
+
+func namespaceComponentEqual(left, right string, caseInsensitive, normInsensitive bool) bool {
+	if normInsensitive {
+		left = norm.NFD.String(left)
+		right = norm.NFD.String(right)
+	}
+	if caseInsensitive {
+		return strings.EqualFold(left, right)
+	}
+	return left == right
+}
+
+func existingNamespaceAncestor(path string) (string, error) {
+	current := filepath.Clean(path)
+	for {
+		if _, err := os.Lstat(current); err == nil {
+			return current, nil
+		} else if !os.IsNotExist(err) {
+			return "", err
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return "", fmt.Errorf("path has no existing ancestor: %s", path)
+		}
+		current = parent
+	}
+}
