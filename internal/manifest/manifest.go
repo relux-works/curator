@@ -63,6 +63,15 @@ func Load(projectRoot string) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ParseBytes(payload, filePath)
+}
+
+// ParseBytes parses one manifest payload that a caller already read. It is the
+// byte-level entry point Load itself is built from, so a caller that has to bind
+// a generation digest to the exact bytes its closure was resolved from can read
+// the file once and parse those bytes, instead of reading the path a second time
+// and parsing a possibly different generation.
+func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
 	if err := protocoljson.Validate(payload); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
 	}
