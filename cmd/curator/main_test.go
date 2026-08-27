@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 )
@@ -149,6 +151,42 @@ func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
 	_, positional, _, auditMode, err = installFlags([]string{"project-a", "--audit", "strict"})
 	if err != nil || auditMode != "strict" || len(positional) != 1 || positional[0] != "project-a" {
 		t.Fatalf("strict --audit: positional=%v mode=%q err=%v", positional, auditMode, err)
+	}
+}
+
+// The run-wide SSH selection reaches an install from the command line, and the
+// environment fills only what the command line left unsaid.
+func TestInstallFlagsCarryTheRunWideBuildSSHSelection(t *testing.T) {
+	opts, positional, _, _, err := installFlags([]string{
+		"project-a", "--build-ssh-agent", "auto", "--build-ssh-identity", "/operator/id.pub",
+		"--build-ssh-known-hosts", "/operator/known_hosts",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(positional) != 1 || positional[0] != "project-a" {
+		t.Fatalf("positional = %v", positional)
+	}
+	want := install.BuildSSHFlags{
+		Identity: "/operator/id.pub", Agent: install.BuildSSHAgentAuto,
+		KnownHosts: "/operator/known_hosts",
+	}
+	if opts.BuildSSH != want {
+		t.Fatalf("build-ssh flags = %+v, want %+v", opts.BuildSSH, want)
+	}
+
+	environment := map[string]string{
+		install.EnvBuildSSHIdentity: "/operator/env.pub",
+		install.EnvBuildSSHAgent:    "/operator/env.sock",
+		"SSH_AUTH_SOCK":             "/operator/live.sock",
+	}
+	selection := install.CaptureBuildSSHSelection(nil, opts.BuildSSH,
+		func(name string) string { return environment[name] })
+	if selection.RunWide.Identity != "/operator/id.pub" || selection.RunWide.Agent != install.BuildSSHAgentAuto {
+		t.Fatalf("selection = %+v, want the flag values to win", selection.RunWide)
+	}
+	if selection.AgentSocket != "/operator/live.sock" {
+		t.Fatalf("live agent socket = %q", selection.AgentSocket)
 	}
 }
 
@@ -402,5 +440,326 @@ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
 	}
 	if code := run([]string{godriver.WorkerMode, "extra"}); code != exitUsage {
 		t.Fatalf("run with an extra argument = %d, want the unknown-command usage exit", code)
+	}
+}
+
+// bootstrapConfig points the CLI at a private config file and creates it.
+func bootstrapConfig(t *testing.T) string {
+	t.Helper()
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("CURATOR_CONFIG", configPath)
+	if code := run([]string{"bootstrap", "--non-interactive", "--skills-root", t.TempDir()}); code != exitOK {
+		t.Fatalf("bootstrap = %d", code)
+	}
+	return configPath
+}
+
+// captureStdout collects what a command prints, so a test can assert on the
+// listing itself rather than only on its exit code.
+func captureStdout(t *testing.T, body func()) string {
+	t.Helper()
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := os.Stdout
+	os.Stdout = writer
+	defer func() { os.Stdout = saved }()
+	body()
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	output, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(output)
+}
+
+func TestConfigBuildSSHAddListRemove(t *testing.T) {
+	configPath := bootstrapConfig(t)
+
+	for _, args := range [][]string{
+		{"config", "build-ssh", "add", "zeta.example.com", "--agent"},
+		{"config", "build-ssh", "add", "git.example.com/portals", "--agent", "/run/portals.sock",
+			"--identity", "~/.ssh/portals", "--known-hosts", "/etc/ssh/known_hosts_portals"},
+		{"config", "build-ssh", "add", "git.example.com", "--identity", "/keys/org"},
+	} {
+		if code := run(args); code != exitOK {
+			t.Fatalf("%v = %d, want %d", args, code, exitOK)
+		}
+	}
+
+	cfg, err := config.Load(configPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := config.BuildSSHCredential{
+		Scope: "git.example.com/portals", Agent: true, AgentSocket: "/run/portals.sock",
+		Identity: "~/.ssh/portals", KnownHosts: "/etc/ssh/known_hosts_portals",
+	}
+	if got := cfg.BuildSSH["git.example.com/portals"]; got != want {
+		t.Fatalf("credential = %+v, want %+v", got, want)
+	}
+
+	// A second add under the same scope replaces the entry rather than
+	// merging with it: the leftover agent selection would still authenticate.
+	replaceOutput := captureStdout(t, func() {
+		if code := run([]string{"config", "build-ssh", "add", "zeta.example.com", "--identity", "/keys/zeta"}); code != exitOK {
+			t.Fatalf("replace add = %d", code)
+		}
+	})
+	if !strings.HasPrefix(replaceOutput, "replaced build_ssh scope zeta.example.com: identity=/keys/zeta") {
+		t.Fatalf("replace output = %q", replaceOutput)
+	}
+	cfg, err = config.Load(configPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replaced := cfg.BuildSSH["zeta.example.com"]; replaced.Agent || replaced.Identity != "/keys/zeta" {
+		t.Fatalf("replaced credential = %+v", replaced)
+	}
+
+	listing := captureStdout(t, func() {
+		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
+			t.Fatalf("list = %d", code)
+		}
+	})
+	wantListing := "git.example.com\tidentity=/keys/org\n" +
+		"git.example.com/portals\tagent=/run/portals.sock identity=~/.ssh/portals known_hosts=/etc/ssh/known_hosts_portals\n" +
+		"zeta.example.com\tidentity=/keys/zeta\n"
+	if listing != wantListing {
+		t.Fatalf("listing =\n%q\nwant\n%q", listing, wantListing)
+	}
+
+	if code := run([]string{"config", "build-ssh", "remove", "git.example.com/portals"}); code != exitOK {
+		t.Fatalf("remove = %d", code)
+	}
+	cfg, err = config.Load(configPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, present := cfg.BuildSSH["git.example.com/portals"]; present {
+		t.Fatalf("removed scope still configured: %+v", cfg.BuildSSH)
+	}
+	if len(cfg.BuildSSH) != 2 {
+		t.Fatalf("remove disturbed other scopes: %+v", cfg.BuildSSH)
+	}
+}
+
+func TestConfigBuildSSHListWithoutScopesPrintsNothing(t *testing.T) {
+	bootstrapConfig(t)
+	listing := captureStdout(t, func() {
+		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
+			t.Fatalf("empty list = %d", code)
+		}
+	})
+	if listing != "" {
+		t.Fatalf("empty listing = %q, want no stdout", listing)
+	}
+}
+
+func TestConfigBuildSSHAddRejectsInvalidInvocations(t *testing.T) {
+	configPath := bootstrapConfig(t)
+	before, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, args := range map[string][]string{
+		"no scope":            {"config", "build-ssh", "add", "--agent"},
+		"two scopes":          {"config", "build-ssh", "add", "a.example.com", "b.example.com", "--agent"},
+		"uppercase host":      {"config", "build-ssh", "add", "Git.Example.com", "--agent"},
+		"dot segment":         {"config", "build-ssh", "add", "git.example.com/../etc", "--agent"},
+		"empty segment":       {"config", "build-ssh", "add", "git.example.com//portals", "--agent"},
+		"scheme in scope":     {"config", "build-ssh", "add", "ssh://git.example.com", "--agent"},
+		"selects nothing":     {"config", "build-ssh", "add", "git.example.com"},
+		"known hosts only":    {"config", "build-ssh", "add", "git.example.com", "--known-hosts", "/etc/kh"},
+		"relative identity":   {"config", "build-ssh", "add", "git.example.com", "--identity", "keys/org"},
+		"relative socket":     {"config", "build-ssh", "add", "git.example.com", "--agent=run/agent.sock"},
+		"relative known host": {"config", "build-ssh", "add", "git.example.com", "--identity", "/keys/org", "--known-hosts", "kh"},
+		"negated agent":       {"config", "build-ssh", "add", "git.example.com", "--agent=false"},
+		"unknown flag":        {"config", "build-ssh", "add", "git.example.com", "--agent", "--pin", "x"},
+	} {
+		if code := run(args); code != exitUsage {
+			t.Fatalf("%s: %v = %d, want %d", name, args, code, exitUsage)
+		}
+	}
+	after, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatalf("a rejected add rewrote the config:\n%s", after)
+	}
+}
+
+func TestConfigBuildSSHAgentFlagKeepsScopePositional(t *testing.T) {
+	configPath := bootstrapConfig(t)
+	if code := run([]string{"config", "build-ssh", "add", "--agent", "alpha.example.com"}); code != exitOK {
+		t.Fatalf("bare --agent before the scope = %d", code)
+	}
+	if code := run([]string{"config", "build-ssh", "add", "beta.example.com", "--agent", "/run/beta.sock"}); code != exitOK {
+		t.Fatalf("--agent with a socket = %d", code)
+	}
+	cfg, err := config.Load(configPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alpha := cfg.BuildSSH["alpha.example.com"]
+	if !alpha.Agent || alpha.AgentSocket != "" {
+		t.Fatalf("alpha credential = %+v", alpha)
+	}
+	beta := cfg.BuildSSH["beta.example.com"]
+	if !beta.Agent || beta.AgentSocket != "/run/beta.sock" {
+		t.Fatalf("beta credential = %+v", beta)
+	}
+}
+
+func TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets(t *testing.T) {
+	bootstrapConfig(t)
+	if code := run([]string{"config", "build-ssh", "add", "git.example.com", "--agent"}); code != exitOK {
+		t.Fatalf("add = %d", code)
+	}
+	if code := run([]string{"config", "build-ssh", "remove", "other.example.com"}); code != exitFail {
+		t.Fatalf("remove of an unconfigured scope = %d, want %d", code, exitFail)
+	}
+	for _, args := range [][]string{
+		{"config", "build-ssh", "remove"},
+		{"config", "build-ssh", "remove", "a.example.com", "b.example.com"},
+		{"config", "build-ssh", "remove", "--agent"},
+	} {
+		if code := run(args); code != exitUsage {
+			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
+		}
+	}
+}
+
+func TestConfigHelpDocumentsPrecedenceAndSubcommands(t *testing.T) {
+	for _, fragment := range []string{
+		"curator config build-ssh add <scope>",
+		"curator config build-ssh list",
+		"curator config build-ssh remove <scope>",
+		"--known-hosts PATH",
+		"CURATOR_BUILD_SSH_*",
+	} {
+		if !strings.Contains(buildSSHUsage, fragment) {
+			t.Fatalf("build-ssh help does not document %q", fragment)
+		}
+	}
+	// Precedence is the operator's only defence against a stale config scope
+	// silently outranking the flag they just typed.
+	flags := strings.Index(buildSSHUsage, "flags override")
+	environment := strings.Index(buildSSHUsage, "CURATOR_BUILD_SSH_*")
+	scopes := strings.Index(buildSSHUsage, "override the scopes configured here")
+	if flags < 0 || flags >= environment || environment >= scopes {
+		t.Fatalf("help must order precedence flags > env > config scopes: %d %d %d", flags, environment, scopes)
+	}
+	if !strings.Contains(configUsage, "build-ssh") || !strings.Contains(configUsage, "curator config show") {
+		t.Fatalf("config help does not enumerate its subcommands: %q", configUsage)
+	}
+}
+
+func TestConfigSubcommandDispatch(t *testing.T) {
+	bootstrapConfig(t)
+	for _, args := range [][]string{
+		{"config", "-h"},
+		{"config", "build-ssh", "-h"},
+		{"config", "show"},
+	} {
+		if code := run(args); code != exitOK {
+			t.Fatalf("%v = %d, want %d", args, code, exitOK)
+		}
+	}
+	for _, args := range [][]string{
+		{"config"},
+		{"config", "frobnicate"},
+		{"config", "build-ssh"},
+		{"config", "build-ssh", "frobnicate"},
+	} {
+		if code := run(args); code != exitUsage {
+			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
+		}
+	}
+}
+
+// TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt proves the two
+// conditions the interactive precheck depends on. A test process is not a
+// terminal, so both cases here are the fail-closed one; the dry-run case is
+// asserted separately because it must hold even in front of a real terminal.
+func TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt(t *testing.T) {
+	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
+	if resolver := operatorBuildSSHResolver(cfg, true); resolver != nil {
+		t.Fatal("a dry run offered to persist a credential")
+	}
+	if resolver := operatorBuildSSHResolver(cfg, false); resolver != nil {
+		t.Fatal("a non-interactive process offered a prompt nobody can answer")
+	}
+	// `< /dev/null` is a character device. Treating that as a terminal would
+	// make a scripted run block on a question instead of failing closed.
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = devNull.Close() }()
+	if attachedToTerminal(devNull) {
+		t.Fatal(os.DevNull + " was reported as a terminal")
+	}
+	pipeRead, pipeWrite, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = pipeRead.Close(); _ = pipeWrite.Close() }()
+	if attachedToTerminal(pipeRead) {
+		t.Fatal("a pipe was reported as a terminal")
+	}
+}
+
+// TestThePromptPersistsThroughTheOrdinaryConfigWriter proves the resolver
+// wiring records exactly what `curator config build-ssh add` would, so a
+// prompted answer and a typed command leave the same configuration behind.
+func TestThePromptPersistsThroughTheOrdinaryConfigWriter(t *testing.T) {
+	configPath := bootstrapConfig(t)
+	cfg, err := config.Load(configPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transcript := &strings.Builder{}
+	resolver := install.InteractiveBuildSSHResolver(strings.NewReader("\n\n"), transcript,
+		func(credential config.BuildSSHCredential) error {
+			_, setErr := config.SetBuildSSH(cfg.Path, credential)
+			return setErr
+		})
+	added, err := resolver([]install.BuildSSHRequest{{
+		Skill: "portals", Command: "build-tool",
+		Identity:     "git.example.test/portals/app",
+		DefaultScope: "git.example.test/portals",
+	}}, install.BuildSSHCandidates{
+		AgentSocket: "/run/agent.sock", AgentKeys: 1, AgentKeysKnown: true,
+		Identities: []string{"~/.ssh/id_ed25519.pub"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(added) != 1 {
+		t.Fatalf("resolver returned %+v", added)
+	}
+	reloaded, err := config.Load(configPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := config.BuildSSHCredential{
+		Scope: "git.example.test/portals", Agent: true, Identity: "~/.ssh/id_ed25519.pub",
+	}
+	if got := reloaded.BuildSSH["git.example.test/portals"]; got != want {
+		t.Fatalf("persisted credential = %+v, want %+v", got, want)
+	}
+	// The same entry the CLI would have written, byte for byte in the listing.
+	listing := captureStdout(t, func() {
+		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
+			t.Fatalf("list = %d", code)
+		}
+	})
+	if listing != "git.example.test/portals\tagent identity=~/.ssh/id_ed25519.pub\n" {
+		t.Fatalf("listing = %q", listing)
 	}
 }
