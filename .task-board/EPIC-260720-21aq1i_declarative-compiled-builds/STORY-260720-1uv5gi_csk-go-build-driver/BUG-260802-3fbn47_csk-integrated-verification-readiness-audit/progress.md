@@ -1,5 +1,5 @@
 ## Status
-to-review
+closed
 
 ## Review
 light
@@ -35,6 +35,7 @@ spawn run started: [analyst] researcher (codex) (run=RUN-260802-4655c2)
 RESEARCH HANDOFF 2026-08-02: Published .research/260802_csk-integrated-verification-readiness-audit.md and attached byte-identical outcome BUG-260802-3fbn47_csk-integrated-verification-readiness-audit.md. It maps the hard TASK-260720-3pemm6 accepted-done/landed gate, future clean base capture, authenticated curator-spec 432eb2ee / sha256:12e58b candidate, every story/target criterion, macOS/Windows native Go 1.25 commands, Ubuntu portable fail-closed commands, full pytest/mypy/build/Twine/diff/hosted-CI gates, skip inventory, no-tag/no-release/no-pin/no-claim guards, evidence filenames, ordering and stop conditions. Validation: git diff --check exit 0; 10-section structure gate exit 0; required-content gate exit 0; resource cmp exit 0. task-board validate itself exited 0 while reporting 1,226 pre-existing board diagnostics; these were not altered. Important provenance/claim boundaries recorded in LOGBOOK.md. No CocoaSkills or curator-spec repository state, tag, release, pin, claim, or blocked delivery-task status was changed.
 agent completed: [analyst] researcher (codex) (exit=0)
 spawn run completed: codex (run=RUN-260802-4655c2, pid=80582, exit=0)
+Closed 2026-08-27 as moot. This is read-only preparation for TASK-260720-3s27te, which is still in backlog and was never started. Its matrix is derived from the rc.6 candidate and the clean-base state of that period; the implementation has since moved to rc.10 and schema 8, so the commands and digests it would publish no longer describe the verification anyone would run.
 
 ## Precondition Resources
 (none)
@@ -47,7 +48,7 @@ spawn run completed: codex (run=RUN-260802-4655c2, pid=80582, exit=0)
 2026-08-02T11:58:21Z
 
 ## Last Update
-2026-08-02T12:08:21Z
+2026-08-27T03:32:10Z
 
 ## Assigned To
 [analyst] researcher (codex)

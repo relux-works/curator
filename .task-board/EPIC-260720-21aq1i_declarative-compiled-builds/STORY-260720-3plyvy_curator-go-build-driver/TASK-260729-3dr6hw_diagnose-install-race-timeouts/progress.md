@@ -1,5 +1,5 @@
 ## Status
-analysis
+closed
 
 ## Review
 required
@@ -214,6 +214,7 @@ spawn agent resolution: Agent selection: claude via explicit_override
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=claude; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [analyst] researcher (claude) (run=RUN-260729-4079e5, max_parallel=20)
 spawn run started: [analyst] researcher (claude) (run=RUN-260729-4079e5)
+Closed 2026-08-27 because the condition it diagnoses no longer holds. The task exists to explain install/atomicity race timeouts against a 480s acceptance bar. ci.yml now records the measurement inline: internal/install/atomicity runs 115.687s under -race on the accepted candidate's macOS measurement, against that same 480s bar. The margin is 4x, and the 30m per-package timeout is headroom rather than a fix.
 
 ## Precondition Resources
 - [TASK-260729-3dr6hw_diagnosis-input.md](file://TASK-260729-3dr6hw/TASK-260729-3dr6hw_diagnosis-input.md) — Exact verifier3 evidence and no-execution diagnosis boundary
@@ -252,7 +253,7 @@ spawn run started: [analyst] researcher (claude) (run=RUN-260729-4079e5)
 2026-07-29T12:38:32Z
 
 ## Last Update
-2026-07-29T16:15:12Z
+2026-08-27T03:32:11Z
 
 ## Assigned To
 [analyst] researcher (claude)

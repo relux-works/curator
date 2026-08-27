@@ -1,5 +1,5 @@
 ## Status
-reviewing
+closed
 
 ## Assigned To
 [reviewer] reviewer (codex)
@@ -8,7 +8,7 @@ reviewing
 2026-07-20T01:44:31Z
 
 ## Last Update
-2026-07-30T10:00:30Z
+2026-08-27T03:32:08Z
 
 ## Blocked By
 - (none)
@@ -168,6 +168,7 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260727-825e19)
 Independent external-build-repository architecture v6 verdict: accepted. V6 closes the sole v5 gap with exact-tag-only acquisition for every unsubstituted tagged declaration, terminal-lock equality before audit/cache/compiler/publication, stable moved/missing outcomes, and no direct-OID/branch/all-tags fallback. Six-case Git 2.50.1 smoke, 13 JSON parses, official Git source checks, scoped validator, full make validate, and git diff --check pass. Evidence attached as TASK-260720-1nvomm_external-build-repositories-review-v6.md.
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260727-825e19, pid=36271, exit=0)
+Closed 2026-08-27 as obsolete. Its reviewer verdict requested documentation rework of the schema 6 normative prose in protocol/core.md. That prose has been rewritten twice since, for schema 7 and then schema 8, and SPEC_PIN is now rc.10 0ed5c691. The security contract the task describes is expressed in the current schema; the rework it was routed for targets text that no longer exists.
 
 ## Precondition Resources
 - [TASK-260720-1nvomm_artifact-map.puml](file://TASK-260720-1nvomm/TASK-260720-1nvomm_artifact-map.puml) — Implementation planning diagram showing normative contract ownership and downstream consumers

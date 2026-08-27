@@ -1,5 +1,5 @@
 ## Status
-analysis
+closed
 
 ## Review
 required
@@ -133,6 +133,7 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260729-fb818d)
 REVIEW CYCLE 3 — CHANGES REQUESTED to analysis. The cycle-3 arithmetic correction and routing are accepted, as are the exact 13-file patch, integrity/applicability evidence, Patch A timings, assertion retention, and deliberate cross-class retirement. Acceptance still fails the authoritative <=480s focused condition: Patch B atomicity is 591.280/560.828/564.022s; the separately scoped fixture trim has one valid race result at 493s (492.231s test-reported), with race2 partial evidence excluded and race3 not run. Preserve the patch and route production work through TASK-260729-365r5r. Evidence: TASK-260729-rfrdfo_review-verdict-cycle-3.md. No Go command or code/worktree mutation was performed.
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260729-fb818d, pid=4604, exit=0)
+Closed 2026-08-27 because the problem it prototypes against is gone. Neither patch ever landed: git log -S namespaceGraph over internal/transaction on main is empty. The open question recorded in the logbook -- that the combination of Patch A and Patch B was never measured against the 480s bar -- is moot, because atomicity now measures 115.687s under -race against that bar without either patch. The stored patch artefact and its cycle-3 verdict remain attached.
 
 ## Precondition Resources
 - [TASK-260729-rfrdfo_prototype-input.md](file://TASK-260729-rfrdfo/TASK-260729-rfrdfo_prototype-input.md) — Exact prototype inputs and non-overlap boundary
@@ -165,7 +166,7 @@ spawn run completed: codex (run=RUN-260729-fb818d, pid=4604, exit=0)
 2026-07-29T13:44:00Z
 
 ## Last Update
-2026-07-29T16:19:39Z
+2026-08-27T03:32:11Z
 
 ## Assigned To
 [reviewer] reviewer (codex)
