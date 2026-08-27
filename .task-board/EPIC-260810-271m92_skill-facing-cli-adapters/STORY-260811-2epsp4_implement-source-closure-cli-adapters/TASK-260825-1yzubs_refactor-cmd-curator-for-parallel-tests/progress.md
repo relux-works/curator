@@ -1,5 +1,5 @@
 ## Status
-to-review
+to-dev
 
 ## Review
 required
@@ -37,6 +37,7 @@ spawn run started: [implementer] developer (codex) (run=RUN-260826-d73db1)
 Developer handoff: run is invocation-scoped through injected configSource, stdout, stderr, and user-home seams; prior global config/output capture removed from tests. Heavy compiled-status coverage split across independent parallel fixtures. Three exact uncached cmd/curator runs exited 0 at 230.91s, 207.11s, and 232.05s wall clock versus 408.01s baseline; coverage 60.1% -> 61.3%; race/vet/gofmt/golangci 2.12.2/diff/board validation green. Cross-package exclusion run exited 1 only because the repository-local replacement ./agents/skills/skill-go-testing-tools/tuitestkit is absent; every other reached package passed. Root LOGBOOK.md was intentionally not edited because explicit task scope permits only cmd/curator/** and a concurrent docs run owns documentation; anomaly is recorded in attached developer outcome and these board notes. No staging or commit.
 agent completed: [implementer] developer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260826-d73db1, pid=51872, exit=0)
+Orchestrator disposition 2026-08-27: producer RUN-260826-d73db1 validated the design (injectable config+writers, cmd/curator 408s to ~223s, coverage clean) but built it in the story worktree pinned to main, a base lacking the adapter delivery — its patch does not apply to the delivery branch (see skill-project-management#12 comment for the reproduction). The wrong-base patch is preserved at .temp/landing/refactor-1yzubs-vs-main.patch (base 903af23) as a design blueprint. Redo the task against the merged base once PR https://github.com/relux-works/curator/pull/47 lands in main; the 7 main-only cmd/curator tests named by the 1kzj22 review join that pass.
 
 ## Precondition Resources
 (none)
@@ -52,7 +53,7 @@ spawn run completed: codex (run=RUN-260826-d73db1, pid=51872, exit=0)
 2026-08-24T23:50:43Z
 
 ## Last Update
-2026-08-26T22:21:42Z
+2026-08-27T02:23:34Z
 
 ## Assigned To
 [implementer] developer (codex)

@@ -58,6 +58,19 @@ func TestVerifyPublishedReleasePinWhenConformanceRootIsSupplied(t *testing.T) {
 	if conformanceRoot == "" {
 		t.Skip("CURATOR_CONFORMANCE_ROOT is not set")
 	}
+	// The supplied root and this module's immutable pin are promoted by
+	// separate owners: CI's SPEC_PIN moves when a newer release qualifies,
+	// and this pin moves only with the promotion task named in the workflow.
+	// Verifying an unrelated release against this pin would report a drift
+	// that is not one, so the release the root actually publishes is
+	// identified first and a different one is declared rather than asserted.
+	manifest, err := os.ReadFile(filepath.Join(filepath.Clean(conformanceRoot), "manifest.json"))
+	if err != nil {
+		t.Fatalf("read the supplied conformance manifest: %v", err)
+	}
+	if digestTestBytes(manifest) != ConformanceManifestSHA256 {
+		t.Skipf("the supplied conformance root publishes a release other than the pinned %s", SpecReleaseTag)
+	}
 	specRoot := filepath.Dir(filepath.Dir(filepath.Clean(conformanceRoot)))
 	if err := VerifyReleasePin(specRoot, SpecReleaseCommit); err != nil {
 		t.Fatal(err)

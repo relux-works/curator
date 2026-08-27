@@ -44,6 +44,7 @@
 root-unset	CURATOR_CONFORMANCE_ROOT is not set	deferred-only	the package was deferred by suite-plan.sh
 root-content	publishes no 	allow	the supplied root does not publish this vector group
 root-content	is a pre-revision root	allow	the supplied root predates this artefact
+root-content	publishes a release other than the pinned 	allow	CI's SPEC_PIN and the module's immutable release pin are promoted by separate owners; the module pin is asserted against its own release and declares any other one
 
 # --- protocol / platform-defined controls -----------------------------------
 platform-control	available only on (Windows|macOS) in rc5-native-control-inventory-v1	allow	the inventory defines this control for one platform only

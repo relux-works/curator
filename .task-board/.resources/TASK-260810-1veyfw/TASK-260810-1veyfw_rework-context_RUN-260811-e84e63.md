@@ -26,7 +26,7 @@ and closure ledger.
   There is exactly one task-scoped inventory outcome resource, so the producer
   correctly updated the existing artifact rather than creating a duplicate.
 - The deterministic inclusion rule now covers Curator declarations,
-  repo-facing CLIs invoked by instructions or launchers, CocoaSkills
+  repo-facing CLIs invoked by instructions or launchers, the alternative implementation
   project/global surfaces, and external system commands as a distinct class.
 - `skill-currency-exchange@c29210aa6eb4cc0f64f307fa30561ac80feb6b3b`
   is fully represented. Independent Git-object checks reproduce Go 1.25.5,
@@ -50,7 +50,7 @@ and closure ledger.
   fail-closed mixed-source fields.
 - The Node/TypeScript versus Python relationship is explicitly and correctly
   resolved as protocol-level rather than implementation-level. Pinned
-  CocoaSkills metadata exposes only the Python `csk` entry point, has zero
+  the alternative implementation metadata exposes only the Python `csk` entry point, has zero
   runtime dependencies, and contains no Node manifest, lock, JavaScript, or
   TypeScript source.
 - Kotlin remains deferred. The pinned Android repository evidence reproduces
@@ -64,7 +64,7 @@ and closure ledger.
 
 ## Finding: the active-manifest inclusion rule is not closed
 
-The report says to include every command declared by a CocoaSkills
+The report says to include every command declared by a the alternative implementation
 `csk-skill.json` and states that its hidden-file scan covered
 `/Users/iv/agents/skills`, finding eight such manifests. It then says the
 post-review closure ledger accounts for every resulting command-bearing or
@@ -72,7 +72,7 @@ negative disposition.
 
 That evidence does not agree with the current scanned source:
 
-- `csk list --paths` identifies `/Users/iv/agents/skills` as the CocoaSkills
+- `csk list --paths` identifies `/Users/iv/agents/skills` as the the alternative implementation
   skills root.
 - `/Users/iv/agents/skills/skill-grafana` is a clean Git checkout at
   `6234e2a3ef35415b765f74cca21c8ad7846f521e` on
@@ -103,7 +103,7 @@ applied to Grafana without an explicit, consistent boundary.
 ## Required corrections
 
 1. Define which revision is authoritative for every manifest discovered under
-   the CocoaSkills skills root: working-copy HEAD, configured ref, installed
+   the the alternative implementation skills root: working-copy HEAD, configured ref, installed
    marker, or an explicit combination. Make the scan and its counts operate on
    that revision rule rather than mixing working-copy file discovery with
    installed-marker command extraction.
@@ -130,7 +130,7 @@ applied to Grafana without an explicit, consistent boundary.
 - Re-ran the hidden manifest/marker scan over the stated active roots; it
   reproduced 16 installed markers, eight `csk-skill.json` files, and one
   `agent-skill.json`.
-- Read pinned local Git objects for Curator, Curator Protocol, CocoaSkills,
+- Read pinned local Git objects for Curator, Curator Protocol, the alternative implementation,
   project management, currency exchange, and Telegram. Read the remaining
   cited repository revisions through isolated temporary bare fetches, without
   modifying their working trees.

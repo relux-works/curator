@@ -1,0 +1,46 @@
+{
+  "contract_version": "board-goal-v2",
+  "goal_id": "PRIMARY-GOAL-260811-1zl9m7",
+  "revision": 18,
+  "expected_previous_revision": 17,
+  "previous_ref": {
+    "id": "PRIMARY-GOAL-260811-1zl9m7",
+    "revision": 17
+  },
+  "owner": {
+    "kind": "parent",
+    "id": "primary"
+  },
+  "kind": "alignment",
+  "objective": "The portable source-closure adapter delivery is complete, reconciled with main, and awaiting the human merge of pull request https://github.com/relux-works/curator/pull/47 (codex/legacy-board-repair into main, merge commit 149e176). The branch carries: all eleven accepted delivery tasks (Rust capture/vendor and offline build; Node/TS with npm, pnpm, Yarn Classic, and modern Yarn profiles; SwiftPM source, reject-by-default C-family interop, and offline build with the observed-read provider; cross-language conformance with the independent CCJ-1 oracle over all 53 CGP05/CGP10 records), the cmd/curator test parallelization side task, the language-adapter authoring guide docs/authoring-language-adapters.md (TASK-260827-1ifnxi, done, linked from README and CONTRIBUTING), and the merge reconciliation with main's operator-credentials epic (combined externalPipelineRequest signature carrying both credential selection and the build assurance authority; main's rc.9 CI suite pin, godriver directive-severity scan, and rc.9 multi-project dry-run contract adopted; the module release pin stays rc.8 with promotion ownership documented in README). Merged-tree validation: build/vet/gofmt clean, full uncached go test exit 0 across all 57 packages, board valid. Remaining after the PR merges: (1) redo TASK-260825-1yzubs (injectable cmd/curator config/output refactor and full parallelization, target under 4 minutes) against the merged main base — its first run RUN-260826-d73db1 validated the design but was built in the story worktree pinned to a base lacking the delivery (reproduction recorded on skill-project-management issue 12; blueprint patch preserved at .temp/landing/refactor-1yzubs-vs-main.patch), and the 7 main-only cmd/curator tests join that pass; (2) nothing else — the delivery goal is otherwise achieved. Exclude Kotlin. Keep verified execution providers in the separate future EPIC-260819-2ats6u. Reject vendored compiled binaries until explicit signature and provenance verification exists. All producer, tester, reviewer, researcher, and architecture runs use Codex gpt-5.6-sol with medium reasoning effort; historical Claude claude-opus-5 runs remain valid evidence.",
+  "scope": {
+    "requested_ids": null,
+    "resolved_leaf_items": null
+  },
+  "mutation_authority": "agent_discretion",
+  "success_predicate": "alignment_handled",
+  "provider_condition": "The bound parent session has handled this exact alignment revision.",
+  "native_reflection": "required",
+  "state": "active",
+  "legacy_refs": [
+    {
+      "contract": "primary-goal-v1",
+      "id": "PRIMARY-GOAL-260811-1zl9m7",
+      "revision": 18
+    }
+  ],
+  "role_policy": {},
+  "mutation": {
+    "kind": "alignment_realigned",
+    "reason": "Merge reconciliation with main's credentials epic completed and validated (57 packages green); PR 47 opened awaiting human merge; 1yzubs dispositioned for redo on the merged base",
+    "actor_context": {
+      "kind": "agent",
+      "actor_id": "iv"
+    },
+    "authority": "agent_discretion"
+  },
+  "created_at": "2026-08-10T23:51:12.680862Z",
+  "updated_at": "2026-08-27T02:23:51.697158Z",
+  "created_by": "iv",
+  "reason": "Merge reconciliation with main's credentials epic completed and validated (57 packages green); PR 47 opened awaiting human merge; 1yzubs dispositioned for redo on the merged base"
+}
