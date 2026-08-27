@@ -7,6 +7,7 @@
 package install
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -46,10 +47,27 @@ type Options struct {
 	// FetchedRepos deduplicates closure-scoped upgrades across selected
 	// projects. Callers may leave it nil for a single installation.
 	FetchedRepos map[string]bool
+	// Context bounds toolchain probing and compilation. Nil means background.
+	Context context.Context
+	// Build injects the narrow toolchain, protected-cache, builder, clock, and
+	// generation-read boundaries. The zero value resolves the real ones.
+	Build BuildDeps
+	// OnStaged observes the operation-private staging result after every build
+	// succeeded and before the plan releases it. Publishing staged outputs to
+	// the protected cache and to live installation targets belongs to the
+	// atomic commit phase, not to this one.
+	OnStaged func(Staged) error
 	// Hooks for later phases. Each may be nil.
 	VerifyMcp     func(nodes []*closure.Node) (map[string]map[string][]string, []string, error)
 	AuditGate     func(nodes []*closure.Node) (warnings []string, errs []string)
 	ResolveAttest func(nodes []*closure.Node) (map[string]*marker.Attestation, []string, error)
+}
+
+func (o Options) context() context.Context {
+	if o.Context == nil {
+		return context.Background()
+	}
+	return o.Context
 }
 
 // Result reports one project installation.
@@ -59,6 +77,11 @@ type Result struct {
 	Status   string // ok | skipped | failed
 	Messages []string
 	Errors   []string
+	// Builds is the immutable build plan derived before any mutation.
+	Builds []PlannedBuild
+	// Staged describes the operation-private outputs a real run produced. The
+	// staging itself is already released when the result is returned.
+	Staged []StagedBuild
 }
 
 func (r *Result) failf(format string, args ...any) {
@@ -67,8 +90,8 @@ func (r *Result) failf(format string, args ...any) {
 }
 
 // Project installs one project per Spec §8.1.
-func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result {
-	result := Result{Alias: alias, Path: projectRoot, Status: "ok"}
+func Project(cfg *config.Config, projectRoot, alias string, opts Options) (result Result) {
+	result = Result{Alias: alias, Path: projectRoot, Status: "ok"}
 	platform := opts.Platform
 	if platform == "" {
 		platform = runtimestore.Platform()
@@ -179,15 +202,19 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		effectiveLocale = cfg.PreferredLocale
 	}
 
-	// 7. Closure resolution.
+	// 7. Closure resolution. One operation-private root serves the whole run:
+	// the read-only closure workspace of a dry run and, later, the trusted
+	// toolchain's probe or build base all live inside it. It is released last,
+	// after the plan dropped the staging it owns.
+	private := &privateRoot{prefix: operationPrivatePrefix}
+	defer func() { releasePrivateRoot(&result, alias, private) }()
 	scratchRoot := ""
 	if opts.DryRun {
-		scratchRoot, err = os.MkdirTemp("", "curator-dry-run-")
+		scratchRoot, err = private.dir("closure-")
 		if err != nil {
-			result.failf("could not create temporary dry-run workspace: %v", err)
+			result.failf("could not create the read-only dry-run workspace: %v", err)
 			return result
 		}
-		defer func() { _ = os.RemoveAll(scratchRoot) }()
 	}
 	if opts.FetchedRepos == nil {
 		opts.FetchedRepos = map[string]bool{}
@@ -235,28 +262,11 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 	// 11. MCP verification (Spec §11); Options.VerifyMcp overrides for tests.
 	verifyMcp := opts.VerifyMcp
 	if verifyMcp == nil {
-		verifyMcp = func(nodes []*closure.Node) (map[string]map[string][]string, []string, error) {
-			userHome, err := os.UserHomeDir()
-			if err != nil {
-				userHome = ""
-			}
-			requirements := map[string]map[string]skillspec.McpServer{}
-			for _, node := range nodes {
-				if len(node.Spec.McpServers) > 0 {
-					requirements[node.Name] = node.Spec.McpServers
-				}
-			}
-			findings, warnings, err := mcp.Verify(mcp.Env{ProjectRoot: projectRoot, UserHome: userHome}, agents, requirements)
-			found := map[string]map[string][]string{}
-			for name, finding := range findings {
-				found[name] = finding.FoundIn
-			}
-			prefixed := make([]string, 0, len(warnings))
-			for _, warning := range warnings {
-				prefixed = append(prefixed, alias+": "+warning)
-			}
-			return found, prefixed, err
+		userHome, homeErr := os.UserHomeDir()
+		if homeErr != nil {
+			userHome = ""
 		}
+		verifyMcp = mcpVerifier(mcp.Env{ProjectRoot: projectRoot, UserHome: userHome}, agents, alias)
 	}
 	mcpFound, mcpWarnings, mcpErr := verifyMcp(nodes)
 	result.Messages = append(result.Messages, mcpWarnings...)
@@ -323,8 +333,19 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		return result
 	}
 
-	// 15. Moved tags.
-	movedTags := detectMovedTags(projectRoot, nodes)
+	// 15. Narrow boundaries for the remaining read-only gates. Operation-private
+	// toolchain state must never land in the checkout, the runtime store, or a
+	// skill repository.
+	deps, err := opts.Build.resolve(cfg.Home(), private, []string{
+		projectRoot, filepath.Join(cfg.Home(), "runtime"), cfg.SkillsRoot,
+	})
+	if err != nil {
+		result.failf("%v", err)
+		return result
+	}
+
+	// 16. Moved tags.
+	movedTags := detectMovedTags(projectRoot, nodes, deps.Generation)
 	if len(movedTags) > 0 {
 		if opts.StrictTags {
 			result.failf("%s", strings.Join(movedTags, "; "))
@@ -335,7 +356,21 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		}
 	}
 
-	// 16. Dry run stops before any file changes.
+	// 17. Build planning. This is the last read-only phase: it resolves the
+	// trusted toolchain identity and inspects protected cache state, but runs
+	// no go list or go build and writes no persistent state.
+	plan, planErr := planBuilds(opts.context(), buildPlanRequest{
+		scope: alias, nodes: nodes, deps: deps, dryRun: opts.DryRun,
+	})
+	defer func() { releasePlan(&result, plan) }()
+	result.Messages = append(result.Messages, plan.Lines()...)
+	result.Builds = plan.Builds()
+	if planErr != nil {
+		result.failf("%v", planErr)
+		return result
+	}
+
+	// 18. Dry run stops before any file changes.
 	if opts.DryRun {
 		for _, node := range nodes {
 			result.Messages = append(result.Messages, fmt.Sprintf("%s: %s (planned)", alias, nodeSummary(node)))
@@ -344,13 +379,31 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		return result
 	}
 
-	// 17. Record the checkout as a runtime consumer for GC (Spec §8.7).
+	// 19. Stage every build miss privately, then finalize toolchain and
+	// build-source trust. Nothing below has run yet, so a staging or trust
+	// failure leaves the prior installation and the live build cache
+	// byte-for-byte unchanged once the plan releases its private root.
+	staged, stageErr := stageBuilds(opts.context(), plan, deps)
+	if stageErr != nil {
+		result.failf("%v", stageErr)
+		return result
+	}
+	result.Messages = append(result.Messages, staged.Lines()...)
+	result.Staged = staged.Builds()
+	if opts.OnStaged != nil {
+		if err := opts.OnStaged(staged); err != nil {
+			result.failf("%v", err)
+			return result
+		}
+	}
+
+	// 20. Record the checkout as a runtime consumer for GC (Spec §8.7).
 	if err := scopes.RecordConsumer(cfg.Home(), projectRoot); err != nil {
 		result.failf("%v", err)
 		return result
 	}
 
-	// 18. Materialize every node in provider-first order.
+	// 21. Materialize every node in provider-first order.
 	skillsDir := filepath.Join(projectRoot, ".agents", "skills")
 	binDir := filepath.Join(projectRoot, ".agents", "bin")
 	hybridStore := scopes.HybridSkillsRoot(cfg.Home())
@@ -364,11 +417,7 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 			expectedSkills[node.Name] = true
 		}
 		active := node.ActiveCommands()
-		var activeSorted []string
-		for name := range active {
-			activeSorted = append(activeSorted, name)
-		}
-		sort.Strings(activeSorted)
+		activeSorted := node.ActiveCommandNames()
 
 		if len(active) > 0 {
 			commandNames, err := installRuntime(cfg.Home(), binDir, node, active, platform)
@@ -396,14 +445,14 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		var status string
 		var installErr error
 		if node.ContextActive() {
-			status, installErr = installContext(targetDir, node, nodeLocale, expected)
+			status, installErr = installContext(targetDir, node, nodeLocale, expected, deps.Clock)
 			if isHybrid {
 				hybridContextNames = append(hybridContextNames, node.Name)
 			} else {
 				contextNames = append(contextNames, node.Name)
 			}
 		} else {
-			status, installErr = installMarkerOnly(targetDir, node, expected)
+			status, installErr = installMarkerOnly(targetDir, node, expected, deps.Clock)
 		}
 		if installErr != nil {
 			result.failf("%s: %v", node.Name, installErr)
@@ -419,7 +468,7 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		}
 	}
 
-	// 19. Cleanup, shims, env files, adapters.
+	// 22. Cleanup, shims, env files, adapters.
 	if err := cleanupRemoved(skillsDir, expectedSkills); err != nil {
 		result.failf("%v", err)
 		return result
@@ -448,7 +497,7 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 		))
 	}
 
-	// 20. Garbage-collect unreferenced runtime entries (Spec §8.7).
+	// 23. Garbage-collect unreferenced runtime entries (Spec §8.7).
 	if _, err := scopes.CollectRuntime(cfg.Home()); err != nil {
 		result.failf("%v", err)
 		return result
@@ -629,7 +678,7 @@ func directoryOnPath(directory, pathValue, platform string) bool {
 	return false
 }
 
-func installContext(skillsDir string, node *closure.Node, effectiveLocale string, expected *marker.Marker) (string, error) {
+func installContext(skillsDir string, node *closure.Node, effectiveLocale string, expected *marker.Marker, clock Clock) (string, error) {
 	target := filepath.Join(skillsDir, node.Name)
 
 	current, err := marker.Current(target, expected)
@@ -650,7 +699,8 @@ func installContext(skillsDir string, node *closure.Node, effectiveLocale string
 			includeScripts = false
 		}
 	}
-	files, err := whitelist.CopyContext(node.Snapshot, tmp, includeScripts, node.Spec.RuntimeRoots)
+	excludeRoots := whitelist.ContextExcludedRoots(node.Spec.RuntimeRoots, node.Spec.BuildRoots)
+	files, err := whitelist.CopyContext(node.Snapshot, tmp, includeScripts, excludeRoots)
 	if err != nil {
 		return "", err
 	}
@@ -663,7 +713,7 @@ func installContext(skillsDir string, node *closure.Node, effectiveLocale string
 	}
 	expected.ContentSHA256 = contentHash
 	expected.Files = files
-	expected.InstalledAt = time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	expected.InstalledAt = installedAt(clock)
 	if err := marker.Write(tmp, expected); err != nil {
 		return "", err
 	}
@@ -689,7 +739,7 @@ func validateNodes(nodes []*closure.Node, localeValue, alias string, result *Res
 	return valid
 }
 
-func installMarkerOnly(skillsDir string, node *closure.Node, expected *marker.Marker) (string, error) {
+func installMarkerOnly(skillsDir string, node *closure.Node, expected *marker.Marker, clock Clock) (string, error) {
 	target := filepath.Join(skillsDir, node.Name)
 	current, err := marker.Current(target, expected)
 	if err != nil {
@@ -713,7 +763,7 @@ func installMarkerOnly(skillsDir string, node *closure.Node, expected *marker.Ma
 	expected.Files = []string{}
 	expected.Locale = ""
 	expected.Agents = []string{}
-	expected.InstalledAt = time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	expected.InstalledAt = installedAt(clock)
 	if err := marker.Write(tmp, expected); err != nil {
 		return "", err
 	}
@@ -834,17 +884,19 @@ func checkLegacySkillDependencies(nodes []*closure.Node) error {
 	return nil
 }
 
-func detectMovedTags(projectRoot string, nodes []*closure.Node) []string {
-	return detectMovedTagsIn(filepath.Join(projectRoot, ".agents", "skills"), nodes)
+func detectMovedTags(projectRoot string, nodes []*closure.Node, generation GenerationReader) []string {
+	return detectMovedTagsIn(filepath.Join(projectRoot, ".agents", "skills"), nodes, generation)
 }
 
-func detectMovedTagsIn(skillsDir string, nodes []*closure.Node) []string {
+// detectMovedTagsIn is a read-only gate: it only reads the recorded
+// installation generation of each node through the injected reader.
+func detectMovedTagsIn(skillsDir string, nodes []*closure.Node, generation GenerationReader) []string {
 	var warnings []string
 	for _, node := range nodes {
 		if node.Resolved.Kind != "tag" {
 			continue
 		}
-		recorded := marker.Read(filepath.Join(skillsDir, node.Name))
+		recorded := generation.InstalledMarker(filepath.Join(skillsDir, node.Name))
 		if recorded == nil {
 			continue
 		}
@@ -905,6 +957,32 @@ func shortCommit(commit string) string {
 		return commit[:7]
 	}
 	return commit
+}
+
+// mcpVerifier is the default MCP requirement gate of one scope (Spec §11).
+// env fixes the two configuration surfaces the check reads: the project-level
+// one — a checkout for a project install, the global scope root for the
+// machine-wide one — and the user home. Both scopes run the identical gate, so
+// neither can reach build planning with an unproven MCP requirement.
+func mcpVerifier(env mcp.Env, agents []string, scope string) func([]*closure.Node) (map[string]map[string][]string, []string, error) {
+	return func(nodes []*closure.Node) (map[string]map[string][]string, []string, error) {
+		requirements := map[string]map[string]skillspec.McpServer{}
+		for _, node := range nodes {
+			if len(node.Spec.McpServers) > 0 {
+				requirements[node.Name] = node.Spec.McpServers
+			}
+		}
+		findings, warnings, err := mcp.Verify(env, agents, requirements)
+		found := map[string]map[string][]string{}
+		for name, finding := range findings {
+			found[name] = finding.FoundIn
+		}
+		prefixed := make([]string, 0, len(warnings))
+		for _, warning := range warnings {
+			prefixed = append(prefixed, scope+": "+warning)
+		}
+		return found, prefixed, err
+	}
 }
 
 // resolveRegistries applies the audit registry gate (Spec §13.3, §13.4):
