@@ -364,11 +364,7 @@ func Project(cfg *config.Config, projectRoot, alias string, opts Options) Result
 			expectedSkills[node.Name] = true
 		}
 		active := node.ActiveCommands()
-		var activeSorted []string
-		for name := range active {
-			activeSorted = append(activeSorted, name)
-		}
-		sort.Strings(activeSorted)
+		activeSorted := node.ActiveCommandNames()
 
 		if len(active) > 0 {
 			commandNames, err := installRuntime(cfg.Home(), binDir, node, active, platform)
@@ -650,7 +646,8 @@ func installContext(skillsDir string, node *closure.Node, effectiveLocale string
 			includeScripts = false
 		}
 	}
-	files, err := whitelist.CopyContext(node.Snapshot, tmp, includeScripts, node.Spec.RuntimeRoots)
+	excludeRoots := whitelist.ContextExcludedRoots(node.Spec.RuntimeRoots, node.Spec.BuildRoots)
+	files, err := whitelist.CopyContext(node.Snapshot, tmp, includeScripts, excludeRoots)
 	if err != nil {
 		return "", err
 	}

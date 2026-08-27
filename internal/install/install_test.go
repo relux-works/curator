@@ -153,6 +153,101 @@ func TestEndToEndInstall(t *testing.T) {
 	}
 }
 
+func TestBuildRootExcludedBeforeLocaleRenderingWithoutCompilerExecution(t *testing.T) {
+	e := newEnv(t)
+	name := "build-skill"
+	dir := filepath.Join(e.skillsRoot, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.git(dir, "init", "-q", "-b", "main")
+	e.write(dir, "SKILL.md", "---\nname: build-skill\ndescription: source\n---\n"+
+		"Resolve .agents/bin/build-tool.cmd, then global/bin/build-tool, then command -v build-tool or Get-Command build-tool.\n")
+	e.write(dir, "assets/prompt.md", "prompt-visible asset\n")
+	e.write(dir, "assets/build-tool/go.mod", "module example.com/build-tool\n")
+	e.write(dir, "assets/build-tool/cmd/tool/main.go", "package main\nfunc main() {}\n")
+	e.write(dir, "locales/metadata.json", `{"locales":{"en":{"description":"localized build skill"}}}`)
+	e.write(dir, ".skill_triggers/en.md", "- build tool\n")
+	e.write(dir, "agent-skill.json", `{
+		"schema_version": 6,
+		"build_roots": ["assets/build-tool"],
+		"capabilities": {},
+		"commands": {
+			"build-tool": {"type":"build","driver":"go-v1","source_dir":"assets/build-tool/cmd/tool"}
+		}
+	}`)
+	e.git(dir, "add", ".")
+	e.git(dir, "commit", "-qm", "init")
+	e.git(dir, "tag", "v1")
+	consumer := filepath.Join(e.skillsRoot, "consumer")
+	if err := os.MkdirAll(consumer, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.git(consumer, "init", "-q", "-b", "main")
+	e.write(consumer, "SKILL.md", "---\nname: consumer\ndescription: consumer\n---\n")
+	e.write(consumer, "agent-skill.json", `{
+		"schema_version": 4,
+		"capabilities": {},
+		"commands": {},
+		"dependencies": {"skills": {
+			"build-skill": {
+				"git": "./build-skill",
+				"ref": {"kind":"tag","value":"v1"},
+				"mode": "context"
+			}
+		}}
+	}`)
+	e.git(consumer, "add", ".")
+	e.git(consumer, "commit", "-qm", "init")
+	e.git(consumer, "tag", "v1")
+	e.declare("consumer")
+	e.cfg.PreferredLocale = "en"
+
+	fakeBin := t.TempDir()
+	compilerMarker := filepath.Join(t.TempDir(), "go-invoked")
+	e.write(fakeBin, "go", "#!/bin/sh\nprintf invoked > \""+compilerMarker+"\"\nexit 99\n")
+	if err := os.Chmod(filepath.Join(fakeBin, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	dryRun := e.install(Options{DryRun: true})
+	if dryRun.Status != "ok" {
+		t.Fatalf("dry-run failed: %+v", dryRun)
+	}
+	if _, err := os.Stat(filepath.Join(e.project, ".agents")); !os.IsNotExist(err) {
+		t.Fatalf("dry-run created installed context: %v", err)
+	}
+	if _, err := os.Stat(compilerMarker); !os.IsNotExist(err) {
+		t.Fatalf("compiler executed during dry-run: %v", err)
+	}
+
+	result := e.install(Options{})
+	if result.Status != "ok" {
+		t.Fatalf("install failed: %+v", result)
+	}
+	installed := filepath.Join(e.project, ".agents", "skills", name)
+	if _, err := os.Stat(filepath.Join(installed, "assets", "build-tool")); !os.IsNotExist(err) {
+		t.Fatalf("build root leaked into installed context: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(installed, "assets", "prompt.md")); err != nil {
+		t.Fatalf("unrelated prompt asset missing: %v", err)
+	}
+	payload, err := os.ReadFile(filepath.Join(installed, "SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), "description: \"localized build skill\"") {
+		t.Fatalf("localized SKILL.md missing: %s", payload)
+	}
+	if _, err := os.Stat(filepath.Join(e.home, "runtime", name)); !os.IsNotExist(err) {
+		t.Fatalf("build root or artifact leaked into runtime store: %v", err)
+	}
+	if _, err := os.Stat(compilerMarker); !os.IsNotExist(err) {
+		t.Fatalf("compiler executed during static context installation: %v", err)
+	}
+}
+
 func TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("executes POSIX skill commands")

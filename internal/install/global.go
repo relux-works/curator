@@ -168,11 +168,7 @@ func Global(cfg *config.Config, userHome string, opts Options) Result {
 	for _, node := range nodes {
 		expectedSkills[node.Name] = true
 		active := node.ActiveCommands()
-		var activeSorted []string
-		for name := range active {
-			activeSorted = append(activeSorted, name)
-		}
-		sort.Strings(activeSorted)
+		activeSorted := node.ActiveCommandNames()
 		if len(active) > 0 {
 			commandNames, err := installRuntime(home, binDir, node, active, platform)
 			if err != nil {
