@@ -5,6 +5,22 @@
 
 ## 2026-08-27
 
+### 0640 — A month of run evidence lived on one laptop; it is on the remote now, in a ref namespace nothing fetches by default
+
+- FINDING: `.temp/` held 15GB across 96 registered worktrees, and `LOGBOOK.md` on `origin/main` carried 16 entries against 344 locally. Neither the scratch evidence nor most of the institutional memory existed anywhere but one working copy. Entry [[0650]] had already recorded the logbook half and left it unresolved.
+- DECISION: preserve rather than delete. Every dirty worktree became a commit under `refs/archive/wt/<slug>`; the non-git evidence became one orphan commit at `refs/archive/temp/evidence-2026-08-27` — 38555 files of run transcripts, verdicts, briefs, patches and inventories. Both namespaces are pushed.
+- MEASUREMENT, WHY NOT LFS: 38555 files reduce to 13841 unique blobs — 64% are byte-identical duplicates — totalling 1.09GB raw. Packed, those same blobs occupy **165MB**. Git LFS stores each object whole and deltas nothing, so it would have cost 1.09GB against a 1GB included quota, needed a client, and thrown away the 7x compression that text logs are the ideal case for. LFS is for binaries that do not delta; this is the opposite.
+- WHY A CUSTOM NAMESPACE IS SAFE: the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so `refs/archive/*` is invisible to an ordinary clone, fetch, `git branch` and `git log`. It costs a normal user nothing and GitHub accepts the namespace on push — both verified.
+- RECOVERY, verified end-to-end against a fresh blobless clone of the remote:
+  ```
+  git fetch origin 'refs/archive/*:refs/archive/*'
+  git ls-tree -r --name-only refs/archive/temp/evidence-2026-08-27
+  git show refs/archive/temp/evidence-2026-08-27:.temp/spawn-runs/<RUN>/runner.log
+  ```
+  A spawn log round-tripped with an identical SHA-256 from the remote clone.
+- NOT ARCHIVED, deliberately: downloads rather than data — seven copies of `golangci-lint`, a Go toolchain tarball, an 88MB Alpine ISO, a disk image, five Python virtualenvs and their bytecode. Also files inside nested git repositories, which their own repositories still hold.
+- RESULT: `.temp` 15GB to 914MB, registered worktrees 96 to 3, `.git` 280MB to 271MB — smaller than before while holding all of it, because `gc` deltas near-identical runner logs against each other.
+
 ### 0123 — `BUG-260823-1vx45a`: the helper protocol reported "someone holds this lock" whenever it meant "I ran out of time"
 
 - ROOT CAUSE: `TestManagerLockHelper` gave one 200ms context to lock-state directory creation, lock-file opening, the 10ms retry loop of `acquireFileLock`, and — in build-key mode — two sequential acquisitions. `acquireFileLock` returns `ctx.Err()` for a deadline expiry no matter what caused it, and the helper serialized every expiry as `blocked`. An uncontended lock on a slow runner was therefore indistinguishable from a lock another process held.
