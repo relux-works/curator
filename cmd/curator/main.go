@@ -481,6 +481,13 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
 	verbose := flags.Bool("verbose", false, "print detailed progress")
 	var auditMode auditModeValue
 	flags.Var(&auditMode, "audit", "run the audit gate in advisory or strict mode")
+	sshIdentity := flags.String("build-ssh-identity", "",
+		"identity file for external SSH build repositories (or "+install.EnvBuildSSHIdentity+")")
+	sshAgent := flags.String("build-ssh-agent", "",
+		"agent socket for external SSH build repositories, or \""+install.BuildSSHAgentAuto+
+			"\" for your own agent (or "+install.EnvBuildSSHAgent+")")
+	sshKnownHosts := flags.String("build-ssh-known-hosts", "",
+		"host keys external SSH build repositories are verified against (or "+install.EnvBuildSSHKnownHosts+")")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil {
 		return install.Options{}, nil, false, "", err
@@ -488,6 +495,9 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
 	return install.Options{
 		DryRun: *dryRun, FixGitignore: *fixGitignore,
 		StrictTags: *strictTags, Verbose: *verbose,
+		BuildSSH: install.BuildSSHFlags{
+			Identity: *sshIdentity, Agent: *sshAgent, KnownHosts: *sshKnownHosts,
+		},
 	}, positional, *all, auditMode.value, nil
 }
 
@@ -520,6 +530,7 @@ func cmdInstallMode(args []string, fetch bool) int {
 	opts.Fetch = fetch && !opts.DryRun
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
+	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
 	exitCode := exitOK
 	for _, target := range targets {
 		result := install.Project(cfg, target.Root, target.Alias, opts)
@@ -1279,6 +1290,7 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	opts.Fetch = fetch && !opts.DryRun
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
+	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "curator:", err)
@@ -1301,6 +1313,9 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 // that actually activate go-repository-v1.
 func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDeps {
 	deps := install.ExternalDeps{GitTool: productionGitTool()}
+	// Read-only surfaces get the environment and configured scopes; a command
+	// that also parses --build-ssh-* flags overrides this with them.
+	deps.BuildSSH = install.CaptureBuildSSHSelection(cfg, install.BuildSSHFlags{}, os.Getenv)
 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
 		candidate := audit.Subject{
 			Name: subject.Declared.Repository, Source: subject.Declared.Identity,

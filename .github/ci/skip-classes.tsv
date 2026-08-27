@@ -56,6 +56,7 @@ platform-control	shell sentinel is Unix-only	allow	the sentinel exists on unix o
 platform-control	test transport wrapper is POSIX-only	allow	the fixture uses a POSIX shell wrapper; native admission remains covered on Windows
 platform-control	controlled launcher symlink is a Unix regression fixture	allow	the launcher symlink fixture is asserted on unix runners
 platform-control	hard-link count is enforced by the native Windows protected-root backend	allow	the generic hard-link fixture is replaced by the native Windows backend case
+platform-control	an operator agent socket is a unix-domain rendezvous point	allow	the SSH agent-socket fixture is a POSIX unix-domain socket; Windows reaches an agent over a named pipe, so the shape is asserted on the unix runners
 
 # --- host capability --------------------------------------------------------
 host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
@@ -79,6 +80,7 @@ host-capability	test filesystem (is case-sensitive|distinguishes canonical Unico
 host-capability	temporary directory uses case-sensitive Windows path semantics	allow	the runner temporary directory case semantics differ
 host-capability	no trusted Go toolchain is resolvable here	allow	no trusted toolchain is resolvable on this runner
 host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
+host-capability	no home directory	allow	the runner exposes no home directory to expand a `~/` credential path against
 
 # --- opt-in probes ----------------------------------------------------------
 opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable

@@ -280,6 +280,9 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
 		result.failBuild(externalPlanErr)
 		return result, nil
 	}
+	for _, message := range externalPlan.messages {
+		result.Messages = append(result.Messages, "global: "+message)
+	}
 	for _, row := range externalPlan.rows {
 		for _, warning := range row.result.Warnings {
 			result.Messages = append(result.Messages, "global: warning: "+warning)

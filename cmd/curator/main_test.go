@@ -12,6 +12,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 )
@@ -149,6 +150,42 @@ func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
 	_, positional, _, auditMode, err = installFlags([]string{"project-a", "--audit", "strict"})
 	if err != nil || auditMode != "strict" || len(positional) != 1 || positional[0] != "project-a" {
 		t.Fatalf("strict --audit: positional=%v mode=%q err=%v", positional, auditMode, err)
+	}
+}
+
+// The run-wide SSH selection reaches an install from the command line, and the
+// environment fills only what the command line left unsaid.
+func TestInstallFlagsCarryTheRunWideBuildSSHSelection(t *testing.T) {
+	opts, positional, _, _, err := installFlags([]string{
+		"project-a", "--build-ssh-agent", "auto", "--build-ssh-identity", "/operator/id.pub",
+		"--build-ssh-known-hosts", "/operator/known_hosts",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(positional) != 1 || positional[0] != "project-a" {
+		t.Fatalf("positional = %v", positional)
+	}
+	want := install.BuildSSHFlags{
+		Identity: "/operator/id.pub", Agent: install.BuildSSHAgentAuto,
+		KnownHosts: "/operator/known_hosts",
+	}
+	if opts.BuildSSH != want {
+		t.Fatalf("build-ssh flags = %+v, want %+v", opts.BuildSSH, want)
+	}
+
+	environment := map[string]string{
+		install.EnvBuildSSHIdentity: "/operator/env.pub",
+		install.EnvBuildSSHAgent:    "/operator/env.sock",
+		"SSH_AUTH_SOCK":             "/operator/live.sock",
+	}
+	selection := install.CaptureBuildSSHSelection(nil, opts.BuildSSH,
+		func(name string) string { return environment[name] })
+	if selection.RunWide.Identity != "/operator/id.pub" || selection.RunWide.Agent != install.BuildSSHAgentAuto {
+		t.Fatalf("selection = %+v, want the flag values to win", selection.RunWide)
+	}
+	if selection.AgentSocket != "/operator/live.sock" {
+		t.Fatalf("live agent socket = %q", selection.AgentSocket)
 	}
 }
 

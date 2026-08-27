@@ -56,6 +56,9 @@ type Options struct {
 	// External injects operator-owned external repository acquisition, audit,
 	// protected-store, and signer policy. Package manifests cannot populate it.
 	External ExternalDeps
+	// BuildSSH is the run-wide operator SSH selection this command line
+	// carries. It takes precedence over every configured build_ssh scope.
+	BuildSSH BuildSSHFlags
 	// Commit injects the manager locks, transaction journal, cache publisher,
 	// and post-commit collector of the serialized commit phase, plus the fault
 	// hooks a rollback test drives. The zero value resolves the real ones.
@@ -533,6 +536,9 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
 	if externalPlanErr != nil {
 		result.failBuild(externalPlanErr)
 		return result, nil
+	}
+	for _, message := range externalPlan.messages {
+		result.Messages = append(result.Messages, alias+": "+message)
 	}
 	for _, row := range externalPlan.rows {
 		for _, warning := range row.result.Warnings {
