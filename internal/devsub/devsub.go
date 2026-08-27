@@ -51,6 +51,16 @@ func Load(projectRoot string) (map[string]Substitution, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ParseBytes(payload, projectRoot)
+}
+
+// ParseBytes parses one substitution payload that a caller already read. It is
+// the byte-level entry point Load itself is built from, so a caller that has to
+// bind a generation digest to the exact bytes its closure was resolved from can
+// read the file once and parse those bytes. The project root stays a parameter
+// because a relative substitution path resolves against it.
+func ParseBytes(payload []byte, projectRoot string) (map[string]Substitution, error) {
+	filePath := PathIn(projectRoot)
 	if err := protocoljson.Validate(payload); err != nil {
 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
 	}
