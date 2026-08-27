@@ -28,6 +28,20 @@ type ExecutableIdentity struct {
 // resolveExecutableIdentity canonicalizes path to a real installed regular
 // file, rejects symlink, reparse-point, and hard-link substitution, records
 // strong file identity, and hashes the bytes.
+//
+// Resolution comes first and rejection comes second, so how the operator
+// launched the manager is not itself the fault. A package manager that puts a
+// shim on PATH -- a Homebrew or Scoop link, a Windows tool-cache junction over
+// the install directory -- names the same installed file through a link, and
+// what this boundary rejects is substitution of that file, not the link the
+// process was started through.
+//
+// physicalPath, not filepath.EvalSymlinks: this is the same rule the selected
+// GOROOT and its launcher are resolved by, and on Windows EvalSymlinks leaves a
+// directory junction unresolved and fails outright on a path that descends
+// through one. Resolving here is what makes the checks below strict rather than
+// lenient: they are applied to the physical file, so retargeting the link
+// afterwards cannot move the identity this manager and its worker agree on.
 func resolveExecutableIdentity(path string) (ExecutableIdentity, error) {
 	if path == "" {
 		return ExecutableIdentity{}, diagnostic(CodeWorkerIdentityInvalid, "manager executable path is empty")
@@ -36,7 +50,7 @@ func resolveExecutableIdentity(path string) (ExecutableIdentity, error) {
 	if err != nil {
 		return ExecutableIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err, "cannot resolve the manager executable")
 	}
-	canonical, err := filepath.EvalSymlinks(filepath.Clean(absolute))
+	canonical, err := physicalPath(absolute)
 	if err != nil {
 		return ExecutableIdentity{}, diagnosticErr(CodeWorkerIdentityInvalid, err, "cannot canonicalize the manager executable")
 	}
