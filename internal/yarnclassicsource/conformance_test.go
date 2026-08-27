@@ -706,7 +706,10 @@ func newConcreteYarnRunner(t *testing.T) *concreteYarnRunner {
 	if err != nil {
 		t.Fatal(err)
 	}
-	yarnPackageRoot := filepath.Join(filepath.Dir(filepath.Dir(yarnBin)), "libexec")
+	yarnPackageRoot, err := yarnClassicPackageRoot(yarnBin)
+	if err != nil {
+		t.Skipf("exact Yarn %s is installed without a supported pinned tool root: %v", SupportedYarnVersion, err)
+	}
 	stagedYarnRoot := filepath.Join(executionRoot, "toolchain", "yarn")
 	if err = copyContainedTreeDereferencingLinks(yarnPackageRoot, yarnPackageRoot, stagedYarnRoot, map[string]bool{}); err != nil {
 		t.Fatal(err)
@@ -728,6 +731,48 @@ func newConcreteYarnRunner(t *testing.T) *concreteYarnRunner {
 	runner := &concreteYarnRunner{ManagerProcessRunner: manager, executionRoot: executionRoot, sandboxPath: sandboxPath, nodePath: stagedNode, yarnPath: stagedYarn, nodeRelative: "toolchain/node/bin/node", yarnRelative: "toolchain/yarn/bin/yarn.js", nodeDigest: nodeDigest, yarnDigest: yarnDigest, managerID: managerID}
 	manager.ProcessLaunchObserver = func(launch closureexec.ProcessLaunch) { runner.launches = append(runner.launches, launch) }
 	return runner
+}
+
+func yarnClassicPackageRoot(yarnBin string) (string, error) {
+	candidates := []string{filepath.Join(filepath.Dir(filepath.Dir(yarnBin)), "libexec")}
+	if filepath.Base(yarnBin) == "yarn.js" && filepath.Base(filepath.Dir(yarnBin)) == "bin" {
+		candidates = append(candidates, filepath.Dir(filepath.Dir(yarnBin)))
+	}
+	for _, candidate := range candidates {
+		entrypoint := filepath.Join(candidate, "bin", "yarn.js")
+		if info, err := os.Stat(entrypoint); err == nil && info.Mode().IsRegular() {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("neither Homebrew libexec nor package-root bin/yarn.js exists for %s", yarnBin)
+}
+
+func TestYarnClassicPackageRootRecognizesPinnedInstallLayouts(t *testing.T) {
+	for _, layout := range []struct {
+		name, command, root string
+	}{
+		{name: "homebrew-libexec", command: "bin/yarn", root: "libexec"},
+		{name: "package-root", command: "bin/yarn.js", root: "."},
+	} {
+		t.Run(layout.name, func(t *testing.T) {
+			prefix := t.TempDir()
+			root := filepath.Clean(filepath.Join(prefix, layout.root))
+			entrypoint := filepath.Join(root, "bin", "yarn.js")
+			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(entrypoint, []byte("fixture"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := yarnClassicPackageRoot(filepath.Join(prefix, layout.command))
+			if err != nil || got != root {
+				t.Fatalf("root=%q err=%v, want %q", got, err, root)
+			}
+		})
+	}
+	if _, err := yarnClassicPackageRoot(filepath.Join(t.TempDir(), "bin", "yarn.js")); err == nil {
+		t.Fatal("missing pinned Yarn tool root was accepted")
+	}
 }
 
 func (runner *concreteYarnRunner) Run(ctx context.Context, request closureexec.ExecutionRequest) (closureexec.PortableRunResult, error) {

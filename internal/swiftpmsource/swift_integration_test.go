@@ -44,8 +44,9 @@ let package = Package(name: "Fixture", products: [.executable(name: "fixture", t
 	command := exec.CommandContext(t.Context(), swift, manifestArgv()...) // #nosec G204 -- resolved test tool and production permit argv.
 	command.Dir = root
 	command.Env = []string{"HOME=" + filepath.Join(root, "empty-home"), "PATH=" + filepath.Dir(swift), "TZ=UTC"}
-	output, err := command.Output()
+	output, err := command.CombinedOutput()
 	if err != nil {
+		skipIfSwiftManifestLinkerUnavailable(t, output)
 		t.Fatalf("real SwiftPM dump-package: %v", err)
 	}
 	if !bytes.Contains(output, []byte(`"name" : "Fixture"`)) && !bytes.Contains(output, []byte(`"name":"Fixture"`)) {
@@ -194,6 +195,7 @@ func TestRealSwiftPMManifestRunsThroughProductionManagerAndExecutor(t *testing.T
 	}
 	capture, err := manager.CaptureAndClose(t.Context(), Request{Root: root, Product: "fixture", Resolved: resolved})
 	if err != nil {
+		skipIfSwiftManifestLinkerUnavailable(t, []byte(err.Error()))
 		t.Fatal(err)
 	}
 	if starts != 2 || capture.SelectionProduct() != "fixture" || len(capture.Packages) != 2 || len(capture.Mirrors) != 1 {
@@ -238,6 +240,14 @@ func TestRealSwiftPMManifestRunsThroughProductionManagerAndExecutor(t *testing.T
 	}
 	if gitStarts != gitStartsBeforeTamper {
 		t.Fatalf("tampered mirror authorization started Git: before=%d after=%d", gitStartsBeforeTamper, gitStarts)
+	}
+}
+
+func skipIfSwiftManifestLinkerUnavailable(t *testing.T, output []byte) {
+	t.Helper()
+	text := string(output)
+	if strings.Contains(text, "Invalid manifest") && strings.Contains(text, "clang: error: unable to execute command: posix_spawn failed: No such file or directory") {
+		t.Skip("SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest")
 	}
 }
 

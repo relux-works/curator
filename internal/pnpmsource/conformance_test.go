@@ -1453,6 +1453,9 @@ func (runner *fakePNPMRunner) Run(_ context.Context, request closureexec.Executi
 						target = filepath.Join(cwd, filepath.FromSlash(path))
 					}
 				}
+				if target == "" {
+					continue
+				}
 				link := filepath.Join(owner, "node_modules", filepath.FromSlash(edge.Name))
 				if err := os.MkdirAll(filepath.Dir(link), 0o700); err != nil {
 					return closureexec.PortableRunResult{}, err

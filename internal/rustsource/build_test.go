@@ -22,6 +22,7 @@ import (
 )
 
 func TestBuildToolchainRegistrationStartsNoProcessBeforeC0(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	var starts []closureexec.DerivationPermit
 	manager, err := NewManager(t.Context(), ManagerConfig{WorkRoot: t.TempDir(), ProcessStartObserver: func(permit closureexec.DerivationPermit) {
 		starts = append(starts, permit)
@@ -79,6 +80,7 @@ func TestBuildToolchainRegistrationStartsNoProcessBeforeC0(t *testing.T) {
 }
 
 func TestCargoRegistrationBindsApprovedExecutableBytes(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	registration := registerCargoAtC0(t.Context())
 	if registration.err != nil {
 		t.Fatal(registration.err)
@@ -237,6 +239,7 @@ func TestBuildBindingRequiresUniqueNativePlatformAndEveryPhysicalTool(t *testing
 }
 
 func TestRustConformanceR01R08R09RH05RH06RH08AndProtectedCache(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	workspace := t.TempDir()
 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
 		t.Fatal(err)
@@ -439,6 +442,7 @@ func TestVerifiedManagerWithoutProviderFailsBeforeSessionOrProcess(t *testing.T)
 }
 
 func TestPathOnlyClosureDerivesFreshFrozenMetadata(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	workspace := t.TempDir()
 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
 		t.Fatal(err)

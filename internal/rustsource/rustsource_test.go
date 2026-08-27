@@ -311,6 +311,7 @@ path = "src/main.rs"
 }
 
 func TestManagerRejectsCompiledGitBeforeOracleVendorOrPrivateCargoState(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	workspace := t.TempDir()
 	manifestPath := filepath.Join(workspace, "Cargo.toml")
 	lockPath := filepath.Join(workspace, "Cargo.lock")
@@ -352,6 +353,7 @@ func TestManagerRejectsCompiledGitBeforeOracleVendorOrPrivateCargoState(t *testi
 }
 
 func TestGitProtectedSnapshotMutationPreventsOracleStart(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	repository := t.TempDir()
 	if err := os.Mkdir(filepath.Join(repository, "src"), 0o700); err != nil {
 		t.Fatal(err)

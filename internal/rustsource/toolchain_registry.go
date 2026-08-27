@@ -32,6 +32,19 @@ var approvedCargoDescriptors = map[string]approvedCargoDescriptor{
 	},
 }
 
+// NativeCargoDescriptorAvailable reports whether the closed operator registry
+// contains an approved Cargo identity for this process's native Rust target.
+// It does not inspect or discover a host toolchain; callers must still use
+// registerCargoAtC0 to prove the selected executable bytes match the descriptor.
+func NativeCargoDescriptorAvailable() (target string, approved bool) {
+	target, supported := nativeRustTarget()
+	if !supported {
+		return "", false
+	}
+	_, approved = approvedCargoDescriptors[target]
+	return target, approved
+}
+
 // cargoRegistration is selected by NewManager while establishing C0. Adapter
 // requests cannot replace it and selection never performs PATH, environment,
 // shell, or rustup process lookup.

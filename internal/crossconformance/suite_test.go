@@ -3,6 +3,7 @@ package crossconformance_test
 import (
 	"context"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -43,6 +44,7 @@ func TestCrossAdapterConformance(t *testing.T) {
 	projections := map[crossconformance.PathID][2]crossconformance.TargetProjection{}
 	captureText := map[crossconformance.PathID]string{}
 	var rustManifestIDs []string
+	rustUnavailableReason := ""
 
 	t.Run("project-every-path", func(t *testing.T) {
 		nodeSources := map[crossconformance.PathID]nodeCapture{
@@ -58,22 +60,29 @@ func TestCrossAdapterConformance(t *testing.T) {
 		projections[crossconformance.PathSwiftPM] = [2]crossconformance.TargetProjection{projectSwiftPath(t, 0), projectSwiftPath(t, 1)}
 		captureText[crossconformance.PathSwiftPM] = swiftCaptureText(t)
 
-		rust := runRustManager(t)
-		rustManifestIDs = rust.artifactManifestIDs
-		first := projectRustPath(t, 0, rustManifestIDs)
-		second := projectRustPath(t, 1, rustManifestIDs)
-		// The Rust manager owns the C0 Cargo registration, the pinned vendor
-		// transform, and the metadata derivations; the reconciliation seam
-		// owns the selection-neutral lock superset and the exact active
-		// identity. Both belong to one rust-source-v1 projection.
-		first.DerivationReceipts, second.DerivationReceipts = rust.receipts, rust.receipts
-		first.ToolIdentities = append(first.ToolIdentities, rust.tools...)
-		second.ToolIdentities = append(second.ToolIdentities, rust.tools...)
-		projections[crossconformance.PathRust] = [2]crossconformance.TargetProjection{first, second}
-		captureText[crossconformance.PathRust] = rustCaptureText(t)
+		t.Run("rust", func(t *testing.T) {
+			target, approved := rustsource.NativeCargoDescriptorAvailable()
+			if target != "" && !approved {
+				rustUnavailableReason = "no operator-approved Cargo descriptor for native target " + target
+				t.Skip(rustUnavailableReason)
+			}
+			rust := runRustManager(t)
+			rustManifestIDs = rust.artifactManifestIDs
+			first := projectRustPath(t, 0, rustManifestIDs)
+			second := projectRustPath(t, 1, rustManifestIDs)
+			// The Rust manager owns the C0 Cargo registration, the pinned vendor
+			// transform, and the metadata derivations; the reconciliation seam
+			// owns the selection-neutral lock superset and the exact active
+			// identity. Both belong to one rust-source-v1 projection.
+			first.DerivationReceipts, second.DerivationReceipts = rust.receipts, rust.receipts
+			first.ToolIdentities = append(first.ToolIdentities, rust.tools...)
+			second.ToolIdentities = append(second.ToolIdentities, rust.tools...)
+			projections[crossconformance.PathRust] = [2]crossconformance.TargetProjection{first, second}
+			captureText[crossconformance.PathRust] = rustCaptureText(t)
+		})
 	})
 	if t.Failed() {
-		t.Fatal("no path could be projected; the normative suite cannot run")
+		t.Fatal("one or more available paths could not be projected; the normative suite cannot run")
 	}
 
 	t.Run("normative-suite", func(t *testing.T) {
@@ -81,6 +90,10 @@ func TestCrossAdapterConformance(t *testing.T) {
 			path := path
 			pair, present := projections[path]
 			if !present {
+				if path == crossconformance.PathRust && rustUnavailableReason != "" {
+					t.Run(string(path), func(t *testing.T) { t.Skip(rustUnavailableReason) })
+					continue
+				}
 				t.Errorf("%s produced no projection", path)
 				continue
 			}
@@ -127,15 +140,31 @@ func TestCrossAdapterConformance(t *testing.T) {
 	})
 
 	t.Run("rejection-matrix", func(t *testing.T) {
-		proveRejectionMatrix(t, coverage)
+		proveRejectionMatrix(t, coverage, rustUnavailableReason != "")
 	})
 
 	t.Run("coverage-is-complete", func(t *testing.T) {
 		// This gate only means something when the whole test ran: a filtered
 		// -run that skips the proving subtests must fail here rather than
 		// report a green integration proof over an empty matrix.
-		if missing := coverage.MissingObligations(); len(missing) != 0 {
-			t.Errorf("obligations never proved (a filtered -run cannot satisfy this gate): %s", strings.Join(missing, ", "))
+		missing := coverage.MissingObligations()
+		if rustUnavailableReason == "" {
+			if len(missing) != 0 {
+				t.Errorf("obligations never proved (a filtered -run cannot satisfy this gate): %s", strings.Join(missing, ", "))
+			}
+		} else {
+			expected := []string{}
+			for _, obligation := range crossconformance.Obligations() {
+				if obligation != crossconformance.ObligationSharedArtifactAdmission {
+					expected = append(expected, string(obligation)+"/"+string(crossconformance.PathRust))
+				}
+			}
+			sort.Strings(expected)
+			if strings.Join(missing, "\n") != strings.Join(expected, "\n") {
+				t.Errorf("available-path obligations never proved: got %s, want only unavailable Rust obligations %s", strings.Join(missing, ", "), strings.Join(expected, ", "))
+			} else {
+				t.Logf("rust manager path unavailable on this host: %s", rustUnavailableReason)
+			}
 		}
 		if uncovered := coverage.UncoveredRejections(); len(uncovered) != 0 {
 			t.Errorf("rejection vectors never proved: %s", strings.Join(uncovered, ", "))

@@ -83,9 +83,16 @@ host-capability	temporary directory uses case-sensitive Windows path semantics	a
 host-capability	no trusted Go toolchain is resolvable here	allow	no trusted toolchain is resolvable on this runner
 host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
 host-capability	no home directory	allow	the runner exposes no home directory to expand a `~/` credential path against
+host-capability	no operator-approved Cargo descriptor for native target 	allow	the closed Cargo registry has no approved descriptor for this native host target; no toolchain identity is inferred or invented
+host-capability	(pinned pnpm executable unavailable|pnpm .* is outside pinned profile .*)	allow	the runner does not expose the exact pnpm executable admitted by the integration profile
+host-capability	(Yarn Classic is not installed|exact Yarn .* is unavailable)	allow	the runner does not expose the exact Yarn Classic release admitted by the integration profile
+host-capability	exact Yarn .* is installed without a supported pinned tool root	allow	the exact Yarn release is present but its installation layout cannot be staged by the pinned integration harness
+host-capability	OS-level network-denial harness is unavailable	allow	the runner does not provide the sandbox control required by the real Yarn Classic zero-network vector
+host-capability	SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest	allow	the Swift executable is present but its manifest compiler cannot spawn the host linker
 
 # --- opt-in probes ----------------------------------------------------------
 opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable
+opt-in	set CURATOR_TEST_YARN_MODERN_JS to the @yarnpkg/cli-dist 4[.]9[.]2 bin/yarn[.]js integration tool	allow	enabled by an explicit path to the exact modern Yarn integration entry point
 opt-in	cross-check env not set	allow	enabled by an explicit developer environment variable
 opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
 

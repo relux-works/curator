@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -105,6 +106,30 @@ func newNPMFixture(t *testing.T) npmFixture {
 		t.Fatal(err)
 	}
 	return npmFixture{root: root, work: work, request: request, tarballs: tarballs, payloads: payloads, graph: graph}
+}
+
+func newNativeNPMFixture(t *testing.T) npmFixture {
+	t.Helper()
+	fixture := newNPMFixture(t)
+	osName := map[string]string{"windows": "win32"}[runtime.GOOS]
+	if osName == "" {
+		osName = runtime.GOOS
+	}
+	architecture := map[string]string{"amd64": "x64", "arm64": "arm64"}[runtime.GOARCH]
+	if architecture == "" {
+		architecture = runtime.GOARCH
+	}
+	libc := "none"
+	if runtime.GOOS == "linux" {
+		libc = "glibc"
+	}
+	fixture.request.Target = Target{OS: osName, Architecture: architecture, Libc: libc, IncludeDev: true}
+	graph, err := Parse(fixture.request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.graph = graph
+	return fixture
 }
 
 func TestS01N01ClosedGraphCaptureAndExactTarballs(t *testing.T) {
@@ -628,7 +653,7 @@ func TestVerifiedProviderObservesRealNodeLaunchedNPMBoundary(t *testing.T) {
 	if _, err := exec.LookPath("npm"); err != nil {
 		t.Skip("npm unavailable")
 	}
-	fixture := newNPMFixture(t)
+	fixture := newNativeNPMFixture(t)
 	capture := captureFixture(t, fixture)
 	runner := newConcreteNPMRunner(t)
 	provider := newVerifiedFixtureProvider()
@@ -881,7 +906,7 @@ func TestN01RealNPMCIUsesOnlyDerivedPrivateCache(t *testing.T) {
 	if _, err := exec.LookPath("npm"); err != nil {
 		t.Skip("npm unavailable")
 	}
-	fixture := newNPMFixture(t)
+	fixture := newNativeNPMFixture(t)
 	capture := captureFixture(t, fixture)
 	runner := newConcreteNPMRunner(t)
 	cache := deriveCacheFixture(t, capture, runner)
@@ -896,7 +921,12 @@ func TestN01RealNPMCIUsesOnlyDerivedPrivateCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(materialized.MaterializedPackages, []string{"node_modules/a", "node_modules/b", "node_modules/workspace"}) {
+	wantPackages := []string{"node_modules/a", "node_modules/b", "node_modules/workspace"}
+	if runtime.GOOS == "linux" {
+		wantPackages = append(wantPackages, "node_modules/opt")
+		sort.Strings(wantPackages)
+	}
+	if !reflect.DeepEqual(materialized.MaterializedPackages, wantPackages) {
 		t.Fatalf("real npm ci materialized unexpected graph: %v", materialized.MaterializedPackages)
 	}
 	if _, err = Invoke(t.Context(), materialized, "index.js", nil, runner.context); err != nil {

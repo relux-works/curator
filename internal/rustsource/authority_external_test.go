@@ -51,6 +51,7 @@ func TestRawCaptureAPIContainsNoAuthorityOrDerivedSeam(t *testing.T) {
 }
 
 func TestProductionManagerCapturesRegistryFromRawPaths(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	workspace := t.TempDir()
 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
 		t.Fatal(err)
@@ -101,6 +102,7 @@ func TestProductionManagerCapturesRegistryFromRawPaths(t *testing.T) {
 }
 
 func TestZeroManagerAndForeignCaptureFailClosed(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	var zero rustsource.Manager
 	if _, err := zero.Capture(t.Context(), rustsource.RawCaptureRequest{}); err == nil {
 		t.Fatal("zero manager authorized capture")
@@ -120,6 +122,7 @@ func TestZeroManagerAndForeignCaptureFailClosed(t *testing.T) {
 }
 
 func TestProductionManagerCapturesGitWithoutCallerProjection(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	submodule := t.TempDir()
 	if err := os.WriteFile(filepath.Join(submodule, "nested.txt"), []byte("submodule evidence\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -201,6 +204,14 @@ func TestProductionManagerCapturesGitWithoutCallerProjection(t *testing.T) {
 	}
 	if metadata.UnfilteredReceipt == "" || metadata.ActiveReceipt == "" {
 		t.Fatal("Git metadata receipts are absent")
+	}
+}
+
+func requireNativeCargoDescriptor(t *testing.T) {
+	t.Helper()
+	target, approved := rustsource.NativeCargoDescriptorAvailable()
+	if target != "" && !approved {
+		t.Skipf("no operator-approved Cargo descriptor for native target %s", target)
 	}
 }
 

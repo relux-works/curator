@@ -5,6 +5,43 @@
 
 ## 2026-08-27
 
+### 0732 — CI portability requires classifying absent authority, not minting it (TASK-260827-18tswm)
+
+- RUST AUTHORITY BOUNDARY: the Cargo registry deliberately approves only
+  `aarch64-apple-darwin`. An x86_64 host therefore lacks authority to execute
+  the real-tool tests; it is not evidence that another Cargo binary is safe.
+  Tests now skip with the exact native target when the closed registry has no
+  descriptor, while a descriptor that exists but fails its byte digest remains
+  a fatal `rust_vendor_transform_unsupported` rejection. Cross-conformance
+  records that same unavailable path, runs every other adapter plus Rust's
+  shared artifact-admission proof, and accepts only the six explicitly
+  enumerated Rust manager-obligation gaps. Any additional gap still fails the
+  completeness gate.
+- FIX, NOT A SKIP: the npm real-tool fixture claimed a Darwin/arm64 target even
+  on Linux. npm correctly installed a Linux-only optional package and the
+  closure validator correctly rejected it as outside that target's lock graph.
+  Only the two native real-tool cases now derive npm OS, CPU, and libc from the
+  host; parser and cross-target tests keep the frozen Darwin fixture. The pnpm
+  Linux failure was a test-runner defect: it attempted an empty symlink for an
+  intentionally omitted package before production validation could issue
+  `closure_graph_incomplete`.
+- HOST-LAYOUT HANDLING: Swift integration skips only the captured compound
+  failure (`Invalid manifest` plus clang's linker `posix_spawn` error), not a
+  merely installed Swift. Yarn Classic now recognizes both Homebrew `libexec`
+  and the global package-root `bin/yarn.js` layout; an exact Yarn in any other
+  layout gets a precise classified host-capability skip. Pinned pnpm absence
+  and the explicit Yarn Modern integration path are likewise classified from
+  their verbatim observed reasons.
+- EVIDENCE: all nine affected packages and the two targeted CLI cases pass
+  locally; `go build ./...`, `go vet ./...`, pinned `golangci-lint` 2.12.2,
+  gofmt, CI gate self-tests, ledger consistency, broad-suppression guard, and
+  `git diff --check` exit 0. Replaying the captured macOS platform evidence
+  exits 0. The captured Ubuntu Tier-2 classification exits 0 with zero
+  unclassified skips; its full historical replay still exits 1 only because
+  the current ledger requires a `godriver` case absent from that older run.
+  Remote matrix execution and its passing URL remain the landing
+  orchestrator's responsibility; neither is inferred from local evidence.
+
 ### 0123 — `BUG-260823-1vx45a`: the helper protocol reported "someone holds this lock" whenever it meant "I ran out of time"
 
 - ROOT CAUSE: `TestManagerLockHelper` gave one 200ms context to lock-state directory creation, lock-file opening, the 10ms retry loop of `acquireFileLock`, and — in build-key mode — two sequential acquisitions. `acquireFileLock` returns `ctx.Err()` for a deadline expiry no matter what caused it, and the helper serialized every expiry as `blocked`. An uncontended lock on a slow runner was therefore indistinguishable from a lock another process held.

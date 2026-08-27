@@ -20,7 +20,7 @@ import (
 // proveRejectionMatrix runs the published cross-adapter rejection matrix. Each
 // vector requires the same three things from every path that runs it: a stable
 // diagnostic from the closed set, no affected process, and no publication.
-func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage) {
+func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage, rustManagerUnavailable bool) {
 	vectors := map[string]crossconformance.RejectionVector{}
 	for _, vector := range crossconformance.RejectionVectors() {
 		vectors[vector.ID] = vector
@@ -35,7 +35,7 @@ func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage) {
 	}
 
 	t.Run("compiled-dependency-bytes", func(t *testing.T) {
-		for _, outcome := range compiledByteOutcomes(t) {
+		for _, outcome := range compiledByteOutcomes(t, rustManagerUnavailable) {
 			record(t, "compiled-dependency-bytes", outcome)
 		}
 	})
@@ -182,7 +182,7 @@ func crossDescriptor(adapter string, profile artifactpolicy.ProfileID, manager s
 // compiledByteOutcomes drives one pinned GNU shared object through every
 // delivered path's real capture and admission API. No path may admit it, and
 // no path may start a manager process first.
-func compiledByteOutcomes(t *testing.T) map[crossconformance.PathID]crossconformance.RejectionOutcome {
+func compiledByteOutcomes(t *testing.T, rustManagerUnavailable bool) map[crossconformance.PathID]crossconformance.RejectionOutcome {
 	t.Helper()
 	outcomes := map[crossconformance.PathID]crossconformance.RejectionOutcome{}
 	extra := sharedCompiledPayload()
@@ -205,8 +205,10 @@ func compiledByteOutcomes(t *testing.T) map[crossconformance.PathID]crossconform
 	_, swiftErr := swiftpmsource.CaptureAndClose(context.Background(), swift.config, swiftpmsource.Request{Root: swift.root, Product: "cli", Resolved: swiftLock()})
 	outcomes[crossconformance.PathSwiftPM] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathSwiftPM, Err: swiftErr, Code: diagnosticCode(swiftErr), ProcessStarts: starts}
 
-	rustErr := captureRustCompiledWorkspace(t)
-	outcomes[crossconformance.PathRust] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathRust, Err: rustErr, Code: diagnosticCode(rustErr)}
+	if !rustManagerUnavailable {
+		rustErr := captureRustCompiledWorkspace(t)
+		outcomes[crossconformance.PathRust] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathRust, Err: rustErr, Code: diagnosticCode(rustErr)}
+	}
 	return outcomes
 }
 

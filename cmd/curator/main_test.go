@@ -198,6 +198,7 @@ func cliVerifiedToolchainIdentity() buildmeta.Toolchain {
 }
 
 func TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
 	_, home := compiledProject(t)
 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
 		t.Fatalf("portable seed install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
@@ -245,6 +246,7 @@ func TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt(t *testing.T) 
 }
 
 func TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache(t *testing.T) {
+	requireNativeControlInventoryPlatform(t)
 	_, home := compiledProject(t)
 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
 		t.Fatalf("portable seed install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)

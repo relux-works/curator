@@ -56,6 +56,9 @@ func TestRealSwiftPMBuildMatchesThePlannedLayout(t *testing.T) {
 	process.Dir = root
 	process.Env = []string{"HOME=" + filepath.Join(root, "empty-home"), "PATH=" + filepath.Dir(swift), "TZ=UTC"}
 	if output, runErr := process.CombinedOutput(); runErr != nil {
+		if text := string(output); strings.Contains(text, "Invalid manifest") && strings.Contains(text, "clang: error: unable to execute command: posix_spawn failed: No such file or directory") {
+			t.Skip("SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest")
+		}
 		t.Fatalf("real SwiftPM build with the planned argv: %v: %s", runErr, output)
 	}
 

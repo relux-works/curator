@@ -14,6 +14,7 @@ import (
 )
 
 func TestRustConformanceR03R05R06R07PathWorkspaceBuild(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	workspace := t.TempDir()
 	files := map[string]string{
 		"Cargo.toml":             "[workspace]\nmembers=[\"app\",\"dep1\",\"dep2\"]\nexclude=[\"unix_dep\",\"windows_dep\"]\nresolver=\"2\"\n",
@@ -114,6 +115,7 @@ func TestRustConformanceR03R05R06R07PathWorkspaceBuild(t *testing.T) {
 }
 
 func TestRustConformanceR02GitBuildWithoutOriginalRemoteOrCache(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	submodule := t.TempDir()
 	writeRustFixtureFiles(t, submodule, map[string]string{"nested.txt": "submodule evidence\n"})
 	runGitFixture(t, submodule, "init", "-q")
@@ -258,6 +260,7 @@ func TestRustConformanceRH09ToolchainCopyIsDependencyArtifact(t *testing.T) {
 }
 
 func TestRustConformanceRH10BuildRejectsToolchainDriftBeforeProcessOrPublication(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	workspace := t.TempDir()
 	writeRustFixtureFiles(t, workspace, map[string]string{
 		"Cargo.toml":  "[package]\nname='rh10_app'\nversion='0.1.0'\nedition='2021'\n[[bin]]\nname='rh10-app'\npath='src/main.rs'\n",
@@ -351,6 +354,7 @@ func TestRustConformanceR04FeatureSelectionKeepsCaptureNeutral(t *testing.T) {
 }
 
 func TestRustConformanceR04FeatureSelectedBuildsHaveDistinctIdentities(t *testing.T) {
+	requireNativeCargoDescriptor(t)
 	workspace := t.TempDir()
 	writeRustFixtureFiles(t, workspace, map[string]string{
 		"Cargo.toml":              "[package]\nname=\"feature_app\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[dependencies]\noptional_dep={path=\"optional_dep\",optional=true}\n[features]\nextra=[\"dep:optional_dep\"]\n[[bin]]\nname=\"feature-app\"\npath=\"src/main.rs\"\n",
