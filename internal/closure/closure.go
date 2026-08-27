@@ -58,12 +58,13 @@ func (n *Node) ContextActive() bool {
 }
 
 // ActiveCommands returns the active command set under the node's edges
-// (Spec §8.3): full activates every exported script command; runtime edges
-// activate their narrowing, or everything when unnarrowed.
+// (Spec §8.3): full activates every exported script or build command; runtime
+// edges activate their narrowing, or everything when unnarrowed. System
+// commands are requirements checked on PATH and are never activated.
 func (n *Node) ActiveCommands() map[string]bool {
 	exported := map[string]bool{}
 	for name, command := range n.Spec.Commands {
-		if command.Type == "script" {
+		if command.Type == "script" || command.Type == "build" {
 			exported[name] = true
 		}
 	}
@@ -84,10 +85,25 @@ func (n *Node) ActiveCommands() map[string]bool {
 			continue
 		}
 		for _, name := range edge.Commands {
-			active[name] = true
+			if exported[name] {
+				active[name] = true
+			}
 		}
 	}
 	return active
+}
+
+// ActiveCommandNames returns active exported commands in bytewise lexical
+// order. Closure callers process nodes in provider-first order, then use this
+// order within each provider.
+func (n *Node) ActiveCommandNames() []string {
+	active := n.ActiveCommands()
+	names := make([]string, 0, len(active))
+	for name := range active {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // Consumers returns the distinct consumers in first-seen order.
@@ -191,12 +207,7 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
 func DetectActiveCommandCollisions(nodes []*Node) error {
 	owners := map[string]string{}
 	for _, node := range nodes {
-		var commands []string
-		for name := range node.ActiveCommands() {
-			commands = append(commands, name)
-		}
-		sort.Strings(commands)
-		for _, command := range commands {
+		for _, command := range node.ActiveCommandNames() {
 			if previous, taken := owners[command]; taken {
 				return fmt.Errorf("command collision for %q: exported by %s and %s", command, previous, node.Name)
 			}
@@ -451,8 +462,8 @@ func gateSource(opts Options, name, gitURL, chain string) error {
 		name, gitURL, label, joinComma(opts.AllowedSources), chain)
 }
 
-// validateRequirementCommands checks that command narrowing names script
-// commands the provider actually exports (Spec §8.3).
+// validateRequirementCommands checks that command narrowing names script or
+// build commands the provider actually exports (Spec §8.3).
 func validateRequirementCommands(nodes map[string]*Node) error {
 	var problems []string
 	names := make([]string, 0, len(nodes))
@@ -475,9 +486,9 @@ func validateRequirementCommands(nodes map[string]*Node) error {
 			}
 			for _, command := range requirement.Commands {
 				provided, exported := provider.Spec.Commands[command]
-				if !exported || provided.Type != "script" {
+				if !exported || (provided.Type != "script" && provided.Type != "build") {
 					problems = append(problems, fmt.Sprintf(
-						"requirement %s -> %s names command %q, but %s does not export a script command named %q",
+						"requirement %s -> %s names command %q, but %s does not export a script or build command named %q",
 						node.Name, requirement.Name, command, requirement.Name, command))
 				}
 			}
