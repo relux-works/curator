@@ -1,12 +1,22 @@
 {
   "mode": "local",
   "local": {
-    "board_dir": ".task-board"
+    "board_dir": "/Users/iv/Developer/ReluxWorks/curator-parity/.task-board"
+  },
+  "agent_context": {
+    "profile": "lite"
   },
   "spawn": {
     "max_parallel": 20,
     "launch_composition": {
       "enabled": false
+    },
+    "ceilings": {
+      "codex": {
+        "model": "gpt-5.6-sol",
+        "model_criterion": "equal",
+        "reasoning_effort": "medium"
+      }
     }
   }
 }
