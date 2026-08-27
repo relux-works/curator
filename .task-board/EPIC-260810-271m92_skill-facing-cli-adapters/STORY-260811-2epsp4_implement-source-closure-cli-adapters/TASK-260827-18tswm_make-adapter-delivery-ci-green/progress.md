@@ -1,5 +1,5 @@
 ## Status
-to-review
+blocked
 
 ## Review
 required
@@ -70,6 +70,14 @@ spawn queued: [implementer] developer (codex) (run=RUN-260827-00c793, max_parall
 spawn run started: [implementer] developer (codex) (run=RUN-260827-00c793)
 agent completed: [implementer] developer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260827-00c793, pid=41336, exit=0)
+spawn agent resolution: Agent selection: codex via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260827-8ea88a, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260827-8ea88a)
+RUN-260827-8ea88a stop-the-line: two macOS reproductions falsify the prior transient disposition. The old CI assertion discarded Reason and DiagnosticCode, so the exact inner godriver.Probe failure is unavailable. Added strict diagnostic output to both sibling outcome assertions and a negative routing regression proving invalid authority stops before inner while the exact portable authority preserves the inner error. Exact rc.9 test, 5x concurrent real-probe model, build, vet, gofmt, lint, and diff-check all exit 0 locally. Failed approach: local standalone and concurrent reproduction did not produce the hosted failure. Viable options after evidence: fix the named inner diagnostic, or only if it proves a genuine host limitation use the existing no-trusted-Go-toolchain class. Rejected tradeoffs: blind retry, relaxed admitted outcomes, unconditional skip, or invented identity. Recommendation/exact external input: landing Orchestrator pushes the diagnostic patch and supplies the macOS Test rerun line containing reason and diagnostic. Outcome: TASK-260827-18tswm_diagnostic-outcome_RUN-260827-8ea88a.md
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260827-8ea88a, pid=89597, exit=0)
+No Change Request revision was published for TASK-260827-18tswm (handoff_unsatisfied): the board is not at to-review
 
 ## Precondition Resources
 (none)
@@ -85,12 +93,14 @@ spawn run completed: codex (run=RUN-260827-00c793, pid=41336, exit=0)
 - [TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-00c793.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-00c793.log) — System spawn log captured by task-board
 - [TASK-260827-18tswm_macos-residuals_RUN-260827-00c793.md](file://TASK-260827-18tswm/TASK-260827-18tswm_macos-residuals_RUN-260827-00c793.md) — Focused macOS residual disposition: strict Rust host-capability classification, rc.9 dry-run diagnosis, local validation evidence, and handoff boundary
 - [TASK-260827-18tswm_change-request_rev1.patch](file://TASK-260827-18tswm/TASK-260827-18tswm_change-request_rev1.patch) — Change Request CR-TASK-260827-18tswm-1 revision 1 candidate patch (repository_delta=present, 17 changed paths)
+- [TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-8ea88a.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-8ea88a.log) — System spawn log captured by task-board
+- [TASK-260827-18tswm_diagnostic-outcome_RUN-260827-8ea88a.md](file://TASK-260827-18tswm/TASK-260827-18tswm_diagnostic-outcome_RUN-260827-8ea88a.md) — Diagnostic patch, proven failure boundary, local validation, and exact remote rerun blocker
 
 ## Created
 2026-08-27T02:58:38Z
 
 ## Last Update
-2026-08-27T04:18:03Z
+2026-08-27T04:49:30Z
 
 ## Assigned To
 [implementer] developer (codex)

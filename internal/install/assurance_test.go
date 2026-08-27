@@ -75,6 +75,20 @@ func (toolchain assuredTestToolchain) Establish(context.Context) (BuildSession, 
 	return toolchain.session, nil
 }
 
+type assuredProbeFailureToolchain struct {
+	err    error
+	probes int
+}
+
+func (toolchain *assuredProbeFailureToolchain) Probe(context.Context) (buildmeta.Target, buildmeta.Toolchain, error) {
+	toolchain.probes++
+	return buildmeta.Target{}, buildmeta.Toolchain{}, toolchain.err
+}
+
+func (*assuredProbeFailureToolchain) Establish(context.Context) (BuildSession, error) {
+	return nil, errors.New("establish is not part of this probe test")
+}
+
 type assuredTestSession struct {
 	target    buildmeta.Target
 	toolchain buildmeta.Toolchain
@@ -167,6 +181,34 @@ func TestVerifiedBuildAuthorityCarriesOneBindingThroughCacheAndDispatch(t *testi
 		*artifact.ExecutionReceipt.Binding.CapabilityReceiptID != *authority.Binding().CapabilityReceiptID {
 		t.Fatalf("dispatch did not retain negotiated authority: starts=%d receipt=%+v", builder.starts, artifact.ExecutionReceipt)
 	}
+}
+
+func TestAssuredToolchainProbeKeepsAuthorityAndInnerFailuresDisjoint(t *testing.T) {
+	innerErr := errors.New("inner trusted-toolchain probe failed")
+
+	t.Run("authority refusal never reaches the inner probe", func(t *testing.T) {
+		inner := &assuredProbeFailureToolchain{err: innerErr}
+		toolchain := &assuredToolchain{authority: &BuildAuthority{}, inner: inner}
+		_, _, err := toolchain.Probe(t.Context())
+		if err == nil || !strings.Contains(err.Error(), "execution_mode_unknown") {
+			t.Fatalf("probe error = %v, want the authority refusal", err)
+		}
+		if inner.probes != 0 {
+			t.Fatalf("authority refusal reached the inner probe %d times", inner.probes)
+		}
+	})
+
+	t.Run("valid portable authority preserves the inner failure", func(t *testing.T) {
+		inner := &assuredProbeFailureToolchain{err: innerErr}
+		toolchain := &assuredToolchain{authority: NewPortableBuildAuthority(), inner: inner}
+		_, _, err := toolchain.Probe(t.Context())
+		if !errors.Is(err, innerErr) {
+			t.Fatalf("probe error = %v, want the inner failure", err)
+		}
+		if inner.probes != 1 {
+			t.Fatalf("valid authority reached the inner probe %d times, want once", inner.probes)
+		}
+	})
 }
 
 func TestVerifiedBuildAuthorityFailsBeforeCacheOrDispatchOnProviderDrift(t *testing.T) {

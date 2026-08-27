@@ -454,14 +454,14 @@ func (baseline *dryRunBaseline) assertCompiledCase(
 		}
 		build := result.Builds[0]
 		if !reported[string(build.Outcome())] {
-			t.Fatalf("project %d reported build outcome %q, which the published case does not admit: %v",
-				index, build.Outcome(), published.ReportedBuildOutcomes)
+			t.Fatalf("project %d reported build outcome %q (reason %q, diagnostic %q), which the published case does not admit: %v",
+				index, build.Outcome(), build.Reason(), build.DiagnosticCode(), published.ReportedBuildOutcomes)
 		}
 		// The shared protected entry is absent, and the case name says what that
 		// has to report: a miss, planned without preflighting or building.
 		if build.Outcome() != BuildWouldPreflightAndBuild {
-			t.Fatalf("project %d reported %q against an empty protected cache, want %q",
-				index, build.Outcome(), BuildWouldPreflightAndBuild)
+			t.Fatalf("project %d reported %q against an empty protected cache (reason %q, diagnostic %q), want %q",
+				index, build.Outcome(), build.Reason(), build.DiagnosticCode(), BuildWouldPreflightAndBuild)
 		}
 		if len(result.Staged) != 0 {
 			t.Fatalf("project %d staged an artifact during a dry run: %+v", index, result.Staged)
