@@ -116,7 +116,8 @@ func TestGoldenContextCopy(t *testing.T) {
 	}
 	dest := filepath.Join(t.TempDir(), "ctx")
 	includeScripts := len(spec.Commands) == 0
-	files, err := whitelist.CopyContext(fixture, dest, includeScripts, spec.RuntimeRoots)
+	excludeRoots := whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
+	files, err := whitelist.CopyContext(fixture, dest, includeScripts, excludeRoots)
 	if err != nil {
 		t.Fatal(err)
 	}
