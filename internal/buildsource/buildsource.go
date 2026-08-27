@@ -16,8 +16,6 @@ import (
 	"sync"
 
 	"github.com/relux-works/curator/internal/identifiers"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -299,16 +297,12 @@ func compareState(left, right stateEntry) int {
 }
 
 type pathSet struct {
-	exact      map[string]struct{}
-	platform   map[string]string
-	caseFolder cases.Caser
+	exact map[string]struct{}
 }
 
 func newPathSet() *pathSet {
 	return &pathSet{
-		exact:      make(map[string]struct{}),
-		platform:   make(map[string]string),
-		caseFolder: cases.Fold(),
+		exact: make(map[string]struct{}),
 	}
 }
 
@@ -320,12 +314,5 @@ func (set *pathSet) add(path string) error {
 		return fmt.Errorf("%w: duplicate protocol path %q", ErrInvalidSnapshot, path)
 	}
 	set.exact[path] = struct{}{}
-	// Case folding plus canonical decomposition conservatively models the
-	// collisions of supported case-insensitive Windows and macOS filesystems.
-	platformKey := norm.NFD.String(set.caseFolder.String(norm.NFD.String(path)))
-	if previous, exists := set.platform[platformKey]; exists {
-		return fmt.Errorf("%w: platform path collision between %q and %q", ErrInvalidSnapshot, previous, path)
-	}
-	set.platform[platformKey] = path
 	return nil
 }

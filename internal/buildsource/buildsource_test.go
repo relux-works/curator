@@ -186,23 +186,23 @@ func TestRejectsInvalidPathsLinksAndCollisions(t *testing.T) {
 		}
 	})
 
-	t.Run("case-insensitive platform collision", func(t *testing.T) {
+	t.Run("case-distinct encoded paths", func(t *testing.T) {
 		paths := newPathSet()
 		if err := paths.add("Dir/File"); err != nil {
 			t.Fatal(err)
 		}
-		if err := paths.add("dir/file"); !errors.Is(err, ErrInvalidSnapshot) {
-			t.Fatalf("collision error = %v", err)
+		if err := paths.add("dir/file"); err != nil {
+			t.Fatalf("distinct encoded path error = %v", err)
 		}
 	})
 
-	t.Run("normalizing platform collision", func(t *testing.T) {
+	t.Run("normalization-distinct encoded paths", func(t *testing.T) {
 		paths := newPathSet()
 		if err := paths.add("é.txt"); err != nil {
 			t.Fatal(err)
 		}
-		if err := paths.add("e\u0301.txt"); !errors.Is(err, ErrInvalidSnapshot) {
-			t.Fatalf("collision error = %v", err)
+		if err := paths.add("e\u0301.txt"); err != nil {
+			t.Fatalf("distinct encoded path error = %v", err)
 		}
 	})
 }
