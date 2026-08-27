@@ -136,15 +136,7 @@ func WriteBinShim(binDir, commandName, runtimePath, platform string, pathEntries
 		}
 	}
 	if len(pathEntries) > 0 {
-		prefix := strings.Join(pathEntries, ":")
-		content := "#!/bin/sh\n" +
-			"if [ -n \"${PATH:-}\" ]; then\n" +
-			"  PATH=" + shellQuote(prefix) + ":\"$PATH\"\n" +
-			"else\n" +
-			"  PATH=" + shellQuote(prefix) + "\n" +
-			"fi\n" +
-			"export PATH\n" +
-			"exec " + shellQuote(runtimePath) + " \"$@\"\n"
+		content := UnixShimContent(runtimePath, pathEntries)
 		if err := os.WriteFile(shim, []byte(content), 0o755); err != nil {
 			return "", err
 		}
@@ -163,6 +155,23 @@ func WriteBinShim(binDir, commandName, runtimePath, platform string, pathEntries
 	return shim, nil
 }
 
+// UnixShimContent returns a relocatable launcher which replaces itself with
+// the selected runtime executable. Because it uses exec, arguments, signals,
+// and the executable's exit status pass through without an intermediate shell.
+func UnixShimContent(runtimePath string, pathEntries []string) string {
+	content := "#!/bin/sh\n"
+	if len(pathEntries) > 0 {
+		prefix := strings.Join(pathEntries, ":")
+		content += "if [ -n \"${PATH:-}\" ]; then\n" +
+			"  PATH=" + shellQuote(prefix) + ":\"$PATH\"\n" +
+			"else\n" +
+			"  PATH=" + shellQuote(prefix) + "\n" +
+			"fi\n" +
+			"export PATH\n"
+	}
+	return content + "exec " + shellQuote(runtimePath) + " \"$@\"\n"
+}
+
 // WindowsShimContent returns the exact managed Windows launcher bytes. It is
 // shared with forwarding-shim ownership checks.
 func WindowsShimContent(runtimePath string, pathEntries []string) string {
@@ -172,7 +181,12 @@ func WindowsShimContent(runtimePath string, pathEntries []string) string {
 		for _, entry := range pathEntries {
 			escaped = append(escaped, escapeCMDValue(entry))
 		}
-		content += "set \"PATH=" + strings.Join(escaped, ";") + ";%PATH%\"\r\n"
+		prefix := strings.Join(escaped, ";")
+		content += "if defined PATH (\r\n" +
+			"  set \"PATH=" + prefix + ";%PATH%\"\r\n" +
+			") else (\r\n" +
+			"  set \"PATH=" + prefix + "\"\r\n" +
+			")\r\n"
 	}
 	content += "call \"" + escapeCMDValue(runtimePath) + "\" %*\r\n"
 	content += "exit /b %ERRORLEVEL%\r\n"
