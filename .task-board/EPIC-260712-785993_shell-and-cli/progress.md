@@ -8,10 +8,10 @@ claude
 2026-07-12T00:00:00Z
 
 ## Last Update
-2026-08-10T11:23:33Z
+2026-07-13T02:10:00Z
 
 ## Blocked By
-- (none)
+- (see dependency order in docs/implementation-plan.md section 5)
 
 ## Blocks
 - (none)
@@ -21,4 +21,3 @@ claude
 
 ## Notes
 
-- Regression story STORY-260713-9f4c2b is ready for review.

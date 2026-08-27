@@ -1,0 +1,37 @@
+package godriver
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// REVIEWER PROBE (temporary, not part of the change): does the vendored
+// //go:generate carve-out let a //go:cgo_import_dynamic in the same file
+// through, when the generate directive lands in an earlier read window?
+func TestReviewerProbeGenerateShadowsCgoImportDynamic(t *testing.T) {
+	fixture := newSnapshotFixture(t)
+	vendorDir := filepath.Join(fixture.buildRoot, "vendor", "example.test", "dep", "value")
+	filler := strings.Repeat("// padding padding padding padding padding padding padding\n", 2000)
+	source := "package value\n//go:generate stringer -type=Value\n" + filler +
+		"//go:cgo_import_dynamic libc_x x \"/usr/lib/libSystem.B.dylib\"\nconst V = 1\n"
+	t.Logf("source size = %d bytes (read window = 65536)", len(source))
+	writeTestFile(t, filepath.Join(vendorDir, "value.go"), []byte(source), 0o644)
+	writeTestFile(t, filepath.Join(fixture.buildRoot, "vendor", "modules.txt"),
+		[]byte("# example.test/dep v1.0.0\n## explicit; go 1.23\nexample.test/dep/value\n"), 0o644)
+
+	matched, err := scanSourceDirectives(filepath.Join(vendorDir, "value.go"))
+	t.Logf("scanSourceDirectives = %d (1=cgo_import_dynamic, 2=go:generate), err=%v", matched, err)
+
+	vendored := packageJSON{
+		Dir: vendorDir, ImportPath: "example.test/dep/value", Name: "value", DepOnly: true,
+		GoFiles: []string{"value.go"},
+		Module:  &moduleJSON{Path: "example.test/dep", Version: "v1.0.0", GoVersion: "1.23"},
+	}
+	validation := graphValidation{BuildRoot: fixture.buildRoot, SourceDir: fixture.sourceDir, GOROOT: mustPhysical(t, t.TempDir())}
+	graphErr := validatePackageGraph(encodePackages(t, vendored, fixture.rootPackage()), validation)
+	t.Logf("validatePackageGraph = %v (code=%q)", graphErr, DiagnosticCode(graphErr))
+	if DiagnosticCode(graphErr) != "go_forbidden_compiler_directive" {
+		t.Errorf("BYPASS: a vendored file containing //go:cgo_import_dynamic was admitted; got %v", graphErr)
+	}
+}

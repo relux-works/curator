@@ -1,0 +1,127 @@
+# TASK-260728-1yhuqi rework cycle 5 gate log
+date: 2026-07-29T04:40:00Z
+host: macOS 26.5 arm64
+swift: swift-driver version: 1.148.6 Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)
+go: go version go1.25.5 darwin/arm64
+
+--- probe: gofmt -l ---
+exit=0
+
+--- probe: go vet ./... ---
+exit=0
+
+--- probe: go test -count=1 ./... ---
+ok  	swiftboundaryprobe	0.638s
+exit=0
+
+--- probe: go build ---
+exit=0
+
+--- native probe run ---
+cases: 23, matched 23, divergences 0, not run 0
+alignment: P1 no-widening=true P2 no-narrowing=true (security partition empty=false)
+closure: 32 checks, 0 yielded a verdict (must be 0)
+controls: 17 of 17 failing as required
+structural: 70 checks, 0 divergences
+native target admission (P2 arm64-apple-macosx26.0): ok=true in-closure=1 base-installation=1 p1==p2=true
+green: true
+exit=0
+
+--- degraded run (no resolvable toolchain) ---
+swift-boundary-fixture-v1: toolchain unavailable, 23 cases not run; nothing was installed
+exit=0
+
+--- expected-red controls, each replayed individually (each MUST exit 1) ---
+C1   exit=1  C1-lead-only-recognition: failed=true findings=3
+C2   exit=1  C2-substring-recognition: failed=true findings=1
+C3   exit=1  C3-exit-status-as-semantics: failed=true findings=7
+C4   exit=1  C4-build-as-the-isolated-command: failed=true findings=3
+C5   exit=1  C5-unearned-path-closure-zero: failed=true findings=1
+C6   exit=1  C6-plugin-closure-unchecked: failed=true findings=2
+C7   exit=1  C7-lenient-plan-parsing: failed=true findings=16
+C8   exit=1  C8-lexical-containment: failed=true findings=1
+C9   exit=1  C9-collapsing-module-name-derivation: failed=true findings=3
+C10  exit=1  C10-prefix-only-banner-parser: failed=true findings=17
+C11  exit=1  C11-lenient-runtime-library-admission: failed=true findings=6
+C12  exit=1  C12-cr-normalizing-plan-splitter: failed=true findings=4
+C13  exit=1  C13-macro-source-admitted-without-stage-b: failed=true findings=1
+C14  exit=1  C14-path-shape-only-totality: failed=true findings=14
+C15  exit=1  C15-multi-command-compile-under-v2: failed=true findings=3
+C16  exit=1  C16-compile-permit-without-permit-time-rebinding: failed=true findings=1
+       with the re-binding step removed, a plugin path verified absent appears after
+       verification and the session still starts 2 manager commands (compile ran=true);
+       the live session stops at 1 command with
+       build_execution_control_unavailable/swift_permit_binding_changed and no artifact
+C17  exit=1  C17-retired-permit-recheck-binding-model: failed=true findings=6
+       on the same verified happy-path bindings, measured AT the permit, the retired
+       re-check reports 5 findings where the live one reports 0, rejecting a correctly
+       absent output; on an absent plugin path that cannot be stat'ed the retired
+       re-check reports 0 and the live one 1
+
+--- new cycle-5 structural checks (all match) ---
+S65 permit ran over 35 bindings (33 plan + 2 admitted sources), 0 findings,
+    10 absent plugin paths and 5 absent-output bindings re-checked at their parent,
+    2 manager commands, artifact produced
+S66 absent plugin path created after graph  -> 2 findings, 1 command, no artifact
+S67 admitted source gains '@' after Stage B -> 3 findings, 1 command, no artifact,
+    finding names swift_source_macro_selector_forbidden
+S68 admitted source replaced by rename      -> 3 findings, 1 command, no artifact,
+    finding names the Stage-B digest change
+S69 presented SDK re-pointed                -> 4 findings, 1 command, no artifact
+S70 recorded output parent replaced         -> 1 finding,  1 command, no artifact
+S71 bound executable's bytes changed        -> 1 finding,  1 command, no artifact
+    (synthetic manager-owned toolchain root; its control run reaches 2 commands,
+     2 executable bindings and an artifact)
+S72 live vs retired re-check on the same bindings at the permit: 0 vs 5 on the
+    happy path, 1 vs 0 on an absent plugin path that cannot be stat'ed
+
+--- curator repo: gofmt -l . (expected-red; attribution below) ---
+exit=2 paths=1141
+  paths under .temp/TASK-260728-1yhuqi : 0
+  paths outside .temp/                 : 0
+  modified tracked files               : 0
+
+--- spec validate.py, task worktree ---
+validation failed: .../curator-spec-worktree/docs/external-build-repositories.md: broken local link: ../release/1.0.0-rc.5.json
+exit=1
+
+--- spec validate.py, clean baseline at 57c1f56 ---
+validated 30 schemas and 93 vector files
+exit=0
+
+--- spec validate.py link-check attribution ---
+Documents this task authored:
+  docs/swift-build-drivers.md                      4 links, 0 broken
+  decisions/0011-swift-driver-pair.md              2 links, 0 broken
+Documents copied in, NOT authored by this task:
+  docs/external-build-repositories.md              6 links, 1 broken ['../release/1.0.0-rc.5.json']
+  docs/portable-go-execution-policy.md             6 links, 2 broken ['../conformance/v1/vectors/go-host-execution-policy.json' x2]
+  docs/compiled-build-toolchain-requirements.md    8 links, 0 broken
+
+--- probe tarball round-trip ---
+sources: 22 non-test go files, 10 test files
+test functions: 69
+lines: 9683
+gofmt -l: clean; go vet: exit 0
+ok  	swiftboundaryprobe	1.005s
+go build: exit 0
+tarball sha256: 4465da8689f68031ef7c1908369c6cdf44aa8e18ebdc3f6db5de9dbfef37f5b9
+
+--- worktree hygiene ---
+spec worktree staged files: 0
+spec worktree tracked modifications: 0
+curator repo tracked modifications: 0
+nothing committed, pinned, published or installed on any host
+
+--- artifact digests ---
+decision  sha256: be75f586b2dc15c6c8d7361909119c682eed020f600cff4795e4922a3144f238
+reference sha256: 6350a7aa37a106a8dac001fe2d6c446edcc76cd079d826617e035e6605ee3447
+probe.tar.gz sha256: 4465da8689f68031ef7c1908369c6cdf44aa8e18ebdc3f6db5de9dbfef37f5b9
+spec worktree copies match the board artifacts byte for byte
+
+--- curator repo gates ---
+go build ./... exit=0
+go vet ./...   exit=0
+go test ./...  exit=0
+make check     exit=2 (fails at the same gofmt stage; 0 files from this task)
+golangci-lint  not installed on this host (command not found)

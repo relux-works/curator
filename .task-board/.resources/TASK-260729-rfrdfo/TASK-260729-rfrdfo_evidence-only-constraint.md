@@ -1,0 +1,3 @@
+# Evidence-only rework constraint
+
+Run no Go command of any kind: no go test, probe, benchmark, build, vet, lint, helper script that invokes Go, or detached process. Make no product/prototype edits. Use only stored TASK-260729-2afulh tester evidence: non-race 273s; isolated race1 exit 0 in 493s; race2/3 deliberately not completed after the strict <=480s bar was conclusively missed. Correct rejected arithmetic and route fixture-only as rejected in favor of TASK-260729-365r5r. Partial probe artifacts from cancelled RUN-260729-5e854d are invalid and must not be cited.

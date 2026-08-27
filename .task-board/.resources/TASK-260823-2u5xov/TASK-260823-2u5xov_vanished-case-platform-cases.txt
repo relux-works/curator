@@ -1,0 +1,12 @@
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.temp/ci-evidence/local-candidate/rows-scriptpolicy.tsv
+
+ok    internal/scriptpolicy :: TestScriptHostExecutionPolicySectionsAreAllClassified
+ok    internal/scriptpolicy :: TestScriptExecutionPolicyIdentityMatchesTheSuite
+FAIL  required case never ran on darwin: internal/scriptpolicy :: TestScriptExecutionOptInCases
+      required behaviour: every published opt-in case decides manifest acceptance and enforced/declared-only classification
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+ok    internal/scriptpolicy :: TestARefusalPrecedesEveryWorkerSurface
+
+platform-case gate: 0 skips recorded in .temp/ci-evidence/local-candidate/gate-renamed/skips-observed.tsv
+platform-case gate: FAILED

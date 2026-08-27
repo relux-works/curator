@@ -283,35 +283,29 @@ jobs:
         with:
           submodules: true
 
-      - name: Alternative implementation name gate
+      - name: Employer name gate
         run: |
-          # The alternative protocol implementation is referenced exactly
-          # once: the README open-protocol section (one line carrying the
-          # link). Zero matches anywhere else. The pattern is assembled from
-          # parts so this file does not trip the gate itself.
-          pattern="$(printf '%s%s' co coa)skill"
-          if grep -riIn --exclude-dir=.git --exclude-dir=agents --exclude=README.md "$pattern" .; then
-            echo "naming gate: name found outside README.md"
-            exit 1
+          # Curator is an open protocol implementation. The employer under
+          # whose roof some of it was written is not part of that protocol and
+          # must not appear anywhere in the repository -- not in source, docs,
+          # task records or commit messages. Historical records that named a
+          # local checkout path or an internal remote were masked to
+          # `intranet` rather than deleted.
+          #
+          # Both patterns are assembled from parts so this file does not trip
+          # the gate it defines.
+          full="$(printf '%s%s' wild berries)"
+          short="$(printf '%s%s' w b)"
+          status=0
+          if grep -riIn --exclude-dir=.git "$full" .; then
+            echo "naming gate: the employer name must not appear in this repository"
+            status=1
           fi
-          lines=$(grep -ci "$pattern" README.md || true)
-          if [ "$lines" != "1" ]; then
-            echo "naming gate: README.md must mention the name on exactly one line, found $lines"
-            exit 1
+          if grep -riIEn --exclude-dir=.git "\\b$short\\b" .; then
+            echo "naming gate: the employer's short name must not appear in this repository"
+            status=1
           fi
-          echo "naming gate: clean (one README line)"
-
-  # ---------------------------------------------------------------------------
-  # Candidate suite qualification.
-  #
-  # Non-default by construction: it runs only on an explicit workflow_dispatch
-  # that supplies a candidate, never on push or pull_request, and it never
-  # touches SPEC_PIN. `CI_REQUIRE_FULL_ROOT=1` makes any deferral fatal, so a
-  # candidate must serve the whole package set -- this run cannot be green
-  # while a package quietly executed without its vectors. Its output is
-  # candidate evidence, stamped in the artifact itself as neither a published
-  # release nor a conformance claim.
-  # ---------------------------------------------------------------------------
+          exit "$status"
   candidate-conformance:
     name: Candidate suite (${{ matrix.os }})
     if: >-

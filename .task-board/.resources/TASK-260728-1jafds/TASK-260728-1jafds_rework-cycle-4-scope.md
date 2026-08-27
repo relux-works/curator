@@ -1,0 +1,3 @@
+# Rework cycle 4
+
+Read TASK-260728-1jafds_review-verdict-cycle-4.md first and address every finding exactly. Preserve all accepted portable and hardened contracts, rc.5 bytes, closed schemas, identity constructions, and prior reviewer fixes. Keep this hardened story non-gating for the main compiled-skill implementation. Use only task-owned spec worktree and validation artifacts; no curator/csk production integration, no pin promotion, no commit or publish. Attach exact changed files, reviewer-finding mapping, adversarial probes, validation commands/exits, and hand off for review.

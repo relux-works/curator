@@ -1,0 +1,7 @@
+# TASK-260730-1fsbqd unsigned rework evidence
+
+The signing-only reviewer finding is repaired. Branch release/curator-spec-v1.0.0-rc.5-candidate now points to unsigned commit 0aae5dff11ab90400fc6a0b003a4492767b38043 with parent 57c1f56846d221ecc55786bd3c2467ec32f11730 and unchanged accepted Git tree 78210085727ec33b79a050a807f51da253ffb0c8. The raw commit has no gpgsig header and Git signature status is N.
+
+The committed archive independently reproduces 447 manifest entries, manifest SHA-256 b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c, and suite-tree SHA-256 e6a132157806bf747f0ad24a61bb5a9a4c8b915dac743d9465c889c0a1ad2fae. Validation passed: 42 schemas and 447 vectors, 41 Python tests, Go tests, Go vet, gofmt, deterministic regeneration, release gate, metadata checks, topology checks, and final clean status all exited 0.
+
+The initial unquoted %G? diagnostic exited 1 from zsh glob expansion; the corrected quoted signature gate exited 0. GitHub Release lookup exited 1 with expected HTTP 404. No push, tag, release, signing, accepted-byte modification, dirty-primary import, or downstream-pin advancement occurred. The updated review brief identifies only the new unsigned commit. Publication remains deferred until a new human command.

@@ -1,0 +1,14 @@
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.temp/ci-evidence/local-candidate/rows.tsv
+
+ok    internal/skillspec :: TestReleasedSchemaCases
+ok    internal/marker :: TestReadAuthoritativeMarkerV4SchemaCases
+ok    internal/moduleroots :: TestModuleRootVectors
+ok    internal/godriver :: TestModuleRootVectorsDriveTheWholeBuild
+ok    internal/scriptpolicy :: TestScriptHostExecutionPolicySectionsAreAllClassified
+ok    internal/scriptpolicy :: TestScriptExecutionPolicyIdentityMatchesTheSuite
+ok    internal/scriptpolicy :: TestScriptExecutionOptInCases
+ok    internal/scriptpolicy :: TestARefusalPrecedesEveryWorkerSurface
+
+platform-case gate: 6 skips recorded in .temp/ci-evidence/local-candidate/gate/skips-observed.tsv
+platform-case gate: ok

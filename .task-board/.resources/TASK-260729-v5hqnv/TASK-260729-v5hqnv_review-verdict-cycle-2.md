@@ -1,0 +1,19 @@
+# TASK-260729-v5hqnv review verdict — cycle 2
+
+Verdict: ACCEPTED.
+
+## Independent evidence
+
+- Fresh direct projections of all seven briefs match TASK-260729-v5hqnv_after.jsonl exactly across id, name, title, description, scope, ac, blockedBy, blocks, status, and notes; normalized diff is empty.
+- Comparing the attached before and after JSONL yields exactly the authorized net changes: description, scope, and ac on all seven briefs, plus blockedBy additions on TASK-260720-2dnqw2 and TASK-260720-12r55p. No other shared field changed.
+- Cycle-1 correction 1 is satisfied: receipt hash 750f5f75 is absent from the current description, scope, and ac of all seven briefs. Historical board resources remain intact. The global grep count has increased from the producer-time 29 to 35 because later reviewer and spawn evidence also records the historical value; this reinforces rather than contradicts the corrected preservation claim.
+- Cycle-1 correction 2 is satisfied: TASK-260720-12r55p.notes is restored to 515 bytes with SHA-256 3a04adc70cd2e5499608172203a7d3ed17b4ec33e281c4c7ca7b51f24ace2500, exactly matching both cited pre-retarget sources. The fail-closed rc.5 gate clause is now only in the allowed scope field.
+- TASK-260720-12r55p retains its hard edge to TASK-260720-3ag6pi. Direct projection confirms that 3ag6pi remains blocked and literal rc.4, while no replacement rc.5 verification gate exists; the brief correctly requires retarget-and-review or replacement-and-relink before start.
+- The immutable rc.5 root independently verifies: manifest SHA-256 b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c, protocol 1.0.0-rc.5, 447 manifest files, 11 expected/build-driver files, 869-byte build input at 529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b, and 1120-byte receipt at 919fbbad8e6ce95532219fd952c2309d0d7026f85209650508fd6834af4020cd. Release metadata pins the same candidate and downstream-required manifest digest and keeps committed_release_pin_advanced false.
+- Vector facts match the briefs: 5 argv forms, 8 positive cases, 77 rejection cases, 10 build-source cases, 12 toolchain cases, 18 mandatory controls, 13 session states, 4 process nodes, 14 identity/protocol cases, 8 package-influence cases, 11 capability-evidence cases, 6 deferred guarantees and guards, and an exhaustive five-control inventory over exactly macOS and Windows. Claim-v3 pins rc.5 and requires build_drivers; Linux remains excluded until TASK-260728-1skseh.
+- All seven tasks remain backlog under STORY-260720-1uv5gi with titles, names, parents, blocks, statuses, and preserved checklists unchanged. The retained checklist labels mentioning rc.4 are pre-existing execution checklist text outside this task scope; the retargeted scope and AC are the current binding contract.
+- TASK-260729-3nx97g is done with an accepted reviewer verdict, so the two added provenance edges are valid and do not create an unfinished prerequisite. The remaining dependency DAG is unchanged and fail-closed where evidence is unavailable.
+- CocoaSkills has no tracked or staged change and remains at edce8816dda44bb121d661b7c4dea942558ce408. Curator has no tracked or staged product change. The rc.5 worktree remains at 57c1f56846d221ecc55786bd3c2467ec32f11730 with 130 candidate entries and nothing staged. No pin, tag, commit, publication, product, test, or spec mutation was made by this review.
+- No tests were run, as TASK-260729-v5hqnv_review-instructions-cycle-2.md explicitly requires. The generic Tests green checklist item is treated as not applicable to this board-metadata-only task, not as a claim that a suite ran.
+
+The seven briefs now truthfully target rc.5 manager-worker-v1 semantics, claim-v3 identity, macOS and Windows native qualification, regenerated build-driver artifacts, and explicit fail-closed prerequisites. No finding requires another rework cycle.

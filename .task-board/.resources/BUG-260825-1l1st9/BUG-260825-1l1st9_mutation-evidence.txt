@@ -1,0 +1,41 @@
+M1 narrow classify band back to the single written schema (the original bug)
+    exit=1  RED (test caught it)
+    --- FAIL: TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema (0.00s)
+    builds_test.go:918: schema 3: state = "needs-install", want "current" (rows [{Skill:build-skill Command:build-tool Driver:go-v1 BuildRoot:assets/build-tool SourceDir:asse
+    --- FAIL: TestStatusReportFindsASchema8InstallationCurrent (0.00s)
+    builds_test.go:987: marker schema 3: rows = [{Skill:build-skill Command:build-tool Driver:go-v1 BuildRoot:assets/build-tool SourceDir:assets/build-tool/cmd/tool BuildSour
+    builds_test.go:987: marker schema 4: rows = [{Skill:build-skill Command:build-tool Driver:go-v1 BuildRoot:assets/build-tool SourceDir:assets/build-tool/cmd/tool BuildSour
+M2 delete the classify band entirely (accept any schema)
+    exit=1  RED (test caught it)
+    --- FAIL: TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild (0.00s)
+    builds_test.go:474: legacy marker: state = "build-command-drift" rows = [{Skill:build-skill Command:build-tool Driver:go-v1 BuildRoot:assets/build-tool SourceDir:assets/b
+    --- FAIL: TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema (0.00s)
+    builds_test.go:928: schema 0: state = "current", want "needs-install"
+M3 narrow the refusal readable band back to schemas 1 and 2
+    exit=1  RED (test caught it)
+    --- FAIL: TestMarkerRefusalSeparatesUnsupportedFromInvalid (0.01s)
+    builds_test.go:534: state = "unsupported-marker", want "invalid-marker" (detail "install marker schema 4 cannot be read by this manager; the newest supported schema is 4"
+    builds_test.go:534: state = "unsupported-marker", want "invalid-marker" (detail "install marker schema 3 cannot be read by this manager; the newest supported schema is 4"
+M4 delete the refusal readable band (never report unsupported)
+    exit=1  RED (test caught it)
+    --- FAIL: TestMarkerRefusalSeparatesUnsupportedFromInvalid (0.01s)
+    builds_test.go:534: state = "invalid-marker", want "unsupported-marker" (detail "the install marker is present but is not a valid install marker document")
+    builds_test.go:534: state = "invalid-marker", want "unsupported-marker" (detail "the install marker is present but is not a valid install marker document")
+M5 narrow the GC mark band back to schemas 2 and 3
+    exit=1  RED (test caught it)
+    --- FAIL: TestCollectMarksBuildKeysFromEveryBuildBearingMarkerSchema (0.00s)
+    gc_test.go:162: referenced = [sha256:1111111111111111111111111111111111111111111111111111111111111111 sha256:2222222222222222222222222222222222222222222222222222222222222
+    --- FAIL: TestAbsorbKeysBuildLivenessOnTheSchemaBandNotOnAPopulatedBuildsMap (0.00s)
+    gc_test.go:198: schema 4 marked [], want 1 reference(s)
+M6 delete the GC mark band (mark builds from any schema)
+    exit=1  RED (test caught it)
+    --- FAIL: TestAbsorbKeysBuildLivenessOnTheSchemaBandNotOnAPopulatedBuildsMap (0.00s)
+    gc_test.go:198: schema 1 marked [sha256:1111111111111111111111111111111111111111111111111111111111111111], want 0 reference(s)
+    gc_test.go:198: schema 0 marked [sha256:1111111111111111111111111111111111111111111111111111111111111111], want 0 reference(s)
+    gc_test.go:198: schema 5 marked [sha256:1111111111111111111111111111111111111111111111111111111111111111], want 0 reference(s)
+M7 leave NewestSchemaVersion behind the readable band
+    exit=1  RED (test caught it)
+    --- FAIL: TestSupportedSchemaBandIsExactAndNewestIsItsMaximum (0.00s)
+    schema_band_test.go:30: schema 4 is readable, so NewestSchemaVersion 3 understates the band
+
+ALL MUTANTS CAUGHT

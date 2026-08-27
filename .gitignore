@@ -13,3 +13,20 @@ coverage.out
 
 # OS noise
 .DS_Store
+
+# task-board operational state
+# The markdown evidence beside a run is the part worth keeping, and it is what
+# this repository has always tracked. Run output is not: spawn logs alone are
+# 900MB, and a resources directory has held a 4.9MB Windows test binary.
+# Goal heads and the write ledger are rewritten by every run.
+.task-board/.goals/
+.task-board/.board-write-ledger.json
+.task-board/.progress-pair-generation
+.task-board/.resources/**/*.log
+.task-board/.resources/**/*.gz
+.task-board/.resources/**/*.tgz
+.task-board/.resources/**/*.zip
+.task-board/.resources/**/*.exe
+.task-board/.resources/**/*.test
+.task-board/.resources/**/*-go-test.json
+.task-board/.resources/**/*-coverage.json

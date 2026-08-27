@@ -1,5 +1,5 @@
 ## Status
-done
+review
 
 ## Assigned To
 codex
@@ -8,10 +8,10 @@ codex
 2026-07-12T00:00:00Z
 
 ## Last Update
-2026-08-10T14:00:42Z
+2026-07-13T03:14:10Z
 
 ## Blocked By
-- (none)
+- (see dependency order in docs/implementation-plan.md section 5)
 
 ## Blocks
 - (none)
