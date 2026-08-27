@@ -1,5 +1,5 @@
 ## Status
-reviewing
+done
 
 ## Assigned To
 [reviewer] reviewer (codex)
@@ -8,7 +8,7 @@ reviewing
 2026-07-20T02:11:47Z
 
 ## Last Update
-2026-07-30T10:00:29Z
+2026-08-27T03:16:09Z
 
 ## Blocked By
 - TASK-260720-2g0e3b
@@ -123,6 +123,7 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260728-4ab2ca)
 Cycle-2 independent reviewer verdict: ACCEPTED. R1 parent-installed native control boundary and R2 nil ProcessState child-start handling are closed. Full local test/race/vet/build, accepted rc.5 conformance with real vendored build, scoped lint, cross-platform compile gates, byte-matched macOS/Windows native evidence, and provenance checks pass. Evidence: TASK-260720-1zntv0_portable-review-cycle-2-verdict.md.
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260728-4ab2ca, pid=84134, exit=0)
+Closed 2026-08-27 by reconciliation against origin/main. The task carries an ACCEPTED cycle-2 verdict (TASK-260720-1zntv0_portable-review-cycle-2-verdict.md): "The cycle-2 rework closes R1 and R2 and matches the portable manager-worker-v1 acceptance criteria and the accepted rc.5 contract. No remaining implementation, architecture, or test finding requires rework." The deliverable is on origin/main: internal/godriver carries the preflight and build path, and go-repository-v1 builds and launches end to end, exercised on this date against a live schema-7 build skill. The board status had simply never followed the verdict.
 
 ## Precondition Resources
 - [portable-host-execution-accepted-spec.md](file://TASK-260720-1zntv0/portable-host-execution-accepted-spec.md) — Independent acceptance of portable manager-worker-v1 contract and exact candidate digest.

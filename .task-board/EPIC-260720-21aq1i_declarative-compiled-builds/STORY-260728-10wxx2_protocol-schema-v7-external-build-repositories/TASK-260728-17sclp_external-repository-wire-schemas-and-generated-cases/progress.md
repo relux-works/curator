@@ -1,5 +1,5 @@
 ## Status
-reviewing
+closed
 
 ## Review
 required
@@ -80,6 +80,7 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260727-c17962)
 Review cycle 3 2026-07-28 — ACCEPTED. The eleven marker-v3 cases are generated, indexed, inventory-required, and directly validate through the intended marker/buildRecordV2 branches. Independent 42-schema/400-vector validation, 15 Python tests, Go tests/vet/format/build, make validate, two-pass clean regeneration, 103-case adversarial replay, accepted prose comparison, legacy frozen-byte guards, clean index, pinned HEAD, and artifact checks all pass. Verdict evidence: TASK-260728-17sclp_review-3.md.
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260727-c17962, pid=33230, exit=0)
+Closed 2026-08-27 as delivered by evidence outside the board. Schema 7 external build repositories shipped and are in production use: build_repositories and the go-repository-v1 driver are what a live schema-7 skill was installed and built against on this date. The protocol has since moved to schema 8. No verdict resource was ever attached, so this is recorded as closed rather than done.
 
 ## Precondition Resources
 (none)
@@ -102,7 +103,7 @@ spawn run completed: codex (run=RUN-260727-c17962, pid=33230, exit=0)
 2026-07-27T20:20:00Z
 
 ## Last Update
-2026-07-30T09:58:31Z
+2026-08-27T03:32:09Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

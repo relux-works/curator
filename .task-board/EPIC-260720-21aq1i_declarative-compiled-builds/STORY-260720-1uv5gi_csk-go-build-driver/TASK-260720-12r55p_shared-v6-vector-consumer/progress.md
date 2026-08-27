@@ -1,5 +1,5 @@
 ## Status
-to-dev
+closed
 
 ## Assigned To
 [reviewer] reviewer (codex)
@@ -8,7 +8,7 @@ to-dev
 2026-07-20T02:09:20Z
 
 ## Last Update
-2026-08-02T12:06:36Z
+2026-08-27T03:32:09Z
 
 ## Blocked By
 - TASK-260720-th0jdi
@@ -116,6 +116,7 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260802-04f9cd)
 REVIEW VERDICT CYCLE 3 2026-08-02 — CHANGES REQUESTED on exact signed CocoaSkills PR19 head 6e7742f0d28ad95ddd7d8e92364b84062571ad0b. The portable timestamp helper repairs only the first GC aging call; four reachable direct os.utime calls at tests/protocol_lifecycle_observations.py:3055, :3063, :3071, and :3112 still pass follow_symlinks=false and hit the same Windows NotImplementedError boundary that caused the prior 408-failure cascade. The new regression tests the helper in isolation and cannot detect these remaining call sites. Strict mypy is green; independent exact-root pytest was externally interrupted after 891 passes in 507.04s and is not claimed green; fresh hosted run 30743353816 remained non-terminal with four Windows lanes active. Full evidence and exact repair requirements: TASK-260720-12r55p_review-verdict-cycle-3.md. Routed to to-dev for ordinary rework and another reviewer cycle.
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260802-04f9cd, pid=77822, exit=0)
+Closed 2026-08-27 as unreachable as written. The acceptance criterion pins the Python harness to the rc.6 candidate suite at curator-spec commit 432eb2ee1fe2d6b271e37269f867c8851c325539 with named artefact digests. That candidate is three release candidates behind: the consumer now pins rc.10, and csk 0.15.0 accepts Curator Protocol v1.0.0-rc.10. The vectors named here cannot be re-qualified without reverting the pin.
 
 ## Precondition Resources
 (none)

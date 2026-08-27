@@ -1,5 +1,5 @@
 ## Status
-to-dev
+backlog
 
 ## Assigned To
 [analyst] solution-architect (codex)
@@ -8,7 +8,7 @@ to-dev
 2026-07-19T22:10:05Z
 
 ## Last Update
-2026-08-01T08:42:48Z
+2026-08-27T03:32:10Z
 
 ## Blocked By
 - STORY-260720-3plyvy
