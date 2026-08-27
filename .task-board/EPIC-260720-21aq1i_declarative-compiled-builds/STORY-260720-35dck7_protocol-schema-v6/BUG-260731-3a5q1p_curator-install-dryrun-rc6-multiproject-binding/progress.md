@@ -1,5 +1,5 @@
 ## Status
-to-dev
+closed
 
 ## Review
 required
@@ -99,6 +99,7 @@ ALSO NOTED (accepted as-is): revocation-state binds all of <home>/state, subsumi
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260731-cefd98, pid=23831, exit=0)
 Migration routing: reviewer requested candidate-conformance evidence after integrated Windows trusted-GOROOT behavior lands. The active dependency is BUG-260731-33v6zz / Curator PR #13; the closed BUG-260731-fs3dht branch is comparison-only and must not be merged. After PR #13 lands, rebase PR #14, correct the rc6 ordering rationale, dispatch the three-platform candidate lane, then route to a fresh independent Opus reviewer.
+Closed 2026-08-27 as superseded, not as delivered. Its own reviewer verdict requested changes and it was never reworked. The fix nevertheless reached origin/main by another route: internal/install/dryrun_conformance_test.go carries both TestAuthoritativeDryRunCasesMutateNothingPersistent and TestDryRunEffectBindingsSeeWhatARealOperationWrites, and diffing PR #14 against main adds no test function. Main is also strictly better than the PR: it uses installPlatform() where the PR hardcodes Platform=unix, which would make these cases vacuous on the Windows lane they exist to protect. Merging the PR would additionally revert .github/ci/root-artifacts.tsv to a pre-Schema-8 ledger, dropping the internal/moduleroots, internal/scriptpolicy and schema-8 manifest rows. PR #14 was closed with that evidence. The acceptance criterion here is unreachable as written because it targets an rc.6 conformance root and SPEC_PIN is now rc.10 0ed5c691.
 
 ## Precondition Resources
 (none)
@@ -117,7 +118,7 @@ Migration routing: reviewer requested candidate-conformance evidence after integ
 2026-07-31T09:29:30Z
 
 ## Last Update
-2026-07-31T13:41:18Z
+2026-08-27T03:16:22Z
 
 ## Assigned To
 [reviewer] reviewer (claude)
