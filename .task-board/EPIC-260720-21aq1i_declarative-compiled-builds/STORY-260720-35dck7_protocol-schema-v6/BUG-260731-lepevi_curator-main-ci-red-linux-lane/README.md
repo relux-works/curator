@@ -1,0 +1,10 @@
+# BUG-260731-lepevi: curator-main-ci-red-linux-lane
+
+## Description
+Curator CI has been red on main since cfffd7cd for reasons unrelated to any protocol vector. Two of them surface on the Linux lane once the toolchain-identity gate stops failing first (BUG-260731-3gm8kc PR 9 repairs that gate). 1) Lint: golangci-lint v2.12.2 on ubuntu reports two unused findings that only exist in the linux build - internal/godriver/controls_other.go:35 func (*controlDomain).destroy is unused, and internal/transaction/namespace.go:310 func existingNamespaceAncestor is unused. Neither reproduces on darwin, which is why local golangci-lint run reports 0 issues. 2) Test (ubuntu-latest): six cmd/curator compiled-build cases fail because rc5-native-control-inventory-v1 defines no record for host linux - TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck, TestGlobalStatusReportsATransitivelyResolvedCompiledCommand, TestCompiledProjectStatusRepairRollbackRecovery, TestStatusReportsATransitivelyResolvedCompiledCommand, TestStatusReportsAnUnusableToolchainPerCompiledCommand, TestGCRetainsAndReportsReferencedCompiledState. The stderr is go-v1 build_execution_control_unavailable: the portable execution policy is specified for macOS and Windows only. Evidence: run 30615765014 jobs 91108467255 and 91108467248, and the isolated control run on branch ci/goenv-control-BUG-260731-3gm8kc which carries only the toolchain-identity repair.
+
+## Scope
+Curator CI linux lane: golangci-lint unused findings and the cmd/curator compiled-status/GC expectations on a host the native control inventory does not cover. Decide per finding whether the code is genuinely dead, whether the linux expectation belongs behind the same platform carve-out the inventory already defines, and how it relates to the open linux qualification item named in the curator-spec conformance README.
+
+## Acceptance Criteria
+Curator CI Lint and Test (ubuntu-latest) pass on main without weakening the unused check or the native control inventory carve-out.

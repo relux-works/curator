@@ -1,0 +1,85 @@
+@startuml
+!theme plain
+!pragma layout smetana
+
+title Curator Go build driver — implementation ownership
+top to bottom direction
+skinparam componentStyle rectangle
+
+package "Accepted protocol gate" #LightGray {
+  [TASK-260720-3ag6pi\nUpstream rc.4 integrated verification] as ProtocolGate
+}
+
+package "Manifest, activation, and logical identity" #LightBlue {
+  [TASK-260720-2g0e3b\nSchema v6 parser] as Parser
+  [TASK-260720-11pfex\nClosure + context exclusion] as Activation
+  [TASK-260720-256kj1\nImmutable build-source identity] as SourceIdentity
+  [TASK-260720-3mrm4z\nCCJ-1 inputs + receipts] as Metadata
+}
+
+package "Trusted build boundary" #LightYellow {
+  [TASK-260720-6i3cya\nTrusted Go session] as Toolchain
+  [TASK-260720-1zntv0\ngo-v1 preflight + private build] as GoBuild
+  [TASK-260720-3pwg2w\nProtected immutable cache] as BuildCache
+}
+
+package "Cross-process lifecycle primitives" #Wheat {
+  [TASK-260720-1zl1cj\nProject, key, and home locks] as Locks
+  [TASK-260720-31nl14\nDurable transaction journal] as Journal
+  [TASK-260720-4bd0it\nMarker v2 + currentness] as Marker
+  [TASK-260720-29hi1h\nRuntime targets + managed shims] as Shims
+}
+
+package "Install and maintenance orchestration" #LightGreen {
+  [TASK-260720-3itlly\nRead-only plan + private staging] as Stage
+  [TASK-260720-2284br\nAtomic cross-scope commit] as Commit
+  [TASK-260720-1ljev5\nProtected build-cache GC] as GC
+  [TASK-260720-1nlmvv\nCLI currentness + repair] as CLI
+}
+
+package "Release evidence" #LightPink {
+  [TASK-260720-2qqq0w\nAuthoring + operator docs] as Docs
+  [TASK-260720-jrrgw9\nrc.4 end-to-end conformance] as Conformance
+  [TASK-260720-1pvfj5\nCross-platform CI gates] as CI
+}
+
+ProtocolGate -down-> Parser
+ProtocolGate -down-> SourceIdentity
+ProtocolGate -down-> Locks
+
+Parser -down-> Activation : active commands
+SourceIdentity -down-> Metadata : source digest
+Metadata -down-> Toolchain : canonical input model
+Metadata -down-> BuildCache : cache key + receipt
+Locks -down-> Journal : caller-held home lock
+
+Parser -down-> GoBuild : validated roots
+SourceIdentity -down-> GoBuild : frozen snapshot
+Toolchain -down-> GoBuild : fixed session
+Activation -down-> Shims : selected commands
+BuildCache -down-> Shims : immutable artifact target
+BuildCache -down-> Marker : receipt + artifact identity
+
+Activation -down-> Stage
+GoBuild -down-> Stage
+BuildCache -down-> Stage
+Marker -down-> Stage
+Shims -down-> Stage
+Journal -down-> Commit
+Stage -down-> Commit
+Commit -down-> GC
+Commit -down-> CLI
+GC -down-> CLI
+
+CLI -down-> Docs
+CLI -down-> Conformance
+Commit -down-> Conformance
+Conformance -down-> CI
+Docs -down-> CI
+
+note right of Stage
+  Exact prerequisite edges and phase ordering
+  are authoritative on the task board.
+end note
+
+@enduml

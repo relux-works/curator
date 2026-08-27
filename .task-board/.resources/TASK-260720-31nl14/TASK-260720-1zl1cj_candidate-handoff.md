@@ -1,0 +1,3 @@
+# Managerlock candidate handoff
+
+TASK-260720-1zl1cj remains blocked solely because native Windows subprocess execution is unavailable without a Windows runner or an unauthorized commit/push. Review cycle 4 found no remaining code or architecture defect. Consume the candidate product diff from /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1zl1cj/worktree. Preserve the native Windows race/full-suite gate for final qualification; Windows cross-compilation is not runtime evidence. Do not mark TASK-260720-1zl1cj done and do not fabricate CI provenance.

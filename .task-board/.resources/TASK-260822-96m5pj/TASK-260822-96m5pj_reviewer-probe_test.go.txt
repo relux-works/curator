@@ -1,0 +1,119 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func probeLoad(t *testing.T, body string) error {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.json")
+	text := `{"schema_version": 1, "skills_root": "x", "projects": {}, "build_ssh": ` + body + "}"
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(path, nil)
+	return err
+}
+
+// Both identity and known_hosts invalid: which field does the parser name?
+func TestProbeFieldFaultDeterminism(t *testing.T) {
+	seen := map[string]int{}
+	for range 200 {
+		err := probeLoad(t, `{"git.example.com": {"agent": true, "identity": "rel/id", "known_hosts": "rel/kh"}}`)
+		if err == nil {
+			t.Fatal("want error")
+		}
+		field := "identity"
+		if strings.Contains(err.Error(), "known_hosts") {
+			field = "known_hosts"
+		}
+		seen[field]++
+	}
+	t.Logf("fault field distribution over 200 runs: %v", seen)
+	if len(seen) > 1 {
+		t.Errorf("NONDETERMINISTIC error field: %v", seen)
+	}
+}
+
+// Scope length boundary at exactly MaxBuildSSHScopeLength.
+func TestProbeScopeLengthBoundary(t *testing.T) {
+	host := "git.example.com/"
+	exact := host + strings.Repeat("a", MaxBuildSSHScopeLength-len(host))
+	if len(exact) != MaxBuildSSHScopeLength {
+		t.Fatalf("len=%d", len(exact))
+	}
+	if !ValidBuildSSHScope(exact) {
+		t.Errorf("scope of exactly %d runes rejected", MaxBuildSSHScopeLength)
+	}
+	if ValidBuildSSHScope(exact + "a") {
+		t.Errorf("scope of %d runes accepted", MaxBuildSSHScopeLength+1)
+	}
+}
+
+// Duplicate-looking scopes that differ only in case of the path.
+func TestProbePathCaseSensitivity(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.json")
+	text := `{"schema_version":1,"skills_root":"x","projects":{},"build_ssh":{"git.example.com/Relux":{"agent":true}}}`
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.BuildSSHFor("git.example.com/Relux/app"); !ok {
+		t.Error("exact-case identity did not match")
+	}
+	if _, ok := cfg.BuildSSHFor("git.example.com/relux/app"); ok {
+		t.Error("lowercased identity matched a mixed-case scope")
+	}
+}
+
+// BuildSSHObject on a credential the parser would never produce.
+func TestProbeObjectAsymmetry(t *testing.T) {
+	c := BuildSSHCredential{Scope: "git.example.com", Agent: false, AgentSocket: "/run/a.sock", Identity: "/keys/id"}
+	object := BuildSSHObject(map[string]BuildSSHCredential{c.Scope: c})
+	t.Logf("invalid credential serializes to: %#v", object)
+	if err := ValidateBuildSSH(c); err == nil {
+		t.Error("expected the credential to be invalid")
+	}
+}
+
+// Nested-map entry values and arrays.
+func TestProbeOddEntryValues(t *testing.T) {
+	for name, body := range map[string]string{
+		"entry is array":        `{"git.example.com": ["agent"]}`,
+		"entry is null":         `{"git.example.com": null}`,
+		"agent object":          `{"git.example.com": {"agent": {"socket": "/run/a.sock"}}}`,
+		"identity array":        `{"git.example.com": {"identity": ["/keys/id"]}}`,
+		"tilde only identity":   `{"git.example.com": {"identity": "~"}}`,
+		"identity newline":      `{"git.example.com": {"identity": "/keys/id\n"}}`,
+		"identity tab":          `{"git.example.com": {"identity": "/keys/\tid"}}`,
+		"unicode path identity": `{"git.example.com": {"identity": "/keys/ünicode"}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := probeLoad(t, body)
+			t.Logf("%s -> %v", name, err)
+		})
+	}
+}
+
+// Scope that is a bare host vs identity that equals the host alone.
+func TestProbeHostOnlyIdentity(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.json")
+	text := `{"schema_version":1,"skills_root":"x","projects":{},"build_ssh":{"git.example.com":{"agent":true}}}`
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"git.example.com/a", "git.example.com/a/b", "git.example.com", "git.example.com/", "git.example.com/.git", "git.example.com/a/../b"} {
+		c, ok := cfg.BuildSSHFor(id)
+		t.Logf("BuildSSHFor(%q) = %q, %v", id, c.Scope, ok)
+	}
+}

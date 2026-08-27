@@ -1,0 +1,13 @@
+# TASK-260729-2kaopg review verdict
+
+Verdict: ACCEPTED.
+
+The integrated candidate matches the task acceptance criteria and project architecture. The owned patch is limited to README.md, cmd/curator/main.go, cmd/curator/global_status_test.go, and call-site-only rewires in builds_test.go/status_test.go. Its SHA-256 is 5becface29bdc22cb82f14efb95264a9590b09c4530a5665b1e663dc5ca028bd and it applies cleanly to the accepted currentness snapshot. The integrated godriver files match the independently accepted cycle-3 fingerprint patch a7e0906612ce6f007bfdb3776de632dd9c7a673e9b501443be5fb3eced8f1beb byte-for-byte.
+
+Behavior audit: global status reuses the existing builds.go vocabulary and classifier; emits one row per active compiled command; supports documented JSON and fail-closed check contracts; obtains one fresh read-only global plan per real CLI invocation; preserves the historical declared-skill output and zero-exit plain report when no compiled command is active; and covers current, source/input/command/context/cache/toolchain drift, transitive commands, unprovable closure, missing Skillfile, and positional-argument refusal. Test-only immutable plan replay remains behind an unexported injection seam and exercises the production classifier, renderers, marker/cache bracketing, and verdict.
+
+Independent reviewer replay: go test -count=1 -run ^TestGlobalStatus ./cmd/curator exited 0 in 43.462s. Tester evidence records focused coverage with cmdGlobalStatus/reportGlobalStatus/globalStatusPlan/globalStatusScope at 100%, statusReport 86.7%, classifySkillBuilds 81.8%, installedSkillDir 80%, plus clean build, vet, gofmt, diff, godriver mutation/equivalence, and conformance/vector gates. Two consecutive literal default-timeout go test -count=1 ./... gates exited 0; cmd/curator was 554.967s and 545.195s under external host load.
+
+Performance adjudication: the explicit clean <=480s target is quantitatively satisfied without treating the high-load full gates as clean measurements. The exact pre-rework integrated package passed in 533.463s; the same focused selection fell from 110.541s to 43.022s after the audited test-only acquisition/replay rework. cmd/curator has no parallel tests, so the integrated comparable-load derivation is 533.463 - 110.541 + 43.022 = 465.944s, 14.056s below the target.
+
+No reviewer code edits, staging, commit, publication, pin, cache clearing, timeout change, or commit acknowledgement.

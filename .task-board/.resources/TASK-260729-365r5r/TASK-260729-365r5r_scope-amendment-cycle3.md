@@ -1,0 +1,5 @@
+# Cycle 3 scope amendment
+
+Orchestrator decision: APPROVED. The fourth cleanup-tomb closure parameter rename from t *testing.T to _ *testing.T in internal/transaction/namespace_pass_test.go is authorized, together with the mechanically matching adaptation in the equivcheck copy. This is the same lint-only correction as the first three renames; it was hidden initially by golangci-lint max-same-issues truncation.
+
+Preserve the current product and test source bytes. Do not run Go, lint, build, test, benchmark, or detached commands. Correct only the contradictory final sentence in TASK-260729-365r5r_results.md so it accurately states that the equivcheck adaptation contains the same four closure-parameter renames and that gate-rw2-equivalence exited 0. Update the board resource through task-board, hand off to review, and do not mark done.

@@ -1,0 +1,87 @@
+@startuml
+!theme plain
+
+title Curator Go build driver — safe install lifecycle
+
+start
+:Classify dry-run or real operation;
+
+if (Real operation?) then (yes)
+  :Acquire canonical project operation lock(s)\n(TASK-260720-1zl1cj);
+  :Acquire manager-home lock;
+  :Recover every incomplete transaction journal\n(TASK-260720-31nl14);
+  :Release manager-home lock;
+else (dry-run)
+  note right
+    No project, key, or manager-home lock is created.
+  end note
+endif
+
+partition "Compiler-free validation and trust gates" #LightBlue {
+  :Resolve and freeze immutable snapshots;
+  :Parse schema v6 and validate build roots\n(TASK-260720-2g0e3b);
+  :Compute build-source identity before cache lookup\n(TASK-260720-256kj1);
+  :Build closure, check collisions, and exclude build roots\n(TASK-260720-11pfex);
+  :Run skill check, system, MCP, audit, registry,\nattestation, and moved-tag gates;
+}
+
+partition "Toolchain and cache planning" #LightYellow {
+  :Create an operation-private probe and establish\nthe trusted Go session (TASK-260720-6i3cya);
+  :Derive exact inputs and inspect the protected cache\nread-only (TASK-260720-3mrm4z / 3pwg2w);
+}
+
+if (Dry-run?) then (yes)
+  :Report exact hit, would-build, untrusted,\ncorrupt, or unsupported outcomes;
+  :Delete the operation-private probe;
+  note right
+    No go list or go build.
+    No cache, marker, runtime, shim, adapter,
+    journal, consumer, or GC mutation.
+  end note
+  stop
+else (real operation)
+endif
+
+partition "Operation-private build staging" #Moccasin {
+  :For every miss, run fixed go list and validate\nthe complete graph (TASK-260720-1zntv0);
+  :Run fixed internal-link go build;
+  :Verify and hash each artifact and canonical receipt;
+}
+
+if (Any staged build failed?) then (yes)
+  :Delete private staging and probe state;
+  :Release project operation lock(s);
+  note right
+    Previous install and live cache remain byte-for-byte intact.
+  end note
+  stop
+else (no)
+endif
+
+partition "Serialized publication and commit" #LightGreen {
+  :Acquire manager-home lock;
+  :Recover journals and revalidate cache boundary,\nclosure generations, owners, preimages, and keys;
+  if (Consulted state changed?) then (yes)
+    :Release manager-home lock;
+    :Discard stale staging and restart from\nthe earliest affected planning step;
+    stop
+  else (no)
+  endif
+  :Publish verified immutable cache winners;
+  :Write a durable target journal;
+  :Atomically swap contexts, marker v2, runtime, shims,\nenv files, adapters, mirrors, and managed removals;
+  :Commit the machine-wide consumer ledger last\n(TASK-260720-2284br);
+}
+
+if (Publication or target swap failed?) then (yes)
+  :Keep the manager-home lock and restore journaled\ntargets in exact reverse order;
+  :Preserve pre-existing immutable cache entries;
+else (no)
+  :Durably remove backups and journal;
+  :Run locked runtime, snapshot, and build-cache GC\n(TASK-260720-1ljev5);
+endif
+
+:Release manager-home lock, then project lock(s);
+stop
+
+@enduml

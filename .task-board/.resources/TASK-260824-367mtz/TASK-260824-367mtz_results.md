@@ -1,0 +1,4 @@
+# Binary refreshed and auto-return fired
+
+- ~/.local/bin/curator rebuilt from curator origin/main at 272b203 (SPEC_PIN on the rc.9 release commit; all schema-8 module-roots implementation included): curator v0.14.0-rc.3-45-g272b203. Sanity: --version ok, skill check runs (known nonfatal SKILL.md command-resolution warning on the skill repo).
+- Auto-return trigger recorded on skill-project-management board TASK-260822-hje0ya with the full evidence chain: rc.9 release (v1.0.0-rc.9, spec commit 0ed5c69), curator qualification run 32689488293, cocoaskills qualification run 32756144649, consumer pins 272b203 (curator) and PR 46 (cocoaskills), green post-merge mains everywhere.

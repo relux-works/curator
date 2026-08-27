@@ -1,0 +1,68 @@
+@startuml
+!theme plain
+
+title Protocol v6 integrated verification — evidence gates
+
+start
+
+partition "Gate 1 — Normative contract" #LightBlue {
+  :TASK-260720-1nvomm\nCore, security, and decision record;
+  :TASK-260720-17llva\nNormative go-v1 process and install ordering;
+}
+
+if (Normative contract covers every accepted decision?) then (yes)
+else (no)
+  :Route the defect to its normative owner;
+  stop
+endif
+
+partition "Gate 2 — Wire compatibility" #LightGreen {
+  :TASK-260720-wajgn8 + TASK-260720-12iigs\nManifest v6, receipt v1, and marker v2;
+  :TASK-260720-2zc6k1 + TASK-260720-37ei85\nClaim v2 and frozen legacy contracts;
+}
+
+if (Schemas, cases, identities, and legacy guards agree?) then (yes)
+else (no)
+  :Route the defect to its schema or compatibility owner;
+  stop
+endif
+
+partition "Gate 3 — Executable conformance" #LightYellow {
+  :TASK-260720-1s1vr6\nBuild-driver identities and rejection vectors;
+  :TASK-260720-cw39jh\nDry-run, transaction, concurrency, and recovery vectors;
+  :TASK-260720-1u7hes\nFail-closed validator and release inventory;
+}
+
+if (All required cases are named, indexed, and enforced?) then (yes)
+else (no)
+  :Route the defect to its vector or validation owner;
+  stop
+endif
+
+partition "Gate 4 — Publication evidence" #LightPink {
+  :TASK-260720-3lo9jc\nAuthoring, conformance, and CLI documentation;
+  :TASK-260720-q5oy3o\nProtocol rc.4 compatibility and release metadata;
+}
+
+if (Links, versions, and release claims are accurate?) then (yes)
+else (no)
+  :Route the defect to its documentation or release owner;
+  stop
+endif
+
+partition "TASK-260720-3ag6pi — Integrated verification" #LightGray {
+  :Run make validate;
+  :Run two byte-stable regenerations\nand make regenerate-check;
+  :Run make release-check VERSION=1.0.0-rc.4;
+  :Map every story AC and rejection cluster\nto passing executable evidence;
+}
+
+if (Every integrated gate passes?) then (yes)
+  :Attach task-scoped logs and coverage matrix;
+  stop
+else (no)
+  :Route substantive defects to the owning task;
+  stop
+endif
+
+@enduml

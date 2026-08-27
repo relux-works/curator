@@ -1,0 +1,195 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 22820cb..8ccd9e1 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3038,3 +3038,9 @@ PR #22 merged as 1f55f1b4e: six signed commits assembled from the accepted patch
+ - SPEC EVIDENCE: local validate and rc.9 release-check passed; both vector families regenerated twice byte-identically. Specification CI run `32633567102` passed on the exact candidate SHA across Linux, macOS, and Windows.
+ - STOP-THE-LINE: Curator candidate-conformance run `32633572039` is red. Ubuntu records the exact candidate identity then exposes the unlanded multi-project dry-run binding defect (fix remains on open PR #14); Windows exposes a `shasum` path-escaping portability defect in candidate identity normalization. Neither gate nor digest was weakened to manufacture green evidence. Downstream implementation qualification and the later atomic landing remain required; `SPEC_PIN` is unchanged.
+ - EVIDENCE: board outcome `TASK-260822-c0rxj7_results.md` plus task-scoped identity, regeneration inventories, and CI logs under `.temp/TASK-260822-c0rxj7/`.
++
++### 0052 — BUG-260823-1vx45a: managerlock subprocess results preceded lock release
++
++- ROOT CAUSE: `TestManagerLockHelper` registered acquired `Operation` and `HomeLock` handles with `testing.T.Cleanup`, then printed `acquired` or `blocked` before those callbacks ran. `TestSubprocessBuildKeyDeduplicationAcrossProjects` likewise left its parent operation to deferred test cleanup. Unix permits unlinking an open file and hid the lifecycle gap; Windows keeps `.lock` files undeletable while either process still owns a handle, so `t.TempDir` cleanup could fail after the assertions passed.
++- FIX AND REGRESSION SHAPE: helper branches now close every lock explicitly before publishing their result, including the normal `hold-project` EOF path, and the build-key test closes its parent operation in the test body. The final helper invocation in both affected tests uses an opt-in handshake: the child releases its lock, prints the result, and remains alive while the parent removes the manager home. On Windows the old cleanup-deferred lifecycle makes that removal fail deterministically; the corrected lifecycle permits it without moving state out of `t.TempDir` or suppressing cleanup errors.
++- CURRENT-BYTE EVIDENCE: macOS named tests 10x, package 5x, and named race tests 5x exited 0; Linux/arm64 Go 1.25.5 named tests 10x and package 5x exited 0; Windows/amd64 test-binary compilation exited 0; `go vet ./...`, `golangci-lint run`, build, and diff hygiene exited 0. Native Windows execution was not available because the online Tailscale Windows host rejected every loaded public key for `administrator`; five consecutive Windows CI runs therefore remain a post-publication gate for the commit/PR-owning orchestrator.
+diff --git a/internal/managerlock/managerlock_test.go b/internal/managerlock/managerlock_test.go
+index 2bffe50..c26661e 100644
+--- a/internal/managerlock/managerlock_test.go
++++ b/internal/managerlock/managerlock_test.go
+@@ -21,6 +21,7 @@ const (
+ 	helperHomeEnv    = "CURATOR_MANAGERLOCK_HELPER_HOME"
+ 	helperProjectEnv = "CURATOR_MANAGERLOCK_HELPER_PROJECT"
+ 	helperKeyEnv     = "CURATOR_MANAGERLOCK_HELPER_KEY"
++	helperWaitEnv    = "CURATOR_MANAGERLOCK_HELPER_WAIT_AFTER_RESULT"
+ )
+ 
+ func TestCanonicalProjectIdentitiesAndOrder(t *testing.T) {
+@@ -481,7 +482,7 @@ func TestSubprocessContentionAndIndependentProjects(t *testing.T) {
+ 	if err := homeLock.Close(); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runHelper(t, "try-home", home, ""); got != "acquired" {
++	if got := runWaitingHelper(t, "try-home", home, "", ""); got != "acquired" {
+ 		t.Fatalf("released home helper = %q, want acquired", got)
+ 	}
+ }
+@@ -495,7 +496,6 @@ func TestSubprocessBuildKeyDeduplicationAcrossProjects(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	operation := manager.NewOperation(false)
+-	cleanupOperation(t, operation)
+ 	if _, err := operation.AcquireProjects(context.Background(), projectA); err != nil {
+ 		t.Fatal(err)
+ 	}
+@@ -511,7 +511,10 @@ func TestSubprocessBuildKeyDeduplicationAcrossProjects(t *testing.T) {
+ 	if err := operation.ReleaseBuildKey(); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if got := runKeyHelper(t, home, projectB, "sha256:shared"); got != "acquired" {
++	if err := operation.Close(); err != nil {
++		t.Fatal(err)
++	}
++	if got := runWaitingHelper(t, "try-key", home, projectB, "sha256:shared"); got != "acquired" {
+ 		t.Fatalf("released build key helper = %q, want acquired", got)
+ 	}
+ }
+@@ -584,6 +587,56 @@ func runKeyHelper(t *testing.T, home, project, key string) string {
+ 	return line
+ }
+ 
++func runWaitingHelper(t *testing.T, mode, home, project, key string) string {
++	t.Helper()
++	command := helperCommand(mode, home, project)
++	command.Env = append(command.Env, helperWaitEnv+"=1")
++	if key != "" {
++		command.Env = append(command.Env, helperKeyEnv+"="+key)
++	}
++	stdout, err := command.StdoutPipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	var stderr bytes.Buffer
++	command.Stderr = &stderr
++	stdin, err := command.StdinPipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := command.Start(); err != nil {
++		t.Fatal(err)
++	}
++	defer func() {
++		if command.ProcessState == nil {
++			_ = stdin.Close()
++			_ = command.Process.Kill()
++			_ = command.Wait()
++		}
++	}()
++
++	scanner := bufio.NewScanner(stdout)
++	if !scanner.Scan() {
++		t.Fatalf("waiting helper %s produced no result: %v\n%s", mode, scanner.Err(), stderr.String())
++	}
++	result := scanner.Text()
++	if err := os.RemoveAll(home); err != nil {
++		t.Fatalf("remove released manager home while helper is alive: %v", err)
++	}
++	if err := stdin.Close(); err != nil {
++		t.Fatal(err)
++	}
++	for scanner.Scan() {
++	}
++	if err := scanner.Err(); err != nil {
++		t.Fatal(err)
++	}
++	if err := command.Wait(); err != nil {
++		t.Fatalf("waiting helper %s failed: %v\n%s", mode, err, stderr.String())
++	}
++	return result
++}
++
+ func helperCommand(mode, home, project string) *exec.Cmd {
+ 	command := exec.Command(os.Args[0], "-test.run=^TestManagerLockHelper$")
+ 	command.Env = append(os.Environ(),
+@@ -605,46 +658,65 @@ func TestManagerLockHelper(t *testing.T) {
+ 	}
+ 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+ 	defer cancel()
++	var release func() error
+ 	switch mode {
+ 	case "try-project":
+ 		operation := manager.NewOperation(false)
+-		cleanupOperation(t, operation)
++		release = operation.Close
+ 		_, err = operation.AcquireProjects(ctx, os.Getenv(helperProjectEnv))
+ 	case "try-home":
+ 		var lock *HomeLock
+ 		lock, err = manager.AcquireHomeOnly(ctx, false)
+ 		if lock != nil {
+-			cleanupHomeLock(t, lock)
++			release = lock.Close
+ 		}
+ 	case "try-key":
+ 		operation := manager.NewOperation(false)
+-		cleanupOperation(t, operation)
++		release = operation.Close
+ 		if _, err = operation.AcquireProjects(ctx, os.Getenv(helperProjectEnv)); err == nil {
+ 			err = operation.AcquireBuildKey(ctx, os.Getenv(helperKeyEnv))
+ 		}
+ 	case "hold-project":
+ 		operation := manager.NewOperation(false)
+-		cleanupOperation(t, operation)
+ 		if _, err = operation.AcquireProjects(context.Background(), os.Getenv(helperProjectEnv)); err == nil {
+ 			fmt.Println("ready")
+ 			_ = os.Stdout.Sync()
+ 			_, _ = io.Copy(io.Discard, os.Stdin)
++			if closeErr := operation.Close(); closeErr != nil {
++				t.Fatalf("release held project lock: %v", closeErr)
++			}
+ 			return
+ 		}
++		if closeErr := operation.Close(); closeErr != nil {
++			err = errors.Join(err, closeErr)
++		}
+ 	default:
+ 		t.Fatalf("unknown helper mode %q", mode)
+ 	}
++	if release != nil {
++		err = errors.Join(err, release())
++	}
+ 	if err == nil {
+ 		fmt.Println("acquired")
++		waitAfterHelperResult()
+ 		return
+ 	}
+ 	if errors.Is(err, context.DeadlineExceeded) {
+ 		fmt.Println("blocked")
++		waitAfterHelperResult()
+ 		return
+ 	}
+ 	t.Fatalf("helper lock error: %v", err)
+ }
+ 
++func waitAfterHelperResult() {
++	if os.Getenv(helperWaitEnv) == "" {
++		return
++	}
++	_ = os.Stdout.Sync()
++	_, _ = io.Copy(io.Discard, os.Stdin)
++}
++
+ func cleanupOperation(t *testing.T, operation *Operation) {
+ 	t.Helper()
+ 	t.Cleanup(func() {
+@@ -653,12 +725,3 @@ func cleanupOperation(t *testing.T, operation *Operation) {
+ 		}
+ 	})
+ }
+-
+-func cleanupHomeLock(t *testing.T, lock *HomeLock) {
+-	t.Helper()
+-	t.Cleanup(func() {
+-		if err := lock.Close(); err != nil {
+-			t.Errorf("release manager-home lock: %v", err)
+-		}
+-	})
+-}

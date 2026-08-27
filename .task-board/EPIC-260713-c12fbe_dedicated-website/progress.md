@@ -1,5 +1,5 @@
 ## Status
-backlog
+todo
 
 ## Assigned To
 (unassigned)
