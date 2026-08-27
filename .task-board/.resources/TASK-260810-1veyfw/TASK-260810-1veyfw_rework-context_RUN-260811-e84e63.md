@@ -77,7 +77,7 @@ That evidence does not agree with the current scanned source:
 - `/Users/iv/agents/skills/skill-grafana` is a clean Git checkout at
   `6234e2a3ef35415b765f74cca21c8ad7846f521e` on
   `feature/oparin/PMA-23845` (remote
-  `git@gitlab.wildberries.ru:portals/agentic-infra/skills/skill-grafana.git`).
+  `git@gitlab.intranet:portals/agentic-infra/skills/skill-grafana.git`).
 - Its authoritative checked-in `csk-skill.json` declares three script
   commands: `analyze -> scripts/grafana-analyze`,
   `query -> scripts/grafana-query`, and

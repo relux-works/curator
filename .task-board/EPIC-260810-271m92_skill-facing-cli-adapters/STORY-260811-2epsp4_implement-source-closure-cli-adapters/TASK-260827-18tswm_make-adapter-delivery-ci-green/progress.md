@@ -1,5 +1,5 @@
 ## Status
-reviewing
+development
 
 ## Review
 required
@@ -30,9 +30,9 @@ estimated(fibonacci(13))
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
 - [ ] Implementation matches AC
-- [ ] Solution fits project architecture
-- [ ] Tests green
-- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
 spawn agent resolution: Agent selection: codex via explicit_override
@@ -54,6 +54,13 @@ spawn agent resolution: Agent selection: codex via explicit_override
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [reviewer] reviewer (codex) (run=RUN-260827-34e3b7, max_parallel=20)
 spawn run started: [reviewer] reviewer (codex) (run=RUN-260827-34e3b7)
+Review RUN-260827-34e3b7: changes requested. Crossconformance derives the Rust-unavailable exception from all Obligations except shared admission, so a future seventh Rust obligation would silently become allowed. Replace it with an explicit closed six-gap set and add a negative extra-Rust-gap regression; preserve mandatory artifact.shared_admission/rust. Full disposition and rerun evidence: TASK-260827-18tswm_review-verdict_RUN-260827-34e3b7.md
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260827-34e3b7, pid=53918, exit=0)
+spawn agent resolution: Agent selection: codex via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260827-9339ff, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260827-9339ff)
 
 ## Precondition Resources
 (none)
@@ -63,12 +70,15 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260827-34e3b7)
 - [TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-f31608.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-f31608.log) — System spawn log captured by task-board
 - [TASK-260827-18tswm_results.md](file://TASK-260827-18tswm/TASK-260827-18tswm_results.md) — Developer outcome: failure dispositions, validation exit codes, known non-green diagnostics, and remote-CI evidence boundary
 - [TASK-260827-18tswm_spawn-log_-reviewer--reviewer--codex-_RUN-260827-34e3b7.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-reviewer--reviewer--codex-_RUN-260827-34e3b7.log) — System spawn log captured by task-board
+- [TASK-260827-18tswm_review-verdict_RUN-260827-34e3b7.md](file://TASK-260827-18tswm/TASK-260827-18tswm_review-verdict_RUN-260827-34e3b7.md) — Reviewer verdict: changes requested because Rust-unavailable completeness exception is dynamically open to future obligations; includes per-item review and rerun evidence
+- [TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-9339ff.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-9339ff.log) — System spawn log captured by task-board
+- [TASK-260827-18tswm_rework-outcome_RUN-260827-9339ff.md](file://TASK-260827-18tswm/TASK-260827-18tswm_rework-outcome_RUN-260827-9339ff.md) — Focused rework: closed six-pair Rust gap enumeration, negative regressions, and validation evidence
 
 ## Created
 2026-08-27T02:58:38Z
 
 ## Last Update
-2026-08-27T03:38:07Z
+2026-08-27T04:01:35Z
 
 ## Assigned To
-[reviewer] reviewer (codex)
+[implementer] developer (codex)
