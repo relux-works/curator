@@ -1,0 +1,52 @@
+# Platform case ledger for the compiled-build CI gates.
+#
+# `.github/ci/test-gate.sh` enforces this table against a `go test -json` stream:
+#
+#   * a skip is ONLY tolerated when a row lists the current GOOS in
+#     `skip_allowed_on`.  Every other skip fails the gate, so a case can never
+#     disappear silently.
+#   * every row that lists the current GOOS in `must_run_on` must be observed
+#     as a passing test.  A renamed, deleted or newly-skipped case fails the
+#     gate instead of quietly reducing coverage.
+#
+# Columns are TAB separated.  `must_run_on` / `skip_allowed_on` take a comma
+# separated subset of {linux,darwin,windows}, or `-` for the empty set.
+# Comments and blank lines are ignored.
+#
+# Scope note, deliberately recorded rather than faked: this repository revision
+# implements the portable protocol surface.  The schema v6 build-driver
+# resource-policy controls (`vectors/go-host-execution-policy.json`
+# #native_control_inventory: per-file-size-limit, aggregate-memory-limit,
+# active-process-count-limit, inherited-handle-restriction,
+# descendant-domain-termination) and the read-only build-source cases
+# (`vectors/build-drivers.json` #build_source_cases) have NO consumer package
+# here yet.  They are covered by the candidate lane, whose coverage gate fails
+# closed until those packages land -- see `.github/ci/candidate-suite.sh` and
+# the `candidate-conformance` job.  Nothing in this table pretends to cover
+# them.
+#
+# package	test	must_run_on	skip_allowed_on	behaviour
+
+# --- Windows launcher surface: `.cmd` shims ---------------------------------
+internal/runtimestore	TestInstallSingleCommandAndShims	linux,darwin,windows	-	writes the `run.cmd` Windows launcher and asserts its `@echo off` payload
+internal/runtimestore	TestRuntimeCommandPath	linux,darwin,windows	-	maps a `tool.cmd` Windows launcher back to its command name
+
+# --- Link behaviour: POSIX symlink / Windows reparse point ------------------
+internal/adapters	TestSymlinkModeUsesRelativeLinks	linux,darwin,windows	-	creates a link (Windows: a reparse point) and asserts it stays relative
+internal/gitops	TestArchiveRejectsLinks	linux,darwin	windows	no-follow: archiving refuses a tree containing links (needs `ln`, absent from the Windows job PATH)
+
+# --- Ownership and permission ----------------------------------------------
+internal/config	TestBootstrapAndAddProject	linux,darwin,windows	-	asserts the manager config is written with private (0o600) ownership bits on unix
+
+# --- Executable behaviour ---------------------------------------------------
+internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	linux,darwin	windows	executes the POSIX shell hook end to end (Git Bash rewrites Win32 paths)
+internal/shell	TestPowerShellHookRunsOnEveryPrompt	windows	linux,darwin	executes the PowerShell prompt hook end to end
+internal/envfiles	TestWriteProjectShapesAndSourcing	linux,darwin,windows	-	sources the generated env file through a real shell on unix; shape-only on Windows
+internal/install	TestEndToEndInstall	linux,darwin,windows	-	materialises the executable shim and env files of a full install
+
+# --- Read-only source boundary ---------------------------------------------
+internal/install	TestDryRunTouchesNothing	linux,darwin,windows	-	proves a dry run leaves the source and target trees unwritten
+internal/whitelist	TestRuntimeRootsExcludedFromContext	linux,darwin,windows	-	proves runtime roots stay outside the copied agent context
+
+# --- Opt-in developer probe -------------------------------------------------
+internal/hashing	TestCrossCheckTree	-	linux,darwin,windows	cross-implementation tree digest probe, enabled by an explicit developer env var

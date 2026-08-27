@@ -4,9 +4,43 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: >-
+          Full 40-character relux-works/curator-spec revision holding the schema v6
+          candidate suite. Branches, tags, short hashes and placeholders are rejected.
+          Leave empty to use candidate_root instead.
+        required: false
+        default: ""
+      candidate_root:
+        description: >-
+          Absolute path to a conformance/v1 root already materialised on the runner.
+          Use instead of candidate_ref when the candidate has no published revision.
+        required: false
+        default: ""
+      candidate_manifest_sha256:
+        description: >-
+          Expected sha256 of <root>/manifest.json. When set, a mismatch aborts the run
+          rather than silently re-baselining onto a different candidate.
+        required: false
+        default: ""
 
 permissions:
   contents: read
+
+env:
+  # The one immutable committed protocol-suite pin, referenced by every job.
+  # It stays on the currently qualified released revision; promoting it is owned
+  # by TASK-260720-38l1sy, after TASK-260720-25d05o qualifies the release.
+  # This pin publishes protocol 1.0.0-rc.3 and claims no later revision.
+  SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+  # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
+  # workflow pins @v5, so without these two lines a job may download a
+  # toolchain or read a per-user go env file. The identity step below reads
+  # both back rather than trusting this block.
+  GOTOOLCHAIN: local
+  GOENV: off
 
 jobs:
   test:
@@ -25,15 +59,20 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: relux-works/curator-spec
-          ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+          ref: ${{ env.SPEC_PIN }}
           path: protocol-spec
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
       - name: gofmt check
         if: runner.os != 'Windows'
+        shell: bash
         run: |
           unformatted="$(gofmt -l cmd internal)"
           if [ -n "$unformatted" ]; then
@@ -45,10 +84,71 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      - name: go test
+      # Runs the whole package set and enforces .github/ci/platform-cases.tsv:
+      # the Windows runner must execute the .cmd launcher and reparse-point
+      # cases, the unix runners must execute the ownership, no-follow,
+      # read-only-source and executable cases, and no case may skip unless the
+      # ledger names it as a platform control on this GOOS.
+      - name: go test + platform-case gate
+        shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
-        run: go test ./...
+        run: bash .github/ci/test-gate.sh .temp/ci-evidence/test ./...
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-evidence-${{ matrix.os }}
+          path: .temp/ci-evidence/
+          if-no-files-found: warn
+
+  race:
+    name: Race (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu satisfies the "supported race job on at least Linux" clause and
+        # covers the install and conformance packages; macOS is the second
+        # supported race runner. windows-latest is deliberately absent: the Go
+        # race detector needs a C toolchain there and this repository has no
+        # measurement that the hosted image satisfies it. Recorded, not dropped
+        # silently.
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ env.SPEC_PIN }}
+          path: protocol-spec
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
+      - name: go test -race ./...
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: bash .github/ci/test-gate.sh .temp/ci-evidence/race ./...
+
+      - name: Upload race evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: race-evidence-${{ matrix.os }}
+          path: .temp/ci-evidence/
+          if-no-files-found: warn
 
   lint:
     name: Lint
@@ -62,9 +162,52 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
+      # `version: latest` is a mutable supply-chain input: a new golangci-lint
+      # release can turn this job red with no repository change. Pinned to the
+      # version `latest` resolved to when this gate was written.
       - uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          version: v2.12.2
+
+      # The AC forbids broad suppression for new security code. The narrow,
+      # documented gosec excludes in .golangci.yml are the only sanctioned
+      # suppression surface; blanket file-level or linter-wide disables are not.
+      - name: No broad suppression
+        shell: bash
+        run: |
+          set -u
+          rc=0
+          if grep -rInE '//[[:space:]]*nolint([[:space:]]|$|:all)' --include='*.go' cmd internal; then
+            echo 'lint: bare or all-linter //nolint is not allowed; name the linter and the reason.'
+            rc=1
+          fi
+          if grep -rInE '//[[:space:]]*#nosec([[:space:]]*$)' --include='*.go' cmd internal; then
+            echo 'lint: bare //#nosec is not allowed; name the rule and the reason.'
+            rc=1
+          fi
+          if [ "$rc" -eq 0 ]; then echo 'no-broad-suppression: ok'; fi
+          exit "$rc"
+
+  # The gates are only worth their exit codes if they reject what they claim
+  # to reject. This runs on all three runners because the gate scripts must
+  # behave identically under Git Bash on Windows.
+  gate-selftest:
+    name: Gate self-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Self-test the CI gates
+        shell: bash
+        run: bash .github/ci/gate-selftest.sh
 
   interop:
     name: Interop conformance gate
@@ -78,17 +221,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: relux-works/curator-spec
-          ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+          ref: ${{ env.SPEC_PIN }}
           path: protocol-spec
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
       - name: Shared protocol suite
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
-        run: go test ./internal/interop/ -v
+        run: go test -count=1 -timeout 30m ./internal/interop/ -v
 
   naming-gate:
     name: Naming gate
@@ -115,3 +262,101 @@ jobs:
             exit 1
           fi
           echo "naming gate: clean (one README line)"
+
+  # ---------------------------------------------------------------------------
+  # Schema v6 candidate qualification.
+  #
+  # Non-default by construction: it runs only on an explicit workflow_dispatch
+  # that supplies a candidate, never on push or pull_request, and it never
+  # touches SPEC_PIN. Its output is candidate evidence, stamped in the artifact
+  # itself as neither a published release nor a conformance claim.
+  # ---------------------------------------------------------------------------
+  candidate-conformance:
+    name: Candidate suite (${{ matrix.os }})
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.candidate_ref != '' || inputs.candidate_root != '')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Reject a non-immutable candidate revision
+        if: inputs.candidate_ref != ''
+        shell: bash
+        env:
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
+        run: bash .github/ci/candidate-suite.sh verify-ref "$CANDIDATE_REF"
+
+      - name: Check out the candidate suite
+        if: inputs.candidate_ref != ''
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ inputs.candidate_ref }}
+          path: candidate-spec
+
+      # The committed released pin is checked out here only so the candidate
+      # can be proved to differ from it. This job never runs against it and
+      # never modifies it.
+      - name: Checkout the committed released pin for comparison
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ env.SPEC_PIN }}
+          path: protocol-spec
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
+      - name: Resolve and record the candidate suite identity
+        id: candidate
+        shell: bash
+        env:
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
+          CANDIDATE_ROOT_INPUT: ${{ inputs.candidate_root }}
+          CANDIDATE_EXPECTED_MANIFEST_SHA256: ${{ inputs.candidate_manifest_sha256 }}
+        run: |
+          set -u
+          if [ -n "$CANDIDATE_ROOT_INPUT" ]; then
+            root="$CANDIDATE_ROOT_INPUT"
+          else
+            root="$GITHUB_WORKSPACE/candidate-spec/conformance/v1"
+          fi
+          echo "root=$root" >>"$GITHUB_OUTPUT"
+
+          pin_manifest="$GITHUB_WORKSPACE/protocol-spec/conformance/v1/manifest.json"
+          if command -v shasum >/dev/null 2>&1; then
+            PIN_MANIFEST_SHA256="$(shasum -a 256 "$pin_manifest" | awk '{print $1}')"
+          else
+            PIN_MANIFEST_SHA256="$(sha256sum "$pin_manifest" | awk '{print $1}')"
+          fi
+          export PIN_MANIFEST_SHA256
+          bash .github/ci/candidate-suite.sh record "$root" .temp/ci-evidence/candidate
+
+      # The full candidate suite on every platform. The platform-case ledger is
+      # enforced here exactly as in the default lane, so a candidate run cannot
+      # report success while a platform case quietly stopped executing.
+      - name: Candidate suite + platform-case gate
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ steps.candidate.outputs.root }}
+        run: bash .github/ci/test-gate.sh .temp/ci-evidence/test ./...
+
+      - name: Upload candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-evidence-${{ matrix.os }}
+          path: .temp/ci-evidence/
+          if-no-files-found: warn
