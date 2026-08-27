@@ -513,3 +513,35 @@ func assertFixedBuildEnvironment(t *testing.T, environment []string, session *Se
 		t.Fatalf("PATH is not an empty manager-owned directory: %v %v", entries, err)
 	}
 }
+
+// TestBuildCompilesThroughAVendoredGeneratorDirective drives the production
+// entry point, not just the graph validator: a real materialized vendor tree
+// carrying an inert //go:generate must reach `go build` instead of stopping at
+// preflight, which is the case that blocks task-board-tui (bubbletea reaches
+// clipperhouse/displaywidth through charmbracelet/x/ansi).
+func TestBuildCompilesThroughAVendoredGeneratorDirective(t *testing.T) {
+	fixture := newSnapshotFixture(t)
+	vendorDir := filepath.Join(fixture.buildRoot, "vendor", "example.test", "dep", "value")
+	writeTestFile(t, filepath.Join(vendorDir, "value.go"),
+		[]byte("package value\n//go:generate stringer -type=Value\nconst V = 1\n"), 0o644)
+	writeTestFile(t, filepath.Join(fixture.buildRoot, "vendor", "modules.txt"),
+		[]byte("# example.test/dep v1.0.0\n## explicit; go 1.23\nexample.test/dep/value\n"), 0o644)
+	vendored := packageJSON{
+		Dir: vendorDir, ImportPath: "example.test/dep/value", Name: "value", DepOnly: true,
+		GoFiles: []string{"value.go"},
+		Module:  &moduleJSON{Path: "example.test/dep", Version: "v1.0.0", GoVersion: "1.23"},
+	}
+	fixture.start(stubScript{ListStdout: string(encodePackages(t, vendored, fixture.rootPackage())), Artifact: "artifact"})
+
+	result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
+	if err != nil {
+		t.Fatalf("vendored generator directive stopped the build: %v", err)
+	}
+	calls := fixture.sourceAwareCalls()
+	if len(calls) != 2 {
+		t.Fatalf("source-aware calls = %d, want one list and one build", len(calls))
+	}
+	if !reflect.DeepEqual(calls[1].Argv, wantBuildArgv(result.Artifact.StagedPath)) {
+		t.Fatalf("build argv = %q", calls[1].Argv)
+	}
+}

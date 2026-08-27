@@ -244,7 +244,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 			if matched == 1 && item.ImportPath != "golang.org/x/sys" && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys/") {
 				return diagnostic("go_forbidden_compiler_directive", "package %q contains //go:cgo_import_dynamic", item.ImportPath)
 			}
-			if matched == 2 {
+			if matched == 2 && !vendoredDependency(item, validation.BuildRoot) {
 				return diagnostic("go_generator_forbidden", "package %q contains an active generator directive", item.ImportPath)
 			}
 		}
@@ -267,6 +267,21 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 		}
 	}
 	return nil
+}
+
+// vendoredDependency reports whether a result is third-party code the build root
+// materialized into its vendor tree, rather than code the build root owns. The
+// //go:generate relaxation of decision 0005 is bounded to exactly this set: the
+// directive is inert because the manager never runs generators and `go build
+// -mod=vendor` does not execute them, and a vendored dependency cannot drop a
+// directive the upstream release ships. First-party code, including a main-module
+// package that happens to sit below the vendor directory, can simply not use the
+// construct and is still rejected.
+func vendoredDependency(item packageJSON, buildRoot string) bool {
+	if item.Module == nil || item.Module.Main {
+		return false
+	}
+	return strictlyBelow(item.Dir, filepath.Join(buildRoot, "vendor"))
 }
 
 func scanSourceDirectives(path string) (int, error) {

@@ -3,6 +3,21 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-08-25
+
+### 0558 — `BUG-260825-11nmd5`: the vendored `//go:generate` carve-out, and why the bound is the module and not the path
+
+- REGRESSION: `9ba552f Restore Go generator rejection` folded a de-obfuscation pass over `internal/godriver/graph.go` and, in the same hunk, replaced the vendor carve-out's empty branch with an unconditional `return diagnostic("go_generator_forbidden", ...)`. `go-v1` then rejected **every** active Go file containing `//go:generate`, vendored or not, against the normative profile.
+- ROOT CAUSE OF THE BLOCKAGE DOWNSTREAM: `skill-project-management`'s `task-board-tui` reaches `clipperhouse/displaywidth` through `bubbletea` → `charmbracelet/x/ansi`; its `gen.go` ships a bare `//go:generate` and no released version drops it. Nothing the consuming skill can do about it, which is exactly the case decision 0005 was written for.
+- FIX: `internal/godriver/graph.go:247` now reads `if matched == 2 && !vendoredDependency(item, validation.BuildRoot)`, with the new `vendoredDependency` helper at `graph.go:272`. Only `//go:generate` is relaxed; the `//go:cgo_import_dynamic` allowlist, the `SFiles` vendored-assembly carve-out, and every other rejection class are untouched.
+- DECISION, THE BOUND IS `!Module.Main` **AND** below `vendor/`, NOT A PATH PREFIX: the neighbouring `SFiles` carve-out tests `strictlyBelow(item.Dir, vendorRoot)` alone. That is not sufficient here, because a package's own build command declares `source_dir`, so first-party code can be made to sit below `<buildRoot>/vendor` and would inherit the exemption on a prefix match. A main-module result is first-party by definition wherever its directory is. The `SFiles` carve-out has the same theoretical hole and was deliberately left alone as out of scope — worth closing separately.
+- FINDING, THE NARROWING MUTANT IS THE ONLY ONE THAT PROVES ANYTHING: deleting the gate (`if false`) kills two subtests but says nothing about the class. Dropping *just* the `Module.Main` guard while keeping the path prefix is what proves the bound is a first-party/third-party distinction: `first-party_package_below_the_vendor_tree: error = <nil>, want go_generator_forbidden`. Four mutants applied and reverted in total, all killed; table in the board artifact.
+- ANOMALY, `go test ./cmd/curator` EXITS 1 WHILE THE BINARY PRINTS `PASS`: `testing: can't write .../go-build*/b001/testlog.txt: write ...: file too large`. Go's build-cache testlog for that package outgrew the writable limit; the non-zero status is the cache write, not a test. `-count=1` makes the run non-cacheable, skips the testlog, and exits 0 in 285s. Reach for `-count=1` on `cmd/curator` here rather than debugging a phantom failure.
+- NOTE ON RUNNING THE SUITE HEADLESS: `make ci-test` cannot finish inside one time-bounded shell call. `suite-plan.sh` against the pin root emits `plan-served.txt`/`plan-deferred.txt`; running those lists as bounded chunks — deferred with `CURATOR_CONFORMANCE_ROOT` **unset**, as `test-gate.sh` does — is the same gate without the wall-clock. Plan at `SPEC_PIN` `00b1688` on darwin: `served=34 deferred=7 excluded=0`.
+- SCOPE: `internal/godriver/graph.go`, `internal/godriver/graph_test.go`, `internal/godriver/build_test.go`. Worktree `.temp/STORY-260822-2lvw0e/worktree`, branch `task-board/story/STORY-260822-2lvw0e`.
+- STATUS: handed to review. All local gates exit 0 (godriver incl. `-race`, all 34 served + 7 deferred packages, `golangci-lint`, `go vet`, `gofmt`, `gate-selftest` 75/0, `ledger-consistency` 72 rows, `no-broad-suppression`). linux and windows lanes not run — no local runner; CI's to run.
+
+
 ## 2026-08-23
 
 ### 0216 — `TASK-260822-4p3dcq`: the build_ssh docs surface, and the scope-grammar finding that does not reproduce as filed
