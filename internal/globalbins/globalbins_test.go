@@ -7,6 +7,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/skillspec"
 )
 
 func TestRefreshPublishesAndRemovesManagedUnixShims(t *testing.T) {
@@ -188,6 +191,56 @@ func TestRefreshWarnsWhenNoSafeBinExists(t *testing.T) {
 	if len(messages) != 1 || !strings.Contains(messages[0], filepath.Join(managerHome, "global", "bin")) ||
 		!strings.Contains(messages[0], "curator shell-init --install") {
 		t.Fatalf("fallback warning: %v", messages)
+	}
+}
+
+func TestSafeSelectionFeedsStagedForwardingTargetWithoutLiveMutation(t *testing.T) {
+	root := t.TempDir()
+	managerHome := filepath.Join(root, "manager")
+	userHome := filepath.Join(root, "user")
+	userBin := filepath.Join(userHome, ".local", "bin")
+	if err := os.MkdirAll(userBin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	selection := Select(managerHome, "unix", map[string]string{"PATH": userBin}, userHome)
+	if selection.Path != userBin {
+		t.Fatalf("safe user bin selection = %+v", selection)
+	}
+	snapshot := filepath.Join(root, "snapshot")
+	if err := os.MkdirAll(filepath.Join(snapshot, "scripts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshot, "scripts", "tool"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	runtimePlan, err := runtimestore.PrepareScriptRuntime(filepath.Join(root, "runtime-stage"), runtimestore.ScriptRuntimeSpec{
+		Home: managerHome, SkillName: "skill-a", Commit: "commit-a", Snapshot: snapshot,
+		RuntimeRoots: []string{"scripts"},
+		Commands:     []skillspec.Command{{Name: "tool", Type: "script", UnixPath: "scripts/tool"}},
+		Platform:     "unix",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	forward, err := runtimestore.NewManagedShim(runtimestore.SafeForwardingShim, selection.Path, "tool", "unix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := runtimestore.StageShimTransition(filepath.Join(root, "shim-stage"), []runtimestore.ShimSpec{{
+		Destination: forward,
+		Target:      runtimePlan.Commands["tool"],
+	}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Desired) != 1 {
+		t.Fatalf("forwarding transition = %+v", plan)
+	}
+	if _, err := os.Stat(filepath.Join(userBin, "tool")); !os.IsNotExist(err) {
+		t.Fatalf("staging touched safe live user bin: %v", err)
+	}
+	if _, err := os.Stat(plan.Desired[0].StagedPath); err != nil {
+		t.Fatalf("forwarding shim was not staged: %v", err)
 	}
 }
 

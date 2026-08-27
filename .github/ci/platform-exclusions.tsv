@@ -1,0 +1,32 @@
+# Packages governed by the protocol's own platform qualification.
+#
+# When the SUPPLIED conformance root publishes
+# `vectors/conformance-claim-v3-qualification.json`, that vector -- not this
+# file -- decides which platforms are excluded. This table then only says which
+# packages the exclusion reaches, and which case must still run and pass there
+# to prove the exclusion is real fail-closed behaviour rather than a quiet
+# omission.
+#
+# `default_excluded_on` is the fallback for a root that predates the vector.
+# The committed released pin is such a root: it publishes no qualification
+# vector at all, so without a fallback the default lane would lose an exclusion
+# that is a property of the implementation rather than of the root.
+# `internal/godriver` implements rc5-native-control-inventory-v1, which defines
+# control records for macOS and Windows only, so linux is excluded under any
+# root; the rc.5 vector states the same thing normatively, with
+# `until_task: TASK-260728-1skseh`. A root that publishes the vector always
+# wins, so the fallback can never contradict a live protocol statement, and
+# when the vector stops excluding a platform the package returns to the full
+# run there automatically.
+#
+# The exclusion is never taken on trust. The assertion case drives
+# `probeNativeControlsFor("")` and `probeNativeControlsFor("linux")` and
+# requires `build_execution_control_unavailable` from both -- the manager
+# refuses BEFORE any worker starts. It is pure and compiles everywhere, so the
+# excluded runner still proves the boundary it is excluded by.
+#
+# Columns are TAB separated:
+#   package  assertion_case  default_excluded_on  note
+#
+# package	assertion_case	default_excluded_on	note
+internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux	an uncovered inventory platform is refused before the worker starts
