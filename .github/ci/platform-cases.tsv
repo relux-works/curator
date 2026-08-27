@@ -105,6 +105,31 @@ internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	darwin	p
 # Executable identity and executable behaviour
 # ===========================================================================
 internal/godriver	TestExecutableIdentityRejectsSubstitutionAndMutation	darwin,windows	-	-	the toolchain executable identity rejects substitution and mutation
+
+# The manager resolves its own executable to the canonical installed file
+# BEFORE the substitution battery above runs, so the launch shape an operator
+# used -- a shim link on PATH, a chain of them, a linked install directory, a
+# Windows directory junction -- is not itself a fault. That ordering is a
+# Windows-only behaviour change (`physicalPath` rather than
+# `filepath.EvalSymlinks`, which since Go 1.23 does not follow a junction), so
+# the two junction cases below are the only ones that catch a regression of it
+# and a runner must be REQUIRED to execute them by name.
+#
+# The tolerated skip is narrow and classified: creating a file symbolic link on
+# Windows needs SeCreateSymbolicLinkPrivilege and creating a junction needs
+# `mklink /J` to work, neither of which a hosted runner is obliged to grant.
+# Every such skip is recorded in `skips-observed.tsv` against
+# `host-capability`, and a skip for any other reason -- or any skip at all on
+# darwin, which creates both -- is fatal.
+internal/godriver	TestExecutableIdentityResolvesALauncherLink	darwin,windows	windows	host-capability	the manager resolves its own executable through a package-manager launcher link, and every launch shape yields the one installed identity
+internal/godriver	TestExecutableIdentityResolvesALauncherLink/*	-	windows	host-capability	a launch-shape subtest may skip only where the Windows host forbids unprivileged symlink creation; the case itself must still pass
+internal/godriver	TestExecutableIdentityRejectsSubstitutionThroughALauncherLink	darwin,windows	windows	host-capability	resolving the launch shape does not trust what it reaches: substitution of the installed file still fails closed
+internal/godriver	TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/*	-	windows	host-capability	a substitution subtest may skip only where the Windows host forbids unprivileged symlink creation; the case itself must still pass
+internal/godriver	TestExecutableIdentityResolvesARealSymlinkedProcessLaunch	darwin,windows	windows	host-capability	a process really started through a launcher link resolves the installed identity, so what os.Executable reports for this platform is observed rather than assumed
+internal/godriver	TestBuildAcceptsAManagerStartedThroughALauncherLink	darwin,windows	windows	host-capability	the whole identity handshake completes for a manager whose own path is a launcher link
+internal/godriver	TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink	darwin,windows	windows	host-capability	a worker process started from a launcher link proves the installed identity back over the protocol
+internal/godriver	TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction	windows	windows	host-capability	a manager installed under a directory junction resolves instead of being refused as a non-canonical file -- the shape EvalSymlinks alone cannot follow
+internal/godriver	TestExecutableIdentityStillRejectsSubstitutionBehindAJunction	windows	windows	host-capability	a retargeted, dangling or hard-linked install behind a junction cannot move a recorded manager identity or pass as it
 internal/runtimestore	TestUnixPostInstallShimPropagatesSignal	linux,darwin	-	-	the installed unix shim is executable and propagates signals
 internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	linux,darwin	windows	platform-control	executes the POSIX shell hook end to end
 internal/shell	TestPowerShellHookRunsOnEveryPrompt	windows	linux,darwin	platform-control	executes the PowerShell prompt hook end to end
@@ -179,6 +204,34 @@ cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	darwin,w
 # runner, including the one where the package is otherwise excluded.
 # ===========================================================================
 internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwin,windows	-	-	an uncovered inventory platform (including linux) is rejected before the worker starts
+
+# ===========================================================================
+# Schema-8 suite consumption.
+#
+# Schema 8 is one shared bump carrying script-worker-v1 and first-party module
+# roots. The pinned implementation jobs of curator-spec pass against a schema-8
+# suite while consuming none of it (TASK-260823-omp8zt), so presence of the
+# families in the root is not evidence: `.github/ci/root-artifacts.tsv` makes a
+# root that stops publishing them defer the package, and the candidate lane's
+# CI_REQUIRE_FULL_ROOT=1 makes that deferral fatal.
+#
+# These rows are the other half. They name the cases that actually READ the
+# schema-8 families, so a rename, a deletion or a -run filter matching nothing
+# fails by name instead of shrinking the run. Every row is required on all
+# three runners and tolerates exactly one skip class: the one the case prints
+# when it ran without a root -- `root-unset` for the packages the artefact
+# table defers, `root-content` for the driver case that guards its own read.
+# `root-unset` is `deferred-only` in `.github/ci/skip-classes.tsv`, so in a
+# lane that requires a fully serving root there is no tolerated skip left.
+# ===========================================================================
+internal/skillspec	TestReleasedSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published agent-skill-v8 and csk-skill-v8 families are loaded, and every case in them is consumed
+internal/marker	TestReadAuthoritativeMarkerV4SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published install-marker-v4 family is read back through the marker reader
+internal/moduleroots	TestModuleRootVectors	linux,darwin,windows	linux,darwin,windows	root-unset	the published module-roots family drives declaration/containment and the replace bijection at their own failure boundaries
+internal/godriver	TestModuleRootVectorsDriveTheWholeBuild	linux,darwin,windows	linux,darwin,windows	root-content	the published module-roots family drives the go-v1 driver to the exact process state each case records
+internal/scriptpolicy	TestScriptHostExecutionPolicySectionsAreAllClassified	linux,darwin,windows	linux,darwin,windows	root-unset	every section of the published script-worker family is classified, so a new one cannot be ignored
+internal/scriptpolicy	TestScriptExecutionPolicyIdentityMatchesTheSuite	linux,darwin,windows	linux,darwin,windows	root-unset	the closed policy identity and interpreter set this build hard-codes are the suite's own
+internal/scriptpolicy	TestScriptExecutionOptInCases	linux,darwin,windows	linux,darwin,windows	root-unset	every published opt-in case decides manifest acceptance and enforced/declared-only classification
+internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is refused with script_execution_policy_unsupported before any worker surface
 
 # ===========================================================================
 # Opt-in developer probe -- never required, always tolerated.

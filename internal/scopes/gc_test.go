@@ -51,6 +51,15 @@ func buildKey(seed string) buildmeta.CacheKey {
 // installBuildMarker writes a valid marker v2 that references one build key.
 func installBuildMarker(t *testing.T, skillsDir, name, commit, command string, key buildmeta.CacheKey) {
 	t.Helper()
+	installBuildMarkerForBand(t, skillsDir, name, commit, command, key, 6)
+}
+
+// installBuildMarkerForBand writes, through the real marker writer, the marker
+// an installation of a skill in the given manifest band leaves behind. The
+// schema is chosen by the writer, never by the test.
+func installBuildMarkerForBand(t *testing.T, skillsDir, name, commit, command string,
+	key buildmeta.CacheKey, skillSchema int) {
+	t.Helper()
 	dir := filepath.Join(skillsDir, name)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -64,19 +73,137 @@ func installBuildMarker(t *testing.T, skillsDir, name, commit, command string, k
 		Name: name, Source: name, RefKind: "tag", Ref: "v1",
 		Commit: commit, ContentSHA256: hash,
 		Agents: []string{}, Commands: []string{command}, Dependencies: []string{},
-		SkillSchemaVersion: 6, BuildRoots: []string{"build"},
+		SkillSchemaVersion: skillSchema, BuildRoots: []string{"build"},
 		BuildSource: &buildsource.Identity{
 			Algorithm: buildsource.Algorithm, ContentSHA256: "sha256:" + strings.Repeat("b", 64),
 		},
 		InstalledAt: "2026-07-20T00:00:00Z",
-		Builds: map[string]marker.Build{command: {
-			Driver: buildmeta.DriverGoV1, CacheKey: key,
-			ReceiptSHA256:  buildmeta.ReceiptHash("sha256:" + strings.Repeat("d", 64)),
-			ArtifactSHA256: "sha256:" + strings.Repeat("e", 64),
-			ArtifactPath:   artifactPath,
-		}},
+		Builds:      map[string]marker.Build{command: buildRecordForBand(key, artifactPath, skillSchema)},
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// buildRecordForBand carries the per-schema fields marker v3 and v4 require of
+// a local go-v1 command. Nothing the mark phase reads changes with the band, so
+// a band difference can only be observed through the schema banding under test.
+func buildRecordForBand(key buildmeta.CacheKey, artifactPath string, skillSchema int) marker.Build {
+	build := marker.Build{
+		Driver: buildmeta.DriverGoV1, CacheKey: key,
+		ReceiptSHA256:  buildmeta.ReceiptHash("sha256:" + strings.Repeat("d", 64)),
+		ArtifactSHA256: "sha256:" + strings.Repeat("e", 64),
+		ArtifactPath:   artifactPath,
+	}
+	if skillSchema >= 7 {
+		build.ExecutionPolicy = buildmeta.ExecutionPolicy
+		build.ReceiptSchemaVersion = 1
+	}
+	return build
+}
+
+// TestCollectMarksBuildKeysFromEveryBuildBearingMarkerSchema proves the mark
+// phase keeps a live build reference from every marker schema that can record
+// one, including the marker v4 a schema-8 installation writes.
+//
+// A schema missing from that band is not "this installation has no builds": its
+// recorded keys go unmarked, the sweep sees them as unreferenced, and the
+// collector deletes cache entries the installation is still running from. The
+// schema-1 case is the other side of the bound -- it genuinely records no build
+// and must contribute nothing -- so the band cannot be widened to accept
+// anything either.
+func TestCollectMarksBuildKeysFromEveryBuildBearingMarkerSchema(t *testing.T) {
+	home := t.TempDir()
+	project := t.TempDir()
+	skillsDir := filepath.Join(project, ".agents", "skills")
+
+	bands := []struct {
+		skillSchema  int
+		markerSchema int
+		key          buildmeta.CacheKey
+	}{
+		{skillSchema: 6, markerSchema: marker.SchemaVersion, key: buildKey("1")},
+		{skillSchema: 7, markerSchema: marker.ExternalSchemaVersion, key: buildKey("2")},
+		{skillSchema: 8, markerSchema: marker.PolicySchemaVersion, key: buildKey("3")},
+	}
+	want := make([]string, 0, len(bands))
+	for index, band := range bands {
+		name := fmt.Sprintf("skill-band-%d", band.skillSchema)
+		commit := strings.Repeat(fmt.Sprintf("%d", index+4), 40)
+		installBuildMarkerForBand(t, skillsDir, name, commit, fmt.Sprintf("tool-%d", band.skillSchema),
+			band.key, band.skillSchema)
+
+		// The writer really did produce the schema this band is about, so a
+		// marked key cannot come from silently falling back to schema 2.
+		written := marker.Read(filepath.Join(skillsDir, name))
+		if written == nil {
+			t.Fatalf("skill schema %d: the marker writer produced a marker its own reader refuses", band.skillSchema)
+		}
+		if written.SchemaVersion != band.markerSchema {
+			t.Fatalf("skill schema %d wrote marker schema %d, want %d",
+				band.skillSchema, written.SchemaVersion, band.markerSchema)
+		}
+		want = append(want, string(band.key))
+	}
+
+	// A schema-1 installation records no build at all and must add no key.
+	legacyCommit := strings.Repeat("9", 40)
+	installMarker(t, skillsDir, "skill-legacy", legacyCommit)
+	downgradeToLegacyMarker(t, filepath.Join(skillsDir, "skill-legacy"))
+
+	if err := RecordConsumer(home, project); err != nil {
+		t.Fatal(err)
+	}
+	cache := &recordingCache{}
+	if _, err := Collect(MaintenanceRequest{Home: home, Lock: testHomeLock{}, Cache: cache}); err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(want)
+	if strings.Join(cache.referenced, ",") != strings.Join(want, ",") {
+		t.Fatalf("referenced = %v, want %v", cache.referenced, want)
+	}
+}
+
+// TestAbsorbKeysBuildLivenessOnTheSchemaBandNotOnAPopulatedBuildsMap pins the
+// delete direction of the mark band, which no marker on disk can exercise: the
+// reader already refuses a schema-1 document that carries build fields, so a
+// mark phase with the band removed still behaves correctly through Collect.
+//
+// The band is therefore asserted against the struct directly. Liveness is keyed
+// on the schema that gives `builds` its meaning, not on the map merely being
+// non-empty, so a document from outside the build-bearing band can never
+// contribute a reference that protects a cache entry.
+func TestAbsorbKeysBuildLivenessOnTheSchemaBandNotOnAPopulatedBuildsMap(t *testing.T) {
+	builds := map[string]marker.Build{"tool": {
+		Driver: buildmeta.DriverGoV1, CacheKey: buildKey("1"),
+	}}
+	for _, testCase := range []struct {
+		name   string
+		schema int
+		want   int
+	}{
+		{name: "schema 1 predates the build record", schema: marker.LegacySchemaVersion, want: 0},
+		{name: "schema 0 is not a readable schema", schema: 0, want: 0},
+		{name: "a schema past the readable band", schema: marker.NewestSchemaVersion + 1, want: 0},
+		{name: "schema 2 records builds", schema: marker.SchemaVersion, want: 1},
+		{name: "schema 3 records builds", schema: marker.ExternalSchemaVersion, want: 1},
+		{name: "schema 4 records builds", schema: marker.PolicySchemaVersion, want: 1},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			marked := &marks{runtime: map[string]bool{}}
+			marked.absorb(scopeMarks{markers: []*marker.Marker{{
+				SchemaVersion: testCase.schema, Name: "skill",
+				Commit: strings.Repeat("a", 40), Builds: builds,
+			}}})
+			if len(marked.builds) != testCase.want {
+				t.Fatalf("schema %d marked %v, want %d reference(s)",
+					testCase.schema, marked.builds, testCase.want)
+			}
+			// Runtime liveness never depends on the band: an installation of any
+			// schema keeps its runtime tree.
+			if !marked.runtime["skill/"+strings.Repeat("a", 40)] {
+				t.Fatalf("schema %d lost its runtime reference", testCase.schema)
+			}
+		})
 	}
 }
 

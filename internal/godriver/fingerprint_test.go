@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestToolchainFramingMatchesRC4Vector(t *testing.T) {
@@ -144,4 +145,44 @@ func writeVectorLength(buffer *bytes.Buffer, length int) {
 	var encoded [8]byte
 	binary.BigEndian.PutUint64(encoded[:], uint64(length))
 	buffer.Write(encoded[:])
+}
+
+// TestFingerprintImplementationMatchesRC4ToolchainVector pins the published
+// digest of a tree that carries a relative link, and it runs on every host.
+//
+// That is the whole point of asserting it here rather than under a unix build
+// tag: the toolchain content digest names the tree, so the same tree must hash
+// to the same bytes wherever it is walked. Windows cannot store this link's
+// protocol target verbatim, so before the separators were normalized back this
+// same tree hashed differently there and the identity silently forked per host.
+func TestFingerprintImplementationMatchesRC4ToolchainVector(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "bin", "go"), []byte("GO"), 0o755)
+	if err := os.MkdirAll(filepath.Join(root, "pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../bin/go", filepath.Join(root, "pkg", "tool-link")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	digest, _, err := fingerprintToolchain(context.Background(), root, "go version go1.25.5 darwin/arm64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if digest != "sha256:baf7c5f3b9c3f1fae3da4c356381bf74442aa7f8f0b6fb2304c9c10833d6032e" {
+		t.Fatalf("digest = %s", digest)
+	}
+
+	if err := os.Chmod(filepath.Join(root, "bin", "go"), 0o555); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(filepath.Join(root, "bin", "go"), time.Unix(1, 0), time.Unix(1, 0)); err != nil {
+		t.Fatal(err)
+	}
+	afterMetadata, _, err := fingerprintToolchain(context.Background(), root, "go version go1.25.5 darwin/arm64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterMetadata != digest {
+		t.Fatalf("mode/time changed digest: %s != %s", afterMetadata, digest)
+	}
 }

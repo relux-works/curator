@@ -460,6 +460,45 @@ func TestPackIndexConformanceAndExactSSHWrapper(t *testing.T) {
 			t.Errorf("unsafe SSH argv accepted: %#v", mutation)
 		}
 	}
+
+	pinned := policy
+	pinned.AgentSocket = filepath.Join(policyRoot, "operator", "agent.sock")
+	command, err = ExactSSHCommand(pinned, argv)
+	if err != nil {
+		t.Fatalf("pinned-agent selection rejected: %v", err)
+	}
+	joined = strings.Join(command, " ")
+	for _, required := range []string{"IdentitiesOnly=yes", "IdentityAgent=" + pinned.AgentSocket, "-i " + pinned.Identity} {
+		if !strings.Contains(joined, required) {
+			t.Errorf("pinned-agent SSH command missing %q", required)
+		}
+	}
+	if strings.Contains(joined, "IdentityAgent=none") || strings.Contains(joined, "IdentityFile=none") {
+		t.Errorf("pinned-agent SSH command carries a disabling option: %s", joined)
+	}
+
+	agentOnly := policy
+	agentOnly.Identity = ""
+	agentOnly.AgentSocket = filepath.Join(policyRoot, "operator", "agent.sock")
+	command, err = ExactSSHCommand(agentOnly, argv)
+	if err != nil {
+		t.Fatalf("agent-only selection rejected: %v", err)
+	}
+	if !strings.Contains(strings.Join(command, " "), "IdentityFile=none") {
+		t.Errorf("agent-only SSH command must disable identity files")
+	}
+
+	relativePin := pinned
+	relativePin.AgentSocket = "agent.sock"
+	if _, err := ExactSSHCommand(relativePin, argv); ErrorCode(err) != CodeIdentityInvalid {
+		t.Errorf("relative agent socket accepted in pinned-agent form")
+	}
+
+	empty := policy
+	empty.Identity = ""
+	if _, err := ExactSSHCommand(empty, argv); ErrorCode(err) != CodeIdentityInvalid {
+		t.Errorf("empty SSH selection accepted")
+	}
 }
 
 func validateTreeSyntax(data []byte, format string) error {
@@ -608,6 +647,11 @@ func fakeHTTPGitTool(t *testing.T, repository string) (GitTool, string) {
 	logPath := filepath.Join(root, "argv.log")
 	script := fmt.Sprintf(`#!/bin/sh
 {
+	secret_present=0
+	state_present=0
+	[ -n "${%s-}" ] && secret_present=1
+	[ -n "${%s-}" ] && state_present=1
+	printf ' secret=%%s state=%%s askpass=%%s' "$secret_present" "$state_present" "${GIT_ASKPASS-}"
   for arg in "$@"; do printf ' %%s' "$arg"; done
   printf '\n'
 } >> %s
@@ -627,7 +671,7 @@ IFS='
 set -- $args
 IFS=$oldifs
 exec %s "$@"
-`, shellQuote(logPath), shellQuote("file://"+repository), shellQuote(realTool.Executable))
+`, EnvHTTPSBrokerSecret, EnvHTTPSBrokerState, shellQuote(logPath), shellQuote("file://"+repository), shellQuote(realTool.Executable))
 	if err := os.WriteFile(wrapper, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}

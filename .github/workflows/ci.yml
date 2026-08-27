@@ -8,8 +8,9 @@ on:
     inputs:
       candidate_ref:
         description: >-
-          Full 40-character relux-works/curator-spec revision holding the schema v6
-          candidate suite. Branches, tags, short hashes and placeholders are rejected.
+          Full 40-character relux-works/curator-spec revision holding the candidate
+          suite. The lane is schema-agnostic: it qualifies whatever suite the revision
+          publishes. Branches, tags, short hashes and placeholders are rejected.
           Leave empty to use candidate_root instead.
         required: false
         default: ""
@@ -31,12 +32,16 @@ permissions:
 
 env:
   # The one immutable committed protocol-suite pin, referenced by every job.
-  # It is the exact commit targeted by the signed annotated v1.0.0-rc.8 tag.
-  # The verifier also pins conformance/v1/manifest.json and the rc.8 release
-  # metadata, including its empty implementation/platform claim sets. A
-  # candidate never appears here: it enters only through the non-default
-  # `candidate-conformance` job below.
-  SPEC_PIN: f8c405aa3ad0a39d260c2ed93684e55c5a346359
+  # It stays on the currently qualified released revision; promoting it is
+  # owned by TASK-260720-38l1sy, after TASK-260720-25d05o qualifies the
+  # release. This pin is the v1.0.0-rc.9 release commit on curator-spec main:
+  # it publishes protocol 1.0.0-rc.9, whose conformance/v1/manifest.json is
+  # sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403,
+  # byte-identical to the schema-8 candidate 6001dc33 this module qualified
+  # against. It claims no later revision. A candidate suite never appears here
+  # -- it enters through the non-default `candidate-conformance` job below and
+  # nowhere else.
+  SPEC_PIN: 0ed5c691e9208eea52f21db2fc05e226ce3516fd
   # actions/setup-go only began forcing GOTOOLCHAIN=local in v6.0.0; this
   # workflow pins @v5, so without these two lines a job may download a
   # toolchain or read a per-user go env file. The identity step below reads
@@ -80,10 +85,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Verify authoritative rc.8 release pin
-        shell: bash
-        run: go run ./cmd/curator-spec-pin --root "$GITHUB_WORKSPACE/protocol-spec" --revision "$SPEC_PIN"
-
       - name: Verify Go toolchain identity
         shell: bash
         run: bash .github/ci/toolchain-identity.sh
@@ -115,10 +116,19 @@ jobs:
       # launcher cases; the unix runners must execute the ownership, no-follow,
       # read-only-source, resource-policy and executable cases; and every skip
       # anywhere in the run is classified and recorded by name.
+      #
+      # The per-package deadline is a hosted-runner budget, not a behavioural
+      # bar: the Windows runner pays a real syscall and process-spawn cost that
+      # the unix runners do not. Measured on run 32648313266 (windows-latest):
+      # cmd/curator 1099s and internal/install/atomicity 1027s here against
+      # 454s and 125s for the same packages on macOS. 30m leaves those two
+      # under 40% headroom on the slowest runner, so Windows gets 60m and
+      # every other runner keeps 30m. A hang is still bounded and still fatal.
       - name: go test + platform-case gate
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '60m' || '30m' }}
         run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
 
       - name: Upload gate evidence
@@ -166,10 +176,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
-      - name: Verify authoritative rc.8 release pin
-        shell: bash
-        run: go run ./cmd/curator-spec-pin --root "$GITHUB_WORKSPACE/protocol-spec" --revision "$SPEC_PIN"
 
       - name: Verify Go toolchain identity
         shell: bash
@@ -260,10 +266,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Verify authoritative rc.8 release pin
-        shell: bash
-        run: go run ./cmd/curator-spec-pin --root "$GITHUB_WORKSPACE/protocol-spec" --revision "$SPEC_PIN"
-
       - name: Verify Go toolchain identity
         shell: bash
         run: bash .github/ci/toolchain-identity.sh
@@ -300,7 +302,7 @@ jobs:
           echo "naming gate: clean (one README line)"
 
   # ---------------------------------------------------------------------------
-  # Schema v6 candidate qualification.
+  # Candidate suite qualification.
   #
   # Non-default by construction: it runs only on an explicit workflow_dispatch
   # that supplies a candidate, never on push or pull_request, and it never
@@ -364,10 +366,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Verify authoritative rc.8 release pin
-        shell: bash
-        run: go run ./cmd/curator-spec-pin --root "$GITHUB_WORKSPACE/protocol-spec" --revision "$SPEC_PIN"
-
       - name: Verify Go toolchain identity
         shell: bash
         run: bash .github/ci/toolchain-identity.sh
@@ -390,9 +388,9 @@ jobs:
 
           pin_manifest="$GITHUB_WORKSPACE/protocol-spec/conformance/v1/manifest.json"
           if command -v shasum >/dev/null 2>&1; then
-            PIN_MANIFEST_SHA256="$(shasum -a 256 "$pin_manifest" | awk '{print $1}')"
+            PIN_MANIFEST_SHA256="$(shasum -a 256 <"$pin_manifest" | awk '{print $1}')"
           else
-            PIN_MANIFEST_SHA256="$(sha256sum "$pin_manifest" | awk '{print $1}')"
+            PIN_MANIFEST_SHA256="$(sha256sum <"$pin_manifest" | awk '{print $1}')"
           fi
           export PIN_MANIFEST_SHA256
           bash .github/ci/candidate-suite.sh record "$root" .temp/ci-evidence/candidate
@@ -400,11 +398,21 @@ jobs:
       # The full candidate suite on every platform. The platform-case ledger is
       # enforced exactly as in the default lane, and CI_REQUIRE_FULL_ROOT=1
       # additionally forbids the package deferral the default lane permits.
+      # CI_REQUIRE_FULL_ROOT=1 also concentrates the load: the three long-pole
+      # packages the default lane splits across its served and deferred
+      # invocations -- cmd/curator, internal/install/atomicity and
+      # internal/install -- all run inside the single served invocation here
+      # and contend for the same four Windows cores. On run 32648313266 that put
+      # cmd/curator and internal/install/atomicity past 1800s with every
+      # executed case passing, which the ledger then read as two required
+      # Windows cases that never ran. Windows gets the same 60m as the default
+      # lane; the deadline is still fixed and still fatal.
       - name: Candidate suite + platform-case gate
         shell: bash
         env:
           CURATOR_CONFORMANCE_ROOT: ${{ steps.candidate.outputs.root }}
           CI_REQUIRE_FULL_ROOT: "1"
+          GO_TEST_TIMEOUT: ${{ runner.os == 'Windows' && '60m' || '30m' }}
         run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
 
       - name: Upload candidate evidence

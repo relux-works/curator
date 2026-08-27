@@ -14,6 +14,16 @@ import (
 
 var forbiddenCompilerDirective = []byte("//go:cgo_import_dynamic")
 
+var generatorDirective = []byte("//go:generate")
+
+// Severity codes returned by scanSourceDirectives, ordered so the strongest
+// rejection class wins when a file carries more than one directive.
+const (
+	directiveNone = iota
+	directiveCgoImportDynamic
+	directiveGenerate
+)
+
 type packageError struct {
 	ImportStack []string
 	Pos         string
@@ -94,6 +104,15 @@ type graphValidation struct {
 	BuildRoot string
 	SourceDir string
 	GOROOT    string
+
+	// Snapshot is the canonical frozen snapshot root. BuildRootRel and
+	// Modules are protocol (slash-separated) paths relative to it: the
+	// command's build root, and the schema-8 first-party module directories
+	// that build root replaces (Spec §4.2.3). Modules is empty for every
+	// schema-6 and schema-7 command, which is the single-module build root.
+	Snapshot     string
+	BuildRootRel string
+	Modules      []string
 }
 
 func validatePackageGraph(payload []byte, validation graphValidation) error {
@@ -139,6 +158,15 @@ func validatePackageGraph(payload []byte, validation graphValidation) error {
 		return diagnostic("build_package_not_main", "selected root is not the canonical main package")
 	}
 
+	// Spec §4.2.3 fixes the order: the effective replace set is read and the
+	// bijection is checked once `go list` has returned, and only then does the
+	// scan surface run with the declared directories included and the
+	// audited-vendor allowances withheld from every replaced module.
+	replaced, err := admitModuleRoots(validation)
+	if err != nil {
+		return err
+	}
+
 	hasVendoredModule := false
 	for index := range packages {
 		item := &packages[index]
@@ -151,7 +179,7 @@ func validatePackageGraph(payload []byte, validation graphValidation) error {
 		if item.ForTest != "" {
 			return diagnostic("go_test_input_forbidden", "go list selected a test package")
 		}
-		if err := validatePackageInputs(*item, validation); err != nil {
+		if err := validatePackageInputs(*item, validation, replaced); err != nil {
 			return err
 		}
 	}
@@ -161,12 +189,16 @@ func validatePackageGraph(payload []byte, validation graphValidation) error {
 			return diagnosticErr("vendor_metadata_inconsistent", err, "vendored graph lacks a regular in-root vendor/modules.txt")
 		}
 	}
-	return nil
+	return scanDeclaredModules(validation)
 }
 
-func validatePackageInputs(item packageJSON, validation graphValidation) error {
+func validatePackageInputs(item packageJSON, validation graphValidation, replaced map[string]bool) error {
 	trustedStandard := item.Standard && item.Goroot
 	root := validation.BuildRoot
+	// A result whose module carries a replacement is first-party code the
+	// package declared, so §4.2.3 withholds from it every allowance a profile
+	// grants to audited third-party vendored code.
+	firstParty := item.Module != nil && item.Module.Replace != nil
 	if trustedStandard {
 		root = validation.GOROOT
 		if item.Module != nil {
@@ -175,7 +207,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 		if item.Root != validation.GOROOT && (item.Root != "" || !strings.HasPrefix(item.ImportPath, "vendor/")) {
 			return diagnostic("go_standard_input_escape", "standard package %q has an unexpected Root", item.ImportPath)
 		}
-	} else if err := validateModule(item, validation.BuildRoot); err != nil {
+	} else if err := validateModule(item, validation, replaced); err != nil {
 		return err
 	}
 	if !trustedStandard && item.Root != "" {
@@ -207,7 +239,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 		}
 		if len(item.SFiles) != 0 {
 			vendorRoot := filepath.Join(validation.BuildRoot, "vendor")
-			if !strictlyBelow(item.Dir, vendorRoot) {
+			if firstParty || !strictlyBelow(item.Dir, vendorRoot) {
 				return diagnostic("go_assembly_forbidden", "package %q contains non-standard assembly", item.ImportPath)
 			}
 			for _, name := range item.SFiles {
@@ -241,10 +273,16 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 			if readErr != nil {
 				return diagnosticErr("go_source_unreadable", readErr, "cannot read active Go file in %q", item.ImportPath)
 			}
-			if matched == 1 && item.ImportPath != "golang.org/x/sys" && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys/") {
+			if matched == directiveCgoImportDynamic && (firstParty ||
+				item.ImportPath != "golang.org/x/sys" && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys/")) {
 				return diagnostic("go_forbidden_compiler_directive", "package %q contains //go:cgo_import_dynamic", item.ImportPath)
 			}
-			if matched == 2 {
+			// §2.3 words //go:generate as inert: managers never run generators
+			// and `go build -mod=vendor` does not execute them, so its presence
+			// in an already materialized vendor tree does not fail preflight.
+			// The build root and a replaced module are code the package itself
+			// declares, so both stay held to the unexceptioned rule.
+			if matched == directiveGenerate && (firstParty || !strictlyBelow(item.Dir, filepath.Join(validation.BuildRoot, "vendor"))) {
 				return diagnostic("go_generator_forbidden", "package %q contains an active generator directive", item.ImportPath)
 			}
 		}
@@ -269,45 +307,43 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
 	return nil
 }
 
+// scanSourceDirectives reports the highest-severity directive an active Go file
+// contains: directiveCgoImportDynamic, directiveGenerate, or directiveNone.
+//
+// Severity, not first hit, decides the result. //go:generate is exempt inside a
+// materialized vendor tree while //go:cgo_import_dynamic is not, so stopping the
+// scan at a //go:generate would let a cgo directive in any later window ride in
+// unread and turn the carve-out into a bypass. Only the cgo directive, which
+// nothing weaker can override, ends the scan early; a generate hit is recorded
+// and the file is still read to EOF.
 func scanSourceDirectives(path string) (int, error) {
-	file, err := os.Open(path) // #nosec G304 -- path was constrained to the frozen build root
+	matched := directiveNone
+	err := scanFileWindows(path, len(forbiddenCompilerDirective)-1, func(window []byte) bool {
+		if bytes.Contains(window, forbiddenCompilerDirective) {
+			matched = directiveCgoImportDynamic
+			return true
+		}
+		if matched == directiveNone && bytes.Contains(window, generatorDirective) {
+			matched = directiveGenerate
+		}
+		return false
+	})
 	if err != nil {
-		return 0, err
+		return directiveNone, err
 	}
-	defer func() { _ = file.Close() }()
-	needles := [][]byte{forbiddenCompilerDirective, []byte("//go:generate")}
-	buffer := make([]byte, 64*1024)
-	carry := make([]byte, 0, len(forbiddenCompilerDirective)-1)
-	for {
-		read, readErr := file.Read(buffer)
-		if read > 0 {
-			window := append(carry, buffer[:read]...)
-			for index, needle := range needles {
-				if bytes.Contains(window, needle) {
-					return index + 1, nil
-				}
-			}
-			keep := len(forbiddenCompilerDirective) - 1
-			if len(window) < keep {
-				keep = len(window)
-			}
-			carry = append(carry[:0], window[len(window)-keep:]...)
-		}
-		if readErr != nil {
-			if errors.Is(readErr, io.EOF) {
-				return 0, nil
-			}
-			return 0, readErr
-		}
-	}
+	return matched, nil
 }
 
-func validateModule(item packageJSON, buildRoot string) error {
-	if item.Module == nil || item.Module.Path == "" || item.Module.Error != nil || item.Module.Replace != nil {
-		return diagnostic("vendor_metadata_inconsistent", "non-standard package %q has missing, failed, or replaced module metadata", item.ImportPath)
+func validateModule(item packageJSON, validation graphValidation, replaced map[string]bool) error {
+	buildRoot := validation.BuildRoot
+	if item.Module == nil || item.Module.Path == "" || item.Module.Error != nil {
+		return diagnostic("vendor_metadata_inconsistent", "non-standard package %q has missing or failed module metadata", item.ImportPath)
 	}
 	module := item.Module
 	if module.Main {
+		if module.Replace != nil {
+			return diagnostic("vendor_metadata_inconsistent", "package %q resolves through a replaced main module", item.ImportPath)
+		}
 		if module.Dir != buildRoot || module.GoMod != filepath.Join(buildRoot, "go.mod") {
 			return diagnostic("nested_build_module", "package %q resolves through an escaped or nested main module", item.ImportPath)
 		}
@@ -317,7 +353,24 @@ func validateModule(item packageJSON, buildRoot string) error {
 		return nil
 	}
 	vendorRoot := filepath.Join(buildRoot, "vendor")
-	if module.Version == "" || !strictlyBelow(item.Dir, vendorRoot) {
+	if module.Replace != nil {
+		// A replacement is admitted only because admitModuleRoots proved that
+		// vendor/modules.txt materializes exactly one directive for this
+		// module and that it names a declared directory the driver validated
+		// against the snapshot. The stream's own Module.Replace.Dir and
+		// Module.Replace.GoMod are never read: §4.2.3 forbids treating them as
+		// evidence that any path exists. A replacement the effective set does
+		// not carry means `go list` and vendor/modules.txt disagree.
+		if !replaced[module.Path] {
+			return diagnostic("vendor_metadata_inconsistent",
+				"package %q carries a replacement that vendor/modules.txt does not materialize", item.ImportPath)
+		}
+		// The compiled bytes still come from below R/vendor. A replaced module
+		// is not versioned there, which is the one rule §4.2.3 relaxes.
+		if !strictlyBelow(item.Dir, vendorRoot) {
+			return diagnostic("vendor_dependency_missing", "package %q is not resolved from the checked-in vendor tree", item.ImportPath)
+		}
+	} else if module.Version == "" || !strictlyBelow(item.Dir, vendorRoot) {
 		return diagnostic("vendor_dependency_missing", "package %q is not resolved from the checked-in vendor tree", item.ImportPath)
 	}
 	for _, candidate := range []string{module.Dir, module.GoMod} {

@@ -1,5 +1,5 @@
 // Package skillspec parses and validates the portable skill machine manifest,
-// schemas 1 through 7 (Spec §4), including legacy filename and runtime
+// schemas 1 through 8 (Spec §4), including legacy filename and runtime
 // fallbacks.
 package skillspec
 
@@ -15,7 +15,18 @@ const (
 )
 
 // SupportedSchemaVersions is the accepted agent skill manifest schema range.
-var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true}
+var SupportedSchemaVersions = map[int]bool{1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true}
+
+// ScriptExecutionPolicy is the single closed schema-8 script execution policy
+// identity (Spec §4.1.1). It never aliases the compiled `manager-worker-v1`
+// identity, and a successor needs its own identity rather than a widened
+// constant.
+const ScriptExecutionPolicy = "script-worker-v1"
+
+// ScriptInterpreters is the closed schema-8 interpreter identifier set. Every
+// shell identifier is deliberately absent; admitting one is a specification
+// revision, not a manager configuration option.
+var ScriptInterpreters = map[string]bool{"node-v1": true, "python3-v1": true}
 
 // UpgradeHint tells the user how to move to a build that understands a newer
 // schema.
@@ -33,6 +44,19 @@ type Command struct {
 	SourceDir  string // build: package directory below BuildRoots
 	Repository string // go-repository-v1: key in BuildRepositories
 	Target     string // go-repository-v1: key in skill-build.json targets
+
+	// Modules are the schema-8 first-party module directories the go-v1 build
+	// root replaces (Spec §4.2.3), in declaration order. Absent and empty mean
+	// the same thing: the schema-6 and schema-7 single-module build root.
+	Modules []string
+
+	// ExecutionPolicy is the schema-8 enforced script execution policy the
+	// command opted into, or "" for the declared-only default. Interpreter is
+	// its bound interpreter identity; the two are always both set or both
+	// empty. Enforcement is per command: there is no manifest-level default
+	// and no override resolution.
+	ExecutionPolicy string
+	Interpreter     string
 }
 
 // LockedCommit is an immutable Git object lock. ObjectFormat determines the

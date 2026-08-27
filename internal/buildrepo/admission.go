@@ -95,6 +95,14 @@ type GitTool struct {
 	AllowedVersions []string
 	AskPass         string
 	SSHWrapper      string
+	// HTTPSCredentials is resolved for exactly one fetch. Its secret is only
+	// copied into that fetch process tree.
+	HTTPSCredentials HTTPSCredentials
+	// SSHCredentials is the operator selection for the one repository this
+	// tool is about to reach. It is bound per repository rather than per run
+	// so a closure that spans two hosts cannot offer either host the other's
+	// key (Spec §12.2).
+	SSHCredentials OperatorSSHCredentials
 }
 
 // SSHPolicy contains the manager-owned inputs for the fixed SSH wrapper.
@@ -148,8 +156,21 @@ func ExactSSHCommand(policy SSHPolicy, argv []string) ([]string, error) {
 			return nil, admissionError(CodeIdentityInvalid, "SSH agent path is not absolute")
 		}
 		result = append(result, "-o", "IdentitiesOnly=no", "-o", "IdentityFile=none", "-o", "IdentityAgent="+policy.AgentSocket)
+	case policy.Identity != "" && policy.AgentSocket != "":
+		// The pinned-agent form: the operator agent holds the private key and
+		// the named identity (conventionally the public half) pins which
+		// single key the agent offers. One authentication attempt, one
+		// disclosed public key, and passphrase-protected keys authenticate
+		// without a prompt.
+		if !filepath.IsAbs(policy.Identity) {
+			return nil, admissionError(CodeIdentityInvalid, "SSH identity path is not absolute")
+		}
+		if !filepath.IsAbs(policy.AgentSocket) {
+			return nil, admissionError(CodeIdentityInvalid, "SSH agent path is not absolute")
+		}
+		result = append(result, "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent="+policy.AgentSocket, "-i", policy.Identity)
 	default:
-		return nil, admissionError(CodeIdentityInvalid, "SSH authentication policy must select exactly one mode")
+		return nil, admissionError(CodeIdentityInvalid, "SSH authentication policy must select an identity, an agent, or both")
 	}
 	return append(result, policy.ExpectedHost, expectedCommand), nil
 }
@@ -240,6 +261,13 @@ func AcquireNetwork(ctx context.Context, request NetworkRequest) (*Snapshot, err
 	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
 		return nil, admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
 	}
+	// The admission boundary refuses an unselected SSH repository even when a
+	// caller forgot to resolve credentials, so no fetch can quietly fall back
+	// to whatever the operator's ambient SSH state happens to offer.
+	if request.Source.Transport == "ssh" && !request.Tool.SSHCredentials.Selected() {
+		return nil, admissionError(CodeSSHCredentialMissing,
+			"SSH build repositories require an operator identity or agent")
+	}
 	if _, err := ParseLockedCommit(map[string]any{"object_format": request.Lock.ObjectFormat, "hex": request.Lock.Hex}, "lock"); err != nil {
 		return nil, admissionError(CodeIdentityInvalid, "invalid immutable lock")
 	}
@@ -296,8 +324,26 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
 		}
 	}
 	refspec := sourceRef + ":" + destination
-	fetchArgs := strictFetchArgs(paths.repo, paths.hooks, request.Tool.AskPass, request.Source.Transport, request.Source.Git, refspec)
-	if err := runGit(ctx, request.Tool.Executable, paths.work, env, fetchArgs...); err != nil {
+	askPass := request.Tool.AskPass
+	fetchEnv := env
+	if request.Source.Transport == "https" && request.Tool.HTTPSCredentials.Selected() {
+		host := strings.SplitN(request.Source.Identity, "/", 2)[0]
+		if request.Tool.HTTPSCredentials.Host != host {
+			return nil, admissionError(CodeIdentityInvalid, "HTTPS credential host does not match protected source")
+		}
+		var state string
+		askPass, state, err = materializeHTTPSCredentialBroker(root, request.Tool.AskPass, request.Tool.HTTPSCredentials)
+		if err != nil {
+			return nil, admissionError(CodeSourceUnavailable, "cannot materialize HTTPS credential broker")
+		}
+		fetchEnv = append([]string{}, env...)
+		fetchEnv = setEnvironmentValue(fetchEnv, "GIT_ASKPASS", askPass)
+		fetchEnv = append(fetchEnv,
+			EnvHTTPSBrokerState+"="+state,
+			EnvHTTPSBrokerSecret+"="+request.Tool.HTTPSCredentials.secret)
+	}
+	fetchArgs := strictFetchArgs(paths.repo, paths.hooks, askPass, request.Source.Transport, request.Source.Git, refspec)
+	if err := runGit(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...); err != nil {
 		return nil, admissionError(CodeSourceUnavailable, "exact source fetch failed")
 	}
 	if err := validatePrivateRepository(paths.repo, request.Lock.ObjectFormat); err != nil {
@@ -362,6 +408,17 @@ func cleanDiscoveryEnvironment() []string {
 		}
 	}
 	return env
+}
+
+func setEnvironmentValue(environment []string, name, value string) []string {
+	prefix := name + "="
+	for index := range environment {
+		if strings.HasPrefix(environment[index], prefix) {
+			environment[index] = prefix + value
+			return environment
+		}
+	}
+	return append(environment, prefix+value)
 }
 
 func cleanGitEnvironment(p privatePaths, tool GitTool, transport string) []string {

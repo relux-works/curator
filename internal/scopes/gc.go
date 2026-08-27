@@ -210,7 +210,11 @@ func markScopes(home string) marks {
 func (marked *marks) absorb(scope scopeMarks) {
 	for _, installed := range scope.markers {
 		marked.runtime[installed.Name+"/"+installed.Commit] = true
-		if installed.SchemaVersion != marker.SchemaVersion && installed.SchemaVersion != marker.ExternalSchemaVersion {
+		// Every build-bearing schema contributes its live cache keys. A schema
+		// missing from this band is not "no builds": its recorded keys would go
+		// unmarked and the collector would delete artifacts an installation is
+		// still using.
+		if !marker.BuildBearingSchema(installed.SchemaVersion) {
 			continue
 		}
 		for _, build := range installed.Builds {

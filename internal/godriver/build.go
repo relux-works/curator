@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"time"
 
@@ -56,7 +57,8 @@ type ResourceLimits struct {
 type BuildCommand map[string]any
 
 // BuildRequest identifies one already-validated command in a frozen source
-// snapshot. BuildRoot and SourceDir use protocol (slash-separated) paths.
+// snapshot. BuildRoot, BuildRoots, SourceDir, Modules, and RuntimeRoots use
+// protocol (slash-separated) paths.
 type BuildRequest struct {
 	Session *Session
 	Source  *buildsource.Token
@@ -65,7 +67,22 @@ type BuildRequest struct {
 	BuildRoot     string
 	SourceDir     string
 	Command       string
-	Limits        ResourceLimits
+	// Modules are the schema-8 first-party module directories this build root
+	// replaces (Spec §4.2.3), in declaration order. Empty is the schema-6 and
+	// schema-7 single-module build root.
+	Modules []string
+	// BuildRoots and RuntimeRoots are the skill's declared build roots and
+	// runtime roots. The driver reads them for exactly one purpose: re-running
+	// the containment half of §4.2.3, which no declared module directory may
+	// equal, contain, or be contained by. §4.2.3 names EVERY declared build
+	// root there, not only the one this command compiles, so a caller that
+	// supplies the whole set gets the whole rule re-verified; BuildRoot is
+	// always checked whether or not it appears in BuildRoots, so an
+	// unplumbed caller is never checked less than before. They select nothing
+	// about the build.
+	BuildRoots   []string
+	RuntimeRoots []string
+	Limits       ResourceLimits
 }
 
 // Artifact is a verified private output. StagedPath is manager-private and is
@@ -153,6 +170,11 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 	if err != nil {
 		return Result{}, err
 	}
+	// Spec §4.2.3 puts declaration and containment validation before the fixed
+	// `go list`, so it runs here, before the worker exists.
+	if err := verifyModuleDeclaration(sourceRoot, request.BuildRoot, request.BuildRoots, request.Modules, request.RuntimeRoots); err != nil {
+		return Result{}, err
+	}
 
 	// Step 2: probe, once for this operation and before the worker exists,
 	// which inventory controls this platform provides for exactly these limits.
@@ -231,6 +253,7 @@ func Build(ctx context.Context, request BuildRequest) (_ Result, resultErr error
 	}
 	if err := validatePackageGraph(listOutput.Stdout, graphValidation{
 		BuildRoot: buildRoot, SourceDir: sourceDir, GOROOT: request.Session.GOROOT(),
+		Snapshot: sourceRoot, BuildRootRel: request.BuildRoot, Modules: request.Modules,
 	}); err != nil {
 		return Result{}, err
 	}
@@ -281,7 +304,7 @@ func validatePackageCommandSurface(request BuildRequest) error {
 	extra := make([]string, 0, len(object))
 	for key := range object {
 		switch key {
-		case "type", "driver", "source_dir":
+		case "type", "driver", "source_dir", "modules":
 		default:
 			extra = append(extra, key)
 		}
@@ -304,7 +327,53 @@ func validatePackageCommandSurface(request BuildRequest) error {
 	if value, _ := object["source_dir"].(string); value != request.SourceDir {
 		return diagnostic(CodePackageInfluenceForbidden, "package build command source_dir %q does not match the validated command", value)
 	}
+	// The schema-8 `modules` list is the one further field §4.2.3 admits. It is
+	// held to the same rule as source_dir: the declared surface must be exactly
+	// the validated one, so a list the manager never checked cannot reach the
+	// directories the driver is about to trust. Absent and empty are the same
+	// declaration, so either spelling matches an empty validated list.
+	declared, listed := declaredModuleList(object["modules"])
+	if !listed {
+		return diagnostic(CodePackageInfluenceForbidden,
+			"package build command declares a modules value that is not a list of directories")
+	}
+	if !slices.Equal(declared, request.Modules) {
+		return diagnostic(CodePackageInfluenceForbidden,
+			"package build command modules %q do not match the validated command", declared)
+	}
 	return nil
+}
+
+// declaredModuleList normalizes the package-declared `modules` value. A build
+// command object reaches the driver either as the manager rebuilt it or as a
+// decoded manifest object, so both a []string and a JSON []any of strings are
+// the same declaration; anything else is not a module list at all. An absent
+// and an empty list are one declaration, and both normalize to nil.
+func declaredModuleList(value any) ([]string, bool) {
+	switch typed := value.(type) {
+	case nil:
+		return nil, true
+	case []string:
+		if len(typed) == 0 {
+			return nil, true
+		}
+		return typed, true
+	case []any:
+		declared := make([]string, 0, len(typed))
+		for _, item := range typed {
+			text, ok := item.(string)
+			if !ok {
+				return nil, false
+			}
+			declared = append(declared, text)
+		}
+		if len(declared) == 0 {
+			return nil, true
+		}
+		return declared, true
+	default:
+		return nil, false
+	}
 }
 
 func normalizeBuildLimits(limits ResourceLimits) (ResourceLimits, error) {

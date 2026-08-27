@@ -3,7 +3,7 @@
 #
 # The committed `SPEC_PIN` in `.github/workflows/ci.yml` is the only default
 # protocol input and always stays on the currently qualified released
-# revision.  A schema v6 candidate suite is never committed and never becomes a
+# revision.  A candidate suite is never committed and never becomes a
 # default: it enters exactly one non-default job, through an explicit
 # caller-supplied full revision or a pre-materialised root, and everything it
 # produces is stamped as candidate evidence.
@@ -37,13 +37,26 @@ set -u
 die() { echo "candidate-suite: $*" >&2; exit 1; }
 
 sha256_of() {
+	local file="$1" output digest
 	if command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 "$1" | awk '{print $1}'
+		output="$(shasum -a 256 <"$file")" || die "sha256 failed for $file"
 	elif command -v sha256sum >/dev/null 2>&1; then
-		sha256sum "$1" | awk '{print $1}'
+		output="$(sha256sum <"$file")" || die "sha256 failed for $file"
 	else
 		die 'neither shasum nor sha256sum is available'
 	fi
+
+	# Hash stdin rather than a filename. Git for Windows shasum prefixes its
+	# output line with a backslash when the printed filename needs escaping;
+	# parsing that line's first field would turn the escape marker into part of
+	# the digest. Keep the shape check as a fail-closed guard for any hash tool
+	# that still returns non-canonical output.
+	read -r digest _ <<<"$output"
+	case "$digest" in
+		*[!0-9a-f]*) die "hash tool returned a non-canonical sha256 digest for $file: '$digest'" ;;
+	esac
+	[ "${#digest}" -eq 64 ] || die "hash tool returned a non-canonical sha256 digest for $file: '$digest'"
+	printf '%s\n' "$digest"
 }
 
 # A revision and a pre-materialised root are independent identities. Accepting

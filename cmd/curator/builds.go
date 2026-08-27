@@ -362,12 +362,19 @@ func classifySkillBuilds(installedDir string, recorded *marker.Marker, planned [
 		state, detail := markerRefusal(installedDir)
 		return state, plannedRows(planned, state, "", detail)
 	}
-	if recorded.SchemaVersion != marker.SchemaVersion {
+	if !marker.BuildBearingSchema(recorded.SchemaVersion) {
 		// A marker below schema 2 cannot describe a compiled command at all, so
 		// an installation that now activates one has to be installed again.
+		//
+		// Every build-bearing schema is accepted here, not just the one this
+		// release writes. Banding on a single schema turns each schema advance
+		// into a false needs-install for installations that are exactly
+		// current, and the remedy it printed named a schema the manager would
+		// not even write back.
 		return stateNeedsInstall, plannedRows(planned, stateNeedsInstall, "", fmt.Sprintf(
-			"install marker schema %d cannot describe a compiled command; reinstall to record marker schema %d",
-			recorded.SchemaVersion, marker.SchemaVersion))
+			"install marker schema %d cannot describe a compiled command; "+
+				"reinstall to record a marker schema that can",
+			recorded.SchemaVersion))
 	}
 
 	if exposure := contextExposure(installedDir, recorded); exposure != "" {
@@ -542,10 +549,10 @@ func markerRefusal(installedDir string) (string, string) {
 	if json.Unmarshal(payload, &refused) != nil || refused.SchemaVersion == nil {
 		return stateInvalidMarker, "the install marker is not a readable install marker document"
 	}
-	if *refused.SchemaVersion != marker.SchemaVersion && *refused.SchemaVersion != marker.LegacySchemaVersion {
+	if !marker.SupportedSchema(*refused.SchemaVersion) {
 		return stateUnsupportedMarker, fmt.Sprintf(
 			"install marker schema %d cannot be read by this manager; the newest supported schema is %d",
-			*refused.SchemaVersion, marker.SchemaVersion)
+			*refused.SchemaVersion, marker.NewestSchemaVersion)
 	}
 	commands := make([]string, 0, len(refused.Builds))
 	for command := range refused.Builds {

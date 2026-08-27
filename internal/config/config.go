@@ -42,7 +42,9 @@ const (
 var DefaultAgents = []string{"codex_cli"}
 
 // LockableKeys are the top-level keys an organization may lock from the
-// system config (Spec §7.2).
+// system config (Spec §7.2). Operator credential selections — build_ssh
+// among them — are deliberately absent and never lockable: credential
+// material is operator-owned (ratified with the spec owner 2026-08-23).
 var LockableKeys = map[string]bool{
 	"audit_registries":           true,
 	"disable_builtin_registries": true,
@@ -64,6 +66,7 @@ var managerKeys = map[string]bool{
 	"projects": true, "allowed_sources": true, "audit": true,
 	"audit_registries": true, "disable_builtin_registries": true,
 	"execution": true,
+	"build_ssh": true, "build_https": true,
 }
 
 // Project is a registered project entry.
@@ -136,6 +139,13 @@ type Config struct {
 	AllowedSources           []string
 	AuditRegistries          []Registry
 	DisableBuiltinRegistries bool
+	// BuildSSH maps a credential scope to the operator SSH credentials that
+	// cover every external build repository below it (Spec §12.2).
+	BuildSSH map[string]BuildSSHCredential
+	// BuildHTTPS maps a credential scope to the operator HTTPS token
+	// selection that covers every external build repository below it
+	// (Spec §12.2).
+	BuildHTTPS map[string]BuildHTTPSCredential
 }
 
 // Home returns the directory holding the config file: the machine home for
@@ -372,6 +382,16 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		return nil, err
 	}
 
+	buildSSH, err := parseBuildSSH(data["build_ssh"])
+	if err != nil {
+		return nil, err
+	}
+
+	buildHTTPS, err := parseBuildHTTPS(data["build_https"])
+	if err != nil {
+		return nil, err
+	}
+
 	disableBuiltin := false
 	if raw, present := data["disable_builtin_registries"]; present {
 		disableBuiltin, ok = raw.(bool)
@@ -450,6 +470,8 @@ func Parse(data map[string]any, path string) (*Config, error) {
 		AllowedSources:           allowedSources,
 		AuditRegistries:          registries,
 		DisableBuiltinRegistries: disableBuiltin,
+		BuildSSH:                 buildSSH,
+		BuildHTTPS:               buildHTTPS,
 	}, nil
 }
 

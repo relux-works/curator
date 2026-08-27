@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"go/build"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,12 @@ import (
 	"github.com/relux-works/curator/internal/buildsource"
 )
 
+// identityProbeMode is a test-only second hidden mode. It exists so a test can
+// start this binary through a launcher link and read back the identity the
+// started process resolves for itself, which is the only way to observe what
+// os.Executable reports for a real launch shape rather than to assume it.
+const identityProbeMode = "-curator-test-identity-probe"
+
 // TestMain gives the test binary the same fixed hidden worker mode the
 // installed manager has, so every worker test launches a real identity-verified
 // process instead of an in-process mock.
@@ -22,7 +29,33 @@ func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == WorkerMode {
 		os.Exit(RunWorker(os.Stdin, os.Stdout))
 	}
+	if len(os.Args) == 2 && os.Args[1] == identityProbeMode {
+		os.Exit(runIdentityProbe(os.Stdout))
+	}
 	os.Exit(m.Run())
+}
+
+// identityProbe is what a started process reports about itself.
+type identityProbe struct {
+	Reported string `json:"reported"`
+	Path     string `json:"path"`
+	SHA256   string `json:"sha256"`
+	Size     int64  `json:"size"`
+	Error    string `json:"error"`
+}
+
+func runIdentityProbe(out io.Writer) int {
+	probe := identityProbe{Reported: managerExecutable()}
+	identity, err := resolveExecutableIdentity(probe.Reported)
+	if err != nil {
+		probe.Error = err.Error()
+	} else {
+		probe.Path, probe.SHA256, probe.Size = identity.Path, identity.SHA256, identity.Size
+	}
+	if err := json.NewEncoder(out).Encode(probe); err != nil {
+		return 1
+	}
+	return 0
 }
 
 // stubScript mirrors the manager-owned script consumed by testdata/stubgo.
@@ -127,6 +160,21 @@ type workerFixture struct {
 	goroot    string
 	token     *buildsource.Token
 	session   *Session
+
+	// modules and runtimeRoots are the schema-8 declaration the request
+	// carries. Both are empty for a schema-6 or schema-7 fixture, which is
+	// what every pre-existing test builds.
+	modules      []string
+	runtimeRoots []string
+	// buildRootRel and sourceDirRel are the protocol paths of buildRoot and
+	// sourceDir, so a fixture can move its build root out of "build".
+	buildRootRel string
+	sourceDirRel string
+	// buildRootsRel is the skill's whole declared build-root set, which
+	// §4.2.3's containment rule is written against. Empty means "the command's
+	// own build root is the only one declared", which is every fixture that
+	// does not say otherwise.
+	buildRootsRel []string
 }
 
 // newSnapshotFixture creates the frozen snapshot only, so a test can compute
@@ -141,8 +189,10 @@ func newSnapshotFixture(t *testing.T) *workerFixture {
 	snapshot = mustPhysical(t, snapshot)
 	return &workerFixture{
 		t: t, root: snapshot,
-		buildRoot: filepath.Join(snapshot, "build"),
-		sourceDir: filepath.Join(snapshot, "build", "cmd", "tool"),
+		buildRoot:    filepath.Join(snapshot, "build"),
+		sourceDir:    filepath.Join(snapshot, "build", "cmd", "tool"),
+		buildRootRel: "build",
+		sourceDirRel: "build/cmd/tool",
 	}
 }
 
@@ -172,13 +222,20 @@ func (fixture *workerFixture) start(script stubScript) *workerFixture {
 }
 
 func (fixture *workerFixture) request(limits ResourceLimits) BuildRequest {
+	object := BuildCommand{"type": "build", "driver": "go-v1", "source_dir": fixture.sourceDirRel}
+	if len(fixture.modules) != 0 {
+		object["modules"] = append([]string(nil), fixture.modules...)
+	}
 	return BuildRequest{
 		Session:       fixture.session,
 		Source:        fixture.token,
-		CommandObject: BuildCommand{"type": "build", "driver": "go-v1", "source_dir": "build/cmd/tool"},
-		BuildRoot:     "build",
-		SourceDir:     "build/cmd/tool",
+		CommandObject: object,
+		BuildRoot:     fixture.buildRootRel,
+		SourceDir:     fixture.sourceDirRel,
 		Command:       "golden-tool",
+		Modules:       fixture.modules,
+		BuildRoots:    fixture.buildRootsRel,
+		RuntimeRoots:  fixture.runtimeRoots,
 		Limits:        limits,
 	}
 }

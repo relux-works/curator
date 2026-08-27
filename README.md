@@ -40,6 +40,7 @@ gh attestation verify <artifact> --owner relux-works
 - **Scopes**: project, global, and hybrid (machine-stored, per-project activation).
 - **MCP requirements**: read-only verification of declared MCP servers against agent configuration surfaces.
 - **Security**: source allowlists, declared capabilities, no code execution at install time, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
+- **Operator credentials**: per-repository SSH selection and scoped HTTPS token sources for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS can remain anonymous. See [SSH credentials](docs/build-ssh.md) and [HTTPS credentials](docs/build-https.md).
 
 ## Registry client guarantees
 
@@ -296,6 +297,10 @@ Supported profiles, explicit unsupported cases, the stable diagnostic
 vocabulary, the conformance matrix, and migration steps for an existing command
 are in
 [docs/source-closure-adapter-conformance.md](docs/source-closure-adapter-conformance.md).
+Building a new language adapter — the contract, the process seams, the
+reject-by-default source-analysis posture, and what a new path must publish —
+is covered by
+[docs/authoring-language-adapters.md](docs/authoring-language-adapters.md).
 
 ## Compiled-command status, diagnostics, and repair
 
@@ -568,6 +573,13 @@ it.
 | Swift / SwiftPM | validates `swiftpm-source-v1` lock, exact pin, tree-intake, manifest permit, kind-preserving mirror, selection-neutral capture, exact binding, extension/binary rejection, and offline replay contracts; runs real protected `swift package dump-package` and forced-lock `show-dependencies` mirror replay when Swift is installed | `go test -count=1 ./internal/swiftpmsource` | Go test output; task evidence may be stored under `.temp/<TASK-ID>/` |
 | Cross-adapter source-closure conformance | runs one normative semantic suite across Rust, npm, pnpm, Yarn Classic, modern Yarn, and SwiftPM/C-family; independently canonicalizes and hashes all 53 accepted CGP05/CGP10 records; drives the published rejection matrix; refuses an incomplete coverage matrix; and emits the committed protocol export for independent implementations | `go test -count=1 ./internal/crossconformance` | Go test output and `internal/crossconformance/testdata/cross-adapter-protocol-export.json`; task evidence may be stored under `.temp/<TASK-ID>/` |
 
+The module's immutable release pin (`internal/buildrepo/release_pin.go`,
+verified by `curator-spec-pin`) is curator-spec `v1.0.0-rc.8`; CI's conformance
+suite pin has since been promoted to the rc.9 release commit — see `SPEC_PIN`
+in [.github/workflows/ci.yml](.github/workflows/ci.yml), which owns that
+promotion. Aligning the module release pin to rc.9 is tracked with the
+promotion task named there.
+
 The released suite is pinned to curator-spec `v1.0.0-rc.8` at commit
 `f8c405aa3ad0a39d260c2ed93684e55c5a346359`. `curator-spec-pin` verifies the
 suite manifest SHA-256
@@ -608,8 +620,29 @@ granularities, and neither is a silent omission:
 When the inventory gains a record for a platform, the guard stops skipping there
 on its own; only `must_run_on` in `platform-cases.tsv` needs widening.
 
+#### Suite consumption, not suite presence
+
+A conformance root that publishes a family proves nothing about whether this
+build reads it. The schema-8 impact analysis measured the difference: pinned
+implementation jobs returned exit 0 against a schema-8 suite while consuming
+none of it. Two tables answer the two halves, and a family needs both:
+
+* **presence** — [`root-artifacts.tsv`](.github/ci/root-artifacts.tsv) declares
+  the root artefacts a package's conformance tests read without a guard. A root
+  that stops publishing one defers that package, and `CI_REQUIRE_FULL_ROOT=1`
+  makes the deferral fatal in the candidate lane;
+* **consumption** — [`platform-cases.tsv`](.github/ci/platform-cases.tsv) names
+  the case that actually reads it, on each runner. A rename, a deletion or a
+  `-run` filter matching nothing then fails by name instead of shrinking the
+  run.
+
+For schema 8 that is `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`,
+`vectors/module-roots.json` and `vectors/script-host-execution-policy.json`,
+consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`,
+`internal/godriver` and `internal/scriptpolicy`.
+
 The committed protocol-suite pin is declared once, as `SPEC_PIN` in the workflow
-`env:` block, and every job reads it from there. A schema v6 candidate suite is
+`env:` block, and every job reads it from there. A candidate suite is
 never committed and never a default: it enters only through the
 `candidate-conformance` job, on an explicit `workflow_dispatch` that supplies a
 full 40-character revision or a pre-materialised root. That job sets

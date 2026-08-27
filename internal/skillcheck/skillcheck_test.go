@@ -21,6 +21,12 @@ func TestValidateMissingSkillAndInvalidManifest(t *testing.T) {
 	if !HasErrors(issues) || !strings.Contains(Format(issues[0]), "SKILL.md") {
 		t.Fatalf("error helpers rejected issues: %+v", issues)
 	}
+	// Closure provenance (skill name, resolved ref, requirement chain) is
+	// added at the closure call site, not inside skillspec.Load, so a
+	// standalone check keeps reporting the bare validation message.
+	if issues[1].Path != "csk-skill.json" || strings.Contains(issues[1].Message, "invalid skill manifest for") {
+		t.Fatalf("standalone manifest issue = %+v", issues[1])
+	}
 }
 
 func TestValidateLocaleWarning(t *testing.T) {
@@ -213,4 +219,69 @@ func marshal(t *testing.T, value any) string {
 		t.Fatal(err)
 	}
 	return string(payload)
+}
+
+// schema8ScriptSkill lays out a schema-8 skill with one script command,
+// enforced or declared-only, and nothing else that could produce an error.
+func schema8ScriptSkill(t *testing.T, enforced bool) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeSkillFile(t, dir, "SKILL.md", "---\nname: skill\ndescription: d\n---\n"+
+		"Resolve the command from project .agents/bin, then the manager global/bin fallback, "+
+		"then a validated bare command with command -v or Get-Command; on Windows the shim carries .cmd.\n")
+	writeSkillFile(t, dir, "scripts/tool", "#!/bin/sh\n")
+	command := map[string]any{"type": "script", "unix_path": "scripts/tool"}
+	if enforced {
+		command["execution_policy"] = "script-worker-v1"
+		command["interpreter"] = "python3-v1"
+	}
+	writeSkillFile(t, dir, "agent-skill.json", marshal(t, map[string]any{
+		"schema_version": 8,
+		"capabilities": map[string]any{
+			"env_read": []string{}, "exec": "none", "filesystem": "repo",
+			"network": "none", "secrets": "none",
+		},
+		"runtime_roots": []string{"scripts"},
+		"commands":      map[string]any{"tool": command},
+	}))
+	return dir
+}
+
+// A schema-8 manifest that selects script-worker-v1 is a valid document, so it
+// parses; the manager still refuses it, because it has no worker and the
+// policy forbids installing the command declared-only.
+func TestValidateRejectsEnforcedScriptExecutionPolicy(t *testing.T) {
+	issues := Validate(schema8ScriptSkill(t, true), "")
+	var refusals []Issue
+	for _, issue := range issues {
+		if issue.Code == "script_execution_policy_unsupported" {
+			refusals = append(refusals, issue)
+		}
+		if issue.Code == "skill.manifest_invalid" {
+			t.Fatalf("the parser rejected a valid schema-8 manifest: %+v", issue)
+		}
+	}
+	if len(refusals) != 1 {
+		t.Fatalf("want exactly one execution-policy refusal, got %+v", issues)
+	}
+	if refusals[0].Severity != "error" || !HasErrors(issues) {
+		t.Fatalf("refusal is not an error: %+v", refusals[0])
+	}
+	if refusals[0].Path != "commands.tool.execution_policy" {
+		t.Fatalf("Path = %q", refusals[0].Path)
+	}
+}
+
+// The declared-only schema-8 script command is the control: admitting schema 8
+// must not have changed what an unenforced command does.
+func TestValidateAcceptsDeclaredOnlySchema8ScriptCommand(t *testing.T) {
+	issues := Validate(schema8ScriptSkill(t, false), "")
+	if HasErrors(issues) {
+		t.Fatalf("a declared-only schema-8 skill reported errors: %+v", issues)
+	}
+	for _, issue := range issues {
+		if issue.Code == "script_execution_policy_unsupported" {
+			t.Fatalf("a declared-only command was refused: %+v", issue)
+		}
+	}
 }

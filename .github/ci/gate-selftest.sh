@@ -99,8 +99,8 @@ FAKEROOT="$WORK/root"
 mkdir -p "$FAKEROOT/vectors"
 printf '{\n  "protocol_version": "1.0.0-rc.5"\n}\n' >"$FAKEROOT/manifest.json"
 printf 'vector-a\n' >"$FAKEROOT/vectors/a.json"
-MANIFEST_SHA="$(shasum -a 256 "$FAKEROOT/manifest.json" 2>/dev/null | awk '{print $1}')"
-[ -n "$MANIFEST_SHA" ] || MANIFEST_SHA="$(sha256sum "$FAKEROOT/manifest.json" | awk '{print $1}')"
+MANIFEST_SHA="$(shasum -a 256 <"$FAKEROOT/manifest.json" 2>/dev/null | awk '{print $1}')"
+[ -n "$MANIFEST_SHA" ] || MANIFEST_SHA="$(sha256sum <"$FAKEROOT/manifest.json" | awk '{print $1}')"
 
 assert 'record rejects a nonexistent root'          1 bash "$CS" record "$WORK/absent" "$WORK/ev1"
 mkdir -p "$WORK/noman"
@@ -108,6 +108,35 @@ assert 'record rejects a root with no manifest.json' 1 bash "$CS" record "$WORK/
 assert 'record rejects a manifest digest mismatch'  1 env CANDIDATE_EXPECTED_MANIFEST_SHA256=deadbeef bash "$CS" record "$FAKEROOT" "$WORK/ev3"
 assert 'record rejects a candidate identical to the pin' 1 env PIN_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev4"
 assert 'record accepts a distinct candidate'        0 env CANDIDATE_EXPECTED_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev5"
+
+# Git for Windows shasum prefixes the entire output line with `\` when a
+# filename needs escaping. This shim emits that form only when given a path,
+# proving candidate-suite hashes through stdin and never consumes the escaped
+# filename form.
+WINDOWS_SHASUM_BIN="$WORK/windows-shasum-bin"
+mkdir -p "$WINDOWS_SHASUM_BIN"
+cat >"$WINDOWS_SHASUM_BIN/shasum" <<'EOF'
+#!/usr/bin/env bash
+if [ "$#" -gt 2 ]; then
+	printf '\\%s  %s\n' "$SIMULATED_SHA256" "${!#}"
+else
+	printf '%s  -\n' "$SIMULATED_SHA256"
+fi
+EOF
+chmod +x "$WINDOWS_SHASUM_BIN/shasum"
+assert 'record avoids Git for Windows shasum filename escaping' 0 env PATH="$WINDOWS_SHASUM_BIN:$PATH" SIMULATED_SHA256="$MANIFEST_SHA" CANDIDATE_EXPECTED_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev6"
+
+# A malformed hash tool must fail closed rather than persisting a textual
+# backslash-prefixed digest as candidate identity.
+PREFIXED_SHASUM_BIN="$WORK/prefixed-shasum-bin"
+mkdir -p "$PREFIXED_SHASUM_BIN"
+cat >"$PREFIXED_SHASUM_BIN/shasum" <<'EOF'
+#!/usr/bin/env bash
+printf '\\%s  -\n' "$SIMULATED_SHA256"
+EOF
+chmod +x "$PREFIXED_SHASUM_BIN/shasum"
+assert 'record rejects a backslash-prefixed digest' 1 env PATH="$PREFIXED_SHASUM_BIN:$PATH" SIMULATED_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev7"
+assert_contains 'prefixed digest rejection names non-canonical output' 'hash tool returned a non-canonical sha256 digest' "$WORK/out.txt"
 
 EV="$WORK/ev5/candidate-suite-identity.txt"
 if [ -f "$EV" ]; then
@@ -391,6 +420,78 @@ make_stub "$WANT_GO" local ''
 assert 'go 1.25'"'"'s empty GOENV spelling passes'    0 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
 make_stub "$WANT_GO" local "$WORK/user.env"
 assert 'a per-user go env file is rejected'         1 env PATH="$STUBROOT/bin:$PATH" bash "$TI"
+
+echo ''
+echo '=== ci.yml: every windows lane that runs test-gate.sh buys the slower runner its own budget ==='
+
+# A per-package timeout is a hosted-runner budget, and the Windows runner needs
+# a bigger one than the unix runners for the same passing work. That budget
+# lives in the workflow, so a refactor can drop it without any gate noticing --
+# the run just dies at the old deadline and the ledger reports the truncated
+# cases as cases that never ran. These cases read the wiring back.
+#
+# Emits one "<job> <windows-lane?> <has-timeout?>" record per test-gate.sh step.
+gate_lane_records() {
+	awk '
+		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ { job = $1; sub(/:[ \t\r]*$/, "", job) }
+		/^[ \t]*os:[ \t]*\[/           { if ($0 ~ /windows-latest/) win[job] = 1 }
+		/^      - name:/               { timeout = 0 }
+		/^[ \t]*GO_TEST_TIMEOUT:/      { timeout = 1 }
+		/test-gate\.sh/ && /^[ \t]*run:/ {
+			printf "%s %d %d\n", job, (win[job] ? 1 : 0), timeout
+		}
+	' "$WORKFLOW"
+}
+
+lane_records="$(gate_lane_records)"
+if [ -z "$lane_records" ]; then
+	bad 'the workflow still runs test-gate.sh' 'no test-gate.sh step found in .github/workflows/ci.yml'
+else
+	unbudgeted=''
+	while read -r job is_win has_timeout; do
+		[ -n "$job" ] || continue
+		[ "$is_win" = '1' ] || continue
+		[ "$has_timeout" = '1' ] || unbudgeted="$unbudgeted $job"
+	done <<-RECORDS
+	$lane_records
+	RECORDS
+	if [ -z "$unbudgeted" ]; then
+		ok 'every windows test-gate.sh lane declares GO_TEST_TIMEOUT'
+	else
+		bad 'every windows test-gate.sh lane declares GO_TEST_TIMEOUT' \
+			"lanes running on windows-latest with no GO_TEST_TIMEOUT:$unbudgeted"
+	fi
+fi
+
+# minutes <duration>  -- "60m" and "1h" both answer 60; anything else answers -1.
+minutes() {
+	case "$1" in
+	*m) printf '%s\n' "${1%m}" ;;
+	*h) printf '%s\n' "$(( ${1%h} * 60 ))" ;;
+	*)  printf '%s\n' '-1' ;;
+	esac
+}
+
+GATE_DEFAULT_TIMEOUT="$(awk -F'-' '/^GO_TEST_TIMEOUT=/{print $2; exit}' "$HERE/test-gate.sh" | tr -d '}"')"
+win_timeout="$(awk -F"'" '/GO_TEST_TIMEOUT:.*Windows/{print $4; exit}' "$WORKFLOW")"
+other_timeout="$(awk -F"'" '/GO_TEST_TIMEOUT:.*Windows/{print $6; exit}' "$WORKFLOW")"
+win_minutes="$(minutes "$win_timeout")"
+other_minutes="$(minutes "$other_timeout")"
+default_minutes="$(minutes "$GATE_DEFAULT_TIMEOUT")"
+
+if [ "$win_minutes" -gt 0 ] && [ "$other_minutes" -gt 0 ] && [ "$win_minutes" -gt "$other_minutes" ]; then
+	ok 'the windows per-package budget is larger than the unix one'
+else
+	bad 'the windows per-package budget is larger than the unix one' \
+		"windows='$win_timeout' other='$other_timeout'"
+fi
+
+if [ "$default_minutes" -gt 0 ] && [ "$other_minutes" -eq "$default_minutes" ]; then
+	ok 'the unix per-package budget still matches the gate default'
+else
+	bad 'the unix per-package budget still matches the gate default' \
+		"workflow='$other_timeout' test-gate.sh default='$GATE_DEFAULT_TIMEOUT'"
+fi
 
 echo ''
 printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"

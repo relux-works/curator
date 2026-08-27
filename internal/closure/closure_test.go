@@ -575,3 +575,49 @@ func TestScratchResolutionLeavesPersistentRootsAbsent(t *testing.T) {
 		t.Fatalf("dry-run created manager home: %v", err)
 	}
 }
+
+// brokenSkill creates a repository named name whose csk-skill.json is present
+// but cannot be parsed, tagged v1 like every other harness skill.
+func (h *harness) brokenSkill(name, payload string) string {
+	h.t.Helper()
+	dir := filepath.Join(h.skillsRoot, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		h.t.Fatal(err)
+	}
+	h.git(dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# "+name), 0o644); err != nil {
+		h.t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "csk-skill.json"), []byte(payload), 0o644); err != nil {
+		h.t.Fatal(err)
+	}
+	h.git(dir, "add", ".")
+	h.git(dir, "commit", "-qm", "init")
+	h.git(dir, "tag", "v1")
+	return dir
+}
+
+func TestTransitiveManifestErrorNamesNodeRefAndChain(t *testing.T) {
+	h := newHarness(t)
+	h.brokenSkill("leaf", `{"schema_version": 4, "capabilities": {}, "commands": "not-an-object"}`)
+	h.skill("mid", nil, map[string]map[string]any{"leaf": requirement("leaf", "full")})
+
+	_, err := h.build([]manifest.Decl{decl("mid")}, nil)
+	if err == nil {
+		t.Fatal("a broken transitive manifest must fail the closure")
+	}
+	message := err.Error()
+	for _, want := range []string{
+		"invalid skill manifest for leaf",
+		"tag v1",
+		"(via " + ProjectEdge + " -> mid -> leaf)",
+		"commands: must be an object",
+	} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("closure error = %q, want it to contain %q", message, want)
+		}
+	}
+	if strings.Contains(message, "manifest for mid") {
+		t.Fatalf("closure error = %q, must not read as if the declaring skill were broken", message)
+	}
+}

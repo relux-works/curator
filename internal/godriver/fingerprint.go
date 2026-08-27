@@ -200,6 +200,12 @@ func (walk *toolchainWalk) descend(ctx context.Context, dir *os.Root, prefix str
 			if readErr != nil {
 				return diagnosticErr("toolchain_link_dangling", readErr, "cannot read toolchain link %q", protocolPath)
 			}
+			// Readlink hands back the separators the host stored, which on
+			// Windows are the ones the platform substituted for the protocol's.
+			// Converting here, before anything validates or hashes the target,
+			// is what keeps the toolchain identity a property of the tree
+			// rather than of the host that walked it.
+			target = protocolLinkTarget(target)
 			if !utf8.ValidString(target) || strings.ContainsRune(target, 0) {
 				return diagnostic("invalid_unicode", "toolchain link %q has an invalid target", protocolPath)
 			}

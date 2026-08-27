@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 // toolchainCase is one authoritative toolchain identity vector.
@@ -58,10 +60,11 @@ type argvCase struct {
 }
 
 type positiveVectors struct {
-	FixedEnvironment map[string]string `json:"fixed_environment"`
-	Argv             []argvCase        `json:"argv"`
-	ToolchainCases   []toolchainCase   `json:"toolchain_cases"`
-	PositiveCases    []struct {
+	FixedEnvironment      map[string]string      `json:"fixed_environment"`
+	FixedEnvironmentCases []fixedEnvironmentCase `json:"fixed_environment_cases"`
+	Argv                  []argvCase             `json:"argv"`
+	ToolchainCases        []toolchainCase        `json:"toolchain_cases"`
+	PositiveCases         []struct {
 		Name    string `json:"name"`
 		Result  string `json:"result"`
 		Package struct {
@@ -76,6 +79,14 @@ type positiveVectors struct {
 			EmbeddedInputs    []string `json:"embedded_inputs"`
 		} `json:"package"`
 	} `json:"positive_cases"`
+}
+
+type fixedEnvironmentCase struct {
+	Name              string            `json:"name"`
+	GOOS              string            `json:"goos"`
+	GOARCH            string            `json:"goarch"`
+	Environment       map[string]string `json:"environment"`
+	OptionalVariables []string          `json:"optional_variables"`
 }
 
 func loadPositiveVectors(t *testing.T) positiveVectors {
@@ -170,20 +181,21 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 	}
 
 	t.Run("fixed environment", func(t *testing.T) {
-		if len(vectors.FixedEnvironment) == 0 {
+		expected, optional := fixedEnvironmentForHost(t, vectors, runtime.GOOS, runtime.GOARCH)
+		if len(expected) == 0 {
 			t.Skip("this conformance root publishes no fixed environment")
 		}
 		fixture := newSnapshotFixture(t)
 		fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})
 		values := environmentMap(fixture.session.Environment())
 
-		published := make([]string, 0, len(vectors.FixedEnvironment))
-		for key := range vectors.FixedEnvironment {
+		published := make([]string, 0, len(expected))
+		for key := range expected {
 			published = append(published, key)
 		}
 		sort.Strings(published)
 		for _, key := range published {
-			want := vectors.FixedEnvironment[key]
+			want := expected[key]
 			got, present := values[key]
 			if !present {
 				t.Fatalf("Curator's closed environment omits %s", key)
@@ -198,11 +210,50 @@ func TestFixedEnvironmentAndFiveDirectArgvFormsVector(t *testing.T) {
 			}
 		}
 		for key := range values {
-			if _, ok := vectors.FixedEnvironment[key]; !ok {
+			if _, ok := expected[key]; !ok && !optional[key] {
 				t.Fatalf("Curator's closed environment carries %s, which the suite does not publish", key)
 			}
 		}
 	})
+}
+
+func fixedEnvironmentForHost(t *testing.T, vectors positiveVectors, goos, goarch string) (map[string]string, map[string]bool) {
+	t.Helper()
+	if len(vectors.FixedEnvironmentCases) == 0 {
+		return vectors.FixedEnvironment, nil
+	}
+	for _, testCase := range vectors.FixedEnvironmentCases {
+		if testCase.GOOS != goos || testCase.GOARCH != goarch {
+			continue
+		}
+		optional := make(map[string]bool, len(testCase.OptionalVariables))
+		for _, key := range testCase.OptionalVariables {
+			optional[key] = true
+		}
+		return testCase.Environment, optional
+	}
+	// A suite that publishes host cases but stays silent about this one is
+	// saying nothing about this host rather than failing it, so a host outside
+	// the published set (an Intel Mac, linux/arm64) skips instead of going red.
+	t.Skipf("the suite publishes no fixed environment for native host %s/%s", goos, goarch)
+	return nil, nil
+}
+
+func TestFixedEnvironmentForHostSelectsNativeCase(t *testing.T) {
+	vectors := positiveVectors{
+		FixedEnvironment: map[string]string{"GOARCH": "arm64"},
+		FixedEnvironmentCases: []fixedEnvironmentCase{
+			{GOOS: "darwin", GOARCH: "arm64", Environment: map[string]string{"GOARCH": "arm64"}},
+			{GOOS: "windows", GOARCH: "amd64", Environment: map[string]string{"GOARCH": "amd64"}, OptionalVariables: []string{"SYSTEMROOT", "WINDIR"}},
+		},
+	}
+	environment, optional := fixedEnvironmentForHost(t, vectors, "windows", "amd64")
+	if environment["GOARCH"] != "amd64" {
+		t.Fatalf("selected GOARCH = %q", environment["GOARCH"])
+	}
+	if !optional["SYSTEMROOT"] || !optional["WINDIR"] {
+		t.Fatalf("optional variables = %#v", optional)
+	}
 }
 
 // TestToolchainIdentityVectors proves every authoritative toolchain identity
@@ -262,9 +313,8 @@ func TestToolchainIdentityVectors(t *testing.T) {
 			case "invalid-unicode-toolchain-path":
 				root := t.TempDir()
 				writeTestFile(t, filepath.Join(root, "bin", "go"), []byte("GO"), 0o755)
-				name := filepath.Join(root, "bin", string(decodeBase64(t, testCase.Input.PathBytesBase64)))
-				if err := os.WriteFile(name, []byte("x"), 0o600); err != nil { // #nosec G306 -- deliberate invalid-UTF-8 probe
-					t.Skipf("this host cannot create a non-UTF-8 filename: %v", err)
+				if !writeInvalidUnicodeMember(t, filepath.Join(root, "bin"), decodeBase64(t, testCase.Input.PathBytesBase64)) {
+					t.Skip("this host cannot create a member whose name is not valid Unicode")
 				}
 				_, _, err := fingerprintToolchain(context.Background(), root, "go version go1.25.5 darwin/arm64")
 				requireDiagnostic(t, testCase, err)
@@ -307,6 +357,61 @@ func TestToolchainIdentityVectors(t *testing.T) {
 	}
 }
 
+// invalidUnicodeNames lists the byte spellings that can carry an invalid
+// Unicode scalar into a directory entry on this host, the vector's own bytes
+// first.
+//
+// A POSIX directory stores those bytes verbatim. Windows stores names as
+// UTF-16, and Go replaces the vector's ill-formed UTF-8 with U+FFFD on the way
+// in, which would launder the probe into a perfectly valid name; the reachable
+// spelling of an invalid scalar there is an unpaired surrogate, which Go's
+// WTF-8 encoding carries into and back out of the filesystem unchanged.
+func invalidUnicodeNames(vector []byte) [][]byte {
+	names := [][]byte{vector}
+	if runtime.GOOS == "windows" {
+		names = append(names, []byte{0xed, 0xa0, 0x80})
+	}
+	return names
+}
+
+// writeInvalidUnicodeMember creates one member of dir whose name the host
+// reads back as invalid Unicode. It reports false when no spelling survives,
+// which is a host capability limit and not a Curator result.
+func writeInvalidUnicodeMember(t *testing.T, dir string, vector []byte) bool {
+	t.Helper()
+	for _, raw := range invalidUnicodeNames(vector) {
+		path := filepath.Join(dir, string(raw))
+		if err := os.WriteFile(path, []byte("x"), 0o600); err != nil { // #nosec G306 -- deliberate invalid-UTF-8 probe
+			continue
+		}
+		if hasInvalidUnicodeMember(t, dir) {
+			return true
+		}
+		// The host laundered this spelling into valid Unicode, so it proves
+		// nothing about the guard. Remove it before trying the next one.
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return false
+}
+
+// hasInvalidUnicodeMember reports whether dir presents a member whose name is
+// not valid Unicode.
+func hasInvalidUnicodeMember(t *testing.T, dir string) bool {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !utf8.ValidString(entry.Name()) {
+			return true
+		}
+	}
+	return false
+}
+
 func requireDiagnostic(t *testing.T, testCase toolchainCase, err error) {
 	t.Helper()
 	if testCase.Expected.Result != "reject" || testCase.Expected.Reuse || testCase.Expected.ArtifactExecuted {
@@ -335,8 +440,19 @@ func materializeToolchain(t *testing.T, testCase toolchainCase) string {
 				t.Fatal(err)
 			}
 		case "symlink":
-			if err := os.Symlink(filepath.FromSlash(entry.Target), target); err != nil {
+			// The link payload is a protocol byte input, and os.Symlink is
+			// handed it unconverted. Windows still stores its own separators —
+			// os.Symlink applies FromSlash itself before the syscall — so the
+			// round trip is asserted through the same normalizer the
+			// fingerprint hashes with. That still catches a materializer that
+			// mangles the target while tolerating the one substitution the
+			// platform is entitled to make.
+			if err := os.Symlink(entry.Target, target); err != nil {
 				t.Skipf("this host cannot create the symbolic link the vector needs: %v", err)
+			}
+			observed, err := os.Readlink(target)
+			if err != nil || protocolLinkTarget(observed) != entry.Target {
+				t.Fatalf("materialized link target = %q, %v; want protocol target %q", observed, err, entry.Target)
 			}
 		default:
 			writeTestFile(t, target, decodeBase64(t, entry.Content), 0o755)

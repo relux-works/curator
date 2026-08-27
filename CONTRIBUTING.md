@@ -17,6 +17,7 @@ Curator follows a small set of working agreements. They are binding for every ch
 ## Code
 
 - Go, stdlib first. New third-party dependencies only when the plan names them (section 2); anything else needs a plan update first.
+- A new language source-closure adapter follows [docs/authoring-language-adapters.md](docs/authoring-language-adapters.md): the shared contract, the two allowed process seams, the reject-by-default source-analysis posture, and the conformance obligations a new path must publish.
 - Windows is a first-class target: path handling, shims, and configuration surfaces are tested in the CI matrix.
 - Error messages that the spec words normatively keep the same information content.
 

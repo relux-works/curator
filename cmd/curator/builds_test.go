@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -503,10 +504,19 @@ func TestMarkerRefusalSeparatesUnsupportedFromInvalid(t *testing.T) {
 			payload: `{"name":"build-skill"}`, want: stateInvalidMarker,
 		},
 		"schema from a newer manager": {
-			payload: `{"schema_version":3,"name":"build-skill"}`, want: stateUnsupportedMarker,
+			payload: `{"schema_version":5,"name":"build-skill"}`, want: stateUnsupportedMarker,
 		},
 		"schema below the oldest readable": {
 			payload: `{"schema_version":0,"name":"build-skill"}`, want: stateUnsupportedMarker,
+		},
+		// Schemas 3 and 4 are readable. Calling their documents unreadable told
+		// an operator to expect a manager upgrade that does not exist, when the
+		// document itself was simply not a valid marker.
+		"readable external schema that is still not a valid marker": {
+			payload: `{"schema_version":3,"name":"build-skill"}`, want: stateInvalidMarker,
+		},
+		"readable policy schema that is still not a valid marker": {
+			payload: `{"schema_version":4,"name":"build-skill"}`, want: stateInvalidMarker,
 		},
 		"build driver outside the closed set": {
 			payload: `{"schema_version":2,"name":"build-skill",` +
@@ -536,6 +546,13 @@ func TestMarkerRefusalSeparatesUnsupportedFromInvalid(t *testing.T) {
 			}
 			if detail == "" {
 				t.Fatal("a refusal produced no operator detail")
+			}
+			// "upgrade the manager" is only actionable if the schema it names as
+			// the newest readable one is the schema this release actually reads.
+			if state == stateUnsupportedMarker &&
+				!strings.Contains(detail, fmt.Sprintf("newest supported schema is %d", marker.NewestSchemaVersion)) {
+				t.Fatalf("the unsupported-marker detail does not name the newest readable schema %d: %q",
+					marker.NewestSchemaVersion, detail)
 			}
 		})
 	}
@@ -847,6 +864,18 @@ func TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill(t *testing.T) {
 // compiled state testFacts derives.
 func writeCompiledMarker(t *testing.T, installed string) {
 	t.Helper()
+	writeCompiledMarkerForBand(t, installed, 6)
+}
+
+// writeCompiledMarkerForBand installs, through the real marker writer, the
+// marker one installation of a skill in the given manifest band would leave
+// behind, recording exactly the compiled state testFacts derives.
+//
+// The schema is never set here: marker.Write derives it from the manifest band
+// exactly as an installation does, so a test cannot accidentally assert against
+// a schema the manager would not actually write.
+func writeCompiledMarkerForBand(t *testing.T, installed string, skillSchema int) {
+	t.Helper()
 	if err := os.MkdirAll(installed, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -859,10 +888,128 @@ func writeCompiledMarker(t *testing.T, installed string) {
 		Name: "build-skill", Source: "build-skill", RefKind: "tag", Ref: "v1",
 		Commit: strings.Repeat("a", 40), ContentSHA256: contentHash,
 		Agents: []string{}, Commands: []string{"build-tool"}, Dependencies: []string{},
-		SkillSchemaVersion: 6, RuntimeRoots: []string{}, BuildRoots: []string{"assets/build-tool"},
-		BuildSource: &source, Builds: map[string]marker.Build{"build-tool": testRecordedBuild()},
-		Files: []string{}, InstalledAt: "2026-07-20T00:00:00Z",
+		SkillSchemaVersion: skillSchema, RuntimeRoots: []string{}, BuildRoots: []string{"assets/build-tool"},
+		BuildSource: &source,
+		Builds:      map[string]marker.Build{"build-tool": recordedBuildForBand(skillSchema)},
+		Files:       []string{}, InstalledAt: "2026-07-20T00:00:00Z",
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// recordedBuildForBand restates the recorded build of testRecordedBuild with
+// the per-schema fields marker v3 and v4 require of a local go-v1 command.
+// Nothing the currentness comparison reads changes, so a band difference can
+// only be observed through the schema banding under test.
+func recordedBuildForBand(skillSchema int) marker.Build {
+	build := testRecordedBuild()
+	if skillSchema >= 7 {
+		build.ExecutionPolicy = buildmeta.ExecutionPolicy
+		build.ReceiptSchemaVersion = 1
+	}
+	return build
+}
+
+// markerAtSchema restates the exactly-current marker of testRecordedMarker at
+// one schema, carrying whatever build-record fields that schema requires.
+func markerAtSchema(schema int) *marker.Marker {
+	recorded := testRecordedMarker()
+	recorded.SchemaVersion = schema
+	if schema != marker.SchemaVersion {
+		recorded.Builds["build-tool"] = recordedBuildForBand(8)
+	}
+	return recorded
+}
+
+// TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema is the regression
+// for the marker-v4 status escape: a schema-8 installation wrote marker v4,
+// published its shims, and was then reported needs-install for every compiled
+// command, with a remedy that told the operator to reinstall so the manager
+// would record marker schema 2 -- a schema it would never write for that band.
+//
+// The band is pinned from both sides. Narrowing it back to the single written
+// schema fails the v3 and v4 cases; widening it to accept anything fails the
+// schema-1 and unknown-schema cases, which genuinely cannot describe a build.
+func TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema(t *testing.T) {
+	facts := []buildFacts{testFacts(string(install.BuildCacheHit))}
+
+	for _, schema := range []int{marker.SchemaVersion, marker.ExternalSchemaVersion, marker.PolicySchemaVersion} {
+		state, rows := classifySkillBuilds(t.TempDir(), markerAtSchema(schema), facts)
+		if state != buildCurrent {
+			t.Fatalf("schema %d: state = %q, want %q (rows %+v)", schema, state, buildCurrent, rows)
+		}
+		if len(rows) != 1 || rows[0].State != buildCurrent {
+			t.Fatalf("schema %d: rows = %+v", schema, rows)
+		}
+	}
+
+	for _, schema := range []int{0, marker.LegacySchemaVersion, marker.NewestSchemaVersion + 1} {
+		state, rows := classifySkillBuilds(t.TempDir(), markerAtSchema(schema), facts)
+		if state != stateNeedsInstall {
+			t.Fatalf("schema %d: state = %q, want %q", schema, state, stateNeedsInstall)
+		}
+		if len(rows) != 1 || rows[0].Detail == "" {
+			t.Fatalf("schema %d: rows = %+v", schema, rows)
+		}
+		// The remedy must never name a schema older than the one already
+		// recorded: that self-contradiction is what made the escape unreadable
+		// to an operator holding a perfectly good marker.
+		for _, older := range []int{marker.LegacySchemaVersion, marker.SchemaVersion,
+			marker.ExternalSchemaVersion, marker.PolicySchemaVersion} {
+			if older >= schema {
+				continue
+			}
+			if strings.Contains(rows[0].Detail, fmt.Sprintf("marker schema %d", older)) {
+				t.Fatalf("schema %d: remedy tells the operator to record the older schema %d: %q",
+					schema, older, rows[0].Detail)
+			}
+		}
+	}
+}
+
+// TestStatusReportFindsASchema8InstallationCurrent drives the production status
+// path end to end for the band that broke: statusReport -- the call site behind
+// `curator global status` and `curator status` in cmd/curator/status.go -- over
+// an installation whose marker was produced by the real marker writer.
+//
+// Every manifest band that can carry a compiled command is covered, so the
+// schema the writer picks and the schema the status reader admits are proven to
+// agree rather than assumed to.
+func TestStatusReportFindsASchema8InstallationCurrent(t *testing.T) {
+	for _, band := range []struct {
+		skillSchema  int
+		markerSchema int
+	}{
+		{skillSchema: 6, markerSchema: marker.SchemaVersion},
+		{skillSchema: 7, markerSchema: marker.ExternalSchemaVersion},
+		{skillSchema: 8, markerSchema: marker.PolicySchemaVersion},
+	} {
+		t.Run(fmt.Sprintf("skill schema %d", band.skillSchema), func(t *testing.T) {
+			project := t.TempDir()
+			cfg := &config.Config{Path: filepath.Join(t.TempDir(), "home", "config.json"), SkillsRoot: t.TempDir()}
+			installed := filepath.Join(project, ".agents", "skills", "build-skill")
+			writeCompiledMarkerForBand(t, installed, band.skillSchema)
+
+			// The writer really did produce the schema this case is about, so a
+			// green run cannot come from silently falling back to schema 2.
+			written := marker.Read(installed)
+			if written == nil {
+				t.Fatal("the marker writer produced a marker its own reader refuses")
+			}
+			if written.SchemaVersion != band.markerSchema {
+				t.Fatalf("skill schema %d wrote marker schema %d, want %d",
+					band.skillSchema, written.SchemaVersion, band.markerSchema)
+			}
+
+			scope := projectStatusScope(cfg, project, "app")
+			drift, rows := statusReport(cfg, scope, []buildFacts{testFacts(string(install.BuildCacheHit))},
+				markerDigests(scope.stores...))
+			if len(rows) != 1 || rows[0].State != buildCurrent {
+				t.Fatalf("marker schema %d: rows = %+v", band.markerSchema, rows)
+			}
+			if checkFailed(drift, rows) {
+				t.Fatalf("marker schema %d: an exactly current installation failed --check", band.markerSchema)
+			}
+		})
 	}
 }

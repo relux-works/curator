@@ -35,6 +35,15 @@ const (
 	// ExternalSchemaVersion is written for schema-7 installations. It can
 	// represent local go-v1 and external go-repository-v1 commands together.
 	ExternalSchemaVersion = 3
+	// PolicySchemaVersion is written for schema-8 installations. It is
+	// ExternalSchemaVersion with `schema_version` 4 and `skill_schema_version`
+	// 8 and no other difference, so every marker-v3 build-record rule applies
+	// to it unchanged.
+	PolicySchemaVersion = 4
+	// NewestSchemaVersion is the highest marker schema this release reads. It
+	// is what an operator is told when a document from a newer manager is
+	// refused, so it must advance with every new readable schema.
+	NewestSchemaVersion = PolicySchemaVersion
 )
 
 var (
@@ -250,7 +259,7 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 	case SchemaVersion:
 		required = append(required, "build_roots", "builds")
 		allowed = append(allowed, "build_roots", "build_source", "builds")
-	case ExternalSchemaVersion:
+	case ExternalSchemaVersion, PolicySchemaVersion:
 		required = append(required, "build_roots", "builds")
 		allowed = append(allowed, "build_roots", "build_source", "builds")
 	default:
@@ -267,10 +276,12 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 		!markerSHA256RE.MatchString(m.ContentSHA256) || m.SkillSchemaVersion < 0 ||
 		(m.SchemaVersion == LegacySchemaVersion && m.SkillSchemaVersion > 5) ||
 		(m.SchemaVersion == SchemaVersion && m.SkillSchemaVersion > 6) ||
-		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) {
+		(m.SchemaVersion == ExternalSchemaVersion && m.SkillSchemaVersion != 7) ||
+		(m.SchemaVersion == PolicySchemaVersion && m.SkillSchemaVersion != 8) {
 		return false
 	}
-	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion
+	setsSorted := m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
+		m.SchemaVersion == PolicySchemaVersion
 	if !validNullableLocale(raw["locale"], m.Locale) || !validTimestamp(m.InstalledAt) ||
 		!validIdentifierSet(m.Agents, setsSorted) || !validIdentifierSet(m.Commands, setsSorted) ||
 		!validIdentifierSet(m.Dependencies, setsSorted) || !validPathSet(m.RuntimeRoots, setsSorted) ||
@@ -317,7 +328,8 @@ func validMarker(m *Marker, raw map[string]json.RawMessage) bool {
 			return false
 		}
 	}
-	if (m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion) && !validBuildState(m, raw) {
+	if (m.SchemaVersion == SchemaVersion || m.SchemaVersion == ExternalSchemaVersion ||
+		m.SchemaVersion == PolicySchemaVersion) && !validBuildState(m, raw) {
 		return false
 	}
 	return true
@@ -510,14 +522,44 @@ func rawObject(raw json.RawMessage) (map[string]json.RawMessage, bool) {
 	return object, true
 }
 
+// BuildBearingSchema reports whether a marker of this schema carries the
+// build_roots/builds/build_source triple.
+//
+// Every reader that decides whether a recorded compiled command is knowable
+// asks this, so a new build-bearing schema is admitted in one place instead of
+// in each reader's own inequality. A reader that bands on a single schema
+// silently reports a perfectly current installation as needing reinstallation
+// the moment the written schema advances.
+func BuildBearingSchema(version int) bool {
+	return version == SchemaVersion || externalCapableSchema(version)
+}
+
+// externalCapableSchema reports whether a marker of this schema can record
+// external go-repository-v1 commands alongside local ones. Marker v4 is v3
+// with the version bumped and nothing else changed, so both answer yes.
+func externalCapableSchema(version int) bool {
+	return version == ExternalSchemaVersion || version == PolicySchemaVersion
+}
+
+// SupportedSchema reports whether version is a marker schema this release
+// reads. Every listed version stays readable for the whole of protocol 1.x;
+// only the written version advances with the manifest band.
+func SupportedSchema(version int) bool {
+	return version == LegacySchemaVersion || version == SchemaVersion ||
+		version == ExternalSchemaVersion || version == PolicySchemaVersion
+}
+
 // Write stores the marker inside dir with sorted keys and a trailing newline.
 func Write(dir string, m *Marker) error {
 	if m == nil {
 		return errors.New("install marker is nil")
 	}
-	if m.SkillSchemaVersion == 7 {
+	switch {
+	case m.SkillSchemaVersion >= 8:
+		m.SchemaVersion = PolicySchemaVersion
+	case m.SkillSchemaVersion == 7:
 		m.SchemaVersion = ExternalSchemaVersion
-	} else {
+	default:
 		m.SchemaVersion = SchemaVersion
 	}
 	m.Agents = nonNilStrings(m.Agents)
@@ -580,14 +622,14 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if len(buildState) > 1 {
 		return false, errors.New("multiple build currentness values supplied")
 	}
-	if version, ok := markerSchemaVersion(installedDir); ok && version != LegacySchemaVersion && version != SchemaVersion && version != ExternalSchemaVersion {
+	if version, ok := markerSchemaVersion(installedDir); ok && !SupportedSchema(version) {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
 	}
 	recorded := Read(installedDir)
 	if recorded == nil {
 		return false, nil
 	}
-	if recorded.SchemaVersion != LegacySchemaVersion && recorded.SchemaVersion != SchemaVersion && recorded.SchemaVersion != ExternalSchemaVersion {
+	if !SupportedSchema(recorded.SchemaVersion) {
 		return false, fmt.Errorf("unsupported installed marker schema in %s", filepath.Join(installedDir, Name))
 	}
 	if recorded.SchemaVersion == LegacySchemaVersion &&
@@ -615,7 +657,7 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if !reflect.DeepEqual(recorded.Attestation, expected.Attestation) {
 		return false, nil
 	}
-	if recorded.SchemaVersion == SchemaVersion || recorded.SchemaVersion == ExternalSchemaVersion {
+	if BuildBearingSchema(recorded.SchemaVersion) {
 		if !equalStrings(recorded.BuildRoots, normalizedStrings(expected.BuildRoots)) ||
 			!reflect.DeepEqual(recorded.Builds, normalizedBuilds(expected.Builds)) ||
 			!reflect.DeepEqual(recorded.BuildSource, expected.BuildSource) {
@@ -632,7 +674,7 @@ func Current(installedDir string, expected *Marker, buildState ...BuildCurrentne
 	if len(recorded.Builds) == 0 {
 		return true, nil
 	}
-	if (recorded.SchemaVersion != SchemaVersion && recorded.SchemaVersion != ExternalSchemaVersion) || len(buildState) != 1 {
+	if !BuildBearingSchema(recorded.SchemaVersion) || len(buildState) != 1 {
 		return false, nil
 	}
 	return currentBuilds(installedDir, recorded, buildState[0])
@@ -734,7 +776,7 @@ func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness
 				current = false
 				return nil
 			}
-			if recorded.SchemaVersion == ExternalSchemaVersion {
+			if externalCapableSchema(recorded.SchemaVersion) {
 				if state.VerifyShim == nil {
 					current = false
 					return nil

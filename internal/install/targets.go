@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/locale"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/runtimestore"
+	"github.com/relux-works/curator/internal/scriptpolicy"
 	"github.com/relux-works/curator/internal/skillspec"
 	"github.com/relux-works/curator/internal/staging"
 	"github.com/relux-works/curator/internal/whitelist"
@@ -149,7 +150,10 @@ func stageRuntimeAndShims(
 		if err != nil {
 			return runtimeStaging{}, err
 		}
-		scriptCommands := activeScriptCommands(node, active)
+		scriptCommands, err := activeScriptCommands(node, active)
+		if err != nil {
+			return runtimeStaging{}, err
+		}
 		targets := map[string]runtimestore.RuntimeTarget{}
 		if len(scriptCommands) > 0 {
 			runtimePlan, err := runtimestore.PrepareScriptRuntime(stageRoot, runtimestore.ScriptRuntimeSpec{
@@ -256,15 +260,26 @@ func stageRuntimeAndShims(
 
 // activeScriptCommands lists the active script commands of one node in
 // command-lexical order.
-func activeScriptCommands(node *closure.Node, active map[string]bool) []skillspec.Command {
+//
+// It refuses an enforced command rather than returning it. The install
+// preflight already rejected the node through skillcheck, so reaching this
+// point means a caller skipped that gate; the shim writer must not be the
+// layer that decides, because the only thing it can do with an enforced
+// command is write the ordinary uncontained shim §4.1.1 forbids.
+func activeScriptCommands(node *closure.Node, active map[string]bool) ([]skillspec.Command, error) {
 	var commands []skillspec.Command
 	for _, name := range node.ActiveCommandNames() {
 		command := node.Spec.Commands[name]
-		if command.Type == "script" && active[name] {
-			commands = append(commands, command)
+		if command.Type != "script" || !active[name] {
+			continue
 		}
+		if scriptpolicy.Enforced(command) {
+			return nil, fmt.Errorf("%s.%s: %w", node.Name, name,
+				scriptpolicy.Admit(map[string]skillspec.Command{name: command}))
+		}
+		commands = append(commands, command)
 	}
-	return commands
+	return commands, nil
 }
 
 // stageStaleSkillRemovals turns installed skills that the next closure does not

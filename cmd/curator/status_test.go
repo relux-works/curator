@@ -609,13 +609,30 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
 			snapshotCache: true,
 			want:          buildMissingArtifact, outcome: "would-preflight-and-build",
 		},
+		// The unreadable schema is one past the whole readable band, not one
+		// past the written one. Schemas 3 and 4 are read by this manager, so
+		// pinning `written + 1` silently stopped testing the unsupported band
+		// the moment a newer schema became readable -- and asserted the
+		// opposite of the spec while doing it.
 		"marker schema cannot be read by this manager": {
 			tamper: func(t *testing.T) {
 				object := markerPayload(t, installed)
-				object["schema_version"] = marker.SchemaVersion + 1
+				object["schema_version"] = marker.NewestSchemaVersion + 1
 				refuseMarker(t, installed, marshal(t, object))
 			},
 			want: stateUnsupportedMarker, outcome: "cache-hit",
+		},
+		// A readable schema whose document is not a valid marker must be
+		// reported as an invalid document, never as one from a newer manager:
+		// "upgrade the manager" is not the remedy and no upgrade exists.
+		"marker at a readable schema is still not a marker document": {
+			tamper: func(t *testing.T) {
+				object := markerPayload(t, installed)
+				object["schema_version"] = marker.NewestSchemaVersion
+				delete(object, "commit")
+				refuseMarker(t, installed, marshal(t, object))
+			},
+			want: stateInvalidMarker, outcome: "cache-hit",
 		},
 		"marker records a build driver outside the closed set": {
 			tamper: func(t *testing.T) {
