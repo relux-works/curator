@@ -1,0 +1,2922 @@
+diff --git a/.github/ci/skip-classes.tsv b/.github/ci/skip-classes.tsv
+index daf9338..92a9032 100644
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -56,6 +56,7 @@ platform-control	shell sentinel is Unix-only	allow	the sentinel exists on unix o
+ platform-control	test transport wrapper is POSIX-only	allow	the fixture uses a POSIX shell wrapper; native admission remains covered on Windows
+ platform-control	controlled launcher symlink is a Unix regression fixture	allow	the launcher symlink fixture is asserted on unix runners
+ platform-control	hard-link count is enforced by the native Windows protected-root backend	allow	the generic hard-link fixture is replaced by the native Windows backend case
++platform-control	an operator agent socket is a unix-domain rendezvous point	allow	the SSH agent-socket fixture is a POSIX unix-domain socket; Windows reaches an agent over a named pipe, so the shape is asserted on the unix runners
+ 
+ # --- host capability --------------------------------------------------------
+ host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
+@@ -79,6 +80,7 @@ host-capability	test filesystem (is case-sensitive|distinguishes canonical Unico
+ host-capability	temporary directory uses case-sensitive Windows path semantics	allow	the runner temporary directory case semantics differ
+ host-capability	no trusted Go toolchain is resolvable here	allow	no trusted toolchain is resolvable on this runner
+ host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
++host-capability	no home directory	allow	the runner exposes no home directory to expand a `~/` credential path against
+ 
+ # --- opt-in probes ----------------------------------------------------------
+ opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index bafb5af..8031edc 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -71,7 +71,7 @@ Commands:
+   gc                       remove unreferenced runtime entries
+   shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+   ui                       terminal view over installed state
+-  config show              print the effective configuration
++  config <subcommand>      show | build-ssh (see config build-ssh -h)
+   --version                print the curator version
+ `
+ 
+@@ -133,9 +133,7 @@ func run(args []string) int {
+ 	case "ui":
+ 		return cmdUI()
+ 	case "config":
+-		if len(args) >= 2 && args[1] == "show" {
+-			return cmdConfigShow()
+-		}
++		return cmdConfig(args[1:])
+ 	case "-h", "--help", "help":
+ 		fmt.Print(usage)
+ 		return exitOK
+@@ -481,6 +479,13 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
+ 	verbose := flags.Bool("verbose", false, "print detailed progress")
+ 	var auditMode auditModeValue
+ 	flags.Var(&auditMode, "audit", "run the audit gate in advisory or strict mode")
++	sshIdentity := flags.String("build-ssh-identity", "",
++		"identity file for external SSH build repositories (or "+install.EnvBuildSSHIdentity+")")
++	sshAgent := flags.String("build-ssh-agent", "",
++		"agent socket for external SSH build repositories, or \""+install.BuildSSHAgentAuto+
++			"\" for your own agent (or "+install.EnvBuildSSHAgent+")")
++	sshKnownHosts := flags.String("build-ssh-known-hosts", "",
++		"host keys external SSH build repositories are verified against (or "+install.EnvBuildSSHKnownHosts+")")
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil {
+ 		return install.Options{}, nil, false, "", err
+@@ -488,6 +493,9 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
+ 	return install.Options{
+ 		DryRun: *dryRun, FixGitignore: *fixGitignore,
+ 		StrictTags: *strictTags, Verbose: *verbose,
++		BuildSSH: install.BuildSSHFlags{
++			Identity: *sshIdentity, Agent: *sshAgent, KnownHosts: *sshKnownHosts,
++		},
+ 	}, positional, *all, auditMode.value, nil
+ }
+ 
+@@ -520,6 +528,7 @@ func cmdInstallMode(args []string, fetch bool) int {
+ 	opts.Fetch = fetch && !opts.DryRun
+ 	opts.FetchedRepos = map[string]bool{}
+ 	opts.External = productionExternalDeps(cfg, opts.DryRun)
++	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
+ 	exitCode := exitOK
+ 	for _, target := range targets {
+ 		result := install.Project(cfg, target.Root, target.Alias, opts)
+@@ -1279,6 +1288,7 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
+ 	opts.Fetch = fetch && !opts.DryRun
+ 	opts.FetchedRepos = map[string]bool{}
+ 	opts.External = productionExternalDeps(cfg, opts.DryRun)
++	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
+ 	userHome, err := os.UserHomeDir()
+ 	if err != nil {
+ 		fmt.Fprintln(os.Stderr, "curator:", err)
+@@ -1301,6 +1311,9 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
+ // that actually activate go-repository-v1.
+ func productionExternalDeps(cfg *config.Config, dryRun bool) install.ExternalDeps {
+ 	deps := install.ExternalDeps{GitTool: productionGitTool()}
++	// Read-only surfaces get the environment and configured scopes; a command
++	// that also parses --build-ssh-* flags overrides this with them.
++	deps.BuildSSH = install.CaptureBuildSSHSelection(cfg, install.BuildSSHFlags{}, os.Getenv)
+ 	deps.AuditWarnings = func(_ context.Context, subject buildrepo.AuditSubject) ([]string, error) {
+ 		candidate := audit.Subject{
+ 			Name: subject.Declared.Repository, Source: subject.Declared.Identity,
+@@ -1711,6 +1724,223 @@ func cmdShellInit(args []string) int {
+ 	return exitOK
+ }
+ 
++const configUsage = `curator config: inspect and edit the machine configuration
++
++Usage:
++  curator config show                  print the effective configuration
++  curator config build-ssh <subcommand>
++                                       operator SSH credentials for external
++                                       build repositories (add | list | remove)
++`
++
++const buildSSHUsage = `curator config build-ssh: operator SSH credentials for external build repositories
++
++Usage:
++  curator config build-ssh add <scope> [--agent [SOCKET]] [--identity PATH] [--known-hosts PATH]
++  curator config build-ssh list
++  curator config build-ssh remove <scope>
++
++A scope is a lowercase host optionally followed by '/'-separated path segments.
++It is matched against the canonical host/path identity of a build repository on
++whole-segment boundaries, and the longest matching scope wins: scope
++'git.example.com/portals' covers 'git.example.com/portals/app' and never
++'git.example.com/portals-other'.
++
++An entry names an agent, an identity file, or both:
++  --agent                  the agent socket the operator's environment provides
++  --agent SOCKET           a named agent socket
++  --identity PATH          an identity file offered to the destination
++  --agent --identity PATH  an agent pinned to that one identity
++  --known-hosts PATH       a known-hosts file for this scope
++Every path must be absolute or start with '~/'.
++
++add replaces whatever was recorded under the same scope; remove reports a scope
++that is not configured as an error; list prints one line per scope, sorted.
++
++Precedence: command-line flags override CURATOR_BUILD_SSH_* environment values,
++which override the scopes configured here. Credentials are operator-owned: no
++manifest, descriptor, repository, substitution, or marker can select them.
++`
++
++func cmdConfig(args []string) int {
++	if len(args) == 0 {
++		fmt.Fprint(os.Stderr, configUsage)
++		return exitUsage
++	}
++	switch args[0] {
++	case "show":
++		return cmdConfigShow()
++	case "build-ssh":
++		return cmdConfigBuildSSH(args[1:])
++	case "-h", "--help", "help":
++		fmt.Print(configUsage)
++		return exitOK
++	}
++	fmt.Fprintf(os.Stderr, "curator: unknown config subcommand %q\n\n%s", args[0], configUsage)
++	return exitUsage
++}
++
++// buildSSHAgentValue is the --agent selector. Bare, it selects the agent
++// socket the operator's environment provides; with a value it names one
++// socket. Only the affirmative spelling exists, matching the config grammar,
++// where "agent": false would be a second way to write an identity-only entry.
++type buildSSHAgentValue struct {
++	selected bool
++	socket   string
++}
++
++func (value *buildSSHAgentValue) String() string {
++	if value.socket != "" {
++		return value.socket
++	}
++	if value.selected {
++		return "true"
++	}
++	return ""
++}
++
++func (value *buildSSHAgentValue) Set(raw string) error {
++	switch raw {
++	case "true":
++		value.selected = true
++		return nil
++	case "false":
++		return fmt.Errorf("--agent %s", config.BuildSSHAgentRule)
++	}
++	if !config.ValidBuildSSHPath(raw) {
++		return fmt.Errorf("agent socket %s", config.BuildSSHPathRule)
++	}
++	value.selected, value.socket = true, raw
++	return nil
++}
++
++func (*buildSSHAgentValue) IsBoolFlag() bool { return true }
++
++// AcceptsOptionalValue claims the next token only when it reads as a socket
++// path, so `--agent <scope>` keeps the scope positional.
++func (*buildSSHAgentValue) AcceptsOptionalValue(raw string) bool {
++	return config.ValidBuildSSHPath(raw)
++}
++
++func cmdConfigBuildSSH(args []string) int {
++	if len(args) == 0 {
++		fmt.Fprint(os.Stderr, buildSSHUsage)
++		return exitUsage
++	}
++	switch args[0] {
++	case "add":
++		return cmdConfigBuildSSHAdd(args[1:])
++	case "list":
++		return cmdConfigBuildSSHList()
++	case "remove":
++		return cmdConfigBuildSSHRemove(args[1:])
++	case "-h", "--help", "help":
++		fmt.Print(buildSSHUsage)
++		return exitOK
++	}
++	fmt.Fprintf(os.Stderr, "curator: unknown config build-ssh subcommand %q\n\n%s", args[0], buildSSHUsage)
++	return exitUsage
++}
++
++func cmdConfigBuildSSHAdd(args []string) int {
++	flags := flag.NewFlagSet("config build-ssh add", flag.ContinueOnError)
++	agent := &buildSSHAgentValue{}
++	flags.Var(agent, "agent", "select an SSH agent, optionally by socket path")
++	identity := flags.String("identity", "", "identity file offered to the destination")
++	knownHosts := flags.String("known-hosts", "", "known-hosts file for this scope")
++	positional, err := parseInterspersed(flags, args)
++	if err != nil {
++		return exitUsage
++	}
++	if len(positional) != 1 {
++		fmt.Fprintln(os.Stderr, "curator: config build-ssh add requires exactly one <scope>")
++		return exitUsage
++	}
++	credential := config.BuildSSHCredential{
++		Scope:       positional[0],
++		Agent:       agent.selected,
++		AgentSocket: agent.socket,
++		Identity:    *identity,
++		KnownHosts:  *knownHosts,
++	}
++	// Checked before the config is read, so a malformed invocation is a usage
++	// error rather than a failure attributed to the config file.
++	if err := config.ValidateBuildSSH(credential); err != nil {
++		fmt.Fprintln(os.Stderr, "curator:", err)
++		return exitUsage
++	}
++	cfg, code := loadConfig()
++	if code != exitOK {
++		return code
++	}
++	replaced, err := config.SetBuildSSH(cfg.Path, credential)
++	if err != nil {
++		fmt.Fprintln(os.Stderr, "curator:", err)
++		return exitFail
++	}
++	verb := "added"
++	if replaced {
++		verb = "replaced"
++	}
++	fmt.Printf("%s build_ssh scope %s: %s\n", verb, credential.Scope, formatBuildSSH(credential))
++	return exitOK
++}
++
++func cmdConfigBuildSSHList() int {
++	cfg, code := loadConfig()
++	if code != exitOK {
++		return code
++	}
++	scopes := cfg.BuildSSHScopes()
++	if len(scopes) == 0 {
++		// On stderr, so a caller parsing the listing sees an empty stdout
++		// rather than a line that names no scope.
++		fmt.Fprintln(os.Stderr, "curator: no build_ssh scopes are configured")
++		return exitOK
++	}
++	for _, scope := range scopes {
++		fmt.Printf("%s\t%s\n", scope, formatBuildSSH(cfg.BuildSSH[scope]))
++	}
++	return exitOK
++}
++
++func cmdConfigBuildSSHRemove(args []string) int {
++	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
++		fmt.Fprintln(os.Stderr, "curator: config build-ssh remove requires exactly one <scope>")
++		return exitUsage
++	}
++	cfg, code := loadConfig()
++	if code != exitOK {
++		return code
++	}
++	if err := config.RemoveBuildSSH(cfg.Path, args[0]); err != nil {
++		fmt.Fprintln(os.Stderr, "curator:", err)
++		return exitFail
++	}
++	fmt.Printf("removed build_ssh scope %s\n", args[0])
++	return exitOK
++}
++
++// formatBuildSSH renders one credential in the operator's own spelling, so a
++// listed line names the paths the config file carries rather than resolved
++// ones.
++func formatBuildSSH(credential config.BuildSSHCredential) string {
++	var parts []string
++	switch {
++	case credential.AgentSocket != "":
++		parts = append(parts, "agent="+credential.AgentSocket)
++	case credential.Agent:
++		parts = append(parts, "agent")
++	}
++	if credential.Identity != "" {
++		parts = append(parts, "identity="+credential.Identity)
++	}
++	if credential.KnownHosts != "" {
++		parts = append(parts, "known_hosts="+credential.KnownHosts)
++	}
++	return strings.Join(parts, " ")
++}
++
+ func cmdConfigShow() int {
+ 	cfg, code := loadConfig()
+ 	if code != exitOK {
+diff --git a/cmd/curator/main_test.go b/cmd/curator/main_test.go
+index d7b36f0..c435728 100644
+--- a/cmd/curator/main_test.go
++++ b/cmd/curator/main_test.go
+@@ -2,6 +2,7 @@ package main
+ 
+ import (
+ 	"context"
++	"io"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+@@ -12,6 +13,7 @@ import (
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/godriver"
+ 	"github.com/relux-works/curator/internal/hashing"
++	"github.com/relux-works/curator/internal/install"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ )
+@@ -152,6 +154,42 @@ func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
+ 	}
+ }
+ 
++// The run-wide SSH selection reaches an install from the command line, and the
++// environment fills only what the command line left unsaid.
++func TestInstallFlagsCarryTheRunWideBuildSSHSelection(t *testing.T) {
++	opts, positional, _, _, err := installFlags([]string{
++		"project-a", "--build-ssh-agent", "auto", "--build-ssh-identity", "/operator/id.pub",
++		"--build-ssh-known-hosts", "/operator/known_hosts",
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(positional) != 1 || positional[0] != "project-a" {
++		t.Fatalf("positional = %v", positional)
++	}
++	want := install.BuildSSHFlags{
++		Identity: "/operator/id.pub", Agent: install.BuildSSHAgentAuto,
++		KnownHosts: "/operator/known_hosts",
++	}
++	if opts.BuildSSH != want {
++		t.Fatalf("build-ssh flags = %+v, want %+v", opts.BuildSSH, want)
++	}
++
++	environment := map[string]string{
++		install.EnvBuildSSHIdentity: "/operator/env.pub",
++		install.EnvBuildSSHAgent:    "/operator/env.sock",
++		"SSH_AUTH_SOCK":             "/operator/live.sock",
++	}
++	selection := install.CaptureBuildSSHSelection(nil, opts.BuildSSH,
++		func(name string) string { return environment[name] })
++	if selection.RunWide.Identity != "/operator/id.pub" || selection.RunWide.Agent != install.BuildSSHAgentAuto {
++		t.Fatalf("selection = %+v, want the flag values to win", selection.RunWide)
++	}
++	if selection.AgentSocket != "/operator/live.sock" {
++		t.Fatalf("live agent socket = %q", selection.AgentSocket)
++	}
++}
++
+ func TestSelectProjectTargetsUsesAliasesAndStableAllOrder(t *testing.T) {
+ 	cfg := &config.Config{Projects: map[string]config.Project{
+ 		"zeta":  {Path: "/work/zeta"},
+@@ -404,3 +442,242 @@ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
+ 		t.Fatalf("run with an extra argument = %d, want the unknown-command usage exit", code)
+ 	}
+ }
++
++// bootstrapConfig points the CLI at a private config file and creates it.
++func bootstrapConfig(t *testing.T) string {
++	t.Helper()
++	configPath := filepath.Join(t.TempDir(), "config.json")
++	t.Setenv("CURATOR_CONFIG", configPath)
++	if code := run([]string{"bootstrap", "--non-interactive", "--skills-root", t.TempDir()}); code != exitOK {
++		t.Fatalf("bootstrap = %d", code)
++	}
++	return configPath
++}
++
++// captureStdout collects what a command prints, so a test can assert on the
++// listing itself rather than only on its exit code.
++func captureStdout(t *testing.T, body func()) string {
++	t.Helper()
++	reader, writer, err := os.Pipe()
++	if err != nil {
++		t.Fatal(err)
++	}
++	saved := os.Stdout
++	os.Stdout = writer
++	defer func() { os.Stdout = saved }()
++	body()
++	if err := writer.Close(); err != nil {
++		t.Fatal(err)
++	}
++	output, err := io.ReadAll(reader)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return string(output)
++}
++
++func TestConfigBuildSSHAddListRemove(t *testing.T) {
++	configPath := bootstrapConfig(t)
++
++	for _, args := range [][]string{
++		{"config", "build-ssh", "add", "zeta.example.com", "--agent"},
++		{"config", "build-ssh", "add", "git.example.com/portals", "--agent", "/run/portals.sock",
++			"--identity", "~/.ssh/portals", "--known-hosts", "/etc/ssh/known_hosts_portals"},
++		{"config", "build-ssh", "add", "git.example.com", "--identity", "/keys/org"},
++	} {
++		if code := run(args); code != exitOK {
++			t.Fatalf("%v = %d, want %d", args, code, exitOK)
++		}
++	}
++
++	cfg, err := config.Load(configPath, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	want := config.BuildSSHCredential{
++		Scope: "git.example.com/portals", Agent: true, AgentSocket: "/run/portals.sock",
++		Identity: "~/.ssh/portals", KnownHosts: "/etc/ssh/known_hosts_portals",
++	}
++	if got := cfg.BuildSSH["git.example.com/portals"]; got != want {
++		t.Fatalf("credential = %+v, want %+v", got, want)
++	}
++
++	// A second add under the same scope replaces the entry rather than
++	// merging with it: the leftover agent selection would still authenticate.
++	replaceOutput := captureStdout(t, func() {
++		if code := run([]string{"config", "build-ssh", "add", "zeta.example.com", "--identity", "/keys/zeta"}); code != exitOK {
++			t.Fatalf("replace add = %d", code)
++		}
++	})
++	if !strings.HasPrefix(replaceOutput, "replaced build_ssh scope zeta.example.com: identity=/keys/zeta") {
++		t.Fatalf("replace output = %q", replaceOutput)
++	}
++	cfg, err = config.Load(configPath, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if replaced := cfg.BuildSSH["zeta.example.com"]; replaced.Agent || replaced.Identity != "/keys/zeta" {
++		t.Fatalf("replaced credential = %+v", replaced)
++	}
++
++	listing := captureStdout(t, func() {
++		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
++			t.Fatalf("list = %d", code)
++		}
++	})
++	wantListing := "git.example.com\tidentity=/keys/org\n" +
++		"git.example.com/portals\tagent=/run/portals.sock identity=~/.ssh/portals known_hosts=/etc/ssh/known_hosts_portals\n" +
++		"zeta.example.com\tidentity=/keys/zeta\n"
++	if listing != wantListing {
++		t.Fatalf("listing =\n%q\nwant\n%q", listing, wantListing)
++	}
++
++	if code := run([]string{"config", "build-ssh", "remove", "git.example.com/portals"}); code != exitOK {
++		t.Fatalf("remove = %d", code)
++	}
++	cfg, err = config.Load(configPath, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, present := cfg.BuildSSH["git.example.com/portals"]; present {
++		t.Fatalf("removed scope still configured: %+v", cfg.BuildSSH)
++	}
++	if len(cfg.BuildSSH) != 2 {
++		t.Fatalf("remove disturbed other scopes: %+v", cfg.BuildSSH)
++	}
++}
++
++func TestConfigBuildSSHListWithoutScopesPrintsNothing(t *testing.T) {
++	bootstrapConfig(t)
++	listing := captureStdout(t, func() {
++		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
++			t.Fatalf("empty list = %d", code)
++		}
++	})
++	if listing != "" {
++		t.Fatalf("empty listing = %q, want no stdout", listing)
++	}
++}
++
++func TestConfigBuildSSHAddRejectsInvalidInvocations(t *testing.T) {
++	configPath := bootstrapConfig(t)
++	before, err := os.ReadFile(configPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for name, args := range map[string][]string{
++		"no scope":            {"config", "build-ssh", "add", "--agent"},
++		"two scopes":          {"config", "build-ssh", "add", "a.example.com", "b.example.com", "--agent"},
++		"uppercase host":      {"config", "build-ssh", "add", "Git.Example.com", "--agent"},
++		"dot segment":         {"config", "build-ssh", "add", "git.example.com/../etc", "--agent"},
++		"empty segment":       {"config", "build-ssh", "add", "git.example.com//portals", "--agent"},
++		"scheme in scope":     {"config", "build-ssh", "add", "ssh://git.example.com", "--agent"},
++		"selects nothing":     {"config", "build-ssh", "add", "git.example.com"},
++		"known hosts only":    {"config", "build-ssh", "add", "git.example.com", "--known-hosts", "/etc/kh"},
++		"relative identity":   {"config", "build-ssh", "add", "git.example.com", "--identity", "keys/org"},
++		"relative socket":     {"config", "build-ssh", "add", "git.example.com", "--agent=run/agent.sock"},
++		"relative known host": {"config", "build-ssh", "add", "git.example.com", "--identity", "/keys/org", "--known-hosts", "kh"},
++		"negated agent":       {"config", "build-ssh", "add", "git.example.com", "--agent=false"},
++		"unknown flag":        {"config", "build-ssh", "add", "git.example.com", "--agent", "--pin", "x"},
++	} {
++		if code := run(args); code != exitUsage {
++			t.Fatalf("%s: %v = %d, want %d", name, args, code, exitUsage)
++		}
++	}
++	after, err := os.ReadFile(configPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(after) != string(before) {
++		t.Fatalf("a rejected add rewrote the config:\n%s", after)
++	}
++}
++
++func TestConfigBuildSSHAgentFlagKeepsScopePositional(t *testing.T) {
++	configPath := bootstrapConfig(t)
++	if code := run([]string{"config", "build-ssh", "add", "--agent", "alpha.example.com"}); code != exitOK {
++		t.Fatalf("bare --agent before the scope = %d", code)
++	}
++	if code := run([]string{"config", "build-ssh", "add", "beta.example.com", "--agent", "/run/beta.sock"}); code != exitOK {
++		t.Fatalf("--agent with a socket = %d", code)
++	}
++	cfg, err := config.Load(configPath, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	alpha := cfg.BuildSSH["alpha.example.com"]
++	if !alpha.Agent || alpha.AgentSocket != "" {
++		t.Fatalf("alpha credential = %+v", alpha)
++	}
++	beta := cfg.BuildSSH["beta.example.com"]
++	if !beta.Agent || beta.AgentSocket != "/run/beta.sock" {
++		t.Fatalf("beta credential = %+v", beta)
++	}
++}
++
++func TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets(t *testing.T) {
++	bootstrapConfig(t)
++	if code := run([]string{"config", "build-ssh", "add", "git.example.com", "--agent"}); code != exitOK {
++		t.Fatalf("add = %d", code)
++	}
++	if code := run([]string{"config", "build-ssh", "remove", "other.example.com"}); code != exitFail {
++		t.Fatalf("remove of an unconfigured scope = %d, want %d", code, exitFail)
++	}
++	for _, args := range [][]string{
++		{"config", "build-ssh", "remove"},
++		{"config", "build-ssh", "remove", "a.example.com", "b.example.com"},
++		{"config", "build-ssh", "remove", "--agent"},
++	} {
++		if code := run(args); code != exitUsage {
++			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
++		}
++	}
++}
++
++func TestConfigHelpDocumentsPrecedenceAndSubcommands(t *testing.T) {
++	for _, fragment := range []string{
++		"curator config build-ssh add <scope>",
++		"curator config build-ssh list",
++		"curator config build-ssh remove <scope>",
++		"--known-hosts PATH",
++		"CURATOR_BUILD_SSH_*",
++	} {
++		if !strings.Contains(buildSSHUsage, fragment) {
++			t.Fatalf("build-ssh help does not document %q", fragment)
++		}
++	}
++	// Precedence is the operator's only defence against a stale config scope
++	// silently outranking the flag they just typed.
++	flags := strings.Index(buildSSHUsage, "flags override")
++	environment := strings.Index(buildSSHUsage, "CURATOR_BUILD_SSH_*")
++	scopes := strings.Index(buildSSHUsage, "override the scopes configured here")
++	if flags < 0 || flags >= environment || environment >= scopes {
++		t.Fatalf("help must order precedence flags > env > config scopes: %d %d %d", flags, environment, scopes)
++	}
++	if !strings.Contains(configUsage, "build-ssh") || !strings.Contains(configUsage, "curator config show") {
++		t.Fatalf("config help does not enumerate its subcommands: %q", configUsage)
++	}
++}
++
++func TestConfigSubcommandDispatch(t *testing.T) {
++	bootstrapConfig(t)
++	for _, args := range [][]string{
++		{"config", "-h"},
++		{"config", "build-ssh", "-h"},
++		{"config", "show"},
++	} {
++		if code := run(args); code != exitOK {
++			t.Fatalf("%v = %d, want %d", args, code, exitOK)
++		}
++	}
++	for _, args := range [][]string{
++		{"config"},
++		{"config", "frobnicate"},
++		{"config", "build-ssh"},
++		{"config", "build-ssh", "frobnicate"},
++	} {
++		if code := run(args); code != exitUsage {
++			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
++		}
++	}
++}
+diff --git a/internal/buildrepo/admission.go b/internal/buildrepo/admission.go
+index dda2ef8..e54de81 100644
+--- a/internal/buildrepo/admission.go
++++ b/internal/buildrepo/admission.go
+@@ -95,6 +95,11 @@ type GitTool struct {
+ 	AllowedVersions []string
+ 	AskPass         string
+ 	SSHWrapper      string
++	// SSHCredentials is the operator selection for the one repository this
++	// tool is about to reach. It is bound per repository rather than per run
++	// so a closure that spans two hosts cannot offer either host the other's
++	// key (Spec §12.2).
++	SSHCredentials OperatorSSHCredentials
+ }
+ 
+ // SSHPolicy contains the manager-owned inputs for the fixed SSH wrapper.
+@@ -253,6 +258,13 @@ func AcquireNetwork(ctx context.Context, request NetworkRequest) (*Snapshot, err
+ 	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
+ 		return nil, admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
+ 	}
++	// The admission boundary refuses an unselected SSH repository even when a
++	// caller forgot to resolve credentials, so no fetch can quietly fall back
++	// to whatever the operator's ambient SSH state happens to offer.
++	if request.Source.Transport == "ssh" && !request.Tool.SSHCredentials.Selected() {
++		return nil, admissionError(CodeSSHCredentialMissing,
++			"SSH build repositories require an operator identity or agent")
++	}
+ 	if _, err := ParseLockedCommit(map[string]any{"object_format": request.Lock.ObjectFormat, "hex": request.Lock.Hex}, "lock"); err != nil {
+ 		return nil, admissionError(CodeIdentityInvalid, "invalid immutable lock")
+ 	}
+diff --git a/internal/buildrepo/credentials.go b/internal/buildrepo/credentials.go
+new file mode 100644
+index 0000000..7385f65
+--- /dev/null
++++ b/internal/buildrepo/credentials.go
+@@ -0,0 +1,131 @@
++package buildrepo
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++)
++
++// CodeSSHCredentialMissing reports an SSH build repository the operator has
++// selected no credentials for. Ambient SSH state is never a fallback: a fetch
++// that succeeds because some unrelated key happened to be loaded in the
++// operator's agent is a fetch nobody authorized.
++const CodeSSHCredentialMissing = "build_repository_ssh_credential_missing"
++
++// OperatorSSHCredentials is one operator SSH selection for one external build
++// repository. It is operator-owned: no manifest, descriptor, repository,
++// substitution, or marker may select it (Spec §12.2).
++//
++// The three shapes an SSH invocation admits are an identity alone, an agent
++// alone, and an agent pinned to one named identity. SSHPolicyFor carries each
++// of them into the wrapper policy unchanged.
++type OperatorSSHCredentials struct {
++	// Identity is the identity file offered to the destination. Together with
++	// AgentSocket it pins the single key the agent may offer.
++	Identity string
++	// AgentSocket is the agent socket the destination authenticates against.
++	AgentSocket string
++	// KnownHosts carries the operator host keys for this repository. The fetch
++	// pins StrictHostKeyChecking=yes and has no other source of truth.
++	KnownHosts string
++}
++
++// Selected reports whether the operator named any authentication material.
++// Known hosts alone authenticate nothing, so they do not count as a selection.
++func (c OperatorSSHCredentials) Selected() bool {
++	return c.Identity != "" || c.AgentSocket != ""
++}
++
++// ValidateOperatorSSHCredentials resolves every operator-named path and proves
++// it is the admitted kind of object.
++//
++// A symbolic link is resolved rather than refused: a live agent socket is
++// conventionally a stable link onto a per-session rendezvous point. What must
++// hold is that the resolved target exists and is the right kind.
++func ValidateOperatorSSHCredentials(credentials OperatorSSHCredentials) (OperatorSSHCredentials, error) {
++	for _, field := range []struct {
++		label  string
++		socket bool
++		value  *string
++	}{
++		{"SSH identity", false, &credentials.Identity},
++		{"SSH agent socket", true, &credentials.AgentSocket},
++		{"SSH known hosts", false, &credentials.KnownHosts},
++	} {
++		if *field.value == "" {
++			continue
++		}
++		if !filepath.IsAbs(*field.value) {
++			return OperatorSSHCredentials{}, admissionError(CodeIdentityInvalid, "%s path must be absolute", field.label)
++		}
++		target, err := filepath.EvalSymlinks(*field.value)
++		if err != nil {
++			return OperatorSSHCredentials{}, admissionError(CodeIdentityInvalid, "%s is unavailable", field.label)
++		}
++		info, err := os.Lstat(target)
++		if err != nil {
++			return OperatorSSHCredentials{}, admissionError(CodeIdentityInvalid, "%s is unavailable", field.label)
++		}
++		admitted, kind := info.Mode().IsRegular(), "regular file"
++		if field.socket {
++			admitted, kind = info.Mode()&os.ModeSocket != 0, "socket"
++		}
++		if !admitted {
++			return OperatorSSHCredentials{}, admissionError(CodeIdentityInvalid, "%s is not an admitted %s", field.label, kind)
++		}
++		*field.value = target
++	}
++	return credentials, nil
++}
++
++// SSHEndpoint returns the exact host and repository path Git hands to the SSH
++// program. Git passes `user@host` verbatim and quotes the path exactly as
++// written: an `ssh://` source keeps its leading slash, an scp-like source does
++// not.
++func SSHEndpoint(source Source) (string, string, error) {
++	if source.Transport != "ssh" {
++		return "", "", admissionError(CodeIdentityInvalid, "repository transport is not SSH")
++	}
++	if remainder, found := strings.CutPrefix(source.Git, "ssh://"); found {
++		boundary := strings.Index(remainder, "/")
++		if boundary <= 0 {
++			return "", "", admissionError(CodeIdentityInvalid, "SSH source has no repository path")
++		}
++		return remainder[:boundary], remainder[boundary:], nil
++	}
++	host, path, found := strings.Cut(source.Git, ":")
++	if !found || host == "" || path == "" {
++		return "", "", admissionError(CodeIdentityInvalid, "SSH source has no repository path")
++	}
++	return host, path, nil
++}
++
++// SSHPolicyFor completes a manager-owned wrapper policy with the exact endpoint
++// of one SSH source and the operator's credential selection. Every path in base
++// belongs to the manager; the operator owns only what the returned policy
++// authenticates with, and the known-hosts file it verifies the host against.
++func SSHPolicyFor(base SSHPolicy, source Source, credentials OperatorSSHCredentials) (SSHPolicy, error) {
++	if !credentials.Selected() {
++		return SSHPolicy{}, admissionError(CodeSSHCredentialMissing,
++			"SSH build repositories require an operator identity or agent")
++	}
++	host, repositoryPath, err := SSHEndpoint(source)
++	if err != nil {
++		return SSHPolicy{}, err
++	}
++	admitted, err := ValidateOperatorSSHCredentials(credentials)
++	if err != nil {
++		return SSHPolicy{}, err
++	}
++	policy := base
++	policy.ExpectedHost, policy.RepositoryPath = host, repositoryPath
++	policy.Identity, policy.AgentSocket = admitted.Identity, admitted.AgentSocket
++	if admitted.KnownHosts != "" {
++		policy.KnownHosts = admitted.KnownHosts
++	}
++	if policy.KnownHosts == "" {
++		return SSHPolicy{}, admissionError(CodeSSHCredentialMissing,
++			"SSH build repositories pin StrictHostKeyChecking and require operator host keys")
++	}
++	return policy, nil
++}
+diff --git a/internal/buildrepo/credentials_test.go b/internal/buildrepo/credentials_test.go
+new file mode 100644
+index 0000000..9281758
+--- /dev/null
++++ b/internal/buildrepo/credentials_test.go
+@@ -0,0 +1,237 @@
++package buildrepo
++
++import (
++	"context"
++	"net"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// operatorMaterial creates the three kinds of object an operator selection may
++// name and returns them already canonicalized, the way validation reports them.
++func operatorMaterial(t *testing.T) (identity, agentSocket, knownHosts string) {
++	t.Helper()
++	root := t.TempDir()
++	identity = writeOperatorFile(t, filepath.Join(root, "id_ed25519.pub"), "ssh-ed25519 AAAA operator\n")
++	knownHosts = writeOperatorFile(t, filepath.Join(root, "known_hosts"), "example.test ssh-ed25519 AAAA\n")
++	agentSocket = listenOperatorSocket(t, filepath.Join(shortTempDir(t), "agent.sock"))
++	return identity, agentSocket, knownHosts
++}
++
++// shortTempDir is a scratch directory whose path fits a unix-domain socket
++// address. The default per-test temporary directory does not on macOS, where
++// it spells out the test name under a long per-user container.
++func shortTempDir(t *testing.T) string {
++	t.Helper()
++	root, err := os.MkdirTemp("/tmp", "curator-buildrepo")
++	if err != nil {
++		t.Skipf("this host cannot create a short scratch directory: %v", err)
++	}
++	t.Cleanup(func() { _ = os.RemoveAll(root) })
++	return root
++}
++
++func writeOperatorFile(t *testing.T, path, content string) string {
++	t.Helper()
++	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return canonical(t, path)
++}
++
++func listenOperatorSocket(t *testing.T, path string) string {
++	t.Helper()
++	if runtime.GOOS == "windows" {
++		t.Skip("an operator agent socket is a unix-domain rendezvous point")
++	}
++	listener, err := net.Listen("unix", path)
++	if err != nil {
++		t.Skipf("this host cannot create an agent socket: %v", err)
++	}
++	t.Cleanup(func() { _ = listener.Close() })
++	return canonical(t, path)
++}
++
++func canonical(t *testing.T, path string) string {
++	t.Helper()
++	resolved, err := filepath.EvalSymlinks(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return resolved
++}
++
++func managerPolicy(t *testing.T) SSHPolicy {
++	t.Helper()
++	root := t.TempDir()
++	return SSHPolicy{
++		Wrapper:         filepath.Join(root, "manager", "ssh-wrapper"),
++		SSH:             filepath.Join(root, "tools", "ssh"),
++		EmptyConfig:     filepath.Join(root, "manager", "ssh.config"),
++		EmptyKnownHosts: filepath.Join(root, "manager", "empty_known_hosts"),
++		ConnectTimeout:  15,
++	}
++}
++
++// The operator's three authentication shapes have to survive the whole path
++// from a selection to the argv the wrapper execs, because each one produces a
++// different OpenSSH tail and only one of them is the pinned-agent form.
++func TestEveryOperatorSelectionShapeReachesTheWrapperPolicy(t *testing.T) {
++	identity, agentSocket, knownHosts := operatorMaterial(t)
++	source, err := ParseSource("git@example.test:skills/tool.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, testCase := range []struct {
++		name        string
++		credentials OperatorSSHCredentials
++		wanted      []string
++		refused     []string
++	}{
++		{
++			name:        "identity only",
++			credentials: OperatorSSHCredentials{Identity: identity, KnownHosts: knownHosts},
++			wanted:      []string{"IdentitiesOnly=yes", "IdentityAgent=none", "-i " + identity},
++			refused:     []string{"IdentityAgent=" + agentSocket},
++		},
++		{
++			name:        "agent only",
++			credentials: OperatorSSHCredentials{AgentSocket: agentSocket, KnownHosts: knownHosts},
++			wanted:      []string{"IdentitiesOnly=no", "IdentityFile=none", "IdentityAgent=" + agentSocket},
++			refused:     []string{"-i " + identity},
++		},
++		{
++			name:        "agent pinned to one identity",
++			credentials: OperatorSSHCredentials{Identity: identity, AgentSocket: agentSocket, KnownHosts: knownHosts},
++			wanted:      []string{"IdentitiesOnly=yes", "IdentityAgent=" + agentSocket, "-i " + identity},
++			refused:     []string{"IdentityFile=none", "IdentityAgent=none"},
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			policy, err := SSHPolicyFor(managerPolicy(t), source, testCase.credentials)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if policy.ExpectedHost != "git@example.test" || policy.RepositoryPath != "skills/tool.git" {
++				t.Fatalf("endpoint = %q %q", policy.ExpectedHost, policy.RepositoryPath)
++			}
++			if policy.KnownHosts != knownHosts {
++				t.Fatalf("known hosts = %q, want %q", policy.KnownHosts, knownHosts)
++			}
++			argv := []string{policy.Wrapper, policy.ExpectedHost, "git-upload-pack 'skills/tool.git'"}
++			command, err := ExactSSHCommand(policy, argv)
++			if err != nil {
++				t.Fatal(err)
++			}
++			joined := strings.Join(command, " ")
++			for _, required := range testCase.wanted {
++				if !strings.Contains(joined, required) {
++					t.Errorf("SSH command missing %q in %s", required, joined)
++				}
++			}
++			for _, forbidden := range testCase.refused {
++				if strings.Contains(joined, forbidden) {
++					t.Errorf("SSH command carries %q in %s", forbidden, joined)
++				}
++			}
++		})
++	}
++}
++
++func TestSSHEndpointKeepsTheSpellingGitHandsToSSH(t *testing.T) {
++	for _, testCase := range []struct{ raw, host, path string }{
++		{"git@example.test:skills/tool.git", "git@example.test", "skills/tool.git"},
++		{"example.test:skills/tool", "example.test", "skills/tool"},
++		{"ssh://git@example.test/skills/tool.git", "git@example.test", "/skills/tool.git"},
++		{"ssh://example.test/skills/tool", "example.test", "/skills/tool"},
++	} {
++		source, err := ParseSource(testCase.raw)
++		if err != nil {
++			t.Fatalf("%s: %v", testCase.raw, err)
++		}
++		host, path, err := SSHEndpoint(source)
++		if err != nil || host != testCase.host || path != testCase.path {
++			t.Errorf("%s -> %q %q %v, want %q %q", testCase.raw, host, path, err, testCase.host, testCase.path)
++		}
++	}
++	https, err := ParseSource("https://example.test/skills/tool.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, _, err := SSHEndpoint(https); ErrorCode(err) != CodeIdentityInvalid {
++		t.Fatalf("HTTPS endpoint error = %v, want %s", err, CodeIdentityInvalid)
++	}
++}
++
++func TestSSHPolicyRefusesUnselectedAndUnverifiableRepositories(t *testing.T) {
++	identity, _, knownHosts := operatorMaterial(t)
++	source, err := ParseSource("git@example.test:skills/tool.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := SSHPolicyFor(managerPolicy(t), source, OperatorSSHCredentials{KnownHosts: knownHosts}); ErrorCode(err) != CodeSSHCredentialMissing {
++		t.Fatalf("unselected repository error = %v, want %s", err, CodeSSHCredentialMissing)
++	}
++	// Known hosts alone authenticate nothing, and their absence leaves
++	// StrictHostKeyChecking=yes with nothing to check against.
++	if _, err := SSHPolicyFor(managerPolicy(t), source, OperatorSSHCredentials{Identity: identity}); ErrorCode(err) != CodeSSHCredentialMissing {
++		t.Fatalf("hostless policy error = %v, want %s", err, CodeSSHCredentialMissing)
++	}
++}
++
++func TestOperatorSSHCredentialsAdmitOnlyResolvedObjectsOfTheRightKind(t *testing.T) {
++	identity, agentSocket, knownHosts := operatorMaterial(t)
++	root := t.TempDir()
++	directory := filepath.Join(root, "directory")
++	if err := os.Mkdir(directory, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	for name, credentials := range map[string]OperatorSSHCredentials{
++		"relative identity":     {Identity: "id_ed25519"},
++		"absent identity":       {Identity: filepath.Join(root, "absent")},
++		"identity is directory": {Identity: directory},
++		"agent is a file":       {AgentSocket: identity},
++		"known hosts directory": {Identity: identity, KnownHosts: directory},
++	} {
++		if _, err := ValidateOperatorSSHCredentials(credentials); ErrorCode(err) != CodeIdentityInvalid {
++			t.Errorf("%s: error = %v, want %s", name, err, CodeIdentityInvalid)
++		}
++	}
++	// A link onto the material is resolved, not refused: a live agent socket
++	// is conventionally reached through exactly that shape.
++	link := filepath.Join(root, "agent.link")
++	if err := os.Symlink(agentSocket, link); err != nil {
++		t.Skipf("this host cannot create a symbolic link: %v", err)
++	}
++	admitted, err := ValidateOperatorSSHCredentials(OperatorSSHCredentials{
++		Identity: identity, AgentSocket: link, KnownHosts: knownHosts,
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if admitted.AgentSocket != agentSocket {
++		t.Fatalf("agent socket = %q, want the resolved %q", admitted.AgentSocket, agentSocket)
++	}
++}
++
++// The admission boundary is the last place an unselected SSH repository can be
++// stopped, and it has to stop it even when a caller forgot to resolve anything.
++func TestAcquireNetworkRefusesAnSSHRepositoryWithoutAnOperatorSelection(t *testing.T) {
++	tool := realGitTool(t)
++	tool.SSHWrapper = writeOperatorFile(t, filepath.Join(t.TempDir(), "ssh-wrapper"), "#!/bin/sh\nexit 1\n")
++	source, err := ParseSource("git@example.test:skills/tool.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, err = AcquireNetwork(context.Background(), NetworkRequest{
++		Source: source,
++		Lock:   LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("a", 40)},
++		Tool:   tool,
++	})
++	if ErrorCode(err) != CodeSSHCredentialMissing {
++		t.Fatalf("unselected SSH acquisition error = %v, want %s", err, CodeSSHCredentialMissing)
++	}
++}
+diff --git a/internal/config/buildssh.go b/internal/config/buildssh.go
+new file mode 100644
+index 0000000..2daa6e1
+--- /dev/null
++++ b/internal/config/buildssh.go
+@@ -0,0 +1,303 @@
++package config
++
++import (
++	"regexp"
++	"sort"
++	"strings"
++	"unicode"
++	"unicode/utf8"
++
++	"github.com/relux-works/curator/internal/identity"
++	"github.com/relux-works/curator/internal/verr"
++)
++
++// build_ssh selects the operator SSH credentials used to reach an external
++// build repository. Credentials are operator-owned: no manifest, descriptor,
++// repository, substitution, or marker may select them (Spec §12.2). The
++// operator names a scope, the scope is matched against the canonical
++// `host/path` repository identity of Spec §6.3, and the longest matching
++// scope wins.
++//
++// A scope is a lowercase host, optionally followed by `/`-separated path
++// segments. Matching is segment-aware exactly like the source allowlist of
++// Spec §6.1: scope `h/portals` covers `h/portals/app` and never
++// `h/portals-evil`.
++//
++// An entry names an agent, an identity file, or both, which are the three
++// authentication shapes an SSH invocation admits: an identity alone, an agent
++// alone, and an agent pinned to one named identity.
++
++// MaxBuildSSHScopeLength bounds a scope by the canonical identity it selects.
++const MaxBuildSSHScopeLength = 4096
++
++// maxCredentialPathLength bounds an operator credential path.
++const maxCredentialPathLength = 4096
++
++// maxScopeHostLength bounds the host part of a scope.
++const maxScopeHostLength = 253
++
++// BuildSSHScopeRule is the human-readable scope rule, phrased once for reuse.
++const BuildSSHScopeRule = "must be a lowercase host optionally followed by '/'-separated path segments of letters, digits, dots, underscores, or hyphens"
++
++// BuildSSHPathRule is the human-readable rule for an operator credential path.
++const BuildSSHPathRule = "must be an absolute path or start with '~/' and carry no control character"
++
++// BuildSSHAgentRule is the human-readable rule for the agent selector.
++const BuildSSHAgentRule = "must be true for the operator's own agent socket, or an agent socket path"
++
++var (
++	scopeHostRE    = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$`)
++	scopeSegmentRE = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
++	// Recognised without consulting the running platform, so one config file
++	// yields the same verdict wherever it is read.
++	windowsAbsoluteRE = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\\\\)`)
++)
++
++// buildSSHFields are the only fields a scope entry may carry.
++var buildSSHFields = map[string]bool{"agent": true, "identity": true, "known_hosts": true}
++
++// BuildSSHCredential is one operator credential selection. Paths keep the
++// operator's spelling; Expanded resolves a leading `~/`.
++type BuildSSHCredential struct {
++	// Scope is the config key this credential was recorded under.
++	Scope string
++	// Agent reports that an SSH agent is selected for this scope.
++	Agent bool
++	// AgentSocket names the agent socket. Empty with Agent set means the
++	// agent socket the operator's own environment provides, which keeps a
++	// per-login socket path out of a persisted config.
++	AgentSocket string
++	// Identity is the identity file offered to the destination. Together
++	// with Agent it pins the single key the agent may offer.
++	Identity string
++	// KnownHosts overrides the operator known-hosts file for this scope.
++	KnownHosts string
++}
++
++// Empty reports a selection that names no credential at all.
++func (b BuildSSHCredential) Empty() bool { return !b.Agent && b.Identity == "" }
++
++// Expanded returns the credential with every `~/` path resolved against the
++// operator's home directory.
++func (b BuildSSHCredential) Expanded() BuildSSHCredential {
++	b.AgentSocket = expandHome(b.AgentSocket)
++	b.Identity = expandHome(b.Identity)
++	b.KnownHosts = expandHome(b.KnownHosts)
++	return b
++}
++
++// ValidBuildSSHScope reports whether value is a well-formed credential scope.
++func ValidBuildSSHScope(value string) bool {
++	if value == "" || utf8.RuneCountInString(value) > MaxBuildSSHScopeLength {
++		return false
++	}
++	host, path, hasPath := strings.Cut(value, "/")
++	if len(host) > maxScopeHostLength || !scopeHostRE.MatchString(host) {
++		return false
++	}
++	if !hasPath {
++		return true
++	}
++	for _, segment := range strings.Split(path, "/") {
++		// A canonical identity never carries an empty, "." or ".." path
++		// component, so a scope spelled with one could never match.
++		if segment == "." || segment == ".." || !scopeSegmentRE.MatchString(segment) {
++			return false
++		}
++	}
++	return true
++}
++
++// ValidBuildSSHPath reports whether value is a usable operator credential
++// path, so a caller can tell an omitted path from a malformed one before it
++// builds a credential.
++func ValidBuildSSHPath(value string) bool { return validCredentialPath(value) }
++
++// ValidateBuildSSH checks one credential against the scope grammar, the path
++// rule, and the requirement that a scope actually select something.
++func ValidateBuildSSH(credential BuildSSHCredential) error {
++	if !ValidBuildSSHScope(credential.Scope) {
++		return verr.New("build_ssh", "scope %q %s", credential.Scope, BuildSSHScopeRule)
++	}
++	label := "build_ssh." + credential.Scope
++	if credential.AgentSocket != "" && !credential.Agent {
++		return verr.New(label+".agent", "%s", BuildSSHAgentRule)
++	}
++	for _, field := range []struct{ name, value string }{
++		{"agent", credential.AgentSocket},
++		{"identity", credential.Identity},
++		{"known_hosts", credential.KnownHosts},
++	} {
++		if field.value != "" && !validCredentialPath(field.value) {
++			return verr.New(label+"."+field.name, "%s", BuildSSHPathRule)
++		}
++	}
++	if credential.Empty() {
++		return verr.New(label, "requires 'agent', 'identity', or both")
++	}
++	return nil
++}
++
++// BuildSSHFor returns the credential whose scope is the longest segment-aware
++// prefix of a canonical repository identity (Spec §6.3). A value that is not
++// a canonical `host/path` identity, and an identity no scope covers, select
++// no credential; the caller then fails closed rather than falling back to
++// ambient SSH state.
++func (c *Config) BuildSSHFor(canonical string) (BuildSSHCredential, bool) {
++	return MatchBuildSSH(c.BuildSSH, canonical)
++}
++
++// MatchBuildSSH is BuildSSHFor over a bare scope map, for a caller that carries
++// the operator's scopes without the whole config: the run-wide selection of an
++// install already has to travel that way.
++func MatchBuildSSH(scopes map[string]BuildSSHCredential, canonical string) (BuildSSHCredential, bool) {
++	if !identity.ValidCanonical(canonical) {
++		return BuildSSHCredential{}, false
++	}
++	best := ""
++	for scope := range scopes {
++		if len(scope) > len(best) && identity.MatchesPrefix(canonical, scope) {
++			best = scope
++		}
++	}
++	if best == "" {
++		return BuildSSHCredential{}, false
++	}
++	return scopes[best], true
++}
++
++// BuildSSHScopes returns the configured scopes in sorted order.
++func (c *Config) BuildSSHScopes() []string {
++	scopes := make([]string, 0, len(c.BuildSSH))
++	for scope := range c.BuildSSH {
++		scopes = append(scopes, scope)
++	}
++	sort.Strings(scopes)
++	return scopes
++}
++
++// BuildSSHObject renders credentials back into the config JSON shape. Unset
++// fields are omitted and the result parses back to the same credentials.
++func BuildSSHObject(credentials map[string]BuildSSHCredential) map[string]any {
++	if len(credentials) == 0 {
++		return nil
++	}
++	object := make(map[string]any, len(credentials))
++	for scope, credential := range credentials {
++		entry := map[string]any{}
++		switch {
++		case credential.AgentSocket != "":
++			entry["agent"] = credential.AgentSocket
++		case credential.Agent:
++			entry["agent"] = true
++		}
++		if credential.Identity != "" {
++			entry["identity"] = credential.Identity
++		}
++		if credential.KnownHosts != "" {
++			entry["known_hosts"] = credential.KnownHosts
++		}
++		object[scope] = entry
++	}
++	return object
++}
++
++// parseBuildSSH validates the build_ssh field. Anything the grammar does not
++// spell out is rejected rather than ignored: a credential that silently fails
++// to apply is worse than a config that refuses to load.
++func parseBuildSSH(raw any) (map[string]BuildSSHCredential, error) {
++	if raw == nil {
++		return nil, nil
++	}
++	object, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("build_ssh", "must be an object")
++	}
++	scopes := make([]string, 0, len(object))
++	for scope := range object {
++		scopes = append(scopes, scope)
++	}
++	// Sorted, so a config with several faults always reports the same one.
++	sort.Strings(scopes)
++
++	credentials := map[string]BuildSSHCredential{}
++	for _, scope := range scopes {
++		if !ValidBuildSSHScope(scope) {
++			return nil, verr.New("build_ssh", "scope %q %s", scope, BuildSSHScopeRule)
++		}
++		label := "build_ssh." + scope
++		entry, ok := object[scope].(map[string]any)
++		if !ok {
++			return nil, verr.New(label, "must be an object")
++		}
++		var unknown []string
++		for key := range entry {
++			if !buildSSHFields[key] {
++				unknown = append(unknown, key)
++			}
++		}
++		if len(unknown) > 0 {
++			sort.Strings(unknown)
++			return nil, verr.New(label, "has unsupported field(s): %s", strings.Join(unknown, ", "))
++		}
++		credential := BuildSSHCredential{Scope: scope}
++		if raw, present := entry["agent"]; present {
++			switch value := raw.(type) {
++			case bool:
++				// Only the affirmative spelling exists: "agent": false
++				// would be a second way to write an identity-only entry.
++				if !value {
++					return nil, verr.New(label+".agent", "%s", BuildSSHAgentRule)
++				}
++				credential.Agent = true
++			case string:
++				if !validCredentialPath(value) {
++					return nil, verr.New(label+".agent", "socket %s", BuildSSHPathRule)
++				}
++				credential.Agent = true
++				credential.AgentSocket = value
++			default:
++				return nil, verr.New(label+".agent", "%s", BuildSSHAgentRule)
++			}
++		}
++		for field, target := range map[string]*string{
++			"identity": &credential.Identity, "known_hosts": &credential.KnownHosts,
++		} {
++			raw, present := entry[field]
++			if !present {
++				continue
++			}
++			// Present-but-empty is a fault here, while an empty struct
++			// field simply means the operator named no path.
++			value, ok := raw.(string)
++			if !ok || !validCredentialPath(value) {
++				return nil, verr.New(label+"."+field, "%s", BuildSSHPathRule)
++			}
++			*target = value
++		}
++		if err := ValidateBuildSSH(credential); err != nil {
++			return nil, err
++		}
++		credentials[scope] = credential
++	}
++	return credentials, nil
++}
++
++// validCredentialPath reports whether value is a rooted, control-free path an
++// operator can hand to the SSH client unchanged. A relative path is refused
++// because a machine-global config has no stable directory to resolve it
++// against.
++func validCredentialPath(value string) bool {
++	if value == "" || utf8.RuneCountInString(value) > maxCredentialPathLength {
++		return false
++	}
++	for _, character := range value {
++		if unicode.IsControl(character) {
++			return false
++		}
++	}
++	if strings.HasPrefix(value, "~/") {
++		return true
++	}
++	return strings.HasPrefix(value, "/") || windowsAbsoluteRE.MatchString(value)
++}
+diff --git a/internal/config/buildssh_test.go b/internal/config/buildssh_test.go
+new file mode 100644
+index 0000000..f8e2607
+--- /dev/null
++++ b/internal/config/buildssh_test.go
+@@ -0,0 +1,425 @@
++package config
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++)
++
++// buildSSHConfig carries all three authentication shapes at three nesting
++// depths, so one fixture exercises parsing, matching, and serialization.
++const buildSSHConfig = `{
++	"schema_version": 1, "skills_root": "/tmp/skills", "projects": {},
++	"build_ssh": {
++		"git.example.com": {"agent": true},
++		"git.example.com/relux-works": {"identity": "~/.ssh/org", "known_hosts": "~/.ssh/known_hosts_org"},
++		"git.example.com/relux-works/portals": {"agent": "/run/portals.sock", "identity": "/keys/portals"}
++	}
++}`
++
++func loadBuildSSHConfig(t *testing.T) *Config {
++	t.Helper()
++	cfg, err := Load(writeConfig(t, t.TempDir(), "config.json", buildSSHConfig), nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return cfg
++}
++
++func TestParseBuildSSH(t *testing.T) {
++	cfg := loadBuildSSHConfig(t)
++	want := map[string]BuildSSHCredential{
++		"git.example.com": {
++			Scope: "git.example.com", Agent: true,
++		},
++		"git.example.com/relux-works": {
++			Scope:    "git.example.com/relux-works",
++			Identity: "~/.ssh/org", KnownHosts: "~/.ssh/known_hosts_org",
++		},
++		"git.example.com/relux-works/portals": {
++			Scope: "git.example.com/relux-works/portals", Agent: true,
++			AgentSocket: "/run/portals.sock", Identity: "/keys/portals",
++		},
++	}
++	if !reflect.DeepEqual(cfg.BuildSSH, want) {
++		t.Fatalf("build_ssh = %+v, want %+v", cfg.BuildSSH, want)
++	}
++	wantScopes := []string{
++		"git.example.com", "git.example.com/relux-works",
++		"git.example.com/relux-works/portals",
++	}
++	if got := cfg.BuildSSHScopes(); !reflect.DeepEqual(got, wantScopes) {
++		t.Fatalf("scopes = %v, want %v", got, wantScopes)
++	}
++}
++
++func TestParseBuildSSHAbsentAndEmpty(t *testing.T) {
++	for name, text := range map[string]string{
++		"absent": minimal,
++		"null":   `{"schema_version": 1, "skills_root": "x", "projects": {}, "build_ssh": null}`,
++		"empty":  `{"schema_version": 1, "skills_root": "x", "projects": {}, "build_ssh": {}}`,
++	} {
++		t.Run(name, func(t *testing.T) {
++			cfg, err := Load(writeConfig(t, t.TempDir(), "config.json", text), nil)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if len(cfg.BuildSSH) != 0 {
++				t.Fatalf("build_ssh = %+v, want empty", cfg.BuildSSH)
++			}
++			if len(cfg.BuildSSHScopes()) != 0 {
++				t.Fatalf("scopes = %v, want none", cfg.BuildSSHScopes())
++			}
++			if _, ok := cfg.BuildSSHFor("git.example.com/relux-works/portals"); ok {
++				t.Fatal("an unset build_ssh must select no credential")
++			}
++		})
++	}
++}
++
++// TestBuildSSHSerializationRoundtrip writes the parsed credentials back out
++// through BuildSSHObject and requires the reparsed config to be identical.
++func TestBuildSSHSerializationRoundtrip(t *testing.T) {
++	dir := t.TempDir()
++	first := loadBuildSSHConfig(t)
++	payload, err := json.Marshal(map[string]any{
++		"schema_version": 1, "skills_root": "/tmp/skills", "projects": map[string]any{},
++		"build_ssh": BuildSSHObject(first.BuildSSH),
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	path := filepath.Join(dir, "roundtrip.json")
++	if err := os.WriteFile(path, payload, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	second, err := Load(path, nil)
++	if err != nil {
++		t.Fatalf("serialized build_ssh did not parse: %v", err)
++	}
++	if !reflect.DeepEqual(second.BuildSSH, first.BuildSSH) {
++		t.Fatalf("roundtrip = %+v, want %+v", second.BuildSSH, first.BuildSSH)
++	}
++}
++
++func TestBuildSSHObjectOmitsUnsetFields(t *testing.T) {
++	for name, tc := range map[string]struct {
++		credential BuildSSHCredential
++		want       string
++	}{
++		"agent only": {
++			BuildSSHCredential{Scope: "git.example.com", Agent: true},
++			`{"git.example.com":{"agent":true}}`,
++		},
++		"pinned socket": {
++			BuildSSHCredential{Scope: "git.example.com", Agent: true, AgentSocket: "/run/a.sock", Identity: "/keys/id"},
++			`{"git.example.com":{"agent":"/run/a.sock","identity":"/keys/id"}}`,
++		},
++		"identity only": {
++			BuildSSHCredential{Scope: "git.example.com", Identity: "~/.ssh/id", KnownHosts: "~/.ssh/kh"},
++			`{"git.example.com":{"identity":"~/.ssh/id","known_hosts":"~/.ssh/kh"}}`,
++		},
++	} {
++		t.Run(name, func(t *testing.T) {
++			payload, err := json.Marshal(BuildSSHObject(map[string]BuildSSHCredential{
++				tc.credential.Scope: tc.credential,
++			}))
++			if err != nil {
++				t.Fatal(err)
++			}
++			if string(payload) != tc.want {
++				t.Fatalf("serialized = %s, want %s", payload, tc.want)
++			}
++		})
++	}
++	if got := BuildSSHObject(nil); len(got) != 0 {
++		t.Fatalf("BuildSSHObject(nil) = %v, want empty", got)
++	}
++}
++
++func TestValidBuildSSHScope(t *testing.T) {
++	cases := []struct {
++		scope string
++		want  bool
++	}{
++		{"git.example.com", true},
++		{"git.example.com/relux-works", true},
++		{"git.example.com/relux-works/portals", true},
++		{"git.example.com/a.b/c_d/e-f", true},
++		{"localhost", true},
++		{"127.0.0.1/repo", true},
++		// Spec §6.3 lowercases the host and preserves repository path case.
++		{"git.example.com/RELUX", true},
++		{"", false},
++		{"Git.Example.com", false},
++		{"git.example.com//portals", false},
++		{"git.example.com/", false},
++		{"/git.example.com", false},
++		{"git.example.com/.", false},
++		{"git.example.com/..", false},
++		{"git.example.com/a b", false},
++		{`git.example.com/a\b`, false},
++		{"git.example.com/a:b", false},
++		{"git.example.com/ünicode", false},
++		{"git..example.com", false},
++		{"-git.example.com", false},
++		{"git.example.com./repo", false},
++		{"git.example.com:22/repo", false},
++		{"ssh://git.example.com/repo", false},
++		{"git@example.com/repo", false},
++		{strings.Repeat("a", 253), true},
++		{strings.Repeat("a", 254), false},
++		{"git.example.com/" + strings.Repeat("a", 4096), false},
++	}
++	for _, tc := range cases {
++		if got := ValidBuildSSHScope(tc.scope); got != tc.want {
++			t.Errorf("ValidBuildSSHScope(%q) = %v, want %v", tc.scope, got, tc.want)
++		}
++	}
++}
++
++func TestParseBuildSSHRejections(t *testing.T) {
++	const prefix = `{"schema_version": 1, "skills_root": "x", "projects": {}, "build_ssh": `
++	cases := []struct {
++		name string
++		body string
++		want string
++	}{
++		{"not an object", `[]`, "build_ssh: must be an object"},
++		{"entry not an object", `{"git.example.com": "agent"}`, "build_ssh.git.example.com: must be an object"},
++		{"uppercase host", `{"Git.Example.com": {"agent": true}}`, `scope "Git.Example.com"`},
++		{"empty segment", `{"git.example.com//portals": {"agent": true}}`, `scope "git.example.com//portals"`},
++		{"trailing slash", `{"git.example.com/portals/": {"agent": true}}`, `scope "git.example.com/portals/"`},
++		{"dot segment", `{"git.example.com/./portals": {"agent": true}}`, `scope "git.example.com/./portals"`},
++		{"dotdot segment", `{"git.example.com/../portals": {"agent": true}}`, `scope "git.example.com/../portals"`},
++		{"scheme in scope", `{"ssh://git.example.com/repo": {"agent": true}}`, "scope"},
++		{"port in scope", `{"git.example.com:22/repo": {"agent": true}}`, "scope"},
++		{"empty scope", `{"": {"agent": true}}`, `scope ""`},
++		{"unknown entry field", `{"git.example.com": {"agent": true, "port": 22}}`, `unsupported field(s): port`},
++		{"unknown entry fields sorted", `{"git.example.com": {"agent": true, "user": "x", "port": 22}}`, `unsupported field(s): port, user`},
++		{"no selection", `{"git.example.com": {"known_hosts": "/k"}}`, "requires 'agent', 'identity', or both"},
++		{"empty entry", `{"git.example.com": {}}`, "requires 'agent', 'identity', or both"},
++		{"agent false", `{"git.example.com": {"agent": false}}`, "build_ssh.git.example.com.agent"},
++		{"agent false with identity", `{"git.example.com": {"agent": false, "identity": "/keys/id"}}`, "build_ssh.git.example.com.agent"},
++		{"agent null", `{"git.example.com": {"agent": null}}`, "build_ssh.git.example.com.agent"},
++		{"agent number", `{"git.example.com": {"agent": 22}}`, "build_ssh.git.example.com.agent"},
++		{"agent empty socket", `{"git.example.com": {"agent": ""}}`, "build_ssh.git.example.com.agent"},
++		{"agent relative socket", `{"git.example.com": {"agent": "run/agent.sock"}}`, "build_ssh.git.example.com.agent"},
++		{"identity empty", `{"git.example.com": {"identity": ""}}`, "build_ssh.git.example.com.identity"},
++		{"identity null", `{"git.example.com": {"identity": null}}`, "build_ssh.git.example.com.identity"},
++		{"identity relative", `{"git.example.com": {"identity": ".ssh/id"}}`, "build_ssh.git.example.com.identity"},
++		{"identity bare tilde", `{"git.example.com": {"identity": "~other/id"}}`, "build_ssh.git.example.com.identity"},
++		{"identity padded", `{"git.example.com": {"identity": " /keys/id"}}`, "build_ssh.git.example.com.identity"},
++		{"identity control byte", `{"git.example.com": {"identity": "/keys/\u0001id"}}`, "build_ssh.git.example.com.identity"},
++		{"identity number", `{"git.example.com": {"identity": 1}}`, "build_ssh.git.example.com.identity"},
++		{"known_hosts empty", `{"git.example.com": {"agent": true, "known_hosts": ""}}`, "build_ssh.git.example.com.known_hosts"},
++		{"known_hosts null", `{"git.example.com": {"agent": true, "known_hosts": null}}`, "build_ssh.git.example.com.known_hosts"},
++		{"known_hosts relative", `{"git.example.com": {"agent": true, "known_hosts": "known_hosts"}}`, "build_ssh.git.example.com.known_hosts"},
++		{"known_hosts control byte", `{"git.example.com": {"agent": true, "known_hosts": "/etc/\u0007kh"}}`, "build_ssh.git.example.com.known_hosts"},
++		{"known_hosts number", `{"git.example.com": {"agent": true, "known_hosts": 1}}`, "build_ssh.git.example.com.known_hosts"},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			text := prefix + tc.body + "}"
++			_, err := Load(writeConfig(t, t.TempDir(), "config.json", text), nil)
++			if err == nil || !strings.Contains(err.Error(), tc.want) {
++				t.Fatalf("err = %v, want mention of %q", err, tc.want)
++			}
++		})
++	}
++}
++
++// TestParseBuildSSHReportsOneFaultDeterministically pins the scope ordering,
++// so a config with several faults never reports a different one per run.
++func TestParseBuildSSHReportsOneFaultDeterministically(t *testing.T) {
++	const text = `{"schema_version": 1, "skills_root": "x", "projects": {}, "build_ssh": {
++		"z.example.com": {},
++		"a.example.com": {}
++	}}`
++	for range 8 {
++		_, err := Load(writeConfig(t, t.TempDir(), "config.json", text), nil)
++		if err == nil || !strings.Contains(err.Error(), "build_ssh.a.example.com") {
++			t.Fatalf("err = %v, want the lowest scope reported first", err)
++		}
++	}
++}
++
++func TestBuildSSHAcceptsWindowsPaths(t *testing.T) {
++	const text = `{"schema_version": 1, "skills_root": "x", "projects": {}, "build_ssh": {
++		"git.example.com": {"agent": "\\\\.\\pipe\\openssh-ssh-agent", "identity": "C:/keys/id"}
++	}}`
++	cfg, err := Load(writeConfig(t, t.TempDir(), "config.json", text), nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	credential := cfg.BuildSSH["git.example.com"]
++	if credential.AgentSocket != `\\.\pipe\openssh-ssh-agent` || credential.Identity != "C:/keys/id" {
++		t.Fatalf("credential = %+v", credential)
++	}
++}
++
++func TestBuildSSHLongestPrefixMatch(t *testing.T) {
++	cfg := loadBuildSSHConfig(t)
++	cases := []struct {
++		identity string
++		want     string // matched scope, "" for no match
++	}{
++		{"git.example.com/relux-works/portals", "git.example.com/relux-works/portals"},
++		{"git.example.com/relux-works/portals/sub", "git.example.com/relux-works/portals"},
++		// Boundary: a scope matches on whole segments only, so a longer
++		// repository name falls back to the enclosing organization scope.
++		{"git.example.com/relux-works/portals-evil", "git.example.com/relux-works"},
++		{"git.example.com/relux-works/portals.git-mirror", "git.example.com/relux-works"},
++		{"git.example.com/relux-works", "git.example.com/relux-works"},
++		{"git.example.com/relux-works-evil/portals", "git.example.com"},
++		{"git.example.com/other/repo", "git.example.com"},
++		// The same boundary rule applies to the host.
++		{"git.example.community/relux-works/portals", ""},
++		{"other.example.com/relux-works/portals", ""},
++		{"", ""},
++		{"git.example.com", ""}, // a host alone is not a canonical identity
++		{"GIT.EXAMPLE.COM/relux-works/portals", ""},
++		{"ssh://git.example.com/relux-works/portals", ""},
++		{"git@git.example.com:relux-works/portals", ""},
++		{"git.example.com/relux-works/portals.git", "git.example.com/relux-works"},
++	}
++	for _, tc := range cases {
++		got, ok := cfg.BuildSSHFor(tc.identity)
++		if tc.want == "" {
++			if ok {
++				t.Errorf("BuildSSHFor(%q) = %+v, want no match", tc.identity, got)
++			}
++			continue
++		}
++		if !ok || got.Scope != tc.want {
++			t.Errorf("BuildSSHFor(%q) = %+v, %v; want scope %q", tc.identity, got, ok, tc.want)
++		}
++	}
++}
++
++func TestBuildSSHMatchCarriesCredential(t *testing.T) {
++	cfg := loadBuildSSHConfig(t)
++	credential, ok := cfg.BuildSSHFor("git.example.com/relux-works/portals/deep")
++	if !ok || !credential.Agent || credential.AgentSocket != "/run/portals.sock" ||
++		credential.Identity != "/keys/portals" || credential.KnownHosts != "" {
++		t.Fatalf("match = %+v, %v", credential, ok)
++	}
++	organization, ok := cfg.BuildSSHFor("git.example.com/relux-works/other")
++	if !ok || organization.Agent || organization.Identity != "~/.ssh/org" ||
++		organization.KnownHosts != "~/.ssh/known_hosts_org" {
++		t.Fatalf("organization match = %+v, %v", organization, ok)
++	}
++}
++
++func TestBuildSSHExpandedResolvesHome(t *testing.T) {
++	home, err := os.UserHomeDir()
++	if err != nil {
++		t.Skipf("no home directory: %v", err)
++	}
++	credential := BuildSSHCredential{
++		Scope: "git.example.com", Agent: true, AgentSocket: "~/.ssh/agent.sock",
++		Identity: "~/.ssh/org", KnownHosts: "~/.ssh/known_hosts_org",
++	}
++	expanded := credential.Expanded()
++	for field, got := range map[string]string{
++		"agent": expanded.AgentSocket, "identity": expanded.Identity,
++		"known_hosts": expanded.KnownHosts,
++	} {
++		if !strings.HasPrefix(got, filepath.Join(home, ".ssh")+string(filepath.Separator)) {
++			t.Errorf("%s = %q, want a path under %s", field, got, home)
++		}
++	}
++	if !expanded.Agent || expanded.Scope != "git.example.com" {
++		t.Errorf("expanded = %+v", expanded)
++	}
++	absolute := BuildSSHCredential{Identity: "/keys/id", KnownHosts: "/etc/known_hosts"}
++	if got := absolute.Expanded(); got != absolute {
++		t.Errorf("Expanded(%+v) = %+v, want unchanged", absolute, got)
++	}
++}
++
++func TestValidateBuildSSH(t *testing.T) {
++	valid := []BuildSSHCredential{
++		{Scope: "git.example.com", Agent: true},
++		{Scope: "git.example.com", Identity: "~/.ssh/id"},
++		{Scope: "git.example.com/org", Agent: true, AgentSocket: "/run/a.sock", Identity: "/keys/id"},
++		{Scope: "git.example.com", Agent: true, KnownHosts: "/etc/known_hosts"},
++	}
++	for _, credential := range valid {
++		if err := ValidateBuildSSH(credential); err != nil {
++			t.Errorf("ValidateBuildSSH(%+v) = %v, want nil", credential, err)
++		}
++	}
++	invalid := map[string]BuildSSHCredential{
++		"bad scope":            {Scope: "Git.Example.com", Agent: true},
++		"no scope":             {Agent: true},
++		"nothing chosen":       {Scope: "git.example.com"},
++		"known_hosts only":     {Scope: "git.example.com", KnownHosts: "/etc/known_hosts"},
++		"socket without agent": {Scope: "git.example.com", AgentSocket: "/run/a.sock", Identity: "/keys/id"},
++		"relative identity":    {Scope: "git.example.com", Identity: "keys/id"},
++		"relative known_hosts": {Scope: "git.example.com", Agent: true, KnownHosts: "kh"},
++	}
++	for name, credential := range invalid {
++		if err := ValidateBuildSSH(credential); err == nil {
++			t.Errorf("ValidateBuildSSH(%s) = nil, want an error", name)
++		}
++	}
++}
++
++// TestValidateBuildSSHAcceptsEveryParsedCredential keeps the exported
++// validator and the parser from drifting apart: whatever the config accepts
++// must also satisfy the check the CLI runs before writing an entry.
++func TestValidateBuildSSHAcceptsEveryParsedCredential(t *testing.T) {
++	for scope, credential := range loadBuildSSHConfig(t).BuildSSH {
++		if err := ValidateBuildSSH(credential); err != nil {
++			t.Errorf("ValidateBuildSSH(%q, %+v) = %v", scope, credential, err)
++		}
++	}
++}
++
++// TestBuildSSHIsAManagerKey covers the system-config path: build_ssh is a
++// recognised top-level key, so an enforced config may supply it as a default.
++func TestBuildSSHIsAManagerKey(t *testing.T) {
++	if !managerKeys["build_ssh"] {
++		t.Fatal("build_ssh is not a manager key")
++	}
++	dir := t.TempDir()
++	userPath := writeConfig(t, dir, "config.json", minimal)
++	systemPath := writeConfig(t, dir, "system.json", `{"schema_version": 1, "locked": [],
++		"build_ssh": {"git.example.com": {"agent": true}}}`)
++	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
++	cfg, err := Load(userPath, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, ok := cfg.BuildSSHFor("git.example.com/relux-works/portals"); !ok {
++		t.Fatalf("system default not applied: %+v", cfg.BuildSSH)
++	}
++}
++
++func TestMatchBuildSSHOverABareScopeMap(t *testing.T) {
++	scopes := map[string]BuildSSHCredential{
++		"git.example.com":              {Scope: "git.example.com", Agent: true},
++		"git.example.com/relux-works":  {Scope: "git.example.com/relux-works", Identity: "/operator/group"},
++		"other.example.com/relux-work": {Scope: "other.example.com/relux-work", Identity: "/operator/other"},
++	}
++	credential, matched := MatchBuildSSH(scopes, "git.example.com/relux-works/portals")
++	if !matched || credential.Scope != "git.example.com/relux-works" {
++		t.Fatalf("match = %+v %v, want the longest covering scope", credential, matched)
++	}
++	if _, matched := MatchBuildSSH(scopes, "GIT.EXAMPLE.COM/relux-works"); matched {
++		t.Fatal("a non-canonical identity selected a credential")
++	}
++	if _, matched := MatchBuildSSH(nil, "git.example.com/relux-works"); matched {
++		t.Fatal("an empty scope map selected a credential")
++	}
++	// The method and the function are the same rule over the same scopes.
++	cfg := &Config{BuildSSH: scopes}
++	viaConfig, _ := cfg.BuildSSHFor("git.example.com/relux-works/portals")
++	if viaConfig != credential {
++		t.Fatalf("BuildSSHFor = %+v, want %+v", viaConfig, credential)
++	}
++}
+diff --git a/internal/config/config.go b/internal/config/config.go
+index a0fe44f..b38968d 100644
+--- a/internal/config/config.go
++++ b/internal/config/config.go
+@@ -61,6 +61,7 @@ var managerKeys = map[string]bool{
+ 	"preferred_locale": true, "adapter_mode": true, "worktree_alias_pattern": true,
+ 	"projects": true, "allowed_sources": true, "audit": true,
+ 	"audit_registries": true, "disable_builtin_registries": true,
++	"build_ssh": true,
+ }
+ 
+ // Project is a registered project entry.
+@@ -122,6 +123,9 @@ type Config struct {
+ 	AllowedSources           []string
+ 	AuditRegistries          []Registry
+ 	DisableBuiltinRegistries bool
++	// BuildSSH maps a credential scope to the operator SSH credentials that
++	// cover every external build repository below it (Spec §12.2).
++	BuildSSH map[string]BuildSSHCredential
+ }
+ 
+ // Home returns the directory holding the config file: the machine home for
+@@ -354,6 +358,11 @@ func Parse(data map[string]any, path string) (*Config, error) {
+ 		return nil, err
+ 	}
+ 
++	buildSSH, err := parseBuildSSH(data["build_ssh"])
++	if err != nil {
++		return nil, err
++	}
++
+ 	disableBuiltin := false
+ 	if raw, present := data["disable_builtin_registries"]; present {
+ 		disableBuiltin, ok = raw.(bool)
+@@ -431,6 +440,7 @@ func Parse(data map[string]any, path string) (*Config, error) {
+ 		AllowedSources:           allowedSources,
+ 		AuditRegistries:          registries,
+ 		DisableBuiltinRegistries: disableBuiltin,
++		BuildSSH:                 buildSSH,
+ 	}, nil
+ }
+ 
+diff --git a/internal/config/write.go b/internal/config/write.go
+index f9211d2..2e1cc77 100644
+--- a/internal/config/write.go
++++ b/internal/config/write.go
+@@ -5,6 +5,8 @@ import (
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
++
++	"github.com/relux-works/curator/internal/verr"
+ )
+ 
+ // Bootstrap writes a minimal schema 1 user configuration. Existing files are
+@@ -110,3 +112,72 @@ func toFloatJSON(value any) map[string]any {
+ 	_ = json.Unmarshal(payload, &object)
+ 	return object
+ }
++
++// SetBuildSSH records one operator credential scope in the user
++// configuration, replacing whatever was recorded under the same scope, and
++// reports whether an existing entry was replaced. Unrelated user fields and
++// other scopes are left untouched.
++func SetBuildSSH(path string, credential BuildSSHCredential) (bool, error) {
++	if err := ValidateBuildSSH(credential); err != nil {
++		return false, err
++	}
++	object, err := readObject(path)
++	if err != nil {
++		return false, err
++	}
++	entries, err := buildSSHEntries(object)
++	if err != nil {
++		return false, err
++	}
++	_, replaced := entries[credential.Scope]
++	rendered := BuildSSHObject(map[string]BuildSSHCredential{credential.Scope: credential})
++	entries[credential.Scope] = rendered[credential.Scope]
++	object["build_ssh"] = entries
++	if _, err := Parse(object, path); err != nil {
++		return false, err
++	}
++	return replaced, writeObjectAtomic(path, object)
++}
++
++// RemoveBuildSSH drops one credential scope from the user configuration.
++// Removing a scope that is not recorded is an error: reporting success would
++// read as "that credential no longer applies" while it still does.
++func RemoveBuildSSH(path, scope string) error {
++	object, err := readObject(path)
++	if err != nil {
++		return err
++	}
++	entries, err := buildSSHEntries(object)
++	if err != nil {
++		return err
++	}
++	if _, present := entries[scope]; !present {
++		return fmt.Errorf("build_ssh scope %q is not configured in %s", scope, path)
++	}
++	delete(entries, scope)
++	// The last scope takes the whole field with it, so a config that selects
++	// no credential says so by omission rather than by an empty object.
++	if len(entries) == 0 {
++		delete(object, "build_ssh")
++	} else {
++		object["build_ssh"] = entries
++	}
++	if _, err := Parse(object, path); err != nil {
++		return err
++	}
++	return writeObjectAtomic(path, object)
++}
++
++// buildSSHEntries returns the raw build_ssh object, treating an absent field
++// as an empty one.
++func buildSSHEntries(object map[string]any) (map[string]any, error) {
++	raw, present := object["build_ssh"]
++	if !present || raw == nil {
++		return map[string]any{}, nil
++	}
++	entries, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("build_ssh", "must be an object")
++	}
++	return entries, nil
++}
+diff --git a/internal/config/write_test.go b/internal/config/write_test.go
+index 765607b..b8e2cac 100644
+--- a/internal/config/write_test.go
++++ b/internal/config/write_test.go
+@@ -1,8 +1,10 @@
+ package config
+ 
+ import (
++	"encoding/json"
+ 	"os"
+ 	"path/filepath"
++	"reflect"
+ 	"runtime"
+ 	"testing"
+ )
+@@ -34,3 +36,125 @@ func TestBootstrapAndAddProject(t *testing.T) {
+ 		t.Fatalf("config mode = %o, want private", info.Mode().Perm())
+ 	}
+ }
++
++func TestSetBuildSSHRecordsReplacesAndPreservesOtherFields(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "home", "config.json")
++	if err := Bootstrap(path, filepath.Join(t.TempDir(), "skills"), "ru", []string{"codex_cli"}, false); err != nil {
++		t.Fatal(err)
++	}
++	project := t.TempDir()
++	if err := AddProject(path, "app", project, []string{"codex_cli"}); err != nil {
++		t.Fatal(err)
++	}
++	replaced, err := SetBuildSSH(path, BuildSSHCredential{
++		Scope: "git.example.com", Agent: true, AgentSocket: "/run/agent.sock",
++	})
++	if err != nil || replaced {
++		t.Fatalf("first set: replaced=%v err=%v", replaced, err)
++	}
++	if replaced, err = SetBuildSSH(path, BuildSSHCredential{
++		Scope: "git.example.com/portals", Identity: "~/.ssh/portals", KnownHosts: "~/.ssh/known_hosts",
++	}); err != nil || replaced {
++		t.Fatalf("second set: replaced=%v err=%v", replaced, err)
++	}
++	// A replacement is a whole entry: a leftover agent selection from the
++	// previous spelling would still authenticate.
++	if replaced, err = SetBuildSSH(path, BuildSSHCredential{
++		Scope: "git.example.com", Identity: "/keys/org",
++	}); err != nil || !replaced {
++		t.Fatalf("replacement: replaced=%v err=%v", replaced, err)
++	}
++	cfg, err := Load(path, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	want := map[string]BuildSSHCredential{
++		"git.example.com": {Scope: "git.example.com", Identity: "/keys/org"},
++		"git.example.com/portals": {
++			Scope: "git.example.com/portals", Identity: "~/.ssh/portals",
++			KnownHosts: "~/.ssh/known_hosts",
++		},
++	}
++	if !reflect.DeepEqual(cfg.BuildSSH, want) {
++		t.Fatalf("build_ssh = %+v, want %+v", cfg.BuildSSH, want)
++	}
++	if cfg.PreferredLocale != "ru" || cfg.Projects["app"].Path != project {
++		t.Fatalf("unrelated fields disturbed: %+v", cfg)
++	}
++}
++
++func TestSetBuildSSHRejectsInvalidCredentialsWithoutWriting(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "home", "config.json")
++	if err := Bootstrap(path, filepath.Join(t.TempDir(), "skills"), "", nil, false); err != nil {
++		t.Fatal(err)
++	}
++	before, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for name, credential := range map[string]BuildSSHCredential{
++		"malformed scope":  {Scope: "Git.Example.com", Agent: true},
++		"selects nothing":  {Scope: "git.example.com"},
++		"known hosts only": {Scope: "git.example.com", KnownHosts: "/etc/known_hosts"},
++		"relative path":    {Scope: "git.example.com", Identity: "keys/org"},
++		"socket no agent":  {Scope: "git.example.com", AgentSocket: "/run/agent.sock", Identity: "/keys/org"},
++	} {
++		if _, err := SetBuildSSH(path, credential); err == nil {
++			t.Fatalf("%s: SetBuildSSH accepted %+v", name, credential)
++		}
++	}
++	after, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(after) != string(before) {
++		t.Fatalf("a rejected credential rewrote the config:\n%s", after)
++	}
++}
++
++func TestRemoveBuildSSHDropsScopesAndReportsMissingOnes(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "home", "config.json")
++	if err := Bootstrap(path, filepath.Join(t.TempDir(), "skills"), "", nil, false); err != nil {
++		t.Fatal(err)
++	}
++	if err := RemoveBuildSSH(path, "git.example.com"); err == nil {
++		t.Fatal("removing from a config with no build_ssh must fail")
++	}
++	for _, scope := range []string{"git.example.com", "git.example.com/portals"} {
++		if _, err := SetBuildSSH(path, BuildSSHCredential{Scope: scope, Agent: true}); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if err := RemoveBuildSSH(path, "git.example.com/other"); err == nil {
++		t.Fatal("removing an unconfigured scope must fail")
++	}
++	if err := RemoveBuildSSH(path, "git.example.com"); err != nil {
++		t.Fatal(err)
++	}
++	cfg, err := Load(path, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(cfg.BuildSSH) != 1 || !cfg.BuildSSH["git.example.com/portals"].Agent {
++		t.Fatalf("build_ssh = %+v", cfg.BuildSSH)
++	}
++	// The last scope takes the field with it, so nothing reads as "an empty
++	// credential set was configured on purpose".
++	if err := RemoveBuildSSH(path, "git.example.com/portals"); err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var object map[string]any
++	if err := json.Unmarshal(payload, &object); err != nil {
++		t.Fatal(err)
++	}
++	if _, present := object["build_ssh"]; present {
++		t.Fatalf("build_ssh survived its last scope: %s", payload)
++	}
++	if err := RemoveBuildSSH(path, "git.example.com/portals"); err == nil {
++		t.Fatal("a second removal must fail")
++	}
++}
+diff --git a/internal/install/buildssh.go b/internal/install/buildssh.go
+new file mode 100644
+index 0000000..78ab59b
+--- /dev/null
++++ b/internal/install/buildssh.go
+@@ -0,0 +1,252 @@
++package install
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/config"
++)
++
++// The run-wide operator SSH selection an install accepts from the environment.
++// Command-line flags carry the same three values and win over all of them.
++const (
++	// EnvBuildSSHIdentity names the identity file offered to every external
++	// build repository of the run.
++	EnvBuildSSHIdentity = "CURATOR_BUILD_SSH_IDENTITY"
++	// EnvBuildSSHAgent names the agent socket, or the literal "auto" to adopt
++	// the operator's own live agent.
++	EnvBuildSSHAgent = "CURATOR_BUILD_SSH_AGENT"
++	// EnvBuildSSHKnownHosts names the host keys the fetch verifies against.
++	EnvBuildSSHKnownHosts = "CURATOR_BUILD_SSH_KNOWN_HOSTS"
++	// BuildSSHAgentAuto adopts the operator's live agent socket instead of a
++	// literal path. A macOS agent socket is per login session, so a path is
++	// the one thing a persisted selection cannot keep current.
++	BuildSSHAgentAuto = "auto"
++	// envAgentSocket is where the operator's own agent advertises itself.
++	envAgentSocket = "SSH_AUTH_SOCK"
++)
++
++// BuildSSHFlags is one run-wide operator SSH selection as a command line
++// spells it. An empty field means the operator named nothing there.
++type BuildSSHFlags struct {
++	Identity   string
++	Agent      string
++	KnownHosts string
++}
++
++// BuildSSHSelection is everything one install may select operator SSH
++// credentials from. Package data never appears in it: the only key a
++// repository is matched by is the canonical identity it is already locked to
++// (Spec §12.2).
++type BuildSSHSelection struct {
++	// RunWide is the merged flags/env selection. Anything it names covers
++	// every repository of the run, ahead of every configured scope.
++	RunWide BuildSSHFlags
++	// Scopes are the operator's configured build_ssh entries. The longest
++	// scope matching a repository's canonical identity wins.
++	Scopes map[string]config.BuildSSHCredential
++	// AgentSocket is the operator's own live agent socket, read once at
++	// process entry. A selection that asks for "the agent" resolves to it.
++	AgentSocket string
++	// DefaultKnownHosts is the operator's own host key file, used when no
++	// selection names one. The fetch pins StrictHostKeyChecking=yes and has
++	// no other source of truth for host keys.
++	DefaultKnownHosts string
++}
++
++// CaptureBuildSSHSelection merges the run-wide selection from explicit flags
++// and the CURATOR_BUILD_SSH_* environment, flags first, and binds the
++// configured scopes it falls back to.
++//
++// Callers invoke this at process entry, before any project-owned state can
++// influence the environment it reads.
++func CaptureBuildSSHSelection(cfg *config.Config, flags BuildSSHFlags, environ func(string) string) BuildSSHSelection {
++	if environ == nil {
++		environ = func(string) string { return "" }
++	}
++	selection := BuildSSHSelection{RunWide: flags, AgentSocket: environ(envAgentSocket)}
++	if cfg != nil {
++		selection.Scopes = cfg.BuildSSH
++	}
++	for _, field := range []struct {
++		name  string
++		value *string
++	}{
++		{EnvBuildSSHIdentity, &selection.RunWide.Identity},
++		{EnvBuildSSHAgent, &selection.RunWide.Agent},
++		{EnvBuildSSHKnownHosts, &selection.RunWide.KnownHosts},
++	} {
++		if *field.value == "" {
++			*field.value = environ(field.name)
++		}
++	}
++	selection.DefaultKnownHosts = operatorKnownHosts(environ)
++	return selection
++}
++
++// operatorKnownHosts locates the operator's own host key file. Absent, the
++// selection carries none and policy construction refuses rather than trusting
++// an unverified host.
++func operatorKnownHosts(environ func(string) string) string {
++	for _, name := range []string{"HOME", "USERPROFILE"} {
++		home := environ(name)
++		if home == "" {
++			continue
++		}
++		candidate := filepath.Join(home, ".ssh", "known_hosts")
++		if info, err := os.Lstat(candidate); err == nil && info.Mode().IsRegular() {
++			return candidate
++		}
++	}
++	return ""
++}
++
++// buildSSHKey identifies one external build repository within a run.
++type buildSSHKey struct {
++	skill   string
++	command string
++}
++
++// resolveBuildSSH selects operator SSH credentials for every planned external
++// build repository.
++//
++// Precedence: an explicit run-wide selection covers every repository;
++// otherwise the longest matching build_ssh scope covers its own. A repository
++// reached over HTTPS, and one an operator substitution replaced with a local
++// path, need no selection at all. Anything still unselected fails closed with
++// the exact commands that would fix it — never with a fallback onto whatever
++// the operator's ambient SSH state happens to offer.
++func resolveBuildSSH(selection BuildSSHSelection, rows []plannedExternal) (map[buildSSHKey]buildrepo.OperatorSSHCredentials, []string, error) {
++	credentials := map[buildSSHKey]buildrepo.OperatorSSHCredentials{}
++	var provenance []string
++	var missing []plannedExternal
++	runWide, runWideErr := selection.runWideCredentials()
++	for _, row := range rows {
++		if !needsBuildSSH(row) {
++			continue
++		}
++		if runWideErr != nil {
++			return nil, nil, runWideErr
++		}
++		key := buildSSHKey{skill: row.node.Name, command: row.command.Name}
++		if runWide.Selected() {
++			credentials[key] = runWide
++			provenance = append(provenance, fmt.Sprintf(
++				"external build ssh: %s <- operator flags/env", row.effective.Identity))
++			continue
++		}
++		scope, matched := config.MatchBuildSSH(selection.Scopes, row.effective.Identity)
++		if !matched {
++			missing = append(missing, row)
++			continue
++		}
++		selected, err := selection.scopeCredentials(scope)
++		if err != nil {
++			return nil, nil, fmt.Errorf("build_ssh scope %q selected for %s: %w",
++				scope.Scope, row.effective.Identity, err)
++		}
++		credentials[key] = selected
++		provenance = append(provenance, fmt.Sprintf(
++			"external build ssh: %s <- config scope %q", row.effective.Identity, scope.Scope))
++	}
++	if len(missing) > 0 {
++		return nil, nil, missingBuildSSHError(missing)
++	}
++	return credentials, provenance, nil
++}
++
++// needsBuildSSH reports whether a planned repository is actually fetched over
++// SSH. The effective state is what decides it: a substitution that redirects a
++// declared SSH repository onto HTTPS, or onto a local path, moves the
++// repository off the SSH transport with it.
++func needsBuildSSH(row plannedExternal) bool {
++	return row.effective.IdentityKind == "network-git" && row.effective.Transport == "ssh"
++}
++
++// runWideCredentials materializes the explicit flags/env selection.
++func (s BuildSSHSelection) runWideCredentials() (buildrepo.OperatorSSHCredentials, error) {
++	credentials := buildrepo.OperatorSSHCredentials{
++		Identity:    s.RunWide.Identity,
++		AgentSocket: s.RunWide.Agent,
++		KnownHosts:  s.RunWide.KnownHosts,
++	}
++	if s.RunWide.Agent == BuildSSHAgentAuto {
++		credentials.AgentSocket = s.AgentSocket
++		if credentials.AgentSocket == "" {
++			return buildrepo.OperatorSSHCredentials{}, fmt.Errorf(
++				"%s: an SSH agent was requested but %s is not set",
++				buildrepo.CodeSSHCredentialMissing, envAgentSocket)
++		}
++	}
++	credentials.KnownHosts = s.knownHosts(credentials.KnownHosts)
++	return credentials, nil
++}
++
++// knownHosts resolves the host keys one selection verifies against: the ones
++// it names, else the run-wide ones, else the operator's own. A scope selects
++// authentication material, not who the destination is allowed to be, so an
++// explicit run-wide known-hosts file still applies to a scoped selection.
++func (s BuildSSHSelection) knownHosts(named string) string {
++	for _, candidate := range []string{named, s.RunWide.KnownHosts, s.DefaultKnownHosts} {
++		if candidate != "" {
++			return candidate
++		}
++	}
++	return ""
++}
++
++// scopeCredentials materializes one configured scope. A leading `~/` resolves
++// against the operator home, and an entry that records the agent without a
++// socket resolves to the live one.
++func (s BuildSSHSelection) scopeCredentials(scope config.BuildSSHCredential) (buildrepo.OperatorSSHCredentials, error) {
++	expanded := scope.Expanded()
++	credentials := buildrepo.OperatorSSHCredentials{
++		Identity: expanded.Identity, KnownHosts: expanded.KnownHosts,
++	}
++	if expanded.Agent {
++		credentials.AgentSocket = expanded.AgentSocket
++		if credentials.AgentSocket == "" {
++			credentials.AgentSocket = s.AgentSocket
++		}
++		if credentials.AgentSocket == "" {
++			return buildrepo.OperatorSSHCredentials{}, fmt.Errorf(
++				"an SSH agent was requested but %s is not set", envAgentSocket)
++		}
++	}
++	credentials.KnownHosts = s.knownHosts(credentials.KnownHosts)
++	return credentials, nil
++}
++
++// missingBuildSSHError names every unselected repository at once and the exact
++// commands that would select credentials for them.
++func missingBuildSSHError(missing []plannedExternal) error {
++	lines := []string{buildrepo.CodeSSHCredentialMissing +
++		": external build repositories need SSH credentials:"}
++	for _, row := range missing {
++		lines = append(lines, fmt.Sprintf("  %s (command %q of skill %q)",
++			row.effective.Identity, row.command.Name, row.node.Name))
++	}
++	scope := defaultBuildSSHScope(missing[0].effective.Identity)
++	lines = append(lines,
++		"select credentials with one of:",
++		fmt.Sprintf("  curator config build-ssh add %s --agent --identity ~/.ssh/<key>.pub", scope),
++		fmt.Sprintf("  curator config build-ssh add %s --agent", scope),
++		fmt.Sprintf("or pass --build-ssh-agent/--build-ssh-identity, or set %s/%s",
++			EnvBuildSSHAgent, EnvBuildSSHIdentity))
++	return errors.New(strings.Join(lines, "\n"))
++}
++
++// defaultBuildSSHScope is the narrowest scope worth persisting for a canonical
++// identity: the repository's namespace, so a sibling repository of the same
++// group is covered without the operator naming every repository by hand.
++func defaultBuildSSHScope(canonical string) string {
++	segments := strings.Split(canonical, "/")
++	if len(segments) <= 2 {
++		return canonical
++	}
++	return strings.Join(segments[:len(segments)-1], "/")
++}
+diff --git a/internal/install/buildssh_test.go b/internal/install/buildssh_test.go
+new file mode 100644
+index 0000000..77533e6
+--- /dev/null
++++ b/internal/install/buildssh_test.go
+@@ -0,0 +1,467 @@
++package install
++
++import (
++	"net"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/closure"
++	"github.com/relux-works/curator/internal/config"
++	"github.com/relux-works/curator/internal/skillspec"
++)
++
++// externalRow is one planned external build repository, reduced to the state
++// credential resolution actually reads.
++func externalRow(skill, command, kind, identity, transport string) plannedExternal {
++	return plannedExternal{
++		node:      &closure.Node{Name: skill},
++		command:   skillspec.Command{Name: command},
++		effective: buildrepo.EffectiveState{IdentityKind: kind, Identity: identity, Transport: transport},
++	}
++}
++
++func sshRow(skill, command, identity string) plannedExternal {
++	return externalRow(skill, command, "network-git", identity, "ssh")
++}
++
++func resolvedFor(t *testing.T, credentials map[buildSSHKey]buildrepo.OperatorSSHCredentials, skill, command string) buildrepo.OperatorSSHCredentials {
++	t.Helper()
++	selected, ok := credentials[buildSSHKey{skill: skill, command: command}]
++	if !ok {
++		t.Fatalf("%s.%s selected no credentials", skill, command)
++	}
++	return selected
++}
++
++// operatorFile creates a real operator credential file, since every selection
++// is proved against the filesystem before it reaches the wrapper policy.
++func operatorFile(t *testing.T, path string) string {
++	t.Helper()
++	if err := os.WriteFile(path, []byte("operator\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func operatorAgentSocket(t *testing.T) string {
++	t.Helper()
++	if runtime.GOOS == "windows" {
++		t.Skip("an operator agent socket is a unix-domain rendezvous point")
++	}
++	// A unix-domain socket address is bounded near 104 bytes, which the
++	// per-test temporary directory of macOS does not fit inside.
++	root, err := os.MkdirTemp("/tmp", "curator-install")
++	if err != nil {
++		t.Skipf("this host cannot create a short scratch directory: %v", err)
++	}
++	t.Cleanup(func() { _ = os.RemoveAll(root) })
++	path := filepath.Join(root, "agent.sock")
++	listener, err := net.Listen("unix", path)
++	if err != nil {
++		t.Skipf("this host cannot create an agent socket: %v", err)
++	}
++	t.Cleanup(func() { _ = listener.Close() })
++	return path
++}
++
++// canonicalPath is how validation reports an operator path back: every
++// symbolic link resolved, which on macOS moves /tmp and /var under /private.
++func canonicalPath(t *testing.T, path string) string {
++	t.Helper()
++	resolved, err := filepath.EvalSymlinks(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return resolved
++}
++
++// An explicit run-wide selection is the operator saying "use this, here, now",
++// so it has to cover repositories a configured scope would otherwise claim and
++// repositories no scope covers at all.
++func TestRunWideSelectionCoversEveryRepositoryAheadOfConfiguredScopes(t *testing.T) {
++	identity := operatorFile(t, filepath.Join(t.TempDir(), "run-wide.pub"))
++	selection := BuildSSHSelection{
++		RunWide: BuildSSHFlags{Identity: identity},
++		Scopes: map[string]config.BuildSSHCredential{
++			"git.example.test/portals": {Scope: "git.example.test/portals", Identity: "/operator/scoped"},
++		},
++	}
++	rows := []plannedExternal{
++		sshRow("covered", "build", "git.example.test/portals/app"),
++		sshRow("uncovered", "build", "other.example.test/tools/kit"),
++	}
++	credentials, provenance, err := resolveBuildSSH(selection, rows)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, skill := range []string{"covered", "uncovered"} {
++		if selected := resolvedFor(t, credentials, skill, "build"); selected.Identity != identity {
++			t.Fatalf("%s identity = %q, want the run-wide %q", skill, selected.Identity, identity)
++		}
++	}
++	for _, line := range provenance {
++		if !strings.Contains(line, "operator flags/env") {
++			t.Fatalf("provenance = %q, want the run-wide origin", line)
++		}
++	}
++}
++
++// Without a run-wide selection each repository is matched on its own canonical
++// identity, so one closure spanning two hosts cannot offer either host the
++// other's key.
++func TestConfiguredScopesAreSelectedPerRepository(t *testing.T) {
++	root := t.TempDir()
++	host := operatorFile(t, filepath.Join(root, "host.pub"))
++	group := operatorFile(t, filepath.Join(root, "group.pub"))
++	selection := BuildSSHSelection{Scopes: map[string]config.BuildSSHCredential{
++		"git.example.test":                {Scope: "git.example.test", Identity: host},
++		"git.example.test/portals":        {Scope: "git.example.test/portals", Identity: group},
++		"git.example.test/portals-evil":   {Scope: "git.example.test/portals-evil", Identity: "/operator/never"},
++		"other.example.test/tools":        {Scope: "other.example.test/tools", Identity: host},
++		"git.example.test/portals/nested": {Scope: "git.example.test/portals/nested", Identity: group},
++	}}
++	rows := []plannedExternal{
++		sshRow("group", "build", "git.example.test/portals/app"),
++		sshRow("host", "build", "git.example.test/infra/base"),
++		sshRow("boundary", "build", "git.example.test/portals-evil/app"),
++	}
++	credentials, provenance, err := resolveBuildSSH(selection, rows)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if selected := resolvedFor(t, credentials, "group", "build"); selected.Identity != group {
++		t.Fatalf("longest scope identity = %q, want %q", selected.Identity, group)
++	}
++	if selected := resolvedFor(t, credentials, "host", "build"); selected.Identity != host {
++		t.Fatalf("host scope identity = %q, want %q", selected.Identity, host)
++	}
++	if selected := resolvedFor(t, credentials, "boundary", "build"); selected.Identity != "/operator/never" {
++		t.Fatalf("segment boundary identity = %q, want the portals-evil scope", selected.Identity)
++	}
++	joined := strings.Join(provenance, "\n")
++	if !strings.Contains(joined, `config scope "git.example.test/portals"`) {
++		t.Fatalf("provenance does not name the selected scope: %s", joined)
++	}
++}
++
++// Only a repository actually fetched over SSH consumes a credential. HTTPS
++// authenticates through the manager credential broker, and a repository an
++// operator substitution replaced with a local path is never fetched at all.
++func TestRepositoriesThatNeedNoCredentialSkipSelection(t *testing.T) {
++	rows := []plannedExternal{
++		externalRow("https", "build", "network-git", "git.example.test/portals/app", "https"),
++		externalRow("local", "build", "operator-local-git", "local/portals/app", ""),
++	}
++	credentials, provenance, err := resolveBuildSSH(BuildSSHSelection{}, rows)
++	if err != nil {
++		t.Fatalf("a closure needing no SSH credential failed: %v", err)
++	}
++	if len(credentials) != 0 || len(provenance) != 0 {
++		t.Fatalf("credentials = %v, provenance = %v, want neither", credentials, provenance)
++	}
++}
++
++// A substitution that redirects a declared SSH repository decides the
++// transport with it: the declared spelling is not what gets fetched.
++func TestSubstitutionMovesARepositoryOffAndOntoTheSSHTransport(t *testing.T) {
++	identity := operatorFile(t, filepath.Join(t.TempDir(), "id.pub"))
++	selection := BuildSSHSelection{RunWide: BuildSSHFlags{Identity: identity}}
++	redirected := externalRow("mirrored", "build", "network-git", "mirror.example.test/portals/app", "https")
++	redirected.declared = buildrepo.DeclaredState{Identity: "git.example.test/portals/app", Transport: "ssh"}
++	promoted := externalRow("promoted", "build", "network-git", "git.example.test/portals/app", "ssh")
++	promoted.declared = buildrepo.DeclaredState{Identity: "git.example.test/portals/app", Transport: "https"}
++	credentials, _, err := resolveBuildSSH(selection, []plannedExternal{redirected, promoted})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, selected := credentials[buildSSHKey{skill: "mirrored", command: "build"}]; selected {
++		t.Fatal("a repository redirected onto HTTPS still consumed an SSH credential")
++	}
++	if selected := resolvedFor(t, credentials, "promoted", "build"); selected.Identity != identity {
++		t.Fatalf("promoted identity = %q, want %q", selected.Identity, identity)
++	}
++}
++
++// Nothing may fall back onto whatever the operator's ambient SSH state happens
++// to offer, so an unselected repository stops the run before the first fetch.
++func TestUnselectedSSHRepositoriesFailClosedWithTheProtocolCode(t *testing.T) {
++	rows := []plannedExternal{
++		sshRow("portals", "build-tool", "git.example.test/portals/app"),
++		sshRow("infra", "build-agent", "other.example.test/tools/kit"),
++		externalRow("public", "build", "network-git", "git.example.test/open/lib", "https"),
++	}
++	_, _, err := resolveBuildSSH(BuildSSHSelection{}, rows)
++	if err == nil {
++		t.Fatal("unselected SSH repositories were admitted")
++	}
++	message := err.Error()
++	for _, required := range []string{
++		buildrepo.CodeSSHCredentialMissing,
++		`git.example.test/portals/app (command "build-tool" of skill "portals")`,
++		`other.example.test/tools/kit (command "build-agent" of skill "infra")`,
++		"curator config build-ssh add git.example.test/portals",
++		EnvBuildSSHAgent,
++		EnvBuildSSHIdentity,
++	} {
++		if !strings.Contains(message, required) {
++			t.Errorf("diagnostic missing %q:\n%s", required, message)
++		}
++	}
++	if strings.Contains(message, "git.example.test/open/lib") {
++		t.Errorf("an HTTPS repository was reported as missing credentials:\n%s", message)
++	}
++}
++
++func TestDefaultBuildSSHScopeIsTheRepositoryNamespace(t *testing.T) {
++	for identity, scope := range map[string]string{
++		"git.example.test/portals/infra/app": "git.example.test/portals/infra",
++		"git.example.test/portals/app":       "git.example.test/portals",
++		"git.example.test/app":               "git.example.test/app",
++	} {
++		if got := defaultBuildSSHScope(identity); got != scope {
++			t.Errorf("defaultBuildSSHScope(%q) = %q, want %q", identity, got, scope)
++		}
++	}
++}
++
++func TestCaptureBuildSSHSelectionPrefersFlagsOverTheEnvironment(t *testing.T) {
++	home := t.TempDir()
++	if err := os.Mkdir(filepath.Join(home, ".ssh"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	knownHosts := operatorFile(t, filepath.Join(home, ".ssh", "known_hosts"))
++	environment := map[string]string{
++		"HOME":                "" + home,
++		EnvBuildSSHIdentity:   "/operator/env.pub",
++		EnvBuildSSHAgent:      "/operator/env.sock",
++		EnvBuildSSHKnownHosts: "/operator/env_known_hosts",
++		envAgentSocket:        "/operator/live.sock",
++	}
++	environ := func(name string) string { return environment[name] }
++
++	flagged := CaptureBuildSSHSelection(nil, BuildSSHFlags{Identity: "/operator/flag.pub"}, environ)
++	if flagged.RunWide.Identity != "/operator/flag.pub" {
++		t.Fatalf("identity = %q, want the flag value", flagged.RunWide.Identity)
++	}
++	if flagged.RunWide.Agent != "/operator/env.sock" || flagged.RunWide.KnownHosts != "/operator/env_known_hosts" {
++		t.Fatalf("unflagged fields = %+v, want the environment values", flagged.RunWide)
++	}
++	if flagged.AgentSocket != "/operator/live.sock" || flagged.DefaultKnownHosts != knownHosts {
++		t.Fatalf("operator state = %q %q", flagged.AgentSocket, flagged.DefaultKnownHosts)
++	}
++
++	cfg := &config.Config{BuildSSH: map[string]config.BuildSSHCredential{
++		"git.example.test": {Scope: "git.example.test", Agent: true},
++	}}
++	bound := CaptureBuildSSHSelection(cfg, BuildSSHFlags{}, environ)
++	if len(bound.Scopes) != 1 {
++		t.Fatalf("scopes = %v, want the configured one", bound.Scopes)
++	}
++	if bound.RunWide.Identity != "/operator/env.pub" {
++		t.Fatalf("identity = %q, want the environment value", bound.RunWide.Identity)
++	}
++}
++
++// A machine-global config records the operator's spelling, so `~/` has to
++// resolve at selection time rather than reaching SSH verbatim.
++func TestConfiguredPathsExpandTheOperatorHome(t *testing.T) {
++	home := t.TempDir()
++	t.Setenv("HOME", home)
++	t.Setenv("USERPROFILE", home)
++	identity := operatorFile(t, filepath.Join(home, "id_ed25519.pub"))
++	knownHosts := operatorFile(t, filepath.Join(home, "known_hosts"))
++	selection := BuildSSHSelection{Scopes: map[string]config.BuildSSHCredential{
++		"git.example.test": {
++			Scope: "git.example.test", Identity: "~/id_ed25519.pub", KnownHosts: "~/known_hosts",
++		},
++	}}
++	credentials, _, err := resolveBuildSSH(selection, []plannedExternal{
++		sshRow("portals", "build", "git.example.test/portals/app"),
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	selected := resolvedFor(t, credentials, "portals", "build")
++	if selected.Identity != identity || selected.KnownHosts != knownHosts {
++		t.Fatalf("expanded selection = %+v, want %q and %q", selected, identity, knownHosts)
++	}
++}
++
++// A scope selects authentication material, not who the destination is allowed
++// to be, so an explicitly named host key file still governs a scoped selection.
++func TestKnownHostsFallBackFromScopeToRunWideToOperator(t *testing.T) {
++	scoped := config.BuildSSHCredential{
++		Scope: "git.example.test", Identity: "/operator/id.pub", KnownHosts: "/operator/scoped_known_hosts",
++	}
++	unscoped := config.BuildSSHCredential{Scope: "git.example.test", Identity: "/operator/id.pub"}
++	for name, expectation := range map[string]struct {
++		scope config.BuildSSHCredential
++		want  string
++	}{
++		"scope wins":    {scoped, "/operator/scoped_known_hosts"},
++		"run-wide next": {unscoped, "/operator/run_wide_known_hosts"},
++	} {
++		t.Run(name, func(t *testing.T) {
++			selection := BuildSSHSelection{
++				RunWide:           BuildSSHFlags{KnownHosts: "/operator/run_wide_known_hosts"},
++				DefaultKnownHosts: "/operator/home_known_hosts",
++				Scopes:            map[string]config.BuildSSHCredential{expectation.scope.Scope: expectation.scope},
++			}
++			credentials, _, err := resolveBuildSSH(selection, []plannedExternal{
++				sshRow("portals", "build", "git.example.test/portals/app"),
++			})
++			if err != nil {
++				t.Fatal(err)
++			}
++			if selected := resolvedFor(t, credentials, "portals", "build"); selected.KnownHosts != expectation.want {
++				t.Fatalf("known hosts = %q, want %q", selected.KnownHosts, expectation.want)
++			}
++		})
++	}
++	// Named nowhere, the operator's own host keys are what remains.
++	selection := BuildSSHSelection{
++		DefaultKnownHosts: "/operator/home_known_hosts",
++		Scopes:            map[string]config.BuildSSHCredential{unscoped.Scope: unscoped},
++	}
++	credentials, _, err := resolveBuildSSH(selection, []plannedExternal{
++		sshRow("portals", "build", "git.example.test/portals/app"),
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if selected := resolvedFor(t, credentials, "portals", "build"); selected.KnownHosts != "/operator/home_known_hosts" {
++		t.Fatalf("known hosts = %q, want the operator default", selected.KnownHosts)
++	}
++}
++
++// "agent": true records the operator's choice of an agent, not a socket path:
++// a macOS agent socket is per login session and a persisted path goes stale.
++func TestConfiguredAgentResolvesToTheLiveSocket(t *testing.T) {
++	selection := BuildSSHSelection{
++		AgentSocket: "/operator/live.sock",
++		Scopes: map[string]config.BuildSSHCredential{
++			"git.example.test": {Scope: "git.example.test", Agent: true},
++		},
++	}
++	rows := []plannedExternal{sshRow("portals", "build", "git.example.test/portals/app")}
++	credentials, _, err := resolveBuildSSH(selection, rows)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if selected := resolvedFor(t, credentials, "portals", "build"); selected.AgentSocket != "/operator/live.sock" {
++		t.Fatalf("agent socket = %q, want the live one", selected.AgentSocket)
++	}
++
++	selection.AgentSocket = ""
++	if _, _, err := resolveBuildSSH(selection, rows); err == nil ||
++		!strings.Contains(err.Error(), envAgentSocket) {
++		t.Fatalf("agentless resolution error = %v, want one naming %s", err, envAgentSocket)
++	}
++}
++
++func TestRunWideAgentAutoRequiresALiveSocket(t *testing.T) {
++	selection := BuildSSHSelection{RunWide: BuildSSHFlags{Agent: BuildSSHAgentAuto}}
++	rows := []plannedExternal{sshRow("portals", "build", "git.example.test/portals/app")}
++	_, _, err := resolveBuildSSH(selection, rows)
++	if err == nil || !strings.Contains(err.Error(), buildrepo.CodeSSHCredentialMissing) {
++		t.Fatalf("error = %v, want %s", err, buildrepo.CodeSSHCredentialMissing)
++	}
++	// A closure with nothing to fetch over SSH is unaffected by an agent the
++	// operator asked for and the machine does not offer.
++	if _, _, err := resolveBuildSSH(selection, []plannedExternal{
++		externalRow("https", "build", "network-git", "git.example.test/open/lib", "https"),
++	}); err != nil {
++		t.Fatalf("an SSH-free closure failed on an absent agent: %v", err)
++	}
++
++	selection.AgentSocket = "/operator/live.sock"
++	credentials, _, err := resolveBuildSSH(selection, rows)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if selected := resolvedFor(t, credentials, "portals", "build"); selected.AgentSocket != "/operator/live.sock" {
++		t.Fatalf("agent socket = %q, want the live one", selected.AgentSocket)
++	}
++}
++
++// End to end for the shapes the operator can actually write down: a configured
++// scope has to reach the wrapper policy as the exact OpenSSH tail it means.
++func TestEveryConfiguredShapeReachesTheWrapperPolicy(t *testing.T) {
++	root := t.TempDir()
++	identity := operatorFile(t, filepath.Join(root, "id_ed25519.pub"))
++	knownHosts := operatorFile(t, filepath.Join(root, "known_hosts"))
++	agentSocket := operatorAgentSocket(t)
++	source, err := buildrepo.ParseSource("git@git.example.test:portals/app.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	base := buildrepo.SSHPolicy{
++		Wrapper:         filepath.Join(root, "ssh-wrapper"),
++		SSH:             filepath.Join(root, "ssh"),
++		EmptyConfig:     filepath.Join(root, "ssh.config"),
++		EmptyKnownHosts: filepath.Join(root, "empty_known_hosts"),
++		ConnectTimeout:  15,
++	}
++	// The policy reports every operator path canonicalized, so the expected
++	// tail is spelled the same way.
++	admittedIdentity := canonicalPath(t, identity)
++	admittedAgent := canonicalPath(t, agentSocket)
++	admittedKnownHosts := canonicalPath(t, knownHosts)
++	for _, testCase := range []struct {
++		name   string
++		scope  config.BuildSSHCredential
++		wanted []string
++	}{
++		{
++			name:   "identity only",
++			scope:  config.BuildSSHCredential{Scope: "git.example.test", Identity: identity},
++			wanted: []string{"IdentitiesOnly=yes", "IdentityAgent=none", "-i " + admittedIdentity},
++		},
++		{
++			name:   "agent only",
++			scope:  config.BuildSSHCredential{Scope: "git.example.test", Agent: true},
++			wanted: []string{"IdentitiesOnly=no", "IdentityFile=none", "IdentityAgent=" + admittedAgent},
++		},
++		{
++			name:   "agent pinned to one identity",
++			scope:  config.BuildSSHCredential{Scope: "git.example.test", Agent: true, Identity: identity},
++			wanted: []string{"IdentitiesOnly=yes", "IdentityAgent=" + admittedAgent, "-i " + admittedIdentity},
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			if err := config.ValidateBuildSSH(testCase.scope); err != nil {
++				t.Fatalf("the scope this case selects is not one an operator may write: %v", err)
++			}
++			selection := BuildSSHSelection{
++				AgentSocket:       agentSocket,
++				DefaultKnownHosts: knownHosts,
++				Scopes:            map[string]config.BuildSSHCredential{testCase.scope.Scope: testCase.scope},
++			}
++			credentials, _, err := resolveBuildSSH(selection, []plannedExternal{
++				sshRow("portals", "build", "git.example.test/portals/app"),
++			})
++			if err != nil {
++				t.Fatal(err)
++			}
++			policy, err := buildrepo.SSHPolicyFor(base, source, resolvedFor(t, credentials, "portals", "build"))
++			if err != nil {
++				t.Fatal(err)
++			}
++			command, err := buildrepo.ExactSSHCommand(policy,
++				[]string{policy.Wrapper, policy.ExpectedHost, "git-upload-pack 'portals/app.git'"})
++			if err != nil {
++				t.Fatal(err)
++			}
++			joined := strings.Join(command, " ")
++			for _, required := range append(testCase.wanted, "UserKnownHostsFile="+admittedKnownHosts) {
++				if !strings.Contains(joined, required) {
++					t.Errorf("SSH command missing %q in %s", required, joined)
++				}
++			}
++		})
++	}
++}
+diff --git a/internal/install/external.go b/internal/install/external.go
+index ef3c7a7..2d9e479 100644
+--- a/internal/install/external.go
++++ b/internal/install/external.go
+@@ -31,6 +31,10 @@ type ExternalDeps struct {
+ 	Acquire       func(context.Context, ExternalSource) (*buildrepo.Snapshot, error)
+ 	Audit         func(context.Context, buildrepo.AuditSubject) error
+ 	AuditWarnings func(context.Context, buildrepo.AuditSubject) ([]string, error)
++	// BuildSSH is the operator's SSH credential selection for this run: the
++	// explicit flags/env values and the configured build_ssh scopes they take
++	// precedence over.
++	BuildSSH BuildSSHSelection
+ }
+ 
+ // ExternalSource is the exact declared/effective source passed to an injected
+@@ -57,6 +61,17 @@ type externalPlan struct {
+ 	rows                   []plannedExternal
+ 	deps                   ExternalDeps
+ 	toolchain              buildrepo.ToolchainIdentity
++	// credentials holds the operator SSH selection of every repository that
++	// is actually fetched over SSH. A repository absent from it needs none.
++	credentials map[buildSSHKey]buildrepo.OperatorSSHCredentials
++	// messages report where each selection came from. Populated on a dry run,
++	// where the provenance is the whole point of the report.
++	messages []string
++}
++
++// credentialsFor returns the operator SSH selection of one planned repository.
++func (p externalPlan) credentialsFor(row plannedExternal) buildrepo.OperatorSSHCredentials {
++	return p.credentials[buildSSHKey{skill: row.node.Name, command: row.command.Name}]
+ }
+ 
+ type stagedExternal struct {
+@@ -103,17 +118,30 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
+ 		if err != nil {
+ 			return plan, fmt.Errorf("%s.%s: %w", item.node.Name, item.command.Name, err)
+ 		}
+-		source := ExternalSource{Skill: item.node.Name, Repository: repository.Name, Declared: declared, Effective: effective, Substitution: sub}
+-		request, err := externalPipelineRequest(plan.deps, source, item.command, store, identityOnlyExternalGo{identity: plan.toolchain}, buildrepo.OperationDryRun)
++		plan.rows = append(plan.rows, plannedExternal{node: item.node, command: item.command, repository: repository, declared: declared, effective: effective, sub: sub})
++	}
++	// Credentials are selected for the whole run before the first repository is
++	// reached, so a closure holding one unselected private repository fails
++	// closed naming every one of them instead of part way through the network.
++	credentials, provenance, err := resolveBuildSSH(plan.deps.BuildSSH, plan.rows)
++	if err != nil {
++		return plan, err
++	}
++	plan.credentials = credentials
++	if dryRun {
++		plan.messages = provenance
++	}
++	for index, row := range plan.rows {
++		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
++		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain}, buildrepo.OperationDryRun)
+ 		if err != nil {
+ 			return plan, err
+ 		}
+ 		result, err := buildrepo.RunPipeline(ctx, request)
+ 		if err != nil {
+-			return plan, fmt.Errorf("%s.%s: %w", item.node.Name, item.command.Name, err)
++			return plan, fmt.Errorf("%s.%s: %w", row.node.Name, row.command.Name, err)
+ 		}
+-		plan.rows = append(plan.rows, plannedExternal{node: item.node, command: item.command, repository: repository, declared: declared, effective: effective, sub: sub, result: result})
+-		_ = dryRun // operation is read-only in both planning modes
++		plan.rows[index].result = result
+ 	}
+ 	return plan, nil
+ }
+@@ -154,7 +182,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
+ 		}
+ 		// A verified final hit is copied into operation-private staging so the
+ 		// transaction and shim path are identical for hits and misses.
+-		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, row.command, store, adapter, buildrepo.OperationInstall)
++		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall)
+ 		if err != nil {
+ 			return stagedExternal{}, err
+ 		}
+@@ -209,15 +237,20 @@ func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
+ 	return plan
+ }
+ 
+-func externalPipelineRequest(deps ExternalDeps, source ExternalSource, command skillspec.Command, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation) (buildrepo.PipelineRequest, error) {
++func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, command skillspec.Command, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation) (buildrepo.PipelineRequest, error) {
+ 	if deps.Audit == nil && deps.AuditWarnings == nil {
+ 		return buildrepo.PipelineRequest{}, fmt.Errorf("build_repository_audit_blocked: independent external repository audit is not configured")
+ 	}
++	// The tool is bound per repository so each fetch offers exactly the
++	// credentials selected for the identity it is about to reach, and nothing
++	// selected for a different host in the same closure.
++	tool := deps.GitTool
++	tool.SSHCredentials = credentials
+ 	acquire := deps.Acquire
+ 	if acquire == nil {
+ 		acquire = func(ctx context.Context, selected ExternalSource) (*buildrepo.Snapshot, error) {
+ 			if selected.Substitution != nil && selected.Substitution.Path != "" {
+-				return buildrepo.AdmitLocal(ctx, buildrepo.LocalRequest{Path: selected.Substitution.Path, Tool: deps.GitTool, Limits: deps.Limits})
++				return buildrepo.AdmitLocal(ctx, buildrepo.LocalRequest{Path: selected.Substitution.Path, Tool: tool, Limits: deps.Limits})
+ 			}
+ 			git := selected.Declared.Repository
+ 			transport := selected.Declared.Transport
+@@ -230,7 +263,7 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, command s
+ 				commit, tag = selected.Effective.Commit, ""
+ 				refKind, refValue = selected.Substitution.RefKind, selected.Substitution.RefValue
+ 			}
+-			return buildrepo.AcquireNetwork(ctx, buildrepo.NetworkRequest{Source: buildrepo.Source{Git: git, Transport: transport, Identity: identity}, Lock: buildrepo.LockedCommit{ObjectFormat: selected.Effective.ObjectFormat, Hex: commit}, Tag: tag, RefKind: refKind, RefValue: refValue, Tool: deps.GitTool, Limits: deps.Limits})
++			return buildrepo.AcquireNetwork(ctx, buildrepo.NetworkRequest{Source: buildrepo.Source{Git: git, Transport: transport, Identity: identity}, Lock: buildrepo.LockedCommit{ObjectFormat: selected.Effective.ObjectFormat, Hex: commit}, Tag: tag, RefKind: refKind, RefValue: refValue, Tool: tool, Limits: deps.Limits})
+ 		}
+ 	}
+ 	return buildrepo.PipelineRequest{Operation: operation, Command: command.Name, Target: command.Target, Declared: source.Declared, Effective: source.Effective, Acquire: func(ctx context.Context) (*buildrepo.Snapshot, error) { return acquire(ctx, source) }, Audit: deps.Audit, AuditWarnings: deps.AuditWarnings, Store: store, Go: goSession, SigningPolicy: deps.SigningPolicy}, nil
+diff --git a/internal/install/global.go b/internal/install/global.go
+index eb0de13..01b9235 100644
+--- a/internal/install/global.go
++++ b/internal/install/global.go
+@@ -280,6 +280,9 @@ func globalAttempt(cfg *config.Config, userHome string, opts Options, commit Com
+ 		result.failBuild(externalPlanErr)
+ 		return result, nil
+ 	}
++	for _, message := range externalPlan.messages {
++		result.Messages = append(result.Messages, "global: "+message)
++	}
+ 	for _, row := range externalPlan.rows {
+ 		for _, warning := range row.result.Warnings {
+ 			result.Messages = append(result.Messages, "global: warning: "+warning)
+diff --git a/internal/install/install.go b/internal/install/install.go
+index b00b5cc..f55c893 100644
+--- a/internal/install/install.go
++++ b/internal/install/install.go
+@@ -56,6 +56,9 @@ type Options struct {
+ 	// External injects operator-owned external repository acquisition, audit,
+ 	// protected-store, and signer policy. Package manifests cannot populate it.
+ 	External ExternalDeps
++	// BuildSSH is the run-wide operator SSH selection this command line
++	// carries. It takes precedence over every configured build_ssh scope.
++	BuildSSH BuildSSHFlags
+ 	// Commit injects the manager locks, transaction journal, cache publisher,
+ 	// and post-commit collector of the serialized commit phase, plus the fault
+ 	// hooks a rollback test drives. The zero value resolves the real ones.
+@@ -534,6 +537,9 @@ func projectAttempt(cfg *config.Config, projectRoot, alias string, opts Options,
+ 		result.failBuild(externalPlanErr)
+ 		return result, nil
+ 	}
++	for _, message := range externalPlan.messages {
++		result.Messages = append(result.Messages, alias+": "+message)
++	}
+ 	for _, row := range externalPlan.rows {
+ 		for _, warning := range row.result.Warnings {
+ 			result.Messages = append(result.Messages, alias+": warning: "+warning)

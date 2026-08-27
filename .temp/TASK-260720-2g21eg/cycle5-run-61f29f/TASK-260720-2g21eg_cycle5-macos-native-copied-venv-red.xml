@@ -1,0 +1,2692 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="9" skipped="0" tests="10" time="15.573" timestamp="2026-07-30T13:53:50.579818+04:00" hostname="MacBook-Pro-2.local"><testcase classname="" name="test_installed_hidden_worker_literal_is_parser_rejected" time="0.429" /><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[accepted]" time="3.020"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'accepted'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1077ec8a0&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+                    go_v1._resolve_manager_identity(manager),
+                    tmp_path / "private-manager",
+                )
+            worker_pids: list[int] = []
+            worker_processes: list[subprocess.Popen[bytes]] = []
+&gt;           site_root = go_v1._resolve_manager_identity(manager).startup.site_root
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[accepted-with-private-runtime]" time="1.324"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'accepted-with-private-runtime'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1077aae70&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+&gt;                   go_v1._resolve_manager_identity(manager),
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                    tmp_path / "private-manager",
+                )
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[accepted-with-bound-startup-hook]" time="1.271"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'accepted-with-bound-startup-hook'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu2')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1077b96a0&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+                    go_v1._resolve_manager_identity(manager),
+                    tmp_path / "private-manager",
+                )
+            worker_pids: list[int] = []
+            worker_processes: list[subprocess.Popen[bytes]] = []
+&gt;           site_root = go_v1._resolve_manager_identity(manager).startup.site_root
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[manager-startup-hook-inserted-after-launch]" time="1.336"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'manager-startup-hook-inserted-after-launch'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu3')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1077b89e0&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+                    go_v1._resolve_manager_identity(manager),
+                    tmp_path / "private-manager",
+                )
+            worker_pids: list[int] = []
+            worker_processes: list[subprocess.Popen[bytes]] = []
+&gt;           site_root = go_v1._resolve_manager_identity(manager).startup.site_root
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[manager-stdlib-module-replaced-after-launch]" time="1.398"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'manager-stdlib-module-replaced-after-launch'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu4')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1076ca350&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+&gt;                   go_v1._resolve_manager_identity(manager),
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                    tmp_path / "private-manager",
+                )
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[manager-runtime-image-replaced-after-launch]" time="1.462"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'manager-runtime-image-replaced-after-launch'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu5')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1076c9e50&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+&gt;                   go_v1._resolve_manager_identity(manager),
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                    tmp_path / "private-manager",
+                )
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:189: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[manager-package-replaced-after-launch]" time="1.401"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'manager-package-replaced-after-launch'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu6')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1076b8500&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+                    go_v1._resolve_manager_identity(manager),
+                    tmp_path / "private-manager",
+                )
+            worker_pids: list[int] = []
+            worker_processes: list[subprocess.Popen[bytes]] = []
+&gt;           site_root = go_v1._resolve_manager_identity(manager).startup.site_root
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[worker-executable-replaced-between-checks]" time="1.404"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'worker-executable-replaced-between-checks'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu7')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1076bab70&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+                    go_v1._resolve_manager_identity(manager),
+                    tmp_path / "private-manager",
+                )
+            worker_pids: list[int] = []
+            worker_processes: list[subprocess.Popen[bytes]] = []
+&gt;           site_root = go_v1._resolve_manager_identity(manager).startup.site_root
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase><testcase classname="" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[worker-domain-teardown-failure]" time="1.373"><failure message="csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree">scenario = 'worker-domain-teardown-failure'
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-17/test_real_native_go_fixture_bu8')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x1077f6890&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+        session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+        states: list[str] = []
+        replaced_identity_file: Path | None = None
+        original_identity_file = b""
+        startup_hook: Path | None = None
+        startup_marker = tmp_path / "startup-hook-ran"
+        try:
+            monkeypatch.setenv("PATH", str(snapshot_root))
+            monkeypatch.setenv("GOFLAGS", "-toolexec=/attacker")
+            monkeypatch.setenv("GOENV", "/attacker/go.env")
+            monkeypatch.setenv("GOWORK", "/attacker/go.work")
+            monkeypatch.setenv("GOTOOLCHAIN", "auto")
+            monkeypatch.setenv("GOPROXY", "https://attacker.invalid")
+            monkeypatch.setenv("CC", "/attacker/cc")
+            monkeypatch.setenv("HTTP_PROXY", "http://attacker.invalid")
+    
+            request = go_v1.BuildRequest(
+                toolchain_session=session,
+                source_snapshot=frozen,
+                command_object={
+                    "type": "build",
+                    "driver": "go-v1",
+                    "source_dir": "build/cmd",
+                },
+                build_root="build",
+                source_dir="build/cmd",
+                command="closed-fixture",
+                limits=go_v1.ResourceLimits(timeout_seconds=90),
+            )
+            if scenario in {
+                "accepted-with-private-runtime",
+                "manager-stdlib-module-replaced-after-launch",
+                "manager-runtime-image-replaced-after-launch",
+            }:
+                if (
+                    scenario == "manager-stdlib-module-replaced-after-launch"
+                    and sys.platform != "darwin"
+                ):
+                    pytest.skip(
+                        "the installed private-stdlib mutation negative is "
+                        "macOS-native"
+                    )
+                manager = _copy_installed_manager_with_private_runtime(
+                    go_v1._resolve_manager_identity(manager),
+                    tmp_path / "private-manager",
+                )
+            worker_pids: list[int] = []
+            worker_processes: list[subprocess.Popen[bytes]] = []
+&gt;           site_root = go_v1._resolve_manager_identity(manager).startup.site_root
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+../../Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree/tests/test_builds_go_v1_fixture.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3541: in _resolve_manager_identity
+    startup=_resolve_startup_identity(
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3187: in _resolve_startup_identity
+    runtime_trees = tuple(
+                    ^^^^^
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:3188: in &lt;genexpr&gt;
+    _resolve_identity_tree(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14')
+executable_files = False, label = 'installed manager Python runtime'
+max_files = 20000, max_bytes = 1073741824
+ignored_names = ('site-packages', 'dist-packages')
+included_file_suffixes = ('.py', '.pyc', '.so', '.pyd', '.dll')
+
+    def _resolve_identity_tree(
+        path: Path,
+        *,
+        executable_files: bool,
+        label: str,
+        max_files: int,
+        max_bytes: int,
+        ignored_names: tuple[str, ...] = (),
+        included_file_suffixes: tuple[str, ...] = (),
+    ) -&gt; _TreeIdentity:
+        if not path.is_absolute():
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} path is not absolute",
+            )
+        try:
+            root_stat = path.lstat()
+            canonical = path.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is unavailable",
+            ) from exc
+        if (
+            canonical != path
+            or _is_link_or_reparse(root_stat)
+            or not stat.S_ISDIR(root_stat.st_mode)
+        ):
+            raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} is not a canonical link-free directory",
+            )
+        _reject_identity_named_streams(path, label)
+    
+        entries: list[_TreeEntryIdentity] = []
+        total_size = 0
+    
+        def descend(directory: Path, prefix: str) -&gt; None:
+            nonlocal total_size
+            try:
+                with os.scandir(directory) as iterator:
+                    names = sorted(
+                        (entry.name for entry in iterator),
+                        key=lambda item: item.encode("utf-8", errors="strict"),
+                    )
+            except (OSError, UnicodeEncodeError) as exc:
+                raise GoV1Error(
+                    CODE_WORKER_IDENTITY_INVALID,
+                    f"{label} cannot be enumerated",
+                ) from exc
+            for name in names:
+                if name in ignored_names:
+                    continue
+                relative = f"{prefix}/{name}" if prefix else name
+                if not is_valid_portable_path(relative):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a non-portable path",
+                    )
+                absolute = directory / name
+                try:
+                    info = absolute.lstat()
+                except OSError as exc:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} changed while enumerating",
+                    ) from exc
+                selected_file = (
+                    not included_file_suffixes
+                    or name.casefold().endswith(included_file_suffixes)
+                )
+                if _is_link_or_reparse(info):
+                    try:
+                        linked_directory = absolute.is_dir()
+                    except OSError as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} link cannot be classified",
+                        ) from exc
+                    if linked_directory or selected_file:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} contains an importable link or reparse point",
+                        )
+                    continue
+                _reject_identity_named_streams(absolute, f"{label} {relative!r}")
+                if stat.S_ISDIR(info.st_mode):
+                    try:
+                        if absolute.resolve(strict=True) != absolute:
+                            raise OSError("directory path contains a link")
+                    except (OSError, RuntimeError) as exc:
+                        raise GoV1Error(
+                            CODE_WORKER_IDENTITY_INVALID,
+                            f"{label} directory changed while opening",
+                        ) from exc
+                    entries.append(
+                        _TreeEntryIdentity(
+                            path=relative,
+                            kind="directory",
+                            sha256="",
+                            size=0,
+                            device=info.st_dev,
+                            inode=info.st_ino,
+                            mode=stat.S_IMODE(info.st_mode),
+                        )
+                    )
+                    descend(absolute, relative)
+                    continue
+                if not stat.S_ISREG(info.st_mode):
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} contains a special file",
+                    )
+                if not selected_file:
+                    continue
+                identity = _resolve_file_identity(
+                    absolute,
+                    executable=executable_files,
+                    label=f"{label} file {relative!r}",
+                    max_bytes=max_bytes,
+                )
+                total_size += identity.size
+                if len(entries) + 1 &gt; max_files or total_size &gt; max_bytes:
+                    raise GoV1Error(
+                        CODE_WORKER_IDENTITY_INVALID,
+                        f"{label} exceeds its identity bound",
+                    )
+                entries.append(
+                    _TreeEntryIdentity(
+                        path=relative,
+                        kind="file",
+                        sha256=identity.sha256,
+                        size=identity.size,
+                        device=identity.device,
+                        inode=identity.inode,
+                        mode=identity.mode,
+                    )
+                )
+    
+        descend(path, "")
+        file_count = sum(entry.kind == "file" for entry in entries)
+        if file_count == 0 or file_count &gt; max_files:
+&gt;           raise GoV1Error(
+                CODE_WORKER_IDENTITY_INVALID,
+                f"{label} does not contain a bounded regular-file tree",
+            )
+E           csk.builds.go_v1.GoV1Error: go-v1 build_execution_worker_identity_invalid: installed manager Python runtime does not contain a bounded regular-file tree
+
+.temp/TASK-260720-2g21eg/cycle5-run-61f29f/macos-manager-venv/lib/python3.14/site-packages/csk/builds/go_v1.py:2248: GoV1Error</failure></testcase></testsuite></testsuites>

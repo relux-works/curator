@@ -1,0 +1,77 @@
+=== SUITE A3 ===
+SID=S-1-5-21-2566270768-74292453-1896159616-1001
+--- A3.0 clear any deny ACE ---
+  | Успешно обработано 41821 файлов; не удалось обработать 0 файлов
+--- A3.1 is dependencies/.extracted required? (it is currently ABSENT) ---
+  .extracted present=False
+ARGV[noext] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\noext C:\kn168\src\main.kt
+EXIT[noext]=2
+  downloads_in_output=1
+  O| Downloading native dependencies (LLVM, sysroot etc). This is a one-time action performed only on the first run of the compiler.
+  E| error: compilation failed: Back-end: Please report this problem https://kotl.in/issue
+  E| kotlin-native/Interop/Runtime/src/main/kotlin/kotlinx/cinterop/Types.kt:-1:-1
+  E| Details: Internal error in file lowering: java.io.FileNotFoundException: Cannot find a dependency locally: lldb-2-windows.
+  E| Set `airplaneMode = false` in konan.properties to download it.
+  E|  * Compiler version: 2.4.10
+  E|  * Output kind: PROGRAM
+  E| exception: org.jetbrains.kotlin.backend.common.CompilationException: Back-end: Please report this problem https://kotl.in/issue
+  E| kotlin-native/Interop/Runtime/src/main/kotlin/kotlinx/cinterop/Types.kt:-1:-1
+  RESULT: compile without .extracted exit=2
+--- A3.2 restore .extracted (manager-independent curation artifact) ---
+  .extracted bytes=103
+ARGV[withext] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\withext C:\kn168\src\main.kt
+EXIT[withext]=0
+  downloads_in_output=0
+  RESULT: compile with restored .extracted exit=0
+--- A3.3 curated baseline digest ---
+D0 digest=63d96ff7c488e713dedbf7029237cfc6cd030ae4c1caf11c8ba2274395badae3 files=27867
+--- A3.4 make the bundle read-only to the running account ---
+  | Успешно обработано 41822 файлов; не удалось обработать 0 файлов
+  icacls elapsed_s=43
+  EXEC-PROBE java -version exit=0
+  WRITE-PROBE: denied (UnauthorizedAccessException)
+  DELETE-PROBE: SUCCEEDED (NOT read-only)
+  .extracted still present=False
+--- A3.5 S2: compile against the READ-ONLY bundle data dir ---
+ARGV[s2] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\s2 C:\kn168\src\main.kt
+EXIT[s2]=2
+  downloads_in_output=0
+  E| error: compilation failed: Back-end: Please report this problem https://kotl.in/issue
+  E| kotlin-native/Interop/Runtime/src/main/kotlin/kotlinx/cinterop/Types.kt:-1:-1
+  E| Details: Internal error in file lowering: java.io.IOException: Отказано в доступе
+  E|  * Compiler version: 2.4.10
+  E|  * Output kind: PROGRAM
+  E| exception: org.jetbrains.kotlin.backend.common.CompilationException: Back-end: Please report this problem https://kotl.in/issue
+  E| kotlin-native/Interop/Runtime/src/main/kotlin/kotlinx/cinterop/Types.kt:-1:-1
+  E| Details: Internal error in file lowering: java.io.IOException: Отказано в доступе
+--- A3.6 S3: operation-private overlay ---
+  overlay mechanism=junction
+  ov cache | Directory | 
+  ov libffi-3.3-windows-x64-1 | Directory, ReparsePoint | C:\kn168\b\konan-data\dependencies\libffi-3.3-windows-x64-1
+  ov lldb-2-windows | Directory, ReparsePoint | C:\kn168\b\konan-data\dependencies\lldb-2-windows
+  ov llvm-21-x86_64-windows-essentials-150 | Directory, ReparsePoint | C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150
+  ov msys2-mingw-w64-x86_64-2 | Directory, ReparsePoint | C:\kn168\b\konan-data\dependencies\msys2-mingw-w64-x86_64-2
+ARGV[s3] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\s3 C:\kn168\src\main.kt
+EXIT[s3]=2
+  downloads_in_output=1
+  O| Downloading native dependencies (LLVM, sysroot etc). This is a one-time action performed only on the first run of the compiler.
+  E| error: compilation failed: Back-end: Please report this problem https://kotl.in/issue
+  E| kotlin-native/Interop/Runtime/src/main/kotlin/kotlinx/cinterop/Types.kt:-1:-1
+  E| Details: Internal error in file lowering: java.io.FileNotFoundException: Cannot find a dependency locally: lldb-2-windows.
+  E| Set `airplaneMode = false` in konan.properties to download it.
+  E|  * Compiler version: 2.4.10
+  E|  * Output kind: PROGRAM
+  E| exception: org.jetbrains.kotlin.backend.common.CompilationException: Back-end: Please report this problem https://kotl.in/issue
+  E| kotlin-native/Interop/Runtime/src/main/kotlin/kotlinx/cinterop/Types.kt:-1:-1
+  out withext.exe 570368
+  -- overlay writes (non-junction) --
+    ov \dependencies <DIR>
+    ov \dependencies\cache <DIR>
+    ov \dependencies\.extracted 0
+    ov \dependencies\cache\.lock 0
+  -- staging writes --
+    stg \hsperfdata_admin <DIR>
+--- A3.7 bundle byte-identity ---
+D2 digest=d5b928c38c97794fbbd8ec002b0af51ef6dcbd5ec2643e2be20b28c549ca7726 files=27866
+BUNDLE_UNCHANGED=False
+=== SUITE A3 done rcNoExt=2 rcS2=2 rcS3=2 ===

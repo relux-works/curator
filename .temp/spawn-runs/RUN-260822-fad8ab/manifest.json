@@ -1,0 +1,47 @@
+{
+  "id": "RUN-260822-fad8ab",
+  "task_id": "TASK-260822-b0wg3a",
+  "created_at": "2026-08-22T21:49:13.831236Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "opus",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "opus"
+    },
+    "resolved": {
+      "model": "opus"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260823-01-49-13_-reviewer--reviewer--claude-_TASK-260822-b0wg3a.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "35m0s",
+  "log_resource_name": "TASK-260822-b0wg3a_spawn-log_-reviewer--reviewer--claude-_RUN-260822-fad8ab.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260822-b0wg3a_final.patch",
+    "TASK-260822-b0wg3a_full-suite-final.log",
+    "TASK-260822-b0wg3a_results.md",
+    "TASK-260822-b0wg3a_spawn-log_-implementer--developer--claude-_RUN-260822-46ddd9.log",
+    "TASK-260822-b0wg3a_spawn-log_-implementer--developer--claude-_RUN-260822-e5785a.log"
+  ]
+}

@@ -1,0 +1,77 @@
+=== REVIEWER RUN-260823-ee0acd independent verification ==========================
+date: 2026-08-23
+source: main @ 2671743 (merge of PR 31 / 695c041)
+candidate: curator-spec edd07210d4f3db34fd60238cb14b90f837de03cb (conformance/v1)
+
+--- manifest digest recomputed by the reviewer ---
+803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403  .temp/TASK-260823-czs1cx/candidate-root/conformance/v1/manifest.json
+expected 803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403
+
+--- macOS focused run vs candidate ---
+--- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector (0.73s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/telemetry-off (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/version (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/env (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/list (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/build (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/fixed_environment (0.72s)
+--- PASS: TestToolchainIdentityVectors (0.25s)
+    --- PASS: TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/crlf-version-normalizes-to-lf-identity (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-mode-and-timestamp-are-non-inputs (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-version-missing-terminal-lf (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-version-multiple-terminal-newlines (0.00s)
+    --- SKIP: TestToolchainIdentityVectors/invalid-unicode-toolchain-path (0.00s)
+    --- PASS: TestToolchainIdentityVectors/duplicate-toolchain-path (0.00s)
+    --- PASS: TestToolchainIdentityVectors/escaping-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/absolute-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/dangling-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/selected-go-outside-goroot (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-tree-mutation-during-use (0.24s)
+--- PASS: TestFingerprintImplementationMatchesRC4ToolchainVector (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	1.248s
+
+--- NATIVE WINDOWS focused run vs candidate ---
+
+--- NATIVE WINDOWS: normalizer neutralized, then restored ---
+=== NEUTRALIZE protocolLinkTarget ON WINDOWS ONLY ===
+PATCH_APPLIED=YES
+=== RUN   TestToolchainIdentityVectors
+=== RUN   TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link
+    builddriver_positive_conformance_test.go:271: materialized link target = "..\\bin\\go", <nil>; want protocol target "../bin/go"
+--- FAIL: TestToolchainIdentityVectors (0.00s)
+    --- FAIL: TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link (0.00s)
+=== RUN   TestFingerprintImplementationMatchesRC4ToolchainVector
+    fingerprint_test.go:172: digest = sha256:e9b9a60bd7791f87867056b0f66f78674febc34cf023c2575beacaf2d26ac4bb
+--- FAIL: TestFingerprintImplementationMatchesRC4ToolchainVector (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	0.788s
+FAIL
+NEUTRALIZED_EXIT=1
+=== RESTORE ===
+ok  	github.com/relux-works/curator/internal/godriver	0.792s
+RESTORED_EXIT=0
+
+--- NATIVE WINDOWS: full internal/godriver package vs candidate ---
+=== FULL internal/godriver vs candidate edd0721 ===
+ok  	github.com/relux-works/curator/internal/godriver	123.016s
+FULL_GODRIVER_EXIT=0
+
+--- GOOS=windows go vet ./... ---
+exit=0 (no output)
+
+--- darwin golangci-lint v2.12.2 ---
+0 issues.
+
+--- GOOS=windows golangci-lint v2.12.2 (not a CI gate; lint lane is ubuntu-only) ---
+../worktree/internal/managerlock/identity_windows.go:96:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+../worktree/internal/managerlock/identity_windows_test.go:269:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+../worktree/internal/transaction/durability_windows.go:49:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+internal/buildcache/protection_windows.go:509:18: Error return value of `root.Close` is not checked (errcheck)
+internal/buildrepo/protection_windows.go:331:18: Error return value of `file.Close` is not checked (errcheck)
+../worktree/internal/managerlock/identity_windows.go:102:11: G103: Use of unsafe calls should be audited (gosec)
+internal/buildcache/protection_windows.go:298:25: G103: Use of unsafe calls should be audited (gosec)
+internal/buildrepo/protection_windows.go:333:40: G115: integer overflow conversion int64 -> uint64 (gosec)
+internal/godriver/controls_windows.go:62:11: G103: Use of unsafe calls should be audited (gosec)
+internal/buildrepo/protection_windows.go:321:43: redefines-builtin-id: redefinition of the built-in function max (revive)

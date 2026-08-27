@@ -1,0 +1,2396 @@
+Only in .temp/TASK-260720-1nlmvv/worktree/.temp: TASK-260720-1nlmvv
+Only in .temp/TASK-260729-2kaopg/worktree/.temp: TASK-260729-2kaopg
+Only in .temp/TASK-260720-1nlmvv/worktree/.temp: cycle6
+Only in .temp/TASK-260720-1nlmvv/worktree/.temp: gates
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/README.md .temp/TASK-260729-2kaopg/worktree/README.md
+139c139
+< | `build-state-changed` | the install marker or the protected cache evidence moved while status was classifying it |
+---
+> | `build-state-changed` | installed compiled state moved while status was classifying it |
+160,167d159
+< A compiled verdict is bracketed on both sides. `status` fingerprints the
+< install markers before it plans and re-reads them afterwards, and it re-takes
+< the exact protected-cache lookup every row was classified from once
+< classification is done. Either half moving — a marker rewritten by a concurrent
+< install, or an entry removed, corrupted, replaced, or stripped of its provable
+< protection — reports `build-state-changed` instead of publishing a verdict that
+< was already stale.
+< 
+170,174c162
+< path, and the read-only cache outcome. A command the trusted toolchain refused
+< before any logical identity existed still reports everything that was already
+< established — driver, build root, source directory, and the validated
+< build-source digest — and reports no target, key, or cache outcome, because
+< none was derived. Every path in a diagnostic is
+---
+> path, and the read-only cache outcome. Every path in a diagnostic is
+194,226d181
+< The cache is not a transaction target — a launcher can only point at an entry
+< that is already live — so a replacement is selected before the installation
+< that needs it is durable. A run that then fails puts the cache back before it
+< releases the manager-home lock: the replacement is withdrawn and the entry it
+< displaced is restored, both by renaming inside the protected cache root, so
+< nothing is deleted and the ordinary sweep collects the leftovers.
+< 
+< Selecting a replacement is itself several moves — quarantine the unusable
+< predecessor, rename the new entry into the freed slot, validate it, sync the
+< cache root — and a publication that fails part way through puts back what it
+< already moved before it reports. Each of those moves holds to the same rule on
+< its own: quarantining an entry is a rename plus the sync that makes it durable,
+< and a sync that fails returns the entry to the live slot rather than reporting a
+< failure with the slot already empty. That return is synced too, because it is a
+< move like any other; only if its own sync also fails does the run report the
+< cache as changed, with the entry still live and readable. So a failed
+< publication leaves the cache exactly as it found it, and the reversal above is
+< only ever needed for a publication that fully succeeded.
+< 
+< That reversal is refused in exactly one direction — when an incomplete
+< transaction still references the published entry, or when a journaled target is
+< no longer at the state the run found it. Restoring an unusable predecessor over
+< an entry a recovered commit is about to point at would turn a reported failure
+< into a broken installation, so the rebuilt entry is kept instead.
+< 
+< A restoration that cannot complete is reported rather than assumed. Whenever a
+< run leaves the live cache changed — a kept entry, a publication that could not
+< undo its own moves, or a reversal that stopped part way — it says so per command
+< instead of repeating the ordinary "the live build cache is unchanged" claim, and
+< the warning names which of the three it was. The installation and its consumers
+< are unchanged either way; nothing on these paths is ever deleted, so the state
+< left behind is always one a later `install` or `upgrade` repairs.
+< 
+232,237d186
+< Compiled diagnostics are a project-scope surface. `curator global status`
+< reports declared-skill currentness only: it reads install markers directly, has
+< no `--json` or `--check`, and does not plan, so it reports no compiled-command
+< state even when the global scope activates one. Use `curator status` for
+< compiled currentness.
+< 
+243a193,222
+> 
+> `curator global status` reports the same thing for the machine-wide scope, in
+> the same stable vocabulary: one code per declared skill and one diagnostic line
+> per active compiled command. It accepts `--check` and `--json`, and both mean
+> exactly what they mean for `curator status` — `--json` carries the same values
+> in a `builds` array, and `--check` exits non-zero for every code that is not
+> `up-to-date` or `current`.
+> 
+> Deriving compiled currentness needs the current logical build input, which only
+> a plan produces, so `global status` runs the same read-only plan
+> `curator global install --dry-run` runs. That resolves the machine-wide closure
+> and passes the read-only audit and registry gates. It runs no compiler and
+> writes no installation target, cache entry, or trust state.
+> 
+> Two things differ from the project scope, both deliberate:
+> 
+> - The machine-readable document carries `alias`, `skills`, and — only when the
+>   closure activates compiled commands — `builds`. It carries no `path`: the
+>   scope has no operator-supplied root, and the manager home is never published.
+> - Plain `global status` keeps its historical contract of always reporting and
+>   always exiting zero. The declared-skill report is read straight from install
+>   markers and never from the plan, so a scope without compiled commands prints
+>   the lines it always printed even when the plan refuses; the refusal is a
+>   `warning:` on standard error. `--check` is the only surface that turns a
+>   verdict into a non-zero exit, and it fails closed twice over: once for every
+>   non-current code, and once when the plan refused before it could describe
+>   every compiled command, because such a run cannot prove the scope is current.
+> 
+> A machine-wide scope with no `Skillfile.json` declares and activates nothing:
+> it prints nothing and passes `--check`.
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/cmd/curator/builds.go .temp/TASK-260729-2kaopg/worktree/cmd/curator/builds.go
+13d12
+< 	"github.com/relux-works/curator/internal/buildcache"
+164,167d162
+< 	// Expectation is the read-only lookup the planner's cache verdict was taken
+< 	// with, so the same lookup can be re-taken once classification is done. It
+< 	// is empty for a command whose logical identity was never derived.
+< 	Expectation buildcache.Expectation
+188d182
+< 		Expectation: build.Expectation(),
+192,263d185
+< // cacheEvidence is exactly the protected-cache observation a compiled verdict
+< // is derived from: the reusable outcome, and — only for a hit, because nothing
+< // else exposes one — the receipt identity and artifact metadata the row
+< // compares with the install marker.
+< //
+< // Keeping it a value makes the currentness check bracketable. The planner takes
+< // it once, the classification runs against that copy, and the same lookup is
+< // taken again afterwards; a difference means the verdict describes state that
+< // no longer exists.
+< type cacheEvidence struct {
+< 	Outcome     string
+< 	ReceiptHash buildmeta.ReceiptHash
+< 	Artifact    buildmeta.Artifact
+< }
+< 
+< // plannedEvidence is the evidence the read-only plan recorded for one command.
+< func plannedEvidence(facts buildFacts) cacheEvidence {
+< 	evidence := cacheEvidence{Outcome: facts.Outcome}
+< 	if install.BuildOutcome(facts.Outcome) == install.BuildCacheHit {
+< 		evidence.ReceiptHash = facts.ReceiptHash
+< 		evidence.Artifact = facts.Artifact
+< 	}
+< 	return evidence
+< }
+< 
+< // observedEvidence projects a live read-only inspection the same way, so the
+< // two are comparable without either side interpreting the other.
+< func observedEvidence(result buildcache.Result) cacheEvidence {
+< 	evidence := cacheEvidence{Outcome: result.DryRunOutcome()}
+< 	if result.Status == buildcache.Hit {
+< 		evidence.ReceiptHash = result.ReceiptHash
+< 		evidence.Artifact = result.Receipt.Artifact
+< 	}
+< 	return evidence
+< }
+< 
+< // recheckBuildCache re-takes every read-only cache lookup a compiled verdict
+< // was derived from and names the commands whose protected evidence moved.
+< //
+< // Install markers are fingerprinted around the same window, but a marker is
+< // only half the evidence: an entry that is removed, replaced, corrupted, or
+< // loses its protected provenance changes a compiled verdict without touching a
+< // single marker byte. Planning inspects the cache while no lock is held, so
+< // without this second look a status run could publish a stale `current` — or a
+< // stale drift code — for state that had already moved.
+< //
+< // It is strictly read-only and never repairs, quarantines, or adopts anything.
+< // A cache boundary that cannot be opened at all makes every compiled verdict
+< // unverifiable, which fails closed as changed rather than silently current.
+< func recheckBuildCache(home string, builds []buildFacts) map[string]bool {
+< 	moved := map[string]bool{}
+< 	store, err := buildcache.New(home)
+< 	if err != nil {
+< 		for _, facts := range builds {
+< 			moved[facts.Skill+"."+facts.Command] = true
+< 		}
+< 		return moved
+< 	}
+< 	for _, facts := range builds {
+< 		// A command whose logical identity was never derived — the toolchain
+< 		// boundary refused before any key existed — has no cache verdict to
+< 		// recheck, and inventing a lookup for it would report a phantom change.
+< 		if facts.Expectation.Input.Driver == "" {
+< 			continue
+< 		}
+< 		if observedEvidence(store.Inspect(facts.Expectation)) != plannedEvidence(facts) {
+< 			moved[facts.Skill+"."+facts.Command] = true
+< 		}
+< 	}
+< 	return moved
+< }
+< 
+688c610
+< 	for _, notice := range repairNotices(result.Alias, factsList(result.Builds), result.Status, result.BuildCacheRetained) {
+---
+> 	for _, notice := range repairNotices(result.Alias, factsList(result.Builds), result.Status) {
+716,723c638
+< // repairNotices renders the per-command repair outcome of one run.
+< //
+< // retained is the case where a failed run did not leave the live cache as it
+< // found it. The notice says exactly that, and refers the operator to the
+< // warning that names which of the possible causes it was, rather than repeating
+< // the ordinary "unchanged" claim, which would be false — or naming one cause,
+< // which would be a guess.
+< func repairNotices(alias string, builds []buildFacts, status string, retained bool) []string {
+---
+> func repairNotices(alias string, builds []buildFacts, status string) []string {
+732,735d646
+< 		case repaired != "" && retained:
+< 			notice = fmt.Sprintf("did not finish repairing %s build cache state; "+
+< 				"the previous installation and its consumers are unchanged, but the live build cache was "+
+< 				"left changed; see the warning above for why", repaired)
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/cmd/curator/builds_test.go .temp/TASK-260729-2kaopg/worktree/cmd/curator/builds_test.go
+695,700c695,699
+< 		facts    buildFacts
+< 		status   string
+< 		retained bool
+< 		want     string
+< 		absent   string
+< 		noNotic  bool
+---
+> 		facts   buildFacts
+> 		status  string
+> 		want    string
+> 		absent  string
+> 		noNotic bool
+718,724d716
+< 		// A failed run that could not withdraw what it rebuilt must never repeat
+< 		// the ordinary "the live build cache is unchanged" claim.
+< 		"a rebuilt entry could not be withdrawn": {
+< 			facts: testFacts(string(install.BuildCorrupt)), status: "failed", retained: true,
+< 			want:   "did not finish repairing corrupt build cache state",
+< 			absent: "the live build cache are unchanged",
+< 		},
+735c727
+< 			notices := repairNotices("app", []buildFacts{testCase.facts}, testCase.status, testCase.retained)
+---
+> 			notices := repairNotices("app", []buildFacts{testCase.facts}, testCase.status)
+744c736
+< 	if notices := repairNotices("app", []buildFacts{hit}, "ok", false); len(notices) != 0 {
+---
+> 	if notices := repairNotices("app", []buildFacts{hit}, "ok"); len(notices) != 0 {
+788,789c780,782
+< 	settled := markerDigests(statusStores(cfg, project)...)
+< 	_, rows := statusReport(cfg, project, facts, settled)
+---
+> 	scope := projectStatusScope(cfg, project, "app")
+> 	settled := markerDigests(scope.stores...)
+> 	_, rows := statusReport(cfg, scope, facts, settled)
+797c790
+< 	drift, rows := statusReport(cfg, project, facts, settled)
+---
+> 	drift, rows := statusReport(cfg, scope, facts, settled)
+815c808
+< 	drift, rows := statusReport(cfg, project, facts, map[string]string{})
+---
+> 	drift, rows := statusReport(cfg, projectStatusScope(cfg, project, "app"), facts, map[string]string{})
+Only in .temp/TASK-260729-2kaopg/worktree/cmd/curator: global_status_test.go
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/cmd/curator/main.go .temp/TASK-260729-2kaopg/worktree/cmd/curator/main.go
+64c64
+<   global <subcommand>      init | add | remove | list | status | install | update | upgrade
+---
+>   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+633,634c633,634
+< 		stores := statusStores(cfg, target.Root)
+< 		before := markerDigests(stores...)
+---
+> 		scope := projectStatusScope(cfg, target.Root, target.Alias)
+> 		before := markerDigests(scope.stores...)
+661c661
+< 		drift, builds := statusReport(cfg, target.Root, factsList(result.Builds), before)
+---
+> 		drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
+697,702c697,722
+< // statusStores lists the installed-skill stores one project status reads: the
+< // project context store and the machine-level hybrid store.
+< func statusStores(cfg *config.Config, projectRoot string) []string {
+< 	return []string{
+< 		filepath.Join(projectRoot, ".agents", "skills"),
+< 		scopes.HybridSkillsRoot(cfg.Home()),
+---
+> // statusScope is one installed scope seen by the read-only currentness surface:
+> // the declaration document it compares against, the store its own skills are
+> // installed into, and every store a command it activates may live in.
+> //
+> // It exists so the project scope and the machine-wide scope share one
+> // classification, one stable vocabulary, and one fail-closed verdict rather than
+> // growing a second, weaker one.
+> type statusScope struct {
+> 	alias        string
+> 	manifestRoot string
+> 	skillsDir    string
+> 	// stores is fingerprinted for the classification race window and searched
+> 	// for the installed directory of a compiled command's skill.
+> 	stores []string
+> }
+> 
+> // projectStatusScope is one project. It also reads the machine-level hybrid
+> // store, because a hybrid declaration activates against a project and its
+> // installed node is reachable from here.
+> func projectStatusScope(cfg *config.Config, projectRoot, alias string) statusScope {
+> 	skillsDir := filepath.Join(projectRoot, ".agents", "skills")
+> 	return statusScope{
+> 		alias:        alias,
+> 		manifestRoot: projectRoot,
+> 		skillsDir:    skillsDir,
+> 		stores:       []string{skillsDir, scopes.HybridSkillsRoot(cfg.Home())},
+705a726,739
+> // globalStatusScope is the machine-wide scope. It consults no hybrid store:
+> // hybrid declarations activate against a project, never against the global
+> // scope, and every node the global closure resolves — declared or transitively
+> // reached — is installed into the global store itself.
+> func globalStatusScope(cfg *config.Config) statusScope {
+> 	root := install.GlobalRoot(cfg.Home())
+> 	return statusScope{
+> 		alias:        "global",
+> 		manifestRoot: root,
+> 		skillsDir:    filepath.Join(root, "skills"),
+> 		stores:       []string{filepath.Join(root, "skills")},
+> 	}
+> }
+> 
+711,713c745,747
+< // statusReport is the complete read-only currentness verdict of one project:
+< // the historical per-skill drift map plus one diagnostic row per compiled
+< // command the closure activates.
+---
+> // statusReport is the complete read-only currentness verdict of one scope: the
+> // historical per-skill drift map plus one diagnostic row per compiled command
+> // the closure activates.
+720c754
+< 	projectRoot string,
+---
+> 	scope statusScope,
+724,725c758
+< 	skillsDir := filepath.Join(projectRoot, ".agents", "skills")
+< 	drift := scopeStatusDrift(cfg, projectRoot, skillsDir)
+---
+> 	drift := scopeStatusDrift(cfg, scope.manifestRoot, scope.skillsDir)
+750c783
+< 		installed, present := installedSkillDir(cfg, projectRoot, skill)
+---
+> 		installed, present := installedSkillDir(scope, skill)
+762,769c795,798
+< 	// The second look closes the whole window: planning and every classification
+< 	// above have run, so compiled state that differs from the state this verdict
+< 	// was derived from makes the verdict stale, not authoritative. Both halves of
+< 	// that state are re-read — the install markers this run fingerprinted, and
+< 	// the protected cache evidence every compiled row was classified from —
+< 	// because either one can move on its own.
+< 	after := markerDigests(statusStores(cfg, projectRoot)...)
+< 	movedCache := recheckBuildCache(cfg.Home(), builds)
+---
+> 	// The second fingerprint closes the whole window: planning and every
+> 	// classification above have run, so a marker that differs from the one this
+> 	// verdict was derived from makes the verdict stale, not authoritative.
+> 	after := markerDigests(scope.stores...)
+772c801
+< 		if changed := changedDuringCheck(item.facts, before, after, item.installed, movedCache); changed != "" {
+---
+> 		if markerMoved(before, after, item.installed) {
+774c803,804
+< 			item.rows = plannedRows(item.facts, buildStateChanged, "", changed)
+---
+> 			item.rows = plannedRows(item.facts, buildStateChanged, "",
+> 				"installed compiled state changed while status was classifying it; re-run status")
+782,800d811
+< // changedDuringCheck reports why one skill's compiled verdict is not
+< // authoritative, or an empty string when nothing it was derived from moved.
+< func changedDuringCheck(
+< 	facts []buildFacts,
+< 	before, after map[string]string,
+< 	installedDir string,
+< 	movedCache map[string]bool,
+< ) string {
+< 	if markerMoved(before, after, installedDir) {
+< 		return "the install marker changed while status was classifying it; re-run status"
+< 	}
+< 	for _, item := range facts {
+< 		if movedCache[item.Skill+"."+item.Command] {
+< 			return "protected build cache state changed while status was classifying it; re-run status"
+< 		}
+< 	}
+< 	return ""
+< }
+< 
+813,816c824,827
+< // project context store, or the machine-level hybrid store for a node no
+< // project declaration reaches.
+< func installedSkillDir(cfg *config.Config, projectRoot, skill string) (string, bool) {
+< 	for _, store := range statusStores(cfg, projectRoot) {
+---
+> // scope's own context store, or another store the scope reads for a node no
+> // declaration in it reaches.
+> func installedSkillDir(scope statusScope, skill string) (string, bool) {
+> 	for _, store := range scope.stores {
+822c833
+< 	return filepath.Join(projectRoot, ".agents", "skills", skill), false
+---
+> 	return filepath.Join(scope.skillsDir, skill), false
+1080c1091,1157
+< 		drift := scopeStatusDrift(cfg, install.GlobalRoot(cfg.Home()), filepath.Join(install.GlobalRoot(cfg.Home()), "skills"))
+---
+> 		return cmdGlobalStatus(cfg, args[1:])
+> 	case "update":
+> 		return cmdUpdate()
+> 	case "upgrade":
+> 		return runGlobalInstallMode(cfg, args[1:], true)
+> 	}
+> 	fmt.Fprintf(os.Stderr, "curator: unknown global subcommand %q\n", args[0])
+> 	return exitUsage
+> }
+> 
+> // cmdGlobalStatus is the read-only currentness surface of the machine-wide
+> // scope. It carries the same contract as `curator status`: the same stable
+> // codes, the same optional machine-readable document, and the same fail-closed
+> // `--check`.
+> //
+> // Compiled currentness cannot be read off an install marker alone — the logical
+> // key is a digest over the whole build input, and only a plan derives the
+> // current one — so this command runs the same read-only global plan
+> // `curator global install --dry-run` runs. That resolves the closure and passes
+> // the read-only audit and registry gates; it runs no compiler and writes no
+> // installation target, cache entry, or trust state.
+> //
+> // The pre-existing surface is preserved exactly. The declared-skill report is
+> // still derived straight from install markers, never from the plan, so a global
+> // scope without compiled commands prints the lines it always printed and still
+> // exits zero — including when the plan itself refused. Reporting and verdict
+> // stay separate here too: `--check` is the only surface that turns a
+> // non-current, or an unprovable, verdict into a non-zero exit.
+> func cmdGlobalStatus(cfg *config.Config, args []string) int {
+> 	flags := flag.NewFlagSet("global status", flag.ContinueOnError)
+> 	check := flags.Bool("check", false, "exit non-zero unless every skill and compiled command is current")
+> 	jsonOut := flags.Bool("json", false, "machine-readable output")
+> 	positional, err := parseInterspersed(flags, args)
+> 	if err != nil {
+> 		return exitUsage
+> 	}
+> 	if len(positional) > 0 {
+> 		fmt.Fprintln(os.Stderr, "curator: global status accepts flags only")
+> 		return exitUsage
+> 	}
+> 
+> 	scope := globalStatusScope(cfg)
+> 	// Installed markers are fingerprinted before the read-only plan and again
+> 	// after classification, so compiled state that moved during the whole window
+> 	// is reported as such instead of published as an authoritative verdict.
+> 	before := markerDigests(scope.stores...)
+> 	result, unprovable := globalStatusPlan(cfg)
+> 	if result.Status == "failed" {
+> 		// The declared-skill report was still produced, so the refusal is a
+> 		// warning on standard error rather than an error, exactly as it is for a
+> 		// project status that still published every compiled row.
+> 		printStatusRefusal(result)
+> 	}
+> 
+> 	drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
+> 	if *jsonOut {
+> 		// The machine-wide document carries no `path`: the scope has no
+> 		// operator-supplied root, `alias` already identifies it, and the manager
+> 		// home is never published. A scope without compiled commands produces the
+> 		// declared-skill document with no `builds` key at all.
+> 		payload := map[string]any{"alias": scope.alias, "skills": drift}
+> 		if len(builds) > 0 {
+> 			payload["builds"] = builds
+> 		}
+> 		document, _ := json.MarshalIndent(payload, "", "  ")
+> 		fmt.Println(string(document))
+> 	} else {
+1087c1164
+< 			fmt.Printf("global: %s %s\n", name, drift[name])
+---
+> 			fmt.Printf("%s: %s %s\n", scope.alias, name, drift[name])
+1089,1093c1166,1168
+< 		return exitOK
+< 	case "update":
+< 		return cmdUpdate()
+< 	case "upgrade":
+< 		return runGlobalInstallMode(cfg, args[1:], true)
+---
+> 		for _, build := range builds {
+> 			fmt.Printf("%s: %s\n", scope.alias, build.Describe())
+> 		}
+1095,1096c1170,1193
+< 	fmt.Fprintf(os.Stderr, "curator: unknown global subcommand %q\n", args[0])
+< 	return exitUsage
+---
+> 	if *check && (unprovable || checkFailed(drift, builds)) {
+> 		return exitFail
+> 	}
+> 	return exitOK
+> }
+> 
+> // globalStatusPlan runs the read-only machine-wide plan and reports whether
+> // compiled state stayed unprovable.
+> //
+> // Unprovable means the plan refused before it could describe every compiled
+> // command the closure activates, so this run cannot even tell whether the scope
+> // has compiled state. It never suppresses the declared-skill report; it is the
+> // fail-closed input of `--check`. A scope with no machine-wide Skillfile is not
+> // unprovable: it declares nothing and activates nothing.
+> func globalStatusPlan(cfg *config.Config) (install.Result, bool) {
+> 	userHome, err := os.UserHomeDir()
+> 	if err != nil {
+> 		result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home()), Status: "failed"}
+> 		result.Errors = append(result.Errors, fmt.Sprintf(
+> 			"could not resolve the user home the machine-wide scope mirrors into: %v", err))
+> 		return result, true
+> 	}
+> 	result := install.Global(cfg, userHome, install.Options{DryRun: true})
+> 	return result, result.Status == "failed" && !result.BuildsComplete
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/cmd/curator/status_test.go .temp/TASK-260729-2kaopg/worktree/cmd/curator/status_test.go
+7d6
+< 	"fmt"
+11d9
+< 	"sort"
+16d13
+< 	"github.com/relux-works/curator/internal/adapters"
+18d14
+< 	"github.com/relux-works/curator/internal/buildmeta"
+21d16
+< 	"github.com/relux-works/curator/internal/install"
+24d18
+< 	"github.com/relux-works/curator/internal/scopes"
+663,953d656
+< // TestInstallAndUpgradeRestoreTheCacheWhenTheCommitFails is the other half of
+< // the repair contract, driven end to end through the real commands.
+< //
+< // The refusal case above fails a gate *before* the repair. This one lets the
+< // repair happen — the corrupt entry is really quarantined and a rebuilt entry
+< // really goes live — and then fails the durable commit that needed it. A run
+< // that committed nothing must also have displaced nothing, or the previous
+< // installation would silently change what `status` says about it: from
+< // `corrupt-build-cache`, which install repairs, to receipt or artifact drift
+< // against an entry nobody asked for.
+< //
+< // The commit is failed by taking away write access to the context store the
+< // first target class swaps in, which is the last moment a real installation can
+< // still fail without leaving a durable transaction behind.
+< func TestInstallAndUpgradeRestoreTheCacheWhenTheCommitFails(t *testing.T) {
+< 	for _, command := range []string{"install", "upgrade"} {
+< 		t.Run(command, func(t *testing.T) {
+< 			project, home := compiledProject(t)
+< 			if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+< 				t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+< 			}
+< 			installed := filepath.Join(project, ".agents", "skills", "build-skill")
+< 			before := marker.Read(installed)
+< 			if before == nil || len(before.Builds) != 1 {
+< 				t.Fatalf("first install did not record compiled state: %+v", before)
+< 			}
+< 
+< 			corruptCacheArtifact(t, home)
+< 			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+< 				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+< 				t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
+< 			}
+< 			corruptArtifact := liveArtifactBytes(t, home)
+< 			installedBefore := installedFingerprint(t, project, home)
+< 
+< 			store := filepath.Join(project, ".agents", "skills")
+< 			denyWrites(t, store)
+< 			code, stdout, stderr := capture(t, command, "app")
+< 			restoreWrites(t, store)
+< 			if code != exitFail {
+< 				t.Fatalf("%s over an unwritable context store = %d, want %d\nstdout:\n%s\nstderr:\n%s",
+< 					command, code, exitFail, stdout, stderr)
+< 			}
+< 
+< 			// The case only proves anything if the repair really did publish before
+< 			// the commit failed. Publication quarantines the corrupt entry and the
+< 			// reversal withdraws the replacement the same way, so exactly one
+< 			// withdrawn entry is left behind for the ordinary sweep.
+< 			if withdrawn := quarantinedEntries(t, home); withdrawn != 1 {
+< 				t.Fatalf("withdrawn cache entries = %d, want exactly the one this run published", withdrawn)
+< 			}
+< 			// Nothing half-built survives in the shared cache root either: a
+< 			// publication that failed or was reversed leaves no private staging
+< 			// directory behind for the next run to trip over.
+< 			if staged := stagedEntries(t, home); staged != 0 {
+< 				t.Fatalf("private staging directories left in the shared cache root = %d, want 0", staged)
+< 			}
+< 
+< 			// Exact restoration: the entry the run displaced is live again, with
+< 			// the bytes it had, and the installation is untouched.
+< 			if got := liveArtifactBytes(t, home); got != corruptArtifact {
+< 				t.Fatal("a failed commit did not restore the build cache entry it replaced")
+< 			}
+< 			if len(cacheEntries(t, home)) != 1 {
+< 				t.Fatalf("a failed commit left %d live protected entries, want 1", len(cacheEntries(t, home)))
+< 			}
+< 			if failed := marker.Read(installed); failed == nil ||
+< 				failed.Builds["build-tool"] != before.Builds["build-tool"] {
+< 				t.Fatalf("a failed commit changed the previous compiled state: %+v", failed)
+< 			}
+< 			// The marker is only one class of what an installation commits. The
+< 			// launcher bytes the previous install placed, its adapter mirrors, the
+< 			// machine runtime, and the consumer ledger all have to be at the exact
+< 			// value the run found them at.
+< 			if got := installedFingerprint(t, project, home); got != installedBefore {
+< 				t.Fatalf("a failed commit changed installed state\nbefore:\n%s\nafter:\n%s",
+< 					installedBefore, got)
+< 			}
+< 			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+< 				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+< 				t.Fatalf("the previous installation no longer reports the state it had:\n%s", stdout)
+< 			}
+< 
+< 			// The ordinary reconciliation path still repairs it afterwards.
+< 			if code, stdout, stderr := capture(t, command, "app"); code != exitOK {
+< 				t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
+< 			}
+< 			if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
+< 				t.Fatalf("status --check after the repair = %d, want %d", code, exitOK)
+< 			}
+< 		})
+< 	}
+< }
+< 
+< // installedFingerprint digests every class of state one installation commits:
+< // the project tree it owns, the agent adapter mirrors it publishes, and the
+< // machine-level runtime, hybrid store, and consumer ledger. A run that failed
+< // must leave the whole map at its prior value, not just the parts a single
+< // assertion happens to look at.
+< func installedFingerprint(t *testing.T, project, home string) string {
+< 	t.Helper()
+< 	paths := map[string]string{
+< 		"project/agents":         filepath.Join(project, ".agents"),
+< 		"project/adapters":       filepath.Join(project, ".claude", "skills"),
+< 		"project/adapters-codex": filepath.Join(project, filepath.FromSlash(adapters.AgentPaths["codex_cli"])),
+< 		"home/runtime":           filepath.Join(home, "runtime"),
+< 		"home/hybrid":            scopes.HybridSkillsRoot(home),
+< 		"home/consumers":         filepath.Join(home, scopes.ConsumersName),
+< 	}
+< 	records := make([]string, 0, len(paths))
+< 	for name, path := range paths {
+< 		digest := pathDigest(t, path)
+< 		// A fingerprint of nothing would compare equal to a fingerprint of
+< 		// nothing, so the two classes that always exist after an installation are
+< 		// required to be there. The adapter mirrors and the hybrid store depend on
+< 		// what the project declares and may legitimately be absent.
+< 		if digest == "absent" && (name == "project/agents" || name == "home/consumers") {
+< 			t.Fatalf("%s is missing, so this fingerprint would compare equal to anything", name)
+< 		}
+< 		records = append(records, name+"="+digest)
+< 	}
+< 	sort.Strings(records)
+< 	return strings.Join(records, "\n")
+< }
+< 
+< // pathDigest reads one path exactly as it is. A symbolic link is digested by
+< // its destination rather than followed, so a mirror that was replaced,
+< // re-pointed, or removed shows up as a change instead of resolving to the same
+< // canonical bytes.
+< func pathDigest(t *testing.T, path string) string {
+< 	t.Helper()
+< 	info, err := os.Lstat(path)
+< 	if os.IsNotExist(err) {
+< 		return "absent"
+< 	}
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	switch {
+< 	case info.Mode()&os.ModeSymlink != 0:
+< 		target, err := os.Readlink(path)
+< 		if err != nil {
+< 			t.Fatal(err)
+< 		}
+< 		return "link:" + filepath.ToSlash(target)
+< 	case info.IsDir():
+< 		entries, err := os.ReadDir(path)
+< 		if err != nil {
+< 			t.Fatal(err)
+< 		}
+< 		members := make([]string, 0, len(entries))
+< 		for _, entry := range entries {
+< 			members = append(members, entry.Name()+"="+pathDigest(t, filepath.Join(path, entry.Name())))
+< 		}
+< 		sort.Strings(members)
+< 		return "dir[" + strings.Join(members, ",") + "]"
+< 	default:
+< 		payload, err := os.ReadFile(path) // #nosec G304 -- test fixture path
+< 		if err != nil {
+< 			t.Fatal(err)
+< 		}
+< 		sum := sha256.Sum256(payload)
+< 		return fmt.Sprintf("file:%s:%s", info.Mode().Perm(), hex.EncodeToString(sum[:]))
+< 	}
+< }
+< 
+< // liveArtifactBytes reads the single artifact of the single live protected
+< // entry, so a test can prove which bytes a reversal put back.
+< func liveArtifactBytes(t *testing.T, home string) string {
+< 	t.Helper()
+< 	entries := cacheEntries(t, home)
+< 	if len(entries) != 1 {
+< 		t.Fatalf("live protected entries = %d, want exactly 1", len(entries))
+< 	}
+< 	matches, err := filepath.Glob(filepath.Join(entries[0], "bin", "*"))
+< 	if err != nil || len(matches) != 1 {
+< 		t.Fatalf("protected entry %s does not hold exactly one artifact: %v %v", entries[0], matches, err)
+< 	}
+< 	payload, err := os.ReadFile(matches[0]) // #nosec G304 -- test fixture path
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	sum := sha256.Sum256(payload)
+< 	return hex.EncodeToString(sum[:])
+< }
+< 
+< // replaceCacheEntry rewrites the single live protected entry into a different
+< // but equally valid entry for the same logical key: new artifact bytes and the
+< // canonical receipt that exactly describes them.
+< //
+< // It is the one way protected state can move without ever looking broken, so it
+< // is the case a currentness check can only catch by re-reading the cache.
+< func replaceCacheEntry(t *testing.T, home string, input buildmeta.Input) {
+< 	t.Helper()
+< 	entries := cacheEntries(t, home)
+< 	if len(entries) != 1 {
+< 		t.Fatalf("live protected entries = %d, want exactly 1", len(entries))
+< 	}
+< 	entry := entries[0]
+< 	relative, err := buildmeta.ArtifactPath(input.Command, input.Target.GOOS)
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	payload := []byte("a different artifact, described exactly by its own receipt")
+< 	digest := sha256.Sum256(payload)
+< 	receipt, err := buildmeta.NewReceipt(input, buildmeta.Artifact{
+< 		Path: relative, SHA256: "sha256:" + hex.EncodeToString(digest[:]), Size: int64(len(payload)),
+< 	})
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	receiptBytes, err := receipt.CanonicalBytes()
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	artifact := filepath.Join(entry, filepath.FromSlash(relative))
+< 	if err := os.Chmod(artifact, 0o700); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if err := os.WriteFile(artifact, payload, 0o700); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	receiptPath := filepath.Join(entry, buildcache.ReceiptFilename)
+< 	if err := os.Chmod(receiptPath, 0o600); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if err := os.WriteFile(receiptPath, receiptBytes, 0o600); err != nil {
+< 		t.Fatal(err)
+< 	}
+< }
+< 
+< // quarantinedEntries counts the cache entries that were moved aside rather than
+< // deleted, which is how both a replacement and its reversal withdraw one.
+< func quarantinedEntries(t *testing.T, home string) int {
+< 	t.Helper()
+< 	return cacheRootPrefixCount(t, home, ".quarantine-")
+< }
+< 
+< // stagedEntries counts the private staging directories left in the shared cache
+< // root. A publication owns its staging on every path, so this is always zero
+< // once a run has released the manager-home lock.
+< func stagedEntries(t *testing.T, home string) int {
+< 	t.Helper()
+< 	return cacheRootPrefixCount(t, home, ".stage-")
+< }
+< 
+< func cacheRootPrefixCount(t *testing.T, home, prefix string) int {
+< 	t.Helper()
+< 	entries, err := os.ReadDir(filepath.Join(home, "cache", "build", "go-v1"))
+< 	if err != nil {
+< 		t.Fatalf("protected build cache is missing: %v", err)
+< 	}
+< 	count := 0
+< 	for _, entry := range entries {
+< 		if strings.HasPrefix(entry.Name(), prefix) {
+< 			count++
+< 		}
+< 	}
+< 	return count
+< }
+< 
+< // denyWrites makes one directory unwritable and proves it really is, so a case
+< // that depends on a write failing cannot pass vacuously — a privileged process
+< // ignores the mode entirely.
+< func denyWrites(t *testing.T, dir string) {
+< 	t.Helper()
+< 	info, err := os.Stat(dir)
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if err := os.Chmod(dir, 0o500); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	t.Cleanup(func() { _ = os.Chmod(dir, info.Mode().Perm()) })
+< 	probe := filepath.Join(dir, ".curator-write-probe")
+< 	if err := os.WriteFile(probe, []byte("probe"), 0o600); err == nil {
+< 		_ = os.Remove(probe)
+< 		if err := os.Chmod(dir, info.Mode().Perm()); err != nil {
+< 			t.Fatal(err)
+< 		}
+< 		t.Skip("this process can write through a read-only directory, so a commit failure cannot be injected")
+< 	}
+< }
+< 
+< func restoreWrites(t *testing.T, dir string) {
+< 	t.Helper()
+< 	if err := os.Chmod(dir, 0o755); err != nil {
+< 		t.Fatal(err)
+< 	}
+< }
+< 
+1051,1058d753
+< 	// Everything that was already established when the toolchain was consulted
+< 	// is reported. Build sources are validated before the toolchain is touched
+< 	// and the driver is closed by the schema, so a row that omitted them would
+< 	// be hiding identity it had.
+< 	if row.Driver != "go-v1" || row.BuildRoot != "assets/build-tool" ||
+< 		row.SourceDir != "assets/build-tool/cmd/tool" || row.BuildSource.ContentSHA256 == "" {
+< 		t.Fatalf("toolchain row dropped identities the plan already had: %+v", row)
+< 	}
+1072,1090d766
+< 	// The human line and the JSON row carry the same identities, field for field.
+< 	for _, want := range []string{
+< 		"driver=" + row.Driver, "root=" + row.BuildRoot, "dir=" + row.SourceDir,
+< 		"source=" + row.BuildSource.Algorithm + ":" + row.BuildSource.ContentSHA256,
+< 	} {
+< 		if !strings.Contains(human, want) {
+< 			t.Fatalf("human status does not report %q:\n%s", want, human)
+< 		}
+< 	}
+< 	// The cache outcome is the row's own planner verdict and is reported; the
+< 	// identities that depend on the toolchain are not published at all.
+< 	if !strings.Contains(human, "cache="+row.CacheOutcome) {
+< 		t.Fatalf("human status does not report the planner outcome %q:\n%s", row.CacheOutcome, human)
+< 	}
+< 	for _, absent := range []string{"target=", "key=", "artifact="} {
+< 		if strings.Contains(human, absent) {
+< 			t.Fatalf("human status published %q for a command nothing was derived for:\n%s", absent, human)
+< 		}
+< 	}
+1093,1205d768
+< 	}
+< }
+< 
+< // TestStatusReportsProtectedCacheStateThatMovedDuringTheCheck closes the other
+< // half of the classification window.
+< //
+< // Install markers are fingerprinted around the whole run, but a marker is only
+< // half the evidence a compiled verdict is derived from: the protected cache is
+< // inspected once, during a read-only plan that holds no lock, and an entry that
+< // is removed, corrupted, or loses its provable protection afterwards changes
+< // every verdict taken from it without touching a single marker byte.
+< //
+< // The cache really moves here, between the plan and the classification, exactly
+< // as a concurrent install, sweep, or permission change would move it. Nothing
+< // rewrites a marker, so a verdict that stays authoritative could only have come
+< // from evidence nobody re-read.
+< func TestStatusReportsProtectedCacheStateThatMovedDuringTheCheck(t *testing.T) {
+< 	project, home := compiledProject(t)
+< 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+< 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+< 	}
+< 	cfg, code := loadConfig()
+< 	if code != exitOK {
+< 		t.Fatalf("loading the configuration = %d", code)
+< 	}
+< 
+< 	// The same read-only plan `status` takes, and the same marker fingerprint
+< 	// it opens the window with.
+< 	planned := install.Project(cfg, project, "app", install.Options{DryRun: true})
+< 	if planned.Status != "ok" || len(planned.Builds) != 1 {
+< 		t.Fatalf("read-only plan = %+v", planned)
+< 	}
+< 	facts := factsList(planned.Builds)
+< 	before := markerDigests(statusStores(cfg, project)...)
+< 
+< 	drift, rows := statusReport(cfg, project, facts, before)
+< 	if len(rows) != 1 || rows[0].State != buildCurrent {
+< 		t.Fatalf("settled compiled state = %+v", rows)
+< 	}
+< 	if checkFailed(drift, rows) {
+< 		t.Fatal("a settled compiled installation failed --check")
+< 	}
+< 
+< 	for name, move := range map[string]func(t *testing.T, input buildmeta.Input){
+< 		"the protected entry is corrupted": func(t *testing.T, _ buildmeta.Input) {
+< 			corruptCacheArtifact(t, home)
+< 		},
+< 		"the protected entry is removed": func(t *testing.T, _ buildmeta.Input) {
+< 			for _, entry := range cacheEntries(t, home) {
+< 				if err := os.RemoveAll(entry); err != nil {
+< 					t.Fatal(err)
+< 				}
+< 			}
+< 		},
+< 		"the protected boundary stops being provable": func(t *testing.T, _ buildmeta.Input) {
+< 			for _, entry := range cacheEntries(t, home) {
+< 				if err := os.Chmod(entry, 0o777); err != nil {
+< 					t.Fatal(err)
+< 				}
+< 			}
+< 		},
+< 		// The hardest case: the entry is still a valid hit for the same logical
+< 		// key, so nothing about it looks broken — only its receipt identity moved.
+< 		// Without the recheck this publishes a stale *drift* verdict
+< 		// (corrupt-build-receipt against the marker) rather than a stale current
+< 		// one, which is just as wrong and far less obvious.
+< 		"the protected entry is replaced by another valid one": func(t *testing.T, input buildmeta.Input) {
+< 			replaceCacheEntry(t, home, input)
+< 		},
+< 	} {
+< 		t.Run(name, func(t *testing.T) {
+< 			// Each case opens its own window: a preceding case restored the
+< 			// installation through a real reinstall, which legitimately rewrites
+< 			// the marker this fingerprint has to be taken from.
+< 			planned := install.Project(cfg, project, "app", install.Options{DryRun: true})
+< 			if planned.Status != "ok" || len(planned.Builds) != 1 {
+< 				t.Fatalf("read-only plan = %+v", planned)
+< 			}
+< 			facts := factsList(planned.Builds)
+< 			before := markerDigests(statusStores(cfg, project)...)
+< 			markerPath := filepath.Join(project, ".agents", "skills", "build-skill", marker.Name)
+< 			marked, err := os.ReadFile(markerPath) // #nosec G304 -- test fixture path
+< 			if err != nil {
+< 				t.Fatal(err)
+< 			}
+< 
+< 			move(t, planned.Builds[0].Expectation().Input)
+< 			t.Cleanup(func() { reinstall(t) })
+< 
+< 			// The marker is deliberately untouched, so only the cache recheck can
+< 			// have produced the verdict below.
+< 			after, err := os.ReadFile(markerPath) // #nosec G304 -- test fixture path
+< 			if err != nil {
+< 				t.Fatal(err)
+< 			}
+< 			if string(after) != string(marked) {
+< 				t.Fatal("the case moved the install marker, so it proves nothing about the cache recheck")
+< 			}
+< 
+< 			drift, rows := statusReport(cfg, project, facts, before)
+< 			if len(rows) != 1 || rows[0].State != buildStateChanged {
+< 				t.Fatalf("moved compiled state = %+v", rows)
+< 			}
+< 			if !strings.Contains(rows[0].Detail, "build cache") {
+< 				t.Fatalf("the row does not say what moved: %+v", rows[0])
+< 			}
+< 			if drift["build-skill"] != buildStateChanged {
+< 				t.Fatalf("skills = %v, want build-skill %q", drift, buildStateChanged)
+< 			}
+< 			if !checkFailed(drift, rows) {
+< 				t.Fatal("compiled state that moved during the check passed --check")
+< 			}
+< 		})
+Only in .temp/TASK-260720-1nlmvv/worktree: curator
+Only in .temp/TASK-260729-2kaopg/worktree: curator.test
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/buildcache/cache.go .temp/TASK-260729-2kaopg/worktree/internal/buildcache/cache.go
+80,83d79
+< 	// faults is the deterministic in-package fault seam over the mutation
+< 	// boundaries of publication and reversal. New never sets it, so a store any
+< 	// caller outside this package can construct always takes the unhooked path.
+< 	faults func(faultPoint) error
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/buildcache/cache_test.go .temp/TASK-260729-2kaopg/worktree/internal/buildcache/cache_test.go
+211,349d210
+< // TestRevertRestoresExactlyWhatAPublicationDisplaced proves publication is
+< // reversible against real protected directories.
+< //
+< // A caller that publishes for an installation it cannot yet make durable has to
+< // be able to put the cache back byte for byte, including the unusable entry it
+< // quarantined. Both directions are pinned: a replacement goes back to the
+< // corrupt predecessor, and a publication into a free slot leaves no entry at
+< // all behind.
+< func TestRevertRestoresExactlyWhatAPublicationDisplaced(t *testing.T) {
+< 	store := newTestStore(t)
+< 	publication, receiptHash := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
+< 	key, err := publication.Input.CacheKey()
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 
+< 	// A cold publication is withdrawn completely: nothing was displaced, so the
+< 	// cache goes back to holding no entry for the key at all.
+< 	cold := treeFingerprint(t, store.Home())
+< 	published, err := store.Publish(publication, testHomeLock{})
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if published.Quarantined != "" {
+< 		t.Fatalf("a publication into a free slot reported a quarantine %q", published.Quarantined)
+< 	}
+< 	if err := store.Revert(key, published, testHomeLock{}); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Miss {
+< 		t.Fatalf("withdrawn publication = %+v, want a miss", live)
+< 	}
+< 
+< 	// A replacement is reversible too, and puts the exact corrupt bytes back.
+< 	first, err := store.Publish(publication, testHomeLock{})
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	writeFile(t, first.ArtifactPath, []byte("corrupt"), 0o700)
+< 	corrupt := treeFingerprint(t, store.Home())
+< 	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+< 		t.Fatalf("tampered entry = %+v, want corrupt", live)
+< 	}
+< 
+< 	replacement, source := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
+< 	if source != receiptHash {
+< 		t.Fatalf("the replacement receipt %s is not the original %s", source, receiptHash)
+< 	}
+< 	replaced, err := store.Publish(replacement, testHomeLock{})
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if replaced.Status != Published || replaced.Quarantined == "" {
+< 		t.Fatalf("replacement = %+v, want a published winner that reports its quarantine", replaced)
+< 	}
+< 	if live := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); live.Status != Hit {
+< 		t.Fatalf("replacement inspection = %+v", live)
+< 	}
+< 
+< 	if err := store.Revert(key, replaced, testHomeLock{}); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+< 		t.Fatalf("reverted entry = %+v, want the corrupt predecessor back", live)
+< 	}
+< 	if readFile(t, first.ArtifactPath) != "corrupt" {
+< 		t.Fatal("the restored entry does not hold the bytes the publication displaced")
+< 	}
+< 	// Only the reversal's own quarantine of the withdrawn winner may differ:
+< 	// no byte of the cold state or of the corrupt entry is deleted here.
+< 	if cold == corrupt {
+< 		t.Fatal("the fixture never actually changed the cache, so the case proves nothing")
+< 	}
+< }
+< 
+< // TestRevertFailsClosed pins the boundaries of the reversal: it needs the same
+< // held home lock as the publication, it refuses to import bytes from outside
+< // the protected cache root, and a publication that selected no new winner has
+< // nothing to undo.
+< //
+< // Every refusal is reported as a changed cache even though it moves nothing.
+< // That is not a contradiction: a refused reversal leaves the entry this run
+< // published exactly where it is, so a caller that read the refusal as an
+< // ordinary failure would go on claiming the live cache is unchanged.
+< func TestRevertFailsClosed(t *testing.T) {
+< 	store := newTestStore(t)
+< 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
+< 	key, err := publication.Input.CacheKey()
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	published, err := store.Publish(publication, testHomeLock{})
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 
+< 	unsupported := &Store{home: t.TempDir(), supported: func() bool { return false }}
+< 	for name, refused := range map[string]error{
+< 		"without a held manager-home lock": store.Revert(key, published, nil),
+< 		"without supported protection":     unsupported.Revert(key, published, testHomeLock{}),
+< 		"with a malformed cache key": store.Revert(
+< 			buildmeta.CacheKey("not-a-cache-key"), published, testHomeLock{}),
+< 	} {
+< 		if refused == nil {
+< 			t.Fatalf("reversal %s succeeded", name)
+< 		}
+< 		if !StateChanged(refused) {
+< 			t.Fatalf("reversal %s did not report the published entry as still live: %v", name, refused)
+< 		}
+< 	}
+< 	if err := store.Revert(key, PublicationResult{Status: ReusedWinner}, testHomeLock{}); err != nil {
+< 		t.Fatalf("reverting a reused winner failed: %v", err)
+< 	}
+< 	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Hit {
+< 		t.Fatalf("a reused-winner reversal changed the cache: %+v", live)
+< 	}
+< 
+< 	outside := filepath.Join(t.TempDir(), "planted")
+< 	if err := os.Mkdir(outside, 0o700); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	foreign := PublicationResult{Status: Published, Quarantined: outside}
+< 	foreignErr := store.Revert(key, foreign, testHomeLock{})
+< 	if foreignErr == nil {
+< 		t.Fatal("reversal restored an entry from outside the protected cache root")
+< 	}
+< 	if !StateChanged(foreignErr) {
+< 		t.Fatalf("a refused reversal did not report the published entry as still live: %v", foreignErr)
+< 	}
+< 	if _, err := os.Lstat(outside); err != nil {
+< 		t.Fatalf("the refused reversal moved foreign bytes: %v", err)
+< 	}
+< 	// A refusal is not allowed to be half-applied: the entry it would have
+< 	// replaced is still exactly where the publication left it.
+< 	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Hit {
+< 		t.Fatalf("a refused reversal withdrew the live entry anyway: %+v", live)
+< 	}
+< }
+< 
+Only in .temp/TASK-260720-1nlmvv/worktree/internal/buildcache: compensation_test.go
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/buildcache/publish.go .temp/TASK-260729-2kaopg/worktree/internal/buildcache/publish.go
+46,50d45
+< 	// Quarantined is where an unusable predecessor was moved aside, and is
+< 	// empty when this publication displaced nothing. It is the other half of
+< 	// Revert: a caller that has to undo a publication it made cannot restore
+< 	// what it displaced unless the publication says what that was.
+< 	Quarantined string
+63,166d57
+< // StateChangedError reports a failed cache operation that could not put the
+< // protected cache root back the way it found it.
+< //
+< // It is the one honest answer to a half-applied mutation. Publication and
+< // reversal both move live directories, and a fault between two of those moves
+< // leaves a shared slot holding something neither the caller nor the previous
+< // installation asked for. Presenting that as an ordinary failure would let a
+< // caller repeat the "the live build cache is unchanged" claim while it is not,
+< // so the boundary is marked in the error instead.
+< type StateChangedError struct {
+< 	Key buildmeta.CacheKey
+< 	Err error
+< }
+< 
+< func (err *StateChangedError) Error() string {
+< 	return fmt.Sprintf("protected build cache state for %s was left changed: %v", err.Key, err.Err)
+< }
+< 
+< func (err *StateChangedError) Unwrap() error { return err.Err }
+< 
+< // StateChanged reports whether a failure left the protected cache root changed.
+< //
+< // A Publish error that does not satisfy it is a guarantee, not an absence of
+< // information: publication compensates its own mutations before returning, so
+< // the caller owes nothing for that call. Reversal is the mirror image — every
+< // error it returns means the entry this run published is still what the cache
+< // holds — so callers treat any reversal failure as a change regardless.
+< func StateChanged(err error) bool {
+< 	var changed *StateChangedError
+< 	return errors.As(err, &changed)
+< }
+< 
+< // faultPoint names one mutation boundary inside a publication or a reversal.
+< //
+< // These are exactly the boundaries that can leave the protected cache root
+< // half-changed. Several of them cannot be provoked from outside the package at
+< // all — a post-selection validation failure needs the live entry to break
+< // between the rename and the read, and directory syncing is a no-op on Windows
+< // — so the compensation they guard would otherwise be untestable on the
+< // production path.
+< type faultPoint string
+< 
+< // The mutation boundaries a deterministic in-package fault can be injected at.
+< //
+< // faultQuarantineSync is the interior one: it stands between the rename that
+< // empties the live slot and the sync that makes it durable, which is the only
+< // window where a quarantine has mutated the cache and has not yet returned.
+< // faultQuarantineRollbackSync stands one step further in, at the durability of
+< // the compensating rename that answers the first failure — the repair is a
+< // mutation too, and it is only worth what its own sync is worth.
+< const (
+< 	faultQuarantine             faultPoint = "quarantine"
+< 	faultQuarantineSync         faultPoint = "quarantine-sync"
+< 	faultQuarantineRollbackSync faultPoint = "quarantine-rollback-sync"
+< 	faultSelect                 faultPoint = "select"
+< 	faultValidate               faultPoint = "validate"
+< 	faultSync                   faultPoint = "sync"
+< 	faultWithdraw               faultPoint = "withdraw"
+< 	faultRestore                faultPoint = "restore"
+< 	faultRestoreSync            faultPoint = "restore-sync"
+< )
+< 
+< // unsyncedRollbackError reports a compensating rename that put an entry back at
+< // its live pathname but could not make that repair durable.
+< //
+< // It is the one quarantine outcome where the visible namespace is right and the
+< // durable state is not, so neither ordinary answer is honest on its own: the
+< // bytes are live and recoverable now, and a crash can still leave the slot
+< // empty. It is deliberately not a *StateChangedError, because the helper that
+< // raises it names entries by path while every caller names them by cache key.
+< // The callers re-key it through stateChangeFor so the reported boundary carries
+< // the entry it belongs to.
+< type unsyncedRollbackError struct{ Err error }
+< 
+< func (err *unsyncedRollbackError) Error() string { return err.Err.Error() }
+< 
+< func (err *unsyncedRollbackError) Unwrap() error { return err.Err }
+< 
+< // stateChangeFor marks a quarantine failure that left durable state uncertain as
+< // the changed state it is, and passes every other failure through untouched.
+< //
+< // A quarantine that put the entry back durably compensated its own mutation and
+< // owes the caller nothing, which is the guarantee an untyped error carries.
+< func stateChangeFor(key buildmeta.CacheKey, err error) error {
+< 	var unsynced *unsyncedRollbackError
+< 	if err == nil || !errors.As(err, &unsynced) {
+< 		return err
+< 	}
+< 	return &StateChangedError{Key: key, Err: err}
+< }
+< 
+< // quarantinePrefix names an entry this store moved aside instead of deleting.
+< // The ordinary sweep collects it; nothing else in the cache root carries it.
+< const quarantinePrefix = ".quarantine-"
+< 
+< // fault consults the in-package test seam. New never sets it, so no store a
+< // caller can construct outside this package ever takes the hooked path.
+< func (store *Store) fault(point faultPoint) error {
+< 	if store == nil || store.faults == nil {
+< 		return nil
+< 	}
+< 	return store.faults(point)
+< }
+< 
+170,180c61
+< //
+< // Publication is fail-closed across every live mutation it makes. Selecting a
+< // winner is not one atomic step: an unusable predecessor is quarantined first,
+< // the staged directory is renamed into the freed slot second, and the winner is
+< // validated and the cache root synced third. A fault at any of those later steps
+< // used to return an empty result with an error while the shared cache already
+< // held something else. It now compensates before it returns, so an error from
+< // this call means the cache root is exactly what this call found and the caller
+< // owes it nothing. Only a compensation that itself fails returns a
+< // *StateChangedError, which says the opposite in the one case where it is true.
+< func (store *Store) Publish(publication Publication, lock HomeLock) (result PublicationResult, err error) {
+---
+> func (store *Store) Publish(publication Publication, lock HomeLock) (PublicationResult, error) {
+223,241d103
+< 
+< 	// displaced and selected are the only live mutations the selection below can
+< 	// make: the predecessor it moved aside, and whether the staged directory
+< 	// became the entry a launcher resolves. The compensation is armed here,
+< 	// before either can happen, so every later exit — including the ones inside
+< 	// the loop and the one that runs out of attempts — unwinds exactly what was
+< 	// done. A call that changed neither returns its error untouched.
+< 	displaced := ""
+< 	selected := false
+< 	defer func() {
+< 		if err == nil || (displaced == "" && !selected) {
+< 			return
+< 		}
+< 		result = PublicationResult{}
+< 		if restoreErr := store.restoreDisplaced(entryPath, base, displaced, lock); restoreErr != nil {
+< 			err = &StateChangedError{Key: key, Err: errors.Join(err, restoreErr)}
+< 		}
+< 	}()
+< 
+282,286d143
+< 	// displaced remembers the unusable predecessor this publication moved aside,
+< 	// so it can be put back — by the compensation above if this call fails, or
+< 	// by the caller's Revert if the operation that needed the replacement never
+< 	// becomes durable. Only the first one is kept: a second pass can only find
+< 	// the slot empty, because nothing but this publisher holds the lock.
+296,299c153
+< 				return PublicationResult{
+< 					Status: ReusedWinner, ArtifactPath: winner.ArtifactPath,
+< 					ReceiptHash: winner.ReceiptHash, Quarantined: displaced,
+< 				}, nil
+---
+> 				return PublicationResult{Status: ReusedWinner, ArtifactPath: winner.ArtifactPath, ReceiptHash: winner.ReceiptHash}, nil
+305,311c159,160
+< 			// The moved path is recorded before the error is acted on, and not
+< 			// only on success. A withdrawal that empties the slot and then fails
+< 			// is still a mutation this publication made, and the compensation
+< 			// above can only unwind what displaced names.
+< 			moved, quarantineErr := store.withdrawEntry(entryPath, faultQuarantine, lock)
+< 			if displaced == "" {
+< 				displaced = moved
+---
+> 			if _, err := store.quarantinePath(entryPath, lock); err != nil {
+> 				return PublicationResult{}, err
+313,315d161
+< 			if quarantineErr != nil {
+< 				return PublicationResult{}, stateChangeFor(key, quarantineErr)
+< 			}
+319,327c165
+< 		// The fault stands in for the rename itself rather than short-circuiting
+< 		// the loop, so a selection that never succeeds reaches the exhaustion exit
+< 		// below with the predecessor already quarantined — which is one of the
+< 		// paths that has to put the cache back.
+< 		selectErr := store.fault(faultSelect)
+< 		if selectErr == nil {
+< 			selectErr = renameDirectoryNoReplace(stage, entryPath)
+< 		}
+< 		if selectErr == nil {
+---
+> 		if err := renameDirectoryNoReplace(stage, entryPath); err == nil {
+329,332d166
+< 			selected = true
+< 			if err := store.fault(faultValidate); err != nil {
+< 				return PublicationResult{}, fmt.Errorf("published cache winner failed validation: %v", err)
+< 			}
+337,339d170
+< 			if err := store.fault(faultSync); err != nil {
+< 				return PublicationResult{}, fmt.Errorf("sync cache root: %w", err)
+< 			}
+343,346c174
+< 			return PublicationResult{
+< 				Status: Published, ArtifactPath: winner.ArtifactPath,
+< 				ReceiptHash: winner.ReceiptHash, Quarantined: displaced,
+< 			}, nil
+---
+> 			return PublicationResult{Status: Published, ArtifactPath: winner.ArtifactPath, ReceiptHash: winner.ReceiptHash}, nil
+354,464d181
+< // Revert undoes one publication this run performed and puts back whatever was
+< // live before it.
+< //
+< // It exists because publication is not a transaction target. A launcher can
+< // only point at a protected entry that is already live, so the replacement is
+< // selected before the installation that needs it is durable; an operation that
+< // then fails owns putting the shared cache back, or a run that committed
+< // nothing would still have left the predecessor quarantined and its
+< // replacement live.
+< //
+< // Every step is a rename inside the protected cache root, under the same
+< // caller-held home lock the publication ran under. No byte is deleted here:
+< // the withdrawn entry is quarantined exactly like any other unusable one and
+< // is collected by the ordinary sweep. A publication that selected no new
+< // winner changed nothing this call can undo and is a no-op.
+< //
+< // Every failure it reports is a *StateChangedError, and deliberately so: a
+< // reversal that refuses before it moves anything, and one that stops between
+< // its own two renames, both leave the cache holding something other than what
+< // the run found. The caller has one correct response to either, which is to
+< // stop claiming the live cache is unchanged.
+< func (store *Store) Revert(key buildmeta.CacheKey, published PublicationResult, lock HomeLock) error {
+< 	if err := requireHomeLock(lock); err != nil {
+< 		return &StateChangedError{Key: key, Err: err}
+< 	}
+< 	if store == nil || store.supported == nil || !store.supported() {
+< 		return &StateChangedError{Key: key, Err: fmt.Errorf("persistent build cache protection is unsupported")}
+< 	}
+< 	if published.Status != Published {
+< 		return nil
+< 	}
+< 	entryPath, base, err := store.paths(key)
+< 	if err != nil {
+< 		return &StateChangedError{Key: key, Err: err}
+< 	}
+< 	// The predecessor is only ever restored from inside the cache root this
+< 	// store owns, so a caller cannot use a reversal to move foreign bytes in.
+< 	// It is checked before anything moves: a reversal that cannot complete must
+< 	// not have withdrawn the live entry on its way to refusing.
+< 	if published.Quarantined != "" && !pathWithin(base, published.Quarantined) {
+< 		return &StateChangedError{
+< 			Key: key,
+< 			Err: fmt.Errorf("quarantined cache entry is outside the protected cache root"),
+< 		}
+< 	}
+< 	if err := store.restoreDisplaced(entryPath, base, published.Quarantined, lock); err != nil {
+< 		return &StateChangedError{Key: key, Err: err}
+< 	}
+< 	return nil
+< }
+< 
+< // restoreDisplaced puts one protected slot back the way a publication found it:
+< // it withdraws whatever that publication selected and renames the predecessor
+< // it displaced back into place.
+< //
+< // It is the single implementation behind both the compensation Publish runs
+< // before returning an error and the caller-driven Revert, so a failure in one
+< // path cannot behave differently from the same failure in the other.
+< //
+< // It is fail-closed at its own seam too. Withdrawal and restoration are two
+< // renames, and a fault between them would leave the slot empty while a
+< // perfectly usable entry sat in quarantine — which is strictly worse than
+< // either end state, because a launcher that already points into that slot
+< // resolves to nothing. So a restoration that fails puts the withdrawn entry
+< // back before it reports. No byte is deleted on any path: everything moved
+< // aside is quarantined exactly like any other unusable entry and the ordinary
+< // sweep collects it.
+< func (store *Store) restoreDisplaced(entryPath, base, displaced string, lock HomeLock) error {
+< 	// A withdrawal that fails after it has already emptied the slot is the worst
+< 	// of the three outcomes — the predecessor is still in quarantine and the
+< 	// launcher now resolves to nothing — so the entry goes back before the
+< 	// failure is reported, exactly as it does when the restoration below fails.
+< 	withdrawn, err := store.withdrawEntry(entryPath, faultWithdraw, lock)
+< 	if err != nil {
+< 		return fmt.Errorf("withdraw the published cache entry: %w",
+< 			errors.Join(err, returnWithdrawn(withdrawn, entryPath)))
+< 	}
+< 	if displaced == "" {
+< 		return nil
+< 	}
+< 	restoreErr := store.fault(faultRestore)
+< 	if restoreErr == nil {
+< 		restoreErr = renameDirectoryNoReplace(displaced, entryPath)
+< 	}
+< 	if restoreErr != nil {
+< 		return fmt.Errorf("restore the quarantined cache entry: %w",
+< 			errors.Join(restoreErr, returnWithdrawn(withdrawn, entryPath)))
+< 	}
+< 	if err := store.fault(faultRestoreSync); err != nil {
+< 		return fmt.Errorf("sync cache root: %w", err)
+< 	}
+< 	if err := syncDirectory(base); err != nil {
+< 		return fmt.Errorf("sync cache root: %w", err)
+< 	}
+< 	return nil
+< }
+< 
+< // returnWithdrawn moves the entry a failed restoration had already withdrawn
+< // back into the live slot. It reports its own failure rather than hiding it:
+< // the caller is already returning an error, and which of the two entries ended
+< // up live is the difference between a cache miss and an empty slot.
+< func returnWithdrawn(withdrawn, entryPath string) error {
+< 	if withdrawn == "" {
+< 		return nil
+< 	}
+< 	if err := renameDirectoryNoReplace(withdrawn, entryPath); err != nil {
+< 		return fmt.Errorf("return the withdrawn cache entry to the live slot: %w", err)
+< 	}
+< 	return nil
+< }
+< 
+466,477c183,184
+< // lock. It never traverses or repairs the entry.
+< //
+< // The returned path is what the caller owns afterwards, and it is empty in every
+< // case where the caller owns nothing: a missing key, and a failure that put the
+< // entry back. It is non-empty alongside an error only when the move could
+< // neither be made durable nor undone, because then the path is the sole record
+< // that makes the entry recoverable at all.
+< //
+< // A failure that put the entry back but could not make that repair durable is a
+< // *StateChangedError. The path is empty there too — the caller owns nothing, the
+< // bytes are live — but the slot is not provably what this call found, and
+< // StateChanged is how a caller stops claiming otherwise.
+---
+> // lock. It never traverses or repairs the entry and returns an empty path for a
+> // missing key.
+489,490c196
+< 	moved, err := store.quarantinePath(entryPath, lock)
+< 	return moved, stateChangeFor(key, err)
+---
+> 	return store.quarantinePath(entryPath, lock)
+504c210
+< 	name := quarantinePrefix + filepath.Base(entryPath) + "-"
+---
+> 	name := ".quarantine-" + filepath.Base(entryPath) + "-"
+520,530c226,227
+< 	// The rename is the mutation, and every step after it has to answer for a
+< 	// live slot that is already empty. Returning an error here without the path
+< 	// it just moved was the whole hazard: the caller reads an ordinary failure,
+< 	// has nothing to put back, and the logical entry a launcher resolves through
+< 	// is simply gone. So a sync that fails puts the entry straight back, which
+< 	// keeps the ordinary contract — an error means the slot is untouched — and
+< 	// only a return that also fails reports the quarantine path, because at that
+< 	// point the path is the only thing that makes the move recoverable at all.
+< 	syncErr := store.fault(faultQuarantineSync)
+< 	if syncErr == nil {
+< 		syncErr = syncDirectory(parent)
+---
+> 	if err := syncDirectory(parent); err != nil {
+> 		return "", fmt.Errorf("sync quarantined cache root: %w", err)
+532,555d228
+< 	if syncErr != nil {
+< 		syncErr = fmt.Errorf("sync quarantined cache root: %w", syncErr)
+< 		if back := renameDirectoryNoReplace(quarantinePath, entryPath); back != nil {
+< 			return quarantinePath, errors.Join(syncErr,
+< 				fmt.Errorf("return the quarantined cache entry to the live slot: %w", back))
+< 		}
+< 		// The move back is a mutation of the same directory the first sync failed
+< 		// on, so it is worth exactly what its own sync is worth. Reporting the
+< 		// ordinary "the slot is untouched" failure here would promise a repair
+< 		// that has not reached the disk: the pathname resolves again now, and
+< 		// whether it still does after a crash is the one thing that could not be
+< 		// established. So the second sync gets the same treatment as the first,
+< 		// and only a failure at it is reported as changed durable state — the
+< 		// bytes stay live and recoverable either way.
+< 		rollbackErr := store.fault(faultQuarantineRollbackSync)
+< 		if rollbackErr == nil {
+< 			rollbackErr = syncDirectory(parent)
+< 		}
+< 		if rollbackErr != nil {
+< 			return "", &unsyncedRollbackError{Err: errors.Join(syncErr,
+< 				fmt.Errorf("sync the cache root the entry was returned to: %w", rollbackErr))}
+< 		}
+< 		return "", syncErr
+< 	}
+557,619d229
+< }
+< 
+< // quarantineNames lists the quarantine directories of one entry that are
+< // present in a cache root right now.
+< //
+< // The manager home lock is exclusive, so this set only ever changes because of
+< // the caller holding it. That is what makes a before/after difference a sound
+< // answer to "did my own withdrawal move the entry before it failed" rather than
+< // a guess about a racing process.
+< func quarantineNames(parent, entryName string) map[string]bool {
+< 	prefix := quarantinePrefix + entryName + "-"
+< 	present := map[string]bool{}
+< 	entries, err := os.ReadDir(parent)
+< 	if err != nil {
+< 		return present
+< 	}
+< 	for _, entry := range entries {
+< 		if strings.HasPrefix(entry.Name(), prefix) {
+< 			present[entry.Name()] = true
+< 		}
+< 	}
+< 	return present
+< }
+< 
+< // withdrawnTo reports where a withdrawal that failed had already moved the live
+< // entry, and an empty path when the slot is untouched.
+< //
+< // It answers by looking at the cache root rather than by trusting the step it
+< // follows. A withdrawal is a rename plus the work that makes it durable, and
+< // anything in that tail can fail after the slot is already empty; a caller that
+< // cannot tell those two outcomes apart cannot compensate for either.
+< func withdrawnTo(entryPath, parent string, before map[string]bool) string {
+< 	if _, err := os.Lstat(entryPath); err == nil || !errors.Is(err, os.ErrNotExist) {
+< 		return ""
+< 	}
+< 	for name := range quarantineNames(parent, filepath.Base(entryPath)) {
+< 		if !before[name] {
+< 			return filepath.Join(parent, name)
+< 		}
+< 	}
+< 	return ""
+< }
+< 
+< // withdrawEntry moves one live entry aside and reports what it did even when it
+< // fails.
+< //
+< // This is the single contract every compensation in this file rests on: if it
+< // returns an error, either the entry is still live and the returned path is
+< // empty, or the returned path names exactly where the entry went. Both callers
+< // own the result unconditionally — Publish records it as the predecessor to put
+< // back, a reversal puts it straight back — so neither can be left holding an
+< // error it cannot act on.
+< func (store *Store) withdrawEntry(entryPath string, point faultPoint, lock HomeLock) (string, error) {
+< 	parent := filepath.Dir(entryPath)
+< 	before := quarantineNames(parent, filepath.Base(entryPath))
+< 	if err := store.fault(point); err != nil {
+< 		return withdrawnTo(entryPath, parent, before), fmt.Errorf("quarantine cache entry: %w", err)
+< 	}
+< 	moved, err := store.quarantinePath(entryPath, lock)
+< 	if err != nil && moved == "" {
+< 		moved = withdrawnTo(entryPath, parent, before)
+< 	}
+< 	return moved, err
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/install/commit.go .temp/TASK-260729-2kaopg/worktree/internal/install/commit.go
+67,70d66
+< 	// Publish compensates its own mutations. An error means the protected cache
+< 	// root is what the call found, so this phase records nothing to put back for
+< 	// it — unless the error satisfies buildcache.StateChanged, which says the
+< 	// compensation itself did not complete.
+72,77d67
+< 	// Revert puts back what one publication of this run displaced. It is the
+< 	// compensating half of Publish: the protected entry a launcher points at has
+< 	// to be live before the targets that reference it can be staged, so a run
+< 	// that fails in between owns restoring the shared cache itself. Every error
+< 	// it returns means the cache is not back at what the run found.
+< 	Revert(key buildmeta.CacheKey, published buildcache.PublicationResult, lock buildcache.HomeLock) error
+94,97c84
+< 	// PublishFault injects a failure at cache publication. It obeys the same
+< 	// contract as the store: a plain error models a publication that put the
+< 	// cache back itself, and a buildcache.StateChangedError models one that
+< 	// could not.
+---
+> 	// PublishFault injects a failure at cache publication.
+230,251d216
+< // buildPhaseError marks a commit-phase failure that originated at the protected
+< // build cache boundary.
+< //
+< // Publication, receipt encoding, and reversal all carry filesystem-, toolchain-,
+< // or manager-private detail — cache and staging locations, receipt bytes, driver
+< // text — exactly like the planning and staging phases do. The marker is what
+< // lets a scope route those failures through the one bounded, path-redacted
+< // rendering while an ordinary commit failure keeps naming the operator's own
+< // paths, which are the actionable part of a journal or target error.
+< type buildPhaseError struct{ err error }
+< 
+< func (failure *buildPhaseError) Error() string { return failure.err.Error() }
+< 
+< func (failure *buildPhaseError) Unwrap() error { return failure.err }
+< 
+< // failedBuildBoundary marks one protected build-cache failure of the commit
+< // phase, so the scope renders it through the bounded, redacted path instead of
+< // printing manager-private cache and artifact locations verbatim.
+< func failedBuildBoundary(format string, args ...any) error {
+< 	return &buildPhaseError{err: fmt.Errorf(format, args...)}
+< }
+< 
+515,518d479
+< 	// retainedBuilds marks a failed run that could not put the shared build
+< 	// cache back, so a presentation layer never tells an operator the live cache
+< 	// is unchanged when it is not.
+< 	retainedBuilds bool
+576,614c537
+< 	builds, err := publishWinners(request, lock)
+< 	// journaled is the durable plan this run recorded preimages for, and stays
+< 	// empty until preparation has something to compare against.
+< 	var journaled transaction.Plan
+< 	// A failed run puts the shared build cache back before it releases the home
+< 	// lock, so an operation that committed nothing also displaced nothing. The
+< 	// reversal is deliberately conditional: see reversiblePublication.
+< 	//
+< 	// Every way that can fail ends in the same place — retainedBuilds — because
+< 	// the presentation layer has exactly one decision to make: whether it may
+< 	// still tell the operator the live build cache is unchanged.
+< 	defer func() {
+< 		if err == nil {
+< 			return
+< 		}
+< 		if builds.retained {
+< 			outcome.retainedBuilds = true
+< 			outcome.warnings = append(outcome.warnings, fmt.Sprintf(
+< 				"%s: warning: the rebuilt build cache entries of this run were kept: "+
+< 					"a failed publication could not put the protected cache back", request.scope))
+< 		}
+< 		if len(builds.entries) == 0 {
+< 			return
+< 		}
+< 		reverted, reason := reversiblePublication(request, journaled, builds.entries, lock)
+< 		if !reverted {
+< 			outcome.retainedBuilds = true
+< 			outcome.warnings = append(outcome.warnings, fmt.Sprintf(
+< 				"%s: warning: the rebuilt build cache entries of this run were kept: %s", request.scope, reason))
+< 			return
+< 		}
+< 		if revertErr := revertPublications(request, builds.entries, lock); revertErr != nil {
+< 			outcome.retainedBuilds = true
+< 			outcome.warnings = append(outcome.warnings, fmt.Sprintf(
+< 				"%s: warning: the rebuilt build cache entries of this run were kept: "+
+< 					"the reversal did not complete", request.scope))
+< 			err = errors.Join(err, revertErr)
+< 		}
+< 	}()
+---
+> 	artifacts, publishMessages, err := publishWinners(request, lock)
+618,619c541
+< 	artifacts := builds.artifacts
+< 	outcome.messages = append(outcome.messages, builds.messages...)
+---
+> 	outcome.messages = append(outcome.messages, publishMessages...)
+648d569
+< 	journaled = journalPlan
+702,726d622
+< // publication is one cache entry this run selected, and everything needed to
+< // put back what it displaced.
+< type publication struct {
+< 	skill     string
+< 	command   string
+< 	key       buildmeta.CacheKey
+< 	published buildcache.PublicationResult
+< }
+< 
+< // publishedBuilds is everything the publication phase produced, including what
+< // it left behind on a failing path.
+< type publishedBuilds struct {
+< 	artifacts map[buildmeta.CacheKey]buildcache.Result
+< 	// entries are the publications this run selected and therefore owns putting
+< 	// back. They are reported on every path, including a failing one: a run that
+< 	// displaced a cache entry and then failed still owes the restoration.
+< 	entries  []publication
+< 	messages []string
+< 	// retained marks a publication that failed and could not put the protected
+< 	// cache root back by itself. There is nothing here for the caller to revert
+< 	// — the store compensates its own mutations — but the live cache is no
+< 	// longer what this run found, and reporting it as unchanged would be false.
+< 	retained bool
+< }
+< 
+731,732c627,628
+< func publishWinners(request commitRequest, lock HomeLock) (publishedBuilds, error) {
+< 	var builds publishedBuilds
+---
+> func publishWinners(request commitRequest, lock HomeLock) (map[buildmeta.CacheKey]buildcache.Result, []string, error) {
+> 	var messages []string
+736,737c632
+< 				builds.retained = buildcache.StateChanged(err)
+< 				return builds, failedBuildBoundary("publish %s.%s: %w", build.skill, build.command, err)
+---
+> 				return nil, nil, fmt.Errorf("publish %s.%s: %w", build.skill, build.command, err)
+742,743c637
+< 			return builds, failedBuildBoundary(
+< 				"encode the receipt of %s.%s: %w", build.skill, build.command, err)
+---
+> 			return nil, nil, fmt.Errorf("encode the receipt of %s.%s: %w", build.skill, build.command, err)
+751,755c645
+< 			// A publication that failed without leaving the cache changed owes
+< 			// nothing and is not recorded: adding it would make the caller revert
+< 			// a mutation the store already undid.
+< 			builds.retained = buildcache.StateChanged(err)
+< 			return builds, failedBuildBoundary("publish %s.%s: %w", build.skill, build.command, err)
+---
+> 			return nil, nil, fmt.Errorf("publish %s.%s: %w", build.skill, build.command, err)
+757,760c647
+< 		builds.entries = append(builds.entries, publication{
+< 			skill: build.skill, command: build.command, key: build.key, published: result,
+< 		})
+< 		builds.messages = append(builds.messages, fmt.Sprintf("%s: %s.%s cache %s key=%s",
+---
+> 		messages = append(messages, fmt.Sprintf("%s: %s.%s cache %s key=%s",
+775,776c662
+< 		builds.messages = nil
+< 		return builds, &restartError{
+---
+> 		return nil, nil, &restartError{
+781,841c667
+< 	builds.artifacts = artifacts
+< 	return builds, nil
+< }
+< 
+< // reversiblePublication decides whether a failed run may put the shared build
+< // cache back, and says why when it may not.
+< //
+< // Two independent facts have to hold. Every target this run journaled has to be
+< // back at the exact preimage it recorded under the home lock, so the
+< // installation really did return to its prior state; and no journal may still
+< // reference the build keys this run published, so no durable transaction is
+< // left whose completion recovery — not this process — still owns.
+< //
+< // Either one unmet keeps the published entries. That asymmetry is deliberate:
+< // a valid entry no installation references is always safe and the ordinary
+< // sweep collects it, while restoring an unusable predecessor over the entry a
+< // recovered commit is about to point at would turn a reported failure into a
+< // broken installation.
+< func reversiblePublication(
+< 	request commitRequest,
+< 	journaled transaction.Plan,
+< 	published []publication,
+< 	lock HomeLock,
+< ) (bool, string) {
+< 	for _, target := range journaled.Targets {
+< 		digest, err := transaction.DigestTarget(target.Kind, target.LivePath)
+< 		if err != nil {
+< 			return false, fmt.Sprintf("%s/%s could not be read back", target.Class, target.Identifier)
+< 		}
+< 		if digest != target.PreimageDigest {
+< 			return false, fmt.Sprintf("%s/%s is no longer at the state this run found", target.Class, target.Identifier)
+< 		}
+< 	}
+< 	inflight, err := request.commit.Journal.ReferencedBuildKeys(lock)
+< 	if err != nil {
+< 		return false, "in-flight build references could not be read"
+< 	}
+< 	referenced := map[string]bool{}
+< 	for _, key := range inflight {
+< 		referenced[key] = true
+< 	}
+< 	for _, entry := range published {
+< 		if referenced[string(entry.key)] {
+< 			return false, fmt.Sprintf("an incomplete transaction still references %s.%s", entry.skill, entry.command)
+< 		}
+< 	}
+< 	return true, ""
+< }
+< 
+< // revertPublications puts every entry this run selected back, newest first, so
+< // the cache passes through the same states in reverse order.
+< func revertPublications(request commitRequest, published []publication, lock HomeLock) error {
+< 	var errs []error
+< 	for index := len(published) - 1; index >= 0; index-- {
+< 		entry := published[index]
+< 		if err := request.commit.Publisher.Revert(entry.key, entry.published, lock); err != nil {
+< 			errs = append(errs, failedBuildBoundary(
+< 				"restore the build cache entry of %s.%s: %w", entry.skill, entry.command, err))
+< 		}
+< 	}
+< 	return errors.Join(errs...)
+---
+> 	return artifacts, messages, nil
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/install/commit_test.go .temp/TASK-260729-2kaopg/worktree/internal/install/commit_test.go
+14d13
+< 	"unicode/utf8"
+17,18d15
+< 	"github.com/relux-works/curator/internal/buildcache"
+< 	"github.com/relux-works/curator/internal/buildmeta"
+308,690d304
+< 		}
+< 	}
+< }
+< 
+< // stubJournal is a durable transaction boundary that can fail preparation or
+< // commit while leaving every target exactly where the run found it — which is
+< // what both faults look like before any swap has happened.
+< type stubJournal struct {
+< 	prepareErr error
+< 	commitErr  error
+< 	// inflight is what ReferencedBuildKeys reports, so a test can model a
+< 	// transaction whose completion recovery still owns.
+< 	inflight []string
+< 	prepared int
+< 	commits  int
+< }
+< 
+< func (journal *stubJournal) Recover(transaction.HomeLock) error { return nil }
+< 
+< func (journal *stubJournal) Prepare(_ transaction.HomeLock, _ transaction.Plan) (*transaction.Journal, error) {
+< 	journal.prepared++
+< 	if journal.prepareErr != nil {
+< 		return nil, journal.prepareErr
+< 	}
+< 	return &transaction.Journal{}, nil
+< }
+< 
+< func (journal *stubJournal) Commit(transaction.HomeLock, string) error {
+< 	journal.commits++
+< 	return journal.commitErr
+< }
+< 
+< func (journal *stubJournal) ReferencedBuildKeys(transaction.HomeLock) ([]string, error) {
+< 	return journal.inflight, nil
+< }
+< 
+< // TestAFailedCommitRestoresTheBuildCacheItReplaced is the atomicity half of the
+< // repair path.
+< //
+< // Publication is not a transaction target: a launcher can only point at an
+< // entry that is already live, so a replacement is selected before the
+< // installation that needs it is durable. Every failure between those two
+< // moments therefore has to put the shared cache back, or a run that committed
+< // nothing would still have left the predecessor quarantined and its replacement
+< // live — which is a persistent change made by an operation that reported
+< // failure, and which silently rewrites what `status` says about the *previous*
+< // installation.
+< //
+< // Each case injects a different post-publication fault and asserts the exact
+< // prior cache verdict is back, that the reversal really ran, and that nothing
+< // the installation owns moved.
+< func TestAFailedCommitRestoresTheBuildCacheItReplaced(t *testing.T) {
+< 	for name, testCase := range map[string]struct {
+< 		// prior is the cache verdict the run finds and must restore. The zero
+< 		// value models a cold miss, where the reversal has to withdraw the entry
+< 		// this run added instead of restoring one.
+< 		prior  *buildcache.Result
+< 		commit func(*stubJournal) CommitDeps
+< 	}{
+< 		"preparation fails after a corrupt entry was replaced": {
+< 			prior: &buildcache.Result{Status: buildcache.Corrupt, Reason: "receipt is not canonical"},
+< 			commit: func(journal *stubJournal) CommitDeps {
+< 				journal.prepareErr = fmt.Errorf("injected preparation failure")
+< 				return CommitDeps{Journal: journal, MaxRestarts: 1}
+< 			},
+< 		},
+< 		"journal planning fails after a corrupt entry was replaced": {
+< 			prior: &buildcache.Result{Status: buildcache.Corrupt, Reason: "receipt is not canonical"},
+< 			commit: func(journal *stubJournal) CommitDeps {
+< 				return CommitDeps{
+< 					Journal: journal, MaxRestarts: 1,
+< 					NewTransactionID: func() (string, error) {
+< 						return "", fmt.Errorf("injected journal planning failure")
+< 					},
+< 				}
+< 			},
+< 		},
+< 		"the commit fails after a corrupt entry was replaced": {
+< 			prior: &buildcache.Result{Status: buildcache.Corrupt, Reason: "receipt is not canonical"},
+< 			commit: func(journal *stubJournal) CommitDeps {
+< 				journal.commitErr = fmt.Errorf("injected commit failure")
+< 				return CommitDeps{Journal: journal, MaxRestarts: 1}
+< 			},
+< 		},
+< 		"the commit fails after an untrusted entry was replaced": {
+< 			prior: &buildcache.Result{Status: buildcache.UntrustedProvenance, Reason: "entry is group writable"},
+< 			commit: func(journal *stubJournal) CommitDeps {
+< 				journal.commitErr = fmt.Errorf("injected commit failure")
+< 				return CommitDeps{Journal: journal, MaxRestarts: 1}
+< 			},
+< 		},
+< 		"the commit fails after a cold miss was published": {
+< 			commit: func(journal *stubJournal) CommitDeps {
+< 				journal.commitErr = fmt.Errorf("injected commit failure")
+< 				return CommitDeps{Journal: journal, MaxRestarts: 1}
+< 			},
+< 		},
+< 	} {
+< 		t.Run(name, func(t *testing.T) {
+< 			e := newEnv(t)
+< 			e.buildSkill("build-skill", "alpha")
+< 			e.declare("build-skill")
+< 			deps, _, cache, builder := newFakeDeps(t)
+< 			if testCase.prior != nil {
+< 				cache.byCommand["alpha"] = *testCase.prior
+< 			}
+< 			before := snapshotState(t, e)
+< 
+< 			result := e.install(Options{Build: deps, Commit: testCase.commit(&stubJournal{})})
+< 			if result.Status != "failed" {
+< 				t.Fatalf("install status = %q, want failed: %+v", result.Status, result)
+< 			}
+< 			// The case only proves anything if the run really did rebuild and
+< 			// publish before it failed.
+< 			if len(builder.calls) != 1 || len(cache.published) != 1 {
+< 				t.Fatalf("the run did not rebuild and publish before failing: built %v published %v",
+< 					builder.calls, cache.published)
+< 			}
+< 			if len(cache.reverted) != 1 || cache.reverted[0] != "alpha" {
+< 				t.Fatalf("reverted publications = %v, want exactly [alpha]", cache.reverted)
+< 			}
+< 			if result.BuildCacheRetained {
+< 				t.Fatal("a run that restored the cache reported that it kept what it rebuilt")
+< 			}
+< 			restored, present := cache.byCommand["alpha"]
+< 			switch {
+< 			case testCase.prior == nil && present:
+< 				t.Fatalf("a failed run left the entry it published live: %+v", restored)
+< 			case testCase.prior != nil && (!present || restored.Status != testCase.prior.Status):
+< 				t.Fatalf("cache verdict = %+v, want the prior %+v", restored, testCase.prior)
+< 			}
+< 			if changed := before.diff(snapshotState(t, e)); len(changed) > 0 {
+< 				t.Fatalf("a failed commit changed installed state: %v", changed)
+< 			}
+< 		})
+< 	}
+< }
+< 
+< // TestARolledBackTargetCommitRestoresTheBuildCacheItReplaced drives the same
+< // contract through the real durable transaction rather than a stub: a target
+< // fault mid-commit rolls every target back, and the cache entry that was
+< // replaced to serve that commit goes back with it.
+< func TestARolledBackTargetCommitRestoresTheBuildCacheItReplaced(t *testing.T) {
+< 	e := newEnv(t)
+< 	e.buildSkill("build-skill", "alpha")
+< 	e.declare("build-skill")
+< 	deps, _, cache, builder := newFakeDeps(t)
+< 	cache.byCommand["alpha"] = buildcache.Result{
+< 		Status: buildcache.Corrupt, Reason: "receipt is not canonical",
+< 	}
+< 	before := snapshotState(t, e)
+< 
+< 	probe := &commitProbe{failAt: 0, failErr: fmt.Errorf("injected target failure")}
+< 	result := e.install(Options{Build: deps, Commit: CommitDeps{Hooks: probe.hooks(), MaxRestarts: 1}})
+< 	if result.Status != "failed" {
+< 		t.Fatalf("install status = %q, want failed: %+v", result.Status, result)
+< 	}
+< 	if len(builder.calls) != 1 || len(cache.published) != 1 {
+< 		t.Fatalf("the run did not rebuild and publish before failing: built %v published %v",
+< 			builder.calls, cache.published)
+< 	}
+< 	if len(cache.reverted) != 1 {
+< 		t.Fatalf("reverted publications = %v, want exactly one", cache.reverted)
+< 	}
+< 	if restored := cache.byCommand["alpha"]; restored.Status != buildcache.Corrupt {
+< 		t.Fatalf("cache verdict = %+v, want the prior corrupt entry", restored)
+< 	}
+< 	if changed := before.diff(snapshotState(t, e)); len(changed) > 0 {
+< 		t.Fatalf("a rolled-back commit changed installed state: %v", changed)
+< 	}
+< }
+< 
+< // TestAnInFlightTransactionKeepsThePublishedCacheEntry pins the one direction
+< // the reversal must refuse.
+< //
+< // A durable transaction whose completion recovery still owns may yet commit
+< // forward, and its launchers point at the entry this run published. Restoring
+< // an unusable predecessor over it would turn a reported failure into a broken
+< // installation, so the published entry is kept and the operator is told.
+< // Keeping it is always safe: an entry no installation references is collected
+< // by the ordinary sweep.
+< func TestAnInFlightTransactionKeepsThePublishedCacheEntry(t *testing.T) {
+< 	e := newEnv(t)
+< 	e.buildSkill("build-skill", "alpha")
+< 	e.declare("build-skill")
+< 	deps, _, cache, _ := newFakeDeps(t)
+< 	cache.byCommand["alpha"] = buildcache.Result{
+< 		Status: buildcache.Corrupt, Reason: "receipt is not canonical",
+< 	}
+< 
+< 	// The key is only knowable once the plan derived it, so the stub reports
+< 	// whatever this run publishes as still in flight.
+< 	journal := &stubJournal{commitErr: fmt.Errorf("injected commit failure")}
+< 	result := e.install(Options{
+< 		Build: deps,
+< 		Commit: CommitDeps{
+< 			Journal:     journal,
+< 			MaxRestarts: 1,
+< 			PublishFault: func(key buildmeta.CacheKey) error {
+< 				journal.inflight = append(journal.inflight, string(key))
+< 				return nil
+< 			},
+< 		},
+< 	})
+< 	if result.Status != "failed" {
+< 		t.Fatalf("install status = %q, want failed: %+v", result.Status, result)
+< 	}
+< 	if len(cache.reverted) != 0 {
+< 		t.Fatalf("an in-flight transaction still had its cache entry withdrawn: %v", cache.reverted)
+< 	}
+< 	if !result.BuildCacheRetained {
+< 		t.Fatal("a run that kept what it rebuilt did not say so in its result")
+< 	}
+< 	if published := cache.byCommand["alpha"]; published.Status != buildcache.Hit {
+< 		t.Fatalf("cache verdict = %+v, want the published entry kept", published)
+< 	}
+< 	if !containsSubstring(result.Messages, "rebuilt build cache entries of this run were kept") {
+< 		t.Fatalf("the operator was not told the cache entries were kept: %v", result.Messages)
+< 	}
+< }
+< 
+< // TestAPublicationThatChangedTheCacheIsReportedAsRetained covers the failure
+< // the caller cannot compensate for, because the store already tried.
+< //
+< // Publication compensates its own mutations, so an ordinary publication failure
+< // leaves the cache exactly as the run found it and this phase records nothing
+< // to put back. When that compensation itself fails the store says so, and the
+< // run has to carry it through: it publishes no reversal it could not make, but
+< // it must stop claiming the live cache is unchanged.
+< func TestAPublicationThatChangedTheCacheIsReportedAsRetained(t *testing.T) {
+< 	for name, testCase := range map[string]struct {
+< 		fault        func(buildmeta.CacheKey) error
+< 		wantRetained bool
+< 	}{
+< 		"a publication that put the cache back is not retained": {
+< 			fault:        func(buildmeta.CacheKey) error { return fmt.Errorf("injected publication failure") },
+< 			wantRetained: false,
+< 		},
+< 		"a publication that could not put the cache back is retained": {
+< 			fault: func(key buildmeta.CacheKey) error {
+< 				return &buildcache.StateChangedError{Key: key, Err: fmt.Errorf("injected compensation failure")}
+< 			},
+< 			wantRetained: true,
+< 		},
+< 	} {
+< 		t.Run(name, func(t *testing.T) {
+< 			e := newEnv(t)
+< 			e.buildSkill("build-skill", "alpha")
+< 			e.declare("build-skill")
+< 			deps, _, cache, _ := newFakeDeps(t)
+< 			cache.byCommand["alpha"] = buildcache.Result{
+< 				Status: buildcache.Corrupt, Reason: "receipt is not canonical",
+< 			}
+< 			before := snapshotState(t, e)
+< 
+< 			result := e.install(Options{Build: deps, Commit: CommitDeps{
+< 				MaxRestarts: 1, PublishFault: testCase.fault,
+< 			}})
+< 			if result.Status != "failed" {
+< 				t.Fatalf("install status = %q, want failed: %+v", result.Status, result)
+< 			}
+< 			if result.BuildCacheRetained != testCase.wantRetained {
+< 				t.Fatalf("BuildCacheRetained = %v, want %v", result.BuildCacheRetained, testCase.wantRetained)
+< 			}
+< 			// A publication the store already compensated is never reverted twice:
+< 			// this phase recorded nothing for it.
+< 			if len(cache.reverted) != 0 {
+< 				t.Fatalf("a failed publication was reverted by the caller too: %v", cache.reverted)
+< 			}
+< 			notice := containsSubstring(result.Messages,
+< 				"a failed publication could not put the protected cache back")
+< 			if notice != testCase.wantRetained {
+< 				t.Fatalf("the retention warning = %v, want %v: %v", notice, testCase.wantRetained, result.Messages)
+< 			}
+< 			if changed := before.diff(snapshotState(t, e)); len(changed) > 0 {
+< 				t.Fatalf("a failed publication changed installed state: %v", changed)
+< 			}
+< 		})
+< 	}
+< }
+< 
+< // TestAReversalThatDidNotCompleteIsReportedAsRetained closes the last way a
+< // failed run can leave the shared cache changed.
+< //
+< // The reversal is the compensating half of publication, and it moves live
+< // directories too. When it reports that it did not complete, the entry this run
+< // published is still what the cache holds, so the run owes the operator the same
+< // honesty a failed publication does — the alternative is an installation report
+< // that says the live build cache is unchanged while it is not.
+< func TestAReversalThatDidNotCompleteIsReportedAsRetained(t *testing.T) {
+< 	e := newEnv(t)
+< 	e.buildSkill("build-skill", "alpha")
+< 	e.declare("build-skill")
+< 	deps, _, cache, builder := newFakeDeps(t)
+< 	cache.byCommand["alpha"] = buildcache.Result{
+< 		Status: buildcache.Corrupt, Reason: "receipt is not canonical",
+< 	}
+< 	cache.revertErr["alpha"] = fmt.Errorf("injected reversal failure")
+< 	before := snapshotState(t, e)
+< 
+< 	result := e.install(Options{Build: deps, Commit: CommitDeps{
+< 		Journal:     &stubJournal{commitErr: fmt.Errorf("injected commit failure")},
+< 		MaxRestarts: 1,
+< 	}})
+< 	if result.Status != "failed" {
+< 		t.Fatalf("install status = %q, want failed: %+v", result.Status, result)
+< 	}
+< 	// The case only proves anything if the run really did publish and then try
+< 	// to put the cache back.
+< 	if len(builder.calls) != 1 || len(cache.published) != 1 {
+< 		t.Fatalf("the run did not rebuild and publish before failing: built %v published %v",
+< 			builder.calls, cache.published)
+< 	}
+< 	if len(cache.reverted) != 0 {
+< 		t.Fatalf("a reversal that failed was recorded as done: %v", cache.reverted)
+< 	}
+< 	if !result.BuildCacheRetained {
+< 		t.Fatal("a run whose reversal did not complete claimed the live cache was unchanged")
+< 	}
+< 	if !containsSubstring(result.Messages, "the reversal did not complete") {
+< 		t.Fatalf("the operator was not told the reversal did not complete: %v", result.Messages)
+< 	}
+< 	// The published entry is still what the cache holds, and the run's own
+< 	// failure is still reported through the redacted build boundary.
+< 	if published := cache.byCommand["alpha"]; published.Status != buildcache.Hit {
+< 		t.Fatalf("cache verdict = %+v, want the published entry still live", published)
+< 	}
+< 	if !containsSubstring(result.Errors, "restore the build cache entry of build-skill.alpha") {
+< 		t.Fatalf("the reversal failure never reached the result: %v", result.Errors)
+< 	}
+< 	if changed := before.diff(snapshotState(t, e)); len(changed) > 0 {
+< 		t.Fatalf("a failed commit changed installed state: %v", changed)
+< 	}
+< }
+< 
+< // TestBuildPublicationFailuresAreRedactedInTheResult proves the commit phase
+< // obeys the same rule as planning and staging: a failure at the protected
+< // build cache boundary carries manager-private locations and untrusted detail,
+< // so it reaches Result.Errors only through the bounded, redacted rendering.
+< func TestBuildPublicationFailuresAreRedactedInTheResult(t *testing.T) {
+< 	e := newEnv(t)
+< 	e.buildSkill("build-skill", "alpha")
+< 	e.declare("build-skill")
+< 	deps, _, _, _ := newFakeDeps(t)
+< 
+< 	private := "/Users/operator/.curator/cache/build/go-v1/abcd"
+< 	result := e.install(Options{Build: deps, Commit: CommitDeps{
+< 		MaxRestarts:  1,
+< 		PublishFault: func(buildmeta.CacheKey) error { return fmt.Errorf("write staged artifact: %s: denied", private) },
+< 	}})
+< 	if result.Status != "failed" {
+< 		t.Fatalf("install status = %q, want failed: %+v", result.Status, result)
+< 	}
+< 	if len(result.Errors) == 0 {
+< 		t.Fatal("a failed publication reported no error")
+< 	}
+< 	for _, message := range result.Errors {
+< 		if strings.Contains(message, "/Users/") {
+< 			t.Fatalf("a publication failure published a manager-private location: %q", message)
+< 		}
+< 	}
+< 	if !containsSubstring(result.Errors, "<path>") {
+< 		t.Fatalf("a publication failure did not go through the redactor: %v", result.Errors)
+< 	}
+< 
+< 	// The same boundary bounds length and strips anything that could address the
+< 	// terminal: publication text can carry receipt bytes and driver output.
+< 	unbounded := e.install(Options{Build: deps, Commit: CommitDeps{
+< 		MaxRestarts: 1,
+< 		PublishFault: func(buildmeta.CacheKey) error {
+< 			return fmt.Errorf("\x1b[31m%s\n\nforged second line", strings.Repeat("unbounded cache detail ", 400))
+< 		},
+< 	}})
+< 	if unbounded.Status != "failed" || len(unbounded.Errors) == 0 {
+< 		t.Fatalf("install status = %q, want failed with an error: %+v", unbounded.Status, unbounded)
+< 	}
+< 	for _, message := range unbounded.Errors {
+< 		if utf8.RuneCountInString(message) > maxDiagnosticRunes {
+< 			t.Fatalf("a publication failure is %d runes, want at most %d",
+< 				utf8.RuneCountInString(message), maxDiagnosticRunes)
+< 		}
+< 		if strings.ContainsAny(message, "\n\r\x1b") {
+< 			t.Fatalf("a publication failure published control characters: %q", message)
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/install/global.go .temp/TASK-260729-2kaopg/worktree/internal/install/global.go
+3a4
+> 	"errors"
+327d327
+< 	result.BuildCacheRetained = outcome.retainedBuilds
+329c329,334
+< 		return result.failCommit(commitErr)
+---
+> 		var restart *restartError
+> 		if errors.As(commitErr, &restart) {
+> 			return result, restart
+> 		}
+> 		result.failf("%v", commitErr)
+> 		return result, nil
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/install/install.go .temp/TASK-260729-2kaopg/worktree/internal/install/install.go
+101,111d100
+< 	// BuildCacheRetained marks a failed run that rebuilt protected cache state
+< 	// and did not put the previous state back. There is more than one way to get
+< 	// there — an incomplete transaction may still need what this run published,
+< 	// a publication may have failed without being able to compensate itself, or
+< 	// the reversal may not have completed — and the presentation layer treats
+< 	// them alike, because they differ only in why. It is false for every run
+< 	// that changed no cache entry and for every run that restored the ones it
+< 	// changed, so a presentation layer can state which of the two happened
+< 	// instead of claiming the live cache is always unchanged after a failure.
+< 	// The warnings of the run say which case it was.
+< 	BuildCacheRetained bool
+576d564
+< 	result.BuildCacheRetained = outcome.retainedBuilds
+578,599c566,568
+< 		return result.failCommit(commitErr)
+< 	}
+< 	return result, nil
+< }
+< 
+< // failCommit records one commit-phase failure of a scope.
+< //
+< // A stale observation is not a failure at all: it restarts the attempt. A
+< // failure at the protected build cache boundary carries untrusted or
+< // manager-private detail exactly like the planning and staging phases do, so it
+< // goes through the same bounded, redacted rendering and carries the same stable
+< // boundary code. Everything else is target, journal, or ledger state, whose
+< // paths are the operator's own and are the actionable part of the message.
+< func (r *Result) failCommit(commitErr error) (Result, *restartError) {
+< 	var restart *restartError
+< 	if errors.As(commitErr, &restart) {
+< 		return *r, restart
+< 	}
+< 	var buildFailure *buildPhaseError
+< 	if errors.As(commitErr, &buildFailure) {
+< 		if code := godriver.DiagnosticCode(commitErr); code != "" {
+< 			r.BuildDiagnostic = code
+---
+> 		var restart *restartError
+> 		if errors.As(commitErr, &restart) {
+> 			return result, restart
+601,602c570,571
+< 		r.failBuild(commitErr)
+< 		return *r, nil
+---
+> 		result.failf("%v", commitErr)
+> 		return result, nil
+604,605c573
+< 	r.failf("%v", commitErr)
+< 	return *r, nil
+---
+> 	return result, nil
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/install/plan.go .temp/TASK-260729-2kaopg/worktree/internal/install/plan.go
+114,131d113
+< // Expectation is the read-only protected-cache lookup this row's verdict was
+< // taken with, and is empty for a command whose logical identity was never
+< // derived.
+< //
+< // It exists so a read-only reporting caller can re-take the same lookup after
+< // it has finished classifying, and report that compiled state moved rather than
+< // publishing a verdict that was already stale. Nothing here can mutate the
+< // plan: the returned input is a copy, and every inspector this expectation is
+< // handed to is strictly read-only.
+< func (build PlannedBuild) Expectation() buildcache.Expectation {
+< 	if build.key == "" {
+< 		return buildcache.Expectation{}
+< 	}
+< 	input := build.input
+< 	input.Target = build.Target()
+< 	return buildcache.Expectation{Input: input}
+< }
+< 
+384c366
+< 			plan.builds, plan.complete = toolchainInventory(planned, plan.sources, err), true
+---
+> 			plan.builds, plan.complete = toolchainInventory(planned, err), true
+391c373
+< 			plan.builds, plan.complete = toolchainInventory(planned, plan.sources, err), true
+---
+> 			plan.builds, plan.complete = toolchainInventory(planned, err), true
+425,437c407
+< //
+< // Every identity that was already established when the toolchain was consulted
+< // is carried: the closed build driver the schema admits for the command, the
+< // build root and package directory the declaration names, and the build-source
+< // digest of the frozen snapshot, which is validated before the toolchain is
+< // touched. Only what genuinely depends on the toolchain — the native target,
+< // the logical key, and any cache verdict — stays empty, so a row never
+< // publishes an identity nothing derived.
+< func toolchainInventory(
+< 	planned []plannedCommand,
+< 	sources map[string]*buildsource.Token,
+< 	err error,
+< ) []PlannedBuild {
+---
+> func toolchainInventory(planned []plannedCommand, err error) []PlannedBuild {
+447,450d416
+< 		var source buildsource.Identity
+< 		if token := sources[item.node.Name]; token != nil {
+< 			source = token.Identity()
+< 		}
+452,460c418,421
+< 			skill:         item.node.Name,
+< 			command:       item.command.Name,
+< 			commandObject: commandObject(item.command),
+< 			buildRoot:     buildRoot,
+< 			sourceDir:     item.command.SourceDir,
+< 			source:        source,
+< 			// The driver is the closed go-v1 boundary the parser already admitted
+< 			// this command under; only the input it would have keyed is unknown.
+< 			input:      buildmeta.Input{Driver: item.command.Driver},
+---
+> 			skill:      item.node.Name,
+> 			command:    item.command.Name,
+> 			buildRoot:  buildRoot,
+> 			sourceDir:  item.command.SourceDir,
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/install/stage_test.go .temp/TASK-260729-2kaopg/worktree/internal/install/stage_test.go
+112,118d111
+< 	reverted  []string
+< 	// byKey resolves a published logical key back to its command, so a reversal
+< 	// addresses the cache the same way the real store does.
+< 	byKey map[buildmeta.CacheKey]string
+< 	// displaced holds the entry a publication moved aside, so a reversal can put
+< 	// the exact prior verdict back instead of an approximation of it.
+< 	displaced map[buildmeta.CacheKey]buildcache.Result
+122,124c115
+< 	// publishErr fails publication of one command. It fires before the fake
+< 	// changes anything, which is the store's own contract: a publication that
+< 	// returns a plain error compensated whatever it had already moved.
+---
+> 	// publishErr fails publication of one command.
+126,129d116
+< 	// revertErr fails the reversal of one command, modelling a store that could
+< 	// not put the displaced entry back. The published entry stays live, because
+< 	// that is exactly what a failed reversal leaves behind.
+< 	revertErr map[string]error
+216,230d202
+< 	// An entry the manager refuses to reuse is displaced, exactly like the real
+< 	// publication quarantines it, and is remembered so a reversal can put the
+< 	// same verdict back.
+< 	quarantined := ""
+< 	if existing, present := cache.byCommand[command]; present {
+< 		if cache.displaced == nil {
+< 			cache.displaced = map[buildmeta.CacheKey]buildcache.Result{}
+< 		}
+< 		cache.displaced[receipt.CacheKey] = existing
+< 		quarantined = "quarantine:" + command
+< 	}
+< 	if cache.byKey == nil {
+< 		cache.byKey = map[buildmeta.CacheKey]string{}
+< 	}
+< 	cache.byKey[receipt.CacheKey] = command
+254d225
+< 		Quarantined: quarantined,
+258,288d228
+< // Revert withdraws one published winner and restores whatever it displaced, so
+< // a failed commit leaves the fake cache exactly where the run found it.
+< func (cache *fakeCache) Revert(
+< 	key buildmeta.CacheKey,
+< 	published buildcache.PublicationResult,
+< 	lock buildcache.HomeLock,
+< ) error {
+< 	cache.t.Helper()
+< 	if err := lock.AssertHeld(); err != nil {
+< 		return err
+< 	}
+< 	if published.Status != buildcache.Published {
+< 		return nil
+< 	}
+< 	command, known := cache.byKey[key]
+< 	if !known {
+< 		return fmt.Errorf("revert of an unpublished key %s", key)
+< 	}
+< 	if err := cache.revertErr[command]; err != nil {
+< 		return &buildcache.StateChangedError{Key: key, Err: err}
+< 	}
+< 	cache.reverted = append(cache.reverted, command)
+< 	if displaced, present := cache.displaced[key]; present {
+< 		cache.byCommand[command] = displaced
+< 		delete(cache.displaced, key)
+< 		return nil
+< 	}
+< 	delete(cache.byCommand, command)
+< 	return nil
+< }
+< 
+401,404c341
+< 	cache := &fakeCache{
+< 		t: t, byCommand: map[string]buildcache.Result{},
+< 		publishErr: map[string]error{}, revertErr: map[string]error{},
+< 	}
+---
+> 	cache := &fakeCache{t: t, byCommand: map[string]buildcache.Result{}, publishErr: map[string]error{}}
+1309,1322d1245
+< 	// Every identity that existed before the toolchain was consulted is carried:
+< 	// the closed driver the parser admitted, the declared build root and package
+< 	// directory, and the build-source digest, which is validated first.
+< 	if row.Driver() != buildmeta.DriverGoV1 || row.BuildRoot() != "src" {
+< 		t.Fatalf("inventory row dropped the identity it already had: driver=%q root=%q",
+< 			row.Driver(), row.BuildRoot())
+< 	}
+< 	if row.Source().Algorithm == "" || row.Source().ContentSHA256 == "" {
+< 		t.Fatalf("inventory row dropped the validated build-source identity: %+v", row.Source())
+< 	}
+< 	if !strings.Contains(row.Describe(), "source="+row.Source().Algorithm+":"+row.Source().ContentSHA256) {
+< 		t.Fatalf("inventory line does not report the build source: %s", row.Describe())
+< 	}
+< 	// Only what genuinely depends on the toolchain stays empty.
+1325,1327d1247
+< 	}
+< 	if row.Expectation().Input.Driver != "" {
+< 		t.Fatalf("inventory row published a cache lookup it never took: %+v", row.Expectation())
+diff --color -r --exclude=.git --no-dereference .temp/TASK-260720-1nlmvv/worktree/internal/install/targets.go .temp/TASK-260729-2kaopg/worktree/internal/install/targets.go
+184,185c184
+< 				return runtimeStaging{}, failedBuildBoundary(
+< 					"%s.%s: no protected cache entry for %s", node.Name, name, key)
+---
+> 				return runtimeStaging{}, fmt.Errorf("%s.%s: no protected cache entry for %s", node.Name, name, key)
+187,189d185
+< 			// The cache result carries the manager-private absolute artifact path,
+< 			// so a refusal derived from it is a build-cache boundary failure and is
+< 			// rendered through the same bounded, redacted path as every other one.
+192c188
+< 				return runtimeStaging{}, failedBuildBoundary("%s.%s: %w", node.Name, name, err)
+---
+> 				return runtimeStaging{}, fmt.Errorf("%s.%s: %w", node.Name, name, err)

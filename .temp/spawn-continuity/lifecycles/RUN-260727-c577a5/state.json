@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "lifecycle_id": "RUN-260727-c577a5",
+  "lifecycle_revision": 3,
+  "task_id": "TASK-260720-1nvomm",
+  "created_at": "2026-07-27T18:16:21.169407Z",
+  "updated_at": "2026-07-30T17:00:08.530795Z",
+  "effective_policy": {
+    "selected_spawn_key": "spawn",
+    "config_key": "spawn.execution_policy",
+    "profile": {
+      "value": "pedantic",
+      "source": "compatibility_default",
+      "config_key": "spawn.execution_policy.profile"
+    },
+    "sessions": {
+      "producer": {
+        "value": "fresh",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.sessions.producer"
+      },
+      "reviewer": {
+        "value": "fresh",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.sessions.reviewer"
+      },
+      "max_resumes": {
+        "value": 4,
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.sessions.max_resumes"
+      },
+      "max_age": {
+        "value": "24h",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.sessions.max_age"
+      },
+      "fresh_fallback": {
+        "value": true,
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.sessions.fresh_fallback"
+      }
+    },
+    "context": {
+      "rework": {
+        "value": "full",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.context.rework"
+      }
+    },
+    "review": {
+      "max_attempts": {
+        "value": null,
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.review.max_attempts"
+      },
+      "after_limit": {
+        "value": "pause",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.review.after_limit"
+      },
+      "primary_attempt_limit": null,
+      "final_audit_reserve": 0
+    }
+  },
+  "effective_policy_digest": "sha256:7095dca731199937f8161a647cc0f5e332ffcb6774192a511250d19105e1733b",
+  "selected_launch_authorization": {
+    "agent": "codex",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "high",
+    "selection_audit_digest": "sha256:b2352ef7545e95a000ebdc3800edf755c83766ea80189bccc44130f7839261e9"
+  },
+  "run_lineage": [
+    {
+      "run_id": "RUN-260727-c577a5",
+      "role": "solution-architect",
+      "review_phase": "producer",
+      "lane_key": "bce7b07e16797d8bb232b3d42f55a4dfc8ee2d17d2c9e54427fbf51f5e8c5cbb",
+      "lane_generation": 2,
+      "provider_session_digest": "sha256:13d4f1319c8282ece34f8783022014444473f04eae51b3661016100e011694da",
+      "reused": false,
+      "created_at": "2026-07-27T18:16:21.130689Z"
+    }
+  ],
+  "snapshot_lineage": [
+    {
+      "run_id": "RUN-260727-c577a5",
+      "prompt_mode": "full",
+      "snapshot_digest": "sha256:c35aedc6b5effb5bc3af0bd40f9802208578084baeae15dece71ee76623fa6e8",
+      "controlled_input_bytes": 131234
+    }
+  ],
+  "latest_references": {
+    "validation": {
+      "key": "validation_manifest/current",
+      "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "findings": {
+      "key": "reviewer_findings/current",
+      "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "resolution": {
+      "key": "producer_resolutions/current",
+      "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "dispatched_actions": [],
+  "event_keys": [
+    "session:bce7b07e16797d8bb232b3d42f55a4dfc8ee2d17d2c9e54427fbf51f5e8c5cbb:2"
+  ],
+  "session_count": 1,
+  "controlled_input_bytes": 131234
+}

@@ -1,0 +1,11 @@
+internal/install/buildhttps.go:46:1: exported: exported method BuildHTTPSCredentials.GoString should have comment or be unexported (revive)
+func (c BuildHTTPSCredentials) GoString() string { return c.String() }
+^
+internal/install/buildhttps.go:63:1: exported: exported method CapturedBuildHTTPSOverride.GoString should have comment or be unexported (revive)
+func (o CapturedBuildHTTPSOverride) GoString() string { return o.String() }
+^
+internal/install/buildhttps.go:87:1: exported: exported method BuildHTTPSSelection.GoString should have comment or be unexported (revive)
+func (s BuildHTTPSSelection) GoString() string { return s.String() }
+^
+3 issues:
+* revive: 3

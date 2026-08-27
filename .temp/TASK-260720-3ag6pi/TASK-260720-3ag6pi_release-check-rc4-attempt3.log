@@ -1,0 +1,16 @@
+2026-07-20T22:25:34Z
+57c1f56846d221ecc55786bd3c2467ec32f11730
+python3 tools/validate.py
+validated 35 schemas and 189 vector files
+python3 -B -m unittest discover -s tools -p 'test_*.py'
+...........................
+----------------------------------------------------------------------
+Ran 27 tests in 10.677s
+
+OK
+go test ./tools/...
+ok  	github.com/relux-works/curator-spec/tools/generate-vectors	0.301s
+go run ./tools/generate-vectors -root .
+git diff --exit-code -- conformance/v1
+fatal: unable to read fe33a8e75d8bb93b415c21ad15a91ad9c3a2dfc6
+make: *** [regenerate-check] Error 128

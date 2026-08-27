@@ -1,0 +1,47 @@
+ok  	github.com/relux-works/curator/cmd/curator	882.723s
+ok  	github.com/relux-works/curator/internal/adapters	4.222s
+ok  	github.com/relux-works/curator/internal/audit	3.888s
+ok  	github.com/relux-works/curator/internal/buildcache	10.599s
+ok  	github.com/relux-works/curator/internal/buildmeta	1.737s
+ok  	github.com/relux-works/curator/internal/buildrepo	52.204s
+ok  	github.com/relux-works/curator/internal/buildsource	4.182s
+ok  	github.com/relux-works/curator/internal/capabilities	2.121s
+ok  	github.com/relux-works/curator/internal/closure	25.658s
+ok  	github.com/relux-works/curator/internal/config	6.028s
+ok  	github.com/relux-works/curator/internal/devsub	4.612s
+ok  	github.com/relux-works/curator/internal/envfiles	1.153s
+ok  	github.com/relux-works/curator/internal/gitcred	8.312s
+ok  	github.com/relux-works/curator/internal/gitignore	1.945s
+ok  	github.com/relux-works/curator/internal/gitops	9.627s
+ok  	github.com/relux-works/curator/internal/globalbins	5.780s
+ok  	github.com/relux-works/curator/internal/godriver	116.966s
+ok  	github.com/relux-works/curator/internal/hashing	4.572s
+ok  	github.com/relux-works/curator/internal/identifiers	4.589s
+ok  	github.com/relux-works/curator/internal/identity	4.747s
+--- FAIL: TestRegistryAttestationLandsInMarker (4.07s)
+    registry_e2e_test.go:104: install: {Alias:test Path:/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestRegistryAttestationLandsInMarker1232378614/003 Status:failed Messages:[test: skill-a: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (project .agents/bin lookup, manager global/bin fallback, validated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional test: registry: registry test-reg snapshot timestamp is too far in the future] Errors:[every trusted audit registry served a tampered snapshot] Builds:[] BuildsComplete:false Staged:[] BuildDiagnostic: BuildCacheRetained:false}
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	371.610s
+ok  	github.com/relux-works/curator/internal/install/atomicity	403.241s
+ok  	github.com/relux-works/curator/internal/interop	2.619s
+ok  	github.com/relux-works/curator/internal/locale	3.496s
+ok  	github.com/relux-works/curator/internal/managerlock	5.016s
+ok  	github.com/relux-works/curator/internal/manifest	3.832s
+ok  	github.com/relux-works/curator/internal/marker	5.830s
+ok  	github.com/relux-works/curator/internal/mcp	3.977s
+ok  	github.com/relux-works/curator/internal/protocoljson	3.851s
+ok  	github.com/relux-works/curator/internal/registry	5.040s
+ok  	github.com/relux-works/curator/internal/runtimestore	14.847s
+ok  	github.com/relux-works/curator/internal/scopes	4.146s
+ok  	github.com/relux-works/curator/internal/shell	3.661s
+ok  	github.com/relux-works/curator/internal/skillcheck	3.116s
+ok  	github.com/relux-works/curator/internal/skillspec	6.372s
+ok  	github.com/relux-works/curator/internal/snapshot	4.843s
+ok  	github.com/relux-works/curator/internal/staging	3.265s
+ok  	github.com/relux-works/curator/internal/transaction	134.912s
+ok  	github.com/relux-works/curator/internal/ui	3.034s
+ok  	github.com/relux-works/curator/internal/verr	2.560s
+ok  	github.com/relux-works/curator/internal/version	2.773s
+ok  	github.com/relux-works/curator/internal/whitelist	3.363s
+FAIL
+EXIT=1

@@ -1,0 +1,44 @@
+Bind the multi-project dry-run case
+
+The rc.6 conformance suite publishes a third authoritative dry-run case,
+`compiled-cache-miss-is-read-only`, in scope `multi-project`.
+`TestAuthoritativeDryRunCasesMutateNothingPersistent` had no executable
+binding for that scope and no binding for eighteen of the twenty-seven
+persistent effects it forbids, so against an rc.6 root the test failed on
+its own `default:` branch. Both branches stay exactly as strict as they
+were: an unbound scope and an unbound effect are still fatal.
+
+The binding is Curator's own multi-project operation. `install --all`
+and `upgrade --all` plan every selected project target in one run --
+one manager home, one skills root, one shared fetch-deduplication set
+-- and profiles/manager.md 2.5 takes those targets in the unsigned byte
+order of their canonical project identities. Both projects declare the
+same compiled command, so both derive one shared logical cache key and
+both miss the same protected entry: the shared surface the case exists
+to protect. The trusted toolchain and the protected build cache are the
+real ones, so the compiled surfaces the case forbids are genuinely
+reachable rather than vacuously absent -- the real probe runs the three
+package-independent commands the case allows, and the real boundary is
+really inspected for the shared key. Only the source-aware builder is
+replaced, by one that records and refuses every call a dry run must
+never make.
+
+Each effect binding is now a probe that reports where its surface is
+visible rather than an assertion that fires, so it can be run in both
+directions, and `TestDryRunEffectBindingsSeeWhatARealOperationWrites`
+runs it the other way: a real project install, a real global install
+and a real locked operation produce these surfaces in their production
+locations, and every binding must then see them. A binding that cannot
+see its own surface would make its absence after a dry run prove
+nothing, and now fails instead. Completeness is part of that test, so a
+future effect cannot gain a binding without gaining a witness.
+
+The suite is no longer parallel: each case isolates the process
+temporary directory so the operation-private roots under test are the
+only ones in it, and `t.Setenv` forbids a parallel ancestor. That
+isolation is what binds the published `operation_private_state_after`
+contract for real.
+
+`root-artifacts.tsv` now declares the manager-lifecycle vector the
+package has always read unguarded, so a root without it defers
+`internal/install` instead of failing it.

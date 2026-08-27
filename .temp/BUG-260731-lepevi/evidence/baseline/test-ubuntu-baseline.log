@@ -1,0 +1,606 @@
+Test (ubuntu-latest)	Set up job	﻿2026-07-31T08:17:21.4439926Z Current runner version: '2.336.0'
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4469221Z ##[group]Runner Image Provisioner
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4470118Z Hosted Compute Agent
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4470698Z Version: 20260707.563
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4471365Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4472070Z Build Date: 2026-07-07T19:33:50Z
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4472701Z Worker ID: {3ca40a68-26d2-4252-8fe9-98bb031d994f}
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4473527Z Azure Region: northcentralus
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4474118Z ##[endgroup]
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4475646Z ##[group]Operating System
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4476295Z Ubuntu
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4476803Z 24.04.4
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4477374Z LTS
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4477870Z ##[endgroup]
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4478625Z ##[group]Runner Image
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4479291Z Image: ubuntu-24.04
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4479835Z Version: 20260720.247.2
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4480952Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260720.247/images/ubuntu/Ubuntu2404-Readme.md
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4482676Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260720.247
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4483684Z ##[endgroup]
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4484757Z ##[group]GITHUB_TOKEN Permissions
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4486689Z Contents: read
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4487369Z Metadata: read
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4487977Z ##[endgroup]
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4490346Z Secret source: Actions
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4491455Z Prepare workflow directory
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4900401Z Prepare all required actions
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.4947742Z Getting action download info
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:21.7503018Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:22.1098142Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:22.5147853Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Test (ubuntu-latest)	Set up job	2026-07-31T08:17:22.7724373Z Complete job name: Test (ubuntu-latest)
+Test (ubuntu-latest)	Run actions/checkout@v4	﻿2026-07-31T08:17:22.8534701Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8543809Z ##[group]Run actions/checkout@v4
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8544790Z with:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8545365Z   submodules: true
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8545989Z   repository: relux-works/curator
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8550018Z   token: ***
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8550559Z   ssh-strict: true
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8551061Z   ssh-user: git
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8551682Z   persist-credentials: true
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8552279Z   clean: true
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8552825Z   sparse-checkout-cone-mode: true
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8553434Z   fetch-depth: 1
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8553946Z   fetch-tags: false
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8554584Z   show-progress: true
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8555107Z   lfs: false
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8555768Z   set-safe-directory: true
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8556358Z   allow-unsafe-pr-checkout: false
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8557371Z env:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8558063Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8558947Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8559505Z   GOENV: off
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.8560005Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9584260Z Syncing repository: relux-works/curator
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9587362Z ##[group]Getting Git version info
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9588731Z Working directory is '/home/runner/work/curator/curator'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9589898Z [command]/usr/bin/git version
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9679815Z git version 2.54.0
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9713125Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9721498Z Temporarily overriding HOME='/home/runner/work/_temp/3489c71f-5098-480d-9976-1b15c57c7dc0' before making global git config changes
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9724215Z Adding repository directory to the temporary git global config as a safe directory
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9727040Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/curator/curator
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9785725Z Deleting the contents of '/home/runner/work/curator/curator'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9790300Z ##[group]Initializing the repository
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9795798Z [command]/usr/bin/git init /home/runner/work/curator/curator
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9934214Z hint: Using 'master' as the name for the initial branch. This default branch name
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9936108Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9938122Z hint: to use in all of your new repositories, which will suppress this warning,
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9939865Z hint: call:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9940693Z hint:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9941844Z hint: 	git config --global init.defaultBranch <name>
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9942631Z hint:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9943290Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9944446Z hint: 'development'. The just-created branch can be renamed via this command:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9945599Z hint:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9946523Z hint: 	git branch -m <name>
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9947147Z hint:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9947852Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9949367Z Initialized empty Git repository in /home/runner/work/curator/curator/.git/
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:22.9954171Z [command]/usr/bin/git remote add origin https://github.com/relux-works/curator
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0005042Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0006079Z ##[group]Disabling automatic garbage collection
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0011049Z [command]/usr/bin/git config --local gc.auto 0
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0055514Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0056584Z ##[group]Setting up auth
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0057484Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0101458Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0578166Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0616422Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0842651Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.0878629Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.1104318Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.1144307Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.1145467Z ##[group]Fetching the repository
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.1154086Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +2f3ec629b6a0532ae209d210d74b933f9bd3b828:refs/remotes/pull/9/merge
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5221505Z From https://github.com/relux-works/curator
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5223396Z  * [new ref]         2f3ec629b6a0532ae209d210d74b933f9bd3b828 -> pull/9/merge
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5267683Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5270217Z ##[group]Determining the checkout info
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5272802Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5278292Z [command]/usr/bin/git sparse-checkout disable
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5330824Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5372204Z ##[group]Checking out the ref
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5375152Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/9/merge
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5706487Z Note: switching to 'refs/remotes/pull/9/merge'.
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5707874Z 
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5709254Z You are in 'detached HEAD' state. You can look around, make experimental
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5719068Z changes and commit them, and you can discard any commits you make in this
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5721231Z state without impacting any branches by switching back to a branch.
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5722401Z 
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5723193Z If you want to create a new branch to retain commits you create, you may
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5725102Z do so (now or later) by using -c with the switch command. Example:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5726337Z 
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5727000Z   git switch -c <new-branch-name>
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5727890Z 
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5728662Z Or undo this operation with:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5729491Z 
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5729967Z   git switch -
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5730626Z 
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5731671Z Turn off this advice by setting config variable advice.detachedHead to false
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5733174Z 
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5734891Z HEAD is now at 2f3ec62 Merge bd6ba08acda3dc801512c408c759ac0ac6f79f26 into cfffd7cd7be33aba9ca44d26993ce5ab19b5fa4d
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5741051Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5742995Z ##[group]Setting up auth for fetching submodules
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5745449Z [command]/usr/bin/git config --global http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5761937Z [command]/usr/bin/git config --global --unset-all url.https://github.com/.insteadOf
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5794122Z [command]/usr/bin/git config --global --add url.https://github.com/.insteadOf git@github.com:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5829058Z [command]/usr/bin/git config --global --add url.https://github.com/.insteadOf org-261817730@github.com:
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5860321Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5862629Z ##[group]Fetching submodules
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.5863991Z [command]/usr/bin/git submodule sync
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.6096455Z [command]/usr/bin/git -c protocol.version=2 submodule update --init --force --depth=1
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.6318608Z Submodule 'agents/skills/skill-go-testing-tools' (https://github.com/relux-works/skill-go-testing-tools.git) registered for path 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:23.6343469Z Cloning into '/home/runner/work/curator/curator/agents/skills/skill-go-testing-tools'...
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5165506Z From https://github.com/relux-works/skill-go-testing-tools
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5167181Z  * branch            21585d0e937cae47e54a788d8ae36b1780eae47f -> FETCH_HEAD
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5323203Z Submodule path 'agents/skills/skill-go-testing-tools': checked out '21585d0e937cae47e54a788d8ae36b1780eae47f'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5337823Z [command]/usr/bin/git submodule foreach git config --local gc.auto 0
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5556890Z Entering 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5596674Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5597247Z ##[group]Persisting credentials for submodules
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5604052Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :"
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5816228Z Entering 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.5876869Z [command]/usr/bin/git submodule foreach sh -c "git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6089856Z Entering 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6132126Z file:/home/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6154605Z [command]/usr/bin/git submodule foreach git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6367542Z Entering 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6403768Z [command]/usr/bin/git submodule foreach git config --local --add 'url.https://github.com/.insteadOf' 'org-261817730@github.com:'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6618812Z Entering 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6650340Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6697079Z [command]/usr/bin/git log -1 --format=%H
+Test (ubuntu-latest)	Run actions/checkout@v4	2026-07-31T08:17:24.6724863Z 2f3ec629b6a0532ae209d210d74b933f9bd3b828
+Test (ubuntu-latest)	Checkout authoritative protocol suite	﻿2026-07-31T08:17:24.7014589Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7016609Z ##[group]Run actions/checkout@v4
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7016962Z with:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7017281Z   repository: relux-works/curator-spec
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7017679Z   ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7018067Z   path: protocol-spec
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7020802Z   token: ***
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7021102Z   ssh-strict: true
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7021395Z   ssh-user: git
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7021698Z   persist-credentials: true
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7022071Z   clean: true
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7022410Z   sparse-checkout-cone-mode: true
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7022766Z   fetch-depth: 1
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7023050Z   fetch-tags: false
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7023383Z   show-progress: true
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7023669Z   lfs: false
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7023938Z   submodules: false
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7024231Z   set-safe-directory: true
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7024568Z   allow-unsafe-pr-checkout: false
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7024904Z env:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7025212Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7025605Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7025888Z   GOENV: off
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7026147Z ##[endgroup]
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7884773Z Syncing repository: relux-works/curator-spec
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7891496Z ##[group]Getting Git version info
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7892472Z Working directory is '/home/runner/work/curator/curator/protocol-spec'
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7913499Z [command]/usr/bin/git version
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7958378Z git version 2.54.0
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7982691Z ##[endgroup]
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7997787Z Temporarily overriding HOME='/home/runner/work/_temp/c6284541-499a-4194-9c69-96ac766599ef' before making global git config changes
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.7999115Z Adding repository directory to the temporary git global config as a safe directory
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8004255Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/curator/curator/protocol-spec
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8037966Z ##[group]Initializing the repository
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8043099Z [command]/usr/bin/git init /home/runner/work/curator/curator/protocol-spec
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8083942Z hint: Using 'master' as the name for the initial branch. This default branch name
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8091682Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8093211Z hint: to use in all of your new repositories, which will suppress this warning,
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8094554Z hint: call:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8095330Z hint:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8096142Z hint: 	git config --global init.defaultBranch <name>
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8097179Z hint:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8098051Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8099630Z hint: 'development'. The just-created branch can be renamed via this command:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8100584Z hint:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8101124Z hint: 	git branch -m <name>
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8101742Z hint:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8102546Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8103857Z Initialized empty Git repository in /home/runner/work/curator/curator/protocol-spec/.git/
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8106215Z [command]/usr/bin/git remote add origin https://github.com/relux-works/curator-spec
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8142691Z ##[endgroup]
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8143660Z ##[group]Disabling automatic garbage collection
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8148001Z [command]/usr/bin/git config --local gc.auto 0
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8178083Z ##[endgroup]
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8179239Z ##[group]Setting up auth
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8186480Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8221325Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8472051Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8510054Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8759178Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.8799656Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.9053414Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.9093744Z ##[endgroup]
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.9094690Z ##[group]Fetching the repository
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:24.9103454Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1803022Z From https://github.com/relux-works/curator-spec
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1803944Z  * branch            00b1688a9b2457ca397a0bb550acf47cad8ee967 -> FETCH_HEAD
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1827823Z ##[endgroup]
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1828671Z ##[group]Determining the checkout info
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1830863Z ##[endgroup]
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1836951Z [command]/usr/bin/git sparse-checkout disable
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1886576Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1917745Z ##[group]Checking out the ref
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.1921959Z [command]/usr/bin/git checkout --progress --force 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2043699Z Note: switching to '00b1688a9b2457ca397a0bb550acf47cad8ee967'.
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2044255Z 
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2044613Z You are in 'detached HEAD' state. You can look around, make experimental
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2045472Z changes and commit them, and you can discard any commits you make in this
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2046313Z state without impacting any branches by switching back to a branch.
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2046821Z 
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2047143Z If you want to create a new branch to retain commits you create, you may
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2047911Z do so (now or later) by using -c with the switch command. Example:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2048616Z 
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2048812Z   git switch -c <new-branch-name>
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2049123Z 
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2049240Z Or undo this operation with:
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2049461Z 
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2049626Z   git switch -
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2049832Z 
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2050188Z Turn off this advice by setting config variable advice.detachedHead to false
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2050716Z 
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2051079Z HEAD is now at 00b1688 Adopt agent-skill.json as the canonical manifest (#11)
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2052506Z ##[endgroup]
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2092532Z [command]/usr/bin/git log -1 --format=%H
+Test (ubuntu-latest)	Checkout authoritative protocol suite	2026-07-31T08:17:25.2119430Z 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Run actions/setup-go@v5	﻿2026-07-31T08:17:25.2296203Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2297515Z ##[group]Run actions/setup-go@v5
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2297762Z with:
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2297959Z   go-version-file: go.mod
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2298528Z   check-latest: false
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2300984Z   token: ***
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2301189Z   cache: true
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2301375Z env:
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2301599Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2301903Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2302104Z   GOENV: off
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.2302282Z ##[endgroup]
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.3602038Z Setup go version spec 1.25.5
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.3617435Z Attempting to download 1.25.5...
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.3760802Z (node:2718) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.3762315Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.8715860Z matching 1.25.5...
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:25.8761380Z Acquiring 1.25.5 from https://github.com/actions/go-versions/releases/download/1.25.5-19880500865/go-1.25.5-linux-x64.tar.gz
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:26.3425971Z Extracting Go...
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:26.3551904Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/b49248d1-1526-4e26-a97b-f70c03d1597b -f /home/runner/work/_temp/646ad687-bfc9-4514-8264-3a69f1344079
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:27.8403651Z Successfully extracted go to /home/runner/work/_temp/b49248d1-1526-4e26-a97b-f70c03d1597b
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:27.8404663Z Adding to the cache ...
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.5321337Z Successfully cached go to /opt/hostedtoolcache/go/1.25.5/x64
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.5324606Z Added go to the path
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.5327213Z Successfully set up Go version 1.25.5
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.5573460Z [command]/opt/hostedtoolcache/go/1.25.5/x64/bin/go env GOMODCACHE
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.5619997Z [command]/opt/hostedtoolcache/go/1.25.5/x64/bin/go env GOCACHE
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.5662035Z /home/runner/go/pkg/mod
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.5683565Z /home/runner/.cache/go-build
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.6858750Z Cache is not found
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.6881903Z go version go1.25.5 linux/amd64
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.6882240Z 
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.6882673Z ##[group]go env
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8446172Z AR='ar'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8446627Z CC='gcc'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8446965Z CGO_CFLAGS='-O2 -g'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8447352Z CGO_CPPFLAGS=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8447603Z CGO_CXXFLAGS='-O2 -g'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8447845Z CGO_ENABLED='1'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8448053Z CGO_FFLAGS='-O2 -g'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8448643Z CGO_LDFLAGS='-O2 -g'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8448875Z CXX='g++'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8449068Z GCCGO='gccgo'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8449266Z GO111MODULE=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8449482Z GOAMD64='v1'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8449667Z GOARCH='amd64'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8449855Z GOAUTH='netrc'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8450045Z GOBIN=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8450260Z GOCACHE='/home/runner/.cache/go-build'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8450636Z GOCACHEPROG=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8450958Z GODEBUG=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8451243Z GOENV=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8451531Z GOEXE=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8451845Z GOEXPERIMENT=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8452191Z GOFIPS140='off'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8452395Z GOFLAGS=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8453092Z GOGCCFLAGS='-fPIC -m64 -pthread -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=/tmp/go-build3463578088=/tmp/go-build -gno-record-gcc-switches'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8453795Z GOHOSTARCH='amd64'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8454002Z GOHOSTOS='linux'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8454200Z GOINSECURE=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8454437Z GOMOD='/home/runner/work/curator/curator/go.mod'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8454756Z GOMODCACHE='/home/runner/go/pkg/mod'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8455087Z GONOPROXY=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8455541Z GONOSUMDB=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8455720Z GOOS='linux'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8455917Z GOPATH='/home/runner/go'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8456168Z GOPRIVATE=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8456423Z GOPROXY='https://proxy.golang.org,direct'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8456741Z GOROOT='/opt/hostedtoolcache/go/1.25.5/x64'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8457027Z GOSUMDB='sum.golang.org'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8457252Z GOTELEMETRY='local'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8457509Z GOTELEMETRYDIR='/home/runner/.config/go/telemetry'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8457956Z GOTMPDIR=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8458143Z GOTOOLCHAIN='local'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8458780Z GOTOOLDIR='/opt/hostedtoolcache/go/1.25.5/x64/pkg/tool/linux_amd64'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8459129Z GOVCS=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8459310Z GOVERSION='go1.25.5'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8459510Z GOWORK=''
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8459707Z PKG_CONFIG='pkg-config'
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8459845Z 
+Test (ubuntu-latest)	Run actions/setup-go@v5	2026-07-31T08:17:33.8460158Z ##[endgroup]
+Test (ubuntu-latest)	Verify Go toolchain identity	﻿2026-07-31T08:17:33.8740543Z ##[group]Run bash .github/ci/toolchain-identity.sh
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8741020Z [36;1mbash .github/ci/toolchain-identity.sh[0m
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8793365Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8793718Z env:
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8793951Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8794249Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8794447Z   GOENV: off
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8794626Z ##[endgroup]
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8964057Z toolchain: go version go1.25.5 linux/amd64
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.8993387Z toolchain: GOROOT=/opt/hostedtoolcache/go/1.25.5/x64
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.9043323Z toolchain: GOTOOLCHAIN=local
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.9069250Z toolchain: GOENV=<none>
+Test (ubuntu-latest)	Verify Go toolchain identity	2026-07-31T08:17:33.9069934Z ci-toolchain-identity: ok
+Test (ubuntu-latest)	gofmt check	﻿2026-07-31T08:17:33.9110443Z ##[group]Run unformatted="$(gofmt -l cmd internal)"
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9110853Z [36;1munformatted="$(gofmt -l cmd internal)"[0m
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9111163Z [36;1mif [ -n "$unformatted" ]; then[0m
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9111455Z [36;1m  echo "gofmt: files need formatting:"[0m
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9111745Z [36;1m  echo "$unformatted"[0m
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9111985Z [36;1m  exit 1[0m
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9112174Z [36;1mfi[0m
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9156689Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9157026Z env:
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9157256Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9157554Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9157755Z   GOENV: off
+Test (ubuntu-latest)	gofmt check	2026-07-31T08:17:33.9157936Z ##[endgroup]
+Test (ubuntu-latest)	go vet	﻿2026-07-31T08:17:34.1284873Z ##[group]Run go vet ./...
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.1285393Z [36;1mgo vet ./...[0m
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.1354331Z shell: /usr/bin/bash -e {0}
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.1354738Z env:
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.1355130Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.1355673Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.1356034Z   GOENV: off
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.1356353Z ##[endgroup]
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.2174419Z go: downloading golang.org/x/sys v0.36.0
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.2363905Z go: downloading golang.org/x/text v0.3.8
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.3359434Z go: downloading github.com/BurntSushi/toml v1.6.0
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.5029432Z go: downloading github.com/charmbracelet/bubbletea v1.3.10
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.5340724Z go: downloading github.com/charmbracelet/lipgloss v1.1.0
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.6212758Z go: downloading github.com/charmbracelet/x/ansi v0.10.1
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.6249405Z go: downloading github.com/charmbracelet/x/term v0.2.1
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.6356200Z go: downloading github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.6488921Z go: downloading github.com/muesli/cancelreader v0.2.2
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.6555776Z go: downloading github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.6599398Z go: downloading github.com/muesli/termenv v0.16.0
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.6709173Z go: downloading github.com/rivo/uniseg v0.4.7
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.7232136Z go: downloading github.com/lucasb-eyer/go-colorful v1.2.0
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.7233977Z go: downloading github.com/mattn/go-runewidth v0.0.16
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.7361946Z go: downloading github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.7478036Z go: downloading github.com/aymanbagabas/go-osc52/v2 v2.0.1
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.7580114Z go: downloading github.com/mattn/go-isatty v0.0.20
+Test (ubuntu-latest)	go vet	2026-07-31T08:17:34.7815032Z go: downloading github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
+Test (ubuntu-latest)	Ledger consistency	﻿2026-07-31T08:17:52.8918813Z ##[group]Run bash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:52.8919592Z [36;1mbash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger[0m
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:52.8963250Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:52.8963592Z env:
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:52.8963822Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:52.8964119Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:52.8964319Z   GOENV: off
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:52.8964503Z ##[endgroup]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0044941Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix [must=windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0046204Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix/* [must=- skip=windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0047408Z ok    internal/buildcache :: TestValidateWindowsSecurityPolicy [must=windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0048859Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry [must=windows skip=windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0050251Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot [must=windows skip=windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0051794Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0053067Z ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0053990Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0054733Z ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0055667Z ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0056566Z ok    internal/buildcache :: TestUnixProtectedStateMatrix [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0057301Z ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0058048Z ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0059100Z ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0059916Z ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0060672Z ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0061428Z ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0062166Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0062774Z ok    internal/buildsource :: TestRejectsSpecialFile [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0063334Z ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin skip=windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0063950Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0064630Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation/* [must=- skip=linux,darwin,windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0065335Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0066124Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0066960Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/* [must=- skip=linux,darwin,windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0067665Z ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0068520Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0069336Z excl  internal/godriver :: TestResourceLimitsStayInsideManagerBounds (package excluded on linux by the supplied root)
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0070356Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds [must=darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0071397Z excl  internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly (package excluded on linux by the supplied root)
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0072198Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly [must=darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0073062Z excl  internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (package excluded on linux by the supplied root)
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0073976Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes [must=darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0074789Z excl  internal/godriver :: TestPerFileSizeLimitIsReallyApplied (package excluded on linux by the supplied root)
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0075487Z ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied [must=darwin skip=windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0076245Z excl  internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart (package excluded on linux by the supplied root)
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0077040Z ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart [must=windows skip=darwin]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0077868Z excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation (package excluded on linux by the supplied root)
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0079049Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation [must=darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0079794Z ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0080540Z ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0081240Z ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0081889Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0082491Z ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0083119Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0084035Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0085115Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0086176Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0087204Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0088146Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0089432Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0090221Z ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0090900Z excl  internal/godriver :: TestCandidateGoV1SourceAwareContract (package excluded on linux by the supplied root)
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0091666Z ok    internal/godriver :: TestCandidateGoV1SourceAwareContract [must=darwin,windows skip=darwin,windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0092437Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker [must=linux,darwin,windows skip=-]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0093097Z ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0093397Z 
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0093594Z ledger-consistency: 49 rows checked across linux darwin windows
+Test (ubuntu-latest)	Ledger consistency	2026-07-31T08:17:54.0093945Z ledger-consistency: ok
+Test (ubuntu-latest)	go test + platform-case gate	﻿2026-07-31T08:17:54.0141820Z ##[group]Run bash .github/ci/test-gate.sh .temp/ci-evidence/test
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0142299Z [36;1mbash .github/ci/test-gate.sh .temp/ci-evidence/test[0m
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0186354Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0186698Z env:
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0186925Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0187219Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0187417Z   GOENV: off
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0187768Z   CURATOR_CONFORMANCE_ROOT: /home/runner/work/curator/curator/protocol-spec/conformance/v1
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0188424Z ##[endgroup]
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0313872Z test-gate: flags=<none> timeout=30m
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0314741Z test-gate: conformance root=/home/runner/work/curator/curator/protocol-spec/conformance/v1
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0315143Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7951642Z suite-plan: GOOS=linux
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7952556Z suite-plan: root=/home/runner/work/curator/curator/protocol-spec/conformance/v1
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7954033Z suite-plan: the root publishes no vectors/conformance-claim-v3-qualification.json; the recorded default_excluded_on applies
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7955095Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7955503Z defer internal/buildcache
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7956320Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7957541Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7958901Z defer internal/buildsource
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7959663Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7960809Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7961584Z excl  internal/godriver
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7962817Z       excluded on linux by default_excluded_on (this root publishes no vectors/conformance-claim-v3-qualification.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7964717Z       the exclusion is asserted by TestProbeRejectsAnUncoveredPlatformBeforeTheWorker, which still runs and must pass
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7965785Z defer internal/install
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7966581Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7967390Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7967833Z defer internal/marker
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7969136Z       the supplied root publishes none of: schema-cases/install-marker-v2 expected/build-driver/marker.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7970100Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7970536Z defer internal/scopes
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7971035Z       the supplied root publishes none of: vectors/external-repository-lifecycle.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7971737Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7972234Z defer internal/skillspec
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7972957Z       the supplied root publishes none of: schema-cases/agent-skill-v6 fixtures/go-build-skill
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7973753Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7974183Z defer internal/whitelist
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7974778Z       the supplied root publishes none of: fixtures/go-build-skill expected/build-driver/context_files.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7975527Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7975851Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7975984Z suite-plan: served=32 deferred=7 excluded=1
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7976266Z suite-plan: ok
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:39.9441789Z test-gate: stage served exit=1 (stream: .temp/ci-evidence/test/go-test-served.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:56.8473282Z test-gate: stage deferred exit=0 (stream: .temp/ci-evidence/test/go-test-deferred.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:57.7459980Z test-gate: stage assert-godriver exit=0 (stream: .temp/ci-evidence/test/go-test-assert-godriver.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:57.7465073Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:57.7467649Z test-gate: go test overall exit=1 (merged stream: .temp/ci-evidence/test/go-test.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:57.7468096Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0389422Z platform-case gate: GOOS=linux
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0390137Z platform-case gate: ledger=.github/ci/platform-cases.tsv
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0391654Z platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0393237Z platform-case gate: excluded packages (not run here): internal/godriver 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0393742Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0394090Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0394776Z ok    internal/runtimestore :: TestRuntimeCommandPath
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0395523Z ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0396246Z ok    internal/buildcache :: TestUnixProtectedStateMatrix
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0397084Z ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0397838Z ok    internal/config :: TestBootstrapAndAddProject
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0398876Z ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0401526Z ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0402126Z ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0402707Z ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0403276Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0403719Z ok    internal/buildsource :: TestRejectsSpecialFile
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0404077Z ok    internal/gitops :: TestArchiveRejectsLinks
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0404454Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0404891Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0405423Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0405890Z ok    internal/install :: TestDryRunTouchesNothing
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0406294Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0406766Z ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0407291Z ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0407788Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0408154Z ok    internal/install :: TestEndToEndInstall
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0408882Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0409479Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0410149Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0410809Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0411501Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0412172Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0412789Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0413258Z ok    internal/interop :: TestGoldenContextCopy
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0413830Z excl  internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker (package not executed on linux)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0414280Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0414526Z platform-case gate: 33 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0414936Z platform-case gate: ok
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0415079Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0415217Z test-gate: go test exit=1, platform-case gate exit=0
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0424416Z ##[error]Process completed with exit code 1.
+Test (ubuntu-latest)	Upload gate evidence	﻿2026-07-31T08:18:58.0503868Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0505161Z ##[group]Run actions/upload-artifact@v4
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0505427Z with:
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0505627Z   name: test-evidence-ubuntu-latest
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0505891Z   path: .temp/ci-evidence/
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0506119Z   if-no-files-found: warn
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0506338Z   compression-level: 6
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0506545Z   overwrite: false
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0506752Z   include-hidden-files: false
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0506974Z env:
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0507189Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0507484Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0507677Z   GOENV: off
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.0507865Z ##[endgroup]
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.2130408Z (node:15159) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.2131668Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.2232129Z With the provided path, there will be 24 files uploaded
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.2237306Z Artifact name is valid!
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.2238257Z Root directory input is valid!
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.3995079Z Beginning upload of artifact content to blob storage
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.4791941Z (node:15159) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.6402293Z Uploaded bytes 268940
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.6710179Z Finished uploading artifact content to blob storage!
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.6711310Z SHA256 digest of uploaded artifact zip is 3e09488bd9593129d21cb7d78809e3d2408d5ff9a2ac87eac54d192e7e8b1b2c
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.6713055Z Finalizing artifact upload
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.8368805Z Artifact test-evidence-ubuntu-latest.zip successfully finalized. Artifact ID 8787323313
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.8370612Z Artifact test-evidence-ubuntu-latest has been successfully uploaded! Final size is 268940 bytes. Artifact ID is 8787323313
+Test (ubuntu-latest)	Upload gate evidence	2026-07-31T08:18:58.8377946Z Artifact download URL: https://github.com/relux-works/curator/actions/runs/30615765014/artifacts/8787323313
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	﻿2026-07-31T08:18:58.8564618Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.8565877Z Post job cleanup.
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9425541Z [command]/usr/bin/git version
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9468970Z git version 2.54.0
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9539730Z Temporarily overriding HOME='/home/runner/work/_temp/2a37dc10-ca68-4c73-9646-038c426a55e9' before making global git config changes
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9541085Z Adding repository directory to the temporary git global config as a safe directory
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9545439Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/curator/curator/protocol-spec
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9591528Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9634592Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9882940Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9909214Z http.https://github.com/.extraheader
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9921965Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:58.9955536Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:59.0208803Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (ubuntu-latest)	Post Checkout authoritative protocol suite	2026-07-31T08:18:59.0257704Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Test (ubuntu-latest)	Post Run actions/checkout@v4	﻿2026-07-31T08:18:59.0674410Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.0675681Z Post job cleanup.
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.1523574Z [command]/usr/bin/git version
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.1572490Z git version 2.54.0
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.1620595Z Temporarily overriding HOME='/home/runner/work/_temp/9aad880e-7022-4bec-9bac-f6cb6265f0a1' before making global git config changes
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.1621991Z Adding repository directory to the temporary git global config as a safe directory
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.1627023Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/curator/curator
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.1669050Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.1706635Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.1938547Z Entering 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2001656Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2025663Z http.https://github.com/.extraheader
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2044527Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2082166Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2323678Z Entering 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2352170Z http.https://github.com/.extraheader
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2422318Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2467156Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2708081Z Entering 'agents/skills/skill-go-testing-tools'
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2726679Z file:/home/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Test (ubuntu-latest)	Post Run actions/checkout@v4	2026-07-31T08:18:59.2761185Z [command]/usr/bin/git config --file /home/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config --name-only --get-regexp ^includeIf\.gitdir:
+Test (ubuntu-latest)	Complete job	﻿2026-07-31T08:18:59.2924546Z Cleaning up orphan processes
+Test (ubuntu-latest)	Complete job	2026-07-31T08:18:59.3213483Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

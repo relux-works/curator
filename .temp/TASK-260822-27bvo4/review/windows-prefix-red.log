@@ -1,0 +1,14 @@
+--- mutated to pre-fix EvalSymlinks ---
+	canonical, err := filepath.EvalSymlinks(filepath.Clean(absolute))
+=== RUN   TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction
+    identity_windows_test.go:47: EvalSymlinks("C:\\Users\\admin\\AppData\\Local\\Temp\\TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJ3354397198\\002\\current\\curator.exe") = "", The system cannot find the path specified.
+    identity_windows_test.go:52: a manager launched through a directory junction was refused: go-v1 build_execution_worker_identity_invalid: cannot canonicalize the manager executable
+--- FAIL: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction (0.04s)
+=== RUN   TestExecutableIdentityStillRejectsSubstitutionBehindAJunction
+    identity_windows_test.go:78: a manager launched through a directory junction was refused: go-v1 build_execution_worker_identity_invalid: cannot canonicalize the manager executable
+--- FAIL: TestExecutableIdentityStillRejectsSubstitutionBehindAJunction (0.03s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	0.872s
+FAIL
+PREFIX_EXITCODE=1
+RESTORE_BUILD_EXITCODE=0

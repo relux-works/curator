@@ -1,0 +1,66 @@
+{
+  "id": "RUN-260822-abf447",
+  "task_id": "TASK-260822-27bvo4",
+  "created_at": "2026-08-22T19:22:31.364069Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "opus",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "opus"
+    },
+    "resolved": {
+      "model": "opus"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260822-23-22-31_-reviewer--reviewer--claude-_TASK-260822-27bvo4.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "35m0s",
+  "log_resource_name": "TASK-260822-27bvo4_spawn-log_-reviewer--reviewer--claude-_RUN-260822-abf447.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260822-27bvo4_darwin-mutant-no-canonicalization.log",
+    "TASK-260822-27bvo4_gate-wiring-RUN-185ddd.md",
+    "TASK-260822-27bvo4_ledger-check-RUN-185ddd.log",
+    "TASK-260822-27bvo4_platform-case-gate-darwin-RUN-185ddd.log",
+    "TASK-260822-27bvo4_platform-case-gate-windows-RUN-185ddd.log",
+    "TASK-260822-27bvo4_review-RUN-1f3d1d.md",
+    "TASK-260822-27bvo4_review-darwin-mutant-no-canonical.log",
+    "TASK-260822-27bvo4_review-darwin-prefix-evalsymlinks.log",
+    "TASK-260822-27bvo4_review-windows-identity-postfix.log",
+    "TASK-260822-27bvo4_review-windows-prefix-red.log",
+    "TASK-260822-27bvo4_skips-observed-darwin-RUN-185ddd.tsv",
+    "TASK-260822-27bvo4_skips-observed-windows-RUN-185ddd.tsv",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-185ddd.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-1e48d3.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-507162.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-50e157.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-5ca017.log",
+    "TASK-260822-27bvo4_spawn-log_-reviewer--reviewer--claude-_RUN-260822-1f3d1d.log",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization-RUN-507162.md",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization.md",
+    "TASK-260822-27bvo4_symlink-launcher.patch",
+    "TASK-260822-27bvo4_verification-RUN-50e157.md",
+    "TASK-260822-27bvo4_windows-identity-tests.log",
+    "TASK-260822-27bvo4_windows-prefix-baseline-red.log"
+  ]
+}

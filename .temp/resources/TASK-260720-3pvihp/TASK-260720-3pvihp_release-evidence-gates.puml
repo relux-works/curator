@@ -1,0 +1,73 @@
+@startuml
+!theme plain
+
+title Release evidence gates for compiled-build interoperability
+
+start
+partition #LightBlue "Protocol candidate and independent consumers" {
+  :Commit and verify the schema v6 suite;
+  fork
+    :Curator consumes the candidate suite;
+  fork again
+    :csk consumes the candidate suite;
+  end fork
+  :Run black-box parity against one suite digest;
+}
+
+if (All shared cases match?) then (yes)
+  :Publish real Curator and csk releases;
+else (no)
+  :Return the divergence to its owning task;
+  stop
+endif
+
+partition #Wheat "Manager release qualification" {
+  :Record released tags, full commits, artifacts,\nand the exact candidate suite digest;
+}
+if (Immutable manager evidence exists?) then (yes)
+  partition #LightBlue "Specification release gate" {
+    :Pin only the qualified manager releases;
+    :Run both consumers and parity on\nLinux, macOS, and Windows;
+  }
+else (no)
+  :Block with the exact missing evidence;\nchange no implementation pin;
+  stop
+endif
+
+if (Specification release gate passes?) then (yes)
+  partition #LightBlue "Protocol publication" {
+    :Publish the signed protocol release\nand conformance archive;
+  }
+else (no)
+  :Return the failed case or platform evidence;
+  stop
+endif
+
+partition #Thistle "Protocol release qualification" {
+  :Verify the signed tag, full commit, archive checksum,\nsuite digest, and cross-platform CI;
+}
+if (Immutable protocol evidence exists?) then (yes)
+  partition #LightGreen "Manager CI" {
+    fork
+      :Advance the Curator suite pin\nto the released protocol commit;
+    fork again
+      :Advance the csk suite pin\nto the released protocol commit;
+    end fork
+  }
+else (no)
+  :Block with the exact missing evidence;\nchange no manager suite pin;
+  stop
+endif
+
+partition #LightGray "Independent verification" {
+  :Audit case parity, documentation coverage,\nand pin provenance at qualified refs;
+}
+stop
+
+note right
+  A branch, mutable tag, guessed hash,
+  local-only result, or board status cannot
+  cross either release-evidence gate.
+end note
+
+@enduml

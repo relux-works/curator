@@ -1,0 +1,79 @@
+{
+  "id": "RUN-260729-165f06",
+  "task_id": "TASK-260720-3c0ss2",
+  "created_at": "2026-07-29T23:14:30.700464Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-03-14-30_-implementer--developer--codex-_TASK-260720-3c0ss2.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-3c0ss2_spawn-log_-implementer--developer--codex-_RUN-260729-165f06.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-3c0ss2_build-validation.log",
+    "TASK-260720-3c0ss2_focused-pytest.log",
+    "TASK-260720-3c0ss2_full-pytest.log",
+    "TASK-260720-3c0ss2_mypy.log",
+    "TASK-260720-3c0ss2_results.md",
+    "TASK-260720-3c0ss2_review-verdict.md",
+    "TASK-260720-3c0ss2_reviewer-focused-pytest.log",
+    "TASK-260720-3c0ss2_reviewer-full-pytest.log",
+    "TASK-260720-3c0ss2_reviewer-mypy.log",
+    "TASK-260720-3c0ss2_reviewer-provenance-and-diff.log",
+    "TASK-260720-3c0ss2_reviewer-shared-vector-probe.log",
+    "TASK-260720-3c0ss2_reviewer-stale-context-probe.log",
+    "TASK-260720-3c0ss2_reviewer-stale-context-probe.py",
+    "TASK-260720-3c0ss2_spawn-log_-implementer--developer--codex-_RUN-260729-eca262.log",
+    "TASK-260720-3c0ss2_spawn-log_-reviewer--reviewer--codex-_RUN-260729-d29f5f.log",
+    "TASK-260720-3c0ss2_tool-readiness.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-3c0ss2_build-validation.log": "92958eae028a6cb10a3c25b4765c607fd6e63cc3c55a32cbb7a7a5099ccd080a",
+    "TASK-260720-3c0ss2_focused-pytest.log": "11d7a61a2469b24dbf5262f301f8934b35f590debfbc074fc82b5dcc71b97728",
+    "TASK-260720-3c0ss2_full-pytest.log": "d78fdea0755cc9aaac441ce5592f9b691054414a1497bd14926e1b8389eb707c",
+    "TASK-260720-3c0ss2_mypy.log": "4ce668dcabe564a5c85050b37c7e1b1a8823588c893e7aac6dc8b53b4c96cbef",
+    "TASK-260720-3c0ss2_results.md": "c86dd290fd3551640dbbe5211966eb697d798951c2ee8c638ad2ebd3781f787f",
+    "TASK-260720-3c0ss2_review-verdict.md": "e6a66c0dbc38283f90d3a26c48d6e16590666f2079c18c8b4da6946d1ee5c8b8",
+    "TASK-260720-3c0ss2_reviewer-focused-pytest.log": "37ec0e06b164182d08bb75efd4f9efbb57f5368ea9e5903734a3721c2b779e6f",
+    "TASK-260720-3c0ss2_reviewer-full-pytest.log": "5dd8a0552b8e43575ad3eb4937007a9376ad3cb29700ea0418513ba1912d6d86",
+    "TASK-260720-3c0ss2_reviewer-mypy.log": "caf4cb276b1b834b69b4a51aa776668a80ee64e1a2fd04bb890970c67d4fd7e7",
+    "TASK-260720-3c0ss2_reviewer-provenance-and-diff.log": "fed1bec7281b5e71e694b36a48799721588dafeb0c3af8aa9b3b5586b5723720",
+    "TASK-260720-3c0ss2_reviewer-shared-vector-probe.log": "55aa8aad7bb483babc66edd8d619f47b351de7df404325e75337f0397ffa0766",
+    "TASK-260720-3c0ss2_reviewer-stale-context-probe.log": "5d62da860f4a1a82b9f3740e40e302aee865296ccc0bd6bdc11dcbe3e823466a",
+    "TASK-260720-3c0ss2_reviewer-stale-context-probe.py": "58dbdefa0c23cdb4fbd11e17bdc5bc94436fce948599470a4d413a632ee3c0e4",
+    "TASK-260720-3c0ss2_tool-readiness.log": "4c8db3644873f1dc5f918ccb66a76ab3dd2eb7198ef70a0bd83817676f624bc5"
+  },
+  "require_outcome_artifact": true
+}

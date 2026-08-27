@@ -1,0 +1,51 @@
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/registry_of_an_unknown_schema
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/registry_repeating_a_known_member
+    gc_conservative_test.go:213: pass 1 swept the build cache with an unprovable reference set
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/project_with_only_an_invalid_marker
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/unreadable_installed_skill_directory
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/installed_skill_replaced_by_a_file
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/skill_root_replaced_by_a_file
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/corrupt_consumer_registry
+--- FAIL: TestCollectStaysFailSafeAcrossConsecutivePasses (0.01s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/registry_of_an_unknown_schema (0.00s)
+    --- FAIL: TestCollectStaysFailSafeAcrossConsecutivePasses/registry_repeating_a_known_member (0.00s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/project_with_only_an_invalid_marker (0.00s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/unreadable_installed_skill_directory (0.00s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/installed_skill_replaced_by_a_file (0.00s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/skill_root_replaced_by_a_file (0.00s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/corrupt_consumer_registry (0.00s)
+=== RUN   TestRecordingAConsumerNeverOverwritesAnUntrustedRegistry
+--- PASS: TestRecordingAConsumerNeverOverwritesAnUntrustedRegistry (0.00s)
+=== RUN   TestParseConsumersAcceptsOnlyTheCanonicalRegistry
+    gc_conservative_test.go:318: repeated consumers: parseConsumers accepted "{\"schema_version\": 1, \"consumers\": [\"/a\"], \"consumers\": []}" as []
+--- FAIL: TestParseConsumersAcceptsOnlyTheCanonicalRegistry (0.00s)
+=== RUN   TestARepeatedRegistryMemberNeverEmptiesTheRegistry
+    gc_conservative_test.go:354: pass 1 swept the build cache behind an ambiguous registry
+--- FAIL: TestARepeatedRegistryMemberNeverEmptiesTheRegistry (0.00s)
+=== RUN   TestWritersRefuseARepeatedRegistryMember
+    gc_conservative_test.go:391: a checkout was recorded over an ambiguous registry
+--- FAIL: TestWritersRefuseARepeatedRegistryMember (0.00s)
+=== RUN   TestStructDecodingWouldTrustARepeatedRegistryMember
+    gc_conservative_test.go:426: parseConsumers accepted the ambiguous registry as []
+--- FAIL: TestStructDecodingWouldTrustARepeatedRegistryMember (0.00s)
+=== RUN   TestCollectStaysFailSafeOnRedirectedUnixScopes
+=== RUN   TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_project_skill_root
+=== RUN   TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_installed_skill
+=== RUN   TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_global_scope_root
+=== RUN   TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_hybrid_scope_root
+--- PASS: TestCollectStaysFailSafeOnRedirectedUnixScopes (0.01s)
+    --- PASS: TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_project_skill_root (0.00s)
+    --- PASS: TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_installed_skill (0.00s)
+    --- PASS: TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_global_scope_root (0.00s)
+    --- PASS: TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_hybrid_scope_root (0.00s)
+=== RUN   TestCollectPrunesConsumersInsideTheSamePass
+--- PASS: TestCollectPrunesConsumersInsideTheSamePass (0.00s)
+=== RUN   TestConsumersRoundTrip
+--- PASS: TestConsumersRoundTrip (0.00s)
+=== RUN   TestGcPrunesDeadConsumers
+--- PASS: TestGcPrunesDeadConsumers (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/scopes	0.578s
+FAIL
+EXIT=1

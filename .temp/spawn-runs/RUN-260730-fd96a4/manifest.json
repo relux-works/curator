@@ -1,0 +1,58 @@
+{
+  "id": "RUN-260730-fd96a4",
+  "task_id": "TASK-260720-2x6mjn",
+  "created_at": "2026-07-30T12:56:12.022503Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-16-56-12_-implementer--developer--codex-_TASK-260720-2x6mjn.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "timeout": "1h0m0s",
+  "log_resource_name": "TASK-260720-2x6mjn_spawn-log_-implementer--developer--codex-_RUN-260730-fd96a4.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-2x6mjn_results.md",
+    "TASK-260720-2x6mjn_review-probes.tar.gz",
+    "TASK-260720-2x6mjn_review-verdict.md",
+    "TASK-260720-2x6mjn_spawn-log_-implementer--developer--codex-_RUN-260730-2f9813.log",
+    "TASK-260720-2x6mjn_spawn-log_-reviewer--reviewer--claude-_RUN-260730-6a9fa9.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-2x6mjn_results.md": "016944a78c92a676eae46f183300ceefa3cd2070a8738a2cdfba2170e3b580dd",
+    "TASK-260720-2x6mjn_review-probes.tar.gz": "1ee2881824105f510d8ba5a30af71b87ad2c5e53a7effa14bd5661a9926401db",
+    "TASK-260720-2x6mjn_review-verdict.md": "7ce3274dccadbee8a6a9d3792a4d4255efb5666a05976b4966c4fd382b3c4f63"
+  },
+  "require_outcome_artifact": true
+}

@@ -1,0 +1,12 @@
+Windows run 30624586045 took the three packages from 70 failing cases to one, and
+all eight of their required ledger rows now report `ok` on windows-latest. The
+survivor is not an audit-gate defect.
+
+The `skill-net` fixture declares `unix_path` alone. The spec allows that — a
+script command may name one platform's path only — and a skill that names no path
+for the host is refused during runtime validation, before the audit verdict this
+case exists to assert is ever consulted. The fixture now exports the command on
+both platforms, so the gate itself is what the case measures on every runner. The
+one-platform-only shape is a separate rule, already covered by the POSIX launcher
+cases in the same file, which skip on Windows under the existing
+platform-control classification.

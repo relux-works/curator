@@ -1,0 +1,105 @@
+=== FINAL MEASUREMENT RUN ===
+host=10.0.19045 arch=AMD64 sid=S-1-5-21-2566270768-74292453-1896159616-1001
+
+##### R1 lift deny + restore dependencies/.extracted
+  icacls remove -> Успешно обработано 41822 файлов; не удалось обработать 0 файлов
+  .extracted bytes=103
+ARGV[r1] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\r1 C:\kn168\src\main.kt
+EXIT[r1]=0  dependency_download_lines=0
+  D0 digest=63d96ff7c488e713dedbf7029237cfc6cd030ae4c1caf11c8ba2274395badae3 files=27867
+  D0_MATCHES_ORIGINAL=True
+
+##### R2 re-apply write deny
+  icacls deny -> Успешно обработано 41822 файлов; не удалось обработать 0 файлов
+  EXEC-PROBE exit=0
+  WRITE-PROBE denied
+  APPEND-PROBE denied
+  .extracted bytes still=103
+
+##### R3 overlay + ETW-traced compile
+  overlay mechanism=junction overlay .extracted bytes=103
+ARGV[f1] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\f1 C:\kn168\src\main.kt
+EXIT[f1]=0  dependency_download_lines=0
+  ProcessStart events in window=13
+  -- every ProcessStart in the window, resolved image path, classified --
+    [IN-BUNDLE] x1 C:\kn168\b\jdk\bin\java.exe
+    [IN-BUNDLE] x2 C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150\bin\clang++.exe
+    [IN-BUNDLE] x1 C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150\bin\ld.lld.exe
+    [OUTSIDE] x1 C:\Users\admin\AppData\Local\Programs\Pulsar\go-librespot.exe
+    [OUTSIDE] x1 C:\Windows\System32\cmd.exe
+    [OUTSIDE] x1 C:\Windows\System32\conhost.exe
+    [OUTSIDE] x1 C:\Windows\System32\logman.exe
+    [OUTSIDE] x3 C:\Windows\System32\OpenSSH\sshd.exe
+    [OUTSIDE] x1 C:\Windows\System32\where.exe
+    [OUTSIDE] x1 C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+  children spawned BELOW the compiler JVM=2
+    child C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150\bin\clang++.exe
+    child C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150\bin\ld.lld.exe
+  TRACER-CONTROL where.exe present in trace=True
+
+##### R4 artifact class, run, imports
+  out \f1.exe 570368
+  out \r1.exe 570368
+  -- staging after compile --
+    stg \hsperfdata_admin <DIR>
+  f1.exe size=570368 magic=0x20b machine=0x8664 (0x8664=AMD64)
+  imports: KERNEL32.dll, msvcrt.dll
+  run exit=0 stdout=curator-kotlin-native-probe
+
+##### R5 distribution platform-library sample
+ARGV[plat] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\plat C:\kn168\src2\main.kt
+EXIT[plat]=0  dependency_download_lines=0
+  plat.exe size=582656 machine=0x8664
+  imports: KERNEL32.dll, msvcrt.dll
+  ADDED vs plain program: (none)
+  run exit=0 stdout=curator-kotlin-native-probe 2600 796142062
+
+##### R6 @-response-file expansion table
+  token=@inject | exit=0 | stdout_bytes=23 | stdout=[Kotlin/Native: 2.4.10] | stderr=[]
+  token=@.\inject | exit=0 | stdout_bytes=23 | stdout=[Kotlin/Native: 2.4.10] | stderr=[]
+  token=@<abs>\inject | exit=0 | stdout_bytes=23 | stdout=[Kotlin/Native: 2.4.10] | stderr=[]
+  token=<abs>\@inject | exit=1 | stdout_bytes=0 | stdout=[] | stderr=[error: source entry is not a Kotlin file: C:/kn168/argprobe/@inject]
+  token=.\@inject | exit=1 | stdout_bytes=0 | stdout=[] | stderr=[error: source entry is not a Kotlin file: C:/kn168/argprobe/@inject]
+  token=@nonexistent | exit=1 | stdout_bytes=0 | stdout=[] | stderr=[error: you have not specified any compilation arguments. No output has been produced.]
+
+##### R7 launcher control under the manager-owned empty PATH
+  konanc.bat exit=9009 (9009 = command not found)
+  stdout_bytes=0 stderr_bytes=97
+
+##### R8 airplaneMode fail-closed on an empty data dir
+ARGV[airplane] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\ap C:\kn168\src\main.kt
+EXIT[airplane]=2  dependency_download_lines=0
+  O| Downloading native dependencies (LLVM, sysroot etc). This is a one-time action performed only on the first run of the compiler.
+  E| error: compilation failed: Back-end: Please report this problem https://kotl.in/issue
+  E| kotlin-native/Interop/Runtime/src/main/kotlin/kotlinx/cinterop/Types.kt:-1:-1
+  E| Details: Internal error in file lowering: java.io.FileNotFoundException: Cannot find a dependency locally: lldb-2-windows.
+  E| Set `airplaneMode = false` in konan.properties to download it.
+  E|  * Compiler version: 2.4.10
+  files created in the empty data dir=4
+
+##### R9 network denial
+  add rule -> Ok.
+  control: empty data dir + airplaneMode=false, network denied -> must not obtain any dependency
+ARGV[netctl] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=false -produce program -target mingw_x64 -o C:\kn168\out\netctl C:\kn168\src\main.kt
+EXIT[netctl]=2  dependency_download_lines=1
+  O| Downloading native dependencies (LLVM, sysroot etc). This is a one-time action performed only on the first run of the compiler.
+  O| Downloading dependency https://download.jetbrains.com/kotlin/native/lldb-2-windows.zip to C:\kn168\ov-empty2\dependencies\cache\lldb-2-windows.zip
+  O| Cannot download a dependency https://download.jetbrains.com/kotlin/native/lldb-2-windows.zip: java.net.SocketException: Permission denied: getsockopt
+  O| Waiting 3.0 sec and trying again (attempt: 2/10).
+  O| Cannot download a dependency https://download.jetbrains.com/kotlin/native/lldb-2-windows.zip: java.net.SocketException: Permission denied: getsockopt
+  E| error: compilation failed: Back-end: Please report this problem https://kotl.in/issue
+  E| kotlin-native/Interop/Runtime/src/main/kotlin/kotlinx/cinterop/Types.kt:-1:-1
+  E| Details: Internal error in file lowering: java.net.SocketException: Permission denied: getsockopt
+  E|  * Compiler version: 2.4.10
+  E|  * Output kind: PROGRAM
+  subject: hydrated overlay + airplaneMode=true, network denied -> must exit 0 with no download
+ARGV[netok] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\netok C:\kn168\src\main.kt
+EXIT[netok]=0  dependency_download_lines=0
+  delete rule -> Deleted 1 rule(s). Ok.
+  rule present after cleanup=False
+
+##### R10 final bundle identity
+  D_final digest=63d96ff7c488e713dedbf7029237cfc6cd030ae4c1caf11c8ba2274395badae3 files=27867
+  BUNDLE_UNCHANGED_ACROSS_ALL_OPERATIONS=True
+
+=== FINAL MEASUREMENT RUN COMPLETE ===

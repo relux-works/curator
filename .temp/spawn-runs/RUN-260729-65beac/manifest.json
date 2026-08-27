@@ -1,0 +1,69 @@
+{
+  "id": "RUN-260729-65beac",
+  "task_id": "TASK-260729-osjeay",
+  "created_at": "2026-07-29T14:11:29.046234Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] researcher (claude)",
+  "role": "researcher",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-18-11-29_-analyst--researcher--claude-_TASK-260729-osjeay.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260729-osjeay_spawn-log_-analyst--researcher--claude-_RUN-260729-65beac.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260729-osjeay_final-ci-execution-map.md",
+    "TASK-260729-osjeay_gate-status-cycle3.md",
+    "TASK-260729-osjeay_gate-status.md",
+    "TASK-260729-osjeay_review-verdict-cycle-2.md",
+    "TASK-260729-osjeay_review-verdict-cycle-3.md",
+    "TASK-260729-osjeay_review-verdict-cycle-4.md",
+    "TASK-260729-osjeay_review-verdict.md",
+    "TASK-260729-osjeay_spawn-log_-analyst--researcher--claude-_RUN-260729-580f82.log",
+    "TASK-260729-osjeay_spawn-log_-analyst--researcher--claude-_RUN-260729-84e5b3.log",
+    "TASK-260729-osjeay_spawn-log_-analyst--researcher--claude-_RUN-260729-8fa56b.log",
+    "TASK-260729-osjeay_spawn-log_-analyst--researcher--claude-_RUN-260729-ed33dc.log",
+    "TASK-260729-osjeay_spawn-log_-reviewer--reviewer--codex-_RUN-260729-46ec6d.log",
+    "TASK-260729-osjeay_spawn-log_-reviewer--reviewer--codex-_RUN-260729-a3e693.log",
+    "TASK-260729-osjeay_spawn-log_-reviewer--reviewer--codex-_RUN-260729-ad4a38.log",
+    "TASK-260729-osjeay_spawn-log_-reviewer--reviewer--codex-_RUN-260729-fffc3c.log",
+    "TASK-260729-osjeay_verify-recipes.sh"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260729-osjeay_final-ci-execution-map.md": "73a2da0ea21b71a0da5723e13436767850c8aff58d419257fba06776b113c36e",
+    "TASK-260729-osjeay_gate-status-cycle3.md": "56ed599840e367f1022d2fbfd12ec7897efbbc414e251f61e8898c479f40d1de",
+    "TASK-260729-osjeay_gate-status.md": "dd9dded4a0a09063595b0194a725c96b2db897c5f9c7925e4dae22596f6fcc48",
+    "TASK-260729-osjeay_review-verdict-cycle-2.md": "da6ab2f59471c33b5151ca28e657efc9822dce85ca968c1d58427c8942428fd3",
+    "TASK-260729-osjeay_review-verdict-cycle-3.md": "dda0f3af02bc58280d174a5f020bd04e8e2dbc4aa4a8a32adce958d5158ee340",
+    "TASK-260729-osjeay_review-verdict-cycle-4.md": "f8e818585384fb95d87113a5bc6e6d94aaddf878d790c27d8e5d5ea00fec5360",
+    "TASK-260729-osjeay_review-verdict.md": "3995d2d72fd8f5ee6721e13f46030ab71f80140f3a46337d10a9ccc503e516cb",
+    "TASK-260729-osjeay_verify-recipes.sh": "613bf2dd384381fc1857c2a9560c4f57d358828673c9d412d81fcfa3ae1f2c3b"
+  },
+  "require_outcome_artifact": true
+}

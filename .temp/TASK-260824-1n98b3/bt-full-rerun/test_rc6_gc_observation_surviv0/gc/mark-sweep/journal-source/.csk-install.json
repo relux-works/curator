@@ -1,0 +1,50 @@
+{
+  "activation": {
+    "commands": [
+      "golden-tool"
+    ],
+    "context": true
+  },
+  "agents": [
+    "claude_code",
+    "codex_cli",
+    "cursor"
+  ],
+  "build_roots": [
+    "build"
+  ],
+  "build_source": {
+    "algorithm": "curator-build-source-v1",
+    "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "builds": {
+    "golden-tool": {
+      "artifact_path": "bin/golden-tool",
+      "artifact_sha256": "sha256:ab4505c26e046b55763d5dfd48e86ac551f584322987f0862eb69f98f8264432",
+      "cache_key": "sha256:359fb2c9b7e6936e20abc659abeda8003f8faa1a104dc6ad0143772c2d9e7773",
+      "driver": "go-v1",
+      "receipt_sha256": "sha256:919fbbad8e6ce95532219fd952c2309d0d7026f85209650508fd6834af4020cd"
+    }
+  },
+  "commands": [
+    "golden-tool"
+  ],
+  "commit": "ef81d4fe54060116c79f9124aaf7d5ab2b52fb23",
+  "content_sha256": "sha256:c3337f6c7111f7eb3779b277e5b6a9e1e11a8198d3598e24ca8f64625ab6c06c",
+  "dependencies": [],
+  "files": [
+    "SKILL.md"
+  ],
+  "installed_at": "2026-08-24T20:02:00Z",
+  "locale": "ru",
+  "name": "build-skill",
+  "ref": "v1",
+  "ref_kind": "tag",
+  "requirers": [
+    "<project>"
+  ],
+  "runtime_roots": [],
+  "schema_version": 2,
+  "skill_schema_version": 6,
+  "source": "build-skill"
+}

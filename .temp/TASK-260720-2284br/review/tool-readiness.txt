@@ -1,0 +1,16 @@
+Reviewer tool readiness, 2026-07-28
+
+git --version
+git version 2.50.1 (Apple Git-155)
+
+go version
+go version go1.25.5 darwin/arm64
+
+golangci-lint version
+FAILED: zsh: command not found: golangci-lint
+
+task-board --version
+task-board version 0.23.0 (commit beec6e9, built 2026-07-27T23:36:53Z)
+
+The reviewer will not claim an independent lint rerun unless the producer's
+task-scoped archive exposes a usable explicit golangci-lint binary or command.

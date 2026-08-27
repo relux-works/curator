@@ -1,0 +1,190 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 22820cb..f890583 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,21 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-08-25
++
++### 0558 — `BUG-260825-11nmd5`: the vendored `//go:generate` carve-out, and why the bound is the module and not the path
++
++- REGRESSION: `9ba552f Restore Go generator rejection` folded a de-obfuscation pass over `internal/godriver/graph.go` and, in the same hunk, replaced the vendor carve-out's empty branch with an unconditional `return diagnostic("go_generator_forbidden", ...)`. `go-v1` then rejected **every** active Go file containing `//go:generate`, vendored or not, against the normative profile.
++- ROOT CAUSE OF THE BLOCKAGE DOWNSTREAM: `skill-project-management`'s `task-board-tui` reaches `clipperhouse/displaywidth` through `bubbletea` → `charmbracelet/x/ansi`; its `gen.go` ships a bare `//go:generate` and no released version drops it. Nothing the consuming skill can do about it, which is exactly the case decision 0005 was written for.
++- FIX: `internal/godriver/graph.go:247` now reads `if matched == 2 && !vendoredDependency(item, validation.BuildRoot)`, with the new `vendoredDependency` helper at `graph.go:272`. Only `//go:generate` is relaxed; the `//go:cgo_import_dynamic` allowlist, the `SFiles` vendored-assembly carve-out, and every other rejection class are untouched.
++- DECISION, THE BOUND IS `!Module.Main` **AND** below `vendor/`, NOT A PATH PREFIX: the neighbouring `SFiles` carve-out tests `strictlyBelow(item.Dir, vendorRoot)` alone. That is not sufficient here, because a package's own build command declares `source_dir`, so first-party code can be made to sit below `<buildRoot>/vendor` and would inherit the exemption on a prefix match. A main-module result is first-party by definition wherever its directory is. The `SFiles` carve-out has the same theoretical hole and was deliberately left alone as out of scope — worth closing separately.
++- FINDING, THE NARROWING MUTANT IS THE ONLY ONE THAT PROVES ANYTHING: deleting the gate (`if false`) kills two subtests but says nothing about the class. Dropping *just* the `Module.Main` guard while keeping the path prefix is what proves the bound is a first-party/third-party distinction: `first-party_package_below_the_vendor_tree: error = <nil>, want go_generator_forbidden`. Four mutants applied and reverted in total, all killed; table in the board artifact.
++- ANOMALY, `go test ./cmd/curator` EXITS 1 WHILE THE BINARY PRINTS `PASS`: `testing: can't write .../go-build*/b001/testlog.txt: write ...: file too large`. Go's build-cache testlog for that package outgrew the writable limit; the non-zero status is the cache write, not a test. `-count=1` makes the run non-cacheable, skips the testlog, and exits 0 in 285s. Reach for `-count=1` on `cmd/curator` here rather than debugging a phantom failure.
++- NOTE ON RUNNING THE SUITE HEADLESS: `make ci-test` cannot finish inside one time-bounded shell call. `suite-plan.sh` against the pin root emits `plan-served.txt`/`plan-deferred.txt`; running those lists as bounded chunks — deferred with `CURATOR_CONFORMANCE_ROOT` **unset**, as `test-gate.sh` does — is the same gate without the wall-clock. Plan at `SPEC_PIN` `00b1688` on darwin: `served=34 deferred=7 excluded=0`.
++- SCOPE: `internal/godriver/graph.go`, `internal/godriver/graph_test.go`, `internal/godriver/build_test.go`. Worktree `.temp/STORY-260822-2lvw0e/worktree`, branch `task-board/story/STORY-260822-2lvw0e`.
++- STATUS: handed to review. All local gates exit 0 (godriver incl. `-race`, all 34 served + 7 deferred packages, `golangci-lint`, `go vet`, `gofmt`, `gate-selftest` 75/0, `ledger-consistency` 72 rows, `no-broad-suppression`). linux and windows lanes not run — no local runner; CI's to run.
++
++
+ ## 2026-08-23
+ 
+ ### 0216 — `TASK-260822-4p3dcq`: the build_ssh docs surface, and the scope-grammar finding that does not reproduce as filed
+diff --git a/internal/godriver/build_test.go b/internal/godriver/build_test.go
+index b3bd96c..2c2a688 100644
+--- a/internal/godriver/build_test.go
++++ b/internal/godriver/build_test.go
+@@ -513,3 +513,35 @@ func assertFixedBuildEnvironment(t *testing.T, environment []string, session *Se
+ 		t.Fatalf("PATH is not an empty manager-owned directory: %v %v", entries, err)
+ 	}
+ }
++
++// TestBuildCompilesThroughAVendoredGeneratorDirective drives the production
++// entry point, not just the graph validator: a real materialized vendor tree
++// carrying an inert //go:generate must reach `go build` instead of stopping at
++// preflight, which is the case that blocks task-board-tui (bubbletea reaches
++// clipperhouse/displaywidth through charmbracelet/x/ansi).
++func TestBuildCompilesThroughAVendoredGeneratorDirective(t *testing.T) {
++	fixture := newSnapshotFixture(t)
++	vendorDir := filepath.Join(fixture.buildRoot, "vendor", "example.test", "dep", "value")
++	writeTestFile(t, filepath.Join(vendorDir, "value.go"),
++		[]byte("package value\n//go:generate stringer -type=Value\nconst V = 1\n"), 0o644)
++	writeTestFile(t, filepath.Join(fixture.buildRoot, "vendor", "modules.txt"),
++		[]byte("# example.test/dep v1.0.0\n## explicit; go 1.23\nexample.test/dep/value\n"), 0o644)
++	vendored := packageJSON{
++		Dir: vendorDir, ImportPath: "example.test/dep/value", Name: "value", DepOnly: true,
++		GoFiles: []string{"value.go"},
++		Module:  &moduleJSON{Path: "example.test/dep", Version: "v1.0.0", GoVersion: "1.23"},
++	}
++	fixture.start(stubScript{ListStdout: string(encodePackages(t, vendored, fixture.rootPackage())), Artifact: "artifact"})
++
++	result, err := Build(context.Background(), fixture.request(ResourceLimits{Timeout: 30 * time.Second}))
++	if err != nil {
++		t.Fatalf("vendored generator directive stopped the build: %v", err)
++	}
++	calls := fixture.sourceAwareCalls()
++	if len(calls) != 2 {
++		t.Fatalf("source-aware calls = %d, want one list and one build", len(calls))
++	}
++	if !reflect.DeepEqual(calls[1].Argv, wantBuildArgv(result.Artifact.StagedPath)) {
++		t.Fatalf("build argv = %q", calls[1].Argv)
++	}
++}
+diff --git a/internal/godriver/graph.go b/internal/godriver/graph.go
+index ca8cd2c..3e7da56 100644
+--- a/internal/godriver/graph.go
++++ b/internal/godriver/graph.go
+@@ -244,7 +244,7 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
+ 			if matched == 1 && item.ImportPath != "golang.org/x/sys" && !strings.HasPrefix(item.ImportPath, "golang.org/x/sys/") {
+ 				return diagnostic("go_forbidden_compiler_directive", "package %q contains //go:cgo_import_dynamic", item.ImportPath)
+ 			}
+-			if matched == 2 {
++			if matched == 2 && !vendoredDependency(item, validation.BuildRoot) {
+ 				return diagnostic("go_generator_forbidden", "package %q contains an active generator directive", item.ImportPath)
+ 			}
+ 		}
+@@ -269,6 +269,21 @@ func validatePackageInputs(item packageJSON, validation graphValidation) error {
+ 	return nil
+ }
+ 
++// vendoredDependency reports whether a result is third-party code the build root
++// materialized into its vendor tree, rather than code the build root owns. The
++// //go:generate relaxation of decision 0005 is bounded to exactly this set: the
++// directive is inert because the manager never runs generators and `go build
++// -mod=vendor` does not execute them, and a vendored dependency cannot drop a
++// directive the upstream release ships. First-party code, including a main-module
++// package that happens to sit below the vendor directory, can simply not use the
++// construct and is still rejected.
++func vendoredDependency(item packageJSON, buildRoot string) bool {
++	if item.Module == nil || item.Module.Main {
++		return false
++	}
++	return strictlyBelow(item.Dir, filepath.Join(buildRoot, "vendor"))
++}
++
+ func scanSourceDirectives(path string) (int, error) {
+ 	file, err := os.Open(path) // #nosec G304 -- path was constrained to the frozen build root
+ 	if err != nil {
+diff --git a/internal/godriver/graph_test.go b/internal/godriver/graph_test.go
+index ba88a4f..814b851 100644
+--- a/internal/godriver/graph_test.go
++++ b/internal/godriver/graph_test.go
+@@ -94,3 +94,84 @@ func TestVerifyArtifactRejectsHardLinks(t *testing.T) {
+ 		t.Fatalf("error = %v", err)
+ 	}
+ }
++
++// TestPackageGraphExemptsGeneratorDirectiveOnlyBelowTheVendorTree pins the
++// decision 0005 relaxation and its bound. A materialized vendor tree may carry a
++// bare //go:generate that no released upstream version drops (bubbletea reaches
++// clipperhouse/displaywidth through charmbracelet/x/ansi), and the directive is
++// inert because the manager never runs generators. The carve-out is bounded to
++// that tree: the build root's own code is still rejected, a first-party
++// main-module package parked below the vendor directory is still rejected, and
++// the directive is not a hole for //go:cgo_import_dynamic.
++func TestPackageGraphExemptsGeneratorDirectiveOnlyBelowTheVendorTree(t *testing.T) {
++	const generator = "//go:generate stringer -type=Value\n"
++	fixture := newSnapshotFixture(t)
++	vendorDir := filepath.Join(fixture.buildRoot, "vendor", "example.test", "dep", "value")
++	writeTestFile(t, filepath.Join(vendorDir, "value.go"), []byte("package value\n"+generator+"const V = 1\n"), 0o644)
++	writeTestFile(t, filepath.Join(fixture.buildRoot, "vendor", "modules.txt"),
++		[]byte("# example.test/dep v1.0.0\n## explicit; go 1.23\nexample.test/dep/value\n"), 0o644)
++	goroot := mustPhysical(t, t.TempDir())
++
++	root := fixture.rootPackage()
++	vendored := packageJSON{
++		Dir: vendorDir, ImportPath: "example.test/dep/value", Name: "value", DepOnly: true,
++		GoFiles: []string{"value.go"},
++		Module:  &moduleJSON{Path: "example.test/dep", Version: "v1.0.0", GoVersion: "1.23"},
++	}
++	validation := graphValidation{BuildRoot: fixture.buildRoot, SourceDir: fixture.sourceDir, GOROOT: goroot}
++	if err := validatePackageGraph(encodePackages(t, vendored, root), validation); err != nil {
++		t.Fatalf("vendored generator directive must not fail preflight: %v", err)
++	}
++
++	// A first-party package that sits below the vendor directory: the module is
++	// the main module, so the path prefix alone must not buy the exemption.
++	parkedDir := filepath.Join(fixture.buildRoot, "vendor", "example.test", "build", "internal", "gen")
++	writeTestFile(t, filepath.Join(parkedDir, "gen.go"), []byte("package gen\n"+generator+"const G = 1\n"), 0o644)
++	parked := packageJSON{
++		Dir: parkedDir, ImportPath: "example.test/build/internal/gen", Name: "gen", DepOnly: true,
++		GoFiles: []string{"gen.go"}, Module: root.Module,
++	}
++
++	// Each case restores both scanned files first, so no case can pass because an
++	// earlier one left a rejectable byte behind.
++	cleanRoot := []byte("package main\nfunc main() {}\n")
++	cleanVendored := []byte("package value\n" + generator + "const V = 1\n")
++	for _, testCase := range []struct {
++		name, code string
++		items      []packageJSON
++		setup      func()
++	}{
++		{
++			name: "build root package", code: "go_generator_forbidden",
++			items: []packageJSON{vendored, root},
++			setup: func() {
++				writeTestFile(t, filepath.Join(fixture.sourceDir, "main.go"),
++					[]byte("package main\n"+generator+"func main() {}\n"), 0o644)
++			},
++		},
++		{
++			name: "first-party package below the vendor tree", code: "go_generator_forbidden",
++			items: []packageJSON{vendored, parked, root},
++		},
++		{
++			name: "vendored cgo_import_dynamic", code: "go_forbidden_compiler_directive",
++			items: []packageJSON{vendored, root},
++			setup: func() {
++				writeTestFile(t, filepath.Join(vendorDir, "value.go"),
++					[]byte("package value\n//go:cgo_import_dynamic x y z\nconst V = 1\n"), 0o644)
++			},
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			writeTestFile(t, filepath.Join(fixture.sourceDir, "main.go"), cleanRoot, 0o644)
++			writeTestFile(t, filepath.Join(vendorDir, "value.go"), cleanVendored, 0o644)
++			if testCase.setup != nil {
++				testCase.setup()
++			}
++			err := validatePackageGraph(encodePackages(t, testCase.items...), validation)
++			if DiagnosticCode(err) != testCase.code {
++				t.Fatalf("error = %v, want %s", err, testCase.code)
++			}
++		})
++	}
++}

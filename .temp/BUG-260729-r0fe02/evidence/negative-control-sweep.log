@@ -1,0 +1,8 @@
+=== RUN   TestFingerprintCancellationStaysFailClosed
+=== RUN   TestFingerprintCancellationStaysFailClosed/every_cancellation_point_stays_a_deadline
+    fingerprint_equivalence_test.go:637: budget 17: error = go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, want nil or toolchain_timeout
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.01s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/every_cancellation_point_stays_a_deadline (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	0.471s
+FAIL

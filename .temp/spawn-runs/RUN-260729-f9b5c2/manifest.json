@@ -1,0 +1,72 @@
+{
+  "id": "RUN-260729-f9b5c2",
+  "task_id": "TASK-260728-1yhuqi",
+  "created_at": "2026-07-29T01:00:11.238618Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] solution-architect (claude)",
+  "role": "solution-architect",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-05-00-11_-analyst--solution-architect--claude-_TASK-260728-1yhuqi.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260728-1yhuqi_spawn-log_-analyst--solution-architect--claude-_RUN-260729-f9b5c2.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260728-1yhuqi_command-evidence.log",
+    "TASK-260728-1yhuqi_decision-0011-swift-driver-pair.md",
+    "TASK-260728-1yhuqi_fixture-absent.json",
+    "TASK-260728-1yhuqi_fixture-macos.json",
+    "TASK-260728-1yhuqi_gate-log.txt",
+    "TASK-260728-1yhuqi_probe.tar.gz",
+    "TASK-260728-1yhuqi_results.md",
+    "TASK-260728-1yhuqi_review-verdict-cycle-1.md",
+    "TASK-260728-1yhuqi_review-verdict-cycle-2.md",
+    "TASK-260728-1yhuqi_rework-cycle-1.md",
+    "TASK-260728-1yhuqi_spawn-log_-analyst--solution-architect--claude-_RUN-260728-63be8f.log",
+    "TASK-260728-1yhuqi_spawn-log_-implementer--developer--claude-_RUN-260728-7fdc12.log",
+    "TASK-260728-1yhuqi_spawn-log_-implementer--developer--claude-_RUN-260728-ce039d.log",
+    "TASK-260728-1yhuqi_spawn-log_-reviewer--reviewer--codex-_RUN-260728-63a4dd.log",
+    "TASK-260728-1yhuqi_spawn-log_-reviewer--reviewer--codex-_RUN-260729-d7ff1c.log",
+    "TASK-260728-1yhuqi_swift-build-drivers-reference.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260728-1yhuqi_command-evidence.log": "90385bd0f9a18822b12caba4329ecd1e7a5986beb80f7d1881e2e69b0d7d563e",
+    "TASK-260728-1yhuqi_decision-0011-swift-driver-pair.md": "57e41287a5aa8e051dac4710ff6a731e38bf7b5d8decee82a7775ed3d2ea1f56",
+    "TASK-260728-1yhuqi_fixture-absent.json": "0d6d28dc2f20ad987fb7e3ce9d58a7c6bc0e4407b89a7e4bd45adf258df8c1a2",
+    "TASK-260728-1yhuqi_fixture-macos.json": "8e2673389ebda67e6d14691df4a377585f0e8203c4f5f157dd43d941264eb7c6",
+    "TASK-260728-1yhuqi_gate-log.txt": "11fcd9adbab841c8375be5db06325d415977c1c78e6e58abb629b3907839dde9",
+    "TASK-260728-1yhuqi_probe.tar.gz": "3d09ad98332ec4e4055bfb07b0a82a9e612ba94af77ffceb940e70b8050dc89a",
+    "TASK-260728-1yhuqi_results.md": "e2399ef1b9840dc8f25d9e15d527bb68f84eb015279bda86f5325b7106e0be60",
+    "TASK-260728-1yhuqi_review-verdict-cycle-1.md": "d92463d9f97c6f8c97ec5d1d48225716c0d0d910fb26f34ce161defde1bf2c50",
+    "TASK-260728-1yhuqi_review-verdict-cycle-2.md": "f42d1c563b31b452f479d344a509a95c3701f77e9ea1d8b9b9d94bb352b98927",
+    "TASK-260728-1yhuqi_rework-cycle-1.md": "3d773aef832ca5e99b55856e99a5d82ec64e8742e7944d0e9c0673df16b596b8",
+    "TASK-260728-1yhuqi_swift-build-drivers-reference.md": "ffbeec00b2ba759a4163a7422ed99121df50f474fa3c9764a4711e9863cb775e"
+  },
+  "require_outcome_artifact": true
+}

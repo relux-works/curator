@@ -1,0 +1,55 @@
+{
+  "id": "RUN-260730-a94b19",
+  "task_id": "TASK-260720-11yhth",
+  "created_at": "2026-07-30T12:21:33.637922Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-16-21-33_-implementer--developer--codex-_TASK-260720-11yhth.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "timeout": "30m0s",
+  "log_resource_name": "TASK-260720-11yhth_spawn-log_-implementer--developer--codex-_RUN-260730-a94b19.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-11yhth_implementation-evidence.md",
+    "TASK-260720-11yhth_native-windows-runs.log",
+    "TASK-260720-11yhth_spawn-log_-implementer--developer--claude-_RUN-260730-707884.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-11yhth_implementation-evidence.md": "45b5323b0aff7cb6bef9cabe047af74343810d6964ff4fe37d1110b20b3ee91d",
+    "TASK-260720-11yhth_native-windows-runs.log": "9f0c0593b51cb2c21962b04694f5b21d7c3c6eb5f06b26a016cef52c9937e430"
+  },
+  "require_outcome_artifact": true
+}

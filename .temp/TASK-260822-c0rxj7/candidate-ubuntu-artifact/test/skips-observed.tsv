@@ -1,0 +1,16 @@
+package	test	class	verdict	reason
+cmd/curator	TestCompiledProjectStatusRepairRollbackRecovery	platform-control	tolerated-by-ledger	rc5-native-control-inventory-v1 defines no record for host linux; the portable execution policy is specified for macOS and Windows only
+cmd/curator	TestGCRetainsAndReportsReferencedCompiledState	platform-control	tolerated-by-ledger	rc5-native-control-inventory-v1 defines no record for host linux; the portable execution policy is specified for macOS and Windows only
+cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	platform-control	tolerated-by-ledger	rc5-native-control-inventory-v1 defines no record for host linux; the portable execution policy is specified for macOS and Windows only
+cmd/curator	TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck	platform-control	tolerated-by-ledger	rc5-native-control-inventory-v1 defines no record for host linux; the portable execution policy is specified for macOS and Windows only
+cmd/curator	TestHostGoToolchainIsSelectableOnAnInventoryPlatform	platform-control	allowed-platform-control	rc5-native-control-inventory-v1 defines no record for host linux; the portable execution policy is specified for macOS and Windows only
+cmd/curator	TestStatusReportsATransitivelyResolvedCompiledCommand	platform-control	tolerated-by-ledger	rc5-native-control-inventory-v1 defines no record for host linux; the portable execution policy is specified for macOS and Windows only
+cmd/curator	TestStatusReportsAnUnusableToolchainPerCompiledCommand	platform-control	tolerated-by-ledger	rc5-native-control-inventory-v1 defines no record for host linux; the portable execution policy is specified for macOS and Windows only
+internal/hashing	TestCrossCheckTree	opt-in	tolerated-by-ledger	cross-check env not set
+internal/install	TestInstallHelperProcess	helper-process	allowed-helper-process	helper process
+internal/shell	TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookSupportsNounsetProfiles/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPowerShellHookRunsOnEveryPrompt	platform-control	tolerated-by-ledger	PowerShell prompt integration is exercised on Windows
+internal/shell	TestZshHookIsIdempotentAndDoesNotReenter	host-capability	allowed-host-capability	zsh is unavailable

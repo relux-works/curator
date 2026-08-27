@@ -1,0 +1,25 @@
+=== RUN   TestCanonicalProjectIdentitiesAndOrder
+--- PASS: TestCanonicalProjectIdentitiesAndOrder (0.00s)
+=== RUN   TestLockIdentitiesAreDeterministicAndManagerLocal
+--- PASS: TestLockIdentitiesAreDeterministicAndManagerLocal (0.00s)
+=== RUN   TestDryRunCreatesNoLockState
+--- PASS: TestDryRunCreatesNoLockState (0.00s)
+=== RUN   TestProjectOrderInversionFailsBeforeWaiting
+--- PASS: TestProjectOrderInversionFailsBeforeWaiting (0.00s)
+=== RUN   TestBuildKeyMustBeReleasedBeforeHome
+--- PASS: TestBuildKeyMustBeReleasedBeforeHome (0.00s)
+=== RUN   TestCancellationReleasesPartialAcquisition
+--- PASS: TestCancellationReleasesPartialAcquisition (0.05s)
+=== RUN   TestReleasedLockFileRemainsAndCanBeReacquired
+--- PASS: TestReleasedLockFileRemainsAndCanBeReacquired (0.00s)
+=== RUN   TestSubprocessContentionAndIndependentProjects
+--- PASS: TestSubprocessContentionAndIndependentProjects (5.49s)
+=== RUN   TestSubprocessBuildKeyDeduplicationAcrossProjects
+--- PASS: TestSubprocessBuildKeyDeduplicationAcrossProjects (3.25s)
+=== RUN   TestAbnormalChildExitReleasesOSLock
+--- PASS: TestAbnormalChildExitReleasesOSLock (0.01s)
+=== RUN   TestManagerLockHelper
+--- PASS: TestManagerLockHelper (0.00s)
+PASS
+coverage: 82.1% of statements
+ok  	github.com/relux-works/curator/internal/managerlock	10.207s	coverage: 82.1% of statements

@@ -1,0 +1,35 @@
+### cycle-2 continuation race gates
+host=Darwin 25.5.0 arm64
+go=go version go1.25.5 darwin/arm64
+start=2026-07-29T01:28:47Z
+disk_avail_start=15Gi
+### race: godriver
+cmd: go test -race -timeout 30m -count=1 ./internal/godriver
+began=2026-07-29T01:28:47Z ended=2026-07-29T01:29:34Z
+exit=0
+disk_avail=15Gi
+tail:
+ok  	github.com/relux-works/curator/internal/godriver	46.537s
+
+### race: install
+cmd: go test -race -timeout 60m -count=1 ./internal/install
+began=2026-07-29T01:29:34Z ended=2026-07-29T01:42:19Z
+exit=0
+disk_avail=14Gi
+tail:
+ok  	github.com/relux-works/curator/internal/install	764.275s
+
+### race: cmd-curator
+cmd: go test -race -timeout 60m -count=1 ./cmd/curator
+began=2026-07-29T01:42:19Z ended=2026-07-29T01:53:13Z
+exit=0
+disk_avail=14Gi
+tail:
+ok  	github.com/relux-works/curator/cmd/curator	651.895s
+
+### summary
+godriver_exit=0
+install_exit=0
+cmd_curator_exit=0
+end=2026-07-29T01:53:13Z
+disk_avail_end=14Gi

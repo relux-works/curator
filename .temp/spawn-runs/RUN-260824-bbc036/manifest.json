@@ -1,0 +1,52 @@
+{
+  "id": "RUN-260824-bbc036",
+  "task_id": "TASK-260825-1tgpcn",
+  "created_at": "2026-08-24T22:08:37.639284Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "claude",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-02-08-37_-implementer--developer--claude-_TASK-260825-1tgpcn.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "35m0s",
+  "log_resource_name": "TASK-260825-1tgpcn_spawn-log_-implementer--developer--claude-_RUN-260824-bbc036.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260825-1tgpcn_results.md",
+    "TASK-260825-1tgpcn_review-verdict.md",
+    "TASK-260825-1tgpcn_spawn-log_-implementer--developer--claude-_RUN-260824-e8091d.log",
+    "TASK-260825-1tgpcn_spawn-log_-reviewer--reviewer--claude-_RUN-260824-de8abc.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260825-1tgpcn_results.md": "8a1c592bed7832ff69b49c57fa3ed50b95e978fe1fb1b4fa17871e05c64ceaf7",
+    "TASK-260825-1tgpcn_review-verdict.md": "28cb6f63281b6c8bc4746d653cc0270290875513834aaafaf14f12313237093c"
+  },
+  "require_outcome_artifact": true
+}

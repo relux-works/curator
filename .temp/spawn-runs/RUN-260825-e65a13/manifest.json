@@ -1,0 +1,77 @@
+{
+  "id": "RUN-260825-e65a13",
+  "task_id": "TASK-260825-2fy132",
+  "created_at": "2026-08-25T01:27:36.059488Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "claude-fable-5",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-fable-5",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "claude-fable-5",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "claude",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-05-27-36_-reviewer--reviewer--claude-_TASK-260825-2fy132.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "control_root": "/Users/iv/Developer/ReluxWorks/curator",
+  "execution_root": "/Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260825-39h6vz/worktree",
+  "story_id": "STORY-260825-39h6vz",
+  "workspace": {
+    "workspace_id": "WS-30c4b651e0b4",
+    "story_id": "STORY-260825-39h6vz",
+    "branch_ref": "refs/heads/task-board/story/STORY-260825-39h6vz",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260825-39h6vz/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "change_request_id": "CR-TASK-260825-2fy132-2",
+  "change_request_revision": 2,
+  "change_request_diff_sha256": "306df91bdd1f7018ff4c0649e270bef78f54a1a9e16977d951fed1a8e4464df9",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "30m0s",
+  "supervision": {
+    "check_every_minutes": 5,
+    "idle_deadline_minutes": 0,
+    "max_runtime_minutes": 0,
+    "on_deadline": "park"
+  },
+  "log_resource_name": "TASK-260825-2fy132_spawn-log_-reviewer--reviewer--claude-_RUN-260825-e65a13.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260825-2fy132_blocker.md",
+    "TASK-260825-2fy132_change-request_rev1.patch",
+    "TASK-260825-2fy132_change-request_rev2.patch",
+    "TASK-260825-2fy132_results.md",
+    "TASK-260825-2fy132_review-verdict.md",
+    "TASK-260825-2fy132_rework-rev2.md",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-1b209e.log",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-325ae9.log",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-6e408e.log",
+    "TASK-260825-2fy132_spawn-log_-reviewer--reviewer--claude-_RUN-260825-53327c.log",
+    "TASK-260825-2fy132_verification.md"
+  ],
+  "recovery_root_run_id": "RUN-260825-e65a13"
+}

@@ -1,0 +1,48 @@
+{
+  "id": "RUN-260728-93cc5c",
+  "task_id": "TASK-260720-1ljev5",
+  "created_at": "2026-07-28T18:45:01.546581Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-22-45-01_-reviewer--reviewer--codex-_TASK-260720-1ljev5.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-1ljev5_spawn-log_-reviewer--reviewer--codex-_RUN-260728-93cc5c.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260720-1ljev5_gate-evidence.tar.gz",
+    "TASK-260720-1ljev5_implementation-notes.md",
+    "TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-a448d8.log"
+  ]
+}

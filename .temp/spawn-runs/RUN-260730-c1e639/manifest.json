@@ -1,0 +1,61 @@
+{
+  "id": "RUN-260730-c1e639",
+  "task_id": "TASK-260720-2g21eg",
+  "created_at": "2026-07-30T03:14:12.426173Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-07-14-12_-implementer--developer--codex-_TASK-260720-2g21eg.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-2g21eg_spawn-log_-implementer--developer--codex-_RUN-260730-c1e639.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-2g21eg_focused-pytest.xml",
+    "TASK-260720-2g21eg_full-pytest.xml",
+    "TASK-260720-2g21eg_real-go-fixture.xml",
+    "TASK-260720-2g21eg_results.md",
+    "TASK-260720-2g21eg_review-verdict.md",
+    "TASK-260720-2g21eg_spawn-log_-implementer--developer--codex-_RUN-260730-015113.log",
+    "TASK-260720-2g21eg_spawn-log_-reviewer--reviewer--codex-_RUN-260730-2d9409.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-2g21eg_focused-pytest.xml": "d2ff8ad666ad18494cea57895f1c31318269013bda17506f2d473f9334df835a",
+    "TASK-260720-2g21eg_full-pytest.xml": "a901d1d323084a43256e7264f07ecd2849c18cdce9124cdc4a06a6b095d0fcc0",
+    "TASK-260720-2g21eg_real-go-fixture.xml": "c17af8596f89969390d33c5ff6a171cc8740f9c97ffeacbd9344f391ab890d96",
+    "TASK-260720-2g21eg_results.md": "46172f7702f173a665934d197f1782fd5aa43296b446ba639bb4c03c853fc409",
+    "TASK-260720-2g21eg_review-verdict.md": "79908290612b90a1412c8e3b3820f570c85a062a0995cf25e2d670644e39e790"
+  },
+  "require_outcome_artifact": true
+}

@@ -1,0 +1,324 @@
+{
+  "schema_version": 2,
+  "id": "RUN-260730-37a259",
+  "task_id": "TASK-260720-8nxlgx",
+  "created_at": "2026-07-30T10:38:58.402194Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "lifecycle_id": "RUN-260730-37a259",
+  "lane_key": "f60d043c065d90ef4dd64c2b4ae9d02b0dda3747a7c8385e1902bbf8210fc498",
+  "lane_generation": 2,
+  "lane_lease_generation": 2,
+  "execution_continuity": {
+    "policy": {
+      "selected_spawn_key": "spawn",
+      "config_key": "spawn.execution_policy",
+      "profile": {
+        "value": "pedantic",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.profile"
+      },
+      "sessions": {
+        "producer": {
+          "value": "fresh",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.producer"
+        },
+        "reviewer": {
+          "value": "fresh",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.reviewer"
+        },
+        "max_resumes": {
+          "value": 4,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.max_resumes"
+        },
+        "max_age": {
+          "value": "24h",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.max_age"
+        },
+        "fresh_fallback": {
+          "value": true,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.fresh_fallback"
+        }
+      },
+      "context": {
+        "rework": {
+          "value": "full",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.context.rework"
+        }
+      },
+      "review": {
+        "max_attempts": {
+          "value": null,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.review.max_attempts"
+        },
+        "after_limit": {
+          "value": "pause",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.review.after_limit"
+        },
+        "primary_attempt_limit": null,
+        "final_audit_reserve": 0
+      }
+    },
+    "review_phase": "primary_review",
+    "board": {
+      "mode": "local",
+      "location": "/Users/iv/Developer/ReluxWorks/curator/.task-board"
+    }
+  },
+  "input_snapshot": {
+    "version": "input_snapshot_v1",
+    "entries": [
+      {
+        "type": "checklist",
+        "name": "definition_of_done",
+        "key": "checklist/definition_of_done",
+        "length": 996,
+        "digest": "sha256:1641c34380affcf81294c28b9932b9f872127bc66c7d6b5c56a3231fde16a56f",
+        "body_base64": "WyJSZWNvcmQgdGhlIGJhc2UgU0hBIGFuZCBjcmVhdGUgdGhlIHRhc2sgd29ya3RyZWUgb25seSBhZnRlciB0aGUgY2xlYW4gbG9jYWwgbWFpbiBjbG9uZSBpcyBmYXN0LWZvcndhcmRlZCBhbmQgZGVwZW5kZW5jeSBoYW5kb2ZmcyBhcmUgcHJlc2VudC4iLCJDb3ZlciBEQUNMLCBvd25lcnNoaXAsIHJlcGFyc2UsIGNvbnRhaW5tZW50LCBoYXJkLWxpbmssIGF0b21pYyBwdWJsaWNhdGlvbiwgYW5kIHJlYWQtb25seSBsb29rdXAgYmVoYXZpb3Igb24gV2luZG93cy4iLCJSdW4gV2luZG93cy1mb2N1c2VkIHRlc3RzLCBjcm9zcy1wbGF0Zm9ybSBpbXBvcnQgdGVzdHMsIHB5dGhvbiAtbSBteXB5LCBhbmQgYXR0YWNoIHRhc2stc2NvcGVkIGV2aWRlbmNlLiIsIkNvZGUgd3JpdHRlbiBwZXIgdGFzayBkZXNjcmlwdGlvbiBhbmQgQUMiLCJSZWxldmFudCB0ZXN0cyB3cml0dGVuIGZvciBuZXcgb3IgY2hhbmdlZCBiZWhhdmlvciBhbmQgcGFzc2luZyIsIkxpbnQgY2xlYW4iLCJSZWxldmFudCBidWlsZC92YWxpZGF0aW9uIGNvbW1hbmRzIHJ1biBhZnRlciBjaGFuZ2VzIGFuZCBidWlsZCBub3QgYnJva2VuIiwiTmV3IG91dGNvbWUgYXJ0aWZhY3QgYXR0YWNoZWQgb24gdGhlIGJvYXJkIHdpdGggYSB0YXNrLXNjb3BlZCBuYW1lIHdoZW4gdGhlIHdvcmsgcHJvZHVjZXMgbm90ZXMsIGxvZ3MsIHNjcmVlbnNob3RzLCBvciBvdGhlciBkZWxpdmVyYWJsZXMiLCJJbXBvcnRhbnQgZmluZGluZ3MsIGRlY2lzaW9ucywgYW5vbWFsaWVzLCBvciByZWdyZXNzaW9ucyByZWNvcmRlZCBpbiBsb2dib29rIHdoZW4gcmVsZXZhbnQiLCJJbXBsZW1lbnRhdGlvbiBtYXRjaGVzIEFDIiwiU29sdXRpb24gZml0cyBwcm9qZWN0IGFyY2hpdGVjdHVyZSIsIlRlc3RzIGdyZWVuIiwiSWYgcmV2aWV3IGRvZXMgbm90IGFjY2VwdCB0aGUgd29yayDigJQgdmVyZGljdCBldmlkZW5jZSBhZGRlZCBhbmQgc3RhdHVzIHJvdXRlZCBieSB0aGUgZXhwbGljaXQgdmVyZGljdCBicmFuY2hlcyJd"
+      },
+      {
+        "type": "execution_policy",
+        "name": "digest",
+        "key": "execution_policy/digest",
+        "length": 71,
+        "digest": "sha256:631dca31732b29a626b42e07097ae1301645ac06894e609be1e3f52549f88596",
+        "body_base64": "c2hhMjU2OjcwOTVkY2E3MzExOTk5MzdmODE2MWE2NDdjYzBmNWUzMzJmZmNiNjc3NDE5MmE1MTEyNTBkMTkxMDVlMTczM2I="
+      },
+      {
+        "type": "final_audit_assignment",
+        "name": "current",
+        "key": "final_audit_assignment/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "goal",
+        "name": "revision",
+        "key": "goal/revision",
+        "length": 4,
+        "digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "body_base64": "bnVsbA=="
+      },
+      {
+        "type": "next_action",
+        "name": "reason",
+        "key": "next_action/reason",
+        "length": 22,
+        "digest": "sha256:205f87c0be0dc5b66d88aef7dc6935832fe5f6bfd275ca07da3a91392244f026",
+        "body_base64": "Ym9hcmRfc3RhdHVzOnRvLXJldmlldw=="
+      },
+      {
+        "type": "post_rework_validation",
+        "name": "current",
+        "key": "post_rework_validation/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "producer_resolutions",
+        "name": "current",
+        "key": "producer_resolutions/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "reviewer_authorization",
+        "name": "current",
+        "key": "reviewer_authorization/current",
+        "length": 13,
+        "digest": "sha256:2e2f92c499978b499f71fc5adf3448d4e094f35055ad2a7303212bcc1bff5570",
+        "body_base64": "eyJydW5faWQiOiIifQ=="
+      },
+      {
+        "type": "reviewer_findings",
+        "name": "current",
+        "key": "reviewer_findings/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "role",
+        "name": "body",
+        "key": "role/body",
+        "length": 2044,
+        "digest": "sha256:0571aca5102774ae78178dd47e2a0adc0c391b00bd079254def33430ddbda6a0",
+        "body_base64": "IyByZXZpZXdlcgoKIyMgRGVzY3JpcHRpb24KClJldmlld3MgaG93IGEgdGFzayB3YXMgaW1wbGVtZW50ZWQgYW5kIGhvdyB0aGUgc29sdXRpb24gZml0cyBpbnRvIHRoZSBwcm9qZWN0LiBEb2VzIG5vdCBtb2RpZnkgY29kZTsgcmVjb3JkcyBvbmUgb2YgdGhlIGV4cGxpY2l0IHZlcmRpY3QgYnJhbmNoZXMgYmVsb3cuCgpXaGVuIHRoZSBydW4gaXMgZ29hbC1ib3VuZCwgcXVlcnkgYHRhc2stYm9hcmQgc3Bhd24gZ29hbCAiJFRBU0tfQk9BUkRfUlVOX0lEImAgYmVmb3JlIHJlY29yZGluZyB0aGUgdmVyZGljdC4gVGhlIHJldmlld2VyIGdvYWwgaXMgcm9sZS1kZXJpdmVkIGFzIGByZXZpZXdlcl92ZXJkaWN0L3Jldmlld2VyX3ZlcmRpY3RgLCBjYXJyaWVzIGl0cyBpbW11dGFibGUgcGFyZW50IGdvYWwgSUQvcmV2aXNpb24sIGFuZCBpcyBzYXRpc2ZpZWQgb25seSBieSBleGFjdGx5IG9uZSB2ZXJkaWN0IGJyYW5jaCB3aXRoIGV2aWRlbmNlLiBBIHByb3ZpZGVyIGV4aXQgb3IgYHJldmlld2luZ2Agc3RhdHVzIGlzIG5vdCBhIHZlcmRpY3QuClRoZSBydW5uZXIgcGVyc2lzdHMgdGhlIGJyYW5jaCBmcm9tIHRoZSBhY2NlcHRlZCBib2FyZCBzdGF0dXMgcGx1cyBhIG5ldyBvciB1cGRhdGVkIHRhc2stc2NvcGVkIHZlcmRpY3QgYXJ0aWZhY3QuIE9ubHkgcGVyc2lzdGVkIGBhY2NlcHRlZGAgY2FuIHNhdGlzZnkgdGhlIHBhcmVudCBkZWxpdmVyeSBnb2FsOyBgY2hhbmdlc19yZXF1ZXN0ZWRgIGFuZCBgc3RvcF90aGVfbGluZWAgZmluaXNoIHRoZSByZXZpZXdlciBnb2FsIHdpdGhvdXQgYWNjZXB0aW5nIGRlbGl2ZXJ5LgoKIyMgRGVsaXZlcmFibGUKClZlcmRpY3QgYnJhbmNoZXMgYXJlIGV4cGxpY2l0OgoKLSBhY2NlcHRlZCDihpIgYGRvbmVgCi0gY2hhbmdlcyByZXF1ZXN0ZWQg4oaSIGB0by1kZXZgIGZvciBpbXBsZW1lbnRhdGlvbiByZXdvcmsgb3IgYGFuYWx5c2lzYCBmb3IgcmVzZWFyY2gvZGVjaXNpb24gd29yaywgd2l0aCB2ZXJkaWN0IGV2aWRlbmNlIGZvciB0aGUgbmV4dCBwcm9kdWNlciBhbmQgYW5vdGhlciByZXZpZXdlciBjeWNsZQotIGdlbnVpbmUgc3RvcC10aGUtbGluZSBib3VuZGFyeSDihpIgYGJsb2NrZWRgIG9ubHkgZm9yIGEgY29uY3JldGUgZXh0ZXJuYWwgYmxvY2tlciBvciBhbiB1bnJlc29sdmVkIGh1bWFuLW9ubHkgcGxhdGZvcm0vcHJvZHVjdC9hcmNoaXRlY3R1cmUvdHJhZGVvZmYvYXBwcm92YWwgZGVjaXNpb24sIHdpdGggZXZpZGVuY2UsIGZhaWxlZCBhc3N1bXB0aW9ucy9hdHRlbXB0cywgdmlhYmxlIGFsdGVybmF0aXZlcyBhbmQgdHJhZGVvZmZzLCBhIHJlY29tbWVuZGF0aW9uLCBhbmQgdGhlIGV4YWN0IGh1bWFuIGRlY2lzaW9uIG9yIGV4dGVybmFsIGlucHV0IG5lZWRlZAoKRG8gbm90IGxlYXZlIHRoZSB0YXNrIGluIGByZXZpZXdpbmdgLCBhbmQgZG8gbm90IHVzZSBgYmxvY2tlZGAgZm9yIG9yZGluYXJ5IHJld29yayBvciBhIHJlY292ZXJhYmxlIGNoaWxkL3J1bnRpbWUgZmFpbHVyZS4KCiMjIFN0YXR1cyBUcmFuc2l0aW9ucwoKLSAqKnN0YXJ0X3N0YXR1czoqKiBgcmV2aWV3aW5nYAotICoqZW5kX3N0YXR1czoqKiBubyB1bmNvbmRpdGlvbmFsIGRlZmF1bHQ7IHRoZSByZXZpZXdlciBtdXN0IHNldCBleGFjdGx5IG9uZSB2ZXJkaWN0IHN0YXR1czogYGRvbmVgLCBgdG8tZGV2YCwgYGFuYWx5c2lzYCwgb3IgZXZpZGVuY2UtYmFja2VkIGBibG9ja2VkYAoKIyMgRGVmaW5pdGlvbiBvZiBEb25lCgotIEltcGxlbWVudGF0aW9uIG1hdGNoZXMgQUMKLSBTb2x1dGlvbiBmaXRzIHByb2plY3QgYXJjaGl0ZWN0dXJlCi0gVGVzdHMgZ3JlZW4KLSBJZiByZXZpZXcgZG9lcyBub3QgYWNjZXB0IHRoZSB3b3JrIOKAlCB2ZXJkaWN0IGV2aWRlbmNlIGFkZGVkIHZpYSBgdGFzay1ib2FyZCBtICdzZXRfbm90ZXMoLi4uKSdgIG9yIGFuIG91dGNvbWUgcmVzb3VyY2UsIHRoZW4gc3RhdHVzIHJvdXRlZCBieSB0aGUgZXhwbGljaXQgdmVyZGljdCBicmFuY2hlcyBhYm92ZQoKIyMgQ29uc3RyYWludHMKCkRvZXMgTk9UIG1vZGlmeSBjb2RlLiBSZWFkLW9ubHkgYWNjZXNzLg=="
+      },
+      {
+        "type": "role",
+        "name": "metadata",
+        "key": "role/metadata",
+        "length": 148,
+        "digest": "sha256:ce29a04c3230e295e239ca92ba538b520993f88af99fc1d3c3c84b2ac2869809",
+        "body_base64": "eyJhcmNoZXR5cGUiOiJyZXZpZXdlciIsImRlc2NyaXB0aW9uIjoiUmV2aWV3cyBpbXBsZW1lbnRhdGlvbiBxdWFsaXR5IGFuZCBwcm9qZWN0IGZpdCIsImVuZF9zdGF0dXMiOiIiLCJuYW1lIjoicmV2aWV3ZXIiLCJzdGFydF9zdGF0dXMiOiJyZXZpZXdpbmcifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "Domain skills as needed to evaluate implementation quality",
+        "key": "skill/Domain skills as needed to evaluate implementation quality",
+        "length": 79,
+        "digest": "sha256:e257caafc9ad9c1ceeff028d093e2a5b3455964373f4b8e4af86dc46a8cec4d4",
+        "body_base64": "eyJuYW1lIjoiRG9tYWluIHNraWxscyBhcyBuZWVkZWQgdG8gZXZhbHVhdGUgaW1wbGVtZW50YXRpb24gcXVhbGl0eSIsInBhdGgiOiIifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "architecture-diagrams",
+        "key": "skill/architecture-diagrams",
+        "length": 97,
+        "digest": "sha256:4d77caf872bab194004877589bf7b82672514a42abce5c5e1150027e66b119f8",
+        "body_base64": "eyJuYW1lIjoiYXJjaGl0ZWN0dXJlLWRpYWdyYW1zIiwicGF0aCI6Ii9Vc2Vycy9pdi8uY2xhdWRlL3NraWxscy9hcmNoaXRlY3R1cmUtZGlhZ3JhbXMvU0tJTEwubWQifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "project-management",
+        "key": "skill/project-management",
+        "length": 91,
+        "digest": "sha256:8d1bab60e478d47f7d2ae88871b9a86b0911c06c1bdfa38e7c8c627b91c9fbae",
+        "body_base64": "eyJuYW1lIjoicHJvamVjdC1tYW5hZ2VtZW50IiwicGF0aCI6Ii9Vc2Vycy9pdi8uY2xhdWRlL3NraWxscy9wcm9qZWN0LW1hbmFnZW1lbnQvU0tJTEwubWQifQ=="
+      },
+      {
+        "type": "task",
+        "name": "acceptance_criteria",
+        "key": "task/acceptance_criteria",
+        "length": 711,
+        "digest": "sha256:fd22208e07f64c39d29189ce9b1fd625cc700cc329f6bc0870bceb833e63ede0",
+        "body_base64": "T25seSB0aGUgbWFuYWdlciBwcmluY2lwYWwgYW5kIHRydXN0ZWQgb3BlcmF0aW5nLXN5c3RlbSBhZG1pbmlzdHJhdG9ycyBtYXkgbXV0YXRlIHRoZSBwcm90ZWN0ZWQgYm91bmRhcnkgYW5kIGRlc2NlbmRhbnRzLiBQcmUtZXhpc3RpbmcgcGVybWlzc2l2ZSBvciB1bnZlcmlmaWFibGUgcm9vdHMsIGVzY2FwaW5nIHJlcGFyc2UgcG9pbnRzLCBzcGVjaWFsIGZpbGVzLCBoYXJkLWxpbmtlZCByZWNlaXB0IG9yIGFydGlmYWN0IGZpbGVzLCBvd25lcnNoaXAgb3IgREFDTCBkcmlmdCwgYW5kIGNvbnRhaW5tZW50IHJhY2VzIGZvcmNlIGEgbWlzcyBvciBmYWlsIGNsb3NlZCBhbmQgbmV2ZXIgYWRtaXQgY2FuZGlkYXRlIGJ5dGVzLiBFeGFjdCByZWNlaXB0LCBpbnB1dCwgYXJ0aWZhY3QgcGF0aCwgaGFzaCwgc2l6ZSwgY29uY3VycmVudC13aW5uZXIsIGltbXV0YWJpbGl0eSwgYW5kIGRyeS1ydW4gcnVsZXMgbWF0Y2ggdGhlIFBPU0lYIGJhY2tlbmQuIElmIHByb3RlY3Rpb24gY2Fubm90IGJlIGVzdGFibGlzaGVkIHJlbGlhYmx5LCBwZXJzaXN0ZW50IHJldXNlIGlzIGRpc2FibGVkIHJhdGhlciB0aGFuIG9wZW5lZC4gV2luZG93cyBDSSBleGVyY2lzZXMgcG9zaXRpdmUgYW5kIG5lZ2F0aXZlIGJhY2tlbmQgY2FzZXMsIGFuZCBmdWxsIHB5dGVzdCBwbHVzIHN0cmljdCBteXB5IHBhc3Mgd2l0aG91dCBub24tV2luZG93cyBpbXBvcnQgcmVncmVzc2lvbnMu"
+      },
+      {
+        "type": "task",
+        "name": "description",
+        "key": "task/description",
+        "length": 161,
+        "digest": "sha256:e115e4b6525280450f49d4202b76b7c1381a2a16d625adf6c4b93258e559b198",
+        "body_base64": "SW1wbGVtZW50IHRoZSBXaW5kb3dzIGJhY2tlbmQgZm9yIHRoZSBwcm90ZWN0ZWQgaW1tdXRhYmxlIGJ1aWxkIGNhY2hlIHdpdGggREFDTCBvd25lcnNoaXAsIHJlcGFyc2UtcG9pbnQgY29udGFpbm1lbnQsIGhhbmRsZS1zYWZlIGFjY2VzcywgYW5kIGhhcmQtbGluayBkZWZlbnNlcy4="
+      },
+      {
+        "type": "task",
+        "name": "scope",
+        "key": "task/scope",
+        "length": 453,
+        "digest": "sha256:96dc902154f18cff5afadc20fff8ecaf2d5861e77780f83b2d1c923b6f66f52c",
+        "body_base64": "T3duIHNyYy9jc2svYnVpbGRzL2NhY2hlX3dpbmRvd3MucHkgYW5kIFdpbmRvd3Mtc3BlY2lmaWMgdGVzdHMgd2hpbGUgcHJlc2VydmluZyB0aGUgYmFja2VuZCBjb250cmFjdCBmcm9tIFRBU0stMjYwNzIwLTJqZm56Ni4gVXNlIHN0YW5kYXJkLWxpYnJhcnkgYW5kIGN0eXBlcyBXaW5kb3dzIEFQSXMgYXMgbmVlZGVkIHRvIGNyZWF0ZSBhbmQgdmVyaWZ5IGEgbWFuYWdlci1vd25lZCBjYWNoZSBib3VuZGFyeSwgaW5zcGVjdCBEQUNMcyBhbmQgZmlsZSBpZGVudGl0eSwgcmVqZWN0IHJlcGFyc2UgZXNjYXBlcyBhbmQgbXVsdGlwbHkgbGlua2VkIGZpbGVzLCBhbmQgYXRvbWljYWxseSBwdWJsaXNoIGVudHJpZXMuIEtlZXAgdGhlIG1vZHVsZSBpbXBvcnQtc2FmZSBvbiBub24tV2luZG93cyBob3N0cy4gRG8gbm90IGNoYW5nZSBwb3J0YWJsZSByZWNlaXB0IG9yIGNhY2hlLWtleSBzZW1hbnRpY3Mu"
+      },
+      {
+        "type": "task",
+        "name": "title",
+        "key": "task/title",
+        "length": 39,
+        "digest": "sha256:239ffc1fc774f6e3923c1dc567216a93e911055a6c98fba9837f532e91bc2838",
+        "body_base64": "SW1wbGVtZW50IHByb3RlY3RlZCBXaW5kb3dzIGJ1aWxkIGNhY2hl"
+      },
+      {
+        "type": "validation_manifest",
+        "name": "current",
+        "key": "validation_manifest/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      }
+    ],
+    "root_digest": "sha256:a8acb07fe384b7171dba50ea2d0998d90e4072d9da54fb91197f6daab3c36a19"
+  },
+  "prompt_template_data": {
+    "task_id": "TASK-260720-8nxlgx",
+    "task_title": "Implement protected Windows build cache",
+    "task_description": "Implement the Windows backend for the protected immutable build cache with DACL ownership, reparse-point containment, handle-safe access, and hard-link defenses.",
+    "task_scope": "Own src/csk/builds/cache_windows.py and Windows-specific tests while preserving the backend contract from TASK-260720-2jfnz6. Use standard-library and ctypes Windows APIs as needed to create and verify a manager-owned cache boundary, inspect DACLs and file identity, reject reparse escapes and multiply linked files, and atomically publish entries. Keep the module import-safe on non-Windows hosts. Do not change portable receipt or cache-key semantics.",
+    "task_ac": "Only the manager principal and trusted operating-system administrators may mutate the protected boundary and descendants. Pre-existing permissive or unverifiable roots, escaping reparse points, special files, hard-linked receipt or artifact files, ownership or DACL drift, and containment races force a miss or fail closed and never admit candidate bytes. Exact receipt, input, artifact path, hash, size, concurrent-winner, immutability, and dry-run rules match the POSIX backend. If protection cannot be established reliably, persistent reuse is disabled rather than opened. Windows CI exercises positive and negative backend cases, and full pytest plus strict mypy pass without non-Windows import regressions.",
+    "parent_id": "STORY-260720-1uv5gi",
+    "agent_name": "[reviewer] reviewer (codex)",
+    "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+    "precondition_resources": null,
+    "role_name": "reviewer",
+    "role_body": "# reviewer\n\n## Description\n\nReviews how a task was implemented and how the solution fits into the project. Does not modify code; records one of the explicit verdict branches below.\n\nWhen the run is goal-bound, query `task-board spawn goal \"$TASK_BOARD_RUN_ID\"` before recording the verdict. The reviewer goal is role-derived as `reviewer_verdict/reviewer_verdict`, carries its immutable parent goal ID/revision, and is satisfied only by exactly one verdict branch with evidence. A provider exit or `reviewing` status is not a verdict.\nThe runner persists the branch from the accepted board status plus a new or updated task-scoped verdict artifact. Only persisted `accepted` can satisfy the parent delivery goal; `changes_requested` and `stop_the_line` finish the reviewer goal without accepting delivery.\n\n## Deliverable\n\nVerdict branches are explicit:\n\n- accepted → `done`\n- changes requested → `to-dev` for implementation rework or `analysis` for research/decision work, with verdict evidence for the next producer and another reviewer cycle\n- genuine stop-the-line boundary → `blocked` only for a concrete external blocker or an unresolved human-only platform/product/architecture/tradeoff/approval decision, with evidence, failed assumptions/attempts, viable alternatives and tradeoffs, a recommendation, and the exact human decision or external input needed\n\nDo not leave the task in `reviewing`, and do not use `blocked` for ordinary rework or a recoverable child/runtime failure.\n\n## Status Transitions\n\n- **start_status:** `reviewing`\n- **end_status:** no unconditional default; the reviewer must set exactly one verdict status: `done`, `to-dev`, `analysis`, or evidence-backed `blocked`\n\n## Definition of Done\n\n- Implementation matches AC\n- Solution fits project architecture\n- Tests green\n- If review does not accept the work — verdict evidence added via `task-board m 'set_notes(...)'` or an outcome resource, then status routed by the explicit verdict branches above\n\n## Constraints\n\nDoes NOT modify code. Read-only access.",
+    "archetype": "reviewer",
+    "skills": [
+      {
+        "name": "project-management",
+        "path": "/Users/iv/.claude/skills/project-management/SKILL.md"
+      },
+      {
+        "name": "architecture-diagrams",
+        "path": "/Users/iv/.claude/skills/architecture-diagrams/SKILL.md"
+      },
+      {
+        "name": "Domain skills as needed to evaluate implementation quality",
+        "path": ""
+      }
+    ],
+    "start_status": "reviewing",
+    "end_status": "",
+    "task_dod_content": "- Record the base SHA and create the task worktree only after the clean local main clone is fast-forwarded and dependency handoffs are present.\n- Cover DACL, ownership, reparse, containment, hard-link, atomic publication, and read-only lookup behavior on Windows.\n- Run Windows-focused tests, cross-platform import tests, python -m mypy, and attach task-scoped evidence.\n- Code written per task description and AC\n- Relevant tests written for new or changed behavior and passing\n- Lint clean\n- Relevant build/validation commands run after changes and build not broken\n- New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables\n- Important findings, decisions, anomalies, or regressions recorded in logbook when relevant",
+    "dod_content": "- [ ] Record the base SHA and create the task worktree only after the clean local main clone is fast-forwarded and dependency handoffs are present.\n- [ ] Cover DACL, ownership, reparse, containment, hard-link, atomic publication, and read-only lookup behavior on Windows.\n- [ ] Run Windows-focused tests, cross-platform import tests, python -m mypy, and attach task-scoped evidence.\n- [ ] Code written per task description and AC\n- [ ] Relevant tests written for new or changed behavior and passing\n- [ ] Lint clean\n- [ ] Relevant build/validation commands run after changes and build not broken\n- [ ] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables\n- [ ] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant\n- [ ] Implementation matches AC\n- [ ] Solution fits project architecture\n- [ ] Tests green\n- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches"
+  },
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "continuation": {
+    "mode": "fresh",
+    "prompt_mode": "full"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-14-38-58_-reviewer--reviewer--codex-_TASK-260720-8nxlgx.md",
+  "base_prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-continuity/base-prompts/RUN-260730-37a259.md",
+  "prompt_mode": "full",
+  "snapshot_digest": "sha256:a8acb07fe384b7171dba50ea2d0998d90e4072d9da54fb91197f6daab3c36a19",
+  "prompt_artifact_dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-continuity/prompts/RUN-260730-37a259",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-8nxlgx_spawn-log_-reviewer--reviewer--codex-_RUN-260730-37a259.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260720-8nxlgx_implementation-evidence.md",
+    "TASK-260720-8nxlgx_review-verdict_RUN-260730-e46794.md",
+    "TASK-260720-8nxlgx_reviewer-late-hardlink-probe.py",
+    "TASK-260720-8nxlgx_security-rework-evidence.md",
+    "TASK-260720-8nxlgx_spawn-log_-implementer--developer--claude-_RUN-260730-e4284f.log",
+    "TASK-260720-8nxlgx_spawn-log_-implementer--developer--codex-_RUN-260730-4a1034.log",
+    "TASK-260720-8nxlgx_spawn-log_-implementer--developer--codex-_RUN-260730-5901b7.log",
+    "TASK-260720-8nxlgx_spawn-log_-implementer--developer--codex-_RUN-260730-72d4a3.log",
+    "TASK-260720-8nxlgx_spawn-log_-implementer--developer--codex-_RUN-260730-d4d6d7.log",
+    "TASK-260720-8nxlgx_spawn-log_-implementer--developer--codex-_RUN-260730-f6d1b3.log",
+    "TASK-260720-8nxlgx_spawn-log_-reviewer--reviewer--codex-_RUN-260730-e46794.log",
+    "TASK-260720-8nxlgx_tool-readiness_RUN-260730-72d4a3.md"
+  ]
+}

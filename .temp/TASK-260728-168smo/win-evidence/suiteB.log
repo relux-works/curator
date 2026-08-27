@@ -1,0 +1,31 @@
+=== SUITE B start ===
+--- B1: ETW kernel process trace of the overlay compile (A3) ---
+ARGV[b1] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\b1 C:\kn168\src\main.kt
+EXIT[b1]=0
+ProcessStart events captured=10
+--- all ProcessStart images below this session (resolved absolute path) ---
+  [IN-BUNDLE] C:\kn168\b\jdk\bin\java.exe
+  [IN-BUNDLE] C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150\bin\clang++.exe
+  [IN-BUNDLE] C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150\bin\ld.lld.exe
+  [OUTSIDE] C:\Users\admin\AppData\Local\Programs\Pulsar\go-librespot.exe
+  [OUTSIDE] C:\Windows\System32\logman.exe
+  [OUTSIDE] C:\Windows\System32\netsh.exe
+  [OUTSIDE] C:\Windows\System32\where.exe
+distinct images below session=7
+TRACER-CONTROL where.exe recorded=True
+--- full unfiltered image list (every ProcessStart in the trace window) ---
+  ANY C:\kn168\b\jdk\bin\java.exe
+  ANY C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150\bin\clang++.exe
+  ANY C:\kn168\b\konan-data\dependencies\llvm-21-x86_64-windows-essentials-150\bin\ld.lld.exe
+  ANY C:\Users\admin\AppData\Local\Programs\Pulsar\go-librespot.exe
+  ANY C:\Windows\System32\logman.exe
+  ANY C:\Windows\System32\netsh.exe
+  ANY C:\Windows\System32\where.exe
+--- B2: artifact and by-products (A5) ---
+  out \b1.exe 570368
+  out \s3.exe 570368
+  stg \hsperfdata_admin <DIR>
+  artifact bytes=570368
+  MZ=MZ PEsig=PE machine=0x8664 (0x8664=AMD64)
+  run exit=0 stdout=curator-kotlin-native-probe\n
+=== SUITE B done rcB1=ARGV[b1] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\b1 C:\kn168\src\main.kt EXIT[b1]=0 0 ===

@@ -1,0 +1,56 @@
+{
+  "id": "RUN-260822-50e157",
+  "task_id": "TASK-260822-27bvo4",
+  "created_at": "2026-08-22T16:59:54.373977Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "opus",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "opus"
+    },
+    "resolved": {
+      "model": "opus"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260822-20-59-54_-implementer--developer--claude-_TASK-260822-27bvo4.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "45m0s",
+  "log_resource_name": "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-50e157.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-1e48d3.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-507162.log",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization-RUN-507162.md",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization.md",
+    "TASK-260822-27bvo4_windows-identity-tests.log",
+    "TASK-260822-27bvo4_windows-prefix-baseline-red.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization-RUN-507162.md": "24e6451a1fe45ac5bfe15a27976154372fbccffa3bc37bb835c7445932d23c05",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization.md": "0d5af153de79f26500445aab7b139b63e82769fdad65a56717f6da3d7486a28c",
+    "TASK-260822-27bvo4_windows-identity-tests.log": "a2bd0df9cd132c5fc2f0d5490c3bb57ee26b1e3a848d46abc807a512271facc3",
+    "TASK-260822-27bvo4_windows-prefix-baseline-red.log": "ff6e1883510665d410213751ce06bed1e4f4bb271360170bee37057ccd8457cd"
+  },
+  "require_outcome_artifact": true
+}

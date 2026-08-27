@@ -1,0 +1,175 @@
+
+=== [01] cross-compile the probe for the remote host; no toolchain is installed on either side
+$ env -C /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/probe env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-windows/toolchainboundary.exe . 
+--- output --- (empty)
+--- exit code: 0
+
+=== [02] local digest of the artifact that will be transferred
+$ shasum -a 256 /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-windows/toolchainboundary.exe 
+--- output ---
+9ed12528bc6be28edd003efc3fb9ac950176b034560221f5c2281f77b5291e70  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-windows/toolchainboundary.exe
+--- exit code: 0
+local sha256: 9ed12528bc6be28edd003efc3fb9ac950176b034560221f5c2281f77b5291e70
+
+=== [03] create the remote working directory
+$ ssh -o BatchMode=yes win cmd\ /c\ if\ not\ exist\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\"\ mkdir\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\" 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+--- exit code: 0
+
+=== [04] transfer the probe
+$ scp -o BatchMode=yes /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-windows/toolchainboundary.exe win:C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\\toolchainboundary.exe 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+--- exit code: 0
+
+=== [05] verify the transferred digest on the remote host
+$ ssh -o BatchMode=yes win certutil\ -hashfile\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\\toolchainboundary.exe\"\ SHA256 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+’эш SHA256 C:\Users\admin\AppData\Local\Temp\tb-rhjxtx\toolchainboundary.exe:
+9ed12528bc6be28edd003efc3fb9ac950176b034560221f5c2281f77b5291e70
+CertUtil: -hashfile Ч команда успешно выполнена.
+--- exit code: 0
+
+=== [06] read-only host inventory; every check is Test-Path or Get-Command, nothing is installed
+$ scp -o BatchMode=yes /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/win-inventory.ps1 win:C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\\win-inventory.ps1 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+--- exit code: 0
+$ ssh -o BatchMode=yes win powershell\ -NoProfile\ -ExecutionPolicy\ Bypass\ -File\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\\win-inventory.ps1\" 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+== host ==
+os_version    :: 10.0.19045
+os_caption    :: М†©™аЃбЃдв Windows 10 Pro
+architecture  :: AMD64
+user          :: admin
+== PATH-visible compilers (recorded only; the probe never resolves from PATH) ==
+rustc            :: absent
+cargo            :: absent
+rustup           :: absent
+swift            :: absent
+swiftc           :: absent
+xcrun            :: absent
+kotlinc          :: absent
+kotlinc-native   :: absent
+konanc           :: absent
+gradle           :: absent
+java             :: absent
+go               :: absent
+== candidate trusted roots (Test-Path, read-only) ==
+C:\Program Files\Rust stable MSVC 1.91         :: False
+C:\Users\admin\.rustup\toolchains              :: False
+C:\Users\admin\.cargo                          :: False
+C:\Program Files\Swift                         :: False
+C:\Users\admin\AppData\Local\Programs\Swift    :: False
+C:\Library\Developer\Toolchains                :: False
+C:\Users\admin\.konan                          :: False
+C:\Program Files\Kotlin                        :: False
+C:\kotlinc                                     :: False
+C:\Users\admin\.sdkman                         :: False
+C:\Program Files\Java                          :: False
+C:\Program Files\Eclipse Adoptium              :: False
+== nothing was installed, downloaded, or modified by this inventory ==
+--- exit code: 0
+
+=== [07] run the probe with no toolchain roots supplied; absence is the measurement
+$ ssh -o BatchMode=yes win cd\ /d\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\"\ \&\&\ toolchainboundary.exe\ -work\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\\work\"\ -out\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\\fixture-windows.json\" 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+not_run     kotlin.negative.backend-is-not-native        expected=backend_identity         observed=-                        early=false
+            reason: no Kotlin compiler path was supplied (-kotlinc-jvm), so backend identity could not be measured on this host
+not_run     kotlin.negative.metadata-is-a-program        expected=package_selector         observed=-                        early=false
+            reason: no Gradle launcher path was supplied (-gradle), so the cost of reading Kotlin project metadata could not be measured on this host
+not_run     kotlin.negative.target-not-listed            expected=target_host              observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.negative.target-unknown               expected=target_representability  observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.positive.version-and-target           expected=none                     observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     rust.negative.msrv-future                    expected=host_version             observed=-                        early=false
+            reason: no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+not_run     rust.negative.msrv-malformed                 expected=representability         observed=-                        early=false
+            reason: no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+not_run     rust.negative.selector-toolchain-nightly     expected=package_selector         observed=-                        early=false
+            reason: no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+not_run     rust.negative.selector-toolchain-path        expected=package_selector         observed=-                        early=false
+            reason: no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+not_run     rust.negative.target-std-absent              expected=target_host              observed=-                        early=false
+            reason: no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+not_run     rust.negative.target-unknown                 expected=target_representability  observed=-                        early=false
+            reason: no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+not_run     rust.positive.msrv-below-host                expected=none                     observed=-                        early=false
+            reason: no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+not_run     swift.negative.manifest-is-a-program         expected=package_selector         observed=-                        early=false
+            reason: no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+not_run     swift.negative.selector-swift-version-file   expected=none                     observed=-                        early=false
+            reason: no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+not_run     swift.negative.target-stdlib-absent          expected=target_host              observed=-                        early=false
+            reason: no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+not_run     swift.negative.target-unknown                expected=target_representability  observed=-                        early=false
+            reason: no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+not_run     swift.negative.tools-version-future          expected=host_version             observed=-                        early=false
+            reason: no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+not_run     swift.negative.tools-version-malformed       expected=representability         observed=-                        early=false
+            reason: no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+not_run     swift.positive.tools-version-below-host      expected=none                     observed=-                        early=false
+            reason: no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+
+19 cases: 0 matched, 0 divergences, 19 not run; 3 toolchains unavailable, 0 wrong backend
+--- exit code: 0
+
+=== [08] remote digest of the emitted fixture
+$ ssh -o BatchMode=yes win certutil\ -hashfile\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\\fixture-windows.json\"\ SHA256 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+’эш SHA256 C:\Users\admin\AppData\Local\Temp\tb-rhjxtx\fixture-windows.json:
+8893cf3d215df1009fd13c0781abf8f90760363ec81e4bf73b687e43bc9e4574
+CertUtil: -hashfile Ч команда успешно выполнена.
+--- exit code: 0
+
+=== [09] fetch the fixture back; the remote path uses forward slashes because a download path is expanded by the remote cmd.exe, which eats backslashes
+$ scp -o BatchMode=yes win:C:/Users/admin/AppData/Local/Temp/tb-rhjxtx/fixture-windows.json /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-windows/fixture-windows.json 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+--- exit code: 0
+
+=== [10] local digest of the fetched fixture; it must equal the remote one
+$ shasum -a 256 /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-windows/fixture-windows.json 
+--- output ---
+8893cf3d215df1009fd13c0781abf8f90760363ec81e4bf73b687e43bc9e4574  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-windows/fixture-windows.json
+--- exit code: 0
+
+=== [11] remove everything this run put on the remote host
+$ ssh -o BatchMode=yes win cmd\ /c\ rmdir\ /s\ /q\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\" 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+--- exit code: 0
+
+=== [12] confirm the remote working directory is gone
+$ ssh -o BatchMode=yes win cmd\ /c\ if\ exist\ \"C:\\Users\\admin\\AppData\\Local\\Temp\\tb-rhjxtx\"\ \(echo\ STILL-PRESENT\)\ else\ \(echo\ REMOVED\) 
+--- output ---
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+REMOVED
+--- exit code: 0

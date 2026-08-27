@@ -1,0 +1,138 @@
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+
+FAIL  required case never ran on darwin: internal/runtimestore :: TestInstallSingleCommandAndShims
+      required behaviour: writes the `run.cmd` Windows launcher and asserts its `@echo off` payload
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/runtimestore :: TestRuntimeCommandPath
+      required behaviour: maps a `tool.cmd` Windows launcher back to its command name
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+      required behaviour: compiled shims stage without launching, then forward exactly (POSIX post-install fixture)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildcache :: TestUnixProtectedStateMatrix
+      required behaviour: unix ownership and mode matrix for protected cache state
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+      required behaviour: unix protection helpers fail closed rather than degrading the boundary
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/config :: TestBootstrapAndAddProject
+      required behaviour: asserts the manager config is written with private (0o600) ownership bits on unix
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+      required behaviour: cache sweep refuses to traverse symlinked entries
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+      required behaviour: cache sweep refuses to traverse a symlinked cache root
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+      required behaviour: entry retirement removes links without following them
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+      required behaviour: rejects a symlinked entry and an unprotected cache root
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+      required behaviour: GC stays fail-safe when a unix scope is redirected by a link
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildsource :: TestRejectsSpecialFile
+      required behaviour: build source enumeration rejects a non-regular file
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/gitops :: TestArchiveRejectsLinks
+      required behaviour: archiving refuses a tree containing links (needs `ln`, absent from the Windows job PATH)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildsource :: TestFrozenTokenRejectsMutation
+      required behaviour: a frozen build source rejects mutation of the source tree
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+      required behaviour: a frozen build source rejects replacement of its root
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+      required behaviour: validated enumeration is ordered and refuses mutation during the callback
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/install :: TestDryRunTouchesNothing
+      required behaviour: proves a dry run leaves the source and target trees unwritten
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/whitelist :: TestRuntimeRootsExcludedFromContext
+      required behaviour: proves runtime roots stay outside the copied agent context
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+      required behaviour: worker resource limits stay inside the manager's declared bounds
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+      required behaviour: the probed native control set matches rc5-native-control-inventory-v1 exactly
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+      required behaviour: every native control seam failure rejects before the worker executes
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/godriver :: TestPerFileSizeLimitIsReallyApplied
+      required behaviour: per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS only
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+      required behaviour: the toolchain executable identity rejects substitution and mutation
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+      required behaviour: the installed unix shim is executable and propagates signals
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+      required behaviour: executes the POSIX shell hook end to end
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/envfiles :: TestWriteProjectShapesAndSourcing
+      required behaviour: sources the generated env file through a real shell on unix; shape-only on Windows
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/install :: TestEndToEndInstall
+      required behaviour: materialises the executable shim and env files of a full install
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+      required behaviour: creates a link (Windows: a reparse point) and asserts its target stays relative
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+      required behaviour: independent target namespaces reject overlapping paths (link-capability guarded)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+      required behaviour: a namespace alias introduced between saves is rejected (link-capability guarded)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+      required behaviour: recovery rejects target namespaces aliased while stopped (link-capability guarded)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+      required behaviour: a failure at every target class restores the prior state in reverse order
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+      required behaviour: a stale adapter removal rolls back to the exact prior entry
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+      required behaviour: adapter mirror links are journaled and restored exactly (link-capability guarded)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/interop :: TestGoldenContextCopy
+      required behaviour: the agent context copied for a skill matches the authoritative golden file list
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/godriver :: TestCandidateGoV1SourceAwareContract
+      required behaviour: the go-v1 driver honours the source-aware contract published by the supplied root
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly
+      required behaviour: a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery
+      required behaviour: compiled currentness, corrupt-cache repair, commit rollback and untrusted-state repair over one real installation
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand
+      required behaviour: project status resolves and classifies a compiled command reached only through a dependency
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand
+      required behaviour: an unusable Go toolchain is reported per compiled command as a warning, and `--check` turns it non-zero
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState
+      required behaviour: gc neither removes nor reports removing a cache entry a live marker references
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+      required behaviour: machine-wide status reports compiled currentness and fails `--check` for every non-current state
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+      required behaviour: machine-wide status resolves a compiled command no declaration names
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on darwin: internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+      required behaviour: an uncovered inventory platform (including linux) is rejected before the worker starts
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+
+platform-case gate: 0 skips recorded in ../evidence/local/adversarial/ev-darwin/skips-observed.tsv
+platform-case gate: FAILED

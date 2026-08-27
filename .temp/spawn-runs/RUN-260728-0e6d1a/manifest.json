@@ -1,0 +1,58 @@
+{
+  "id": "RUN-260728-0e6d1a",
+  "task_id": "TASK-260728-1g0z69",
+  "created_at": "2026-07-28T18:27:14.104597Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-22-27-14_-reviewer--reviewer--codex-_TASK-260728-1g0z69.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "timeout": "2h0m0s",
+  "log_resource_name": "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-0e6d1a.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260728-1g0z69_decision-0007.md",
+    "TASK-260728-1g0z69_results.md",
+    "TASK-260728-1g0z69_review-verdict-cycle-2.md",
+    "TASK-260728-1g0z69_review-verdict.md",
+    "TASK-260728-1g0z69_rework-01.md",
+    "TASK-260728-1g0z69_rework-02.md",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-1ccd8b.log",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-af7289.log",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-e41666.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-092e80.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-e30a89.log",
+    "TASK-260728-1g0z69_toolchain-reference.md"
+  ]
+}

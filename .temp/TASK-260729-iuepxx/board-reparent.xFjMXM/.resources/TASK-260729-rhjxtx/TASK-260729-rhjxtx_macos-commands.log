@@ -1,0 +1,70 @@
+
+=== [01] build the probe for the local host
+$ env -C /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/probe go build -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/toolchainboundary . 
+--- output --- (empty)
+--- exit code: 0
+
+=== [02] record the probe binary digest
+$ shasum -a 256 /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/toolchainboundary 
+--- output ---
+7eccb7014b0d5479ae34e95ceafc57a35e748922d3bb0975303213ef45f2a7cb  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/toolchainboundary
+--- exit code: 0
+
+=== [03] confirm the supplied roots exist (read-only)
+$ test -x /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc 
+--- output --- (empty)
+--- exit code: 0
+$ test -x /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc 
+--- output --- (empty)
+--- exit code: 0
+$ test -x /Users/iv/.cargo/bin/rustc 
+--- output --- (empty)
+--- exit code: 0
+$ test -x /opt/homebrew/bin/kotlinc 
+--- output --- (empty)
+--- exit code: 0
+$ test -x /opt/homebrew/bin/gradle 
+--- output --- (empty)
+--- exit code: 0
+
+=== [04] run the probe
+$ /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/toolchainboundary -rust /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin -swift /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain -rust-shim /Users/iv/.cargo/bin/rustc -kotlinc-jvm /opt/homebrew/bin/kotlinc -gradle /opt/homebrew/bin/gradle -work /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/work -out /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/fixture-macos.json 
+--- output ---
+match       kotlin.negative.backend-is-not-native        expected=backend_identity         observed=backend_identity         early=true 
+match       kotlin.negative.metadata-is-a-program        expected=package_selector         observed=package_selector         early=true 
+not_run     kotlin.negative.target-not-listed            expected=target_host              observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.negative.target-unknown               expected=target_representability  observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.positive.version-and-target           expected=none                     observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+match       rust.negative.msrv-future                    expected=host_version             observed=host_version             early=true 
+match       rust.negative.msrv-malformed                 expected=representability         observed=representability         early=true 
+match       rust.negative.selector-toolchain-nightly     expected=package_selector         observed=package_selector         early=true 
+match       rust.negative.selector-toolchain-path        expected=package_selector         observed=package_selector         early=true 
+match       rust.negative.target-std-absent              expected=target_host              observed=target_host              early=true 
+match       rust.negative.target-unknown                 expected=target_representability  observed=target_representability  early=true 
+match       rust.positive.msrv-below-host                expected=none                     observed=none                     early=true 
+match       swift.negative.manifest-is-a-program         expected=package_selector         observed=package_selector         early=true 
+match       swift.negative.selector-swift-version-file   expected=none                     observed=none                     early=true 
+match       swift.negative.target-stdlib-absent          expected=target_host              observed=target_host              early=true 
+match       swift.negative.target-unknown                expected=target_representability  observed=target_representability  early=true 
+match       swift.negative.tools-version-future          expected=host_version             observed=host_version             early=true 
+match       swift.negative.tools-version-malformed       expected=representability         observed=representability         early=true 
+match       swift.positive.tools-version-below-host      expected=none                     observed=none                     early=true 
+
+19 cases: 16 matched, 0 divergences, 3 not run; 1 toolchains unavailable, 0 wrong backend
+--- exit code: 0
+
+=== [05] record the fixture digest
+$ shasum -a 256 /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/fixture-macos.json 
+--- output ---
+62846570b4367238eee16f87ccf75d5a98edb56ed0340571745f6d428fff8263  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/fixture-macos.json
+--- exit code: 0
+
+=== [06] confirm the operator Gradle home was not written to by the probe
+$ find /Users/iv/.gradle -newer /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run2-macos/toolchainboundary -print -quit 
+--- output --- (empty)
+--- exit code: 0
+
+=== probe exit code: 0

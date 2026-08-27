@@ -1,0 +1,15 @@
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/adapters :: TestSymlinkModeUsesRelativeLinks
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+
+platform-case gate: ok

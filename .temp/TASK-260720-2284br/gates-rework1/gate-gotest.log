@@ -1,0 +1,25 @@
+ok  	github.com/relux-works/curator/cmd/curator	17.984s
+ok  	github.com/relux-works/curator/internal/adapters	16.741s
+ok  	github.com/relux-works/curator/internal/audit	17.403s
+ok  	github.com/relux-works/curator/internal/buildcache	18.253s
+ok  	github.com/relux-works/curator/internal/buildmeta	18.019s
+ok  	github.com/relux-works/curator/internal/buildsource	19.681s
+ok  	github.com/relux-works/curator/internal/capabilities	18.690s
+ok  	github.com/relux-works/curator/internal/closure	22.466s
+ok  	github.com/relux-works/curator/internal/config	18.374s
+ok  	github.com/relux-works/curator/internal/devsub	15.917s
+ok  	github.com/relux-works/curator/internal/envfiles	15.593s
+ok  	github.com/relux-works/curator/internal/gitignore	17.218s
+ok  	github.com/relux-works/curator/internal/gitops	19.611s
+ok  	github.com/relux-works/curator/internal/globalbins	19.997s
+--- FAIL: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (40.29s)
+    --- FAIL: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/availability-probe (15.26s)
+        boundary_test.go:66: go-v1 process_timeout: Go probe exceeded its deadline
+    --- FAIL: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/domain-installation (15.02s)
+        boundary_test.go:66: go-v1 process_timeout: Go probe exceeded its deadline
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	99.383s
+ok  	github.com/relux-works/curator/internal/hashing	20.576s
+ok  	github.com/relux-works/curator/internal/identifiers	24.725s
+ok  	github.com/relux-works/curator/internal/identity	24.709s
+ok  	github.com/relux-works/curator/internal/install	228.344s

@@ -1,0 +1,10 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/relux-works/curator/internal/transaction
+cpu: Apple M3 Max
+BenchmarkValidateIndependentTargetNamespaces/targets=8-16         	     104	  11114303 ns/op	 2950734 B/op	   20639 allocs/op
+BenchmarkValidateIndependentTargetNamespaces/targets=16-16        	      27	  41808113 ns/op	10628509 B/op	   71691 allocs/op
+BenchmarkValidateIndependentTargetNamespaces/targets=32-16        	       7	 162514875 ns/op	40173481 B/op	  265181 allocs/op
+BenchmarkValidateIndependentTargetNamespaces/targets=64-16        	       2	 637399312 ns/op	156033228 B/op	 1017729 allocs/op
+PASS
+ok  	github.com/relux-works/curator/internal/transaction	7.848s

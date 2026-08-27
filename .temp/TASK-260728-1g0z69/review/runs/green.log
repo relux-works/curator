@@ -1,0 +1,162 @@
+semantic classifier: isolated
+regression control:  none
+toolchain-position command: go version
+
+== go version go1.25.1 darwin/arm64 (/usr/local/go/bin/go)
+   semantic isolation harness, built by this toolchain from its own GOROOT:
+     /usr/local/go/src/internal/gover/gover.go
+       whole file, sha256 676d41a053ac52e7dbb95c0a6581d17ffe98a1b170f7e826b1a2c2e746186ba5
+     /usr/local/go/src/cmd/go/internal/gover/toolchain.go
+       whole file, sha256 7ab5c7c2a193570c5ee95b19fcbf4e7adb6dce35bd5fa73b968c120c5decbc55
+       FromToolchain lifted verbatim: 503 bytes, sha256 c9d2cacbabd69c6d940a8111bea3956974a2812fd06261d6cc372c1841b8e29b
+
+-- go.mod `go` directive
+
+value              shape  gover     command   semantic  xchk   curator class                      measured
+--------------------------------------------------------------------------------------------------------------------------
+`1.23`             yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.23.4`           yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.21.0`           yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.23rc1`          yes    yes       accepted  yes       ok     3 prerelease literal (compared)    ok
+`1.26.0`           yes    yes       too-new   yes       ok     2 release literal (compared)       ok
+`1.99.0`           yes    yes       too-new   yes       ok     2 release literal (compared)       ok
+`1.99rc1`          yes    yes       too-new   yes       ok     3 prerelease literal (compared)    ok
+`1.23.4rc1`        yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1.24.0alpha1`     yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1.21.3beta2`      yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1`                no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_1/go.mod:3: invalid go version '1': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '1': must match format 1.23.0
+`0.1`              no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_0_1/go.mod:3: invalid go version '0.1': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '0.1': must match format 1.23.0
+`1.023`            no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_1_023/go.mod:3: invalid go version '1.023': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version '1.023': must match format 1.23.0
+`1.23rc`           no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_1_23rc/go.mod:3: invalid go version '1.23rc': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '1.23rc': must match format 1.23.0
+`v1.23`            no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_v1_23/go.mod:3: invalid go version 'v1.23': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version 'v1.23': must match format 1.23.0
+`1.23/4`           no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_1_23_4/go.mod:3: invalid go version '1.23/4': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version '1.23/4': must match format 1.23.0
+
+P1 no widening      (compared subset of upstream):        ok
+P2 no narrowing     (upstream minus forbidden compared):  ok
+   command outcomes inside the recognised closed set:     ok
+   isolated gover vs real command, where shape accepts:   ok
+   no forbidden class in this position, so P2 is C = Upstream
+
+
+-- go.mod `toolchain` directive
+
+value              shape  gover     command   semantic  xchk   curator class                      measured
+--------------------------------------------------------------------------------------------------------------------------
+`default`          yes    yes       accepted  yes       ok     4 default (compared)               ok
+`go1.99.0`         yes    yes       accepted  yes       ok     5 release name (compared)          ok
+`go1.99rc1`        yes    yes       accepted  yes       ok     6 prerelease name (compared)       ok
+`go1`              yes    yes       accepted  yes       ok     5 release name (compared)          ok
+`go1.99.0-custom`  yes    yes       accepted  yes       ok     3 custom-distribution name (forbidden) ok
+`go1.99.0-bigcorp` yes    yes       accepted  yes       ok     3 custom-distribution name (forbidden) ok
+`go1.23/../evil`   yes    no        rejected  no        ok     2 path-bearing name (forbidden)    ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1.23/../evil" in go.mod
+`go1.`             yes    no        rejected  no        ok     7 unclassifiable (mismatch)        ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1." in go.mod
+`go1.99.0rc1x`     yes    no        rejected  no        ok     7 unclassifiable (mismatch)        ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1.99.0rc1x" in go.mod
+`go2.0.0`          no     yes       rejected  yes       n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/tc_go2_0_0/go.mod:4: invalid toolchain version 'go2.0.0': must match format go1.23.0 or default; gover yes; command rejected exit 1: go: invalid GOTOOLCHAIN "go2.0.0"
+`go1x`             no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/tc_go1x/go.mod:4: invalid toolchain version 'go1x': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "go1x" in go.mod
+`godefault`        no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/tc_godefault/go.mod:4: invalid toolchain version 'godefault': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "godefault" in go.mod
+`1.23.4`           no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/tc_1_23_4/go.mod:4: invalid toolchain version '1.23.4': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "1.23.4" in go.mod
+
+P1 no widening      (compared subset of upstream):        ok
+P2 no narrowing     (upstream minus forbidden compared):  ok
+   command outcomes inside the recognised closed set:     ok
+   isolated gover vs real command, where shape accepts:   ok
+   security partition subtracts from upstream:           ok
+
+
+== go version go1.25.5 darwin/arm64 (/opt/homebrew/bin/go)
+   semantic isolation harness, built by this toolchain from its own GOROOT:
+     /opt/homebrew/Cellar/go/1.25.5/libexec/src/internal/gover/gover.go
+       whole file, sha256 676d41a053ac52e7dbb95c0a6581d17ffe98a1b170f7e826b1a2c2e746186ba5
+     /opt/homebrew/Cellar/go/1.25.5/libexec/src/cmd/go/internal/gover/toolchain.go
+       whole file, sha256 7ab5c7c2a193570c5ee95b19fcbf4e7adb6dce35bd5fa73b968c120c5decbc55
+       FromToolchain lifted verbatim: 503 bytes, sha256 c9d2cacbabd69c6d940a8111bea3956974a2812fd06261d6cc372c1841b8e29b
+
+-- go.mod `go` directive
+
+value              shape  gover     command   semantic  xchk   curator class                      measured
+--------------------------------------------------------------------------------------------------------------------------
+`1.23`             yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.23.4`           yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.21.0`           yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.23rc1`          yes    yes       accepted  yes       ok     3 prerelease literal (compared)    ok
+`1.26.0`           yes    yes       too-new   yes       ok     2 release literal (compared)       ok
+`1.99.0`           yes    yes       too-new   yes       ok     2 release literal (compared)       ok
+`1.99rc1`          yes    yes       too-new   yes       ok     3 prerelease literal (compared)    ok
+`1.23.4rc1`        yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1.24.0alpha1`     yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1.21.3beta2`      yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1`                no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_1/go.mod:3: invalid go version '1': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '1': must match format 1.23.0
+`0.1`              no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_0_1/go.mod:3: invalid go version '0.1': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '0.1': must match format 1.23.0
+`1.023`            no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_1_023/go.mod:3: invalid go version '1.023': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version '1.023': must match format 1.23.0
+`1.23rc`           no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_1_23rc/go.mod:3: invalid go version '1.23rc': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '1.23rc': must match format 1.23.0
+`v1.23`            no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_v1_23/go.mod:3: invalid go version 'v1.23': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version 'v1.23': must match format 1.23.0
+`1.23/4`           no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/go_1_23_4/go.mod:3: invalid go version '1.23/4': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version '1.23/4': must match format 1.23.0
+
+P1 no widening      (compared subset of upstream):        ok
+P2 no narrowing     (upstream minus forbidden compared):  ok
+   command outcomes inside the recognised closed set:     ok
+   isolated gover vs real command, where shape accepts:   ok
+   no forbidden class in this position, so P2 is C = Upstream
+
+
+-- go.mod `toolchain` directive
+
+value              shape  gover     command   semantic  xchk   curator class                      measured
+--------------------------------------------------------------------------------------------------------------------------
+`default`          yes    yes       accepted  yes       ok     4 default (compared)               ok
+`go1.99.0`         yes    yes       accepted  yes       ok     5 release name (compared)          ok
+`go1.99rc1`        yes    yes       accepted  yes       ok     6 prerelease name (compared)       ok
+`go1`              yes    yes       accepted  yes       ok     5 release name (compared)          ok
+`go1.99.0-custom`  yes    yes       accepted  yes       ok     3 custom-distribution name (forbidden) ok
+`go1.99.0-bigcorp` yes    yes       accepted  yes       ok     3 custom-distribution name (forbidden) ok
+`go1.23/../evil`   yes    no        rejected  no        ok     2 path-bearing name (forbidden)    ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1.23/../evil" in go.mod
+`go1.`             yes    no        rejected  no        ok     7 unclassifiable (mismatch)        ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1." in go.mod
+`go1.99.0rc1x`     yes    no        rejected  no        ok     7 unclassifiable (mismatch)        ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1.99.0rc1x" in go.mod
+`go2.0.0`          no     yes       rejected  yes       n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/tc_go2_0_0/go.mod:4: invalid toolchain version 'go2.0.0': must match format go1.23.0 or default; gover yes; command rejected exit 1: go: invalid GOTOOLCHAIN "go2.0.0"
+`go1x`             no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/tc_go1x/go.mod:4: invalid toolchain version 'go1x': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "go1x" in go.mod
+`godefault`        no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/tc_godefault/go.mod:4: invalid toolchain version 'godefault': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "godefault" in go.mod
+`1.23.4`           no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-481253097/tc_1_23_4/go.mod:4: invalid toolchain version '1.23.4': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "1.23.4" in go.mod
+
+P1 no widening      (compared subset of upstream):        ok
+P2 no narrowing     (upstream minus forbidden compared):  ok
+   command outcomes inside the recognised closed set:     ok
+   isolated gover vs real command, where shape accepts:   ok
+   security partition subtracts from upstream:           ok
+
+== summary
+toolchains probed:  2
+cases:              16 go-directive, 13 toolchain-directive
+semantic classifier: isolated
+failures:           0

@@ -1,0 +1,300 @@
+TASK-260728-168smo — command evidence, rework cycle 2
+=====================================================
+
+Host
+----
+macOS 26.5 (build 25F71), arm64, machine `macbook-pro-2.local`
+OpenJDK 26.0.1 at /opt/homebrew/Cellar/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home
+  <jdk_root>/bin/java  ->  Mach-O 64-bit executable arm64  (69,568 B)
+Xcode 26.5 present at /Applications/Xcode_26_5.app (relevant to E13-E15 only)
+Raw run logs: TASK-260728-168smo_probe.tar.gz -> evidence/run*.log
+
+Subject
+-------
+Official JetBrains release v2.4.10, asset
+  kotlin-native-prebuilt-macos-aarch64-2.4.10.tar.gz          259,023,091 B
+published checksum asset  ...tar.gz.sha256
+  55ded039bb56a69aec9df354a92b42df9e916104e3c53d8d9852d9cc6617ed9d
+locally computed
+  55ded039bb56a69aec9df354a92b42df9e916104e3c53d8d9852d9cc6617ed9d   MATCH
+(independently equals the value recorded by review cycle 1)
+Unpacked size 889 MB. Deleted after measurement; every run below is reproducible
+from the URL + checksum above with the argv recorded here.
+
+Shorthands used below
+  <dist>  = <unpack>/kotlin-native-prebuilt-macos-aarch64-2.4.10
+  <jar>   = <dist>/konan/lib/kotlin-native-compiler-embeddable.jar
+  <main>  = org.jetbrains.kotlin.cli.utilities.MainKt
+  <jvm>   = -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Dkonan.home=<dist>
+  <data>  = the KONAN_DATA_DIR in use
+  src/main.kt = fun main() { println("curator-kotlin-native-probe") }
+
+
+E1 — the distribution contains no regular executable
+----------------------------------------------------
+  ls -la <dist>/bin ; file -b <dist>/bin/*
+    cinterop, generate-platform, klib, konan-lldb, konanc, kotlinc-native,
+    run_konan  ->  all "Bourne-Again shell script text executable, ASCII text"
+  <dist>/konan/lib/  ->  exactly one file, kotlin-native-compiler-embeddable.jar
+                         (83,901,273 B)
+Consequence: the official distribution root cannot satisfy decision 0007
+section 3 ("regular executable at the entry's fixed relpath inside the tree
+being fingerprinted"). Confirms review cycle 1 finding 1.
+
+E2 — the shipped launcher is inadmissible (source-read, <dist>/bin/run_konan)
+-----------------------------------------------------------------------------
+  JAVACMD from $JAVACMD, else $JAVA_HOME/bin/java, else the bare name `java`
+    resolved from PATH
+  reads $JAVA_OPTS, appends -D* and -J* arguments to the JVM
+  shebang /usr/bin/env bash
+  unsets 118 names listed in <dist>/tools/env_blacklist
+  sets LIBCLANG_DISABLE_CRASH_RECOVERY=1
+  execs:  "$JAVACMD" -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 \
+            -Dkonan.home="$KONAN_HOME" -cp <jar> <main> konanc "$@"
+
+E3 — direct invocation, no launcher script            exit 0
+------------------------------------------------------------
+  <jdk_root>/bin/java <jvm> -cp <jar> <main> konanc \
+      -produce program -target macos_arm64 -o out/app src/main.kt
+  -> out/app.kexe                 785,672 B
+  -> out/app.kexe.dSYM/           by-product directory
+K-4 answered for this tuple: `-o app` produces `app.kexe`, plus `app.kexe.dSYM`.
+
+E4 — artifact class native-executable-v1 is satisfied  exit 0
+--------------------------------------------------------------
+  file -b out/app.kexe   ->  Mach-O 64-bit executable arm64
+  ./out/app.kexe         ->  "curator-kotlin-native-probe", exit 0
+  otool -L out/app.kexe  ->  /usr/lib/libSystem.B.dylib
+                             /usr/lib/libc++.1.dylib
+                             /usr/lib/libobjc.A.dylib
+                             /System/Library/Frameworks/Foundation.framework/...
+                             /System/Library/Frameworks/CoreFoundation.framework/...
+  every entry is a macOS base-installation library.
+This is the measured answer decision 0008 section 10 asks this task to
+establish: a Kotlin backend does satisfy decision 0008 section 3.
+
+E5 — version probe                                     exit 0
+--------------------------------------------------------------
+  <jdk_root>/bin/java -cp <jar> <main> konanc -version
+  stdout (22 B, one line):   Kotlin/Native: 2.4.10
+  stderr (603 B):            four JVM "restricted method" WARNING lines
+                             info: kotlinc-native 2.4.10 (JRE 26.0.1)
+  identical with and without -Dkonan.home.
+The native backend token is on stdout. The JVM-backend distribution measured in
+cycle 1 writes `info: kotlinc-jvm ...` to stderr with empty stdout, so an
+anchored stdout rule requiring the literal `Kotlin/Native: ` cannot be satisfied
+by a JVM-backend distribution. K-7 answered.
+
+E6 — default native target                             exit 0
+--------------------------------------------------------------
+  <jdk_root>/bin/java -Dkonan.home=<dist> -cp <jar> <main> konanc -list-targets
+  -> 20+ lines; the host default is marked:   macos_arm64 (default)
+K-6 mechanism answered: the `(default)`-marked line is the distribution's own
+statement of the host target.
+
+E7 — dependency hydration (one online run)             exit 0
+--------------------------------------------------------------
+  KONAN_DATA_DIR=<data-empty> <jdk_root>/bin/java <jvm> -cp <jar> <main> konanc \
+      -produce program -target macos_arm64 -o out/app src/main.kt
+  downloaded from https://download.jetbrains.com/kotlin/native :
+    lldb-4-macos.tar.gz                              64,230,999 B
+    llvm-21-aarch64-macos-essentials-97.tar.gz      151,150,049 B
+    libffi-3.3-1-macos-arm64.tar.gz                      17,037 B
+  extracted into <data>/dependencies ; resulting tree 688 MB, 1470 files
+  no checksum or signature verification is reported by the compiler for any of
+  the three downloads.
+  NOT downloaded: the Apple target toolchain, sysroot and addon (see E15).
+
+E8 — zero network with a hydrated closure              exit 0
+--------------------------------------------------------------
+  sandbox-exec -f sb-nonet.sb <jdk_root>/bin/java <jvm> -cp <jar> <main> konanc \
+      -produce program -target macos_arm64 -o outA/app src/main.kt
+  sb-nonet.sb:  (version 1)(allow default)(deny network*)
+                (allow network* (local ip) (remote unix-socket)
+                               (literal "/private/var/run/mDNSResponder"))
+  -> exit 0, artifact produced, 0 lines matching "Downloading".
+
+E9 — the hydrated closure is not mutated by a compile
+------------------------------------------------------
+  aggregate SHA-256 over all files under <data>, before and after E8:
+    before  0d2e5016f1d797e5169dfa3da54a11e7257be92439bf27cfd4181f7b84597377  1470 entries
+    after   0d2e5016f1d797e5169dfa3da54a11e7257be92439bf27cfd4181f7b84597377  1470 entries
+  DATA-DIR-UNCHANGED.
+This refutes the cycle-1 reading of the reviewer's empty-directory measurement:
+the writes seen there are hydration writes, not compile writes.
+
+E10 — but the data directory must be writable          exit 2
+--------------------------------------------------------------
+  chmod -R a-w <data> ; same compile
+  -> error: Internal error in file lowering:
+     java.io.FileNotFoundException: <data>/dependencies/cache/.lock (Permission denied)
+  A read-only <dist> is fine; a read-only <data> is not.
+
+E11 — immutable bundle + operation-private overlay      exit 0
+---------------------------------------------------------------
+  chmod -R a-w <dist> <data>          (both roots read-only)
+  overlay/dependencies/<name> -> symlink to <data>/dependencies/<name>  (each dep)
+  overlay/dependencies/.extracted     copied
+  overlay/dependencies/cache/         fresh, writable, empty
+  KONAN_DATA_DIR=<overlay> <jdk_root>/bin/java <jvm> -cp <jar> <main> konanc \
+      -produce program -target macos_arm64 -o outE/app src/main.kt
+  -> exit 0, artifact produced, no download, both read-only roots unchanged.
+The immutable-root + writable-overlay model is measured to work.
+
+E12 — fail closed instead of downloading               exit 2
+--------------------------------------------------------------
+  KONAN_DATA_DIR=<empty> ... konanc -Xoverride-konan-properties="airplaneMode=true" \
+      -produce program -target macos_arm64 -o outF/app src/main.kt
+  -> "Cannot find a dependency locally: lldb-4-macos.
+      Set `airplaneMode = false` in konan.properties to download it."
+  -> no download performed; exit 2.
+  (the run still creates <data>/dependencies/, .extracted and cache/.lock —
+   which is why the overlay of E11 is required rather than optional.)
+
+E13 — DECISIVE: the macOS pipeline requires host executables
+-------------------------------------------------------------
+Method: sandbox-exec profile denying process-exec* everywhere except
+  (subpath <jdk_root>) (subpath <dist>) (subpath <data>) plus an explicit
+  literal allow-list grown one entry per iteration from the failure message.
+
+  iteration 1  exit 2  Cannot run program "/bin/bash"
+                       at CurrentXcode.bash(Xcode.kt:144)
+                       <- CurrentXcode.getBundleVersion(Xcode.kt:119)
+                       <- AppleConfigurablesImpl.getXcodePartsProvider(Apple.kt:62)
+                       <- AppleConfigurablesImpl.getAbsoluteTargetToolchain(Apple.kt:44)
+                       <- ClangArgs.<init>(ClangArgs.kt:28)
+  with /bin/bash allowed, bash itself reports:
+                       /bin/bash: /usr/bin/xcode-select: Operation not permitted
+                       /bin/bash: /usr/libexec/PlistBuddy: Operation not permitted
+                       (the command is
+                        /usr/libexec/PlistBuddy "$(xcode-select -print-path)/../Info.plist"
+                          -c "Print :CFBundleShortVersionString")
+  iteration 2  exit 2  Cannot run program "/usr/bin/xcrun"
+  iteration 3  exit 1  xcrun: error: can't exec
+                       '/Applications/Xcode_26_5.app/Contents/Developer/usr/bin/xcodebuild'
+                       Failed command: /usr/bin/xcrun xcodebuild -version
+  next         exit 2  Cannot run program
+                       '/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/
+                        XcodeDefault.xctoolchain/usr/bin/ld'
+  next         exit 2  Cannot run program
+                       '.../XcodeDefault.xctoolchain/usr/bin/dsymutil'
+  final        exit 0  with exactly these seven allowed.
+
+Complete external-executable set for one hello-world
+`-produce program -target macos_arm64`:
+   1  /bin/bash
+   2  /usr/bin/xcode-select                       (via bash)
+   3  /usr/libexec/PlistBuddy                     (via bash)
+   4  /usr/bin/xcrun
+   5  <Xcode>/Contents/Developer/usr/bin/xcodebuild            (via xcrun)
+   6  <Xcode>/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+   7  <Xcode>/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/dsymutil
+plus the macOS SDK at
+   <Xcode>/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+as sysroot data.
+None of the seven can be a member of an operator-curated root: four are
+OS-owned absolute paths hard-coded in the compiler, and the remaining three are
+discovered at run time from whichever Xcode the host has.
+
+E14 — no manager-fixed override closes E13              exit 2
+---------------------------------------------------------------
+  ... konanc -Xoverride-konan-properties="ignoreXcodeVersionCheck=true;\
+        targetToolchain.macos_arm64=<xctoolchain>;\
+        targetSysRoot.macos_arm64=<MacOSX26.5.sdk>;\
+        additionalToolsDir.macos_arm64=<xctoolchain>" \
+      -produce program -target macos_arm64 -o out9/app src/main.kt
+  under exec containment allowing only <jdk_root>, <dist>, <data>, and the two
+  Xcode binaries ld and dsymutil:
+  -> Cannot run program "/usr/bin/xcrun"
+       at CurrentXcode.xcrun(Xcode.kt:131)
+       <- CurrentXcode.getToolchain(Xcode.kt:92)
+       <- AppleConfigurablesImpl.getAbsoluteTargetToolchain(Apple.kt:45)
+       <- ClangArgs.<init>(ClangArgs.kt:28)
+  The version check was suppressed; the toolchain path is still resolved by
+  spawning /usr/bin/xcrun, and the targetToolchain property is not consulted.
+
+E15 — structural cause, read from the distribution
+---------------------------------------------------
+  <dist>/konan/konan.properties
+    targetToolchain.macos_arm64    = target-toolchain-xcode_26.4_17E192
+    targetSysRoot.macos_arm64      = target-sysroot-xcode_26.4_17E192-macosx
+    additionalToolsDir.macos_arm64 = xcode-addon-xcode_26.4_17E192
+    target-toolchain-xcode_26.4_17E192.default        = remote:internal
+    target-sysroot-xcode_26.4_17E192-macosx.default   = remote:internal
+    xcode-addon-xcode_26.4_17E192.default             = remote:internal
+    (11 occurrences of remote:internal in the file, all Apple parts)
+    dependencies.macos_arm64 = lldb-4-macos
+    llvmHome.macos_arm64     = llvm-21-aarch64-macos-essentials-97
+    minimalXcodeVersion=12.5 ; ignoreXcodeVersionCheck=false
+  <jar> org/jetbrains/kotlin/konan/util/InternalServer.class
+    envKey/envValue     KONAN_USE_INTERNAL_SERVER
+    internalDomain      https://repo.labs.intellij.net/kotlin-native
+  <jar> org/jetbrains/kotlin/konan/target/AppleConfigurablesImpl$XcodePartsProvider
+    two implementations only: InternalServer and Local.
+So the Apple toolchain/sysroot have exactly two sources: a JetBrains-internal
+host no operator can reach, or the host's installed Xcode. There is no third.
+
+E16 — the cause is Apple-specific, not Kotlin-specific
+-------------------------------------------------------
+  same konan.properties, non-Apple targets:
+    targetToolchain.linux_x64 = $gccToolchain.linux_x64/x86_64-unknown-linux-gnu
+    targetSysRoot.linux_x64   = $gccToolchain.linux_x64/x86_64-unknown-linux-gnu/sysroot
+    targetToolchain.mingw_x64 = $toolchainDependency.mingw_x64
+    targetSysRoot.mingw_x64   = $toolchainDependency.mingw_x64
+    llvm.linux_x64.user  = llvm-21-x86_64-linux-essentials-116
+    llvm.mingw_x64.user  = llvm-21-x86_64-windows-essentials-150
+  none of these is remote:internal and none names a host SDK; all four resolve
+  inside $KONAN_DATA_DIR/dependencies, i.e. inside a curatable, fingerprintable
+  tree. This is a properties-file reading, not a measurement of those hosts.
+
+E17 — response-file expansion on the native backend
+----------------------------------------------------
+  file named `inject` containing `-version`:
+    konanc @inject         -> exit 0, stdout "Kotlin/Native: 2.4.10"   EXPANDED
+    konanc @./inject       -> exit 0, stdout "Kotlin/Native: 2.4.10"   EXPANDED
+    konanc @/abs/inject    -> exit 0, stdout "Kotlin/Native: 2.4.10"   EXPANDED
+  file named `@inject` containing `-version`:
+    konanc @inject         -> warning: argfile not found: .../inject
+                              error: you have not specified any compilation
+                              arguments.  exit 1
+    konanc /abs/@inject    -> error: source entry is not a Kotlin file  exit 1
+    konanc ./@inject       -> error: source entry is not a Kotlin file  exit 1
+    konanc @nonexistent    -> warning: argfile not found ... (warning only)
+Corrected rule: expansion is decided by the FIRST CHARACTER OF THE ARGV TOKEN,
+not by whether the path is absolute. The `@` is stripped and the remainder is
+the response-file path, absolute or not. A driver that passes package paths as
+absolute paths starting with `/` therefore never produces an expandable token —
+which is why the absolute-path discipline is a sound structural backstop, and
+why the reason for it must be stated as the token's first character.
+
+E18 — distribution platform libraries are importable    exit 0
+---------------------------------------------------------------
+  srcp/main.kt:
+      import platform.posix.getpid
+      import platform.Foundation.NSProcessInfo
+      fun main() { println("pid=" + getpid())
+                   println("host=" + NSProcessInfo.processInfo.hostName) }
+  compiled with the same vector, no -library, no .def
+  -> exit 0, out/app.kexe 839,032 B, runs and prints pid and host name
+  -> otool -L now additionally lists /usr/lib/libresolv.9.dylib
+  <dist>/klib/platform/macos_arm64/ ships 200+ org.jetbrains.kotlin.native.platform.*
+  klibs (posix, Foundation, AppKit, ...).
+Consequence: the artifact's dynamic dependency set is a function of package
+source, so decision 0008 section 3's base-installation clause needs a
+post-link, pre-publish check; it cannot be discharged by a pre-compile file
+walk. The cycle-1 "stdlib only / no C interop" statement was wrong.
+
+E19 — in-closure children observed
+-----------------------------------
+  <data>/dependencies/llvm-21-aarch64-macos-essentials-97/bin/clang++
+    (surfaced by a disk-full failure message; inside the curatable closure)
+  the compiler writes intermediates to $TMPDIR/konan_temp<random>/ —
+    e.g. /var/folders/.../T/konan_temp12408972187024117976/app.kexe.o
+    so TMPDIR must be operation-private.
+
+Not performed
+-------------
+No Windows or Linux measurement: no such host was reachable for this task.
+No toolchain was installed on this host; the unpacked distribution and its
+hydrated dependency closure were deleted after measurement.
+No repository code, staging, commit, publication, or pin change was performed.

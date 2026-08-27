@@ -1,0 +1,94 @@
+----------------------------------------------------------------
+argv: kotlinc -help 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 3926
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+Usage: kotlinc-jvm <options> <source files>
+where possible options include:
+  -classpath (-cp) <path>    List of directories and JAR/ZIP archives to search for user class files.
+  -d <directory|jar>         Destination for generated class files.
+  -expression (-e)           Evaluate the given string as a Kotlin script.
+  -include-runtime           Include the Kotlin runtime in the resulting JAR.
+  -java-parameters           Generate metadata for Java 1.8 reflection on method parameters.
+  -jdk-home <path>           Include a custom JDK from the specified location in the classpath instead of the default 'JAVA_HOME'.
+  -jvm-default {enable|no-compatibility|disable}
+                             Emit JVM default methods for interface declarations with bodies. The default is 'enable'.
+                             -jvm-default=enable              Generate default methods for non-abstract interface declarations, as well as 'DefaultImpls' classes with
+                                                              static methods for compatibility with code compiled in the 'disable' mode.
+                                                              This is the default behavior since language version 2.2.
+                             -jvm-default=no-compatibility    Generate default methods for non-abstract interface declarations. Do not generate 'DefaultImpls' classes.
+                             -jvm-default=disable             Do not generate JVM default methods. This is the default behavior up to language version 2.1.
+  -jvm-target <version>      The target version of the generated JVM bytecode (1.8 and 9–26), with 1.8 as the default.
+  -module-name <name>        Name of the generated '.kotlin_module' file.
+  -no-jdk                    Don't automatically include the Java runtime in the classpath.
+  -no-reflect                Don't automatically include the Kotlin reflection dependency in the classpath.
+  -no-stdlib                 Don't automatically include the Kotlin/JVM stdlib and Kotlin reflection dependencies in the classpath.
+  -script-templates <fully qualified class name[,]>
+                             Script definition template classes.
+  -P plugin:<pluginId>:<optionName>=<value>
+                             Pass an option to a plugin.
+  -api-version <version>     Allow using declarations from only the specified version of bundled libraries.
+  -kotlin-home <path>        Path to the Kotlin compiler home directory used for the discovery of runtime libraries.
+  -language-version <version> Provide source compatibility with the specified version of Kotlin.
+  -opt-in <fq.name>          Enable API usages that require opt-in with an opt-in requirement marker with the given fully qualified name.
+  -progressive               Enable progressive compiler mode.
+                             In this mode, deprecations and bug fixes for unstable code take effect immediately
+                             instead of going through a graceful migration cycle.
+                             Code written in progressive mode is backward compatible; however, code written without
+                             progressive mode enabled may cause compilation errors in progressive mode.
+  -script                    Evaluate the given Kotlin script (*.kts) file.
+  -Werror                    Report an error if there are any warnings.
+  -Wextra                    Enable extra checkers for K2.
+  -X                         Print a synopsis of advanced options.
+  -help (-h)                 Print a synopsis of standard options.
+  -nowarn                    Don't generate any warnings.
+  -verbose                   Enable verbose logging output.
+----------------------------------------------------------------
+argv: kotlinc -X 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 28108
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+Usage: kotlinc-jvm <options> <source files>
+where advanced options include:
+  -Xabi-stability={stable|unstable}
+                             When using unstable compiler features such as FIR, use 'stable' to mark generated class files as stable
+                             to prevent diagnostics from being reported when using stable compilers at the call site.
+                             When using the JVM IR backend, conversely, use 'unstable' to mark generated class files as unstable
+                             to force diagnostics to be reported.
+  -Xadd-modules=<module[,]>  Root modules to resolve in addition to the initial modules, or all modules on the module path if <module> is ALL-MODULE-PATH.
+  -Xallow-no-source-files    Allow the set of source files to be empty.
+  -Xallow-unstable-dependencies Do not report errors on classes in dependencies that were compiled by an unstable version of the Kotlin compiler.
+  -Xannotations-in-metadata  Write annotations on declarations into the metadata (in addition to the JVM bytecode), and read annotations from the metadata if they are present.
+  -Xassertions={always-enable|always-disable|jvm|legacy}
+                             'kotlin.assert' call behavior:
+                             -Xassertions=always-enable:  enable, ignore JVM assertion settings;
+                             -Xassertions=always-disable: disable, ignore JVM assertion settings;
+                             -Xassertions=jvm:            enable, depend on JVM assertion settings;
+                             -Xassertions=legacy:         calculate the condition on each call, the behavior depends on JVM assertion settings in the kotlin package;
+                             default: legacy
+  -Xbackend-threads=<N>      Run codegen phase in N parallel threads.
+                             0 means use one thread per processor core.
+                             The default value is 1.
+  -Xbuild-file=<path>        Path to the .xml build file to compile.
+  -Xdebug                    Enable debug mode for compilation.
+                             Currently this includes spilling all variables in a suspending context regardless of whether they are alive.
+                             If API Level >= 2.2 -- no-op.
+  -Xdefault-script-extension=<script filename extension>
+                             Compile expressions and unrecognized scripts passed with the -script argument as scripts with the given filename extension.
+  -Xdisable-standard-script  Disable standard Kotlin scripting support.
+  -Xemit-jvm-type-annotations Emit JVM type annotations in bytecode.
+  -Xenhance-type-parameter-types-to-def-not-null
+                             Enhance not-null-annotated type parameter types to definitely-non-nullable types ('@NotNull T' => 'T & Any').
+  -Xenhanced-coroutines-debugging
+                             Generate additional linenumber instruction for compiler-generated code
+                             inside suspend functions and lambdas to distinguish them from user code by debugger.
+  -Xfriend-paths=<path>      Paths to output directories for friend modules (modules whose internals should be visible).
+  -Xgenerate-strict-metadata-version
+                             Generate metadata with strict version semantics (see the KDoc entry on 'Metadata.extraInt').
+  -Xignored-annotations-for-bridges=<fq.name>|*
+                             Do not copy these annotations to the bridge methods from their targets.
+  -Xindy-allow-annotated-lambdas Allow using 'invokedynamic' for lambda expressions with annotations

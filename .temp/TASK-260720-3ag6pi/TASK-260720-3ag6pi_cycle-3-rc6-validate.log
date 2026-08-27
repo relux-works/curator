@@ -1,0 +1,15 @@
+command: make validate
+workdir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/cycle-3-rc6-validation-candidate
+
+python3 tools/validate.py
+validated 42 schemas and 447 vector files
+python3 -B -m unittest discover -s tools -p 'test_*.py'
+...........................................................
+----------------------------------------------------------------------
+Ran 59 tests in 4.418s
+
+OK
+go test ./tools/...
+ok  	github.com/relux-works/curator-spec/tools/generate-vectors	0.379s
+
+exit_code=0

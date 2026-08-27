@@ -1,0 +1,16 @@
+internal/transaction/digest.go:96:71: G115: integer overflow conversion int64 -> uint64 (gosec)
+	if err := writeDigestEntry(hash, 'f', rel, info.Mode().Perm(), uint64(info.Size())); err != nil {
+	                                                                     ^
+internal/transaction/types.go:40:2: exported: exported const PhasePrepared should have comment (or a comment on this block) or be unexported (revive)
+	PhasePrepared        Phase = "prepared"
+	^
+internal/transaction/types.go:53:2: exported: exported const StateBackedUp should have comment (or a comment on this block) or be unexported (revive)
+	StateBackedUp   CommitState = "backed_up"
+	^
+internal/transaction/types.go:114:2: exported: exported const PointBeforeBackup should have comment (or a comment on this block) or be unexported (revive)
+	PointBeforeBackup     Point = "before_backup"
+	^
+4 issues:
+* gosec: 1
+* revive: 3
+exit status 1

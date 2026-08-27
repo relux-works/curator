@@ -1,0 +1,31 @@
+Manage attached resources such as screenshots, docs, logs, and other files.
+
+Use "task-board resource add" to create a new attached resource, "task-board
+resource adopt" to register an orphaned local payload, "task-board resource
+update" to replace an existing one, "task-board resource delete" to remove it,
+and "task-board resource get" to materialize a resource back to the local
+filesystem for inspection.
+
+Usage:
+  task-board resource [command]
+
+Available Commands:
+  add         Attach a new file resource to an element
+  adopt       Register an existing unreferenced local resource payload
+  delete      Delete a resource from an element (requires --confirm)
+  get         Download a resource to the local filesystem
+  update      Replace an existing file resource on an element
+
+Flags:
+  -h, --help   help for resource
+
+Global Flags:
+      --board-dir string         Path to the board directory (overrides TASK_BOARD_DIR and config local.board_dir) (default ".task-board")
+      --context-profile string   Agent context profile override: full or lite
+      --insecure                 Skip TLS certificate verification (for self-signed certs)
+      --json                     Output in JSON format
+      --no-update-check          Disable automatic update check
+      --remote string            Remote board server URL (overrides TASK_BOARD_REMOTE)
+      --remote-board string      Remote board ID (overrides TASK_BOARD_ID)
+
+Use "task-board resource [command] --help" for more information about a command.

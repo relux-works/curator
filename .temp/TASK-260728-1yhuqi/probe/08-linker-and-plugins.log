@@ -1,0 +1,62 @@
+=== F1. clang link job: which linker? (-### on the clang step) ===
+Apple clang version 21.0.0 (clang-2100.1.1.101)
+Target: arm64-apple-macosx26.0
+Thread model: posix
+InstalledDir: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+clang: error: no such file or directory: '/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/probe/stage/tmp/nonexistent.o'
+
+=== F2. plugin-related swiftc flags ===
+  -cas-plugin-option <name>=<option>
+                          Option pass to CAS Plugin
+  -cas-plugin-path <path> Path to CAS Plugin
+  -external-plugin-path <path>#<plugin-server-path>
+                          Add directory to the plugin search path with a plugin server executable
+  -in-process-plugin-server-path <value>
+                          Path to dynamic library plugin server
+  -load-pass-plugin=<path>
+                          Load LLVM pass plugin from a dynamic shared object file.
+  -load-plugin-executable <path>#<module-names>
+                          Path to a compiler plugin executable and a comma-separated list of module names where the macro types are declared
+  -load-plugin-library <path>
+                          Path to a dynamic library containing compiler plugins such as macros
+  -load-resolved-plugin <library-path>#<executable-path>#<module-names>
+                          Path to resolved plugin configuration and a comma-separated list of module names where the macro types are declared. Library path and executable path can be empty if not used
+  -plugin-path <value>    Add directory to the plugin search path
+
+=== F3. swift-frontend plugin flags ===
+  -cas-plugin-option <name>=<option>
+                          Option pass to CAS Plugin
+  -cas-plugin-path <path> Path to CAS Plugin
+  -external-plugin-path <path>#<plugin-server-path>
+                          Add directory to the plugin search path with a plugin server executable
+  -in-process-plugin-server-path <value>
+                          Path to dynamic library plugin server
+  -load-pass-plugin=<path>
+                          Load LLVM pass plugin from a dynamic shared object file.
+  -load-plugin-executable <path>#<module-names>
+                          Path to a compiler plugin executable and a comma-separated list of module names where the macro types are declared
+  -load-plugin-library <path>
+                          Path to a dynamic library containing compiler plugins such as macros
+  -load-resolved-plugin <library-path>#<executable-path>#<module-names>
+                          Path to resolved plugin configuration and a comma-separated list of module names where the macro types are declared. Library path and executable path can be empty if not used
+  -plugin-path <value>    Add directory to the plugin search path
+  -resolved-plugin-verification
+                          verify resolved plugins
+
+=== F4. Platforms plugin dir contents (outside xctoolchain/SDK) ===
+total 3608
+drwxr-xr-x  17 iv  staff     544 May 31 22:12 .
+drwxr-xr-x  33 iv  staff    1056 May 31 22:12 ..
+-rwxr-xr-x   1 iv  staff  749152 Apr 30 17:05 libAppIntentsMacros.dylib
+-rwxr-xr-x   1 iv  staff   97984 Apr 30 17:05 libFinanceMacros.dylib
+-rw-r--r--   1 iv  staff    1715 Apr 19 06:11 libFinanceMacros.tbd
+-rwxr-xr-x   1 iv  staff  311232 Apr 30 17:05 libFoundationMacros.dylib
+-rwxr-xr-x   1 iv  staff  371648 Apr 30 17:05 libFoundationModelsMacros.dylib
+-rw-r--r--   1 iv  staff    2494 Apr 19 06:19 libFoundationModelsMacros.tbd
+-rwxr-xr-x   1 iv  staff  391472 Apr 30 17:05 libMMIOMacros.dylib
+-rwxr-xr-x  1 iv  staff  71520 Apr 30 17:07 /Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server
+=== F5. xctoolchain host plugins ===
+libObservationMacros.dylib
+libPlaygroundMacros.dylib
+libSwiftMacros.dylib
+testing

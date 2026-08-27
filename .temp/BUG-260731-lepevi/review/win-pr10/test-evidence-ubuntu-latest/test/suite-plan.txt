@@ -1,0 +1,31 @@
+suite-plan: GOOS=linux
+suite-plan: root=/home/runner/work/curator/curator/protocol-spec/conformance/v1
+suite-plan: the root publishes no vectors/conformance-claim-v3-qualification.json; the recorded default_excluded_on applies
+
+defer internal/buildcache
+      the supplied root publishes none of: vectors/build-drivers.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/buildsource
+      the supplied root publishes none of: vectors/build-drivers.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+excl  internal/godriver
+      excluded on linux by default_excluded_on (this root publishes no vectors/conformance-claim-v3-qualification.json)
+      the exclusion is asserted by TestProbeRejectsAnUncoveredPlatformBeforeTheWorker, which still runs and must pass
+defer internal/install
+      the supplied root publishes none of: vectors/build-drivers.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/marker
+      the supplied root publishes none of: schema-cases/install-marker-v2 expected/build-driver/marker.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/scopes
+      the supplied root publishes none of: vectors/external-repository-lifecycle.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/skillspec
+      the supplied root publishes none of: schema-cases/agent-skill-v6 fixtures/go-build-skill
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/whitelist
+      the supplied root publishes none of: fixtures/go-build-skill expected/build-driver/context_files.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+
+suite-plan: served=32 deferred=7 excluded=1
+suite-plan: ok

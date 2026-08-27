@@ -1,0 +1,21 @@
+# TASK-260729-v5hqnv review verdict — cycle 1
+
+**Verdict:** CHANGES REQUESTED. Route to `analysis` because the remaining work is board-metadata and audit correction, not product implementation.
+
+## Independently verified
+
+- Fresh direct projections of all seven named tasks are exactly equal to `TASK-260729-v5hqnv_after.jsonl` across `id`, `name`, `title`, `status`, `description`, `scope`, `ac`, `blockedBy`, and `blocks`.
+- The before/after JSONL proves that all seven changed only `description`, `scope`, and `ac`, plus the two documented added dependency edges from `TASK-260720-2dnqw2` and `TASK-260720-12r55p` to `TASK-260729-3nx97g`. IDs, titles, names, statuses, parents, blocks, and checklists were preserved. Field lengths and dependency deltas match audit section 2.8.
+- The immutable rc.5 candidate root independently matches manifest SHA-256 `b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c`, protocol `1.0.0-rc.5`, and 447 manifest files. The release metadata records the same candidate and downstream-required manifest digest and `committed_release_pin_advanced: false`.
+- `expected/build-driver/build-input.ccj.json` is 869 bytes and hashes to `529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b`; `receipt.ccj.json` is 1120 bytes, hashes to `919fbbad8e6ce95532219fd952c2309d0d7026f85209650508fd6834af4020cd`, and ends in byte `0x7d` with no trailing newline. The expected tree has 11 files and the manifest has 12 build-driver entries.
+- Vector counts and semantics match the retarget: five argv forms, 8 positive cases, 77 rejection cases, 10 build-source cases, 12 toolchain cases, 18 mandatory controls, 13 session states, four process nodes, 14 identity/protocol cases, 8 package-influence cases, 11 capability-evidence cases, six deferred guarantees and guards, five native controls over exactly macOS and Windows, claim-v3 protocol const rc.5 with required `build_drivers`, Linux excluded until `TASK-260728-1skseh`, and macOS/Windows pending downstream native evidence.
+- `TASK-260729-3nx97g` is done with an accepted reviewer verdict. `TASK-260720-3ag6pi` remains blocked and literal rc.4; `TASK-260720-jrrgw9` remains in development and literal rc.4. The retained fail-closed prerequisite is real.
+- CocoaSkills is clean at `edce8816dda44bb121d661b7c4dea942558ce408`; the Curator checkout has no tracked or staged diff. The rc.5 worktree remains at base `57c1f56846d221ecc55786bd3c2467ec32f11730` with its candidate-only untracked surface. No tests were run, exactly as required by the reviewer instruction.
+
+## Required corrections
+
+1. Audit section 5 says `750f5f75…` was removed from the board entirely. This is false: `task-board grep` finds the value in multiple historical outcome resources and progress records, including `TASK-260720-12iigs`, `TASK-260720-1nvomm`, `TASK-260720-1s1vr6`, `TASK-260720-3mrm4z`, and others. Replace that claim with the precise verified statement that the stale receipt hash is absent from the current `description`, `scope`, and `ac` of all seven retargeted briefs. Keep historical evidence intact.
+
+2. The producer appended an rc.5 paragraph to `TASK-260720-12r55p.notes`. The task scope authorizes only brief `description`, `scope`, `ac`, and dependency-edge changes, while the raw before/after JSONL excludes `notes`. Therefore the attached audit is not an exact audit of every actual board mutation, and its opening claim that notes were in executed scope contradicts the task scope. Restore `TASK-260720-12r55p.notes` to its exact pre-retarget content. Move the necessary fail-closed explanation into the allowed brief `scope` or `ac`: the hard edge to `TASK-260720-3ag6pi` is intentionally retained, and before `TASK-260720-12r55p` starts the owner must either retarget and re-review that gate against rc.5 or create the replacement rc.5 gate and relink. Then regenerate `after.jsonl` and revise the audit so its mutation inventory is complete and scope-accurate.
+
+After those exact board/audit corrections, the rc.5 semantic retarget itself is suitable for another reviewer cycle.

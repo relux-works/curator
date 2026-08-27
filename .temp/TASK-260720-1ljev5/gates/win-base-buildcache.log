@@ -1,0 +1,85 @@
+=== RUN   TestInspectMissAndUnsupportedAreReadOnly
+--- PASS: TestInspectMissAndUnsupportedAreReadOnly (0.00s)
+=== RUN   TestPublishAndInspectExactProtectedHit
+--- PASS: TestPublishAndInspectExactProtectedHit (0.04s)
+=== RUN   TestInspectRejectsCorruptReceiptAndArtifactState
+=== RUN   TestInspectRejectsCorruptReceiptAndArtifactState/receipt_trailing_newline
+=== RUN   TestInspectRejectsCorruptReceiptAndArtifactState/artifact_bytes
+=== RUN   TestInspectRejectsCorruptReceiptAndArtifactState/missing_receipt
+=== RUN   TestInspectRejectsCorruptReceiptAndArtifactState/oversized_receipt
+=== RUN   TestInspectRejectsCorruptReceiptAndArtifactState/unexpected_entry
+=== RUN   TestInspectRejectsCorruptReceiptAndArtifactState/recorded_receipt_hash
+--- PASS: TestInspectRejectsCorruptReceiptAndArtifactState (0.18s)
+    --- PASS: TestInspectRejectsCorruptReceiptAndArtifactState/receipt_trailing_newline (0.03s)
+    --- PASS: TestInspectRejectsCorruptReceiptAndArtifactState/artifact_bytes (0.04s)
+    --- PASS: TestInspectRejectsCorruptReceiptAndArtifactState/missing_receipt (0.02s)
+    --- PASS: TestInspectRejectsCorruptReceiptAndArtifactState/oversized_receipt (0.04s)
+    --- PASS: TestInspectRejectsCorruptReceiptAndArtifactState/unexpected_entry (0.03s)
+    --- PASS: TestInspectRejectsCorruptReceiptAndArtifactState/recorded_receipt_hash (0.03s)
+=== RUN   TestPublicationRequiresHeldHomeLock
+--- PASS: TestPublicationRequiresHeldHomeLock (0.01s)
+=== RUN   TestPublishQuarantinesCorruptEntryBeforeReplacement
+--- PASS: TestPublishQuarantinesCorruptEntryBeforeReplacement (0.04s)
+=== RUN   TestAtomicPublicationIdenticalRace
+    cache_test.go:235: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestAtomicPublicationIdenticalRace2947430032\001\cache DACL is not protected from inheritance
+--- FAIL: TestAtomicPublicationIdenticalRace (0.06s)
+=== RUN   TestAtomicPublicationConflictingRace
+--- PASS: TestAtomicPublicationConflictingRace (0.04s)
+=== RUN   TestUnsupportedPublicationFailsWithoutPersistentState
+--- PASS: TestUnsupportedPublicationFailsWithoutPersistentState (0.00s)
+=== RUN   TestCandidateCacheOutcomeVocabulary
+    conformance_test.go:13: CURATOR_CONFORMANCE_ROOT is not set
+--- SKIP: TestCandidateCacheOutcomeVocabulary (0.00s)
+=== RUN   TestClosedHandlesFailReadHelpers
+--- PASS: TestClosedHandlesFailReadHelpers (0.00s)
+=== RUN   TestWindowsProtectedStateMatrix
+=== RUN   TestWindowsProtectedStateMatrix/artifact_grants_another_principal_mutation_rights
+=== RUN   TestWindowsProtectedStateMatrix/artifact_denies_owner_mutation_rights
+=== RUN   TestWindowsProtectedStateMatrix/artifact_has_applicable_group_deny
+=== RUN   TestWindowsProtectedStateMatrix/artifact_has_inherit-only_owner_allow
+    testing.go:1369: TempDir RemoveAll cleanup: unlinkat C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_has_inherit-only_owner_3723905463\001\cache\build\go-v1\c8ed5277eecbf2f1a376b81b107c611c688ec95897f57c18135cc610c404b94d\bin\tool.exe: Access is denied.
+=== RUN   TestWindowsProtectedStateMatrix/artifact_owner_lacks_required_mutation_rights
+=== RUN   TestWindowsProtectedStateMatrix/artifact_hard_link
+=== RUN   TestWindowsProtectedStateMatrix/artifact_special_file
+=== RUN   TestWindowsProtectedStateMatrix/artifact_reparse_point
+    protection_windows_test.go:100: creating Windows symlink requires host support: symlink C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_reparse_point334206812\001\reparse-target C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_reparse_point334206812\001\cache\build\go-v1\c8ed5277eecbf2f1a376b81b107c611c688ec95897f57c18135cc610c404b94d\bin\tool.exe: A required privilege is not held by the client.
+--- FAIL: TestWindowsProtectedStateMatrix (1.96s)
+    --- PASS: TestWindowsProtectedStateMatrix/artifact_grants_another_principal_mutation_rights (0.02s)
+    --- PASS: TestWindowsProtectedStateMatrix/artifact_denies_owner_mutation_rights (0.02s)
+    --- PASS: TestWindowsProtectedStateMatrix/artifact_has_applicable_group_deny (0.02s)
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_has_inherit-only_owner_allow (1.77s)
+    --- PASS: TestWindowsProtectedStateMatrix/artifact_owner_lacks_required_mutation_rights (0.04s)
+    --- PASS: TestWindowsProtectedStateMatrix/artifact_hard_link (0.02s)
+    --- PASS: TestWindowsProtectedStateMatrix/artifact_special_file (0.03s)
+    --- SKIP: TestWindowsProtectedStateMatrix/artifact_reparse_point (0.03s)
+=== RUN   TestValidateWindowsSecurityPolicy
+=== RUN   TestValidateWindowsSecurityPolicy/canonical_owner-only_full_control
+=== RUN   TestValidateWindowsSecurityPolicy/owner_deny
+=== RUN   TestValidateWindowsSecurityPolicy/applicable_group_deny
+=== RUN   TestValidateWindowsSecurityPolicy/inherit-only_owner_allow
+=== RUN   TestValidateWindowsSecurityPolicy/owner_lacks_required_mutation_rights
+=== RUN   TestValidateWindowsSecurityPolicy/wrong_owner
+--- PASS: TestValidateWindowsSecurityPolicy (0.00s)
+    --- PASS: TestValidateWindowsSecurityPolicy/canonical_owner-only_full_control (0.00s)
+    --- PASS: TestValidateWindowsSecurityPolicy/owner_deny (0.00s)
+    --- PASS: TestValidateWindowsSecurityPolicy/applicable_group_deny (0.00s)
+    --- PASS: TestValidateWindowsSecurityPolicy/inherit-only_owner_allow (0.00s)
+    --- PASS: TestValidateWindowsSecurityPolicy/owner_lacks_required_mutation_rights (0.00s)
+    --- PASS: TestValidateWindowsSecurityPolicy/wrong_owner (0.00s)
+=== RUN   TestInvalidInputsFailClosed
+--- PASS: TestInvalidInputsFailClosed (0.00s)
+=== RUN   TestInvalidPublicationsLeaveCacheUnpublished
+=== RUN   TestInvalidPublicationsLeaveCacheUnpublished/noncanonical_receipt
+=== RUN   TestInvalidPublicationsLeaveCacheUnpublished/missing_artifact_source
+=== RUN   TestInvalidPublicationsLeaveCacheUnpublished/artifact_source_is_directory
+=== RUN   TestInvalidPublicationsLeaveCacheUnpublished/artifact_bytes_mismatch
+--- PASS: TestInvalidPublicationsLeaveCacheUnpublished (0.01s)
+    --- PASS: TestInvalidPublicationsLeaveCacheUnpublished/noncanonical_receipt (0.00s)
+    --- PASS: TestInvalidPublicationsLeaveCacheUnpublished/missing_artifact_source (0.00s)
+    --- PASS: TestInvalidPublicationsLeaveCacheUnpublished/artifact_source_is_directory (0.00s)
+    --- PASS: TestInvalidPublicationsLeaveCacheUnpublished/artifact_bytes_mismatch (0.00s)
+=== RUN   TestExplicitQuarantineMovesEntryAndMissingIsNoop
+--- PASS: TestExplicitQuarantineMovesEntryAndMissingIsNoop (0.02s)
+=== RUN   TestConflictErrorCarriesLogicalKey
+--- PASS: TestConflictErrorCarriesLogicalKey (0.00s)
+FAIL

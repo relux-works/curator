@@ -1,0 +1,68 @@
+TASK-260728-12pnm1 gate transcript — rework cycle 2
+Each command run standalone. Exit codes are the real ones; nothing is piped through tee.
+Host: macOS 26.5 (25F71) arm64; Go go1.25.5; Rust 1.91.0 / cargo 1.91.0
+
+== probe module: .temp/TASK-260728-12pnm1/probe ==
+gofmt -l .                       exit=0  (no output above = formatted)
+go vet ./...                     exit=0
+go build ./...                   exit=0
+go test -count=1 ./...           exit=0  ok  rustboundaryprobe  0.342s
+                                         14 pre-existing test functions plus 13 new ones
+                                         covering the multiline normalization, the Stage P
+                                         path grammar, the config serializer and the two
+                                         normative argument vectors
+golangci-lint                    NOT RUN: not installed on this host
+
+== probe runs ==
+probe, macOS, SDK pinned         exit=0  green: true
+                                         cases 19/19 matched, 0 divergences
+                                         alignment P1=true P2=true
+                                         closure 24 checks, 0 verdicts
+                                         controls 10 of 10 failing as required
+                                         host-independent vectors 68, 0 divergences
+                                         structural 13 checks, 0 divergences
+probe, toolchain absent          exit=0  19 cases not_run with the reason recorded,
+                                         68 host-independent vectors still run with
+                                         0 divergences, nothing installed
+
+== curator repository ==
+go build ./...                   exit=0
+go vet ./...                     exit=0
+go test ./...                    exit=0
+gofmt -l .                       0 files outside .temp/; this task contributes 0
+make check                       exit=2  EXPECTED-RED, attributed below
+
+== curator-spec ==
+validate.py, clean HEAD          exit=0  baseline: 30 schemas, 93 vector files
+validate.py, task worktree       exit=1  EXPECTED-RED, attributed below
+
+Attribution for the two expected-red gates:
+
+  make check   -> go vet and go test both pass; the run fails at its gofmt stage on
+                  1525 files, every one of them under another task's scratch tree:
+                  .temp/TASK-260720-1zntv0/  (vendored third-party Go sources)
+                  .temp/TASK-260728-2jaw7h/  (an extracted go1.25.1 source tree)
+                  0 of the 1525 files are under .temp/TASK-260728-12pnm1/, and this
+                  task modified no tracked project file in the Curator repository.
+
+  validate.py  -> its schema, manifest, review-evidence and vector-semantics checks all
+                  pass; the link check reports broken links inside
+                  docs/external-build-repositories.md and
+                  docs/portable-go-execution-policy.md, which were copied into this
+                  worktree from another task's in-flight tree to close the link graph
+                  reachable from decision 0007. They point at release/1.0.0-rc.5.json and
+                  conformance/v1/vectors/go-host-execution-policy.json, neither of which
+                  exists at the base commit. The clean-tree baseline above exits 0.
+
+scoped link check over the two documents this task authored
+(decisions/0009-rust-driver-pair.md and docs/rust-build-drivers.md):
+  4 local links scanned, 0 broken
+  exit=0
+
+== what changed since cycle 1 ==
+probe sources         +4 files (vvrecord.go, prewalk.go, cargocfg.go, pipeline.go,
+                      controls2.go) and +1 test file
+controls              6 -> 10
+structural checks     8 -> 13
+host-independent vectors  0 -> 68
+frozen artifacts      unchanged; no schema, vector, release file or pin was touched

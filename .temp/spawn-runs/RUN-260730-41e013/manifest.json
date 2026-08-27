@@ -1,0 +1,55 @@
+{
+  "id": "RUN-260730-41e013",
+  "task_id": "TASK-260720-3t8nr3",
+  "created_at": "2026-07-30T18:56:45.672698Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-22-56-45_-implementer--developer--codex-_TASK-260720-3t8nr3.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-3t8nr3_spawn-log_-implementer--developer--codex-_RUN-260730-41e013.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-3t8nr3_results.md",
+    "TASK-260720-3t8nr3_review-verdict.md",
+    "TASK-260720-3t8nr3_spawn-log_-implementer--developer--codex-_RUN-260730-41c0aa.log",
+    "TASK-260720-3t8nr3_spawn-log_-reviewer--reviewer--claude-_RUN-260730-c38a81.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-3t8nr3_results.md": "3f67102fb97f83df21544c561f145b81d11b6dd60f8209ea0e8c2fe3ce4d16a4",
+    "TASK-260720-3t8nr3_review-verdict.md": "071e51912143814f112c27c90ed1cad4bac68c092d1c8036fdf11c1362f7e4e3"
+  },
+  "require_outcome_artifact": true
+}

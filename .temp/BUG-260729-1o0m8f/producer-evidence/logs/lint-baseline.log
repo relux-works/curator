@@ -1,0 +1,15 @@
+internal/protocoljson/ccj.go:211:38: G115: integer overflow conversion rune -> byte (gosec)
+				buffer.WriteByte(hexadecimal[byte(character)>>4])
+				                                 ^
+internal/protocoljson/ccj.go:212:38: G115: integer overflow conversion rune -> byte (gosec)
+				buffer.WriteByte(hexadecimal[byte(character)&0x0f])
+				                                 ^
+internal/transaction/journal.go:398:82: G602: slice index out of range (gosec)
+		if !validText(entry.RelativePath) || (index > 0 && bytes.Compare([]byte(entries[index-1].RelativePath), []byte(entry.RelativePath)) >= 0) {
+		                                                                               ^
+internal/godriver/builddriver_positive_conformance_test.go:178:4: ineffectual assignment to environment (ineffassign)
+			environment = map[string]string{}
+			^
+4 issues:
+* gosec: 3
+* ineffassign: 1

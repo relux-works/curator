@@ -1,0 +1,91 @@
+=== candidate-suite.sh verify-ref: only a full immutable revision is a candidate ===
+ok    candidate inputs reject revision plus root
+ok    candidate inputs accept revision only
+ok    candidate inputs accept root only
+ok    workflow rejects ambiguous inputs before candidate checkout or recording
+ok    the committed SPEC_PIN is itself a full immutable revision
+ok    verify-ref rejects a branch
+ok    verify-ref rejects a tag
+ok    verify-ref rejects HEAD
+ok    verify-ref rejects a short hash
+ok    verify-ref rejects uppercase hex
+ok    verify-ref rejects a placeholder
+ok    verify-ref rejects the empty string
+ok    verify-ref rejects the null commit
+ok    verify-ref rejects a revision equal to the pin
+ok    verify-ref accepts a full 40-hex revision
+
+=== candidate-suite.sh record: identity, anti-confusion, evidence wording ===
+ok    record rejects a nonexistent root
+ok    record rejects a root with no manifest.json
+ok    record rejects a manifest digest mismatch
+ok    record rejects a candidate identical to the pin
+ok    record accepts a distinct candidate
+ok    evidence states it is NOT A RELEASE
+ok    evidence claims no release
+ok    evidence claims no conformance
+ok    evidence is stamped candidate-only
+ok    evidence records the manifest digest
+ok    evidence records a tree digest
+ok    evidence records the file count
+ok    evidence records the protocol version
+ok    evidence records the committed pin
+
+=== platform-case-gate.sh: the ledger is enforced, not decorated ===
+ok    a complete windows run passes
+ok    a required DACL case that skips fails
+ok    a required case that never runs fails
+ok    a required case that fails, fails the gate
+ok    a declared subtest skip is tolerated
+ok    a declared subtest skip for the WRONG class fails
+ok    a skip with an unrecognised reason fails
+ok    a host-capability skip is recorded and allowed
+ok    a root-unset skip in a SERVED package fails
+ok    a root-unset skip in a DEFERRED package passes
+ok    a tolerated platform-control skip passes
+ok    an excluded package is not demanded
+ok    output text mimicking a result event is not counted
+
+=== platform-case-gate.sh: the SHIPPED ledger is satisfiable on each runner ===
+ok    the shipped ledger is satisfiable on linux
+ok    the shipped ledger is satisfiable on darwin
+ok    the shipped ledger is satisfiable on windows
+
+=== suite-plan.sh: the plan comes from the root, not from the lane ===
+ok    suite-plan rejects a nonexistent root
+ok    a fully serving root defers nothing, even under CI_REQUIRE_FULL_ROOT
+ok    a partial root defers, and that is fatal under CI_REQUIRE_FULL_ROOT
+ok    a partial root defers and is tolerated without it
+ok    the partial root defers internal/marker
+ok    a root excluding linux excludes godriver there
+ok    godriver is excluded on linux
+ok    the exclusion is asserted by a case
+ok    the same root does NOT exclude godriver on darwin
+ok    darwin excludes nothing under a linux-only exclusion
+ok    a pre-vector root still excludes godriver on linux
+ok    the fallback exclusion is recorded as such
+
+=== ledger-consistency.sh: a ledger claim is checked against the real builds ===
+ok    a ledger row naming a nonexistent case fails
+ok    a ledger row naming a nonexistent package fails
+ok    the shipped ledger is consistent with every build
+
+=== no-broad-suppression.sh: narrow and named, or not at all ===
+ok    a clean tree passes
+ok    a bare //nolint is rejected
+ok    a //nolint:all is rejected
+ok    a named //nolint with a reason is accepted
+ok    a bare //#nosec is rejected
+ok    a production-path lint exclusion is rejected
+ok    wholesale linter disabling is rejected
+ok    an unrecorded gosec exclusion is rejected
+ok    a recorded gosec exclusion is accepted
+ok    the shipped .golangci.yml passes the gate
+
+=== toolchain-identity.sh: the toolchain is read back, never assumed ===
+ok    a healthy toolchain passes
+ok    a toolchain that is not go.mod's version is rejected
+ok    GOTOOLCHAIN=auto is rejected
+ok    a per-user go env file is rejected
+
+gate-selftest: 74 passed, 0 failed

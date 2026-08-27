@@ -1,0 +1,38 @@
+test_accepts_complete_rc6_artifact_set (test_release_gate.ProtocolRC6ReleaseGateTests.test_accepts_complete_rc6_artifact_set) ... ok
+test_rc6_has_no_conformance_claim_schema (test_release_gate.ProtocolRC6ReleaseGateTests.test_rc6_has_no_conformance_claim_schema) ... ok
+test_rejects_changed_published_rc5_release_metadata (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_changed_published_rc5_release_metadata) ... ok
+test_rejects_claim_v3_transition_mismatch (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_claim_v3_transition_mismatch) ... ok
+test_rejects_duplicate_rc6_suite_pin (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_duplicate_rc6_suite_pin) ... ok
+test_rejects_each_missing_required_artifact (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_each_missing_required_artifact) ... ok
+test_rejects_missing_required_manifest_entry (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_missing_required_manifest_entry) ... ok
+test_rejects_rc6_history_rewriting_rc5_identity (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_rc6_history_rewriting_rc5_identity) ... ok
+test_rejects_redefined_claim_v1_and_v2_history (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_redefined_claim_v1_and_v2_history) ... ok
+test_rejects_removed_lifecycle_case_with_updated_manifest_hash (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_removed_lifecycle_case_with_updated_manifest_hash) ... ok
+test_rejects_renamed_v6_schema (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_renamed_v6_schema) ... ok
+test_rejects_stale_compiled_fixture_with_updated_manifest_hash (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_stale_compiled_fixture_with_updated_manifest_hash) ... ok
+test_rejects_stale_rc6_suite_pin (test_release_gate.ProtocolRC6ReleaseGateTests.test_rejects_stale_rc6_suite_pin) ... ok
+test_candidate_requires_all_22_compiled_lifecycle_cases (test_validate.ManagerLifecycleValidationTests.test_candidate_requires_all_22_compiled_lifecycle_cases) ... ok
+test_compiled_dry_run_fails_closed (test_validate.ManagerLifecycleValidationTests.test_compiled_dry_run_fails_closed) ... ok
+test_each_compiled_lifecycle_group_fails_closed (test_validate.ManagerLifecycleValidationTests.test_each_compiled_lifecycle_group_fails_closed) ... ok
+test_lifecycle_schema_and_portable_identity_fail_closed (test_validate.ManagerLifecycleValidationTests.test_lifecycle_schema_and_portable_identity_fail_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 1.917s
+
+OK
+=== RUN   TestPublishedRC5ReleaseMetadataRemainsByteFrozen
+--- PASS: TestPublishedRC5ReleaseMetadataRemainsByteFrozen (0.00s)
+=== RUN   TestRC6ReleaseMetadataPinsSuiteWithoutClaimFabrication
+--- PASS: TestRC6ReleaseMetadataPinsSuiteWithoutClaimFabrication (0.00s)
+=== RUN   TestManagerLifecycleReusesPortableBuildDriverIdentity
+--- PASS: TestManagerLifecycleReusesPortableBuildDriverIdentity (0.00s)
+=== RUN   TestManagerLifecyclePlanningOrderAndCompiledDryRun
+--- PASS: TestManagerLifecyclePlanningOrderAndCompiledDryRun (0.00s)
+=== RUN   TestManagerLifecyclePrivateBuildPublicationAndCrossProjectIsolation
+--- PASS: TestManagerLifecyclePrivateBuildPublicationAndCrossProjectIsolation (0.00s)
+=== RUN   TestManagerLifecycleTransactionsRecoveryStatusRepairAndGC
+--- PASS: TestManagerLifecycleTransactionsRecoveryStatusRepairAndGC (0.00s)
+=== RUN   TestManagerLifecycleGenerationIsDeterministic
+--- PASS: TestManagerLifecycleGenerationIsDeterministic (0.00s)
+PASS
+ok  	github.com/relux-works/curator-spec/tools/generate-vectors	0.324s

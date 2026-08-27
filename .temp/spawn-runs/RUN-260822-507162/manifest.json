@@ -1,0 +1,42 @@
+{
+  "id": "RUN-260822-507162",
+  "task_id": "TASK-260822-27bvo4",
+  "created_at": "2026-08-22T16:13:59.887911Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "opus",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "opus"
+    },
+    "resolved": {
+      "model": "opus"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260822-20-13-59_-implementer--developer--claude-_TASK-260822-27bvo4.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "45m0s",
+  "log_resource_name": "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-507162.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "require_outcome_artifact": true
+}

@@ -1,0 +1,37 @@
+=== A. print-target-info (clean env) ===
+{
+  "compilerVersion": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)",
+  "swiftCompilerTag": "swiftlang-6.3.2.1.108",
+  "target": {
+    "triple": "arm64-apple-macosx26.0",
+    "unversionedTriple": "arm64-apple-macosx",
+    "moduleTriple": "arm64-apple-macos",
+    "platform": "macosx",
+    "arch": "arm64",
+    "pointerWidthInBits": 64,
+    "pointerWidthInBytes": 8,
+    "swiftRuntimeCompatibilityVersion": "6.2",
+    "compatibilityLibraries": [ ],
+    "openbsdBTCFIEnabled": false,
+    "librariesRequireRPath": false
+  },
+  "paths": {
+    "runtimeLibraryPaths": [
+      "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx",
+      "/usr/lib/swift"
+    ],
+    "runtimeLibraryImportPaths": [
+      "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx"
+    ],
+    "runtimeResourcePath": "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift"
+  }
+}
+exit=0
+
+=== B. swift --version stream split ===
+cat: illegal option -- A
+usage: cat [-belnstuv] [file ...]
+--stdout above--
+cat: illegal option -- A
+usage: cat [-belnstuv] [file ...]
+--stderr above--

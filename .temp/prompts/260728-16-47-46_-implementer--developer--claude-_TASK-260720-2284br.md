@@ -1,0 +1,303 @@
+# Agent Task Assignment
+
+## FIRST — Run Immediately
+
+```bash
+task-board m 'set_status(TASK-260720-2284br, status=development)'
+```
+
+## Your Role
+# developer
+
+## Description
+
+Writes code — features, bugfixes, refactoring. Writes tests for the code produced.
+
+## Deliverable
+
+Code + tests.
+Final human-facing wording must say "ready for review" or "handed off to review", not "done", "complete", "finished", "final", or "готово", when the board status is `to-review`.
+
+## Standing Orders
+
+1. When you change behavior, add or update tests for that scope unless the task explicitly forbids it.
+2. Run the relevant test commands yourself before handoff; do not leave test execution implicit.
+3. Run the relevant build or validation command after changes to confirm the project still compiles.
+4. If a required test or build cannot be run, state exactly what was not run and why.
+5. Stop if the implementation starts depending on a forced fit: a platform/API constraint, product decision, UX state model, ownership boundary, or architecture conflict that would require compensating hacks. Document the constraint and options, then ask or mark the task blocked instead of adding more stubs, flags, priority rules, or tests around a broken assumption.
+6. For board reads, use compact task-specific projections. A concrete assignment does not need routine `summary()`, `plan()`, `schema()`, or `{ full }`; request scoped schema only after an unknown call.
+
+### Evidence Honesty Contract
+
+1. Run each validation or gate command directly as a standalone process. Do not pipe it through `tee`; do not use a pipe chain unless `pipefail` is enabled and the gate command's real status is preserved.
+2. Report the real exit code of every validation or gate command.
+3. Report expected-red gates truthfully as failing: when a command is expected to fail (for example, `go test` in a package-less module), give its real non-zero exit code and a one-line expected-failure rationale; never present it as passing.
+4. Check a checklist item tied to a command only after that exact command has actually run green with exit code 0. If it did not run or did not exit 0, leave the item unchecked.
+
+## Status Transitions
+
+- **start_status:** `development`
+- **end_status:** `to-review` (review handoff, not accepted done)
+
+## Constraints
+
+Full read/write access does not authorize forced-fit workarounds. Tests and stubs may verify a valid design, but they must not be used to make an invalid product/API model appear acceptable.
+
+## Skills
+
+These role skill references are a lazy catalog, not a mandate to bulk-read every
+body. Before technical work, identify the skills relevant to this task's concrete
+scope and read those full skill bodies. Always read any skill explicitly required
+by the task, user, or project instructions.
+
+- **project-management**: `/Users/iv/.claude/skills/project-management/SKILL.md`
+- **swiftui**: `/Users/iv/.claude/skills/swiftui/SKILL.md`
+- **core-data**: `/Users/iv/.claude/skills/core-data/SKILL.md`
+- **go-testing-tools**: `/Users/iv/.claude/skills/go-testing-tools/SKILL.md`
+- **architecture-diagrams**: `/Users/iv/.claude/skills/architecture-diagrams/SKILL.md`
+
+## Definition of Done
+
+- [ ] Shared targets commit in deterministic classes with consumer last
+- [ ] Failure at every target class rolls back the complete prior install
+- [ ] Concurrent project operations and recovery pass race tests
+- [ ] Lint clean is left UNCHECKED honestly: golangci-lint run ./... exits 1 with 45 issues, all inherited. The pre-change composed base emits the same 45 with identical per-linter counts (gate-lint-baseline.log). The 3 issues this task introduced were fixed; net delta is zero.
+- [ ] SUPERSEDES the previous lint note. golangci-lint run over every package this task created or modified (staging, install, envfiles, adapters, globalbins) exits 0 with 0 issues (gate-lint-task-scope.log) - this is the evidence for Lint clean. Repo-wide golangci-lint run ./... still exits 1 with 45 issues, all inherited and byte-identical in count to the pre-change base; recommend a separate repo-wide lint-cleanup task rather than editing five sibling-owned done packages here.
+- [ ] Implementation matches AC
+- [ ] Solution fits project architecture
+- [ ] Tests green
+- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+- [ ] REWORK CYCLE 1 lint accounting, superseding both earlier lint notes. Lint clean is left UNCHECKED honestly: golangci-lint run ./... exits 1 with 45 issues. The pre-change composed base at .temp/TASK-260720-2284br/worktree exits 1 with the same 45 and byte-identical per-linter counts (errcheck 16, gosec 5, revive 20, staticcheck 3, unused 1), diffed and identical, so this cycle adds zero new lint issues. golangci-lint run over every package this cycle created or modified - staging, install, install/atomicity, envfiles, adapters, globalbins and now transaction - exits 0 with 0 issues. The 45 belong to runtimestore, snapshot, buildsource, buildcache, scopes and gitignore, all sibling-owned and already done; clearing them is still recommended as a separate repo-wide lint-cleanup task.
+- [ ] LINT POSITION CHANGED at handoff, superseding checklist items 10, 11 and 16. The board handoff gate requires Lint clean, and checking it while golangci-lint run ./... exited 1 would not have been true, so the 45 inherited issues were cleared instead of deferred. golangci-lint run ./... now exits 0 with 0 issues. This is a deliberate scope expansion into six packages this task does not own - runtimestore 19, snapshot 5, buildcache 5, buildsource 4, scopes 1, gitignore 1 - and the reviewer should treat it as such. All edits are behaviour preserving: deferred Close/Remove on read-only handles and scratch paths wrapped in _ =, no write path touched; doc comments on exported symbols; two unused walk parameters renamed to _; three ST1005 error strings reworded rather than lowercased so information content is unchanged per CONTRIBUTING; three new #nosec annotations with reasons, and two existing G304 annotations lifted out of if-init statements where gosec was not honouring them. One real latent bug was found next to a G304 site: scopes/hybrid.go AddHybridDecl read into payload but unmarshalled a payload from an outer scope; renamed to recorded so it parses what it just read. Baseline evidence that none of the 45 came from this task is gate-lint-baseline.log.
+- [ ] CORRECTION to checklist item 17. Item 17 claims the scopes/hybrid.go rename fixed a latent bug where the block read into payload but unmarshalled an outer payload. That claim is wrong and is withdrawn. The original code was correct: the if-init statement shadowed the later payload declaration, so json.Unmarshal read exactly the bytes just loaded. The rename to recorded was forced by lifting the read out of the if-init statement to make the #nosec G304 annotation effective, and it changes no behaviour. Everything else in item 17 stands.
+- [ ] Code written per task description and AC
+- [ ] Relevant tests written for new or changed behavior and passing
+- [ ] Lint clean
+- [ ] Relevant build/validation commands run after changes and build not broken
+- [ ] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
+- [ ] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
+## Your Task
+
+- **ID**: TASK-260720-2284br
+- **Title**: Commit installations atomically across scopes
+- **Parent**: STORY-260720-3plyvy
+### Description
+
+Integrate the staged install plan, protected cache, markers, shims, and target journal into one manager-home-isolated commit for project, global, and hybrid operations with the consumer ledger committed last.
+### Scope
+
+Refactor internal/install Project and Global plus narrowly required adapters, envfiles, globalbins, scopes, and cleanup APIs to produce staged targets rather than mutating piecemeal. Hold the canonical project operation lock from planning through handoff. After all private builds succeed, acquire the home lock, recover old journals, revalidate cache protection and every consulted generation or target preimage, and restart the earliest affected planning step when state changed. Atomically publish verified cache winners and commit deterministic target classes: project, global, or hybrid context and markers; script runtime, canonical and forwarding shims, env files; adapter and mirror ledgers; stale managed removals; consumer ledger last. Keep the home lock through reverse rollback and post-commit maintenance handoff.
+### Acceptance Criteria
+
+No shared target changes before the home lock and revalidation; a stale closure, activation, cache trust, target owner, preimage, or required key restarts rather than applying an old plan; injected failure at cache publication or every target class restores the prior project, global, hybrid, runtime, shim, env, adapter, mirror, and consumer state in reverse order while preserving pre-existing immutable cache entries; consumer state is absent after a failed first install and updates last after success; two concurrent project successes preserve both consumers and one project rollback cannot restore over another projects committed shared targets; recovery completes before new mutation; GC failure after commit is a warning and does not roll back the installation; existing install behavior and new race tests pass.
+
+## Instructions
+
+The following instructions have been attached to this task:
+
+### TASK-260720-2284br_install-lifecycle.puml
+> Lifecycle ordering contract for atomic cross-scope commit
+
+@startuml
+!theme plain
+
+title Curator Go build driver — safe install lifecycle
+
+start
+:Classify dry-run or real operation;
+
+if (Real operation?) then (yes)
+  :Acquire canonical project operation lock(s)\n(TASK-260720-1zl1cj);
+  :Acquire manager-home lock;
+  :Recover every incomplete transaction journal\n(TASK-260720-31nl14);
+  :Release manager-home lock;
+else (dry-run)
+  note right
+    No project, key, or manager-home lock is created.
+  end note
+endif
+
+partition "Compiler-free validation and trust gates" #LightBlue {
+  :Resolve and freeze immutable snapshots;
+  :Parse schema v6 and validate build roots\n(TASK-260720-2g0e3b);
+  :Compute build-source identity before cache lookup\n(TASK-260720-256kj1);
+  :Build closure, check collisions, and exclude build roots\n(TASK-260720-11pfex);
+  :Run skill check, system, MCP, audit, registry,\nattestation, and moved-tag gates;
+}
+
+partition "Toolchain and cache planning" #LightYellow {
+  :Create an operation-private probe and establish\nthe trusted Go session (TASK-260720-6i3cya);
+  :Derive exact inputs and inspect the protected cache\nread-only (TASK-260720-3mrm4z / 3pwg2w);
+}
+
+if (Dry-run?) then (yes)
+  :Report exact hit, would-build, untrusted,\ncorrupt, or unsupported outcomes;
+  :Delete the operation-private probe;
+  note right
+    No go list or go build.
+    No cache, marker, runtime, shim, adapter,
+    journal, consumer, or GC mutation.
+  end note
+  stop
+else (real operation)
+endif
+
+partition "Operation-private build staging" #Moccasin {
+  :For every miss, run fixed go list and validate\nthe complete graph (TASK-260720-1zntv0);
+  :Run fixed internal-link go build;
+  :Verify and hash each artifact and canonical receipt;
+}
+
+if (Any staged build failed?) then (yes)
+  :Delete private staging and probe state;
+  :Release project operation lock(s);
+  note right
+    Previous install and live cache remain byte-for-byte intact.
+  end note
+  stop
+else (no)
+endif
+
+partition "Serialized publication and commit" #LightGreen {
+  :Acquire manager-home lock;
+  :Recover journals and revalidate cache boundary,\nclosure generations, owners, preimages, and keys;
+  if (Consulted state changed?) then (yes)
+    :Release manager-home lock;
+    :Discard stale staging and restart from\nthe earliest affected planning step;
+    stop
+  else (no)
+  endif
+  :Publish verified immutable cache winners;
+  :Write a durable target journal;
+  :Atomically swap contexts, marker v2, runtime, shims,\nenv files, adapters, mirrors, and managed removals;
+  :Commit the machine-wide consumer ledger last\n(TASK-260720-2284br);
+}
+
+if (Publication or target swap failed?) then (yes)
+  :Keep the manager-home lock and restore journaled\ntargets in exact reverse order;
+  :Preserve pre-existing immutable cache entries;
+else (no)
+  :Durably remove backups and journal;
+  :Run locked runtime, snapshot, and build-cache GC\n(TASK-260720-1ljev5);
+endif
+
+:Release manager-home lock, then project lock(s);
+stop
+
+@enduml
+
+
+
+### TASK-260720-2284br_install-lifecycle.svg
+> Rendered safe install lifecycle
+
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" data-diagram-type="ACTIVITY" height="2700px" preserveAspectRatio="none" style="width:992px;height:2700px;background:#FFFFFF;" version="1.1" viewBox="0 0 992 2700" width="992px" zoomAndPan="magnify"><?plantuml 1.2026.6?><defs/><g><g class="title" data-source-line="3"><text fill="#000000" font-family="Verdana" font-size="22" font-weight="700" lengthAdjust="spacing" textLength="564.9531" x="212.6091" y="37.1182">Curator Go build driver &#8212; safe install lifecycle</text></g><ellipse cx="417.438" cy="67.7373" fill="#FFFFFF" rx="10" ry="10" style="stroke:#000000;stroke-width:1;"/><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="220.6367" x="307.1196" y="97.7373"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="200.6367" x="317.1196" y="119.8018">Classify dry-run or real operation</text><path d="M10,142.3213 L10,168.1206 L362.4048,168.1206 L362.4048,152.3213 L352.4048,142.3213 L10,142.3213" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M352.4048,142.3213 L352.4048,152.3213 L362.4048,152.3213 L352.4048,142.3213" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="331.4048" x="16" y="160.3911">No project, key, or manager-home lock is created.</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="278.293" x="278.2915" y="216.8049"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="258.293" x="288.2915" y="238.8694">Acquire canonical project operation lock(s)</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="134.9238" x="288.2915" y="253.4534">(TASK-260720-1zl1cj)</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="190.0273" x="322.4243" y="285.9729"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="170.0273" x="332.4243" y="308.0374">Acquire manager-home lock</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="294.2656" x="270.3052" y="355.5569"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="274.2656" x="280.3052" y="377.6213">Recover every incomplete transaction journal</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="141.0879" x="280.3052" y="392.2053">(TASK-260720-31nl14)</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="191.4805" x="321.6978" y="424.7249"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="171.4805" x="331.6978" y="446.7893">Release manager-home lock</text><polygon fill="#FFFFFF" points="374.4048,168.1206,460.4712,168.1206,472.4712,180.1206,460.4712,192.1206,374.4048,192.1206,362.4048,180.1206,374.4048,168.1206" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="421.438" y="203.1797">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="86.0664" x="374.4048" y="184.4954">Real operation?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="41.6689" x="472.4712" y="177.811">dry-run</text><polygon fill="#FFFFFF" points="417.438,479.3088,429.438,491.3088,417.438,503.3088,405.438,491.3088,417.438,479.3088" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><rect fill="#ADD8E6" height="360.2705" style="stroke:#000000;stroke-width:1;" width="367.6152" x="233.6304" y="513.3088"/><path d="M525.5171,513.3088 L525.5171,523.3235 L515.5171,533.3235 L233.6304,533.3235" fill="none" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="281.8867" x="236.6304" y="528.384">Compiler-free validation and trust gates</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="267.5352" x="283.6704" y="550.3235"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="247.5352" x="293.6704" y="572.3879">Resolve and freeze immutable snapshots</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="268.666" x="283.105" y="604.9075"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="248.666" x="293.105" y="626.9719">Parse schema v6 and validate build roots</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="144.6738" x="293.105" y="641.5559">(TASK-260720-2g0e3b)</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="327.8516" x="253.5122" y="674.0754"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="307.8516" x="263.5122" y="696.1399">Compute build-source identity before cache lookup</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="141.4336" x="263.5122" y="710.7239">(TASK-260720-256kj1)</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="347.6152" x="243.6304" y="743.2434"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="327.6152" x="253.6304" y="765.3079">Build closure, check collisions, and exclude build roots</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="140.8887" x="253.6304" y="779.8918">(TASK-260720-11pfex)</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="293.6738" x="270.6011" y="812.4114"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="273.6738" x="280.6011" y="834.4758">Run skill check, system, MCP, audit, registry,</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="202.5527" x="280.6011" y="849.0598">attestation, and moved-tag gates</text><rect fill="#FFFFE0" height="167.3506" style="stroke:#000000;stroke-width:1;" width="354.2734" x="240.3013" y="883.5793"/><path d="M458.0933,883.5793 L458.0933,893.594 L448.0933,903.594 L240.3013,903.594" fill="none" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="207.792" x="243.3013" y="898.6545">Toolchain and cache planning</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="310.3145" x="262.2808" y="920.594"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="290.3145" x="272.2808" y="942.6584">Create an operation-private probe and establish</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="278.8535" x="272.2808" y="957.2424">the trusted Go session (TASK-260720-6i3cya)</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="334.2734" x="250.3013" y="989.762"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="314.2734" x="260.3013" y="1011.8264">Derive exact inputs and inspect the protected cache</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="275.3438" x="260.3013" y="1026.4104">read-only (TASK-260720-3mrm4z / 3pwg2w)</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="266.4102" x="284.2329" y="1119.6143"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="246.4102" x="294.2329" y="1141.6787">Report exact hit, would-build, untrusted,</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="206.959" x="294.2329" y="1156.2627">corrupt, or unsupported outcomes</text><path d="M552.4409,1178.7822 L552.4409,1203.4812 L532.4409,1207.4812 L552.4409,1211.4812 L552.4409,1236.1802 A0,0 0 0 0 552.4409,1236.1802 L854.3818,1236.1802 A0,0 0 0 0 854.3818,1236.1802 L854.3818,1188.7822 L844.3818,1178.7822 L552.4409,1178.7822 A0,0 0 0 0 552.4409,1178.7822" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M844.3818,1178.7822 L844.3818,1188.7822 L854.3818,1188.7822 L844.3818,1178.7822" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="141.2036" x="558.4409" y="1196.8521">No go list or go build.</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="280.9409" x="558.4409" y="1212.6514">No cache, marker, runtime, shim, adapter,</text><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="233.2383" x="558.4409" y="1228.4507">journal, consumer, or GC mutation.</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="230.0059" x="302.4351" y="1190.1892"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="210.0059" x="312.4351" y="1212.2537">Delete the operation-private probe</text><ellipse cx="417.438" cy="1267.1802" fill="none" rx="11" ry="11" style="stroke:#000000;stroke-width:1;"/><ellipse cx="417.438" cy="1267.1802" fill="#FFFFFF" rx="6" ry="6" style="stroke:#000000;stroke-width:1;"/><polygon fill="#FFFFFF" points="392.7927,1070.9299,442.0833,1070.9299,454.0833,1082.9299,442.0833,1094.9299,392.7927,1094.9299,380.7927,1082.9299,392.7927,1070.9299" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="421.438" y="1105.989">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="49.2905" x="392.7927" y="1087.3047">Dry-run?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="77.1128" x="454.0833" y="1080.6204">real operation</text><rect fill="#FFE4B5" height="207.3506" style="stroke:#000000;stroke-width:1;" width="345.918" x="244.479" y="1310.1802"/><path d="M474.3022,1310.1802 L474.3022,1320.1948 L464.3022,1330.1948 L244.479,1330.1948" fill="none" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="219.8232" x="247.479" y="1325.2554">Operation-private build staging</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="290.1113" x="272.3823" y="1347.1948"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="270.1113" x="282.3823" y="1369.2593">For every miss, run fixed go list and validate</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="262.6758" x="282.3823" y="1383.8433">the complete graph (TASK-260720-1zntv0)</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="206.2461" x="314.3149" y="1416.3628"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="186.2461" x="324.3149" y="1438.4272">Run fixed internal-link go build</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="325.918" x="254.479" y="1470.9468"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="305.918" x="264.479" y="1493.0112">Verify and hash each artifact and canonical receipt</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="252.7578" x="291.0591" y="1586.2151"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="232.7578" x="301.0591" y="1608.2795">Delete private staging and probe state</text><path d="M547.2144,1645.1914 L547.2144,1654.0911 L527.2144,1658.0911 L547.2144,1662.0911 L547.2144,1670.9907 A0,0 0 0 0 547.2144,1670.9907 L952.1714,1670.9907 A0,0 0 0 0 952.1714,1670.9907 L952.1714,1655.1914 L942.1714,1645.1914 L547.2144,1645.1914 A0,0 0 0 0 547.2144,1645.1914" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><path d="M942.1714,1645.1914 L942.1714,1655.1914 L952.1714,1655.1914 L942.1714,1645.1914" fill="#FFFFFF" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="13" lengthAdjust="spacing" textLength="383.957" x="553.2144" y="1663.2612">Previous install and live cache remain byte-for-byte intact.</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="219.5527" x="307.6616" y="1640.7991"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="199.5527" x="317.6616" y="1662.8635">Release project operation lock(s)</text><ellipse cx="417.438" cy="1706.3831" fill="none" rx="11" ry="11" style="stroke:#000000;stroke-width:1;"/><ellipse cx="417.438" cy="1706.3831" fill="#FFFFFF" rx="6" ry="6" style="stroke:#000000;stroke-width:1;"/><polygon fill="#FFFFFF" points="351.3655,1537.5308,483.5105,1537.5308,495.5105,1549.5308,483.5105,1561.5308,351.3655,1561.5308,339.3655,1549.5308,351.3655,1537.5308" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="421.438" y="1572.5898">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="132.145" x="351.3655" y="1553.9055">Any staged build failed?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="13.6372" x="495.5105" y="1547.2212">no</text><rect fill="#90EE90" height="636.7068" style="stroke:#000000;stroke-width:1;" width="367.2578" x="233.8091" y="1749.3831"/><path d="M481.5903,1749.3831 L481.5903,1759.3977 L471.5903,1769.3977 L233.8091,1769.3977" fill="none" style="stroke:#000000;stroke-width:1;"/><text fill="#000000" font-family="Verdana" font-size="14" lengthAdjust="spacing" textLength="237.7813" x="236.8091" y="1764.4583">Serialized publication and commit</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="190.0273" x="322.4243" y="1786.3977"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="170.0273" x="332.4243" y="1808.4622">Acquire manager-home lock</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="323.873" x="255.5015" y="1840.9817"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="295.6406" x="265.5015" y="1863.0461">Recover journals and revalidate cache boundary,</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="303.873" x="265.5015" y="1877.6301">closure generations, owners, preimages, and keys</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="191.4805" x="321.6978" y="1958.834"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="171.4805" x="331.6978" y="1980.8984">Release manager-home lock</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="249.4766" x="292.6997" y="2013.418"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="229.4766" x="302.6997" y="2035.4824">Discard stale staging and restart from</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="206.0684" x="302.6997" y="2050.0664">the earliest affected planning step</text><ellipse cx="417.438" cy="2093.5859" fill="none" rx="11" ry="11" style="stroke:#000000;stroke-width:1;"/><ellipse cx="417.438" cy="2093.5859" fill="#FFFFFF" rx="6" ry="6" style="stroke:#000000;stroke-width:1;"/><polygon fill="#FFFFFF" points="346.1475,1910.1497,488.7285,1910.1497,500.7285,1922.1497,488.7285,1934.1497,346.1475,1934.1497,334.1475,1922.1497,346.1475,1910.1497" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="421.438" y="1945.2087">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="142.5811" x="346.1475" y="1926.5244">Consulted state changed?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="13.6372" x="500.7285" y="1919.8401">no</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="269.7734" x="282.5513" y="2146.5859"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="249.7734" x="292.5513" y="2168.6504">Publish verified immutable cache winners</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="200.1875" x="317.3442" y="2201.1699"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="180.1875" x="327.3442" y="2223.2344">Write a durable target journal</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="347.2578" x="243.8091" y="2255.7539"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="327.2578" x="253.8091" y="2277.8184">Atomically swap contexts, marker v2, runtime, shims,</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="314.0742" x="253.8091" y="2292.4023">env files, adapters, mirrors, and managed removals</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="309.5996" x="262.6382" y="2324.9219"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="289.5996" x="272.6382" y="2346.9863">Commit the machine-wide consumer ledger last</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="142.7988" x="272.6382" y="2361.5703">(TASK-260720-2284br)</text><polygon fill="#FFFFFF" points="325.3694,2406.0898,509.5066,2406.0898,521.5066,2418.0898,509.5066,2430.0898,325.3694,2430.0898,313.3694,2418.0898,325.3694,2406.0898" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="184.1372" x="325.3694" y="2422.4646">Publication or target swap failed?</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="18.7935" x="294.5759" y="2415.7803">yes</text><text fill="#000000" font-family="Verdana" font-size="11" lengthAdjust="spacing" textLength="13.6372" x="521.5066" y="2415.7803">no</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="333.3008" x="75.7969" y="2440.0898"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="313.3008" x="85.7969" y="2462.1543">Keep the manager-home lock and restore journaled</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="180.0527" x="85.7969" y="2476.7383">targets in exact reverse order</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="301.0566" x="91.9189" y="2523.8418"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="281.0566" x="101.9189" y="2545.9063">Preserve pre-existing immutable cache entries</text><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="243.248" x="470.8047" y="2440.0898"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="223.248" x="480.8047" y="2462.1543">Durably remove backups and journal</text><rect fill="#FFFFFF" height="49.168" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="326.6621" x="429.0977" y="2509.2578"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="306.6621" x="439.0977" y="2531.3223">Run locked runtime, snapshot, and build-cache GC</text><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="136.6172" x="439.0977" y="2545.9063">(TASK-260720-1ljev5)</text><polygon fill="#FFFFFF" points="417.438,2564.4258,429.438,2576.4258,417.438,2588.4258,405.438,2576.4258,417.438,2564.4258" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><rect fill="#FFFFFF" height="34.584" rx="12.5" ry="12.5" style="stroke:#000000;stroke-width:1;" width="318.7871" x="258.0444" y="2608.4258"/><text fill="#000000" font-family="Verdana" font-size="12" lengthAdjust="spacing" textLength="298.7871" x="268.0444" y="2630.4902">Release manager-home lock, then project lock(s)</text><ellipse cx="417.438" cy="2674.0098" fill="none" rx="11" ry="11" style="stroke:#000000;stroke-width:1;"/><ellipse cx="417.438" cy="2674.0098" fill="#FFFFFF" rx="6" ry="6" style="stroke:#000000;stroke-width:1;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="77.7373" y2="97.7373"/><polygon fill="#000000" points="413.438,87.7373,417.438,97.7373,421.438,87.7373,417.438,91.7373" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="265.9729" y2="285.9729"/><polygon fill="#000000" points="413.438,275.9729,417.438,285.9729,421.438,275.9729,417.438,279.9729" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="320.5569" y2="355.5569"/><polygon fill="#000000" points="413.438,345.5569,417.438,355.5569,421.438,345.5569,417.438,349.5569" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="404.7249" y2="424.7249"/><polygon fill="#000000" points="413.438,414.7249,417.438,424.7249,421.438,414.7249,417.438,418.7249" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="192.1206" y2="216.8049"/><polygon fill="#000000" points="413.438,206.8049,417.438,216.8049,421.438,206.8049,417.438,210.8049" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="472.4712" x2="574.5708" y1="180.1206" y2="180.1206"/><polygon fill="#000000" points="570.5708,328.0569,574.5708,338.0569,578.5708,328.0569,574.5708,332.0569" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="574.5708" x2="574.5708" y1="180.1206" y2="491.3088"/><line style="stroke:#000000;stroke-width:1;" x1="574.5708" x2="429.438" y1="491.3088" y2="491.3088"/><polygon fill="#000000" points="439.438,487.3088,429.438,491.3088,439.438,495.3088,435.438,491.3088" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="459.3088" y2="479.3088"/><polygon fill="#000000" points="413.438,469.3088,417.438,479.3088,421.438,469.3088,417.438,473.3088" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="132.3213" y2="168.1206"/><polygon fill="#000000" points="413.438,158.1206,417.438,168.1206,421.438,158.1206,417.438,162.1206" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="584.9075" y2="604.9075"/><polygon fill="#000000" points="413.438,594.9075,417.438,604.9075,421.438,594.9075,417.438,598.9075" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="654.0754" y2="674.0754"/><polygon fill="#000000" points="413.438,664.0754,417.438,674.0754,421.438,664.0754,417.438,668.0754" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="723.2434" y2="743.2434"/><polygon fill="#000000" points="413.438,733.2434,417.438,743.2434,421.438,733.2434,417.438,737.2434" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="792.4114" y2="812.4114"/><polygon fill="#000000" points="413.438,802.4114,417.438,812.4114,421.438,802.4114,417.438,806.4114" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="503.3088" y2="550.3235"/><polygon fill="#000000" points="413.438,540.3235,417.438,550.3235,421.438,540.3235,417.438,544.3235" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="969.762" y2="989.762"/><polygon fill="#000000" points="413.438,979.762,417.438,989.762,421.438,979.762,417.438,983.762" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="861.5793" y2="920.594"/><polygon fill="#000000" points="413.438,910.594,417.438,920.594,421.438,910.594,417.438,914.594" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1168.7822" y2="1190.1892"/><polygon fill="#000000" points="413.438,1180.1892,417.438,1190.1892,421.438,1180.1892,417.438,1184.1892" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1224.7732" y2="1256.1802"/><polygon fill="#000000" points="413.438,1246.1802,417.438,1256.1802,421.438,1246.1802,417.438,1250.1802" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1094.9299" y2="1119.6143"/><polygon fill="#000000" points="413.438,1109.6143,417.438,1119.6143,421.438,1109.6143,417.438,1113.6143" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="454.0833" x2="864.3818" y1="1082.9299" y2="1082.9299"/><polygon fill="#000000" points="860.3818,1180.8972,864.3818,1190.8972,868.3818,1180.8972,864.3818,1184.8972" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="864.3818" x2="864.3818" y1="1082.9299" y2="1300.1802"/><line style="stroke:#000000;stroke-width:1;" x1="864.3818" x2="417.438" y1="1300.1802" y2="1300.1802"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1300.1802" y2="1347.1948"/><polygon fill="#000000" points="413.438,1337.1948,417.438,1347.1948,421.438,1337.1948,417.438,1341.1948" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1038.9299" y2="1070.9299"/><polygon fill="#000000" points="413.438,1060.9299,417.438,1070.9299,421.438,1060.9299,417.438,1064.9299" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1396.3628" y2="1416.3628"/><polygon fill="#000000" points="413.438,1406.3628,417.438,1416.3628,421.438,1406.3628,417.438,1410.3628" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1450.9468" y2="1470.9468"/><polygon fill="#000000" points="413.438,1460.9468,417.438,1470.9468,421.438,1460.9468,417.438,1464.9468" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1620.7991" y2="1640.7991"/><polygon fill="#000000" points="413.438,1630.7991,417.438,1640.7991,421.438,1630.7991,417.438,1634.7991" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1675.3831" y2="1695.3831"/><polygon fill="#000000" points="413.438,1685.3831,417.438,1695.3831,421.438,1685.3831,417.438,1689.3831" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1561.5308" y2="1586.2151"/><polygon fill="#000000" points="413.438,1576.2151,417.438,1586.2151,421.438,1576.2151,417.438,1580.2151" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="495.5105" x2="962.1714" y1="1549.5308" y2="1549.5308"/><polygon fill="#000000" points="958.1714,1638.7991,962.1714,1648.7991,966.1714,1638.7991,962.1714,1642.7991" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="962.1714" x2="962.1714" y1="1549.5308" y2="1739.3831"/><line style="stroke:#000000;stroke-width:1;" x1="962.1714" x2="417.438" y1="1739.3831" y2="1739.3831"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1739.3831" y2="1786.3977"/><polygon fill="#000000" points="413.438,1776.3977,417.438,1786.3977,421.438,1776.3977,417.438,1780.3977" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1505.5308" y2="1537.5308"/><polygon fill="#000000" points="413.438,1527.5308,417.438,1537.5308,421.438,1527.5308,417.438,1531.5308" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1820.9817" y2="1840.9817"/><polygon fill="#000000" points="413.438,1830.9817,417.438,1840.9817,421.438,1830.9817,417.438,1834.9817" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1993.418" y2="2013.418"/><polygon fill="#000000" points="413.438,2003.418,417.438,2013.418,421.438,2003.418,417.438,2007.418" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="2062.5859" y2="2082.5859"/><polygon fill="#000000" points="413.438,2072.5859,417.438,2082.5859,421.438,2072.5859,417.438,2076.5859" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1934.1497" y2="1958.834"/><polygon fill="#000000" points="413.438,1948.834,417.438,1958.834,421.438,1948.834,417.438,1952.834" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="500.7285" x2="552.1763" y1="1922.1497" y2="1922.1497"/><polygon fill="#000000" points="548.1763,2018.71,552.1763,2028.71,556.1763,2018.71,552.1763,2022.71" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="552.1763" x2="552.1763" y1="1922.1497" y2="2126.5859"/><line style="stroke:#000000;stroke-width:1;" x1="552.1763" x2="417.438" y1="2126.5859" y2="2126.5859"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="2126.5859" y2="2146.5859"/><polygon fill="#000000" points="413.438,2136.5859,417.438,2146.5859,421.438,2136.5859,417.438,2140.5859" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="1890.1497" y2="1910.1497"/><polygon fill="#000000" points="413.438,1900.1497,417.438,1910.1497,421.438,1900.1497,417.438,1904.1497" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="2181.1699" y2="2201.1699"/><polygon fill="#000000" points="413.438,2191.1699,417.438,2201.1699,421.438,2191.1699,417.438,2195.1699" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="2235.7539" y2="2255.7539"/><polygon fill="#000000" points="413.438,2245.7539,417.438,2255.7539,421.438,2245.7539,417.438,2249.7539" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="2304.9219" y2="2324.9219"/><polygon fill="#000000" points="413.438,2314.9219,417.438,2324.9219,421.438,2314.9219,417.438,2318.9219" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="242.4473" x2="242.4473" y1="2489.2578" y2="2523.8418"/><polygon fill="#000000" points="238.4473,2513.8418,242.4473,2523.8418,246.4473,2513.8418,242.4473,2517.8418" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="592.4287" x2="592.4287" y1="2474.6738" y2="2509.2578"/><polygon fill="#000000" points="588.4287,2499.2578,592.4287,2509.2578,596.4287,2499.2578,592.4287,2503.2578" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="313.3694" x2="242.4473" y1="2418.0898" y2="2418.0898"/><line style="stroke:#000000;stroke-width:1;" x1="242.4473" x2="242.4473" y1="2418.0898" y2="2440.0898"/><polygon fill="#000000" points="238.4473,2430.0898,242.4473,2440.0898,246.4473,2430.0898,242.4473,2434.0898" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="521.5066" x2="592.4287" y1="2418.0898" y2="2418.0898"/><line style="stroke:#000000;stroke-width:1;" x1="592.4287" x2="592.4287" y1="2418.0898" y2="2440.0898"/><polygon fill="#000000" points="588.4287,2430.0898,592.4287,2440.0898,596.4287,2430.0898,592.4287,2434.0898" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="242.4473" x2="242.4473" y1="2558.4258" y2="2576.4258"/><line style="stroke:#000000;stroke-width:1;" x1="242.4473" x2="405.438" y1="2576.4258" y2="2576.4258"/><polygon fill="#000000" points="395.438,2572.4258,405.438,2576.4258,395.438,2580.4258,399.438,2576.4258" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="592.4287" x2="592.4287" y1="2558.4258" y2="2576.4258"/><line style="stroke:#000000;stroke-width:1;" x1="592.4287" x2="429.438" y1="2576.4258" y2="2576.4258"/><polygon fill="#000000" points="439.438,2572.4258,429.438,2576.4258,439.438,2580.4258,435.438,2576.4258" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="2374.0898" y2="2406.0898"/><polygon fill="#000000" points="413.438,2396.0898,417.438,2406.0898,421.438,2396.0898,417.438,2400.0898" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="2588.4258" y2="2608.4258"/><polygon fill="#000000" points="413.438,2598.4258,417.438,2608.4258,421.438,2598.4258,417.438,2602.4258" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><line style="stroke:#000000;stroke-width:1;" x1="417.438" x2="417.438" y1="2643.0098" y2="2663.0098"/><polygon fill="#000000" points="413.438,2653.0098,417.438,2663.0098,421.438,2653.0098,417.438,2657.0098" style="stroke:#000000;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/><?plantuml-src ZLRTRjis5BxtKt3TJGnONPoasT1S3As3zQ9h5xJ5XW6veQKZcJ55QYHbHna6x27sX7kIVOUadDX9YjqajYmUdlFzaT-45RKaEYsLcKo22fh4edSoM2VUMR7ibQv4vTI6dFZtxt-4bpK9PNoGMWkjQYg7KjDaWWSkJ5uljFHUrGEM38NhZK0PHr8Bsn6AAcik9XDLYwDFUmz_d0hqOSJHG7uw4UBrc_AFNZaIfJJMg1BlTixUK1dkrmXjo_MHdrwReozlFhylJiwFlpyvBkPtUbxUJ2yULccbaGsvOcKnAY-BltwYql9OX3y3PYfjssaA98AJniioRd9ZUsUaFjZaT6xq_6oQosYI_ibDIEFvKOQ2vp8MvPrgLW5VXFXenx5cOat3ZD5wL4OeBqfW6AXwYLLagbXcWW-gdamwuAvYgoyM641fhAqTaTX8hQg4bCIQu7eVH8Co_eNuzcVkuQtkIVoPPl1MRoY-o8llm77Rza4k8GTlPETNDlWuxfLq6CgNa8qKc_Eu96z5MIxEukK3n4wQOpfT9iIuptvyk_10kCH-5HaCCeWbrJOoZoq0W5tttM6jL-VhctcgzJRkM6hhUqSpWJL0hBHQAu_9_IpsHxUbxgkljJUVTpNTPa8XMxzMq7UiDXD-y87QcVYmk4AzlbAWor6ZV733xDh804n3H3fjrq9MLH5aa-2-cForHzCNQtMvWj_YosbE-CyOPPgHcjz9QxjDv2mY-NZvNlj51qVoGyXdcMZZ5fQOUdLjOAL4DrNiOK-UiH1x0v-hqtAGQU1BOdy39MWUFW0tFfQ4pJks7DV3HW6VAJTyRT1KLLYZX_swfwrhp-x4T-AqspOdssaSdWr_cLpmoEcVgBCkvCrN3EtMzf15v6ecUfCd0T2bTQxlGhH9RtpVyKfqPFi0xvBFmoGFe-TduBfuqeYDHPp18QZTvDnxEVuMHvx1ccvD3joZATNYWLyfo49MiWju7j_EUG4bGdrzowzpaYu4kubxsVEm43xOBkV4VavEdp3uBuy6Iee6zKqIpmTRbj93Mb4vFzantLhbVMnSrEeMa8tJFdHl4iuk1HidkvKuo5OJDiVtBacrbC7qcBdGogntuCMNVeMoS1ZmBYlfLu80fE1vQcOxoNyCU4SbgIxi1FF6374mx92ch2N2hNeae4puY4Z68XPFxc1lqbvKFtkMF26DAqSRPNk_E_Iui6Q_9ESwv23mNWw12WHNmHyO4WpuFDN6FaNlPw05BkumSTV3o-LzUeELLeKn7TuXeZF5_--8owfCjiP0Orwd4PQsDvMCMPQ3L3HaCZIGZTtY2_vtZbIBNNAguiIAbcEo5gnspMQCQ2CvfMaUa_NrupB-VgbyALsie_VPT1Gl6JYWR9kqIj9fHIpZkaxXDEOe5bANAaROGSGE-4WAeEV3h8-HAJQiKyLQtfrw2PgjCZnx1FCtfpY6HONh4R-1PXeA8xRfmX5ios96Algjx3W40jq6FsQ7s9mSn8S7w6Gsi9AEkAOiuGNAEUior0aiXW1d2tWSZr5e8YPTYsQLeMABKtINF09kQVYVzE7m13tvuMpfxiFvwe7Sa1bviZZ2CwvxJzJbhG_lAoDNV8fdSAW2OR4e-oY7lUDe0YdMLUJItGBBo6tOe5JGBGAAgJpa1FS4fpZj7rBw-ZAoCYI8e6bPukAG1F-G8OujxfB1tF6GBpW9wtGhILkzMnpU4_GDRLu1kEpUv-KyIu2DKRCBc2Z7_m00?></g></svg>
+
+
+
+
+## Board CLI Reference
+
+You have access to `task-board` CLI for managing your work. All writes use the `m` (mutation DSL) subcommand:
+
+```bash
+# FIRST/LAST lifecycle commands:
+# Use explicit status changes when the task flow requires it.
+task-board m 'set_status(TASK-260720-2284br, status=analysis)'       # analyst-style work
+task-board m 'set_status(TASK-260720-2284br, status=development)'    # implementation / testing work
+task-board m 'set_status(TASK-260720-2284br, status=reviewing)'      # reviewer handoff
+task-board m 'set_status(TASK-260720-2284br, status=blocked)'        # when blocked
+task-board m 'set_status(TASK-260720-2284br, status=to-review)'      # when your work is ready for review
+
+# Track progress with checklist
+task-board m 'check_item(TASK-260720-2284br, item=1)'                        # check item N
+task-board m 'add_checklist_item(TASK-260720-2284br, text="Write tests")'    # add checklist item
+
+# Add notes about your progress, decisions, blockers, or review findings
+task-board m 'set_notes(TASK-260720-2284br, text="your note here")'
+
+# Save short text directly as outcome resources
+task-board m 'add_resource(TASK-260720-2284br, name=TASK-260720-2284br_results.md, content="...", type=outcome, description="Description")'
+
+# Attach an existing local file (screenshots, PDFs, logs, archives, research docs)
+task-board resource add TASK-260720-2284br ./path/to/file --type outcome --name TASK-260720-2284br_artifact.bin -d "Description"
+```
+
+## Spawn Run Control
+
+Tracked background spawn runs expose `TASK_BOARD_RUN_ID` in the child environment.
+If your work is long-running, check for operator directives at safe checkpoints:
+
+```bash
+task-board spawn status "$TASK_BOARD_RUN_ID"
+task-board spawn directives "$TASK_BOARD_RUN_ID"
+```
+
+Current runtimes do not support direct inbound push into your active session.
+Treat directives as cooperative checkpoint signals:
+- persist your current notes/artifacts before acting on `cancel`-style requests
+- only honor pause/reroute intent at a safe checkpoint
+- if no directive is present, continue normally
+
+## IMPORTANT: Saving Results
+
+When you produce work products (research documents, design docs, screenshots, logs, archives, implementation notes), you MUST save them as outcome resources with names that include the task ID:
+
+```bash
+task-board m 'add_resource(TASK-260720-2284br, name=TASK-260720-2284br_results.md, content="...", type=outcome, description="Description")'
+task-board resource add TASK-260720-2284br ./path/to/file --type outcome --name TASK-260720-2284br_artifact.bin -d "Description"
+```
+
+If you revise the same artifact later, use `task-board m 'update_resource(...)'` or `task-board resource update ...` instead of creating a silent overwrite.
+
+If you discover important findings, decisions, anomalies, regressions, or non-obvious constraints while working, record them in `logbook` as well as on the board.
+
+This ensures your results persist on the board and are accessible to other agents and the coordinator. Spawn completion is expected to produce at least one new task-scoped outcome artifact before the task can cleanly remain in `to-review`.
+
+## Stop-The-Line: No Forced Fits
+
+Do not keep implementing when autonomous work starts requiring a forced fit. A forced fit is any path where the task conflicts with a platform/API constraint, product decision, UX state model, ownership boundary, or architecture, and the remaining "solution" is mostly compensating hacks.
+
+Warning signs:
+- each fix needs another flag, stub, priority rule, mock-only behavior, or special-case test
+- the tests can pass only because the test harness avoids the real platform behavior
+- the implementation depends on an assumption you can no longer defend
+- the user-facing behavior cannot be described cleanly without contradicting the product model
+
+When this happens, stop product-code changes before adding another workaround layer. Attach or note:
+- the constraint and evidence
+- the failed assumptions/attempts
+- the viable options and tradeoffs
+- the recommended option
+- the exact human/product/architecture decision needed
+
+Then set the board item to `blocked` and ask only for that exact decision or external input. This stop applies only to a concrete external blocker or an unresolved human-only platform/product/architecture/tradeoff/approval decision; recoverable failures and ordinary rework stay autonomous. Tests and stubs are not proof that a forced-fit design is correct; use them only after the state model and platform assumptions are valid.
+
+## Completion Discipline
+
+Keep working until the task reaches a terminal handoff for your role. If no objective blocker remains, do not stop while the board item is still parked in `analysis`, `development`, `testing`, or `reviewing`.
+
+Before your final status change:
+- satisfy the task acceptance criteria and relevant checklist items
+- attach outcome evidence for the work you produced
+- run the relevant verification commands when the task changes code, tests, docs, or config
+
+Use `blocked` only for either a concrete external blocker you cannot resolve autonomously or an unresolved human-only platform/product/architecture/tradeoff/approval decision. Record the constraint, evidence, failed assumptions/attempts, viable alternatives and tradeoffs, recommendation, and exact human decision or external input needed. Recoverable failures and ordinary rework are not `blocked`.
+
+Status language is literal:
+- `to-review` means your role has handed work to review; it does not mean the board task is accepted or done.
+- In your final response, say "ready for review" or "handed off to review" when the final board status is `to-review`.
+- Do not say "done", "complete", "finished", "final", or "готово" as the overall task state unless the board status is actually `done`.
+
+## LAST — Run For Role Handoff
+
+When you have completed all role work and the task is ready for its role handoff, run this as your **final board command**:
+
+```bash
+task-board handoff TASK-260720-2284br --role developer
+```
+
+## Working Directory
+Board directory: `/Users/iv/Developer/ReluxWorks/curator/.task-board`
+
+Work in the project root. Do not modify board files directly — always use the `task-board` CLI.

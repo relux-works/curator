@@ -1,0 +1,22 @@
+Download a board resource and save it locally.
+
+If --output is omitted, the file is materialized under:
+  .temp/resources/<ELEMENT-ID>/<NAME>
+
+Use --output - to write the resource bytes to stdout.
+
+Usage:
+  task-board resource get <ELEMENT-ID> <NAME> [flags]
+
+Flags:
+  -h, --help            help for get
+  -o, --output string   Write resource to this path (default: .temp/resources/<ELEMENT-ID>/<NAME>, use - for stdout)
+
+Global Flags:
+      --board-dir string         Path to the board directory (overrides TASK_BOARD_DIR and config local.board_dir) (default ".task-board")
+      --context-profile string   Agent context profile override: full or lite
+      --insecure                 Skip TLS certificate verification (for self-signed certs)
+      --json                     Output in JSON format
+      --no-update-check          Disable automatic update check
+      --remote string            Remote board server URL (overrides TASK_BOARD_REMOTE)
+      --remote-board string      Remote board ID (overrides TASK_BOARD_ID)

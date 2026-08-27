@@ -1,0 +1,12 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/relux-works/curator/internal/godriver
+cpu: Apple M3 Max
+BenchmarkFingerprintToolchainLegacy-16    	       5	3596151558 ns/op
+BenchmarkFingerprintToolchainLegacy-16    	       5	3411405317 ns/op
+BenchmarkFingerprintToolchainLegacy-16    	       5	3425141117 ns/op
+BenchmarkFingerprintToolchainScoped-16    	       5	 995220467 ns/op
+BenchmarkFingerprintToolchainScoped-16    	       5	1041184308 ns/op
+BenchmarkFingerprintToolchainScoped-16    	       5	 986760325 ns/op
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	67.567s

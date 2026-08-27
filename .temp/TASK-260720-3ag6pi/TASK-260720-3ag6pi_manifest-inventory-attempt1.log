@@ -1,0 +1,14 @@
+2026-07-20T22:29:22Z
+manifest_sha256=70cd274150d629f16ca04f2073a8eae5a0f3fff4584f905d807775040af21eae
+all_manifest_hashes_match=189
+schema_case_inventory=agent-skill-v6 filesystem=17 manifest=17 index=17
+schema_case_inventory=csk-skill-v6 filesystem=17 manifest=17 index=17
+schema_case_inventory=build-receipt-v1 filesystem=16 manifest=16 index=16
+schema_case_inventory=install-marker-v2 filesystem=14 manifest=14 index=14
+schema_case_inventory=conformance-claim-v2 filesystem=7 manifest=7 index=7
+artifact_inventory=expected/build-driver/ filesystem=11 manifest=11
+artifact_inventory=fixtures/go-build-skill/ filesystem=13 manifest=13
+MATCH sha256:fd613bbb4d506237fbabd222247478bc1a809266965f4f4b344ba8548661fe33 vectors/build-drivers.json
+MATCH sha256:676e617a0e0a6d575310f38e1de740eab583d709e2351be9eaa818c9882d78d4 vectors/manager-lifecycle.json
+MATCH sha256:c437f5530693868ad11c852e0e083cbcbe3986ac3a5754c9882fe8f74f63020f schema-cases/index.json
+jq: error (at conformance/v1/manifest.json:763): Regex failure: end pattern with unmatched parenthesis

@@ -1,0 +1,210 @@
+=== probe gofmt -l .
+$ gofmt -l .
+exit=0
+
+=== probe go vet ./...
+$ go vet ./...
+exit=0
+
+=== probe go build ./...
+$ go build ./...
+exit=0
+
+=== probe go test -count=1 ./...
+$ go test -count=1 ./...
+ok  	swiftboundaryprobe	0.272s
+exit=0
+
+=== probe tarball extract + go test -count=1 ./...
+$ tar -xzf probe.tar.gz && go test -count=1 ./...
+ok  	swiftboundaryprobe	0.444s
+exit=0
+
+=== probe run, macOS, SDK presented
+$ go run . -work ../run-final -out ../fixture-macos.json -evidence ../command-evidence.log
+cases: 23, matched 23, divergences 0, not run 0
+alignment: P1 no-widening=true P2 no-narrowing=true (security partition empty=false)
+closure: 32 checks, 0 yielded a verdict (must be 0)
+controls: 9 of 9 failing as required
+structural: 30 checks, 0 divergences
+green: true
+exit=0
+
+=== probe run, toolchain absent
+$ go run . -root /nonexistent/toolchain -work ../run-absent-final -out ../fixture-absent.json
+swift-boundary-fixture-v1: toolchain unavailable, 23 cases not run; nothing was installed
+exit=0
+
+=== expected-red control C1
+$ go run . -work ../run-final -red C1
+C1-lead-only-recognition: failed=true findings=3 below-floor-3.1 isolated=accepted(want accepted) corroborating=unknown(want rejected-unsupported-floor); below-floor-1.0 isolated=accepted(want accepted) corroborating=unknown(want rejected-unsupported-floor); above-host-99.0 isolated=accepted(want accepted) corroborating=unknown(want host-gate)
+exit status 1
+exit=1
+
+=== expected-red control C2
+$ go run . -work ../run-final -red C2
+C2-substring-recognition: failed=true findings=1 substring yielded rejected-grammar where exact yielded unknown
+exit status 1
+exit=1
+
+=== expected-red control C3
+$ go run . -work ../run-final -red C3
+C3-exit-status-as-semantics: failed=true findings=7 below-floor-3.1 collapsed to rejected-grammar (want rejected-unsupported-floor); below-floor-1.0 collapsed to rejected-grammar (want rejected-unsupported-floor); above-host-99.0 collapsed to rejected-grammar (want host-gate)
+exit status 1
+exit=1
+
+=== expected-red control C4
+$ go run . -work ../run-final -red C4
+C4-build-as-the-isolated-command: failed=true findings=3 below-floor-3.1 isolated=rejected-unsupported-floor under the wrong command; below-floor-1.0 isolated=rejected-unsupported-floor under the wrong command; above-host-99.0 isolated=host-gate under the wrong command
+exit status 1
+exit=1
+
+=== expected-red control C5
+$ go run . -work ../run-final -red C5
+C5-unearned-path-closure-zero: failed=true findings=1 pinned exit=0 hits=0; sensitivity control exit=1 hits=0
+exit status 1
+exit=1
+
+=== expected-red control C6
+$ go run . -work ../run-final -red C6
+C6-plugin-closure-unchecked: failed=true findings=2 the declared SDK path derives 2 distinct live plugin paths outside every fingerprinted root
+exit status 1
+exit=1
+
+=== expected-red control C7
+$ go run . -work ../run-final -red C7
+C7-lenient-plan-parsing: failed=true findings=16 the retired scan admits 16 of 20 malformed plans the strict verifier rejects (20 rejected): plugin-flag-without-value, plugin-flag-empty-value, external-plugin-path-one-component, external-plugin-path-three-components, hash-in-a-single-path-plugin-flag, blank-line, executable-outside-the-toolchain-root, new-driver-path-outside-the-root, search-path-outside-every-root, joined-search-path-outside-every-root, search-path-that-does-not-exist, output-outside-operation-private-state, unclaimed…
+exit status 1
+exit=1
+
+=== expected-red control C8
+$ go run . -work ../run-final -red C8
+C8-lexical-containment: failed=true findings=1 /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-final/structural/c8root/bin/ld is lexically inside the root and really resolves to /bin/sh
+exit status 1
+exit=1
+
+=== expected-red control C9
+$ go run . -work ../run-final -red C9
+C9-collapsing-module-name-derivation: failed=true findings=3 [my-tool my.tool my_tool] all map to "my_tool"; [a.b-c a-b.c] all map to "a_b_c"; [9.tool 9-tool] all map to "_9_tool"
+exit status 1
+exit=1
+
+=== spec validate.py, task worktree
+$ /Users/iv/Developer/ReluxWorks/.temp/TASK-260728-1g0z69/validation-venv/bin/python tools/validate.py
+validation failed: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/curator-spec-worktree/docs/external-build-repositories.md: broken local link: ../release/1.0.0-rc.5.json
+exit=1
+
+=== curator go build ./...
+exit=0
+
+=== curator go vet ./...
+exit=0
+
+=== curator go test ./...
+ok  	github.com/relux-works/curator/cmd/curator	(cached)
+ok  	github.com/relux-works/curator/internal/adapters	(cached)
+ok  	github.com/relux-works/curator/internal/audit	(cached)
+ok  	github.com/relux-works/curator/internal/capabilities	(cached)
+ok  	github.com/relux-works/curator/internal/closure	(cached)
+ok  	github.com/relux-works/curator/internal/config	(cached)
+ok  	github.com/relux-works/curator/internal/devsub	(cached)
+ok  	github.com/relux-works/curator/internal/envfiles	(cached)
+ok  	github.com/relux-works/curator/internal/gitignore	(cached)
+ok  	github.com/relux-works/curator/internal/gitops	(cached)
+ok  	github.com/relux-works/curator/internal/hashing	(cached)
+ok  	github.com/relux-works/curator/internal/identifiers	(cached)
+ok  	github.com/relux-works/curator/internal/identity	(cached)
+ok  	github.com/relux-works/curator/internal/install	(cached)
+ok  	github.com/relux-works/curator/internal/interop	(cached)
+ok  	github.com/relux-works/curator/internal/locale	(cached)
+ok  	github.com/relux-works/curator/internal/manifest	(cached)
+ok  	github.com/relux-works/curator/internal/marker	(cached)
+ok  	github.com/relux-works/curator/internal/mcp	(cached)
+ok  	github.com/relux-works/curator/internal/protocoljson	(cached)
+ok  	github.com/relux-works/curator/internal/registry	(cached)
+ok  	github.com/relux-works/curator/internal/runtimestore	(cached)
+ok  	github.com/relux-works/curator/internal/scopes	(cached)
+ok  	github.com/relux-works/curator/internal/shell	(cached)
+ok  	github.com/relux-works/curator/internal/skillcheck	(cached)
+ok  	github.com/relux-works/curator/internal/skillspec	(cached)
+ok  	github.com/relux-works/curator/internal/snapshot	(cached)
+ok  	github.com/relux-works/curator/internal/ui	(cached)
+ok  	github.com/relux-works/curator/internal/verr	(cached)
+ok  	github.com/relux-works/curator/internal/version	(cached)
+ok  	github.com/relux-works/curator/internal/whitelist	(cached)
+exit=0
+
+=== spec validate.py, clean baseline 57c1f56
+$ /Users/iv/Developer/ReluxWorks/.temp/TASK-260728-1g0z69/validation-venv/bin/python tools/validate.py   (clean tree at 57c1f56)
+validated 30 schemas and 93 vector files
+exit=0
+
+=== scoped link check over the two authored documents
+6 local links, 0 broken
+exit=0
+
+=== spec validate.py link-check attribution
+3 broken links, all in docs/portable-go-execution-policy.md and docs/external-build-repositories.md,
+copied unmodified from another task tree to close the link graph reachable from decision 0007.
+Targets release/1.0.0-rc.5.json and conformance/v1/vectors/go-host-execution-policy.json do not exist at base 57c1f56.
+The clean-tree baseline at the same commit exits 0. This task authored neither document.
+
+=== curator gofmt -l .
+$ gofmt -l .
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/lucasb-eyer/go-colorful/hsluv.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-isatty/isatty_windows.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_unix.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_windows.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/cgo/internal/testcarchive/testdata/libgo9/a.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/cgo/internal/testerrors/testdata/issue67517.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/cgo/internal/testsanitizers/testdata/tsan14.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/cgo/zdefaultcc.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/inline/inlheur/testdata/props/acrosscall.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/inline/inlheur/testdata/props/calls.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/inline/inlheur/testdata/props/funcflags.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/inline/inlheur/testdata/props/params.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/inline/inlheur/testdata/props/returns.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/fallthrough.go
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue20789.go:9:51: expected '(', found u
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue23385.go:10:5: expected boolean expression, found assignment (missing parentheses around composite literal?)
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue23385.go:15:5: expected boolean expression, found assignment (missing parentheses around composite literal?)
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue23434.go:11:38: expected type, found newline
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue23434.go:13:49: expected type, found newline
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue23434.go:18:49: expected type, found '!'
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue23434.go:26:50: expected type, found ')'
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue31092.go:11:35: expected ';', found ':='
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue31092.go:12:34: expected type, found ':='
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue31092.go:13:33: expected type, found ':='
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue31092.go:15:39: expected ';', found ':='
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue31092.go:16:37: expected ';', found ':='
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue43527.go:9:52: missing type constraint
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue43527.go:10:11: missing type parameter name
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue43527.go:11:55: missing type constraint
+.temp/TASK-260728-2jaw7h/go1.25.1/src/cmd/compile/internal/syntax/testdata/issue43527.go:12:54: missing type constraint
+exit=2 (truncated to 30 lines above)
+
+=== curator make check
+$ make check
+.temp/TASK-260728-2jaw7h/go1.25.1/test/undef.go
+.temp/TASK-260728-2jaw7h/go1.25.1/test/varerr.go
+.temp/TASK-260728-2jaw7h/go1.25.1/test/wasmexport2.go
+.temp/TASK-260728-2jaw7h/go1.25.1/test/zerosize.go
+.temp/TASK-260729-1t1z2l/review-tmp/go-build1368375210/b338/_testmain.go
+.temp/TASK-260729-1t1z2l/review-tmp/go-build1368375210/b340/_testmain.go
+.temp/TASK-260729-3jmqgl/worktree/prototypes/macos-hardened-probes/internal/seatbelt/seatbelt_test.go
+make: *** [check] Error 1
+exit=2
+
+=== gofmt / make check attribution
+gofmt -l paths under this task's tree (.temp/TASK-260728-1yhuqi): 0
+gofmt -l paths in total: 754
+distinct owning scratch trees, none of them this task:
+  .temp/TASK-260720-1zntv0
+  .temp/TASK-260728-2jaw7h
+  .temp/TASK-260729-1t1z2l
+  .temp/TASK-260729-3jmqgl
+paths outside .temp/: 0
+modified tracked files in the curator repo: 0
+This task modified no tracked file and staged, committed, pinned and published nothing.
+Its own module passes gofmt, vet, build and test with exit 0 (top of this log).
+

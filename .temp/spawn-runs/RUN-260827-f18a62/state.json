@@ -1,0 +1,58 @@
+{
+  "id": "RUN-260827-f18a62",
+  "task_id": "TASK-260827-19aqkr",
+  "agent_name": "[implementer] doc-writer (agy)",
+  "agent_type": "agy",
+  "status": "failed",
+  "phase": "finalizing",
+  "summary": "run exceeded --timeout 30m0s and was terminated by the launcher; a child process could not be proven terminated and may still be running",
+  "created_at": "2026-08-27T01:41:20.041701Z",
+  "started_at": "2026-08-27T01:44:22.958335Z",
+  "completed_at": "2026-08-27T02:14:29.846932Z",
+  "last_heartbeat_at": "2026-08-27T02:14:29.846932Z",
+  "last_progress_at": "2026-08-27T02:14:29.846932Z",
+  "completion_reason": "failure",
+  "last_event_seq": 1010,
+  "exit_code": 124,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260827-05-41-20_-implementer--doc-writer--agy-_TASK-260827-19aqkr.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/TASK-260827-19aqkr/-implementer--doc-writer--agy-_RUN-260827-f18a62.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260827-f18a62/runner.log",
+  "error": "run exceeded --timeout 30m0s and was terminated by the launcher; a child process could not be proven terminated and may still be running",
+  "max_parallel": 20,
+  "story_id": "STORY-260827-3a5efk",
+  "workspace": {
+    "workspace_id": "WS-11f533e3fad3",
+    "story_id": "STORY-260827-3a5efk",
+    "branch_ref": "refs/heads/task-board/story/STORY-260827-3a5efk",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260827-3a5efk/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "provider": "agy",
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "recovery_root_run_id": "RUN-260827-f18a62",
+  "element_routing_message": "spawn run RUN-260827-f18a62 failed; operator action required; failure: run exceeded --timeout 30m0s and was terminated by the launcher; a child process could not be proven terminated and may still be running",
+  "element_routing_note_recorded": true,
+  "element_routing_last_attempt_at": "2026-08-27T02:14:30.055489Z",
+  "element_routed_at": "2026-08-27T02:14:30.055489Z",
+  "provider_attempts": [
+    {
+      "attempt": 1,
+      "provider": "agy",
+      "model": "gemini-3.6-flash-high",
+      "started_at": "2026-08-27T01:44:23.263708Z",
+      "completed_at": "2026-08-27T02:14:25.725422Z",
+      "exit_code": 124,
+      "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/TASK-260827-19aqkr/-implementer--doc-writer--agy-_RUN-260827-f18a62.log"
+    }
+  ],
+  "agy_runtime": {
+    "executable": "/Users/iv/.local/bin/agy",
+    "version": "1.1.21"
+  }
+}

@@ -1,0 +1,5 @@
+GO_ROOT=/tmp/approved-go
+printf 'A=<%s> B=<%s>\n' \
+  "$(env A=1 B=2 printenv A 2>/dev/null)" "$(env A=1 B=2 printenv B 2>/dev/null)"
+mk() { make GOROOT_EXPECTED="$GO_ROOT" "$@"; }
+mk all

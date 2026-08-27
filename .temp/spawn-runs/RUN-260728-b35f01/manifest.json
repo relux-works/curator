@@ -1,0 +1,62 @@
+{
+  "id": "RUN-260728-b35f01",
+  "task_id": "TASK-260720-3itlly",
+  "created_at": "2026-07-28T05:51:19.207733Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-09-51-19_-implementer--developer--claude-_TASK-260720-3itlly.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "2h0m0s",
+  "log_resource_name": "TASK-260720-3itlly_spawn-log_-implementer--developer--claude-_RUN-260728-b35f01.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-3itlly_implementation-notes.md",
+    "TASK-260720-3itlly_review-verdict-cycle-1.md",
+    "TASK-260720-3itlly_review-verdict-cycle-2.md",
+    "TASK-260720-3itlly_rework-cycle-2.md",
+    "TASK-260720-3itlly_spawn-log_-implementer--developer--claude-_RUN-260728-3fae54.log",
+    "TASK-260720-3itlly_spawn-log_-implementer--developer--claude-_RUN-260728-94c4cd.log",
+    "TASK-260720-3itlly_spawn-log_-reviewer--reviewer--codex-_RUN-260728-0aa041.log",
+    "TASK-260720-3itlly_spawn-log_-reviewer--reviewer--codex-_RUN-260728-a679a7.log",
+    "TASK-260720-3itlly_verification-cycle-2.log",
+    "TASK-260720-3itlly_verification.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-3itlly_implementation-notes.md": "dbf16521141966688dfbd8f9ffc4fa4e8ae8a0d61129a9b28e9e7eddb16a68ac",
+    "TASK-260720-3itlly_review-verdict-cycle-1.md": "aeed5e30cff5e7c1b0338d79c770ad0bac5b716f8fad452cebdd0f574c386d5d",
+    "TASK-260720-3itlly_review-verdict-cycle-2.md": "82fb0a3a2a8a3164ac9d24d943bfdd05a74c85824950e214fdd0334ae6e010b5",
+    "TASK-260720-3itlly_rework-cycle-2.md": "81a3e5ca85af03940e6c6e39b558435fa6c087f8e985978814e04eb7f714cf91",
+    "TASK-260720-3itlly_verification-cycle-2.log": "7189382f7e6b8b373c72e8a96e5b6934616204952efd02ed2888da227ed205ac",
+    "TASK-260720-3itlly_verification.log": "4574d711fb2bf26a8246bf0b15e5d6346b256f515db762e5324af2513da83d00"
+  },
+  "require_outcome_artifact": true
+}

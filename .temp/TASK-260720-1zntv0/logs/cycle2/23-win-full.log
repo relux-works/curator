@@ -1,0 +1,109 @@
+ok  	github.com/relux-works/curator/cmd/curator	4.313s
+ok  	github.com/relux-works/curator/internal/adapters	1.132s
+ok  	github.com/relux-works/curator/internal/audit	1.238s
+--- FAIL: TestPublishAndInspectExactProtectedHit (0.02s)
+    cache_test.go:55: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestPublishAndInspectExactProtectedHit935728101\001 owner does not match the effective user
+--- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState (0.04s)
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/receipt_trailing_newline (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStatereceipt_trailin2854200671\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/artifact_bytes (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStateartifact_bytes4253027156\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/missing_receipt (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStatemissing_receipt2898458946\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/oversized_receipt (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStateoversized_recei2704748415\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/unexpected_entry (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStateunexpected_entr1166168903\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/recorded_receipt_hash (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStaterecorded_receip1147665889\001 owner does not match the effective user
+--- FAIL: TestPublishQuarantinesCorruptEntryBeforeReplacement (0.01s)
+    cache_test.go:181: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestPublishQuarantinesCorruptEntryBeforeReplacement4061170554\001 owner does not match the effective user
+--- FAIL: TestAtomicPublicationIdenticalRace (0.03s)
+    cache_test.go:235: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestAtomicPublicationIdenticalRace2718598487\001 owner does not match the effective user
+--- FAIL: TestAtomicPublicationConflictingRace (0.02s)
+    cache_test.go:282: unexpected publication error: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestAtomicPublicationConflictingRace1637123304\001 owner does not match the effective user
+--- FAIL: TestWindowsProtectedStateMatrix (0.06s)
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_grants_another_principal_mutation_rights (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_grants_another_principa2859724483\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_denies_owner_mutation_rights (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_denies_owner_mutation_r2506983153\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_has_applicable_group_deny (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_has_applicable_group_de423817732\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_has_inherit-only_owner_allow (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_has_inherit-only_owner_2989323755\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_owner_lacks_required_mutation_rights (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_owner_lacks_required_mu3919965694\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_hard_link (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_hard_link1029850603\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_special_file (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_special_file2959866193\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_reparse_point (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_reparse_point2334469283\001 owner does not match the effective user
+--- FAIL: TestExplicitQuarantineMovesEntryAndMissingIsNoop (0.01s)
+    validation_test.go:106: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestExplicitQuarantineMovesEntryAndMissingIsNoop4288883872\001 owner does not match the effective user
+FAIL
+FAIL	github.com/relux-works/curator/internal/buildcache	1.343s
+ok  	github.com/relux-works/curator/internal/buildmeta	1.141s
+--- FAIL: TestRejectsInvalidPathsLinksAndCollisions (1.35s)
+    --- FAIL: TestRejectsInvalidPathsLinksAndCollisions/invalid_protocol_path (1.34s)
+        buildsource_test.go:135: Validate error = <nil>
+        testing.go:1369: TempDir RemoveAll cleanup: unlinkat C:\Users\admin\AppData\Local\Temp\TestRejectsInvalidPathsLinksAndCollisionsinvalid_protocol_path2291557259\001: The process cannot access the file because it is being used by another process.
+--- FAIL: TestFrozenTokenRejectsRootReplacement (0.00s)
+    buildsource_test.go:256: rename C:\Users\admin\AppData\Local\Temp\TestFrozenTokenRejectsRootReplacement2743393181\001\snapshot C:\Users\admin\AppData\Local\Temp\TestFrozenTokenRejectsRootReplacement2743393181\001\old: The process cannot access the file because it is being used by another process.
+FAIL
+FAIL	github.com/relux-works/curator/internal/buildsource	2.680s
+ok  	github.com/relux-works/curator/internal/capabilities	1.088s
+ok  	github.com/relux-works/curator/internal/closure	22.218s
+ok  	github.com/relux-works/curator/internal/config	1.703s
+ok  	github.com/relux-works/curator/internal/devsub	1.188s
+ok  	github.com/relux-works/curator/internal/envfiles	1.095s
+ok  	github.com/relux-works/curator/internal/gitignore	1.962s
+ok  	github.com/relux-works/curator/internal/gitops	5.069s
+--- FAIL: TestSafeSelectionFeedsStagedForwardingTargetWithoutLiveMutation (0.05s)
+    globalbins_test.go:223: validate staged script runtime: script command is not executable: tool
+FAIL
+FAIL	github.com/relux-works/curator/internal/globalbins	1.571s
+ok  	github.com/relux-works/curator/internal/godriver	102.669s
+ok  	github.com/relux-works/curator/internal/hashing	1.129s
+ok  	github.com/relux-works/curator/internal/identifiers	0.961s
+ok  	github.com/relux-works/curator/internal/identity	1.006s
+ok  	github.com/relux-works/curator/internal/install	35.128s
+ok  	github.com/relux-works/curator/internal/interop	2.931s
+ok  	github.com/relux-works/curator/internal/locale	1.333s
+ok  	github.com/relux-works/curator/internal/manifest	1.511s
+ok  	github.com/relux-works/curator/internal/marker	1.373s
+ok  	github.com/relux-works/curator/internal/mcp	1.298s
+ok  	github.com/relux-works/curator/internal/protocoljson	1.103s
+ok  	github.com/relux-works/curator/internal/registry	4.403s
+--- FAIL: TestPrepareScriptRuntimeStagesIncompleteReplacementWithoutBuildRoots (0.04s)
+    targets_test.go:42: validate staged script runtime: script command is not executable: tool
+--- FAIL: TestPrepareScriptRuntimeReusesOnlyCompleteManagedTree (0.03s)
+    targets_test.go:79: complete runtime not reused: {Commands:map[] Desired:<nil> Replacement:false}, validate staged script runtime: script command is not executable: tool
+--- FAIL: TestPrepareSingleScriptStagesManagedBinWithoutCopyingSnapshotTree (0.01s)
+    targets_test.go:106: validate staged script runtime: script command is not executable: tool
+--- FAIL: TestShimTransitionMatrixIsDeterministicAndManagerScoped (0.02s)
+    targets_test.go:163: Windows compiled artifact must have an .exe suffix
+--- FAIL: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode (0.67s)
+    targets_windows_test.go:95: global-canonical wrapper exit = exit status 1; output:
+        "\"C:\Users\admin\AppData\Local\Temp\TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode1561129642\001\call global-canonical.cmd\"" не является внутренней или внешней
+        командой, исполняемой программой или пакетным файлом.
+FAIL
+FAIL	github.com/relux-works/curator/internal/runtimestore	2.056s
+ok  	github.com/relux-works/curator/internal/scopes	1.285s
+--- FAIL: TestPowerShellHookRunsOnEveryPrompt (1.12s)
+    shell_test.go:393: hook execution: exit status 1
+        Невозможно загрузить файл C:\Users\admin\AppData\Local\Temp\TestPowerShellHookRunsOnEveryPrompt1129647278\001\test.ps1,
+         так как выполнение сценариев отключено в этой системе. Для получения дополнительных сведений см. about_Execution_Polic
+        ies по адресу https:/go.microsoft.com/fwlink/?LinkID=135170.
+            + CategoryInfo          : Ошибка безопасности: (:) [], ParentContainsErrorRecordException
+            + FullyQualifiedErrorId : UnauthorizedAccess
+FAIL
+FAIL	github.com/relux-works/curator/internal/shell	2.294s
+ok  	github.com/relux-works/curator/internal/skillcheck	1.335s
+ok  	github.com/relux-works/curator/internal/skillspec	3.142s
+ok  	github.com/relux-works/curator/internal/snapshot	9.750s
+ok  	github.com/relux-works/curator/internal/ui	1.302s
+ok  	github.com/relux-works/curator/internal/verr	1.001s
+ok  	github.com/relux-works/curator/internal/version	0.964s
+ok  	github.com/relux-works/curator/internal/whitelist	1.190s
+FAIL

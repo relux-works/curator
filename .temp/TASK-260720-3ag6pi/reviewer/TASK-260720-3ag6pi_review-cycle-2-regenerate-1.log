@@ -1,0 +1,12 @@
+## Before first regeneration
+tracked_status_bytes=0
+conformance_file_count=448
+conformance_aggregate_sha256=e6a132157806bf747f0ad24a61bb5a9a4c8b915dac743d9465c889c0a1ad2fae
+$ make regenerate
+go run ./tools/generate-vectors -root .
+make_regenerate_exit_code=0
+## After first regeneration
+conformance_file_count=448
+conformance_aggregate_sha256=e6a132157806bf747f0ad24a61bb5a9a4c8b915dac743d9465c889c0a1ad2fae
+generated_diff_exit_code=0
+worktree_status_bytes=0

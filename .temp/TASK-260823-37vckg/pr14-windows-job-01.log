@@ -1,0 +1,581 @@
+Test (windows-latest)	UNKNOWN STEP	﻿2026-07-31T12:40:30.2805836Z Current runner version: '2.336.0'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2826808Z ##[group]Runner Image Provisioner
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2827467Z Hosted Compute Agent
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2827896Z Version: 20260707.563
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2828381Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2828931Z Build Date: 2026-07-07T19:33:50Z
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2829445Z Worker ID: {9ea3c648-90aa-4862-b48c-c7af1b052f4e}
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2830052Z Azure Region: westus
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2830852Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2832007Z ##[group]Operating System
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2832508Z Microsoft Windows Server 2025
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2832966Z 10.0.26100
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2833340Z Datacenter
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2833786Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2834180Z ##[group]Runner Image
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2834658Z Image: windows-2025-vs2026
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2835118Z Version: 20260728.188.1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2836307Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260728.188/images/windows/Windows2025-VS2026-Readme.md
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2837545Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260728.188
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2838350Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2839270Z ##[group]GITHUB_TOKEN Permissions
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2840814Z Contents: read
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2841260Z Metadata: read
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2841645Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2843308Z Secret source: Actions
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.2844084Z Prepare workflow directory
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.3146569Z Prepare all required actions
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.3185529Z Getting action download info
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.6523723Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:30.7604102Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.1989784Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.5113615Z Complete job name: Test (windows-latest)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6313977Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6321316Z ##[group]Run actions/checkout@v4
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6321949Z with:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6322326Z   submodules: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6322785Z   repository: relux-works/curator
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6326100Z   token: ***
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6326494Z   ssh-strict: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6326927Z   ssh-user: git
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6327320Z   persist-credentials: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6327743Z   clean: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6328144Z   sparse-checkout-cone-mode: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6328592Z   fetch-depth: 1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6329002Z   fetch-tags: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6329389Z   show-progress: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6329848Z   lfs: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6330234Z   set-safe-directory: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6332479Z   allow-unsafe-pr-checkout: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6333332Z env:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6333745Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6334250Z   GOTOOLCHAIN: local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6334664Z   GOENV: off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.6335025Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.7463923Z Syncing repository: relux-works/curator
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.7465448Z ##[group]Getting Git version info
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.7465988Z Working directory is 'D:\a\curator\curator'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:31.8262747Z [command]"C:\Program Files\Git\bin\git.exe" version
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.2185468Z git version 2.55.0.windows.3
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.2219324Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.2287222Z Temporarily overriding HOME='D:\a\_temp\97b248df-e99c-4a31-aeb5-f30d4956d7a7' before making global git config changes
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.2290614Z Adding repository directory to the temporary git global config as a safe directory
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.2291605Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.2828016Z Deleting the contents of 'D:\a\curator\curator'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.2833254Z ##[group]Initializing the repository
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.2840620Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.3692083Z Initialized empty Git repository in D:/a/curator/curator/.git/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.3732562Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.4377337Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.4378211Z ##[group]Disabling automatic garbage collection
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.4385178Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.4627969Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.4629041Z ##[group]Setting up auth
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.4638580Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:32.4874470Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:33.8045956Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:33.8275710Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:34.2362798Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:34.2593035Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:34.6335564Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:34.6568592Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:34.6569147Z ##[group]Fetching the repository
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:34.6578965Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c70fdbe4028edddc12aa761f1542aeedee70031b:refs/remotes/pull/14/merge
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3073658Z From https://github.com/relux-works/curator
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3074868Z  * [new ref]         c70fdbe4028edddc12aa761f1542aeedee70031b -> pull/14/merge
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3107315Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3107752Z ##[group]Determining the checkout info
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3110420Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3118354Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3467625Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3697016Z ##[group]Checking out the ref
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.3703707Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force refs/remotes/pull/14/merge
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4956551Z Note: switching to 'refs/remotes/pull/14/merge'.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4956957Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4957299Z You are in 'detached HEAD' state. You can look around, make experimental
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4957670Z changes and commit them, and you can discard any commits you make in this
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4958017Z state without impacting any branches by switching back to a branch.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4958220Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4958385Z If you want to create a new branch to retain commits you create, you may
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4958745Z do so (now or later) by using -c with the switch command. Example:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4958931Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4959977Z   git switch -c <new-branch-name>
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4960116Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4960209Z Or undo this operation with:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4960337Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4960417Z   git switch -
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4960507Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4960670Z Turn off this advice by setting config variable advice.detachedHead to false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4960903Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.4961164Z HEAD is now at c70fdbe Merge d345420109a9d043546d7cdb7b78a13d0bc19137 into 3a047d56dbfc7fd6adcc2276e665ac187cc0ca0a
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.5126230Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.5126564Z ##[group]Setting up auth for fetching submodules
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.5134550Z [command]"C:\Program Files\Git\bin\git.exe" config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.5375294Z [command]"C:\Program Files\Git\bin\git.exe" config --global --unset-all url.https://github.com/.insteadOf
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.5603737Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf git@github.com:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.5824693Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf org-261817730@github.com:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.6042708Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.6043484Z ##[group]Fetching submodules
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:36.6050822Z [command]"C:\Program Files\Git\bin\git.exe" submodule sync
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:37.1337046Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 submodule update --init --force --depth=1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:37.5406087Z Submodule 'agents/skills/skill-go-testing-tools' (https://github.com/relux-works/skill-go-testing-tools.git) registered for path 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:37.5670718Z Cloning into 'D:/a/curator/curator/agents/skills/skill-go-testing-tools'...
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:39.4984506Z From https://github.com/relux-works/skill-go-testing-tools
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:39.4984909Z  * branch            21585d0e937cae47e54a788d8ae36b1780eae47f -> FETCH_HEAD
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:39.5836796Z Submodule path 'agents/skills/skill-go-testing-tools': checked out '21585d0e937cae47e54a788d8ae36b1780eae47f'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:39.5902124Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local gc.auto 0"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:40.0048443Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:40.4992927Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:40.4993324Z ##[group]Persisting credentials for submodules
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:40.5004109Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:40.9239631Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:40.9976265Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "sh -c \"git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:41.4152814Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:41.4791002Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:41.4895200Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:41.9065116Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:41.9426884Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'org-261817730@github.com:'"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.3297348Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.3642613Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4001411Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4203361Z c70fdbe4028edddc12aa761f1542aeedee70031b
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4559760Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4561298Z ##[group]Run actions/checkout@v4
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4561485Z with:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4561649Z   repository: relux-works/curator-spec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4561874Z   ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4562092Z   path: protocol-spec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4564090Z   token: ***
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4564241Z   ssh-strict: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4564390Z   ssh-user: git
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4564539Z   persist-credentials: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4564707Z   clean: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4564914Z   sparse-checkout-cone-mode: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4565099Z   fetch-depth: 1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4565302Z   fetch-tags: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4565448Z   show-progress: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4565592Z   lfs: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4565726Z   submodules: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4565874Z   set-safe-directory: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4566047Z   allow-unsafe-pr-checkout: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4566221Z env:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4566384Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4566595Z   GOTOOLCHAIN: local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4566731Z   GOENV: off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.4566860Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.5411787Z Syncing repository: relux-works/curator-spec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.5417418Z ##[group]Getting Git version info
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.5417807Z Working directory is 'D:\a\curator\curator\protocol-spec'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.5875433Z [command]"C:\Program Files\Git\bin\git.exe" version
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6083737Z git version 2.55.0.windows.3
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6116289Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6132462Z Temporarily overriding HOME='D:\a\_temp\131d346a-ead5-45ba-9faa-ea23253170a7' before making global git config changes
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6133400Z Adding repository directory to the temporary git global config as a safe directory
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6140846Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6362220Z ##[group]Initializing the repository
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6369341Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator\protocol-spec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6626641Z Initialized empty Git repository in D:/a/curator/curator/protocol-spec/.git/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6657409Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator-spec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6883141Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6883439Z ##[group]Disabling automatic garbage collection
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.6891051Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.7107789Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.7108189Z ##[group]Setting up auth
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.7118118Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:42.7339188Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:43.1630563Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:43.1872964Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:43.6032189Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:43.6263956Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.0481144Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.0705032Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.0705325Z ##[group]Fetching the repository
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.0713711Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5091097Z From https://github.com/relux-works/curator-spec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5091538Z  * branch            00b1688a9b2457ca397a0bb550acf47cad8ee967 -> FETCH_HEAD
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5122191Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5122691Z ##[group]Determining the checkout info
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5124456Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5132566Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5387918Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5613396Z ##[group]Checking out the ref
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.5623838Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6226600Z Note: switching to '00b1688a9b2457ca397a0bb550acf47cad8ee967'.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6226846Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6227000Z You are in 'detached HEAD' state. You can look around, make experimental
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6227361Z changes and commit them, and you can discard any commits you make in this
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6227706Z state without impacting any branches by switching back to a branch.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6227913Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6228047Z If you want to create a new branch to retain commits you create, you may
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6228373Z do so (now or later) by using -c with the switch command. Example:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6228605Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6228688Z   git switch -c <new-branch-name>
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6228815Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6228891Z Or undo this operation with:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6229003Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6229066Z   git switch -
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6229152Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6229315Z Turn off this advice by setting config variable advice.detachedHead to false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6229536Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6229689Z HEAD is now at 00b1688 Adopt agent-skill.json as the canonical manifest (#11)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6272337Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6518500Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.6718161Z 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7020126Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7021182Z ##[group]Run actions/setup-go@v5
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7021366Z with:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7021509Z   go-version-file: go.mod
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7021680Z   check-latest: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7023816Z   token: ***
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7023959Z   cache: true
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7024091Z env:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7024253Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7024477Z   GOTOOLCHAIN: local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7024624Z   GOENV: off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.7025062Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.8249776Z Setup go version spec 1.25.5
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.8258801Z Attempting to download 1.25.5...
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.8404698Z (node:2064) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:44.8405240Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:45.6692471Z matching 1.25.5...
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:45.6726062Z Acquiring 1.25.5 from https://github.com/actions/go-versions/releases/download/1.25.5-19880500865/go-1.25.5-win32-x64.zip
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:46.6664391Z Extracting Go...
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:46.7279721Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command "$ErrorActionPreference = 'Stop' ; try { Add-Type -AssemblyName System.IO.Compression.ZipFile } catch { } ; try { [System.IO.Compression.ZipFile]::ExtractToDirectory('D:\a\_temp\go-1.25.5-win32-x64.zip', 'D:\a\_temp\c870a08f-427d-441d-b037-534323600209', $true) } catch { if (($_.Exception.GetType().FullName -eq 'System.Management.Automation.MethodException') -or ($_.Exception.GetType().FullName -eq 'System.Management.Automation.RuntimeException') ){ Expand-Archive -LiteralPath 'D:\a\_temp\go-1.25.5-win32-x64.zip' -DestinationPath 'D:\a\_temp\c870a08f-427d-441d-b037-534323600209' -Force } else { throw $_ } } ;"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:51.4481819Z Successfully extracted go to D:\a\_temp\c870a08f-427d-441d-b037-534323600209
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:51.4482186Z Adding to the cache ...
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:59.8914894Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64 => D:\hostedtoolcache\windows\go\1.25.5\x64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:59.8918496Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64.complete => D:\hostedtoolcache\windows\go\1.25.5\x64.complete
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:59.8919301Z Successfully cached go to C:\hostedtoolcache\windows\go\1.25.5\x64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:59.8924518Z Added go to the path
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:40:59.8926797Z Successfully set up Go version 1.25.5
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:00.1085859Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOMODCACHE
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:00.1127472Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOCACHE
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:00.1310727Z C:\Users\runneradmin\go\pkg\mod
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:00.1326624Z C:\Users\runneradmin\AppData\Local\go-build
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:00.4828512Z Cache is not found
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:00.4846700Z go version go1.25.5 windows/amd64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:00.4846961Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:00.4847205Z ##[group]go env
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8069748Z set AR=ar
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8070025Z set CC=gcc
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8070434Z set CGO_CFLAGS=-O2 -g
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8070710Z set CGO_CPPFLAGS=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8070926Z set CGO_CXXFLAGS=-O2 -g
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8071136Z set CGO_ENABLED=1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8071322Z set CGO_FFLAGS=-O2 -g
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8071531Z set CGO_LDFLAGS=-O2 -g
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8071737Z set CXX=g++
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8071925Z set GCCGO=gccgo
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8072124Z set GO111MODULE=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8072315Z set GOAMD64=v1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8075060Z set GOARCH=amd64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8075476Z set GOAUTH=netrc
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8075676Z set GOBIN=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8136349Z set GOCACHE=C:\Users\runneradmin\AppData\Local\go-build
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8137204Z set GOCACHEPROG=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8137422Z set GODEBUG=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8137629Z set GOENV=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8137807Z set GOEXE=.exe
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8137994Z set GOEXPERIMENT=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8138184Z set GOFIPS140=off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8138369Z set GOFLAGS=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8139520Z set GOGCCFLAGS=-m64 -mthreads -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=C:\Users\RUNNER~1\AppData\Local\Temp\go-build211499346=/tmp/go-build -gno-record-gcc-switches
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8140647Z set GOHOSTARCH=amd64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8140909Z set GOHOSTOS=windows
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8141148Z set GOINSECURE=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8161674Z set GOMOD=D:\a\curator\curator\go.mod
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8162150Z set GOMODCACHE=C:\Users\runneradmin\go\pkg\mod
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8162539Z set GONOPROXY=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8162779Z set GONOSUMDB=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8163202Z set GOOS=windows
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8163594Z set GOPATH=C:\Users\runneradmin\go
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8163871Z set GOPRIVATE=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8164171Z set GOPROXY=https://proxy.golang.org,direct
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8164877Z set GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8165247Z set GOSUMDB=sum.golang.org
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8165501Z set GOTELEMETRY=local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8165879Z set GOTELEMETRYDIR=C:\Users\runneradmin\AppData\Roaming\go\telemetry
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8166309Z set GOTMPDIR=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8166527Z set GOTOOLCHAIN=local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8166945Z set GOTOOLDIR=C:\hostedtoolcache\windows\go\1.25.5\x64\pkg\tool\windows_amd64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8167412Z set GOVCS=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8167622Z set GOVERSION=go1.25.5
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8167856Z set GOWORK=
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8168083Z set PKG_CONFIG=pkg-config
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8168263Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8168649Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8466482Z ##[group]Run bash .github/ci/toolchain-identity.sh
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8466851Z ^[[36;1mbash .github/ci/toolchain-identity.sh^[[0m
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8482755Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8483083Z env:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8483265Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8483492Z   GOTOOLCHAIN: local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8483639Z   GOENV: off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:08.8483774Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.2629092Z toolchain: go version go1.25.5 windows/amd64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.2970156Z toolchain: GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.3748199Z toolchain: GOTOOLCHAIN=local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.4053824Z toolchain: GOENV=<none>
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.4054314Z ci-toolchain-identity: ok
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.4220717Z ##[group]Run go vet ./...
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.4220963Z ^[[36;1mgo vet ./...^[[0m
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.5750619Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.5750915Z env:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.5751097Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.5751322Z   GOTOOLCHAIN: local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.5751466Z   GOENV: off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:10.5751621Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:11.6291856Z go: downloading github.com/charmbracelet/bubbletea v1.3.10
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:11.6314936Z go: downloading golang.org/x/sys v0.36.0
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:15.0220286Z go: downloading golang.org/x/text v0.3.8
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:20.0078098Z go: downloading github.com/BurntSushi/toml v1.6.0
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:30.3978989Z go: downloading github.com/charmbracelet/lipgloss v1.1.0
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.0732361Z go: downloading github.com/charmbracelet/x/ansi v0.10.1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.0755286Z go: downloading github.com/charmbracelet/x/term v0.2.1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.0761025Z go: downloading github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.1341977Z go: downloading github.com/mattn/go-localereader v0.0.1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.1510120Z go: downloading github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.2034028Z go: downloading github.com/muesli/cancelreader v0.2.2
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.4150061Z go: downloading github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.4460379Z go: downloading github.com/muesli/termenv v0.16.0
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:31.4466034Z go: downloading github.com/rivo/uniseg v0.4.7
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:32.0593661Z go: downloading github.com/lucasb-eyer/go-colorful v1.2.0
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:32.0731163Z go: downloading github.com/mattn/go-runewidth v0.0.16
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:32.8593576Z go: downloading github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:32.9207330Z go: downloading github.com/aymanbagabas/go-osc52/v2 v2.0.1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:33.9070892Z go: downloading github.com/mattn/go-isatty v0.0.20
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:41:34.1892072Z go: downloading github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:02.6318872Z ##[group]Run bash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:02.6319363Z ^[[36;1mbash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger^[[0m
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:02.6330520Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:02.6330823Z env:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:02.6331004Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:02.6331237Z   GOTOOLCHAIN: local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:02.6331388Z   GOENV: off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:02.6331527Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4574271Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix [must=windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4575643Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix/* [must=- skip=windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4576417Z ok    internal/buildcache :: TestValidateWindowsSecurityPolicy [must=windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4577905Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry [must=windows skip=windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4579819Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot [must=windows skip=windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4580828Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4581950Z ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4582945Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4583710Z ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4584523Z ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4585684Z ok    internal/buildcache :: TestUnixProtectedStateMatrix [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4586557Z ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4587282Z ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4587748Z ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4589390Z ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4590246Z ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4591102Z ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4592588Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4593804Z ok    internal/buildsource :: TestRejectsSpecialFile [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4594705Z ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin skip=windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4595174Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4595681Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation/* [must=- skip=linux,darwin,windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4596421Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4597250Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4597881Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/* [must=- skip=linux,darwin,windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4598406Z ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4598872Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4601248Z excl  internal/godriver :: TestResourceLimitsStayInsideManagerBounds (package excluded on linux by the supplied root)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4602587Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds [must=darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4604118Z excl  internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly (package excluded on linux by the supplied root)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4605152Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly [must=darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4606206Z excl  internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (package excluded on linux by the supplied root)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4607322Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes [must=darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4608327Z excl  internal/godriver :: TestPerFileSizeLimitIsReallyApplied (package excluded on linux by the supplied root)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4609220Z ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied [must=darwin skip=windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4610190Z excl  internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart (package excluded on linux by the supplied root)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4611217Z ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart [must=windows skip=darwin]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4612327Z excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation (package excluded on linux by the supplied root)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4613491Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation [must=darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4614462Z ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4615370Z ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4616520Z ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4617387Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4618134Z ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4618914Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4620098Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4621592Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4622617Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4623422Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4624144Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4624878Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4625473Z ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4625982Z excl  internal/godriver :: TestCandidateGoV1SourceAwareContract (package excluded on linux by the supplied root)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4626561Z ok    internal/godriver :: TestCandidateGoV1SourceAwareContract [must=darwin,windows skip=darwin,windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4627145Z ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4627726Z ok    cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery [must=darwin,windows skip=linux]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4628883Z ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand [must=darwin,windows skip=linux]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4629492Z ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand [must=darwin,windows skip=linux]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4630435Z ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState [must=darwin,windows skip=linux]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4630999Z ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck [must=darwin,windows skip=linux]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4631603Z ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand [must=darwin,windows skip=linux]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4632215Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker [must=linux,darwin,windows skip=-]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4632710Z ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4632934Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4633094Z ledger-consistency: 56 rows checked across linux darwin windows
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4633367Z ledger-consistency: ok
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4763316Z ##[group]Run bash .github/ci/test-gate.sh .temp/ci-evidence/test
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4763735Z ^[[36;1mbash .github/ci/test-gate.sh .temp/ci-evidence/test^[[0m
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4774911Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4775219Z env:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4775398Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4775631Z   GOTOOLCHAIN: local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4775789Z   GOENV: off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4776033Z   CURATOR_CONFORMANCE_ROOT: D:\a\curator\curator/protocol-spec/conformance/v1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.4776321Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.5860627Z test-gate: flags=<none> timeout=30m
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.5861221Z test-gate: conformance root=D:\a\curator\curator/protocol-spec/conformance/v1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:13.5861576Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3771597Z suite-plan: GOOS=windows
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3772261Z suite-plan: root=D:\a\curator\curator/protocol-spec/conformance/v1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3773357Z suite-plan: the root publishes no vectors/conformance-claim-v3-qualification.json; the recorded default_excluded_on applies
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3774146Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3774308Z defer internal/buildcache
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3774898Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3775615Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3776049Z defer internal/buildsource
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3776770Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3778357Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3778789Z defer internal/install
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3779258Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3780278Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3780981Z defer internal/marker
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3781733Z       the supplied root publishes none of: schema-cases/install-marker-v2 expected/build-driver/marker.json
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3782832Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3783876Z defer internal/scopes
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3784551Z       the supplied root publishes none of: vectors/external-repository-lifecycle.json
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3785475Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3799200Z defer internal/skillspec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3799889Z       the supplied root publishes none of: schema-cases/agent-skill-v6 fixtures/go-build-skill
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3802497Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3803293Z defer internal/whitelist
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3804006Z       the supplied root publishes none of: fixtures/go-build-skill expected/build-driver/context_files.json
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3804945Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3805686Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3805839Z suite-plan: served=33 deferred=7 excluded=0
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:42:31.3806180Z suite-plan: ok
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:45:24.9799512Z test-gate: stage served exit=1 (stream: .temp/ci-evidence/test/go-test-served.json)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:07.5213411Z test-gate: stage deferred exit=1 (stream: .temp/ci-evidence/test/go-test-deferred.json)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:07.5215246Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:07.5215694Z test-gate: go test overall exit=1 (merged stream: .temp/ci-evidence/test/go-test.json)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:07.5216163Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0461813Z platform-case gate: GOOS=windows
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0462587Z platform-case gate: ledger=.github/ci/platform-cases.tsv
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0468825Z platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0469949Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0472013Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0474653Z ok    internal/buildcache :: TestValidateWindowsSecurityPolicy
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0475486Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0489666Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0490560Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0491801Z ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0492956Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0494272Z ok    internal/runtimestore :: TestRuntimeCommandPath
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0494857Z ok    internal/config :: TestBootstrapAndAddProject
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0496020Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0496867Z FAIL  required case failed: internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0497972Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0498933Z ok    internal/install :: TestDryRunTouchesNothing
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0499509Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0500167Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0500857Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0501650Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0502452Z ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0503225Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0503935Z ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0504526Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0505387Z FAIL  required case failed: internal/install :: TestEndToEndInstall
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0506268Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0507062Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0507938Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0508788Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0509826Z FAIL  required case failed: internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0510930Z FAIL  required case failed: internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0512095Z FAIL  required case failed: internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0512869Z ok    internal/interop :: TestGoldenContextCopy
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0514050Z tol   internal/godriver :: TestCandidateGoV1SourceAwareContract (tolerated skip: root-content)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0515117Z FAIL  required case failed: cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0516034Z FAIL  required case failed: cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0517084Z FAIL  required case failed: cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0517741Z FAIL  required case failed: cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0518294Z FAIL  required case failed: cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0519416Z FAIL  required case failed: cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0520056Z FAIL  required case failed: cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0520624Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0520910Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0521120Z platform-case gate: 64 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0521489Z platform-case gate: FAILED
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0521634Z 
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0521756Z test-gate: go test exit=1, platform-case gate exit=1
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0535610Z ##[error]Process completed with exit code 1.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0692544Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0693596Z ##[group]Run actions/upload-artifact@v4
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0693797Z with:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0693957Z   name: test-evidence-windows-latest
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0694172Z   path: .temp/ci-evidence/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0694357Z   if-no-files-found: warn
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0694530Z   compression-level: 6
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0694691Z   overwrite: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0694851Z   include-hidden-files: false
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0695023Z env:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0695193Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0695421Z   GOTOOLCHAIN: local
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0695566Z   GOENV: off
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.0695751Z ##[endgroup]
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.2211055Z (node:5860) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.2211619Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.2307685Z With the provided path, there will be 23 files uploaded
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.2312070Z Artifact name is valid!
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.2312974Z Root directory input is valid!
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.5580832Z Beginning upload of artifact content to blob storage
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:08.6344432Z (node:5860) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.3032757Z Uploaded bytes 294288
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.3824264Z Finished uploading artifact content to blob storage!
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.3824966Z SHA256 digest of uploaded artifact zip is 8927259d6bbf1c593e3ac004d3c181db40ddbd00521744d7f8c91c3808fdaff6
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.3826497Z Finalizing artifact upload
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.5987874Z Artifact test-evidence-windows-latest.zip successfully finalized. Artifact ID 8793631971
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.5988706Z Artifact test-evidence-windows-latest has been successfully uploaded! Final size is 294288 bytes. Artifact ID is 8793631971
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.5997253Z Artifact download URL: https://github.com/relux-works/curator/actions/runs/30631473821/artifacts/8793631971
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.6311531Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.6312547Z Post job cleanup.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.7742083Z [command]"C:\Program Files\Git\bin\git.exe" version
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.8051085Z git version 2.55.0.windows.3
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.8107873Z Temporarily overriding HOME='D:\a\_temp\3b81f600-8756-4ca7-b0a2-a99fbd757eb9' before making global git config changes
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.8108963Z Adding repository directory to the temporary git global config as a safe directory
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.8116727Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.8357774Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:09.8650331Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:10.2806558Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:10.3003178Z http.https://github.com/.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:10.3035684Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:10.3262706Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:10.7649953Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:10.7898867Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.2278441Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.2279503Z Post job cleanup.
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.3700307Z [command]"C:\Program Files\Git\bin\git.exe" version
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.3914916Z git version 2.55.0.windows.3
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.3966806Z Temporarily overriding HOME='D:\a\_temp\a36d13ec-0289-4b89-b69f-0a4ed8d29601' before making global git config changes
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.3967700Z Adding repository directory to the temporary git global config as a safe directory
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.3975431Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.4208003Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.4442360Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.8422935Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.9146848Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.9343152Z http.https://github.com/.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.9374375Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:11.9597390Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.3642404Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.4136315Z http.https://github.com/.extraheader
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.4542626Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.4773397Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.8856015Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.9121694Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.9315372Z [command]"C:\Program Files\Git\bin\git.exe" config --file D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.9702687Z Cleaning up orphan processes
+Test (windows-latest)	UNKNOWN STEP	2026-07-31T12:46:12.9732418Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

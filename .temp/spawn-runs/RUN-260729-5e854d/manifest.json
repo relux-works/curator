@@ -1,0 +1,69 @@
+{
+  "id": "RUN-260729-5e854d",
+  "task_id": "TASK-260729-rfrdfo",
+  "created_at": "2026-07-29T15:52:40.991805Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] researcher (claude)",
+  "role": "researcher",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-19-52-40_-analyst--researcher--claude-_TASK-260729-rfrdfo.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "2h0m0s",
+  "log_resource_name": "TASK-260729-rfrdfo_spawn-log_-analyst--researcher--claude-_RUN-260729-5e854d.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260729-rfrdfo_cycle2-evidence.tgz",
+    "TASK-260729-rfrdfo_cycle2-routing-and-evidence.md",
+    "TASK-260729-rfrdfo_evidence-bundle.tgz",
+    "TASK-260729-rfrdfo_install-race-timeout.patch",
+    "TASK-260729-rfrdfo_logbook-entry.md",
+    "TASK-260729-rfrdfo_reconciliation-notes.md",
+    "TASK-260729-rfrdfo_results.md",
+    "TASK-260729-rfrdfo_review-verdict-cycle-1.md",
+    "TASK-260729-rfrdfo_review-verdict-cycle-2.md",
+    "TASK-260729-rfrdfo_spawn-log_-analyst--researcher--claude-_RUN-260729-c055ea.log",
+    "TASK-260729-rfrdfo_spawn-log_-implementer--developer--claude-_RUN-260729-1f7b6e.log",
+    "TASK-260729-rfrdfo_spawn-log_-implementer--developer--claude-_RUN-260729-b93d66.log",
+    "TASK-260729-rfrdfo_spawn-log_-reviewer--reviewer--codex-_RUN-260729-b86b2a.log",
+    "TASK-260729-rfrdfo_spawn-log_-reviewer--reviewer--codex-_RUN-260729-ed3fb3.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260729-rfrdfo_cycle2-evidence.tgz": "d57ea635226aeead4e6b1630e49cda0a6f1f603ad4099f7eace60eaaff43e7f2",
+    "TASK-260729-rfrdfo_cycle2-routing-and-evidence.md": "7d46f75a0b198bcc8fefdc7fc22890668eb34d1d3ab290ab89d3f1e32d542ec8",
+    "TASK-260729-rfrdfo_evidence-bundle.tgz": "b645da933a095274d5b24b66c43d5ca825c1e57b8433f3492eb10918432839d4",
+    "TASK-260729-rfrdfo_install-race-timeout.patch": "8e7a42ec65b937dc24dd7d6857c4fe2863f63f7172302b7b43a71b6b6c3f530f",
+    "TASK-260729-rfrdfo_logbook-entry.md": "a9f886d70e2e74ba1295c0c10b17fcd245e5317260b7e52ea18735e7228f7990",
+    "TASK-260729-rfrdfo_reconciliation-notes.md": "b7671e713630634cfb209dfc0632bc258b4b65335cb2c14822208b8dbeb21a0b",
+    "TASK-260729-rfrdfo_results.md": "ace5a809f705e73bcb02b64405dd28c66a4e059e8e55b0f0037c128e0d76b1dd",
+    "TASK-260729-rfrdfo_review-verdict-cycle-1.md": "771ee9b61f76de31590e12e99ee70cb7f49563e7be732dc03ab05bb5497411e7",
+    "TASK-260729-rfrdfo_review-verdict-cycle-2.md": "8660c04bfb3f2b6590920ee926a24ca04a5455dfba1445eaf555f1b91656ebab"
+  },
+  "require_outcome_artifact": true
+}

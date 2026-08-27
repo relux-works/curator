@@ -1,0 +1,79 @@
+diff --git a/internal/buildsource/buildsource.go b/internal/buildsource/buildsource.go
+index 1fef39d..88cfdf8 100644
+--- a/internal/buildsource/buildsource.go
++++ b/internal/buildsource/buildsource.go
+@@ -16,8 +16,6 @@ import (
+ 	"sync"
+ 
+ 	"github.com/relux-works/curator/internal/identifiers"
+-	"golang.org/x/text/cases"
+-	"golang.org/x/text/unicode/norm"
+ )
+ 
+ const (
+@@ -299,16 +297,12 @@ func compareState(left, right stateEntry) int {
+ }
+ 
+ type pathSet struct {
+-	exact      map[string]struct{}
+-	platform   map[string]string
+-	caseFolder cases.Caser
++	exact map[string]struct{}
+ }
+ 
+ func newPathSet() *pathSet {
+ 	return &pathSet{
+-		exact:      make(map[string]struct{}),
+-		platform:   make(map[string]string),
+-		caseFolder: cases.Fold(),
++		exact: make(map[string]struct{}),
+ 	}
+ }
+ 
+@@ -320,12 +314,5 @@ func (set *pathSet) add(path string) error {
+ 		return fmt.Errorf("%w: duplicate protocol path %q", ErrInvalidSnapshot, path)
+ 	}
+ 	set.exact[path] = struct{}{}
+-	// Case folding plus canonical decomposition conservatively models the
+-	// collisions of supported case-insensitive Windows and macOS filesystems.
+-	platformKey := norm.NFD.String(set.caseFolder.String(norm.NFD.String(path)))
+-	if previous, exists := set.platform[platformKey]; exists {
+-		return fmt.Errorf("%w: platform path collision between %q and %q", ErrInvalidSnapshot, previous, path)
+-	}
+-	set.platform[platformKey] = path
+ 	return nil
+ }
+diff --git a/internal/buildsource/buildsource_test.go b/internal/buildsource/buildsource_test.go
+index 3084383..1b426d3 100644
+--- a/internal/buildsource/buildsource_test.go
++++ b/internal/buildsource/buildsource_test.go
+@@ -186,23 +186,23 @@ func TestRejectsInvalidPathsLinksAndCollisions(t *testing.T) {
+ 		}
+ 	})
+ 
+-	t.Run("case-insensitive platform collision", func(t *testing.T) {
++	t.Run("case-distinct encoded paths", func(t *testing.T) {
+ 		paths := newPathSet()
+ 		if err := paths.add("Dir/File"); err != nil {
+ 			t.Fatal(err)
+ 		}
+-		if err := paths.add("dir/file"); !errors.Is(err, ErrInvalidSnapshot) {
+-			t.Fatalf("collision error = %v", err)
++		if err := paths.add("dir/file"); err != nil {
++			t.Fatalf("distinct encoded path error = %v", err)
+ 		}
+ 	})
+ 
+-	t.Run("normalizing platform collision", func(t *testing.T) {
++	t.Run("normalization-distinct encoded paths", func(t *testing.T) {
+ 		paths := newPathSet()
+ 		if err := paths.add("é.txt"); err != nil {
+ 			t.Fatal(err)
+ 		}
+-		if err := paths.add("e\u0301.txt"); !errors.Is(err, ErrInvalidSnapshot) {
+-			t.Fatalf("collision error = %v", err)
++		if err := paths.add("e\u0301.txt"); err != nil {
++			t.Fatalf("distinct encoded path error = %v", err)
+ 		}
+ 	})
+ }

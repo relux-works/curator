@@ -1,0 +1,54 @@
+ci: advance the released suite pin to the rc.9 release commit
+
+RELEASED_SUITE_PIN moves from 0c81c1f8 (protocol 1.0.0-rc.6) to
+0ed5c691, the v1.0.0-rc.9 release commit on curator-spec main. That
+revision publishes the schema-8 suite this manager already qualified
+against on all three runners.
+
+The pin does not move alone, because nothing in this repo lets it. Three
+independent places authenticate the released identity before reading a
+byte of it, and each is advanced here:
+
+  - tests/test_protocol_conformance.py binds the manifest digest and
+    protocol_version, the release record it reads (now
+    release/1.0.0-rc.9.json and its claim_v5 block instead of rc.6's
+    claim_v3), and the qualification vector's protocol_version, which
+    rc.9 moved in lockstep;
+  - tests/test_build_metadata.py binds the same manifest digest before
+    reading the marker-v2 writer golden;
+  - the Windows shard verifier pins the protocol revision itself, plus
+    the sha256 of every audited test file and an ordered node-id
+    baseline.
+
+Leave any one of them behind and the run goes red at collection rather
+than silently re-baselining onto a different suite. That is the point.
+
+rc.9 is a strict superset of rc.6 -- no file removed, 6 changed, 243
+added -- so the only effect on collection is 8 more
+test_rc6_generated_schema_case_is_consumed parametrisations, from the
+eight invalid-v8 cases rc.9 adds under agent-skill-v6 and csk-skill-v6.
+The Windows baseline therefore grows 1045 -> 1053. The new nodes inherit
+the footprint, atomic cluster and shard of the 102 existing rows of that
+same function, which are uniform; no other node changes shard or
+footprint, and only source_line shifts, because the audited file gained
+lines above them. The audit revision records that, with the previous and
+new digest of the audited file.
+
+The test names keep their rc6_ prefix deliberately. They are the ordered
+node-id contract the shard manifest and the isolation classification are
+keyed on; renaming them would rewrite every row of both for no
+behavioural gain.
+
+One detail worth naming: the digest is not repeated in ci.yml. Now that
+rc.9 publishes the qualified candidate's bytes, the released manifest
+digest and the candidate declaration's digest are the same string, and
+test_no_rc6_literal_survives_outside_the_declaration forbids that string
+from appearing in the workflow. The comment says so rather than
+weakening the gate.
+
+
+The comment above that binding is advanced with it: it named the rc.6
+candidate suite as the source of the writer golden, which stopped being
+true the moment the digest below it moved. It now names the released pin
+the same way test_protocol_conformance.py does, so neither file claims a
+revision it no longer reads.

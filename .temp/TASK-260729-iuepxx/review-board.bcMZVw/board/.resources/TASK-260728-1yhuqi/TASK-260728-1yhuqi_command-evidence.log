@@ -1,0 +1,827 @@
+# TASK-260728-1yhuqi command evidence
+
+fixture: swift-boundary-fixture-v1
+toolchain: Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101) (/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain)
+
+## case canonical-current
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.3.2
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-current/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Emitting module probe
+[4/4] Compiling probe lib.swift
+Build complete! (0.61s)
+stderr: 
+
+## case canonical-6.0
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-6.0/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Emitting module probe
+[4/4] Compiling probe lib.swift
+Build complete! (0.86s)
+stderr: 
+
+## case canonical-floor
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 4.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/canonical-floor/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.62s)
+stderr: 
+
+## case below-floor-3.1
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 3.1.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-3.1/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': package 'probe-pkg' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+error: 'probe-pkg': package 'probe-pkg' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+
+## case below-floor-1.0
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 1.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/below-floor-1.0/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': package 'probe-pkg' is using Swift tools version 1.0.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+error: 'probe-pkg': package 'probe-pkg' is using Swift tools version 1.0.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+
+## case grammar-one-component
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: the Swift tools version '6' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-one-component/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': the Swift tools version '6' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+error: 'probe-pkg': the Swift tools version '6' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+error: the Swift tools version '6' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by th…
+
+## case grammar-four-components
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: the Swift tools version '6.0.0.0' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-four-components/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': the Swift tools version '6.0.0.0' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+error: 'probe-pkg': the Swift tools version '6.0.0.0' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+error: the Swift tools version '6.0.0.0' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift versi…
+
+## case grammar-not-a-version
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: the Swift tools version 'notaversion' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/grammar-not-a-version/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': the Swift tools version 'notaversion' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+error: 'probe-pkg': the Swift tools version 'notaversion' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+error: the Swift tools version 'notaversion' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest…
+
+## case missing-specifier
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: the Swift tools version specification is possibly missing a version specifier; consider using '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/missing-specifier/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': the Swift tools version specification is possibly missing a version specifier; consider using '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+error: 'probe-pkg': the Swift tools version specification is possibly missing a version specifier; consider using '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+error: the Swift tools version specification is possibly missing a version specifier; consider using '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version …
+
+## case absent-header
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/absent-header/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+error: 'probe-pkg': package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+
+## case bom-header
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/bom-header/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+error: 'probe-pkg': package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+
+## case carriage-return
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/carriage-return/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.60s)
+stderr: 
+
+## case later-specification-ignored
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/later-specification-ignored/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.65s)
+stderr: 
+
+## case specification-inside-a-single-line-string
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/specification-inside-a-single-line-string/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+error: 'probe-pkg': package 'package.swift' is using Swift tools version 3.1.0 which is no longer supported; consider using '// swift-tools-version: 6.3' to specify the current tools version
+
+## case F-no-space-after-slashes
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-no-space-after-slashes/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.71s)
+stderr: 
+
+## case F-uppercase-keyword
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-uppercase-keyword/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.62s)
+stderr: 
+
+## case F-leading-zero
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-leading-zero/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Emitting module probe
+[4/4] Compiling probe lib.swift
+Build complete! (0.61s)
+stderr: 
+
+## case F-prerelease-suffix
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-prerelease-suffix/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.60s)
+stderr: 
+
+## case F-build-suffix
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-build-suffix/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.62s)
+stderr: 
+
+## case F-extra-whitespace
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-extra-whitespace/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.65s)
+stderr: 
+
+## case F-below-line-one
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-below-line-one/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Compiling probe lib.swift
+[4/4] Emitting module probe
+Build complete! (0.58s)
+stderr: 
+
+## case F-inside-a-multi-line-string-literal
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/F-inside-a-multi-line-string-literal/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: Building for debugging...
+[0/2] Write sources
+[1/2] Write swift-version-45881B103DA9D485.txt
+[3/4] Emitting module probe
+[4/4] Compiling probe lib.swift
+Build complete! (0.58s)
+stderr: 
+
+## case above-host-99.0
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/scratch-isolated tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 99.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/cache --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/scratch-corroborating
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/cases/above-host-99.0/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': package 'probe-pkg' is using Swift tools version 99.0.0 but the installed version is 6.3.2
+error: 'probe-pkg': package 'probe-pkg' is using Swift tools version 99.0.0 but the installed version is 6.3.2
+
+## structural S1-path-closure
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/helper.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/pinned
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/shims HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 
+stderr: 
+
+## structural S2-harness-sensitivity
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics -use-ld=lld /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/helper.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/control
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/shims HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: link command failed with exit code 1 (use -v to see invocation)
+clang: error: unable to execute command: No such file or directory
+clang: error: linker command failed due to signal (use -v to see invocation)
+Apple clang version 21.0.0 (clang-2100.1.1.101)
+Target: arm64-apple-macosx26.0
+Thread model: posix
+InstalledDir: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin
+clang: note: diagnostic msg: 
+********************
+
+PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT:
+Linker snapshot containing input(s) and associated run script(s) are located at:
+clang: note: diagnostic msg: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/r…
+
+## structural S3-job-plan-verification-is-total
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -### -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/helper.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/plan
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/helper.swift -target arm64-apple-macosx26.0 -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -no-color-diagnostics -Xcc -fno-color-diagnostics -swift-version 6 -O -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDef…
+stderr: 
+
+## structural S3b-linker-resolution
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -print-prog-name=ld -target arm64-apple-macosx26.0
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld
+stderr: 
+
+## structural S5-declared-sdk-would-open-a-plugin-tree
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -### -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/helper.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/plan-real
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/helper.swift -target arm64-apple-macosx26.0 -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -no-color-diagnostics -Xcc -fno-color-diagnostics -swift-version 6 -O -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolcha…
+stderr: 
+
+## structural S6-external-platform-macro-unavailable
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics -Xfrontend -Rmacro-loading /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/macro-ext/main.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/ext
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/macro-ext
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/shims HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/macro-ext/main.swift:3:9: error: external macro implementation type 'FoundationMacros.PredicateMacro' could not be found for macro 'Predicate'; plugin for module 'FoundationMacros' not found
+1 | import Foundation
+2 | struct Row { var n: Int }
+3 | let p = #Predicate<Row> { $0.n > 3 }
+  |         `- error: external macro implementation type 'FoundationMacros.PredicateMacro' could not be found for macro 'Predicate'; plugin for module 'FoundationMacros' not found
+4 | print(p)
+5 | 
+
+Foundation.Predicate:2:40: note: 'Predicate' declared here
+1 | @available(macOS 14, iOS 17, tvOS 17, watchOS 10, *)
+2 | @freestandi…
+
+## structural S7-toolchain-macro-loads-in-process
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics -Xfrontend -Rmacro-loading /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/macro-int/main.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/int
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/macro-int
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/shims HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 
+stderr: <unknown>:0: remark: loaded macro implementation module 'ObservationMacros' from shared library '/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/libObservationMacros.dylib'
+
+## structural S8-graph-phase-executes-no-package-code
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -### -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/bad/main.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/bad
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/bad
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/bad/main.swift -target arm64-apple-macosx26.0 -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -no-color-diagnostics -Xcc -fno-color-diagnostics -swift-version 6 -O -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-driver -empty-abi-descriptor -no-auto-bridging-header-chaining -module-n…
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -### -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/bad/does-not-exist.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/absent
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/bad
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/bad/does-not-exist.swift -target arm64-apple-macosx26.0 -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -no-color-diagnostics -Xcc -fno-color-diagnostics -swift-version 6 -O -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-driver -empty-abi-descriptor -no-auto-bridging-header-chaining…
+stderr: 
+
+## structural S9-manifest-is-a-program
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-sandboxed/c --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-sandboxed/s dump-package
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-sandboxed/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-sandboxed/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-sandboxed/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: {
+  "cLanguageStandard" : null,
+  "cxxLanguageStandard" : null,
+  "defaultLocalization" : null,
+  "dependencies" : [
+
+  ],
+  "name" : "probe",
+  "packageKind" : {
+    "root" : [
+      "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-sandboxed/probe-pkg"
+    ]
+  },
+  "pkgConfig" : null,
+  "platforms" : [
+
+  ],
+  "products" : [
+
+  ],
+  "providers" : null,
+  "swiftLanguageVersions" : null,
+  "targets" : [
+    {
+      "dependencies" : [
+
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "probe",
+      "packageAccess" : true,
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    }
+  ],
+  "toolsVersion" : {
+    "_ve…
+stderr: warning: 'probe-pkg': PROBE-MANIFEST-EXECUTED
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --disable-sandbox --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-unsandboxed/c --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-unsandboxed/s dump-package
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-unsandboxed/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-unsandboxed/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-unsandboxed/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: {
+  "cLanguageStandard" : null,
+  "cxxLanguageStandard" : null,
+  "defaultLocalization" : null,
+  "dependencies" : [
+
+  ],
+  "name" : "probe",
+  "packageKind" : {
+    "root" : [
+      "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-unsandboxed/probe-pkg"
+    ]
+  },
+  "pkgConfig" : null,
+  "platforms" : [
+
+  ],
+  "products" : [
+
+  ],
+  "providers" : null,
+  "swiftLanguageVersions" : null,
+  "targets" : [
+    {
+      "dependencies" : [
+
+      ],
+      "exclude" : [
+
+      ],
+      "name" : "probe",
+      "packageAccess" : true,
+      "resources" : [
+
+      ],
+      "settings" : [
+
+      ],
+      "type" : "regular"
+    }
+  ],
+  "toolsVersion" : {
+    "_…
+stderr: warning: 'probe-pkg': PROBE-MANIFEST-EXECUTED
+
+## structural S10-tools-version-is-header-only
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/c --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/s tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 6.0.0
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/c2 --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/s2 dump-package
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: 'probe-pkg': Invalid manifest (compiled with: ["/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc", "-vfsoverlay", "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-header-only/tmp/TemporaryDirectory.iGIkce/vfs.yaml", "-L", "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/pm/ManifestAPI", "-lPackageDescription", "-Xlinker", "-rpath", "-Xlinker", "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/pm/ManifestAPI", "-target", "arm64-apple-macosx14.0", "-plugin-path", "/Applications/Xcode_26_5.app/Content…
+
+## structural S10b-upstream-scans-into-string-literals
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package --cache-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-in-string/c --scratch-path /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-in-string/s tools-version
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-in-string/probe-pkg
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-in-string/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/mf-in-string/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 9.9.0
+stderr: 
+
+## structural S11-representability-is-not-admission
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -print-target-info -target x86_64-unknown-linux-gnu
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: {
+  "compilerVersion": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)",
+  "swiftCompilerTag": "swiftlang-6.3.2.1.108",
+  "target": {
+    "triple": "x86_64-unknown-linux-gnu",
+    "unversionedTriple": "x86_64-unknown-linux-gnu",
+    "moduleTriple": "x86_64-unknown-linux-gnu",
+    "platform": "linux",
+    "arch": "x86_64",
+    "pointerWidthInBits": 64,
+    "pointerWidthInBytes": 8,
+    "compatibilityLibraries": [ ],
+    "openbsdBTCFIEnabled": false,
+    "librariesRequireRPath": false
+  },
+  "paths": {
+    "runtimeLibraryPaths": [
+      "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/linux"
+    ],
+    "runtimeLibraryImpor…
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -print-target-info -target not-a-real-triple
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: 
+stderr: error: unknown target 'not-a-real-triple'
+
+## structural S12-unserved-target-fails-before-any-frontend
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target x86_64-unknown-linux-gnu -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics -v /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/unserved
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: error: unableToFind(tool: "swift-autolink-extract")
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -target x86_64-unknown-linux-gnu -c -v /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/unserved.o
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 1
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift -target x86_64-unknown-linux-gnu -disable-objc-interop -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -no-color-diagnostics -Xcc -fno-color-diagnostics -swift-version 6 -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-driver -empty-abi-descriptor -no-auto-bridging-header-chaining -module-name unserved -disable-clang-spi -in-p…
+stderr: Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)
+Target: x86_64-unknown-linux-gnu
+<unknown>:0: error: unable to load standard library for target 'x86_64-unknown-linux-gnu'
+
+## structural S13-artifact-class
+
+argv: /usr/bin/file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/pinned
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/pinned: Mach-O 64-bit executable arm64
+stderr: 
+
+argv: /usr/bin/otool -L /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/pinned
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/pinned:
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
+	/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation (compatibility version 300.0.0, current version 5026.5.4, weak)
+	/usr/lib/swift/libswiftCore.dylib (compatibility version 0.0.0, current version 0.0.0)
+	/usr/lib/swift/libswiftCoreFoundation.dylib (compatibility version 1.0.0, current version 120.100.0, weak)
+	/usr/lib/swift/libswiftDispatch.dylib (compatibility version 1.0.0, current version 1542.100.32, weak)
+	/usr/lib/swift/libswiftIOKit.dylib (compatibility version 1.0.0, current version…
+stderr: 
+
+argv: /usr/bin/codesign -dvv /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/pinned
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 
+stderr: Executable=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/pinned
+Identifier=pinned
+Format=Mach-O thin (arm64)
+CodeDirectory v=20400 size=511 flags=0x20002(adhoc,linker-signed) hashes=13+0 location=embedded
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements=none
+
+## structural S14-output-path-is-the-only-moving-input
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/helper.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/determinism
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src/helper.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/determinism
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/src
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 
+stderr: 
+
+## structural S15-swift-version-file-is-inert
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/swift-version/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/swift-version/helper.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/sv
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/swift-version
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 
+stderr: 
+
+## structural S25-response-files-are-live-and-unreachable
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -### @/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/respfile/resp.txt -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/respfile/main.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/rf
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/respfile
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/respfile/main.swift -target arm64-apple-macosx26.0 -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -no-color-diagnostics -Xcc -fno-color-diagnostics -swift-version 6 -O -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-driver -empty-abi-descriptor -no-auto-bridging-header-chaining -mod…
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -### -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/atname/@resp.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/at
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/atname
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/atname/@resp.swift -target arm64-apple-macosx26.0 -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -no-color-diagnostics -Xcc -fno-color-diagnostics -swift-version 6 -O -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-driver -empty-abi-descriptor -no-auto-bridging-header-chaining -modu…
+stderr: 
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/atname/@resp.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/at-bin
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/atname
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: 
+stderr: 
+
+## structural S27-a-control-byte-in-a-source-name-breaks-the-plan-grammar
+
+argv: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -### -swift-version 6 -O -target arm64-apple-macosx26.0 -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -module-name Sk_probe -no-color-diagnostics /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/srcname/main.swift /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/srcname/new
+line.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/stage/nl
+dir: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/srcname
+env: PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/empty-path HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/home TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/tmp/ LC_ALL=C LANG=C
+exit: 0
+stdout: /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c -primary-file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/srcname/main.swift '/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/srcname/new
+line.swift' -target arm64-apple-macosx26.0 -Xllvm -aarch64-use-tbi -enable-objc-interop -stack-check -sdk /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-rework/structural/sdk/present/SDKs/MacOSX.sdk -no-color-diagnostics -Xcc -fno-color-diagnostics -swift-version 6 -O -new-driver-path /Applications/Xcode_26_5.app/Contents/Developer/Toolcha…
+stderr: 
+

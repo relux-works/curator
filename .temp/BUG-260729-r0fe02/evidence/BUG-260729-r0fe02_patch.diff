@@ -1,0 +1,291 @@
+--- a/internal/godriver/fingerprint.go
++++ b/internal/godriver/fingerprint.go
+@@ -6,6 +6,7 @@
+ 	"encoding/binary"
+ 	"encoding/hex"
+ 	"errors"
++	"fmt"
+ 	"io"
+ 	"io/fs"
+ 	"os"
+@@ -103,12 +104,8 @@
+ 			contentDigest := sha256.New()
+ 			written, copyErr := copyWithContext(ctx, io.MultiWriter(digest, contentDigest), file)
+ 			closeErr := file.Close()
+-			if copyErr != nil || closeErr != nil || written != opened.Size() {
+-				var lengthErr error
+-				if written != opened.Size() {
+-					lengthErr = errors.New("file length changed")
+-				}
+-				return "", nil, diagnosticErr("toolchain_mutated", errors.Join(copyErr, closeErr, lengthErr), "toolchain file %q changed while reading", record.path)
++			if err := digestCopyDiagnostic(record.path, written, opened.Size(), copyErr, closeErr); err != nil {
++				return "", nil, err
+ 			}
+ 			item.size = written
+ 			copy(item.payload[:], contentDigest.Sum(nil))
+@@ -299,6 +296,35 @@
+ 	var encoded [8]byte
+ 	binary.BigEndian.PutUint64(encoded[:], length)
+ 	_, _ = writer.Write(encoded[:])
++}
++
++// errCopyAbandoned marks the copy loop's own cancellation check, so the digest
++// phase can tell "the caller stopped reading" from "the read failed" without
++// having to recognise an error that came back from the filesystem.
++var errCopyAbandoned = errors.New("toolchain copy abandoned")
++
++// digestCopyDiagnostic classifies a record copy that did not finish cleanly.
++//
++// A copy carrying errCopyAbandoned stopped because the caller's context ended
++// mid-file, and the short length that comes with it is that abort rather than
++// the file moving underneath the read; cancellation is reported as the same
++// deadline diagnostic every other cancellation check in this file reports. The
++// precedence is exactly that narrow: only the abort this package raised is read
++// as cancellation, so a genuine concurrent write — a read or close failure, or a
++// length that moved on its own — still fails closed as toolchain_mutated even
++// when the context happens to be done.
++func digestCopyDiagnostic(path string, written, size int64, copyErr, closeErr error) error {
++	if errors.Is(copyErr, errCopyAbandoned) {
++		return diagnosticErr("toolchain_timeout", errors.Join(copyErr, closeErr), "toolchain fingerprint deadline exceeded")
++	}
++	if copyErr != nil || closeErr != nil || written != size {
++		var lengthErr error
++		if written != size {
++			lengthErr = errors.New("file length changed")
++		}
++		return diagnosticErr("toolchain_mutated", errors.Join(copyErr, closeErr, lengthErr), "toolchain file %q changed while reading", path)
++	}
++	return nil
+ }
+ 
+ func copyWithContext(ctx context.Context, destination io.Writer, source io.Reader) (int64, error) {
+@@ -306,7 +332,7 @@
+ 	var total int64
+ 	for {
+ 		if err := ctx.Err(); err != nil {
+-			return total, err
++			return total, fmt.Errorf("%w: %w", errCopyAbandoned, err)
+ 		}
+ 		read, readErr := source.Read(buffer)
+ 		if read > 0 {
+--- a/internal/godriver/fingerprint_equivalence_test.go
++++ b/internal/godriver/fingerprint_equivalence_test.go
+@@ -5,6 +5,7 @@
+ 	"crypto/sha256"
+ 	"encoding/hex"
+ 	"errors"
++	"fmt"
+ 	"go/build"
+ 	"io"
+ 	"io/fs"
+@@ -151,12 +152,8 @@
+ 			contentDigest := sha256.New()
+ 			written, copyErr := copyWithContext(ctx, io.MultiWriter(digest, contentDigest), file)
+ 			closeErr := file.Close()
+-			if copyErr != nil || closeErr != nil || written != opened.Size() {
+-				var lengthErr error
+-				if written != opened.Size() {
+-					lengthErr = errors.New("file length changed")
+-				}
+-				return "", nil, diagnosticErr("toolchain_mutated", errors.Join(copyErr, closeErr, lengthErr), "toolchain file %q changed while reading", record.path)
++			if err := digestCopyDiagnostic(record.path, written, opened.Size(), copyErr, closeErr); err != nil {
++				return "", nil, err
+ 			}
+ 			item.size = written
+ 			copy(item.payload[:], contentDigest.Sum(nil))
+@@ -511,13 +508,81 @@
+ 		}
+ 	})
+ 
++	// A racing cancellation lands wherever the scheduler puts it, which on an
++	// unloaded machine is almost always before the first file is read. That makes
++	// this subtest a smoke check and nothing more: it is not what proves the
++	// contract, because the window it needs to hit only opens wide enough to be
++	// sampled when the machine is loaded — which is how the original failure was
++	// found, and why repeating it here cannot be relied on to find the next one.
++	// The deterministic subtests below take every cancellation point on purpose.
+ 	t.Run("cancelled between the walk and the digest", func(t *testing.T) {
+-		ctx, cancel := context.WithCancel(context.Background())
+-		go cancel()
+-		_, _, err := fingerprintToolchain(ctx, root, equivalenceVersion)
+-		if err != nil && DiagnosticCode(err) != "toolchain_timeout" {
+-			t.Fatalf("error = %v, want nil or toolchain_timeout", err)
++		for attempt := range 200 {
++			ctx, cancel := context.WithCancel(context.Background())
++			go cancel()
++			_, _, err := fingerprintToolchain(ctx, root, equivalenceVersion)
++			if err != nil && DiagnosticCode(err) != "toolchain_timeout" {
++				t.Fatalf("attempt %d: error = %v, want nil or toolchain_timeout", attempt, err)
++			}
++		}
++	})
++
++	// The same window taken deterministically: the context ends on an exact
++	// ctx.Err() call inside a record's copy loop, past the per-record check that
++	// guards the top of the digest phase. A cancellation there stops the read
++	// short, and a short read is the only thing a genuine concurrent write is
++	// visible as, so this is precisely where the two must not be confused.
++	t.Run("cancelled inside a record read", func(t *testing.T) {
++		handle, err := os.OpenRoot(root)
++		if err != nil {
++			t.Fatal(err)
++		}
++		defer func() { _ = handle.Close() }()
++
++		scopedRecords, scopedCollectErr := collectToolchainRecords(context.Background(), handle)
++		legacyRecords, legacyCollectErr := legacyCollectRecords(context.Background(), handle)
++		if scopedCollectErr != nil || legacyCollectErr != nil {
++			t.Fatalf("collection failed before cancellation: %v / %v", legacyCollectErr, scopedCollectErr)
++		}
++
++		// The digest phase spends one check per record before it reaches the
++		// first file, then one more per copied chunk. Counting the leading
++		// records keeps the budgets anchored to the tree rather than to a
++		// hand-written number that a later fixture edit would silently shift.
++		checksToFirstFile := 0
++		for _, record := range scopedRecords {
++			checksToFirstFile++
++			if record.kind == 'F' {
++				break
++			}
+ 		}
++		if checksToFirstFile == len(scopedRecords) && scopedRecords[len(scopedRecords)-1].kind != 'F' {
++			t.Fatalf("fixture has no file record: %v", scopedRecords)
++		}
++
++		for _, budget := range []struct {
++			name   string
++			checks int
++		}{
++			{"before the first chunk", checksToFirstFile},
++			{"after a partial chunk", checksToFirstFile + 1},
++			{"after the last chunk", checksToFirstFile + 2},
++		} {
++			t.Run(budget.name, func(t *testing.T) {
++				_, _, legacyErr := legacyDigestRecords(newCountdownContext(budget.checks), handle, legacyRecords, equivalenceVersion)
++				_, _, scopedErr := digestToolchainRecords(newCountdownContext(budget.checks), handle, scopedRecords, equivalenceVersion)
++				if DiagnosticCode(legacyErr) != "toolchain_timeout" || DiagnosticCode(scopedErr) != "toolchain_timeout" {
++					t.Fatalf("legacy %v, scoped %v", legacyErr, scopedErr)
++				}
++				if legacyErr.Error() != scopedErr.Error() {
++					t.Fatalf("detail: legacy %q, scoped %q", legacyErr.Error(), scopedErr.Error())
++				}
++				// The precise cause stays reachable for anything upstream that
++				// inspects it; only the reported boundary code changes.
++				if !errors.Is(scopedErr, context.Canceled) {
++					t.Fatalf("scoped error %v does not unwrap to context.Canceled", scopedErr)
++				}
++			})
++		}
+ 	})
+ 
+ 	// The same window, but taken deterministically at the phase seam instead of
+@@ -546,6 +611,108 @@
+ 			t.Fatalf("detail: legacy %q, scoped %q", legacyErr.Error(), scopedErr.Error())
+ 		}
+ 	})
++
++	// The contract in full, with nothing left to the scheduler: every cancellation
++	// point the fingerprint can reach is taken in turn, and each one must produce
++	// the deadline diagnostic or a clean fingerprint — never toolchain_mutated,
++	// because a context ending is not the toolchain changing. Walking the budget
++	// up rather than naming a few interesting values is what makes this a proof
++	// instead of a sample: a check that a later edit adds inside the copy loop, or
++	// anywhere else in either phase, is covered the moment it exists.
++	t.Run("every cancellation point stays a deadline", func(t *testing.T) {
++		// The sweep has to run past the last check to be exhaustive, and the
++		// budget that first completes cleanly proves it got there.
++		completed := false
++		for budget := 0; budget < 200; budget++ {
++			ctx := newCountdownContext(budget)
++			_, _, err := fingerprintToolchain(ctx, root, equivalenceVersion)
++			switch code := DiagnosticCode(err); {
++			case err == nil:
++				completed = true
++			case code == "toolchain_timeout":
++				if !errors.Is(err, context.Canceled) {
++					t.Fatalf("budget %d: %v does not unwrap to context.Canceled", budget, err)
++				}
++			default:
++				t.Fatalf("budget %d: error = %v, want nil or toolchain_timeout", budget, err)
++			}
++			if completed {
++				break
++			}
++		}
++		if !completed {
++			t.Fatal("no budget in the sweep completed the fingerprint; the sweep never reached the last check")
++		}
++	})
++}
++
++// countdownContext reports no error for a fixed number of Err calls and reports
++// cancellation for every call after that. It exists so a test can place a
++// cancellation on an exact check inside the digest phase — including checks
++// taken between two chunks of one file — instead of racing a goroutine against
++// a read and hoping it lands in the window under test. It is used from a single
++// goroutine, which is how the digest phase consumes a context.
++type countdownContext struct {
++	context.Context
++	remaining int
++	done      chan struct{}
++}
++
++func newCountdownContext(checks int) *countdownContext {
++	return &countdownContext{Context: context.Background(), remaining: checks, done: make(chan struct{})}
++}
++
++func (ctx *countdownContext) Err() error {
++	if ctx.remaining > 0 {
++		ctx.remaining--
++		return nil
++	}
++	select {
++	case <-ctx.done:
++	default:
++		close(ctx.done)
++	}
++	return context.Canceled
++}
++
++func (ctx *countdownContext) Done() <-chan struct{} { return ctx.done }
++
++// TestDigestCopyDiagnosticPrecedence pins how narrow the cancellation branch is.
++// Only the abort this package raises inside its own copy loop is read as a
++// cancellation; every other way a copy can end badly still fails closed as
++// toolchain_mutated, including a bare context error that did not come from that
++// loop. Cancellation therefore cannot launder a concurrent write into a
++// deadline, which is the half of the contract the fixture-driven tests above
++// cannot force.
++func TestDigestCopyDiagnosticPrecedence(t *testing.T) {
++	abandoned := func(cause error) error { return fmt.Errorf("%w: %w", errCopyAbandoned, cause) }
++
++	for _, testCase := range []struct {
++		name              string
++		written, size     int64
++		copyErr, closeErr error
++		code              string
++	}{
++		{name: "complete copy", written: 4, size: 4},
++		{name: "abandoned before the first byte", written: 0, size: 4, copyErr: abandoned(context.Canceled), code: "toolchain_timeout"},
++		{name: "abandoned mid-file", written: 2, size: 4, copyErr: abandoned(context.DeadlineExceeded), code: "toolchain_timeout"},
++		{name: "abandoned after the last byte", written: 4, size: 4, copyErr: abandoned(context.Canceled), code: "toolchain_timeout"},
++		{name: "bare context error is not this loop's abort", written: 2, size: 4, copyErr: context.Canceled, code: "toolchain_mutated"},
++		{name: "read failure", written: 2, size: 4, copyErr: errors.New("input/output error"), code: "toolchain_mutated"},
++		{name: "close failure", written: 4, size: 4, closeErr: errors.New("cannot close"), code: "toolchain_mutated"},
++		{name: "file shrank under the read", written: 2, size: 4, code: "toolchain_mutated"},
++		{name: "file grew under the read", written: 6, size: 4, code: "toolchain_mutated"},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			err := digestCopyDiagnostic("bin/go", testCase.written, testCase.size, testCase.copyErr, testCase.closeErr)
++			if DiagnosticCode(err) != testCase.code {
++				t.Fatalf("code = %q, want %q (error %v)", DiagnosticCode(err), testCase.code, err)
++			}
++			if testCase.code == "" && err != nil {
++				t.Fatalf("error = %v, want nil", err)
++			}
++		})
++	}
+ }
+ 
+ // TestFingerprintDoesNotDescendLinkedDirectories pins the containment property

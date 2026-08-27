@@ -1,0 +1,34 @@
+{
+  "backend": "cloud-command",
+  "canary_passed": true,
+  "cloud": true,
+  "commit": "3d672d9cf29232a657d42182ad3df4ca43f9dea0",
+  "content_sha256": "sha256:27698c3b17bc58f9845fcf0afc0b2ded91207447463433b242951b3e8b35bf3f",
+  "decision": "warn",
+  "findings": [
+    {
+      "capability_violation": null,
+      "category": "hygiene",
+      "confidence": "high",
+      "detector": "audit.redaction",
+      "evidence": "File contents redacted before cloud backend request",
+      "id": "audit.redaction.applied",
+      "location": null,
+      "severity": "info",
+      "surface": "manifest",
+      "verifiable": true
+    }
+  ],
+  "model": null,
+  "prompt_version": 1,
+  "ran_at": "2026-07-29T00:20:06.704741+00:00",
+  "ruleset_version": 1,
+  "schema_version": 1,
+  "skill": "skill-a",
+  "source": "skill-a",
+  "trust": {
+    "pinned": false,
+    "pinned_by": null,
+    "reason": null
+  }
+}

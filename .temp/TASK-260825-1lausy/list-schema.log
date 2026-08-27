@@ -1,0 +1,6 @@
+description:List elements with optional filters and pagination
+examples:["list(type=task, status=development) { overview }","list(take=5) { minimal }","list(type=story, skip=10, take=5) { overview }"]
+kind:operation
+name:list
+parameters:[{"name":"type","type":"string","optional":true,"description":"Filter by element type (epic, story, task, bug)"},{"name":"status","type":"string","optional":true,"description":"Filter by status"},{"name":"parent","type":"string","optional":true,"description":"Filter by parent ID"},{"name":"assignee","type":"string","optional":true,"description":"Filter by assignee"},{"name":"blocked","type":"bool","optional":true,"description":"Filter by hard or advisory blocked scheduling state"},{"name":"skip","type":"int","optional":true,"default":0,"description":"Number of items to skip"},{"name":"take","type":"int","optional":true,"description":"Maximum number of items to return"}]
+signature:list(type?:string, status?:string, parent?:string, assignee?:string, blocked?:bool, skip?:int, take?:int)

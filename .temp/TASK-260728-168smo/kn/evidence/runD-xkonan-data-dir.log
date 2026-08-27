@@ -1,0 +1,63 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.jetbrains.kotlin.org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/kn/dist/kotlin-native-prebuilt-macos-aarch64-2.4.10/konan/lib/kotlin-native-compiler-embeddable.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+error: compilation failed: The /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/kn/konan-data/dependencies/llvm-21-aarch64-macos-essentials-97/bin/clang++ command returned non-zero exit code: 1.
+output:
+warning: overriding the module target triple with arm64-apple-macos12.0 [-Woverride-module]
+error: unable to open output file '/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/konan_temp12408972187024117976/app.kexe.o': 'No space left on device'
+1 warning and 1 error generated.
+
+ * Compiler version: 2.4.10
+ * Output kind: PROGRAM
+
+exception: org.jetbrains.kotlin.konan.KonanExternalToolFailure: The /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/kn/konan-data/dependencies/llvm-21-aarch64-macos-essentials-97/bin/clang++ command returned non-zero exit code: 1.
+output:
+warning: overriding the module target triple with arm64-apple-macos12.0 [-Woverride-module]
+error: unable to open output file '/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/konan_temp12408972187024117976/app.kexe.o': 'No space left on device'
+1 warning and 1 error generated.
+	at org.jetbrains.kotlin.konan.exec.Command.handleExitCode(ExecuteCommand.kt:123)
+	at org.jetbrains.kotlin.konan.exec.Command.execute(ExecuteCommand.kt:80)
+	at org.jetbrains.kotlin.backend.konan.BitcodeCompiler.runTool(BitcodeCompiler.kt:36)
+	at org.jetbrains.kotlin.backend.konan.BitcodeCompiler.hostLlvmTool(BitcodeCompiler.kt:45)
+	at org.jetbrains.kotlin.backend.konan.BitcodeCompiler.clang(BitcodeCompiler.kt:70)
+	at org.jetbrains.kotlin.backend.konan.BitcodeCompiler.makeObjectFile(BitcodeCompiler.kt:85)
+	at org.jetbrains.kotlin.backend.konan.driver.phases.ObjectFilesKt.ObjectFilesPhase$lambda$0(ObjectFiles.kt:21)
+	at org.jetbrains.kotlin.backend.common.phaser.PhaseBuildersKt$createSimpleNamedCompilerPhase$3.phaseBody(PhaseBuilders.kt:101)
+	at org.jetbrains.kotlin.backend.common.phaser.PhaseBuildersKt$createSimpleNamedCompilerPhase$3.phaseBody(PhaseBuilders.kt:90)
+	at org.jetbrains.kotlin.config.phaser.NamedCompilerPhase.invoke(CompilerPhase.kt:102)
+	at org.jetbrains.kotlin.backend.common.phaser.PhaseEngine.runPhase(PhaseEngine.kt:72)
+	at org.jetbrains.kotlin.backend.konan.driver.phases.TopLevelPhasesKt.runAndMeasurePhase(TopLevelPhases.kt:497)
+	at org.jetbrains.kotlin.backend.konan.driver.phases.TopLevelPhasesKt.runAndMeasurePhase$default(TopLevelPhases.kt:493)
+	at org.jetbrains.kotlin.backend.konan.driver.phases.TopLevelPhasesKt.compileAndLink(TopLevelPhases.kt:403)
+	at org.jetbrains.kotlin.backend.konan.driver.phases.TopLevelPhasesKt.runBackend$lambda$0$runAfterLowerings(TopLevelPhases.kt:213)
+	at org.jetbrains.kotlin.backend.konan.driver.phases.TopLevelPhasesKt.runBackend(TopLevelPhases.kt:235)
+	at org.jetbrains.kotlin.backend.konan.driver.NativeCompilerDriver.produceBinary(NativeCompilerDriver.kt:118)
+	at org.jetbrains.kotlin.backend.konan.driver.NativeCompilerDriver.run$lambda$0$0$0(NativeCompilerDriver.kt:42)
+	at org.jetbrains.kotlin.backend.konan.driver.MachineryKt$startTopLevel$topLevelPhase$1.phaseBody(Machinery.kt:47)
+	at org.jetbrains.kotlin.backend.konan.driver.MachineryKt$startTopLevel$topLevelPhase$1.phaseBody(Machinery.kt:44)
+	at org.jetbrains.kotlin.config.phaser.NamedCompilerPhase.invoke(CompilerPhase.kt:102)
+	at org.jetbrains.kotlin.backend.konan.driver.MachineryKt.startTopLevel(Machinery.kt:54)
+	at org.jetbrains.kotlin.backend.konan.driver.NativeCompilerDriver.run(NativeCompilerDriver.kt:39)
+	at org.jetbrains.kotlin.backend.konan.KonanDriver.run(KonanDriver.kt:158)
+	at org.jetbrains.kotlin.cli.bc.K2Native.runKonanDriver(K2Native.kt:246)
+	at org.jetbrains.kotlin.cli.bc.K2Native.doExecute(K2Native.kt:128)
+	at org.jetbrains.kotlin.cli.bc.K2Native.doExecute(K2Native.kt:43)
+	at org.jetbrains.kotlin.cli.common.CLICompiler.execImpl(CLICompiler.kt:128)
+	at org.jetbrains.kotlin.cli.common.CLICompiler.exec(CLICompiler.kt:366)
+	at org.jetbrains.kotlin.cli.common.CLICompiler.exec(CLICompiler.kt:344)
+	at org.jetbrains.kotlin.cli.common.CLICompiler.exec(CLICompiler.kt:306)
+	at org.jetbrains.kotlin.cli.common.CLICompiler$Companion.doMainNoExit(CLICompiler.kt:445)
+	at org.jetbrains.kotlin.cli.common.CLICompiler$Companion.doMainNoExit$default(CLICompiler.kt:440)
+	at org.jetbrains.kotlin.cli.common.CLICompiler$Companion.doMain(CLICompiler.kt:432)
+	at org.jetbrains.kotlin.cli.bc.K2Native$Companion.main$lambda$0(K2Native.kt:283)
+	at org.jetbrains.kotlin.util.UtilKt.profileIf(Util.kt:22)
+	at org.jetbrains.kotlin.util.UtilKt.profile(Util.kt:16)
+	at org.jetbrains.kotlin.cli.bc.K2Native$Companion.main(K2Native.kt:282)
+	at org.jetbrains.kotlin.cli.bc.K2NativeKt.main(K2Native.kt:315)
+	at org.jetbrains.kotlin.cli.utilities.MainKt$main$1.invoke(main.kt:40)
+	at org.jetbrains.kotlin.cli.utilities.MainKt$main$1.invoke(main.kt:40)
+	at org.jetbrains.kotlin.cli.utilities.MainKt.mainImpl(main.kt:20)
+	at org.jetbrains.kotlin.cli.utilities.MainKt.main(main.kt:40)
+

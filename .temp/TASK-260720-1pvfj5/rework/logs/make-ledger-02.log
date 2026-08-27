@@ -1,0 +1,60 @@
+bash .github/ci/ledger-consistency.sh '/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1pvfj5/rework/logs/make-ev/ledger'
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix [must=windows skip=-]
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix/* [must=- skip=windows]
+ok    internal/buildcache :: TestValidateWindowsSecurityPolicy [must=windows skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry [must=windows skip=windows]
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot [must=windows skip=windows]
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+ok    internal/buildcache :: TestUnixProtectedStateMatrix [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed [must=linux,darwin skip=-]
+ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot [must=linux,darwin skip=-]
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+ok    internal/buildsource :: TestRejectsSpecialFile [must=linux,darwin skip=-]
+ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin skip=windows]
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation/* [must=- skip=linux,darwin,windows]
+ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/* [must=- skip=linux,darwin,windows]
+ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+excl  internal/godriver :: TestResourceLimitsStayInsideManagerBounds (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds [must=darwin,windows skip=-]
+excl  internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly [must=darwin,windows skip=-]
+excl  internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes [must=darwin,windows skip=-]
+excl  internal/godriver :: TestPerFileSizeLimitIsReallyApplied (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied [must=darwin skip=windows]
+excl  internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart [must=windows skip=darwin]
+excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation [must=darwin,windows skip=-]
+ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder [must=linux,darwin,windows skip=-]
+ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry [must=linux,darwin,windows skip=-]
+ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+excl  internal/godriver :: TestCandidateGoV1SourceAwareContract (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestCandidateGoV1SourceAwareContract [must=darwin,windows skip=darwin,windows]
+ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker [must=linux,darwin,windows skip=-]
+ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+
+ledger-consistency: 49 rows checked across linux darwin windows
+ledger-consistency: ok

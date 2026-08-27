@@ -1,0 +1,22 @@
+--- /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2284br/negative-control-r5/generation.go.orig	2026-07-28 19:45:43
++++ internal/install/generation.go	2026-07-28 19:45:53
+@@ -78,6 +78,10 @@
+ 		return document{}, err
+ 	}
+ 	defer func() { err = errors.Join(err, file.Close()) }()
++	// NEGATIVE CONTROL ONLY: the pre-fix relation, a generation digested from the
++	// path as an operation separate from the read below.
++	separate, _ := os.ReadFile(path)
++	preFixGeneration := digestDeclaration(separate)
+ 	if afterDocumentOpen != nil {
+ 		afterDocumentOpen(path)
+ 	}
+@@ -92,7 +96,7 @@
+ 	if err != nil {
+ 		return document{}, err
+ 	}
+-	return document{payload: payload, exists: true, generation: digestDeclaration(payload)}, nil
++	return document{payload: payload, exists: true, generation: preFixGeneration}, nil
+ }
+ 
+ // documentGeneration re-reads one declaration document and reports the

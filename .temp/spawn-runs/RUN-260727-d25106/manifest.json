@@ -1,0 +1,315 @@
+{
+  "schema_version": 2,
+  "id": "RUN-260727-d25106",
+  "task_id": "TASK-260728-wy3dsw",
+  "created_at": "2026-07-27T22:33:21.832888Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "lifecycle_id": "RUN-260727-d25106",
+  "provider_session_digest": "sha256:60de0beac60b16408d68b944b040564825a15b97a4a78807e2812e54958e3029",
+  "lane_key": "b5dfe2e0bb8538d6bdb6637ba915d27426c5cf263947d5c257bee166d3c472eb",
+  "lane_generation": 1,
+  "lane_lease_generation": 1,
+  "execution_continuity": {
+    "policy": {
+      "selected_spawn_key": "spawn",
+      "config_key": "spawn.execution_policy",
+      "profile": {
+        "value": "pedantic",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.profile"
+      },
+      "sessions": {
+        "producer": {
+          "value": "fresh",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.producer"
+        },
+        "reviewer": {
+          "value": "fresh",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.reviewer"
+        },
+        "max_resumes": {
+          "value": 4,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.max_resumes"
+        },
+        "max_age": {
+          "value": "24h",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.max_age"
+        },
+        "fresh_fallback": {
+          "value": true,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.fresh_fallback"
+        }
+      },
+      "context": {
+        "rework": {
+          "value": "full",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.context.rework"
+        }
+      },
+      "review": {
+        "max_attempts": {
+          "value": null,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.review.max_attempts"
+        },
+        "after_limit": {
+          "value": "pause",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.review.after_limit"
+        },
+        "primary_attempt_limit": null,
+        "final_audit_reserve": 0
+      }
+    },
+    "review_phase": "primary_review",
+    "board": {
+      "mode": "local",
+      "location": "/Users/iv/Developer/ReluxWorks/curator/.task-board"
+    }
+  },
+  "input_snapshot": {
+    "version": "input_snapshot_v1",
+    "entries": [
+      {
+        "type": "checklist",
+        "name": "definition_of_done",
+        "key": "checklist/definition_of_done",
+        "length": 604,
+        "digest": "sha256:7876d9cbfb4c63dba64f8d042d0d467dc1253edbae505a9ee2af3bf97d4825d3",
+        "body_base64": "WyJWYWxpZGF0ZSBleGFjdCBHaXQsIG9mZmxpbmUsIGF1ZGl0LCBjYWNoZSwgdHJhbnNhY3Rpb24sIHN0YXR1cywgcmVwYWlyLCBhbmQgR0MgZXhhbXBsZXMiLCJEb2N1bWVudCBzdGFibGUgdHlwZWQgZmFpbHVyZXMgYW5kIHBhY2thZ2UtY29udHJvbGxlZCBiZWhhdmlvciByZWplY3Rpb25zIiwiRG9jcyB1cGRhdGVkIGFuZCBjb25zaXN0ZW50IHdpdGggY3VycmVudCBjb2RlIiwiTm8gZGlzY3JlcGFuY2llcyBiZXR3ZWVuIGNvZGUgYW5kIGRlc2NyaXB0aW9uIiwiUmVzdWx0IGxpbmtlZCBhcyBhIG5ldyB0YXNrLXNjb3BlZCBvdXRjb21lIHJlc291cmNlIiwiSW1wb3J0YW50IGZpbmRpbmdzLCBkZWNpc2lvbnMsIGFub21hbGllcywgb3IgcmVncmVzc2lvbnMgcmVjb3JkZWQgaW4gbG9nYm9vayB3aGVuIHJlbGV2YW50IiwiSW1wbGVtZW50YXRpb24gbWF0Y2hlcyBBQyIsIlNvbHV0aW9uIGZpdHMgcHJvamVjdCBhcmNoaXRlY3R1cmUiLCJUZXN0cyBncmVlbiIsIklmIHJldmlldyBkb2VzIG5vdCBhY2NlcHQgdGhlIHdvcmsg4oCUIHZlcmRpY3QgZXZpZGVuY2UgYWRkZWQgYW5kIHN0YXR1cyByb3V0ZWQgYnkgdGhlIGV4cGxpY2l0IHZlcmRpY3QgYnJhbmNoZXMiXQ=="
+      },
+      {
+        "type": "execution_policy",
+        "name": "digest",
+        "key": "execution_policy/digest",
+        "length": 71,
+        "digest": "sha256:631dca31732b29a626b42e07097ae1301645ac06894e609be1e3f52549f88596",
+        "body_base64": "c2hhMjU2OjcwOTVkY2E3MzExOTk5MzdmODE2MWE2NDdjYzBmNWUzMzJmZmNiNjc3NDE5MmE1MTEyNTBkMTkxMDVlMTczM2I="
+      },
+      {
+        "type": "final_audit_assignment",
+        "name": "current",
+        "key": "final_audit_assignment/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "goal",
+        "name": "revision",
+        "key": "goal/revision",
+        "length": 4,
+        "digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "body_base64": "bnVsbA=="
+      },
+      {
+        "type": "next_action",
+        "name": "reason",
+        "key": "next_action/reason",
+        "length": 22,
+        "digest": "sha256:205f87c0be0dc5b66d88aef7dc6935832fe5f6bfd275ca07da3a91392244f026",
+        "body_base64": "Ym9hcmRfc3RhdHVzOnRvLXJldmlldw=="
+      },
+      {
+        "type": "post_rework_validation",
+        "name": "current",
+        "key": "post_rework_validation/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "producer_resolutions",
+        "name": "current",
+        "key": "producer_resolutions/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "reviewer_authorization",
+        "name": "current",
+        "key": "reviewer_authorization/current",
+        "length": 13,
+        "digest": "sha256:2e2f92c499978b499f71fc5adf3448d4e094f35055ad2a7303212bcc1bff5570",
+        "body_base64": "eyJydW5faWQiOiIifQ=="
+      },
+      {
+        "type": "reviewer_findings",
+        "name": "current",
+        "key": "reviewer_findings/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "role",
+        "name": "body",
+        "key": "role/body",
+        "length": 2044,
+        "digest": "sha256:0571aca5102774ae78178dd47e2a0adc0c391b00bd079254def33430ddbda6a0",
+        "body_base64": "IyByZXZpZXdlcgoKIyMgRGVzY3JpcHRpb24KClJldmlld3MgaG93IGEgdGFzayB3YXMgaW1wbGVtZW50ZWQgYW5kIGhvdyB0aGUgc29sdXRpb24gZml0cyBpbnRvIHRoZSBwcm9qZWN0LiBEb2VzIG5vdCBtb2RpZnkgY29kZTsgcmVjb3JkcyBvbmUgb2YgdGhlIGV4cGxpY2l0IHZlcmRpY3QgYnJhbmNoZXMgYmVsb3cuCgpXaGVuIHRoZSBydW4gaXMgZ29hbC1ib3VuZCwgcXVlcnkgYHRhc2stYm9hcmQgc3Bhd24gZ29hbCAiJFRBU0tfQk9BUkRfUlVOX0lEImAgYmVmb3JlIHJlY29yZGluZyB0aGUgdmVyZGljdC4gVGhlIHJldmlld2VyIGdvYWwgaXMgcm9sZS1kZXJpdmVkIGFzIGByZXZpZXdlcl92ZXJkaWN0L3Jldmlld2VyX3ZlcmRpY3RgLCBjYXJyaWVzIGl0cyBpbW11dGFibGUgcGFyZW50IGdvYWwgSUQvcmV2aXNpb24sIGFuZCBpcyBzYXRpc2ZpZWQgb25seSBieSBleGFjdGx5IG9uZSB2ZXJkaWN0IGJyYW5jaCB3aXRoIGV2aWRlbmNlLiBBIHByb3ZpZGVyIGV4aXQgb3IgYHJldmlld2luZ2Agc3RhdHVzIGlzIG5vdCBhIHZlcmRpY3QuClRoZSBydW5uZXIgcGVyc2lzdHMgdGhlIGJyYW5jaCBmcm9tIHRoZSBhY2NlcHRlZCBib2FyZCBzdGF0dXMgcGx1cyBhIG5ldyBvciB1cGRhdGVkIHRhc2stc2NvcGVkIHZlcmRpY3QgYXJ0aWZhY3QuIE9ubHkgcGVyc2lzdGVkIGBhY2NlcHRlZGAgY2FuIHNhdGlzZnkgdGhlIHBhcmVudCBkZWxpdmVyeSBnb2FsOyBgY2hhbmdlc19yZXF1ZXN0ZWRgIGFuZCBgc3RvcF90aGVfbGluZWAgZmluaXNoIHRoZSByZXZpZXdlciBnb2FsIHdpdGhvdXQgYWNjZXB0aW5nIGRlbGl2ZXJ5LgoKIyMgRGVsaXZlcmFibGUKClZlcmRpY3QgYnJhbmNoZXMgYXJlIGV4cGxpY2l0OgoKLSBhY2NlcHRlZCDihpIgYGRvbmVgCi0gY2hhbmdlcyByZXF1ZXN0ZWQg4oaSIGB0by1kZXZgIGZvciBpbXBsZW1lbnRhdGlvbiByZXdvcmsgb3IgYGFuYWx5c2lzYCBmb3IgcmVzZWFyY2gvZGVjaXNpb24gd29yaywgd2l0aCB2ZXJkaWN0IGV2aWRlbmNlIGZvciB0aGUgbmV4dCBwcm9kdWNlciBhbmQgYW5vdGhlciByZXZpZXdlciBjeWNsZQotIGdlbnVpbmUgc3RvcC10aGUtbGluZSBib3VuZGFyeSDihpIgYGJsb2NrZWRgIG9ubHkgZm9yIGEgY29uY3JldGUgZXh0ZXJuYWwgYmxvY2tlciBvciBhbiB1bnJlc29sdmVkIGh1bWFuLW9ubHkgcGxhdGZvcm0vcHJvZHVjdC9hcmNoaXRlY3R1cmUvdHJhZGVvZmYvYXBwcm92YWwgZGVjaXNpb24sIHdpdGggZXZpZGVuY2UsIGZhaWxlZCBhc3N1bXB0aW9ucy9hdHRlbXB0cywgdmlhYmxlIGFsdGVybmF0aXZlcyBhbmQgdHJhZGVvZmZzLCBhIHJlY29tbWVuZGF0aW9uLCBhbmQgdGhlIGV4YWN0IGh1bWFuIGRlY2lzaW9uIG9yIGV4dGVybmFsIGlucHV0IG5lZWRlZAoKRG8gbm90IGxlYXZlIHRoZSB0YXNrIGluIGByZXZpZXdpbmdgLCBhbmQgZG8gbm90IHVzZSBgYmxvY2tlZGAgZm9yIG9yZGluYXJ5IHJld29yayBvciBhIHJlY292ZXJhYmxlIGNoaWxkL3J1bnRpbWUgZmFpbHVyZS4KCiMjIFN0YXR1cyBUcmFuc2l0aW9ucwoKLSAqKnN0YXJ0X3N0YXR1czoqKiBgcmV2aWV3aW5nYAotICoqZW5kX3N0YXR1czoqKiBubyB1bmNvbmRpdGlvbmFsIGRlZmF1bHQ7IHRoZSByZXZpZXdlciBtdXN0IHNldCBleGFjdGx5IG9uZSB2ZXJkaWN0IHN0YXR1czogYGRvbmVgLCBgdG8tZGV2YCwgYGFuYWx5c2lzYCwgb3IgZXZpZGVuY2UtYmFja2VkIGBibG9ja2VkYAoKIyMgRGVmaW5pdGlvbiBvZiBEb25lCgotIEltcGxlbWVudGF0aW9uIG1hdGNoZXMgQUMKLSBTb2x1dGlvbiBmaXRzIHByb2plY3QgYXJjaGl0ZWN0dXJlCi0gVGVzdHMgZ3JlZW4KLSBJZiByZXZpZXcgZG9lcyBub3QgYWNjZXB0IHRoZSB3b3JrIOKAlCB2ZXJkaWN0IGV2aWRlbmNlIGFkZGVkIHZpYSBgdGFzay1ib2FyZCBtICdzZXRfbm90ZXMoLi4uKSdgIG9yIGFuIG91dGNvbWUgcmVzb3VyY2UsIHRoZW4gc3RhdHVzIHJvdXRlZCBieSB0aGUgZXhwbGljaXQgdmVyZGljdCBicmFuY2hlcyBhYm92ZQoKIyMgQ29uc3RyYWludHMKCkRvZXMgTk9UIG1vZGlmeSBjb2RlLiBSZWFkLW9ubHkgYWNjZXNzLg=="
+      },
+      {
+        "type": "role",
+        "name": "metadata",
+        "key": "role/metadata",
+        "length": 148,
+        "digest": "sha256:ce29a04c3230e295e239ca92ba538b520993f88af99fc1d3c3c84b2ac2869809",
+        "body_base64": "eyJhcmNoZXR5cGUiOiJyZXZpZXdlciIsImRlc2NyaXB0aW9uIjoiUmV2aWV3cyBpbXBsZW1lbnRhdGlvbiBxdWFsaXR5IGFuZCBwcm9qZWN0IGZpdCIsImVuZF9zdGF0dXMiOiIiLCJuYW1lIjoicmV2aWV3ZXIiLCJzdGFydF9zdGF0dXMiOiJyZXZpZXdpbmcifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "Domain skills as needed to evaluate implementation quality",
+        "key": "skill/Domain skills as needed to evaluate implementation quality",
+        "length": 79,
+        "digest": "sha256:e257caafc9ad9c1ceeff028d093e2a5b3455964373f4b8e4af86dc46a8cec4d4",
+        "body_base64": "eyJuYW1lIjoiRG9tYWluIHNraWxscyBhcyBuZWVkZWQgdG8gZXZhbHVhdGUgaW1wbGVtZW50YXRpb24gcXVhbGl0eSIsInBhdGgiOiIifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "architecture-diagrams",
+        "key": "skill/architecture-diagrams",
+        "length": 97,
+        "digest": "sha256:4d77caf872bab194004877589bf7b82672514a42abce5c5e1150027e66b119f8",
+        "body_base64": "eyJuYW1lIjoiYXJjaGl0ZWN0dXJlLWRpYWdyYW1zIiwicGF0aCI6Ii9Vc2Vycy9pdi8uY2xhdWRlL3NraWxscy9hcmNoaXRlY3R1cmUtZGlhZ3JhbXMvU0tJTEwubWQifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "project-management",
+        "key": "skill/project-management",
+        "length": 91,
+        "digest": "sha256:8d1bab60e478d47f7d2ae88871b9a86b0911c06c1bdfa38e7c8c627b91c9fbae",
+        "body_base64": "eyJuYW1lIjoicHJvamVjdC1tYW5hZ2VtZW50IiwicGF0aCI6Ii9Vc2Vycy9pdi8uY2xhdWRlL3NraWxscy9wcm9qZWN0LW1hbmFnZW1lbnQvU0tJTEwubWQifQ=="
+      },
+      {
+        "type": "task",
+        "name": "acceptance_criteria",
+        "key": "task/acceptance_criteria",
+        "length": 639,
+        "digest": "sha256:1350763a623340ba7bc360ea33497318da8f5802e49562d4044dc5fcf45c1324",
+        "body_base64": "VGhlIHByb2ZpbGUgZml4ZXMgc3VwcG9ydGVkIHRyYW5zcG9ydHMgYW5kIGNhbm9uaWNhbCBpZGVudGl0eSwgZXhhY3QgaW5pdC9mZXRjaC9yZWYgZmxvd3MsIFNTSCBpc29sYXRpb24sIGxvY2FsLXN1YnN0aXR1dGlvbiBhZG1pc3Npb24sIHBhY2svaW5kZXggYW5kIGNhdC1maWxlIGdyYW1tYXIsIGNvbW1pdC90YWcvdHJlZS9ibG9iIHJlY29tcHV0YXRpb24sIGNvbXBsZXRlLW9iamVjdCBhbmQgYWxsLWJsb2IgTEZTIHByb29mLCBhdWRpdCBvcmRlcmluZywgY2FjaGUgYW5kIHJlY2VpcHQga2V5cywgbWFya2VyIGN1cnJlbnRuZXNzLCByb2xsYmFjaywgcmVwYWlyIGFuZCBHQyByb290czsgdGFnZ2VkIGRlY2xhcmF0aW9ucyBhbHdheXMgZXhhY3QtZmV0Y2ggdGhlIHRhZyBhcyB0aGUgc29sZSBwYXRoOyBzeW50YXgtb25seSBvZmZsaW5lIHdhcm5pbmcgYW5kIGluc3RhbGwvYXVkaXQgZmFpbHVyZSBhcmUgdW5hbWJpZ3VvdXM7IG5vIHJlcG9zaXRvcnktY29udHJvbGxlZCBob29rcywgaGVscGVycywgZmlsdGVycywgYXJndiwgZW52LCBvdXRwdXQsIGNyZWRlbnRpYWxzLCBzaWduaW5nLCBvciBsYXp5IG5ldHdvcmsgcmVhZHMgcmVtYWluIHBvc3NpYmxlOyBwcm9maWxlIGV4YW1wbGVzIGFuZCB2YWxpZGF0aW9uIHBhc3Mu"
+      },
+      {
+        "type": "task",
+        "name": "description",
+        "key": "task/description",
+        "length": 387,
+        "digest": "sha256:329ba84d9e3f436b845b795c3dcb35cc0923cb0d446d6a840721407e86b4b4dd",
+        "body_base64": "U3BlY2lmeSB0aGUgcmMuNSBtYW5hZ2VyIHByb2ZpbGUgYW5kIENMSSBsaWZlY3ljbGUgZm9yIHJlc29sdmluZywgdmFsaWRhdGluZywgYXVkaXRpbmcsIGNvbXBpbGluZywgaW5zdGFsbGluZywgcmVwb3J0aW5nLCByZXBhaXJpbmcsIGFuZCBjb2xsZWN0aW5nIGV4dGVybmFsIGJ1aWxkIHJlcG9zaXRvcmllcy4gUGluIHRoZSBleGFjdCBjbGVhbiBHaXQgcHJvY2VzcywgcmF3LW9iamVjdCBwcm9vZiwgTEZTIGFuZCBzcGVjaWFsLWZpbGUgcmVqZWN0aW9uLCBzbmFwc2hvdC9jYWNoZSBpZGVudGl0eSwgbWl4ZWQgcGxhbm5pbmcsIHRyYW5zYWN0aW9uLCBQQVRIL3NoaW0gdmVyaWZpY2F0aW9uLCBvZmZsaW5lIHNlbWFudGljcywgYW5kIHN0YXR1cy9yZXBhaXIvR0MgYmVoYXZpb3Iu"
+      },
+      {
+        "type": "task",
+        "name": "scope",
+        "key": "task/scope",
+        "length": 223,
+        "digest": "sha256:4fbf90d07ac3ae9898a28e51b72aaf84d556325f94e79f390acc0dcf7cc9a511",
+        "body_base64": "Y3VyYXRvci1zcGVjIG1hbmFnZXItcHJvZmlsZSBwcm9zZSwgQ0xJIGNvbnRyYWN0cywgbGlmZWN5Y2xlIHN0YXRlIG1hY2hpbmUsIHN0YWJsZSBkaWFnbm9zdGljcywgYW5kIG5vcm1hdGl2ZSBjb21tYW5kIGV4YW1wbGVzLiBSZXVzZSB0aGUgYWNjZXB0ZWQgZ28tdjEgdHJ1c3RlZCB0b29sY2hhaW4vYnVpbGQgc2Vzc2lvbiB3aXRob3V0IGNoYW5naW5nIGl0cyBzY2hlbWEtNiBtZWFuaW5nLg=="
+      },
+      {
+        "type": "task",
+        "name": "title",
+        "key": "task/title",
+        "length": 78,
+        "digest": "sha256:044e2514d57517224a97b6f81b4a2036410d18db266ddd2ba35bf0d257b05491",
+        "body_base64": "VEFTSy0yNjA3Mjgtd3kzZHN3OiBleHRlcm5hbC1yZXBvc2l0b3J5LW1hbmFnZXItcHJvZmlsZS1hbmQtbGlmZWN5Y2xlLWNvbnRyYWN0"
+      },
+      {
+        "type": "validation_manifest",
+        "name": "current",
+        "key": "validation_manifest/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      }
+    ],
+    "root_digest": "sha256:dc74fb21059ca31536efa7bfed61fbd64243a5bf4c458f913291454d56f94683"
+  },
+  "prompt_template_data": {
+    "task_id": "TASK-260728-wy3dsw",
+    "task_title": "TASK-260728-wy3dsw: external-repository-manager-profile-and-lifecycle-contract",
+    "task_description": "Specify the rc.5 manager profile and CLI lifecycle for resolving, validating, auditing, compiling, installing, reporting, repairing, and collecting external build repositories. Pin the exact clean Git process, raw-object proof, LFS and special-file rejection, snapshot/cache identity, mixed planning, transaction, PATH/shim verification, offline semantics, and status/repair/GC behavior.",
+    "task_scope": "curator-spec manager-profile prose, CLI contracts, lifecycle state machine, stable diagnostics, and normative command examples. Reuse the accepted go-v1 trusted toolchain/build session without changing its schema-6 meaning.",
+    "task_ac": "The profile fixes supported transports and canonical identity, exact init/fetch/ref flows, SSH isolation, local-substitution admission, pack/index and cat-file grammar, commit/tag/tree/blob recomputation, complete-object and all-blob LFS proof, audit ordering, cache and receipt keys, marker currentness, rollback, repair and GC roots; tagged declarations always exact-fetch the tag as the sole path; syntax-only offline warning and install/audit failure are unambiguous; no repository-controlled hooks, helpers, filters, argv, env, output, credentials, signing, or lazy network reads remain possible; profile examples and validation pass.",
+    "parent_id": "STORY-260728-10wxx2",
+    "agent_name": "[reviewer] reviewer (codex)",
+    "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+    "precondition_resources": null,
+    "role_name": "reviewer",
+    "role_body": "# reviewer\n\n## Description\n\nReviews how a task was implemented and how the solution fits into the project. Does not modify code; records one of the explicit verdict branches below.\n\nWhen the run is goal-bound, query `task-board spawn goal \"$TASK_BOARD_RUN_ID\"` before recording the verdict. The reviewer goal is role-derived as `reviewer_verdict/reviewer_verdict`, carries its immutable parent goal ID/revision, and is satisfied only by exactly one verdict branch with evidence. A provider exit or `reviewing` status is not a verdict.\nThe runner persists the branch from the accepted board status plus a new or updated task-scoped verdict artifact. Only persisted `accepted` can satisfy the parent delivery goal; `changes_requested` and `stop_the_line` finish the reviewer goal without accepting delivery.\n\n## Deliverable\n\nVerdict branches are explicit:\n\n- accepted → `done`\n- changes requested → `to-dev` for implementation rework or `analysis` for research/decision work, with verdict evidence for the next producer and another reviewer cycle\n- genuine stop-the-line boundary → `blocked` only for a concrete external blocker or an unresolved human-only platform/product/architecture/tradeoff/approval decision, with evidence, failed assumptions/attempts, viable alternatives and tradeoffs, a recommendation, and the exact human decision or external input needed\n\nDo not leave the task in `reviewing`, and do not use `blocked` for ordinary rework or a recoverable child/runtime failure.\n\n## Status Transitions\n\n- **start_status:** `reviewing`\n- **end_status:** no unconditional default; the reviewer must set exactly one verdict status: `done`, `to-dev`, `analysis`, or evidence-backed `blocked`\n\n## Definition of Done\n\n- Implementation matches AC\n- Solution fits project architecture\n- Tests green\n- If review does not accept the work — verdict evidence added via `task-board m 'set_notes(...)'` or an outcome resource, then status routed by the explicit verdict branches above\n\n## Constraints\n\nDoes NOT modify code. Read-only access.",
+    "archetype": "reviewer",
+    "skills": [
+      {
+        "name": "project-management",
+        "path": "/Users/iv/.claude/skills/project-management/SKILL.md"
+      },
+      {
+        "name": "architecture-diagrams",
+        "path": "/Users/iv/.claude/skills/architecture-diagrams/SKILL.md"
+      },
+      {
+        "name": "Domain skills as needed to evaluate implementation quality",
+        "path": ""
+      }
+    ],
+    "start_status": "reviewing",
+    "end_status": "",
+    "task_dod_content": "- Validate exact Git, offline, audit, cache, transaction, status, repair, and GC examples\n- Document stable typed failures and package-controlled behavior rejections\n- Docs updated and consistent with current code\n- No discrepancies between code and description\n- Result linked as a new task-scoped outcome resource\n- Important findings, decisions, anomalies, or regressions recorded in logbook when relevant",
+    "dod_content": "- [ ] Validate exact Git, offline, audit, cache, transaction, status, repair, and GC examples\n- [ ] Document stable typed failures and package-controlled behavior rejections\n- [ ] Docs updated and consistent with current code\n- [ ] No discrepancies between code and description\n- [ ] Result linked as a new task-scoped outcome resource\n- [ ] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant\n- [ ] Implementation matches AC\n- [ ] Solution fits project architecture\n- [ ] Tests green\n- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches"
+  },
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "continuation": {
+    "mode": "fresh",
+    "prompt_mode": "full"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-02-33-21_-reviewer--reviewer--codex-_TASK-260728-wy3dsw.md",
+  "base_prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-continuity/base-prompts/RUN-260727-d25106.md",
+  "prompt_mode": "full",
+  "snapshot_digest": "sha256:dc74fb21059ca31536efa7bfed61fbd64243a5bf4c458f913291454d56f94683",
+  "prompt_artifact_dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-continuity/prompts/RUN-260727-d25106",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260728-wy3dsw_spawn-log_-reviewer--reviewer--codex-_RUN-260727-d25106.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260728-wy3dsw_manager-profile-outcome.md",
+    "TASK-260728-wy3dsw_spawn-log_-implementer--doc-writer--codex-_RUN-260727-fef777.log"
+  ]
+}

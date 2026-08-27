@@ -1,0 +1,52 @@
+{
+  "id": "RUN-260825-66feea",
+  "task_id": "BUG-260825-2hrpp5",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "agent_type": "claude",
+  "status": "completed",
+  "phase": "finalizing",
+  "summary": "Run completed successfully",
+  "created_at": "2026-08-25T03:49:56.901389Z",
+  "started_at": "2026-08-25T03:49:57.308788Z",
+  "completed_at": "2026-08-25T04:16:43.379149Z",
+  "last_heartbeat_at": "2026-08-25T04:16:43.379149Z",
+  "last_progress_at": "2026-08-25T04:16:43.379149Z",
+  "completion_reason": "success",
+  "last_event_seq": 821,
+  "exit_code": 0,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-07-49-56_-reviewer--reviewer--claude-_BUG-260825-2hrpp5.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260825-2hrpp5/-reviewer--reviewer--claude-_RUN-260825-66feea.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260825-66feea/runner.log",
+  "max_parallel": 20,
+  "story_id": "STORY-260825-32bopo",
+  "workspace": {
+    "workspace_id": "WS-8ab97c9b53ba",
+    "story_id": "STORY-260825-32bopo",
+    "branch_ref": "refs/heads/task-board/story/STORY-260825-32bopo",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260825-32bopo/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "provider": "claude",
+    "producer_version": "v1.6.1",
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "recovery_root_run_id": "RUN-260825-66feea",
+  "provider_attempts": [
+    {
+      "attempt": 1,
+      "provider": "claude",
+      "model": "claude-fable-5",
+      "reasoning_effort": "max",
+      "group": "claude-usage-credits",
+      "started_at": "2026-08-25T03:49:57.430561Z",
+      "completed_at": "2026-08-25T04:16:43.311693Z",
+      "exit_code": 0,
+      "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260825-2hrpp5/-reviewer--reviewer--claude-_RUN-260825-66feea.log"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+toolchain: rust 1.91.0, cargo "cargo 1.91.0 (ea2d97820 2025-10-10)", host aarch64-apple-darwin
+cases: 19, matched 19, divergences 0, not run 0
+alignment: P1 no-widening=true P2 no-narrowing=true (security partition empty=true)
+closure: 24 checks, 0 yielded a verdict (must be 0)
+controls: 12 of 12 failing as required
+  C1/open-classifier               FAILS-AS-REQUIRED  a fall-through branch would name a verdict for 4 measured unrelated failures that the closed classifier leaves without one
+  C2/lead-only-recognition         FAILS-AS-REQUIRED  a lead-only classifier recognised 6 diagnostics that were produced for a different value under test (examples: grammar.prerelease, grammar.nonnumeric, grammar.build-metadata)
+  C3/exit-status-as-semantics      FAILS-AS-REQUIRED  1 cases where the corroborating command's exit status disagrees with the isolated representability measurement (examples: accept.above-host)
+  C4/build-as-isolated             FAILS-AS-REQUIRED  isolated=accepted corroborating=host-gate for a representable value above the resolved toolchain; using the corroborating command as the isolated one yields a P1 violation
+  C5/edition-folded-into-grammar   FAILS-AS-REQUIRED  3 measured values are grammar-representable and rejected only by the edition floor; a merged classifier would report them as grammar rejections
+  C6/substring-matching            FAILS-AS-REQUIRED  a substring matcher recognised 6 outcomes that belong to a different value under test
+  C7/graph-without-all-features    FAILS-AS-REQUIRED  the proc-macro package is absent from packages[]: probefeat
+  C8/escape-decided-after-cargo-read FAILS-AS-REQUIRED  cargo quoted the outside manifest before any verdict could be computed
+  C9/naive-basic-string-config     FAILS-AS-REQUIRED  the written document carries 6 table headers and an injected offline=false
+  C10/operator-cargo-state-inherited FAILS-AS-REQUIRED  inherited operator state resolved the dependency (exit 0) where isolation failed (exit 101)
+  C11/raw-limit-before-folding     FAILS-AS-REQUIRED  the superseded order admitted an LF stream and rejected its CRLF equivalent: folded=4096 LF(raw 4096) admitted=true CRLF(raw 4098) admitted=false; folded=4096 LF(raw 4096) admitted=true CRLF(raw 4506) admitted=false
+  C12/key-only-build-script-gate   FAILS-AS-REQUIRED  no manifest key declares a build script, yet cargo reported a custom-build target; before the file rule this shape reached cargo
+vectors: 81 host-independent checks, 0 divergences
+structural: 14 checks, 0 divergences
+  graph-phase-executes-no-package-code       match       no marker written; exit 0
+  graph-surfaces-visible                     match       custom-build=yes proc-macro=yes links=yes source=yes
+  locked-prevents-snapshot-write             match       without --locked: lockfile written; with --locked: exit 101 and no lockfile
+  package-cargo-config-is-live               match       unneutralised: wrapper ran; neutralised: wrapper did not run
+  ancestor-cargo-config-discovered           match       wrapper ran
+  process-closure-no-path-resolution         match       pinned: 0 resolutions; control: at least 1 resolution
+  target-admission-is-manager-owned          match       absent-std: exit 0; unknown-triple: non-zero
+  git-dependency-rejected-in-graph-phase     match       non-zero exit, no compile phase
+  exact-pipeline-vendored-isolated           match       graph 0, build 0, 0 PATH resolutions, artifact runs
+  local-and-external-source-mapping-equivalence match       identical build-root digest, identical graph after substitution
+  all-features-exposes-optional-proc-macro   match       with: proc-macro present; without: absent
+  graph-phase-reads-outside-build-root       match       cargo reads the outside manifest; the lexical rule rejects the declaration
+  ancestor-workspace-manifest-escapes-old-rows match       workspace_root above the build root, one member, that member is the build root package
+  build-script-auto-discovery-scope          match       key-absent+file=discovered/rejected build-false+file=ignored/rejected build-false+nofile=ignored/admitted other-name=ignored/admitted nested=ignored/admitted dir-named-build.rs=ignored/rejected edition2024=discovered/rejected
+green: true

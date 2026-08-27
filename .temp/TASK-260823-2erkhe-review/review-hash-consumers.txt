@@ -1,0 +1,34 @@
+.github/workflows/ci.yml:365:          CANDIDATE_EXPECTED_MANIFEST_SHA256: ${{ inputs.candidate_manifest_sha256 }}
+.github/workflows/ci.yml:376:          if command -v shasum >/dev/null 2>&1; then
+.github/workflows/ci.yml:377:            PIN_MANIFEST_SHA256="$(shasum -a 256 <"$pin_manifest" | awk '{print $1}')"
+.github/workflows/ci.yml:379:            PIN_MANIFEST_SHA256="$(sha256sum <"$pin_manifest" | awk '{print $1}')"
+.github/workflows/ci.yml:381:          export PIN_MANIFEST_SHA256
+.github/ci/gate-selftest.sh:102:MANIFEST_SHA="$(shasum -a 256 <"$FAKEROOT/manifest.json" 2>/dev/null | awk '{print $1}')"
+.github/ci/gate-selftest.sh:103:[ -n "$MANIFEST_SHA" ] || MANIFEST_SHA="$(sha256sum <"$FAKEROOT/manifest.json" | awk '{print $1}')"
+.github/ci/gate-selftest.sh:108:assert 'record rejects a manifest digest mismatch'  1 env CANDIDATE_EXPECTED_MANIFEST_SHA256=deadbeef bash "$CS" record "$FAKEROOT" "$WORK/ev3"
+.github/ci/gate-selftest.sh:109:assert 'record rejects a candidate identical to the pin' 1 env PIN_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev4"
+.github/ci/gate-selftest.sh:110:assert 'record accepts a distinct candidate'        0 env CANDIDATE_EXPECTED_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev5"
+.github/ci/gate-selftest.sh:112:# Git for Windows shasum prefixes the entire output line with `\` when a
+.github/ci/gate-selftest.sh:116:WINDOWS_SHASUM_BIN="$WORK/windows-shasum-bin"
+.github/ci/gate-selftest.sh:118:cat >"$WINDOWS_SHASUM_BIN/shasum" <<'EOF'
+.github/ci/gate-selftest.sh:126:chmod +x "$WINDOWS_SHASUM_BIN/shasum"
+.github/ci/gate-selftest.sh:127:assert 'record avoids Git for Windows shasum filename escaping' 0 env PATH="$WINDOWS_SHASUM_BIN:$PATH" SIMULATED_SHA256="$MANIFEST_SHA" CANDIDATE_EXPECTED_MANIFEST_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev6"
+.github/ci/gate-selftest.sh:131:PREFIXED_SHASUM_BIN="$WORK/prefixed-shasum-bin"
+.github/ci/gate-selftest.sh:133:cat >"$PREFIXED_SHASUM_BIN/shasum" <<'EOF'
+.github/ci/gate-selftest.sh:137:chmod +x "$PREFIXED_SHASUM_BIN/shasum"
+.github/ci/gate-selftest.sh:138:assert 'record rejects a backslash-prefixed digest' 1 env PATH="$PREFIXED_SHASUM_BIN:$PATH" SIMULATED_SHA256="$MANIFEST_SHA" bash "$CS" record "$FAKEROOT" "$WORK/ev7"
+.github/ci/gate-selftest.sh:147:	assert_contains 'evidence records the manifest digest'   "manifest_sha256         sha256:$MANIFEST_SHA" "$EV"
+.github/ci/candidate-suite.sh:31:#   CANDIDATE_EXPECTED_MANIFEST_SHA256  expected sha256 of <root>/manifest.json
+.github/ci/candidate-suite.sh:39:sha256_of() {
+.github/ci/candidate-suite.sh:41:	if command -v shasum >/dev/null 2>&1; then
+.github/ci/candidate-suite.sh:42:		output="$(shasum -a 256 <"$file")" || die "sha256 failed for $file"
+.github/ci/candidate-suite.sh:43:	elif command -v sha256sum >/dev/null 2>&1; then
+.github/ci/candidate-suite.sh:44:		output="$(sha256sum <"$file")" || die "sha256 failed for $file"
+.github/ci/candidate-suite.sh:46:		die 'neither shasum nor sha256sum is available'
+.github/ci/candidate-suite.sh:49:	# Hash stdin rather than a filename. Git for Windows shasum prefixes its
+.github/ci/candidate-suite.sh:103:	manifest_sha="$(sha256_of "$root/manifest.json")" || exit 1
+.github/ci/candidate-suite.sh:120:		printf '%s  %s\n' "$(sha256_of "$root/$rel")" "$rel" >>"$digests" || die "digest failed for $rel"
+.github/ci/candidate-suite.sh:124:	tree_sha="$(sha256_of "$digests")" || exit 1
+.github/ci/candidate-suite.sh:133:	if [ -n "${PIN_MANIFEST_SHA256:-}" ] && [ "$manifest_sha" = "$PIN_MANIFEST_SHA256" ]; then
+.github/ci/candidate-suite.sh:137:	if [ -n "${CANDIDATE_EXPECTED_MANIFEST_SHA256:-}" ]; then
+.github/ci/candidate-suite.sh:138:		exp="${CANDIDATE_EXPECTED_MANIFEST_SHA256#sha256:}"

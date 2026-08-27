@@ -1,0 +1,42 @@
+=== RUN   TestFingerprintCancellationStaysFailClosed
+=== RUN   TestFingerprintCancellationStaysFailClosed/cancelled_before_the_walk
+=== RUN   TestFingerprintCancellationStaysFailClosed/cancelled_on_an_empty_root
+=== RUN   TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest
+=== RUN   TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read
+=== RUN   TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/before_the_first_chunk
+=== RUN   TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/after_a_partial_chunk
+=== RUN   TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/after_the_last_chunk
+=== RUN   TestFingerprintCancellationStaysFailClosed/cancelled_exactly_at_the_phase_boundary
+=== RUN   TestFingerprintCancellationStaysFailClosed/every_cancellation_point_stays_a_deadline
+--- PASS: TestFingerprintCancellationStaysFailClosed (0.02s)
+    --- PASS: TestFingerprintCancellationStaysFailClosed/cancelled_before_the_walk (0.00s)
+    --- PASS: TestFingerprintCancellationStaysFailClosed/cancelled_on_an_empty_root (0.00s)
+    --- PASS: TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest (0.00s)
+    --- PASS: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read (0.00s)
+        --- PASS: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/before_the_first_chunk (0.00s)
+        --- PASS: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/after_a_partial_chunk (0.00s)
+        --- PASS: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/after_the_last_chunk (0.00s)
+    --- PASS: TestFingerprintCancellationStaysFailClosed/cancelled_exactly_at_the_phase_boundary (0.00s)
+    --- PASS: TestFingerprintCancellationStaysFailClosed/every_cancellation_point_stays_a_deadline (0.01s)
+=== RUN   TestDigestCopyDiagnosticPrecedence
+=== RUN   TestDigestCopyDiagnosticPrecedence/complete_copy
+=== RUN   TestDigestCopyDiagnosticPrecedence/abandoned_before_the_first_byte
+=== RUN   TestDigestCopyDiagnosticPrecedence/abandoned_mid-file
+=== RUN   TestDigestCopyDiagnosticPrecedence/abandoned_after_the_last_byte
+=== RUN   TestDigestCopyDiagnosticPrecedence/bare_context_error_is_not_this_loop's_abort
+=== RUN   TestDigestCopyDiagnosticPrecedence/read_failure
+=== RUN   TestDigestCopyDiagnosticPrecedence/close_failure
+=== RUN   TestDigestCopyDiagnosticPrecedence/file_shrank_under_the_read
+=== RUN   TestDigestCopyDiagnosticPrecedence/file_grew_under_the_read
+--- PASS: TestDigestCopyDiagnosticPrecedence (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/complete_copy (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/abandoned_before_the_first_byte (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/abandoned_mid-file (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/abandoned_after_the_last_byte (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/bare_context_error_is_not_this_loop's_abort (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/read_failure (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/close_failure (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/file_shrank_under_the_read (0.00s)
+    --- PASS: TestDigestCopyDiagnosticPrecedence/file_grew_under_the_read (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	0.500s

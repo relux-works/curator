@@ -1,0 +1,1131 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="10" skipped="0" tests="10" time="1.905" timestamp="2026-07-30T12:04:48.558772+03:00" hostname="DESKTOP-3PBO632"><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_installed_hidden_worker_literal_is_parser_rejected" time="0.357"><failure message="assert 1 == 2&#10; +  where 1 = CompletedProcess(args=['C:\\Users\\admin\\TASK-260720-2g21eg-cycle5-61f29f\\venv\\Scripts\\csk.exe', '__csk-go-worker-...   raise RuntimeError(&quot;Could not determine home directory.&quot;)\r\nRuntimeError: Could not determine home directory.\r\n').returncode">tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_installed_hidden_worker_l0')
+
+    def test_installed_hidden_worker_literal_is_parser_rejected(
+        tmp_path: Path,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_marker = tmp_path / "go-was-started"
+        poison_bin = tmp_path / "poison-bin"
+        poison_bin.mkdir()
+        poison_go = poison_bin / ("go.exe" if os.name == "nt" else "go")
+        poison_go.write_text(
+            "#!/bin/sh\n"
+            f"printf started &gt; {go_marker}\n",
+            encoding="utf-8",
+        )
+        poison_go.chmod(0o755)
+        environment = {"PATH": str(poison_bin)}
+        if os.name == "nt":
+            environment.update(
+                {
+                    name: value
+                    for name in ("SYSTEMROOT", "WINDIR")
+                    if (value := os.environ.get(name))
+                }
+            )
+    
+        completed = subprocess.run(
+            [str(manager), go_v1.WORKER_MODE],
+            input=b"",
+            capture_output=True,
+            check=False,
+            env=environment,
+        )
+    
+&gt;       assert completed.returncode == 2
+E       assert 1 == 2
+E        +  where 1 = CompletedProcess(args=['C:\\Users\\admin\\TASK-260720-2g21eg-cycle5-61f29f\\venv\\Scripts\\csk.exe', '__csk-go-worker-...   raise RuntimeError("Could not determine home directory.")\r\nRuntimeError: Could not determine home directory.\r\n').returncode
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:52: AssertionError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[accepted]" time="0.102"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'accepted'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A597ECB00&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu0/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[accepted-with-private-runtime]" time="0.026"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'accepted-with-private-runtime'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A597ED940&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu1/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[accepted-with-bound-startup-hook]" time="0.029"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'accepted-with-bound-startup-hook'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu2')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A597D9010&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu2/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[manager-startup-hook-inserted-after-launch]" time="0.028"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'manager-startup-hook-inserted-after-launch'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu3')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A597CA250&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu3/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[manager-stdlib-module-replaced-after-launch]" time="0.026"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'manager-stdlib-module-replaced-after-launch'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu4')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A597CA580&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu4/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[manager-runtime-image-replaced-after-launch]" time="0.027"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'manager-runtime-image-replaced-after-launch'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu5')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A59892750&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu5/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[manager-package-replaced-after-launch]" time="0.027"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'manager-package-replaced-after-launch'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu6')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A59892E50&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu6/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[worker-executable-replaced-between-checks]" time="0.029"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'worker-executable-replaced-between-checks'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu7')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A598C19A0&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu7/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase><testcase classname="TASK-260720-2g21eg-cycle5-61f29f.test_builds_go_v1_fixture" name="test_real_native_go_fixture_build_uses_closed_worker_boundary[worker-domain-teardown-failure]" time="0.029"><failure message="csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root">scenario = 'worker-domain-teardown-failure'
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu8')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018A598C25D0&gt;
+
+    @pytest.mark.skipif(
+        sys.platform != "darwin" and os.name != "nt",
+        reason="the portable source-aware policy covers exactly macOS and Windows",
+    )
+    @pytest.mark.parametrize(
+        "scenario",
+        (
+            "accepted",
+            "accepted-with-private-runtime",
+            "accepted-with-bound-startup-hook",
+            "manager-startup-hook-inserted-after-launch",
+            "manager-stdlib-module-replaced-after-launch",
+            "manager-runtime-image-replaced-after-launch",
+            "manager-package-replaced-after-launch",
+            "worker-executable-replaced-between-checks",
+            "worker-domain-teardown-failure",
+        ),
+    )
+    def test_real_native_go_fixture_build_uses_closed_worker_boundary(
+        scenario: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        manager_value = os.environ.get("CSK_GO_V1_MANAGER_EXECUTABLE")
+        if not manager_value:
+            pytest.skip("CSK_GO_V1_MANAGER_EXECUTABLE is not set")
+        manager = Path(manager_value).resolve(strict=True)
+        go_value = os.environ.get("CSK_GO_V1_GO_EXECUTABLE") or shutil.which("go")
+        if not go_value:
+            pytest.skip("a native Go executable is not available")
+        go_executable = Path(go_value).resolve(strict=True)
+    
+        snapshot_root = tmp_path / "snapshot"
+        source_dir = snapshot_root / "build" / "cmd"
+        source_dir.mkdir(parents=True)
+        marker = tmp_path / "artifact-was-run"
+        (snapshot_root / "build" / "go.mod").write_text(
+            "module example.test/closedfixture\n\n"
+            "go 1.25\n\n"
+            "require example.test/fixturedep v1.0.0\n",
+            encoding="utf-8",
+        )
+        vendor = snapshot_root / "build" / "vendor"
+        dependency = vendor / "example.test" / "fixturedep"
+        dependency.mkdir(parents=True)
+        (dependency / "dep.go").write_text(
+            "package fixturedep\n\nfunc Payload() []byte { return []byte(\"ran\") }\n",
+            encoding="utf-8",
+        )
+        (vendor / "modules.txt").write_text(
+            "# example.test/fixturedep v1.0.0\n"
+            "## explicit; go 1.25\n"
+            "example.test/fixturedep\n",
+            encoding="utf-8",
+        )
+        (source_dir / "main.go").write_text(
+            "package main\n\n"
+            "import (\n"
+            "\t\"os\"\n"
+            "\t\"example.test/fixturedep\"\n"
+            ")\n\n"
+            "func main() {\n"
+            f"\t_ = os.WriteFile({json.dumps(str(marker))}, fixturedep.Payload(), 0600)\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        frozen = source.freeze_snapshot(snapshot_root)
+    
+        private_base = tmp_path / "private"
+        private_base.mkdir()
+        repository_root = Path(__file__).resolve().parents[1]
+&gt;       session = toolchain.establish_toolchain(
+            toolchain.ToolchainConfig(
+                private_base=private_base,
+                operator_search_path=toolchain.OperatorSearchPath(
+                    (str(go_executable.parent),)
+                ),
+                forbidden_roots=(snapshot_root, repository_root),
+                go_executable=go_executable,
+            )
+        )
+
+TASK-260720-2g21eg-cycle5-61f29f\test_builds_go_v1_fixture.py:129: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:509: in establish_toolchain
+    return _establish_toolchain(config, _native_host())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:596: in _establish_toolchain
+    selection = _select_toolchain(config, host, forbidden)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:899: in _select_toolchain
+    _reject_forbidden_launcher(launcher, forbidden)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/admin/TASK-260720-2g21eg-cycle5-61f29f/go/bin/go.exe')
+forbidden = (WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-0/test_real_native_go_fixture_bu8/snapshot'), WindowsPath('C:/Users/admin'))
+
+    def _reject_forbidden_launcher(path: Path, forbidden: tuple[Path, ...]) -&gt; None:
+        absolute = path.absolute()
+        try:
+            physical_parent = path.parent.resolve(strict=True)
+            physical = physical_parent / path.name
+        except (OSError, RuntimeError):
+            physical = absolute
+        for root in forbidden:
+            if (
+                _same_path_or_lexical(absolute, root)
+                or _strictly_below_lexical(absolute, root)
+                or _same_path_or_lexical(physical, root)
+                or _strictly_below_lexical(physical, root)
+            ):
+&gt;               raise ToolchainError(
+                    "untrusted_go_executable",
+                    "selected Go executable is under a repository or project-managed root",
+                )
+E               csk.builds.toolchain.ToolchainError: go-v1 untrusted_go_executable: selected Go executable is under a repository or project-managed root
+
+TASK-260720-2g21eg-cycle5-61f29f\venv\Lib\site-packages\csk\builds\toolchain.py:1684: ToolchainError</failure></testcase></testsuite></testsuites>

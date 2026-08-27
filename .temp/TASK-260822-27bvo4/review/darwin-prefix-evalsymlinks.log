@@ -1,0 +1,33 @@
+=== RUN   TestExecutableIdentityRejectsSubstitutionAndMutation
+--- PASS: TestExecutableIdentityRejectsSubstitutionAndMutation (0.01s)
+=== RUN   TestExecutableIdentityResolvesALauncherLink
+=== RUN   TestExecutableIdentityResolvesALauncherLink/shim_symlink_on_PATH
+=== RUN   TestExecutableIdentityResolvesALauncherLink/chain_of_shim_symlinks
+=== RUN   TestExecutableIdentityResolvesALauncherLink/symlinked_install_directory
+=== RUN   TestExecutableIdentityResolvesALauncherLink/unclean_relative_spelling_of_the_link
+--- PASS: TestExecutableIdentityResolvesALauncherLink (0.01s)
+    --- PASS: TestExecutableIdentityResolvesALauncherLink/shim_symlink_on_PATH (0.00s)
+    --- PASS: TestExecutableIdentityResolvesALauncherLink/chain_of_shim_symlinks (0.00s)
+    --- PASS: TestExecutableIdentityResolvesALauncherLink/symlinked_install_directory (0.00s)
+    --- PASS: TestExecutableIdentityResolvesALauncherLink/unclean_relative_spelling_of_the_link (0.01s)
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/dangling_launcher_link
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_directory
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_an_empty_file
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_loop
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_hard-linked_file
+--- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink (0.10s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/dangling_launcher_link (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_directory (0.01s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_an_empty_file (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_loop (0.01s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_hard-linked_file (0.02s)
+=== RUN   TestExecutableIdentityResolvesARealSymlinkedProcessLaunch
+    identity_test.go:270: evidence: on darwin os.Executable reports the launch path "/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestExecutableIdentityResolvesARealSymlinkedProcessLaunch4140123828/001/curator" rather than the physical "/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/go-build428944856/b001/godriver.test", so resolution is load-bearing here
+--- PASS: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch (0.05s)
+=== RUN   TestBuildAcceptsAManagerStartedThroughALauncherLink
+--- PASS: TestBuildAcceptsAManagerStartedThroughALauncherLink (1.57s)
+=== RUN   TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink
+--- PASS: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink (0.42s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	2.623s

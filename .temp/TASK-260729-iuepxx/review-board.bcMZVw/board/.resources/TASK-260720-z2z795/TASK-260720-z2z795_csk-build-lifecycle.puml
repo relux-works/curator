@@ -1,0 +1,91 @@
+@startuml
+!theme plain
+!pragma layout smetana
+
+title csk audit, build, dry-run, commit, and rollback lifecycle
+
+skinparam activity {
+  BackgroundColor #F8F9FA
+  BorderColor #495057
+}
+skinparam activityDiamond {
+  BackgroundColor #FFF3CD
+  BorderColor #856404
+}
+
+start
+if (real operation?) then (yes)
+  :Acquire canonical project operation lock\nTASK-260720-z2z795;
+  :Briefly acquire manager-home lock,\nrecover journals, then release it;
+else (dry-run)
+  :Acquire no project or mutation lock;
+endif
+
+partition "Read-only planning" #EAF4FF {
+  :Resolve refs and immutable snapshots;
+  :Parse schema v6 and validate build roots\nTASK-260720-z9j4c9;
+  :Validate full tree, hash build source,\nand exclude build roots from context\nTASK-260720-3c0ss2;
+  :Build provider-first closure and collision plan;
+  :Run source audit, registry, attestation,\nMCP, system, and moved-tag gates;
+  :Create private probe root, disable telemetry,\nprobe and fingerprint trusted Go\nTASK-260720-3j8pp5;
+  :Compute canonical inputs and keys, then inspect\nprotected cache read-only\nTASK-260720-2dnqw2 / 2jfnz6 / 8nxlgx;
+
+  if (dry-run?) then (yes)
+    :Re-read shared generation digests;
+    if (generation changed?) then (yes)
+      :Retry read-only plan or report\nconcurrent_state_change;
+    else (no)
+      :Report cache-hit, would-preflight-and-build,\nwould-rebuild-untrusted-cache, corrupt, or unsupported;
+    endif
+    :Delete private probe root;
+    note right
+      No go list or go build.
+      No audit, registry, lock, journal, cache,
+      runtime, context, marker, shim, consumer, or GC write.
+    end note
+    stop
+  else (real)
+  endif
+}
+
+partition "Operation-private build staging" #FFF4E6 {
+  while (cache miss remains?) is (yes)
+    :Select provider-first node and lexical command;
+    :Run fixed go list and validate full graph;
+    :Run fixed go build into private staging\nTASK-260720-2g21eg;
+    if (preflight or build failed?) then (yes)
+      :Delete staging and probe state;
+      :Leave all persistent installation and cache state unchanged;
+      stop
+    endif
+    :Verify, permission, and hash staged artifact;
+  endwhile (no)
+}
+
+partition "Manager-home isolated commit" #EEFBEF {
+  :Acquire manager-home mutation lock;
+  :Recover journals and revalidate cache trust,\nshared generations, target preimages, and plan;
+  if (plan materially changed?) then (yes)
+    :Release home lock and restart from\nearliest affected read or build step;
+    stop
+  else (no)
+  endif
+  :Publish missing immutable cache entries atomically;
+  :Create durable transaction journal;
+  :Commit contexts and markers;
+  :Commit runtime, shims, and environments;
+  :Commit adapters, mirrors, and stale removals;
+  :Commit consumer ledger last\nTASK-260720-3t8nr3 / g7kgox;
+
+  if (publication or target swap failed?) then (yes)
+    :Restore journaled targets in exact reverse order\nwhile home lock remains held;
+    :Retain or remove transaction-owned cache only\nwhen a locked fresh mark proves safety;
+  else (no)
+    :Durably remove backups and journal;
+    :Run runtime, snapshot, and build-cache GC\nunder the home lock\nTASK-260720-th0jdi;
+  endif
+  :Release home lock and project lock;
+}
+stop
+
+@enduml

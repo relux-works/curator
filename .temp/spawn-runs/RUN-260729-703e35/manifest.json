@@ -1,0 +1,58 @@
+{
+  "id": "RUN-260729-703e35",
+  "task_id": "TASK-260720-1pvfj5",
+  "created_at": "2026-07-29T18:04:08.466451Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-22-04-08_-implementer--developer--claude-_TASK-260720-1pvfj5.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260720-1pvfj5_spawn-log_-implementer--developer--claude-_RUN-260729-703e35.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-1pvfj5_candidate-release-ci-gates.puml",
+    "TASK-260720-1pvfj5_candidate-release-ci-gates.svg",
+    "TASK-260720-1pvfj5_candidate-suite-identity.txt",
+    "TASK-260720-1pvfj5_final-verification.log",
+    "TASK-260720-1pvfj5_gate-origin-main.log",
+    "TASK-260720-1pvfj5_results.md",
+    "TASK-260720-1pvfj5_spawn-log_-implementer--developer--claude-_RUN-260729-9ead43.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-1pvfj5_candidate-release-ci-gates.puml": "8bdd00d7508df337feac662c5d0dc5574c2517fcc25855147a5c0bf4658861f5",
+    "TASK-260720-1pvfj5_candidate-release-ci-gates.svg": "a2902a57f8877aa38e34409ae54a6f43f16f46ebe8f69842bcadf5d964460887",
+    "TASK-260720-1pvfj5_candidate-suite-identity.txt": "5e332609e5017262598d8cb96c7067ab4a8f0f3cd2db2630c79a2657d5cdb6e1",
+    "TASK-260720-1pvfj5_final-verification.log": "a0e0bc365e2d13a6abda45a6f83efa323512c8e1a2997b4e1bad259e839f0eda",
+    "TASK-260720-1pvfj5_gate-origin-main.log": "c32221865c946c70beeeff6f94a1475a053801f413da3a118d4400e32b577419",
+    "TASK-260720-1pvfj5_results.md": "956bcbb1f7f3fbd6c67cb9987d6975a5cfe67591a2e6d8e443bae33ab2f266c3"
+  },
+  "require_outcome_artifact": true
+}

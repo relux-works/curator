@@ -1,0 +1,39 @@
+=== 0. every skip reason the new identity cases can print, taken from source ===
+ok    internal/godriver/identity_test.go: creating Windows symlink requires host support: 
+      host-capability	allow
+ok    internal/godriver/identity_test.go: this host cannot create a hard link: 
+      host-capability	allow
+ok    internal/godriver/identity_windows_test.go: this host cannot create a junction os.Lstat reports as a non-directory
+      host-capability	allow
+ok    internal/godriver/identity_windows_test.go: this host cannot create a hard link: 
+      host-capability	allow
+ok    internal/godriver/selection_windows_test.go: this host cannot create a junction os.Lstat reports as a non-directory
+      host-capability	allow
+ok    internal/godriver/selection_windows_test.go: this host cannot create a directory junction: 
+      host-capability	allow
+=== 1. a Windows runner WITHOUT SeCreateSymbolicLinkPrivilege ===
+ok    the reworded skip degrades the link cases instead of failing CI (exit 0)
+      recorded: 7
+      internal/godriver	TestExecutableIdentityResolvesALauncherLink	host-capability	tolerated-by-ledger	creating Windows symlink requires host support: A required privilege is not held by the client.
+      internal/godriver	TestExecutableIdentityResolvesALauncherLink/shim symlink on PATH	host-capability	tolerated-by-ledger	creating Windows symlink requires host support: A required privilege is not held by the client.
+
+=== 2. the SAME skip on darwin, which creates symlinks ===
+ok    a link-case skip on darwin is fatal (exit 1)
+
+=== 3. the PRE-FIX skip wording on the same Windows runner ===
+ok    the unclassified wording still fails the gate (exit 1)
+      FAIL  ledger case skipped for the wrong reason on windows: internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink
+            the ledger tolerates a host-capability skip here; this one classified as UNCLASSIFIED
+
+=== 4. the junction cases are required BY NAME on windows ===
+ok    a renamed or deleted junction case fails by name (exit 1)
+      FAIL  required case never ran on windows: internal/godriver :: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction
+ok    a genuine host-capability skip of a junction case is tolerated and recorded (exit 0)
+      internal/godriver	TestExecutableIdentityStillRejectsSubstitutionBehindAJunction	host-capability	tolerated-by-ledger	this host cannot create a hard link: not supported
+ok    a junction case skipped for an unclassified reason fails (exit 1)
+
+=== 5. a complete run on each served platform ===
+ok    every ledger row is satisfiable on darwin (exit 0)
+ok    every ledger row is satisfiable on windows (exit 0)
+
+gate-behaviour-check: 9 passed, 0 failed

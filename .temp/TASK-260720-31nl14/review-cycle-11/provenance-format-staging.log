@@ -1,0 +1,78 @@
+base=17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+go=go version go1.25.5 darwin/arm64
+status:
+ M go.mod
+ M internal/closure/closure.go
+ M internal/closure/closure_test.go
+ M internal/closure/conformance_test.go
+ M internal/globalbins/globalbins_test.go
+ M internal/install/global.go
+ M internal/install/install.go
+ M internal/install/install_test.go
+ M internal/interop/golden_test.go
+ M internal/marker/marker.go
+ M internal/marker/marker_test.go
+ M internal/protocoljson/json_test.go
+ M internal/registry/registry.go
+ M internal/runtimestore/runtimestore.go
+ M internal/skillcheck/skillcheck.go
+ M internal/skillcheck/skillcheck_test.go
+ M internal/skillspec/conformance_test.go
+ M internal/skillspec/parse.go
+ M internal/skillspec/parse_test.go
+ M internal/skillspec/types.go
+ M internal/snapshot/snapshot.go
+ M internal/snapshot/snapshot_test.go
+ M internal/whitelist/whitelist.go
+ M internal/whitelist/whitelist_test.go
+?? internal/buildcache/
+?? internal/buildmeta/
+?? internal/buildsource/
+?? internal/managerlock/
+?? internal/marker/marker_v2_test.go
+?? internal/protocoljson/ccj.go
+?? internal/runtimestore/conformance_test.go
+?? internal/runtimestore/scripts.go
+?? internal/runtimestore/targets.go
+?? internal/runtimestore/targets_test.go
+?? internal/runtimestore/targets_unix_test.go
+?? internal/runtimestore/targets_windows_test.go
+?? internal/skillspec/build_test.go
+?? internal/snapshot/lock.go
+?? internal/snapshot/lock_unix.go
+?? internal/snapshot/lock_windows.go
+?? internal/transaction/
+?? internal/whitelist/conformance_test.go
+?? task-board.config.json
+staged_files:
+format:
+diff_check:
+windows_skips:
+windows_failures:
+transaction_manifest:
+6d42da1fb768aa0d5fe85c905a7ec621b23b00924765e65b66d795afa827f9d7  internal/transaction/digest.go
+c790af91c61ab142ff12b26504c279820a6ad20eae467d3d4e31df0bdf0ee473  internal/transaction/durability_unix.go
+d9dd43b08d69a6e2f4bb80bc8b532a32ecd2214532e129b5ed92b4c2cb71a266  internal/transaction/durability_windows.go
+b6fe03ac3640449418a8a54f6cddc04a094699662ea070e50cefd6942e43c67e  internal/transaction/engine.go
+0e506ce7e26c8ee18c53a34f7ae3a80c0760ada6172c7b107df317b592e742b0  internal/transaction/engine_test.go
+83b16dcd2e7474b134f2183c5ee81a3ef10914e826dbc734ce185c81c9e22137  internal/transaction/files.go
+915546908805b2bf78901eb90cf7955f758b1ab066a5d38fb4a0e58ee499095f  internal/transaction/journal.go
+3462be7be8e054ce6e8b2d81915a36eba97d1a3618e93abbe6ee4698ca2ebc0c  internal/transaction/namespace.go
+8ed05a4135e3b050a3e995d397c1119322dedf4e8f266316122543f60b407ae5  internal/transaction/namespace_case_darwin.go
+e2ecc9e8d652b23e918c10190c2da2a5bf9da16a6aaf3e39b8a84ca72eec0d1d  internal/transaction/namespace_case_other.go
+f9f9e55b8a8a72b2ad9320f94914465c681c48c2eb595a8ff7df6fc5d00b5cea  internal/transaction/namespace_case_windows.go
+00b995ff9f43410f98353151aa7df574aff85af53143cba84b4a66ed410bdb80  internal/transaction/preparation_durability_test.go
+5b6c81f03b5cd0bf9ed30522babcccf50c85fda63f3eed4a8898cbff4c41b73a  internal/transaction/recovery_corruption_test.go
+6b8e7882b444ed21eec5831aaac75179178559029823cd918741cd22e52f4bbe  internal/transaction/rename_noreplace_darwin.go
+6b3e556b13b3b37dc84c2c71747c90d8c8d6055b3acbd99ee89758d7f4c1dfa4  internal/transaction/rename_noreplace_linux.go
+8b326d192bfa80b780bfd44d8db59d89aed7f9af1cce9e587ed21ca137726736  internal/transaction/rename_noreplace_other_unix.go
+50cf212ab9b7992e0bad46e486765d25c0ecc8e4556a009a6ebe16b85bfa250b  internal/transaction/rename_noreplace_windows.go
+5f8973f1b44f921a4c77135f5b236a4eb0218741d486218ef0042a807b633e49  internal/transaction/replace_unix.go
+c901e3d77606cb3ce63a011cca30a8b161266b609623b446678796a7335346fa  internal/transaction/replace_windows.go
+2ff85b24dd88d39cdf1b5cb90496998446c16b774bee93aff886e43ab56c27c6  internal/transaction/root_metadata_unix_test.go
+1b22dfad0c1f2eb2890594e05e161bbe2a3cdf5b210084cf9c2730998e46cb02  internal/transaction/staging.go
+4ca8ba1332f0cdff5fa10762ccac4838968ab2649f28bc34b840016807828845  internal/transaction/subprocess_test.go
+bbdfc67e096327071c301d0be9a7762e95c7f99af27622ef0abdec403140fa3a  internal/transaction/types.go
+4409fdbf672301aefae58e6d3d59da9122f1912aef2846cf60e2fc93103f3b9b  internal/transaction/validation_darwin_test.go
+385bcb2a8fa0861532b7b1a35053c8cac885d63a5b0b82e96d292e288594ed4a  internal/transaction/validation_test.go
+0d17fe286af9003a6abf018df9bf678bff44c3ddfb1efe653e0a9f03eee00fec  internal/transaction/validation_windows_test.go

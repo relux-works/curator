@@ -1,0 +1,100 @@
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/schemas/v1/common.schema.json:177:        "modules": {"$ref": "#/$defs/pathSet"}
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:108:.git .github .gitlab-ci.yml .venv __pycache__ *.pyc node_modules
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:114:subtrees even if nested under an eligible context root. The `build_roots`
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:145:For a selected consistent locale, a manager replaces only the `description`
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:183:| 8 | opt-in `script-worker-v1` script execution policy and declared first-party module roots |
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:190:and `go-repository-v1`. Schema 1 through 7 MUST reject `modules` at the top
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:224:and `source_dir`. Manifest schema 8 adds exactly one OPTIONAL field, `modules`,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:234:name: `bin/<command>` on Unix and `bin/<command>.exe` on Windows. A package
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:239:dependency-command selection, portable-name collision, shim collision, and
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:249:first-party modules of the same package as a declared, manager-validated
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:289:Windows, `APPDATA`, `LOCALAPPDATA`, `USERPROFILE`, `TEMP`, and `TMP` MUST also
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:336:macOS and Windows. The policy identity is a normative cache, receipt, marker,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:413:| Control | macOS | Windows |
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:534:Targets MAY share one build root. A nested module is admitted only when the
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:536:MUST NOT discover modules, targets, commands, or outputs. Every non-standard
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:548:MUST derive `bin/<command>` on Unix or `bin/<command>.exe` on Windows and MUST
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:562:#### 4.2.3 Schema-8 first-party module roots
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:565:command, `modules`: a unique list of portable relative directory paths naming
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:566:first-party Go modules of the same package that the command's build root
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:567:replaces. An absent or empty list is the default and keeps the exact schema-6
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:572:`go.mod` and are therefore forced by the bijection below into equal lists, so
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:577:read any replacement as an instruction, MUST NOT discover modules, targets, or
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:583:**Effective replace set.** For an active build command whose build root is `R`,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:584:the effective replace set is every replacement directive materialized in
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:585:`R/vendor/modules.txt`, and that file is the only surface a manager reads to
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:589:`go build` when the two disagree, so no replacement in `R/go.mod` can be absent
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:590:from it and none can hide from validation by going unused. The manager MUST NOT
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:596:Within `R/vendor/modules.txt` only a line whose first two bytes are exactly
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:597:`# ` and which contains the exact ASCII bytes ` => ` is a replacement
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:603:Go writes a replacement annotation with one left-hand token for every
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:604:unversioned-left directive, including an unused directive. When that directive
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:606:left module path and right replacement but with the selected version as the
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:616:module-to-module redirect and MUST be rejected: it is a versioned dependency
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:622:and its effective replacement directives MUST stand in one-to-one
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:624:every declaration MUST be named by exactly one directive. A replacement naming
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:625:no declared directory MUST be rejected as undeclared; a declared directory
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:626:named by no replacement MUST be rejected as unused. This is the entire use a
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:627:manager makes of the replace records: they are checked against the declaration,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:628:never obeyed. A command with an absent or empty `modules` list therefore MUST
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:629:have an empty effective replace set, which is the schema-6 and schema-7 rule
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:637:and platform path collisions already follow from snapshot validation in section
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:653:extend to a module carrying a replacement.
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:666:replacement remains vendor-only and versioned, resolved strictly below
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:675:before the fixed `go list`. Form and bijection validation MUST complete after
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:748:replaces acquisition only. It MUST NOT change repository identifier,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:764:- contain no explicit port, password, query, fragment, percent escape, or
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:784:after `--` where supported. Submodules are unsupported. Archive extraction
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:785:MUST reject symbolic links, hard links, path escapes, duplicate platform paths,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:802:scheme, an explicit port, password, query, fragment, percent escape, backslash,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:815:escape, or non-ASCII byte MUST be rejected before Git or SSH starts. HTTPS
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:920:alternate, replace, graft, checkout, archive, maintenance, or lazy-fetch
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:923:HTTPS MUST verify TLS and MUST NOT follow redirects. SSH MUST use an operator-
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:938:pack/index state, alternates, promisor state, grafts, replace refs, shallow
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:1041:collisions are invalid. For every regular file, convert its relative protocol
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:1072:`<resolved-goroot>/bin/go` (`bin/go.exe` on Windows), not a wrapper or an
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/protocol/core.md:1259:external `curator-build-source-v1` digest. A manager MUST NOT omit, replace, or
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:55:atomic replacement. Implementations SHOULD serialize concurrent writers with a
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:89:   portable-path, case-folding, and platform-path collisions, and verify system,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:98:duplicate encoded paths, and platform path collisions. A build root MUST be a
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:112:static context exclusion, build-source hashing, closure construction, collision
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:123:the regular executable `<GOROOT>/bin/go` (`bin/go.exe` on Windows), never a
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:165:directory. On Windows, `APPDATA`, `LOCALAPPDATA`, `USERPROFILE`, `TEMP`, and
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:211:macOS and Windows. The worker is one hidden-mode re-execution of the installed
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:224:   boundary so a replacement race cannot widen the graph;
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:256:| Control | macOS | Windows |
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:292:| `build_execution_worker_identity_invalid` | `blocked` | `error` | Worker or toolchain executable identity, substitution, or replacement check fails |
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:330:carries no replacement. A result whose module carries a replacement, and every
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:331:active input below the declared module directory that replacement names, is
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:341:A schema-8 build command that declares `modules` is validated in a fixed order,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:352:   against `vendor/modules.txt` itself and fails the command with its own
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:355:3. After `go list` returns, the manager reads the effective replace set from
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:356:   `<build root>/vendor/modules.txt` exactly as Protocol Core section 4.2.3
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:358:   directive annotations, rejects every versioned replacement side and every
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:359:   module-to-module redirect, resolves each directory-form target against the
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:363:   included and the vendored exceptions withheld from replaced modules.
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:366:source of the effective replace set, and MUST NOT reconcile a vendor copy
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:378:| `build_module_root_directive_form_unsupported` | `unsupported` | `error` | An effective replacement carries a version on either side, is a module-to-module redirect, or has an unreadable or unreconciled annotation shape |
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:379:| `build_module_root_directive_undeclared` | `unsupported` | `error` | An effective replacement names a directory the command does not declare |
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:380:| `build_module_root_declaration_unused` | `unsupported` | `error` | A declared module directory is named by no effective replacement |
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:473:entry may be quarantined or replaced only under this lock from an already
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:571:augmentation is required or an executable POSIX-shell wrapper. On Windows it
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:585:`<project>\.agents\bin\<command>.cmd` on Windows. A manager SHOULD warn when
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:707:native Windows drive paths for manager configuration and global-environment
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:848:HTTPS verifies TLS, follows no redirect, and receives credentials or a proxy
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:865:fragment, percent escape, backslash, empty path, and redirects. SSH has the
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:905:replace, graft, shallow, hook, filter, unknown extension, link, reparse escape,
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:916: "--no-replace-objects",
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:928: "-c", "fetch.recurseSubmodules=false",
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:938: "--no-recurse-submodules", "--no-auto-maintenance",
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:976:escapes, and non-ASCII bytes are rejected before Git.
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1059:  escape: `build_repository_local_layout_unsafe`.
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1074:   only `\\` and `\"` escapes. No legacy dotted subsection syntax is admitted.
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1080:   no quote, control byte, or backslash escape. Malformed or unsupported
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1099:An unescaped closing quote ends them; their escape sets are exactly those
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1155:Any loose or packed `refs/replace/*` entry rejects whether or not it is
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1202: "--no-replace-objects",
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1281:MUST byte-equal the requested tag; nested tag names need only pass the safe-tag
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1295:collision. Only tree mode `40000` and blob modes `100644` and `100755` are
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1446:Windows Authenticode signing/timestamping remain outside install-time build
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/profiles/manager.md:1557:hooks, filters, attributes, alternates, replacements, grafts, promisor/lazy

@@ -1,0 +1,26 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/unc_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/quoted_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/relative_declaration_paths_survive
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/a_bare_separator_is_not_a_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/unix_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/windows_path
+--- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/unc_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/quoted_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/relative_declaration_paths_survive (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/a_bare_separator_is_not_a_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/unix_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/windows_path (0.00s)
+=== RUN   TestRedactDiagnosticCannotDriveATerminal
+--- PASS: TestRedactDiagnosticCannotDriveATerminal (0.00s)
+=== RUN   TestRedactDiagnosticIsBounded
+--- PASS: TestRedactDiagnosticIsBounded (0.00s)
+=== RUN   TestRedactDiagnosticKeepsInvalidUTF8Out
+--- PASS: TestRedactDiagnosticKeepsInvalidUTF8Out (0.00s)
+=== RUN   TestPlanLinesRedactAnUntrustedReason
+--- PASS: TestPlanLinesRedactAnUntrustedReason (0.00s)
+PASS

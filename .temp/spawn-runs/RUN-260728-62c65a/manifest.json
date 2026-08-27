@@ -1,0 +1,53 @@
+{
+  "id": "RUN-260728-62c65a",
+  "task_id": "TASK-260720-1ljev5",
+  "created_at": "2026-07-28T19:03:08.556665Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-23-03-08_-implementer--developer--claude-_TASK-260720-1ljev5.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-62c65a.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-1ljev5_gate-evidence.tar.gz",
+    "TASK-260720-1ljev5_implementation-notes.md",
+    "TASK-260720-1ljev5_review-verdict-cycle-1.md",
+    "TASK-260720-1ljev5_spawn-log_-implementer--developer--claude-_RUN-260728-a448d8.log",
+    "TASK-260720-1ljev5_spawn-log_-reviewer--reviewer--codex-_RUN-260728-93cc5c.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-1ljev5_gate-evidence.tar.gz": "dbf313015d635143159c3868b60901bf040aa72a8e12958509ece671b2239755",
+    "TASK-260720-1ljev5_implementation-notes.md": "ef564cf1d42a723dd7c35819f6caa10ebd4096c22f3e0aeb716c849651d7553b",
+    "TASK-260720-1ljev5_review-verdict-cycle-1.md": "dd925e9960759f4527ad34cb6b874d64440826f92a81ac588ad1aa1a521b878f"
+  },
+  "require_outcome_artifact": true
+}

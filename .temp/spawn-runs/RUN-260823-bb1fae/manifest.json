@@ -1,0 +1,52 @@
+{
+  "id": "RUN-260823-bb1fae",
+  "task_id": "TASK-260823-1vleh5",
+  "created_at": "2026-08-23T21:02:19.031069Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "claude",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260824-01-02-19_-implementer--developer--claude-_TASK-260823-1vleh5.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "45m0s",
+  "log_resource_name": "TASK-260823-1vleh5_spawn-log_-implementer--developer--claude-_RUN-260823-bb1fae.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260823-1vleh5_results.md",
+    "TASK-260823-1vleh5_review-verdict.md",
+    "TASK-260823-1vleh5_spawn-log_-implementer--developer--claude-_RUN-260823-2269a2.log",
+    "TASK-260823-1vleh5_spawn-log_-reviewer--reviewer--claude-_RUN-260823-8f0f4e.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260823-1vleh5_results.md": "54ef343e311455fa0d03ebbca8d8ea773bf4e2dc033b051fa8f62d0c69060bd8",
+    "TASK-260823-1vleh5_review-verdict.md": "7f2fc68231f189221bf8306be5a7eb1e28d8f13e12c6ae5bf58c3da3c5189a92"
+  },
+  "require_outcome_artifact": true
+}

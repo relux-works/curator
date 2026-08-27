@@ -1,0 +1,52 @@
+=== RUN   TestNamespaceIdentityIsReadOnceWithinOneValidationPass
+--- PASS: TestNamespaceIdentityIsReadOnceWithinOneValidationPass (0.00s)
+=== RUN   TestNamespaceIdentitySnapshotDoesNotOutliveItsPass
+--- PASS: TestNamespaceIdentitySnapshotDoesNotOutliveItsPass (0.00s)
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_live
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/nul_live
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/invalid_utf8_live
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_staged
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_backup
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/nul_rollback
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_entry_live
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_reserved
+=== RUN   TestValidateIndependentTargetNamespacesRejectsMalformedPaths/nul_reserved
+--- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_live (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/nul_live (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/invalid_utf8_live (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_staged (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_backup (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/nul_rollback (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_entry_live (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/relative_reserved (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsMalformedPaths/nul_reserved (0.00s)
+=== RUN   TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+=== RUN   TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/nested_live_paths
+=== RUN   TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/repeated_live_path
+=== RUN   TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/live_path_is_another_target's_backup_sidecar
+=== RUN   TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/live_path_is_another_target's_cleanup_tomb
+=== RUN   TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/hard_link_alias_between_live_paths
+=== RUN   TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/symbolic_link_alias_between_live_parents
+=== RUN   TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/target_reaches_into_the_reserved_namespace
+--- PASS: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths (0.01s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/nested_live_paths (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/repeated_live_path (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/live_path_is_another_target's_backup_sidecar (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/live_path_is_another_target's_cleanup_tomb (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/hard_link_alias_between_live_paths (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/symbolic_link_alias_between_live_parents (0.00s)
+    --- PASS: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths/target_reaches_into_the_reserved_namespace (0.00s)
+=== RUN   TestValidateIndependentTargetNamespacesAcceptsDisjointPaths
+--- PASS: TestValidateIndependentTargetNamespacesAcceptsDisjointPaths (0.01s)
+=== RUN   TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+=== RUN   TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves/hard_link_alias
+=== RUN   TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves/symbolic_link_alias_on_the_live_parent
+--- PASS: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves (0.04s)
+    --- PASS: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves/hard_link_alias (0.02s)
+    --- PASS: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves/symbolic_link_alias_on_the_live_parent (0.01s)
+=== RUN   TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+--- PASS: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped (0.14s)
+PASS
+ok  	github.com/relux-works/curator/internal/transaction	0.432s

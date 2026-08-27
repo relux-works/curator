@@ -1,0 +1,186 @@
+# Tier-1 platform case ledger for the compiled-build CI gates.
+#
+# This table names the compiled-build behaviour the task acceptance criteria
+# require each runner to execute.  `.github/ci/platform-case-gate.sh` enforces
+# it against a real `go test -json` stream:
+#
+#   * every row listing this GOOS in `must_run_on` must be observed PASSING.
+#     A rename, a deletion, a `-run` filter matching nothing, a missing
+#     interpreter or an unset conformance root all fail here by name instead
+#     of quietly shrinking the run.
+#   * a skip of a listed case -- or of any of its subtests -- is FATAL unless
+#     a row tolerates it on this GOOS.
+#   * `.github/ci/ledger-consistency.sh` separately proves, from `go list` on
+#     each target GOOS, that every case a row requires is actually compiled
+#     into that platform's build, and that no platform where a case IS
+#     compiled in is left undeclared.
+#
+# Columns are TAB separated:
+#   package  test  must_run_on  skip_allowed_on  class  behaviour
+#
+# `test` may name a subtest (`Parent/child`) or use the `Parent/*` form, which
+# tolerates a skip of any subtest of `Parent` while still requiring `Parent`
+# itself to pass.  `must_run_on` / `skip_allowed_on` take a comma separated
+# subset of {linux,darwin,windows}, or `-` for the empty set.
+#
+# `class` records WHY a tolerated skip is legitimate and is checked against
+# the reason text the test actually printed:
+#   platform-control  a control rc5-native-control-inventory-v1 defines for
+#                     another platform only -- the AC's explicit carve-out
+#   host-capability   the runner filesystem cannot create the artefact the
+#                     vector needs (symlink, hard link, reparse point, FIFO,
+#                     non-UTF-8 name)
+#   root-content      the supplied conformance root publishes no such vector
+#                     group
+#   opt-in            an explicit developer environment variable
+#
+# A GOOS on which the case's package is excluded by the supplied conformance
+# root's own qualification vector (see `.github/ci/suite-plan.sh`) is neither
+# required nor an omission: the exclusion is asserted positively by the
+# rejection case at the bottom of this file.
+#
+# package	test	must_run_on	skip_allowed_on	class	behaviour
+
+# ===========================================================================
+# Windows DACL / security descriptor
+# ===========================================================================
+internal/buildcache	TestWindowsProtectedStateMatrix	windows	-	-	Windows DACL protected-state matrix for the build cache
+internal/buildcache	TestWindowsProtectedStateMatrix/*	-	windows	host-capability	a subtest needing a Windows symlink may skip where the host forbids it; the matrix itself must still pass
+internal/buildcache	TestValidateWindowsSecurityPolicy	windows	-	-	validates the Windows security-descriptor policy on cache state
+
+# ===========================================================================
+# Windows reparse points
+# ===========================================================================
+internal/buildcache	TestSweepDoesNotFollowAReparsedEntry	windows	windows	host-capability	cache sweep refuses to traverse a reparse point inside an entry
+internal/buildcache	TestSweepDoesNotFollowAReparsedCacheRoot	windows	windows	host-capability	cache sweep refuses to traverse a reparsed cache root
+internal/scopes	TestCollectStaysFailSafeOnRedirectedWindowsScopes	windows	windows	host-capability	GC stays fail-safe when a Windows scope is redirected by a reparse point
+
+# ===========================================================================
+# Windows `.cmd` launchers
+# ===========================================================================
+internal/runtimestore	TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode	windows	-	-	the installed `.cmd` wrapper forwards arguments, PATH and exit code through cmd.exe
+internal/runtimestore	TestInstallSingleCommandAndShims	linux,darwin,windows	-	-	writes the `run.cmd` Windows launcher and asserts its `@echo off` payload
+internal/runtimestore	TestRuntimeCommandPath	linux,darwin,windows	-	-	maps a `tool.cmd` Windows launcher back to its command name
+internal/runtimestore	TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly	linux,darwin	windows	platform-control	compiled shims stage without launching, then forward exactly (POSIX post-install fixture)
+
+# ===========================================================================
+# Unix ownership and permission
+# ===========================================================================
+internal/buildcache	TestUnixProtectedStateMatrix	linux,darwin	-	-	unix ownership and mode matrix for protected cache state
+internal/buildcache	TestUnixProtectionHelperFailuresFailClosed	linux,darwin	-	-	unix protection helpers fail closed rather than degrading the boundary
+internal/config	TestBootstrapAndAddProject	linux,darwin,windows	-	-	asserts the manager config is written with private (0o600) ownership bits on unix
+
+# ===========================================================================
+# No-follow: link traversal is refused, never followed
+# ===========================================================================
+internal/buildcache	TestSweepDoesNotFollowSymlinkedEntries	linux,darwin	-	-	cache sweep refuses to traverse symlinked entries
+internal/buildcache	TestSweepDoesNotFollowASymlinkedCacheRoot	linux,darwin	-	-	cache sweep refuses to traverse a symlinked cache root
+internal/buildcache	TestRetireEntryRemovesLinksWithoutFollowingThem	linux,darwin	-	-	entry retirement removes links without following them
+internal/buildcache	TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot	linux,darwin	-	-	rejects a symlinked entry and an unprotected cache root
+internal/scopes	TestCollectStaysFailSafeOnRedirectedUnixScopes	linux,darwin	-	-	GC stays fail-safe when a unix scope is redirected by a link
+internal/buildsource	TestRejectsSpecialFile	linux,darwin	-	-	build source enumeration rejects a non-regular file
+internal/gitops	TestArchiveRejectsLinks	linux,darwin	windows	host-capability	archiving refuses a tree containing links (needs `ln`, absent from the Windows job PATH)
+
+# ===========================================================================
+# Read-only build source
+# ===========================================================================
+internal/buildsource	TestFrozenTokenRejectsMutation	linux,darwin,windows	-	-	a frozen build source rejects mutation of the source tree
+internal/buildsource	TestFrozenTokenRejectsMutation/*	-	linux,darwin,windows	host-capability	a link-dependent subtest may skip where the host forbids symlinks
+internal/buildsource	TestFrozenTokenRejectsRootReplacement	linux,darwin,windows	-	-	a frozen build source rejects replacement of its root
+internal/buildsource	TestWithValidatedOrdersCallbackAndRejectsMutation	linux,darwin,windows	-	-	validated enumeration is ordered and refuses mutation during the callback
+internal/buildsource	TestWithValidatedOrdersCallbackAndRejectsMutation/*	-	linux,darwin,windows	host-capability	a link-dependent subtest may skip where the host forbids symlinks
+internal/install	TestDryRunTouchesNothing	linux,darwin,windows	-	-	proves a dry run leaves the source and target trees unwritten
+internal/whitelist	TestRuntimeRootsExcludedFromContext	linux,darwin,windows	-	-	proves runtime roots stay outside the copied agent context
+
+# ===========================================================================
+# Resource policy -- rc5-native-control-inventory-v1
+# ===========================================================================
+internal/godriver	TestResourceLimitsStayInsideManagerBounds	darwin,windows	-	-	worker resource limits stay inside the manager's declared bounds
+internal/godriver	TestProbeSetGuardMatchesTheInventoryExactly	darwin,windows	-	-	the probed native control set matches rc5-native-control-inventory-v1 exactly
+internal/godriver	TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes	darwin,windows	-	-	every native control seam failure rejects before the worker executes
+internal/godriver	TestPerFileSizeLimitIsReallyApplied	darwin	windows	platform-control	per-file-size-limit is a real kernel limit inherited by the compiler; the inventory defines it for macOS only
+internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	windows	darwin	platform-control	active-process-count-limit refuses the compiler natively; the inventory defines it for Windows only
+
+# ===========================================================================
+# Executable identity and executable behaviour
+# ===========================================================================
+internal/godriver	TestExecutableIdentityRejectsSubstitutionAndMutation	darwin,windows	-	-	the toolchain executable identity rejects substitution and mutation
+internal/runtimestore	TestUnixPostInstallShimPropagatesSignal	linux,darwin	-	-	the installed unix shim is executable and propagates signals
+internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	linux,darwin	windows	platform-control	executes the POSIX shell hook end to end
+internal/shell	TestPowerShellHookRunsOnEveryPrompt	windows	linux,darwin	platform-control	executes the PowerShell prompt hook end to end
+internal/envfiles	TestWriteProjectShapesAndSourcing	linux,darwin,windows	-	-	sources the generated env file through a real shell on unix; shape-only on Windows
+internal/install	TestEndToEndInstall	linux,darwin,windows	-	-	materialises the executable shim and env files of a full install
+internal/adapters	TestSymlinkModeStagesRelativeLinkTargets	linux,darwin,windows	-	-	creates a link (Windows: a reparse point) and asserts its target stays relative
+
+# ===========================================================================
+# Transaction journal and install atomicity
+# ===========================================================================
+internal/transaction	TestValidateIndependentTargetNamespacesRejectsOverlappingPaths	linux,darwin,windows	linux,darwin,windows	host-capability	independent target namespaces reject overlapping paths (link-capability guarded)
+internal/transaction	TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves	linux,darwin,windows	linux,darwin,windows	host-capability	a namespace alias introduced between saves is rejected (link-capability guarded)
+internal/transaction	TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped	linux,darwin,windows	linux,darwin,windows	host-capability	recovery rejects target namespaces aliased while stopped (link-capability guarded)
+internal/install/atomicity	TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder	linux,darwin,windows	-	-	a failure at every target class restores the prior state in reverse order
+internal/install/atomicity	TestStaleAdapterRemovalRollsBackToTheExactPriorEntry	linux,darwin,windows	-	-	a stale adapter removal rolls back to the exact prior entry
+internal/install/atomicity	TestAdapterMirrorLinksAreJournaledAndRestoredExactly	linux,darwin,windows	linux,darwin,windows	host-capability	adapter mirror links are journaled and restored exactly (link-capability guarded)
+
+# An owned entry's content is path text in the host's own syntax, so every case
+# below states its expectation as the destination the host recorded rather than
+# as a POSIX literal.  They are required without tolerance: this runner set can
+# create a link on all three platforms -- `internal/adapters
+# TestSymlinkModeStagesRelativeLinkTargets` above requires exactly that of it --
+# so the link-capability skip these cases carry firing here is a real loss of
+# coverage and not a host that cannot express the vector.
+internal/transaction	TestCommitAndRollbackRestoreALinkExactly	linux,darwin,windows	-	-	an owned link is replaced and restored with the exact destination the host recorded, across a mode transition
+internal/transaction	TestRecoveryFinishesAPreparedLinkTransaction	linux,darwin,windows	-	-	home-scoped recovery finishes an interrupted link commit instead of leaving it half-applied
+internal/transaction	TestEntryRemovalRestoresTheExactLink	linux,darwin,windows	-	-	a removal target puts the exact prior link back when a later class fails
+internal/transaction	TestEntryTargetsDoNotAliasTheirDestination	linux,darwin,windows	-	-	an owned mirror link and the directory it points at stay independent targets
+internal/transaction	TestNamespaceIdentityIsReadOnceWithinOneValidationPass	linux,darwin,windows	-	-	one validation pass reads each declared path's identity once and answers every later pair from that snapshot
+internal/transaction	TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken	windows	-	-	the pass snapshot completes the file identity Windows leaves deferred, so no comparison reads the filesystem and an unreadable one fails closed
+
+# ===========================================================================
+# Interop / conformance consumer
+# ===========================================================================
+internal/interop	TestGoldenContextCopy	linux,darwin,windows	-	-	the agent context copied for a skill matches the authoritative golden file list
+internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
+internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
+
+# ===========================================================================
+# Compiled-build surface -- rc5-native-control-inventory-v1 carve-out
+#
+# A completed compiled command needs the go-v1 driver, which refuses before any
+# worker starts on a platform the inventory defines no record for.  These cases
+# therefore run on the two covered platforms and are carved out elsewhere by
+# `requireNativeControlInventoryPlatform`, whose reason names the inventory.
+#
+# The carve-out is asserted, not merely obeyed: the bidirectional case below
+# runs on EVERY runner and proves the boundary from whichever side that runner
+# is on -- a covered host installs and publishes exactly one protected entry, an
+# uncovered host is refused with `build_execution_control_unavailable`,
+# publishes nothing, and fails `status --check`.
+#
+# Linux is the open qualification item (rc.5 qualification vector, until_task
+# TASK-260728-1skseh).  When the inventory gains a linux record, the guard stops
+# skipping there on its own and only `must_run_on` below needs widening.
+# ===========================================================================
+cmd/curator	TestCompiledInstallFollowsTheNativeControlInventoryExactly	linux,darwin,windows	-	-	a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
+cmd/curator	TestCompiledProjectStatusRepairRollbackRecovery	darwin,windows	linux	platform-control	compiled currentness, corrupt-cache repair, commit rollback and untrusted-state repair over one real installation
+cmd/curator	TestStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	project status resolves and classifies a compiled command reached only through a dependency
+cmd/curator	TestStatusReportsAnUnusableToolchainPerCompiledCommand	darwin,windows	linux	platform-control	an unusable Go toolchain is reported per compiled command as a warning, and `--check` turns it non-zero
+cmd/curator	TestGCRetainsAndReportsReferencedCompiledState	darwin,windows	linux	platform-control	gc neither removes nor reports removing a cache entry a live marker references
+cmd/curator	TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck	darwin,windows	linux	platform-control	machine-wide status reports compiled currentness and fails `--check` for every non-current state
+cmd/curator	TestGlobalStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	machine-wide status resolves a compiled command no declaration names
+
+# ===========================================================================
+# Protocol platform exclusion -- asserted, never merely omitted.
+#
+# The rc.5 qualification vector marks linux `excluded` (until_task
+# TASK-260728-1skseh), so `internal/godriver` does not execute there.  This
+# case proves the exclusion is real fail-closed behaviour: an uncovered
+# platform is refused BEFORE the worker starts.  It is required on every
+# runner, including the one where the package is otherwise excluded.
+# ===========================================================================
+internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwin,windows	-	-	an uncovered inventory platform (including linux) is rejected before the worker starts
+
+# ===========================================================================
+# Opt-in developer probe -- never required, always tolerated.
+# ===========================================================================
+internal/hashing	TestCrossCheckTree	-	linux,darwin,windows	opt-in	cross-implementation tree digest probe, enabled by an explicit developer env var

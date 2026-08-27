@@ -1,0 +1,61 @@
+{
+  "id": "RUN-260728-eb5a56",
+  "task_id": "TASK-260720-2284br",
+  "created_at": "2026-07-28T12:47:46.898965Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-16-47-46_-implementer--developer--claude-_TASK-260720-2284br.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-eb5a56.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-2284br_gate-evidence-rework-1.tar.gz",
+    "TASK-260720-2284br_gate-evidence.tar.gz",
+    "TASK-260720-2284br_implementation-notes-rework-1.md",
+    "TASK-260720-2284br_implementation-notes.md",
+    "TASK-260720-2284br_review-verdict-cycle-1.md",
+    "TASK-260720-2284br_review-verdict-cycle-2.md",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-b80d71.log",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-e054e1.log",
+    "TASK-260720-2284br_spawn-log_-reviewer--reviewer--codex-_RUN-260728-2469cd.log",
+    "TASK-260720-2284br_spawn-log_-reviewer--reviewer--codex-_RUN-260728-27ac8a.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-2284br_gate-evidence-rework-1.tar.gz": "1e9ce9a599d6956b73062d47a75fdcb523003e7209001e4e773de4cf287f6b0a",
+    "TASK-260720-2284br_gate-evidence.tar.gz": "dec0cada4988cee8ff32b45906d7dccaf512d08286daa02c7f20c062ca79df08",
+    "TASK-260720-2284br_implementation-notes-rework-1.md": "c74b70441da27464f21909676eecb57fb0047c4aafae91fdb642df314a81496a",
+    "TASK-260720-2284br_implementation-notes.md": "214cab3dcf23c4bc185616e5c6bbd161eb6b995860b9dd7fb6ed4c5da7030f68",
+    "TASK-260720-2284br_review-verdict-cycle-1.md": "d01d94d947b968da4d6ecbb9b4577b113075710d757c5b966a3f42369593c3d0",
+    "TASK-260720-2284br_review-verdict-cycle-2.md": "a1c5987ac65871f2f0e05e64f4702b942f81a5021ce4764b2d41f81e9b43ebcb"
+  },
+  "require_outcome_artifact": true
+}

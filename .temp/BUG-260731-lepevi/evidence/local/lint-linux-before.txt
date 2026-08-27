@@ -1,0 +1,9 @@
+internal/godriver/controls_other.go:35:30: func (*controlDomain).destroy is unused (unused)
+func (domain *controlDomain) destroy(_ *exec.Cmd) {}
+                             ^
+internal/transaction/namespace.go:310:6: func existingNamespaceAncestor is unused (unused)
+func existingNamespaceAncestor(path string) (string, error) {
+     ^
+2 issues:
+* unused: 2
+BEFORE exit=1

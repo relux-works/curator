@@ -1,0 +1,56 @@
+## task/TASK-260720-3c0ss2-build-source-identity
+ M src/csk/builds/source.py
+ M tests/test_build_source.py
+?? src/csk/builds/_windows.py
+?? task-board.config.json
+2734beff1a0c93d725c00b1c66ef6ad22c3a780a
+task/TASK-260720-3c0ss2-build-source-identity
+commit 2734beff1a0c93d725c00b1c66ef6ad22c3a780a
+Good "git" signature for oparin@me.com with ECDSA key SHA256:V6JiKG7J29mjsvikcLoSVp0bLa77VTsFy12gnLO81cM
+Author:     Ivan Oparin <oparin@me.com>
+AuthorDate: Thu Jul 30 03:40:52 2026 +0400
+Commit:     Ivan Oparin <oparin@me.com>
+CommitDate: Thu Jul 30 03:40:52 2026 +0400
+
+    feat(builds): add source identity boundary
+worktree /Users/iv/Developer/Wildberries/cocoaskills
+HEAD d5d16bfcaa2fe43dc994b819c2659512c4fd8f0a
+branch refs/heads/main
+
+worktree /Users/iv/Developer/ReluxWorks/cocoaskills-production
+HEAD d2db86ce0c999da97829e4900c50f7350b777015
+branch refs/heads/agent/registry-client-production
+
+worktree /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+HEAD 5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+branch refs/heads/task/TASK-260720-z2z795-transaction-engine
+
+worktree /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z9j4c9/worktree
+HEAD dd76b570f88339fd1d659c02950e68b17f6ba834
+branch refs/heads/task/TASK-260720-z9j4c9-schema-v6
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3j8pp5/worktree
+HEAD d5d16bfcaa2fe43dc994b819c2659512c4fd8f0a
+branch refs/heads/task/TASK-260720-3j8pp5-toolchain-identity
+
+worktree /Users/iv/Developer/Wildberries/.worktrees/cocoaskills-agent-skill
+HEAD 9064b23429e3805a4c865e76dc7d782dfe9356a1
+branch refs/heads/agent/agent-skill-manifest
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/csk-runtime-command-fix/cocoaskills-wb
+HEAD 10a758509374e75827e53b7bb43532a08f998e5f
+branch refs/heads/fix/shell-neutral-onboarding
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-3c0ss2/worktree
+HEAD 2734beff1a0c93d725c00b1c66ef6ad22c3a780a
+branch refs/heads/task/TASK-260720-3c0ss2-build-source-identity
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-poa3ze/origin-main-worktree
+HEAD 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+detached
+
+M	src/csk/builds/source.py
+M	tests/test_build_source.py
+ src/csk/builds/source.py   |  30 ++++++++++---
+ tests/test_build_source.py | 108 ++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 132 insertions(+), 6 deletions(-)

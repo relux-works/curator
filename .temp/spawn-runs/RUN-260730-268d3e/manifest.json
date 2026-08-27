@@ -1,0 +1,58 @@
+{
+  "id": "RUN-260730-268d3e",
+  "task_id": "TASK-260720-2dnqw2",
+  "created_at": "2026-07-30T02:55:44.320376Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-06-55-44_-implementer--developer--codex-_TASK-260720-2dnqw2.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-2dnqw2_spawn-log_-implementer--developer--codex-_RUN-260730-268d3e.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-2dnqw2_implementation-evidence.md",
+    "TASK-260720-2dnqw2_review-verdict.md",
+    "TASK-260720-2dnqw2_spawn-log_-implementer--developer--claude-_RUN-260730-c17507.log",
+    "TASK-260720-2dnqw2_spawn-log_-implementer--developer--codex-_RUN-260730-d48f5d.log",
+    "TASK-260720-2dnqw2_spawn-log_-reviewer--reviewer--codex-_RUN-260730-c1d794.log",
+    "TASK-260720-2dnqw2_tool-readiness.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-2dnqw2_implementation-evidence.md": "672e00f0cd047699656944271e8ce9f888528e3d648757be57200750a1d526c0",
+    "TASK-260720-2dnqw2_review-verdict.md": "63e71855610d30152e61d5aeb0d4d32eacb963b50be9f8c2aa5d7a4b0b6afdb7",
+    "TASK-260720-2dnqw2_tool-readiness.md": "4b70c9ae0d01852c8e983f6b510c44f858ca8c4834d6df964934129e998e64c2"
+  },
+  "require_outcome_artifact": true
+}

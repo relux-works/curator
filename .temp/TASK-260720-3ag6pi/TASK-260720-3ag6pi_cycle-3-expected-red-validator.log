@@ -1,0 +1,89 @@
+EEEEEEE
+======================================================================
+ERROR: test_candidate_requires_all_22_compiled_lifecycle_cases (test_validate.ManagerLifecycleValidationTests.test_candidate_requires_all_22_compiled_lifecycle_cases)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 656, in test_candidate_requires_all_22_compiled_lifecycle_cases
+    for names in validate.MANAGER_COMPILED_LIFECYCLE_CASES.values()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'curator_spec_validate' has no attribute 'MANAGER_COMPILED_LIFECYCLE_CASES'
+
+======================================================================
+ERROR: test_compiled_dry_run_fails_closed (test_validate.ManagerLifecycleValidationTests.test_compiled_dry_run_fails_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 687, in test_compiled_dry_run_fails_closed
+    validate.validate_manager_lifecycle_vectors(lifecycle, build_drivers)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'curator_spec_validate' has no attribute 'validate_manager_lifecycle_vectors'
+
+======================================================================
+ERROR: test_each_compiled_lifecycle_group_fails_closed (test_validate.ManagerLifecycleValidationTests.test_each_compiled_lifecycle_group_fails_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 667, in test_each_compiled_lifecycle_group_fails_closed
+    for field, required in validate.MANAGER_COMPILED_LIFECYCLE_CASES.items():
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'curator_spec_validate' has no attribute 'MANAGER_COMPILED_LIFECYCLE_CASES'
+
+======================================================================
+ERROR: test_lifecycle_schema_and_portable_identity_fail_closed (test_validate.ManagerLifecycleValidationTests.test_lifecycle_schema_and_portable_identity_fail_closed) (label='schema version')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 709, in test_lifecycle_schema_and_portable_identity_fail_closed
+    validate.validate_manager_lifecycle_vectors(
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'curator_spec_validate' has no attribute 'validate_manager_lifecycle_vectors'
+
+======================================================================
+ERROR: test_lifecycle_schema_and_portable_identity_fail_closed (test_validate.ManagerLifecycleValidationTests.test_lifecycle_schema_and_portable_identity_fail_closed) (label='source vector')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 707, in test_lifecycle_schema_and_portable_identity_fail_closed
+    mutate(lifecycle)
+    ~~~~~~^^^^^^^^^^^
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 694, in <lambda>
+    "source vector": lambda lifecycle: lifecycle[
+                                       ~~~~~~~~~^
+        "compiled_build_fixture"
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    ].__setitem__("source_vector", "build-drivers.json#/cache_identity"),
+    ^
+KeyError: 'compiled_build_fixture'
+
+======================================================================
+ERROR: test_lifecycle_schema_and_portable_identity_fail_closed (test_validate.ManagerLifecycleValidationTests.test_lifecycle_schema_and_portable_identity_fail_closed) (label='execution policy')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 707, in test_lifecycle_schema_and_portable_identity_fail_closed
+    mutate(lifecycle)
+    ~~~~~~^^^^^^^^^^^
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 697, in <lambda>
+    "execution policy": lambda lifecycle: lifecycle[
+                                          ~~~~~~~~~^
+        "compiled_build_fixture"
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    ].__setitem__("execution_policy", "hardened-worker-v1"),
+    ^
+KeyError: 'compiled_build_fixture'
+
+======================================================================
+ERROR: test_lifecycle_schema_and_portable_identity_fail_closed (test_validate.ManagerLifecycleValidationTests.test_lifecycle_schema_and_portable_identity_fail_closed) (label='cache key')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 707, in test_lifecycle_schema_and_portable_identity_fail_closed
+    mutate(lifecycle)
+    ~~~~~~^^^^^^^^^^^
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_validate.py", line 700, in <lambda>
+    "cache key": lambda lifecycle: lifecycle[
+                                   ~~~~~~~~~^
+        "compiled_build_fixture"
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    ].__setitem__("cache_key", "sha256:" + "0" * 64),
+    ^
+KeyError: 'compiled_build_fixture'
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.005s
+
+FAILED (errors=7)

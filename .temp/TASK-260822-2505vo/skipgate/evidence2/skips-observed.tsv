@@ -1,0 +1,7 @@
+package	test	class	verdict	reason
+internal/buildrepo	TestEveryOperatorSelectionShapeReachesTheWrapperPolicy	platform-control	allowed-platform-control	an operator agent socket is a unix-domain rendezvous point
+internal/buildrepo	TestOperatorSSHCredentialsAdmitOnlyResolvedObjectsOfTheRightKind	host-capability	allowed-host-capability	this host cannot create a symbolic link: nope
+internal/buildrepo	TestSSHPolicyRefusesUnselectedAndUnverifiableRepositories	host-capability	allowed-host-capability	this host cannot create an agent socket: nope
+internal/config	TestBuildSSHExpandedResolvesHome	host-capability	allowed-host-capability	no home directory: nope
+internal/install	TestConfiguredAgentResolvesToTheLiveSocket	host-capability	allowed-host-capability	this host cannot create a short scratch directory: nope
+internal/install	TestEveryConfiguredShapeReachesTheWrapperPolicy	platform-control	allowed-platform-control	an operator agent socket is a unix-domain rendezvous point

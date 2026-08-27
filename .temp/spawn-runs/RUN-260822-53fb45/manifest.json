@@ -1,0 +1,44 @@
+{
+  "id": "RUN-260822-53fb45",
+  "task_id": "TASK-260822-1mwy10",
+  "created_at": "2026-08-22T17:00:23.702652Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260822-21-00-23_-reviewer--reviewer--claude-_TASK-260822-1mwy10.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "30m0s",
+  "log_resource_name": "TASK-260822-1mwy10_spawn-log_-reviewer--reviewer--claude-_RUN-260822-53fb45.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260822-1mwy10_results.md",
+    "TASK-260822-1mwy10_spawn-log_-implementer--developer--claude-_RUN-260822-c60b49.log"
+  ]
+}

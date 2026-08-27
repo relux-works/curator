@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "driver": "go-v1",
+  "build_source": {
+    "algorithm": "curator-build-source-v1",
+    "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "build_root": "build",
+  "command": "golden-tool",
+  "source_dir": "build/cmd/golden-tool",
+  "target": {
+    "goos": "darwin",
+    "goarch": "arm64",
+    "tuning": {
+      "GOARM64": "v8.0"
+    }
+  },
+  "toolchain": {
+    "algorithm": "curator-go-toolchain-v1",
+    "go_relpath": "bin/go",
+    "go_version": "go version go1.26.1 darwin/arm64",
+    "content_sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "policy": {
+    "module_mode": "vendor",
+    "network": "none",
+    "workspace": false,
+    "cgo": false,
+    "compiler_directives": "reject-nonstandard-cgo-import-dynamic-v1",
+    "target_mode": "native",
+    "link_mode": "internal",
+    "libgcc": "none",
+    "package_assembly": false,
+    "host_objects": false,
+    "telemetry": "off-private"
+  }
+}

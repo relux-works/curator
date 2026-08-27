@@ -1,0 +1,15 @@
+python3 tools/validate.py
+validated 42 schemas and 447 vector files
+python3 -B -m unittest discover -s tools -p 'test_*.py'
+........................................................
+----------------------------------------------------------------------
+Ran 56 tests in 3.837s
+
+OK
+go test ./tools/...
+ok  	github.com/relux-works/curator-spec/tools/generate-vectors	0.390s
+go run ./tools/generate-vectors -root .
+git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json
+test -n "1.0.0-rc.5"
+python3 tools/release_gate.py --version "1.0.0-rc.5" --commit HEAD
+release gate passed for 1.0.0-rc.5 at c19ee6fb3fcc12f960455760ccd6cc6fb1bc5380

@@ -1,0 +1,91 @@
+{
+  "id": "RUN-260728-a7533c",
+  "task_id": "TASK-260728-1g0z69",
+  "created_at": "2026-07-28T20:13:40.548661Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-00-13-40_-implementer--developer--claude-_TASK-260728-1g0z69.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-a7533c.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260728-1g0z69_boundary-probe-run.log",
+    "TASK-260728-1g0z69_boundary-probe.go",
+    "TASK-260728-1g0z69_decision-0007.md",
+    "TASK-260728-1g0z69_red-controls-rework-05.log",
+    "TASK-260728-1g0z69_results.md",
+    "TASK-260728-1g0z69_review-verdict-cycle-2.md",
+    "TASK-260728-1g0z69_review-verdict-cycle-3.md",
+    "TASK-260728-1g0z69_review-verdict-cycle-4.md",
+    "TASK-260728-1g0z69_review-verdict-cycle-5.md",
+    "TASK-260728-1g0z69_review-verdict-cycle-6.md",
+    "TASK-260728-1g0z69_review-verdict.md",
+    "TASK-260728-1g0z69_rework-01.md",
+    "TASK-260728-1g0z69_rework-02.md",
+    "TASK-260728-1g0z69_rework-03.md",
+    "TASK-260728-1g0z69_rework-04.md",
+    "TASK-260728-1g0z69_rework-05.md",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-1ccd8b.log",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-2ce7ec.log",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-65ee58.log",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-af7289.log",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-cedcf7.log",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-e41666.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-07357a.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-092e80.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-0e6d1a.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-18b23e.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-8a585f.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-e30a89.log",
+    "TASK-260728-1g0z69_toolchain-reference.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260728-1g0z69_boundary-probe-run.log": "15982d2a7f7f32f645a0e3aade82bdc3af00b32a4754600b0a51dddb01f5767e",
+    "TASK-260728-1g0z69_boundary-probe.go": "78ca41bce251fee163393f38e58450c5c30ad44d816b06123311233c776b1415",
+    "TASK-260728-1g0z69_decision-0007.md": "470bc95f675ec9f7dd0f64d8fabfd5a81fddf5b20f622897d37dfb993ecadf23",
+    "TASK-260728-1g0z69_red-controls-rework-05.log": "223abd351726a3ce0fe92eabc3b50e8bacc1063be2382e839ff2ced1c6756082",
+    "TASK-260728-1g0z69_results.md": "a8416548310029d0314740c697e7c360714f0cdf2773c34b781fc178bc63c9d9",
+    "TASK-260728-1g0z69_review-verdict-cycle-2.md": "403fdb6dc81cd5d0ca82b3b94b60120255522eef1603255298679cb228e22b7b",
+    "TASK-260728-1g0z69_review-verdict-cycle-3.md": "2abb170be2e3e9e9233ec7c741d87621484568fa7813c8b7b822c4f316fae25a",
+    "TASK-260728-1g0z69_review-verdict-cycle-4.md": "79d7f2da7a26b1980a2f115469b86b42033beff3d5a2c7fea394c1ae9a038afd",
+    "TASK-260728-1g0z69_review-verdict-cycle-5.md": "de505b49380402e3c2796cfbd2fe3f0a9230990410aec7bfee29675f30635c7d",
+    "TASK-260728-1g0z69_review-verdict-cycle-6.md": "1616a18e62b22cc73e58dbcfa7adaaeec097e9d7bd09e69e4d747041aa039cde",
+    "TASK-260728-1g0z69_review-verdict.md": "aae37815c5d0fe510a56ecf6cdade27a3c388b950c9eb2b0c00a5d25b76075b0",
+    "TASK-260728-1g0z69_rework-01.md": "3af2081e4a1a9efe7ac78ef16d2aeea3ea5e146572ac84928cf05bdb2b649f37",
+    "TASK-260728-1g0z69_rework-02.md": "37bff9d579b91177a337538ede1fc0a1b45f5dc92ea512fcd3bee4bc4f228a30",
+    "TASK-260728-1g0z69_rework-03.md": "b8cecbf4fd84eed8b2f3467118cd05666c58a79016c417ef826a2c1533be60b5",
+    "TASK-260728-1g0z69_rework-04.md": "47be27f9d797a8b7cd5ea7f8a8fc3ac5f474ee0ad05ad71b37255f6ff1d66589",
+    "TASK-260728-1g0z69_rework-05.md": "6d7e67b8d44d7008863b9163654c5c41330a4572afc3296823fce2c35d17d122",
+    "TASK-260728-1g0z69_toolchain-reference.md": "c8c23291b6515a204517206659c8223edd4686f0a4a777173a6a7ea67f69eee9"
+  },
+  "require_outcome_artifact": true
+}

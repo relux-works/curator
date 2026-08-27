@@ -1,0 +1,76 @@
+{
+  "id": "RUN-260826-175605",
+  "task_id": "BUG-260823-1vx45a",
+  "created_at": "2026-08-26T20:48:16.095796Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "medium",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "codex",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "service_tier": "default",
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260827-00-48-16_-implementer--developer--codex-_BUG-260823-1vx45a.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "control_root": "/Users/iv/Developer/ReluxWorks/curator",
+  "execution_root": "/Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260712-31558c/worktree",
+  "story_id": "STORY-260712-31558c",
+  "workspace": {
+    "workspace_id": "WS-de51037274d6",
+    "story_id": "STORY-260712-31558c",
+    "branch_ref": "refs/heads/task-board/story/STORY-260712-31558c",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260712-31558c/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "timeout": "45m0s",
+  "supervision": {
+    "check_every_minutes": 5,
+    "idle_deadline_minutes": 0,
+    "max_runtime_minutes": 0,
+    "on_deadline": "park"
+  },
+  "log_resource_name": "BUG-260823-1vx45a_spawn-log_-implementer--developer--codex-_RUN-260826-175605.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "BUG-260823-1vx45a_change-request_rev1.patch",
+    "BUG-260823-1vx45a_results.md",
+    "BUG-260823-1vx45a_review-verdict.md",
+    "BUG-260823-1vx45a_spawn-log_-implementer--developer--codex-_RUN-260826-1a42c7.log",
+    "BUG-260823-1vx45a_spawn-log_-reviewer--reviewer--codex-_RUN-260826-99683f.log"
+  ],
+  "initial_outcome_digests": {
+    "BUG-260823-1vx45a_results.md": "6e79160593d7433e77f150768e66bcde7658337adc7cbc88d1880a4a86b7446a",
+    "BUG-260823-1vx45a_review-verdict.md": "50f0c8159ee67ea19d085752fb16b9521f7f72edb2aeeef16b7351e89348f8b9"
+  },
+  "require_outcome_artifact": true,
+  "recovery_root_run_id": "RUN-260826-175605"
+}

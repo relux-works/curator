@@ -1,0 +1,57 @@
+{
+  "id": "RUN-260729-84e5b3",
+  "task_id": "TASK-260729-osjeay",
+  "created_at": "2026-07-29T13:05:59.611258Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] researcher (claude)",
+  "role": "researcher",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-17-05-59_-analyst--researcher--claude-_TASK-260729-osjeay.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260729-osjeay_spawn-log_-analyst--researcher--claude-_RUN-260729-84e5b3.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260729-osjeay_final-ci-execution-map.md",
+    "TASK-260729-osjeay_gate-status.md",
+    "TASK-260729-osjeay_review-verdict-cycle-2.md",
+    "TASK-260729-osjeay_review-verdict.md",
+    "TASK-260729-osjeay_spawn-log_-analyst--researcher--claude-_RUN-260729-8fa56b.log",
+    "TASK-260729-osjeay_spawn-log_-analyst--researcher--claude-_RUN-260729-ed33dc.log",
+    "TASK-260729-osjeay_spawn-log_-reviewer--reviewer--codex-_RUN-260729-46ec6d.log",
+    "TASK-260729-osjeay_spawn-log_-reviewer--reviewer--codex-_RUN-260729-fffc3c.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260729-osjeay_final-ci-execution-map.md": "cfc132a9523d71725f48fe2a32ef153f03261fe2317d132dffc7ac75be8ad41f",
+    "TASK-260729-osjeay_gate-status.md": "288a59de8e67bc9868d242c2ff3836e4d3c6a6b66df1be367c7b32eab54ac1f3",
+    "TASK-260729-osjeay_review-verdict-cycle-2.md": "da6ab2f59471c33b5151ca28e657efc9822dce85ca968c1d58427c8942428fd3",
+    "TASK-260729-osjeay_review-verdict.md": "3995d2d72fd8f5ee6721e13f46030ab71f80140f3a46337d10a9ccc503e516cb"
+  },
+  "require_outcome_artifact": true
+}

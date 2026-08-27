@@ -1,0 +1,21 @@
+tests=107 sequential=19 parallel=88
+--- sequential (must NOT get t.Parallel) ---
+  TestBuildRootExcludedBeforeLocaleRenderingWithoutCompilerExecution     t.Setenv
+  TestByteIdenticalRewriteDuringTheReadDoesNotRestart                    via duringDocumentRead
+  TestDefaultToolchainEstablishRemovesItsPrivateRootOnFailure            t.Setenv
+  TestDefaultToolchainProbeRemovesItsProbeRootOnFailure                  t.Setenv
+  TestDefaultToolchainProbeRemovesItsProbeRootOnSuccess                  t.Setenv
+  TestDryRunRemovesItsOperationPrivateRootOnFailure                      via isolateTempDir
+  TestGlobalDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot       via isolateTempDir
+  TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure                via isolateTempDir
+  TestGlobalInstall                                                      t.Setenv
+  TestGlobalManifestABAAroundTheReadRestartsClosure                      via duringDocumentRead
+  TestHybridActivationABAAroundTheReadRestartsClosure                    via duringDocumentRead
+  TestInstallHelperProcess                                               re-executed as a child process
+  TestProjectDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot      via isolateTempDir
+  TestProjectManifestABAAroundTheReadRestartsClosure                     via duringDocumentRead
+  TestReadDocumentBindsGenerationToBytesReplacedByRename                 via onceAfterOpen
+  TestReadDocumentBindsGenerationToBytesRewrittenInPlace                 via onceAfterOpen
+  TestRealRunKeepsEveryEphemeralPathInOneOperationPrivateRoot            via isolateTempDir
+  TestRuntimeLauncherCapturesDeclaredSystemDependency                    t.Setenv
+  TestSubstitutionsABAAroundTheReadRestartsClosure                       via duringDocumentRead

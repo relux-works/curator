@@ -1,0 +1,274 @@
+diff --git a/tools/generate-vectors/main.go b/tools/generate-vectors/main.go
+index e7b1218..4fbab4f 100644
+--- a/tools/generate-vectors/main.go
++++ b/tools/generate-vectors/main.go
+@@ -2051,6 +2051,9 @@ func writeSchemaCases(suite string, marker, ledger, audited, snapshot, logEntry,
+ 			}
+ 		}
+ 		if version >= 8 {
++			obj["commands"].(map[string]any)["build-tool"].(map[string]any)["modules"] = []any{
++				"pkg/board", "pkg/remoteconfig",
++			}
+ 			obj["commands"].(map[string]any)["enforced-tool"] = map[string]any{
+ 				"type": "script", "unix_path": "scripts/enforced", "win_path": "scripts/enforced.cmd",
+ 				"execution_policy": scriptExecutionPolicy, "interpreter": "python3-v1",
+@@ -2078,6 +2081,7 @@ func writeSchemaCases(suite string, marker, ledger, audited, snapshot, logEntry,
+ 				additionalCases[name] = append(repositorySchemaExamples(version), legacyV8SchemaExamples(validSkill(version))...)
+ 			case version == 8:
+ 				additionalCases[name] = append(repositorySchemaExamples(version), scriptWorkerSchemaExamples()...)
++				additionalCases[name] = append(additionalCases[name], moduleRootSchemaExamples()...)
+ 			default:
+ 				additionalCases[name] = append(legacyV7SchemaExamples(validSkill(version)), legacyV8SchemaExamples(validSkill(version))...)
+ 			}
+@@ -2322,6 +2326,65 @@ func legacyV8SchemaExamples(valid map[string]any) []schemaExample {
+ 	}
+ }
+ 
++func validModuleRootSkillManifest() map[string]any {
++	return map[string]any{
++		"schema_version": 8,
++		"capabilities":   map[string]any{},
++		"build_roots":    []any{"tools/cli"},
++		"commands": map[string]any{
++			"tool": map[string]any{
++				"type": "build", "driver": "go-v1", "source_dir": "tools/cli/cmd/tool",
++				"modules": []any{"pkg/board", "pkg/remoteconfig"},
++			},
++		},
++	}
++}
++
++// moduleRootSchemaExamples covers the structural portion of the schema-8
++// module-root declaration. Filesystem, graph, and platform-path comparisons
++// remain semantic conformance rules rather than JSON Schema rules.
++func moduleRootSchemaExamples() []schemaExample {
++	withModules := func(value any) map[string]any {
++		manifest := validModuleRootSkillManifest()
++		manifest["commands"].(map[string]any)["tool"].(map[string]any)["modules"] = value
++		return manifest
++	}
++	withCommand := func(name string, command map[string]any) map[string]any {
++		manifest := validModuleRootSkillManifest()
++		manifest["commands"].(map[string]any)[name] = command
++		return manifest
++	}
++	empty := withModules([]any{})
++	absent := validModuleRootSkillManifest()
++	delete(absent["commands"].(map[string]any)["tool"].(map[string]any), "modules")
++
++	return []schemaExample{
++		{name: "valid-module-roots-declared", valid: true, instance: validModuleRootSkillManifest()},
++		{name: "valid-module-roots-empty", valid: true, instance: empty},
++		{name: "valid-module-roots-absent", valid: true, instance: absent},
++		{name: "invalid-module-roots-duplicate", instance: withModules([]any{"pkg/lib", "pkg/lib"})},
++		{name: "invalid-module-roots-dot", instance: withModules([]any{"."})},
++		{name: "invalid-module-roots-parent", instance: withModules([]any{"../pkg/lib"})},
++		{name: "invalid-module-roots-absolute", instance: withModules([]any{"/pkg/lib"})},
++		{name: "invalid-module-roots-backslash", instance: withModules([]any{"pkg\\lib"})},
++		{name: "invalid-module-roots-windows-device", instance: withModules([]any{"pkg/CON"})},
++		{name: "invalid-module-roots-string", instance: withModules("pkg/lib")},
++		{name: "invalid-module-roots-null", instance: withModules(nil)},
++		{name: "invalid-module-roots-on-script-command", instance: withCommand("script", map[string]any{
++			"type": "script", "unix_path": "scripts/tool", "modules": []any{"pkg/lib"},
++		})},
++		{name: "invalid-module-roots-on-system-command", instance: withCommand("system", map[string]any{
++			"type": "system", "command": "tool", "modules": []any{"pkg/lib"},
++		})},
++		{name: "invalid-module-roots-on-repository-command", instance: withCommand("repository", map[string]any{
++			"type": "build", "driver": "go-repository-v1", "repository": "golden-tools", "target": "tool",
++			"modules": []any{"pkg/lib"},
++		})},
++		{name: "invalid-module-roots-top-level", instance: withNestedField(
++			validModuleRootSkillManifest(), []string{}, "modules", []any{"pkg/lib"})},
++	}
++}
++
+ func validScriptWorkerSkillManifest() map[string]any {
+ 	return map[string]any{
+ 		"schema_version": 8,
+diff --git a/tools/generate-vectors/main_test.go b/tools/generate-vectors/main_test.go
+index 3ca7910..642f38b 100644
+--- a/tools/generate-vectors/main_test.go
++++ b/tools/generate-vectors/main_test.go
+@@ -308,8 +308,8 @@ func TestSchemaV8WireSurfacesAreClosedAndVersioned(t *testing.T) {
+ 	common := readObject(t, filepath.Join(root, "schemas", "v1", "common.schema.json"))
+ 	defs := common["$defs"].(map[string]any)
+ 
+-	// Schema 7 bytes stay frozen: the schema-7 union still reaches the
+-	// schema-7 script command, which has no execution surface at all.
++	// Schema 7 bytes stay frozen: its script and local-build branches have no
++	// schema-8 execution or module-root surface.
+ 	scriptCommand := defs["scriptCommand"].(map[string]any)
+ 	for _, field := range []string{"execution_policy", "interpreter"} {
+ 		if _, ok := scriptCommand["properties"].(map[string]any)[field]; ok {
+@@ -320,6 +320,10 @@ func TestSchemaV8WireSurfacesAreClosedAndVersioned(t *testing.T) {
+ 	if commandV7[0].(map[string]any)["$ref"] != "#/$defs/scriptCommand" {
+ 		t.Fatalf("commandV7 no longer selects the frozen script command: %#v", commandV7)
+ 	}
++	buildCommandV6 := defs["buildCommandV6"].(map[string]any)
++	if _, ok := buildCommandV6["properties"].(map[string]any)["modules"]; ok {
++		t.Fatal("frozen buildCommandV6 acquired modules")
++	}
+ 
+ 	// The policy identity is one closed constant, never an enum, so a package
+ 	// cannot spell a second policy or a negative opt-out.
+@@ -353,7 +357,20 @@ func TestSchemaV8WireSurfacesAreClosedAndVersioned(t *testing.T) {
+ 		t.Fatalf("schema 8 does not bind execution_policy and interpreter to each other: %#v", dependent)
+ 	}
+ 
+-	// Only script commands carry the opt-in; the build unions are untouched.
++	buildCommandV8 := defs["buildCommandV8"].(map[string]any)
++	if buildCommandV8["additionalProperties"] != false {
++		t.Fatal("buildCommandV8 must reject unknown fields")
++	}
++	buildProperties := buildCommandV8["properties"].(map[string]any)
++	if len(buildProperties) != 4 || buildProperties["modules"].(map[string]any)["$ref"] != "#/$defs/pathSet" {
++		t.Fatalf("buildCommandV8 is not the closed schema-8 module-root surface: %#v", buildProperties)
++	}
++	if !reflect.DeepEqual(buildCommandV8["required"], buildCommandV6["required"]) {
++		t.Fatalf("modules must remain optional: v8 required = %#v", buildCommandV8["required"])
++	}
++
++	// Schema 8 composes the script and local-build additions without widening
++	// the system or external-repository branches.
+ 	commandV8 := defs["commandV8"].(map[string]any)["oneOf"].([]any)
+ 	var refs []string
+ 	for _, branch := range commandV8 {
+@@ -361,7 +378,7 @@ func TestSchemaV8WireSurfacesAreClosedAndVersioned(t *testing.T) {
+ 	}
+ 	want := []string{
+ 		"#/$defs/scriptCommandV8", "#/$defs/systemCommand",
+-		"#/$defs/buildCommandV6", "#/$defs/repositoryBuildCommandV1",
++		"#/$defs/buildCommandV8", "#/$defs/repositoryBuildCommandV1",
+ 	}
+ 	if !reflect.DeepEqual(refs, want) {
+ 		t.Fatalf("commandV8 union = %#v, want %#v", refs, want)
+@@ -445,6 +462,52 @@ func TestGeneratedSchemaV8CasesCoverTheScriptWorkerOptIn(t *testing.T) {
+ 	}
+ }
+ 
++func TestGeneratedSchemaV8CasesCoverModuleRootStructure(t *testing.T) {
++	root := repositoryRoot(t)
++	var index []map[string]any
++	readJSON(t, filepath.Join(root, "conformance", "v1", "schema-cases", "index.json"), &index)
++	required := []string{
++		"valid-module-roots-declared.json",
++		"valid-module-roots-empty.json",
++		"valid-module-roots-absent.json",
++		"invalid-module-roots-duplicate.json",
++		"invalid-module-roots-dot.json",
++		"invalid-module-roots-parent.json",
++		"invalid-module-roots-absolute.json",
++		"invalid-module-roots-backslash.json",
++		"invalid-module-roots-windows-device.json",
++		"invalid-module-roots-string.json",
++		"invalid-module-roots-null.json",
++		"invalid-module-roots-on-script-command.json",
++		"invalid-module-roots-on-system-command.json",
++		"invalid-module-roots-on-repository-command.json",
++		"invalid-module-roots-top-level.json",
++	}
++	got := indexedSchemaCases(index, "agent-skill-v8.schema.json")
++	for _, name := range required {
++		valid, ok := got[name]
++		if !ok {
++			t.Fatalf("agent-skill-v8.schema.json missing generated case %s", name)
++		}
++		if strings.HasPrefix(name, "invalid-") && valid {
++			t.Fatalf("agent-skill-v8.schema.json case %s must be invalid", name)
++		}
++		if strings.HasPrefix(name, "valid-") && !valid {
++			t.Fatalf("agent-skill-v8.schema.json case %s must be valid", name)
++		}
++	}
++	if legacy := indexedSchemaCases(index, "csk-skill-v8.schema.json"); !reflect.DeepEqual(legacy, got) {
++		t.Fatal("canonical and legacy manifest schema-8 cases differ")
++	}
++
++	declared := readObject(t, filepath.Join(
++		root, "conformance", "v1", "schema-cases", "agent-skill-v8", "valid-module-roots-declared.json"))
++	modules := declared["commands"].(map[string]any)["tool"].(map[string]any)["modules"]
++	if !reflect.DeepEqual(modules, []any{"pkg/board", "pkg/remoteconfig"}) {
++		t.Fatalf("generated module-root declaration = %#v", modules)
++	}
++}
++
+ func TestGeneratedSchemaV7CasesCoverEveryWireBranch(t *testing.T) {
+ 	root := repositoryRoot(t)
+ 	var index []map[string]any
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 8d2d7f2..21257c9 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -92,6 +92,20 @@ class WireSemanticValidationTests(unittest.TestCase):
+                     )
+                     self.assertIn("only in manifest schema 8", error)
+ 
++    def test_pre_schema8_manifests_reject_module_roots_surface(self) -> None:
++        reserved_instances = [
++            {"modules": ["pkg/lib"]},
++            {"commands": {"tool": {"modules": ["pkg/lib"]}}},
++        ]
++        for prefix in ("agent-skill", "csk-skill"):
++            for version in range(1, 8):
++                for reserved in reserved_instances:
++                    instance = {"schema_version": version, **copy.deepcopy(reserved)}
++                    error = validate.validate_wire_semantics(
++                        f"{prefix}-v{version}.schema.json", instance
++                    )
++                    self.assertIn("only in manifest schema 8", error)
++
+     def test_schema8_admits_enforced_scripts_and_keeps_schema7_rules(self) -> None:
+         enforced = {
+             "schema_version": 8,
+@@ -104,7 +118,14 @@ class WireSemanticValidationTests(unittest.TestCase):
+                     "interpreter": "python3-v1",
+                 },
+                 "declared-tool": {"type": "script", "unix_path": "scripts/declared"},
++                "build-tool": {
++                    "type": "build",
++                    "driver": "go-v1",
++                    "source_dir": "build/cmd/tool",
++                    "modules": ["pkg/board", "pkg/remoteconfig"],
++                },
+             },
++            "build_roots": ["build"],
+         }
+         for prefix in ("agent-skill", "csk-skill"):
+             self.assertIsNone(
+diff --git a/tools/validate.py b/tools/validate.py
+index 2e795d1..5f6ea73 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -47,6 +47,7 @@ PORTABLE_EXECUTION_POLICY = "manager-worker-v1"
+ RESERVED_HARDENED_EXECUTION_POLICY = "hardened-worker-v1"
+ SCRIPT_EXECUTION_POLICY = "script-worker-v1"
+ SCRIPT_EXECUTION_FIELDS = ("execution_policy", "interpreter")
++MODULE_ROOT_FIELDS = ("modules",)
+ HARDENED_EXECUTION_OWNER = "STORY-260728-327soo"
+ # The exhaustive rc.5 per-platform native-control inventory and the closed
+ # per-operation capability-evidence record that reports it.
+@@ -557,11 +558,11 @@ def validate_effective_source(
+ def validate_wire_semantics(schema_name: str, instance: Any) -> str | None:
+     if not isinstance(instance, dict):
+         return None
+-    pre_script_worker_manifest = re.fullmatch(
++    pre_schema8_manifest = re.fullmatch(
+         r"(?:agent-skill|csk-skill)-v([1-7])\.schema\.json", schema_name
+     )
+-    if pre_script_worker_manifest is not None:
+-        for field in SCRIPT_EXECUTION_FIELDS:
++    if pre_schema8_manifest is not None:
++        for field in SCRIPT_EXECUTION_FIELDS + MODULE_ROOT_FIELDS:
+             if field in instance:
+                 return f"{field} is legal only in manifest schema 8"
+         commands = instance.get("commands", {})
+@@ -569,7 +570,7 @@ def validate_wire_semantics(schema_name: str, instance: Any) -> str | None:
+             for command in commands.values():
+                 if not isinstance(command, dict):
+                     continue
+-                for field in SCRIPT_EXECUTION_FIELDS:
++                for field in SCRIPT_EXECUTION_FIELDS + MODULE_ROOT_FIELDS:
+                     if field in command:
+                         return f"command {field} is legal only in manifest schema 8"
+     legacy_manifest = re.fullmatch(r"(?:agent-skill|csk-skill)-v([1-6])\.schema\.json", schema_name)

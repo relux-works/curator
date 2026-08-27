@@ -1,0 +1,75 @@
+{
+  "id": "RUN-260827-2686f4",
+  "task_id": "TASK-260827-2gmk4c",
+  "created_at": "2026-08-27T02:19:27.787426Z",
+  "max_parallel": 20,
+  "agent_type": "agy",
+  "agent_name": "[implementer] doc-writer (agy)",
+  "role": "doc-writer",
+  "role_archetype": "implementer",
+  "model": "gemini-3.6-flash-high",
+  "selection": {
+    "agent": "agy",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gemini-3.6-flash-high"
+    },
+    "resolved": {
+      "model": "gemini-3.6-flash-high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "agy",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260827-06-19-27_-implementer--doc-writer--agy-_TASK-260827-2gmk4c.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "control_root": "/Users/iv/Developer/ReluxWorks/curator",
+  "execution_root": "/Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260827-3a5efk/worktree",
+  "story_id": "STORY-260827-3a5efk",
+  "workspace": {
+    "workspace_id": "WS-11f533e3fad3",
+    "story_id": "STORY-260827-3a5efk",
+    "branch_ref": "refs/heads/task-board/story/STORY-260827-3a5efk",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260827-3a5efk/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "15m0s",
+  "supervision": {
+    "check_every_minutes": 5,
+    "idle_deadline_minutes": 0,
+    "max_runtime_minutes": 0,
+    "on_deadline": "park"
+  },
+  "log_resource_name": "TASK-260827-2gmk4c_spawn-log_-implementer--doc-writer--agy-_RUN-260827-2686f4.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260827-2gmk4c_change-request_rev1.patch",
+    "TASK-260827-2gmk4c_results.md",
+    "TASK-260827-2gmk4c_review-verdict.md",
+    "TASK-260827-2gmk4c_spawn-log_-implementer--doc-writer--agy-_RUN-260827-c92eed.log",
+    "TASK-260827-2gmk4c_spawn-log_-reviewer--reviewer--claude-_RUN-260827-701ce4.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260827-2gmk4c_results.md": "39e578dad992459da76763269cd162cc3cb1c894635b627b111b67de15c27429",
+    "TASK-260827-2gmk4c_review-verdict.md": "b2e2b9a1fca946af62a9f772c431b60f36e749fc9996f63f3f9e93cb5ee57f41"
+  },
+  "require_outcome_artifact": true,
+  "recovery_root_run_id": "RUN-260827-2686f4",
+  "agy_runtime": {
+    "executable": "/Users/iv/.local/bin/agy",
+    "version": "1.1.21"
+  }
+}

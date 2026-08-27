@@ -1,0 +1,14 @@
+ conformance/v1/manifest.json                       | 126 ++++++++++++++++-
+ .../v1/schema-cases/agent-skill-v8/valid.json      |   4 +
+ .../v1/schema-cases/csk-skill-v8/valid.json        |   4 +
+ conformance/v1/schema-cases/index.json             | 150 +++++++++++++++++++++
+ profiles/manager.md                                |  61 ++++++++-
+ protocol/core.md                                   | 150 +++++++++++++++++++--
+ release/1.0.0-rc.8.json                            |   4 +-
+ schemas/v1/README.md                               |  44 +++++-
+ schemas/v1/common.schema.json                      |  13 +-
+ tools/generate-vectors/main.go                     |  63 +++++++++
+ tools/generate-vectors/main_test.go                |  71 +++++++++-
+ tools/test_validate.py                             |  21 +++
+ tools/validate.py                                  |   9 +-
+ 13 files changed, 693 insertions(+), 27 deletions(-)

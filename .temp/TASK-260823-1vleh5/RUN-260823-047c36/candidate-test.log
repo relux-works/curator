@@ -1,0 +1,79 @@
+test-gate: flags=<none> timeout=40m
+test-gate: conformance root=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260823-1vleh5/spec-6001dc3/conformance/v1
+
+suite-plan: GOOS=darwin
+suite-plan: root=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260823-1vleh5/spec-6001dc3/conformance/v1
+suite-plan: platform qualification read from the root's own vectors/conformance-claim-v3-qualification.json
+
+
+suite-plan: served=43 deferred=0 excluded=0
+suite-plan: CI_REQUIRE_FULL_ROOT=1 -- every package must be served by this root
+suite-plan: ok
+test-gate: stage served exit=0 (stream: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260823-1vleh5/RUN-260823-047c36/candidate-test/go-test-served.json)
+
+test-gate: go test overall exit=0 (merged stream: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260823-1vleh5/RUN-260823-047c36/candidate-test/go-test.json)
+
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+ok    internal/buildcache :: TestUnixProtectedStateMatrix
+ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+ok    internal/buildsource :: TestRejectsSpecialFile
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+ok    internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch
+ok    internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink
+ok    internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink
+ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+ok    internal/transaction :: TestCommitAndRollbackRestoreALinkExactly
+ok    internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction
+ok    internal/transaction :: TestEntryRemovalRestoresTheExactLink
+ok    internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination
+ok    internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass
+ok    internal/interop :: TestGoldenContextCopy
+ok    internal/godriver :: TestCandidateGoV1SourceAwareContract
+ok    internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically
+ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly
+ok    cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery
+ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand
+ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand
+ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState
+ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+
+platform-case gate: 10 skips recorded in /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260823-1vleh5/RUN-260823-047c36/candidate-test/skips-observed.tsv
+platform-case gate: ok
+
+test-gate: go test exit=0, platform-case gate exit=0
+CANDIDATE_TEST_GATE_EXIT=0

@@ -1,0 +1,213 @@
+internal/buildcache/protection_unix.go:163:18: Error return value of `unix.Close` is not checked (errcheck)
+	defer unix.Close(rootFD)
+	                ^
+internal/buildcache/protection_unix.go:247:18: Error return value of `unix.Close` is not checked (errcheck)
+	defer unix.Close(fd)
+	                ^
+internal/buildcache/protection_unix_test.go:357:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/buildcache/protection_unix_test.go:365:17: Error return value of `dir.Close` is not checked (errcheck)
+	defer dir.Close()
+	               ^
+internal/buildcache/publish.go:87:20: Error return value of `source.Close` is not checked (errcheck)
+	defer source.Close()
+	                  ^
+internal/buildsource/buildsource.go:115:19: Error return value of `token.Close` is not checked (errcheck)
+	defer token.Close()
+	                 ^
+internal/buildsource/buildsource.go:257:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/godriver/build_test.go:474:21: Error return value of `session.Close` is not checked (errcheck)
+	defer session.Close()
+	                   ^
+internal/godriver/fingerprint.go:40:18: Error return value of `root.Close` is not checked (errcheck)
+	defer root.Close()
+	                ^
+internal/godriver/session_test.go:40:21: Error return value of `session.Close` is not checked (errcheck)
+	defer session.Close()
+	                   ^
+internal/godriver/session_test.go:129:21: Error return value of `session.Close` is not checked (errcheck)
+	defer session.Close()
+	                   ^
+internal/snapshot/snapshot.go:30:23: Error return value of `validated.Close` is not checked (errcheck)
+	defer validated.Close()
+	                     ^
+internal/snapshot/snapshot.go:49:20: Error return value of `os.RemoveAll` is not checked (errcheck)
+	defer os.RemoveAll(tmp)
+	                  ^
+internal/snapshot/snapshot.go:68:18: Error return value of `lock.Close` is not checked (errcheck)
+	defer lock.Close()
+	                ^
+internal/snapshot/snapshot.go:105:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/snapshot/snapshot.go:176:17: Error return value of `os.Remove` is not checked (errcheck)
+	defer os.Remove(tmpPath)
+	               ^
+internal/snapshot/snapshot_test.go:86:23: Error return value of `validated.Close` is not checked (errcheck)
+	defer validated.Close()
+	                     ^
+internal/snapshot/snapshot_test.go:245:19: Error return value of `token.Close` is not checked (errcheck)
+	defer token.Close()
+	                 ^
+internal/snapshot/snapshot_test.go:308:22: Error return value of `token.Close` is not checked (errcheck)
+				defer token.Close()
+				                 ^
+internal/snapshot/snapshot_test.go:391:23: Error return value of `validated.Close` is not checked (errcheck)
+	defer validated.Close()
+	                     ^
+cmd/curator/main.go:174:14: G602: slice index out of range (gosec)
+		arg := args[index]
+		           ^
+internal/buildcache/protection_unix.go:200:12: G302: Expect file permissions to be 0600 or less (gosec)
+	if err := os.Chmod(path, 0o700); err != nil {
+	          ^
+internal/buildcache/protection_unix.go:211:9: G302: Expect file permissions to be 0600 or less (gosec)
+	return os.Chmod(path, 0o700)
+	       ^
+internal/buildsource/buildsource.go:266:28: G115: integer overflow conversion int64 -> uint64 (gosec)
+	writeUint64(digest, uint64(openedInfo.Size()))
+	                          ^
+internal/gitignore/gitignore.go:60:21: G304: Potential file inclusion via variable (gosec)
+	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- project .gitignore
+	                   ^
+internal/godriver/controls_darwin.go:90:20: G115: integer overflow conversion int64 -> uint64 (gosec)
+			wanted := uint64(limits.FileBytes)
+			                ^
+internal/godriver/fingerprint.go:136:30: G115: integer overflow conversion int64 -> uint64 (gosec)
+			writeLength(digest, uint64(opened.Size()))
+			                          ^
+internal/godriver/workerproto.go:125:46: G115: integer overflow conversion int -> uint32 (gosec)
+	binary.BigEndian.PutUint32(header[:], uint32(len(payload)))
+	                                            ^
+internal/scopes/hybrid.go:134:21: G304: Potential file inclusion via variable (gosec)
+	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- machine home
+	                   ^
+internal/buildcache/cache.go:32:2: exported: exported const Hit should have comment (or a comment on this block) or be unexported (revive)
+	Hit                 Status = "hit"
+	^
+internal/buildcache/cache_test.go:408:50: unused-parameter: parameter 'entry' seems to be unused, consider removing or renaming it as _ (revive)
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+	                                                ^
+internal/buildcache/publish.go:36:2: exported: exported const Published should have comment (or a comment on this block) or be unexported (revive)
+	Published    PublicationStatus = "published"
+	^
+internal/buildmeta/buildmeta_test.go:592:2: redefines-builtin-id: redefinition of the built-in function copy (revive)
+	copy := value
+	^
+internal/buildmeta/models.go:17:2: exported: exported const SchemaVersion should have comment (or a comment on this block) or be unexported (revive)
+	SchemaVersion = 1
+	^
+internal/buildsource/buildsource.go:191:54: unused-parameter: parameter 'entry' seems to be unused, consider removing or renaming it as _ (revive)
+	err := fs.WalkDir(root.FS(), ".", func(path string, entry fs.DirEntry, walkErr error) error {
+	                                                    ^
+internal/godriver/executor.go:44:1: exported: exported method OSExecutor.Run should have comment or be unexported (revive)
+func (OSExecutor) Run(ctx context.Context, process Process) (Output, error) {
+^
+internal/godriver/executor_test.go:59:32: unused-parameter: parameter 't' seems to be unused, consider removing or renaming it as _ (revive)
+func TestGodriverHelperProcess(t *testing.T) {
+                               ^
+internal/godriver/fingerprint.go:44:53: unused-parameter: parameter 'entry' seems to be unused, consider removing or renaming it as _ (revive)
+	err = fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, walkErr error) error {
+	                                                   ^
+internal/godriver/session.go:269:1: exported: exported method Session.Executable should have comment or be unexported (revive)
+func (session *Session) Executable() string             { return session.executable }
+^
+internal/godriver/session.go:270:1: exported: exported method Session.GOROOT should have comment or be unexported (revive)
+func (session *Session) GOROOT() string                 { return session.goroot }
+^
+internal/godriver/session.go:271:1: exported: exported method Session.Target should have comment or be unexported (revive)
+func (session *Session) Target() buildmeta.Target       { return copyTarget(session.target) }
+^
+internal/godriver/session.go:272:1: exported: exported method Session.Toolchain should have comment or be unexported (revive)
+func (session *Session) Toolchain() buildmeta.Toolchain { return session.toolchain }
+^
+internal/godriver/session.go:273:1: exported: exported method Session.Environment should have comment or be unexported (revive)
+func (session *Session) Environment() []string          { return append([]string(nil), session.environment...) }
+^
+internal/runtimestore/targets.go:24:2: exported: exported const ScriptRuntime should have comment (or a comment on this block) or be unexported (revive)
+	ScriptRuntime TargetKind = "script-runtime"
+	^
+internal/runtimestore/targets.go:42:1: exported: exported method ScriptTarget.Kind should have comment or be unexported (revive)
+func (target ScriptTarget) Kind() TargetKind       { return ScriptRuntime }
+^
+internal/runtimestore/targets.go:43:1: exported: exported method ScriptTarget.ExecutablePath should have comment or be unexported (revive)
+func (target ScriptTarget) ExecutablePath() string { return target.executable }
+^
+internal/runtimestore/targets.go:44:1: exported: exported method ScriptTarget.RuntimeDir should have comment or be unexported (revive)
+func (target ScriptTarget) RuntimeDir() string     { return target.runtimeDir }
+^
+internal/runtimestore/targets.go:55:1: exported: exported method CompiledTarget.Kind should have comment or be unexported (revive)
+func (target CompiledTarget) Kind() TargetKind                   { return BuildArtifact }
+^
+internal/runtimestore/targets.go:56:1: exported: exported method CompiledTarget.ExecutablePath should have comment or be unexported (revive)
+func (target CompiledTarget) ExecutablePath() string             { return target.artifactPath }
+^
+internal/runtimestore/targets.go:57:1: exported: exported method CompiledTarget.CacheKey should have comment or be unexported (revive)
+func (target CompiledTarget) CacheKey() buildmeta.CacheKey       { return target.cacheKey }
+^
+internal/runtimestore/targets.go:58:1: exported: exported method CompiledTarget.ReceiptHash should have comment or be unexported (revive)
+func (target CompiledTarget) ReceiptHash() buildmeta.ReceiptHash { return target.receiptHash }
+^
+internal/runtimestore/targets.go:107:2: exported: exported const ProjectShim should have comment (or a comment on this block) or be unexported (revive)
+	ProjectShim         ShimRole = "project"
+	^
+internal/runtimestore/targets.go:123:1: exported: exported function NewManagedShim should have comment or be unexported (revive)
+func NewManagedShim(role ShimRole, binDir, command, platform string) (ManagedShim, error) {
+^
+internal/runtimestore/targets.go:144:1: exported: exported method ManagedShim.Role should have comment or be unexported (revive)
+func (shim ManagedShim) Role() ShimRole   { return shim.role }
+^
+internal/runtimestore/targets.go:145:1: exported: exported method ManagedShim.BinDir should have comment or be unexported (revive)
+func (shim ManagedShim) BinDir() string   { return shim.binDir }
+^
+internal/runtimestore/targets.go:146:1: exported: exported method ManagedShim.Command should have comment or be unexported (revive)
+func (shim ManagedShim) Command() string  { return shim.command }
+^
+internal/runtimestore/targets.go:147:1: exported: exported method ManagedShim.Platform should have comment or be unexported (revive)
+func (shim ManagedShim) Platform() string { return shim.platform }
+^
+internal/runtimestore/targets.go:148:1: exported: exported method ManagedShim.Path should have comment or be unexported (revive)
+func (shim ManagedShim) Path() string     { return shim.path }
+^
+internal/runtimestore/targets.go:162:2: exported: exported const RuntimeTreeTarget should have comment (or a comment on this block) or be unexported (revive)
+	RuntimeTreeTarget ManagedTargetKind = "runtime-tree"
+	^
+internal/godriver/build_test.go:469:35: SA1019: runtime.GOROOT has been deprecated since Go 1.24: The root used during the Go build will not be meaningful if the binary is copied to another machine. Use the system path to locate the “go” binary, and use “go env GOROOT” to find its GOROOT. (staticcheck)
+	config.CuratorGo = filepath.Join(runtime.GOROOT(), "bin", platformGoName)
+	                                 ^
+internal/godriver/session.go:110:57: SA1019: runtime.GOROOT has been deprecated since Go 1.24: The root used during the Go build will not be meaningful if the binary is copied to another machine. Use the system path to locate the “go” binary, and use “go env GOROOT” to find its GOROOT. (staticcheck)
+	return establish(ctx, config, hostFacts{runtimeGOROOT: runtime.GOROOT(), goos: runtime.GOOS, goarch: runtime.GOARCH})
+	                                                       ^
+internal/godriver/session.go:116:53: SA1019: runtime.GOROOT has been deprecated since Go 1.24: The root used during the Go build will not be meaningful if the binary is copied to another machine. Use the system path to locate the “go” binary, and use “go env GOROOT” to find its GOROOT. (staticcheck)
+	return probe(ctx, config, hostFacts{runtimeGOROOT: runtime.GOROOT(), goos: runtime.GOOS, goarch: runtime.GOARCH})
+	                                                   ^
+internal/godriver/session.go:328:2: QF1003: could use tagged switch on goos (staticcheck)
+	if goos == "darwin" {
+	^
+internal/godriver/workerserver.go:422:2: QF1002: could use tagged switch on runErr (staticcheck)
+	switch {
+	^
+internal/runtimestore/targets.go:91:28: ST1005: error strings should not be capitalized (staticcheck)
+		return CompiledTarget{}, fmt.Errorf("Windows compiled artifact must have an .exe suffix")
+		                         ^
+internal/runtimestore/targets.go:262:11: ST1005: error strings should not be capitalized (staticcheck)
+			return fmt.Errorf("Unix PATH entry contains a separator")
+			       ^
+internal/runtimestore/targets.go:265:11: ST1005: error strings should not be capitalized (staticcheck)
+			return fmt.Errorf("Windows PATH entry contains a separator")
+			       ^
+internal/godriver/controls.go:185:6: func probeLimits is unused (unused)
+func probeLimits() ResourceLimits {
+     ^
+internal/runtimestore/targets_test.go:393:6: func decodeHelperOutput is unused (unused)
+func decodeHelperOutput(t *testing.T, payload []byte) map[string]any {
+     ^
+69 issues:
+* errcheck: 20
+* gosec: 9
+* revive: 30
+* staticcheck: 8
+* unused: 2

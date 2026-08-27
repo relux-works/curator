@@ -1,0 +1,165 @@
+
+=== toolchainboundary (macOS, full case corpus)
+match       kotlin.negative.backend-is-not-native        expected=backend_identity         observed=backend_identity         early=true 
+not_run     kotlin.negative.metadata-future              expected=host_version             observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.negative.metadata-malformed           expected=representability         observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.negative.target-unknown               expected=target_representability  observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.positive.version-and-target           expected=none                     observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+match       rust.negative.msrv-future                    expected=host_version             observed=host_version             early=true 
+match       rust.negative.msrv-malformed                 expected=representability         observed=representability         early=true 
+match       rust.negative.selector-toolchain-nightly     expected=package_selector         observed=package_selector         early=true 
+match       rust.negative.selector-toolchain-path        expected=package_selector         observed=package_selector         early=true 
+match       rust.negative.target-std-absent              expected=target_host              observed=target_host              early=true 
+match       rust.negative.target-unknown                 expected=target_representability  observed=target_representability  early=true 
+match       rust.positive.msrv-below-host                expected=none                     observed=none                     early=true 
+match       swift.negative.manifest-is-a-program         expected=package_selector         observed=package_selector         early=true 
+match       swift.negative.selector-swift-version-file   expected=none                     observed=none                     early=true 
+match       swift.negative.target-stdlib-absent          expected=target_host              observed=target_host              early=true 
+match       swift.negative.target-unknown                expected=target_representability  observed=target_representability  early=true 
+match       swift.negative.tools-version-future          expected=host_version             observed=host_version             early=true 
+match       swift.negative.tools-version-malformed       expected=representability         observed=representability         early=true 
+match       swift.positive.tools-version-below-host      expected=none                     observed=none                     early=true 
+
+19 cases: 15 matched, 0 divergences, 4 not run; 1 toolchains unavailable, 0 wrong backend
+EXIT=0
+determinism check: verdicts identical across two independent runs = True
+EXIT=0
+
+=== curator module: go build ./...
+EXIT=0
+
+=== curator module: make check (vet + test)
+go vet ./...
+go test ./...
+ok  	github.com/relux-works/curator/cmd/curator	0.638s
+ok  	github.com/relux-works/curator/internal/adapters	1.045s
+ok  	github.com/relux-works/curator/internal/audit	0.717s
+ok  	github.com/relux-works/curator/internal/capabilities	4.096s
+ok  	github.com/relux-works/curator/internal/closure	4.330s
+ok  	github.com/relux-works/curator/internal/config	1.380s
+ok  	github.com/relux-works/curator/internal/devsub	3.449s
+ok  	github.com/relux-works/curator/internal/envfiles	2.399s
+ok  	github.com/relux-works/curator/internal/gitignore	3.949s
+ok  	github.com/relux-works/curator/internal/gitops	5.141s
+ok  	github.com/relux-works/curator/internal/hashing	3.048s
+ok  	github.com/relux-works/curator/internal/identifiers	1.679s
+ok  	github.com/relux-works/curator/internal/identity	2.720s
+ok  	github.com/relux-works/curator/internal/install	9.247s
+ok  	github.com/relux-works/curator/internal/interop	5.070s
+ok  	github.com/relux-works/curator/internal/locale	5.421s
+ok  	github.com/relux-works/curator/internal/manifest	5.126s
+ok  	github.com/relux-works/curator/internal/marker	5.344s
+ok  	github.com/relux-works/curator/internal/mcp	5.415s
+ok  	github.com/relux-works/curator/internal/protocoljson	5.426s
+ok  	github.com/relux-works/curator/internal/registry	5.383s
+ok  	github.com/relux-works/curator/internal/runtimestore	5.121s
+ok  	github.com/relux-works/curator/internal/scopes	5.144s
+ok  	github.com/relux-works/curator/internal/shell	5.176s
+ok  	github.com/relux-works/curator/internal/skillcheck	5.129s
+ok  	github.com/relux-works/curator/internal/skillspec	4.965s
+ok  	github.com/relux-works/curator/internal/snapshot	5.257s
+ok  	github.com/relux-works/curator/internal/ui	5.230s
+ok  	github.com/relux-works/curator/internal/verr	4.839s
+ok  	github.com/relux-works/curator/internal/version	5.096s
+ok  	github.com/relux-works/curator/internal/whitelist	5.128s
+gofmt: files need formatting:
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/lucasb-eyer/go-colorful/hsluv.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-isatty/isatty_windows.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_unix.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_windows.go
+.temp/TASK-260729-3jmqgl/worktree/prototypes/macos-hardened-probes/internal/probe/environment.go
+.temp/TASK-260729-3jmqgl/worktree/prototypes/macos-hardened-probes/internal/probe/probe.go
+.temp/TASK-260729-3jmqgl/worktree/prototypes/macos-hardened-probes/internal/spec/spec.go
+make: *** [check] Error 1
+EXIT=2
+
+=== git status --porcelain (tracked changes)
+EXIT=1 (empty above means no tracked file changed)
+
+=== git diff --stat
+
+=== curator module: make vet
+go vet ./...
+EXIT=0
+
+=== curator module: make test
+go test ./...
+ok  	github.com/relux-works/curator/cmd/curator	(cached)
+ok  	github.com/relux-works/curator/internal/adapters	(cached)
+ok  	github.com/relux-works/curator/internal/audit	(cached)
+ok  	github.com/relux-works/curator/internal/capabilities	(cached)
+ok  	github.com/relux-works/curator/internal/closure	(cached)
+ok  	github.com/relux-works/curator/internal/config	(cached)
+ok  	github.com/relux-works/curator/internal/devsub	(cached)
+ok  	github.com/relux-works/curator/internal/envfiles	(cached)
+ok  	github.com/relux-works/curator/internal/gitignore	(cached)
+ok  	github.com/relux-works/curator/internal/gitops	(cached)
+ok  	github.com/relux-works/curator/internal/hashing	(cached)
+ok  	github.com/relux-works/curator/internal/identifiers	(cached)
+ok  	github.com/relux-works/curator/internal/identity	(cached)
+ok  	github.com/relux-works/curator/internal/install	(cached)
+ok  	github.com/relux-works/curator/internal/interop	(cached)
+ok  	github.com/relux-works/curator/internal/locale	(cached)
+ok  	github.com/relux-works/curator/internal/manifest	(cached)
+ok  	github.com/relux-works/curator/internal/marker	(cached)
+ok  	github.com/relux-works/curator/internal/mcp	(cached)
+ok  	github.com/relux-works/curator/internal/protocoljson	(cached)
+ok  	github.com/relux-works/curator/internal/registry	(cached)
+ok  	github.com/relux-works/curator/internal/runtimestore	(cached)
+ok  	github.com/relux-works/curator/internal/scopes	(cached)
+ok  	github.com/relux-works/curator/internal/shell	(cached)
+ok  	github.com/relux-works/curator/internal/skillcheck	(cached)
+ok  	github.com/relux-works/curator/internal/skillspec	(cached)
+ok  	github.com/relux-works/curator/internal/snapshot	(cached)
+ok  	github.com/relux-works/curator/internal/ui	(cached)
+ok  	github.com/relux-works/curator/internal/verr	(cached)
+ok  	github.com/relux-works/curator/internal/version	(cached)
+ok  	github.com/relux-works/curator/internal/whitelist	(cached)
+EXIT=0
+
+=== gofmt -l . attribution (make check gofmt stage)
+total unformatted files in tree:        7
+of those under .temp/TASK-260729-rhjxtx/ (this task): 0
+full list:
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/lucasb-eyer/go-colorful/hsluv.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-isatty/isatty_windows.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_unix.go
+.temp/TASK-260720-1zntv0/cycle2/curator/vendor/github.com/mattn/go-localereader/localereader_windows.go
+.temp/TASK-260729-3jmqgl/worktree/prototypes/macos-hardened-probes/internal/probe/environment.go
+.temp/TASK-260729-3jmqgl/worktree/prototypes/macos-hardened-probes/internal/probe/probe.go
+.temp/TASK-260729-3jmqgl/worktree/prototypes/macos-hardened-probes/internal/spec/spec.go
+
+=== tracked-file gofmt (production tree only, excluding .temp scratch)
+unformatted tracked .go files:        0
+EXIT=0
+
+=== clean-room verification of the packaged tarball
+$ tar xzf TASK-260729-rhjxtx_probe.tar.gz -C /tmp/probe-verify
+$ gofmt -l . && go vet ./... && go test -count=1 ./...
+ok  curator.probe/toolchainboundary
+EXIT=0
+
+=== post-lint re-verification (probe module)
+$ gofmt -l .
+EXIT=0 (no output)
+$ go vet ./...
+EXIT=0
+$ go test -count=1 ./...
+ok  curator.probe/toolchainboundary
+EXIT=0
+$ go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run ./...
+0 issues.
+EXIT=0
+  note: golangci-lint is not installed on this host, so the reproducible `go run ...@latest`
+        invocation used by prior reviews in this repo was used. One suppression is present:
+        harness.go gosec G204, justified in a comment (running an operator-named toolchain
+        command is the program purpose).
+$ ./toolchainboundary ... -out TASK-260729-rhjxtx_fixture-macos.json (post-lint re-run)
+match       swift.positive.tools-version-below-host      expected=none                     observed=none                     early=true 
+
+19 cases: 15 matched, 0 divergences, 4 not run; 1 toolchains unavailable, 0 wrong backend
+EXIT=0

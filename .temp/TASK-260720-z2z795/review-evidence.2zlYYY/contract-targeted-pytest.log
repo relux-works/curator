@@ -1,0 +1,22 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.14, pytest-8.3.4, pluggy-1.5.0 -- /opt/homebrew/opt/python@3.11/bin/python3.11
+rootdir: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+configfile: pyproject.toml
+plugins: anyio-4.8.0, docker-3.1.1
+collecting ... collected 13 items
+
+tests/test_locking.py::test_project_locks_are_canonicalized_deduplicated_and_byte_sorted PASSED [  7%]
+tests/test_locking.py::test_home_lock_is_forbidden_while_build_lock_is_held_by_another_thread PASSED [ 15%]
+tests/test_locking.py::test_pending_home_lock_blocks_project_and_build_acquisition PASSED [ 23%]
+tests/test_transactions.py::test_journal_records_complete_ordered_recovery_state_and_consumer_commits_last PASSED [ 30%]
+tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project[after_backup] PASSED [ 38%]
+tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project[after_install] PASSED [ 46%]
+tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project[target_committed] PASSED [ 53%]
+tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project[before_cleanup] PASSED [ 61%]
+tests/test_transactions.py::test_commit_failure_rolls_back_in_exact_reverse_commit_order PASSED [ 69%]
+tests/test_transactions.py::test_concurrent_project_transactions_preserve_both_consumers PASSED [ 76%]
+tests/test_transactions.py::test_failed_second_project_restores_ledger_preimage_containing_first_success PASSED [ 84%]
+tests/test_transactions.py::test_stale_preimage_is_rejected_without_overwriting_newer_state PASSED [ 92%]
+tests/test_transactions.py::test_generation_change_is_rejected_at_commit PASSED [100%]
+
+============================== 13 passed in 1.17s ==============================

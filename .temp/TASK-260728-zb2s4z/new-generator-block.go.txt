@@ -1,0 +1,406 @@
+// writeGoHostExecutionPolicyVectors emits the executable contract for the
+// portable `manager-worker-v1` execution policy shared by `go-v1` and
+// `go-repository-v1`. It distinguishes the mandatory controls that every
+// conforming host applies from the exhaustive per-platform native-control
+// inventory and from the hardened guarantees deferred to the follow-up story,
+// closes the capability-evidence record, states the single failure boundary,
+// and proves that portable, hardened, and pre-revision cache identities cannot
+// alias.
+func writeGoHostExecutionPolicyVectors(dir string) {
+	sessionStates := []any{
+		"parent-package-independent-toolchain-probe",
+		"parent-native-control-availability-probe",
+		"parent-worker-identity-verification",
+		"worker-launch",
+		"worker-identity-proof-and-nonce-acknowledgement",
+		"worker-control-application-and-evidence",
+		"worker-fixed-go-list",
+		"parent-complete-package-graph-validation",
+		"parent-authenticated-build-permit",
+		"worker-fixed-go-build",
+		"parent-artifact-verification",
+		"parent-post-exec-identity-reverification",
+		"worker-domain-teardown",
+	}
+	mandatoryControls := []any{
+		control("fixed-offline-vendored-go", "compiler-input", "manager-owned argument vectors, vendor-only module mode, GOPROXY/GOVCS/GOWORK/CGO disabled"),
+		control("fixed-argument-vectors", "process-graph", "exactly the five package-independent Go argument-vector forms"),
+		control("fixed-empty-environment", "process-graph", "empty bootstrap environment plus manager-owned variables only"),
+		control("fixed-manager-selected-process-graph", "process-graph", "the manager and worker start only the fixed four-node graph and no other program"),
+		control("identity-verified-manager-owned-worker", "process-graph", "one hidden-mode re-execution of the installed manager executable"),
+		control("pre-launch-worker-identity-verification", "process-graph", "canonical regular-file identity and content digest before launch"),
+		control("post-exec-identity-reverification", "process-graph", "worker and fingerprinted toolchain identity re-proved before publication"),
+		control("frozen-source-snapshot-integrity", "filesystem", "the manager freezes the validated snapshot, writes to neither it nor GOROOT, and re-verifies both identities before publication"),
+		control("manager-private-staging-roots", "filesystem", "operation-private user, configuration, cache, temporary, and output roots"),
+		control("manager-derived-output-path", "filesystem", "artifact path derived from the command name alone"),
+		control("bounded-wall-clock-deadline", "resources", "parent-enforced deadline over the whole worker domain"),
+		control("bounded-combined-output", "resources", "bounded, redacted stdout and stderr through manager-owned pipes"),
+		control("bounded-artifact-size", "resources", "bounded regular-file artifact streamed into private staging"),
+		control("closed-standard-input-and-descriptors", "process-graph", "standard input closed and unrelated descriptors or handles released"),
+		control("worker-domain-teardown", "process-graph", "full worker domain terminated and joined before the operation returns"),
+		control("no-artifact-execution", "process-graph", "the built output is never started by the manager or the worker"),
+		control("inventory-native-controls-applied", "resources", "every control "+nativeControlInventoryVersion+" marks available for the host platform is applied, and nothing outside that inventory is applied or reported"),
+		control("closed-capability-evidence-record", "reporting", "exactly one "+capabilityEvidenceRecordVersion+" record per operation with exactly one entry per inventory control"),
+	}
+	inventoryControls := []any{
+		nativeControl("descendant-domain-termination",
+			availablePlatform("process-group-and-session-teardown"),
+			availablePlatform("job-object-kill-on-close")),
+		nativeControl("active-process-count-limit",
+			unavailablePlatform(),
+			availablePlatform("job-object-active-process-limit")),
+		nativeControl("aggregate-memory-limit",
+			unavailablePlatform(),
+			availablePlatform("job-object-process-and-job-memory-limit")),
+		nativeControl("per-file-size-limit",
+			availablePlatform("rlimit-fsize"),
+			unavailablePlatform()),
+		nativeControl("inherited-handle-restriction",
+			availablePlatform("close-on-exec-and-explicit-descriptor-release"),
+			availablePlatform("explicit-handle-inheritance-list")),
+	}
+	nativeControlInventory := map[string]any{
+		"version":             nativeControlInventoryVersion,
+		"exhaustive":          true,
+		"authority":           "conformance/v1/vectors/go-host-execution-policy.json#native_control_inventory",
+		"platforms":           []any{"macos", "windows"},
+		"availability_states": []any{"available", "unavailable"},
+		"unavailable_reasons": []any{unavailableNativeControlReason},
+		"probe_timing":        "pre-worker-launch",
+		"probe_scope":         "per-operation",
+		"controls":            inventoryControls,
+	}
+	deferredGuarantees := []any{
+		deferredGuarantee("total-network-denial", "kernel-enforced denial of every socket family for the whole build domain"),
+		deferredGuarantee("read-only-source-and-toolchain", "kernel-enforced read-only presentation of the snapshot and GOROOT"),
+		deferredGuarantee("private-build-root-only-writes", "kernel-enforced confinement of every write to private build roots"),
+		deferredGuarantee("hard-aggregate-descendant-resource-bounds", "hard aggregate process, memory, disk, time, and output bounds over all descendants"),
+		deferredGuarantee("exact-executable-allowlisting", "kernel-enforced allowlist of the exact permitted executable paths"),
+		deferredGuarantee("fail-closed-capability-preflight", "terminal rejection before the worker when any hardened capability is absent"),
+	}
+	packageInfluenceCases := []any{
+		packageInfluenceCase("package-selected-executable", "worker, Go launcher, or GOROOT tool program"),
+		packageInfluenceCase("package-selected-argv", "Go list or build argument vector"),
+		packageInfluenceCase("package-selected-environment", "worker or compiler environment value"),
+		packageInfluenceCase("package-selected-output-path", "staging, artifact, shim, or install destination"),
+		packageInfluenceCase("package-selected-flags", "compiler, linker, tag, or toolchain flag"),
+		packageInfluenceCase("package-selected-hooks", "pre-build, post-build, or lifecycle hook"),
+		packageInfluenceCase("package-selected-plugins", "compiler, linker, or manager plugin"),
+		packageInfluenceCase("package-selected-generators", "source generator, macro, or code-producing step"),
+	}
+	identityCases := []any{
+		identityCase("pre-launch-identity-mismatch", "build_execution_worker_identity_invalid", false, false, false),
+		identityCase("worker-executable-symlink-substitution", "build_execution_worker_identity_invalid", false, false, false),
+		identityCase("worker-executable-replaced-between-checks", "build_execution_worker_identity_invalid", true, false, false),
+		identityCase("worker-identity-proof-mismatch", "build_execution_worker_identity_invalid", true, false, false),
+		identityCase("post-build-toolchain-identity-mismatch", "build_execution_worker_identity_invalid", true, true, false),
+		identityCase("post-build-source-snapshot-mutated", "build_execution_worker_identity_invalid", true, true, false),
+		identityCase("unexpected-program-started-below-the-worker", "build_execution_worker_identity_invalid", true, false, false),
+		identityCase("build-permit-before-complete-list-validation", "build_execution_worker_protocol_invalid", true, false, false),
+		identityCase("replayed-session-nonce", "build_execution_worker_protocol_invalid", true, false, false),
+		identityCase("out-of-order-protocol-message", "build_execution_worker_protocol_invalid", true, false, false),
+		identityCase("oversize-protocol-message", "build_execution_worker_protocol_invalid", true, false, false),
+		identityCase("unknown-protocol-message-kind", "build_execution_worker_protocol_invalid", true, false, false),
+		identityCase("second-build-request-in-one-session", "build_execution_worker_protocol_invalid", true, true, false),
+		identityCase("mandatory-control-cannot-be-applied", "build_execution_control_unavailable", false, false, false),
+	}
+	capabilityEvidenceCases := []any{
+		evidenceCase("available-native-control-is-applied", "descendant-domain-termination",
+			true, 1, "available", "applied", false, nil),
+		evidenceCase("unavailable-native-control-does-not-reject", "aggregate-memory-limit",
+			true, 1, "unavailable", "unavailable", false, nil),
+		evidenceCase("capability-evidence-is-not-cache-input", "per-file-size-limit",
+			true, 1, "available", "applied", false, nil),
+		evidenceCase("unavailable-control-cannot-be-reported-as-applied", "aggregate-memory-limit",
+			true, 1, "unavailable", "applied", false, "build_execution_capability_evidence_invalid"),
+		evidenceCase("available-control-cannot-be-reported-as-unavailable", "descendant-domain-termination",
+			true, 1, "available", "unavailable", false, "build_execution_capability_evidence_invalid"),
+		evidenceCase("unknown-native-control-is-rejected", "host-firewall-profile",
+			false, 1, "available", "applied", false, "build_execution_capability_evidence_invalid"),
+		evidenceCase("missing-native-control-entry-is-rejected", "inherited-handle-restriction",
+			true, 0, nil, nil, false, "build_execution_capability_evidence_invalid"),
+		evidenceCase("duplicate-native-control-entry-is-rejected", "per-file-size-limit",
+			true, 2, "available", "applied", false, "build_execution_capability_evidence_invalid"),
+		withEvidenceRecordVersion(
+			evidenceCase("unknown-evidence-record-version-is-rejected", "descendant-domain-termination",
+				true, 1, "available", "applied", false, "build_execution_capability_evidence_invalid"),
+			"capability-evidence-v2"),
+		evidenceCase("hardened-guarantee-claimed-under-portable-policy", "total-network-denial",
+			false, 1, "available", "applied", true, "build_execution_hardened_claim_forbidden"),
+		withEvidenceRecordExecutionPolicy(
+			evidenceCase("hardened-execution-policy-in-evidence-record", "descendant-domain-termination",
+				true, 1, "available", "applied", true, "build_execution_hardened_claim_forbidden"),
+			reservedHardenedExecutionPolicy),
+	}
+	rejectionGuards := make([]any, 0, len(deferredGuarantees))
+	for _, raw := range deferredGuarantees {
+		guarantee := raw.(map[string]any)
+		rejectionGuards = append(rejectionGuards, map[string]any{
+			"name":                        guarantee["name"],
+			"in_mandatory_controls":       false,
+			"in_native_control_inventory": false,
+			"in_capability_evidence_record": false,
+			"portable_rejection_code":     nil,
+			"build_permitted_when_absent": true,
+		})
+	}
+	failureBoundary := map[string]any{
+		"missing_mandatory_portable_control": map[string]any{
+			"rejects_build":  true,
+			"expected_error": "build_execution_control_unavailable",
+			"fails_before":   "worker-launch",
+			"published":      false,
+		},
+		"unavailable_inventory_native_control": map[string]any{
+			"rejects_build":  false,
+			"expected_error": nil,
+			"fails_before":   nil,
+			"published":      true,
+		},
+		"missing_deferred_hardened_capability": map[string]any{
+			"rejects_build":  false,
+			"expected_error": nil,
+			"fails_before":   nil,
+			"published":      true,
+		},
+	}
+	policySemantics := map[string]any{
+		"network": map[string]any{
+			"policy_field": "network",
+			"value":        "none",
+			"means":        "fixed offline Go module, proxy, checksum-database, and version-control configuration, and no manager-initiated or Go-initiated network access for dependency resolution or the build",
+			"does_not_mean": "kernel-enforced network denial for the worker domain or its descendants",
+			"deferred_hardened_guarantee": "total-network-denial",
+		},
+		"source_integrity": map[string]any{
+			"policy_field": nil,
+			"value":        "frozen-snapshot-with-identity-reverification",
+			"means":        "the manager freezes the validated snapshot, neither the manager nor the worker writes to it or to GOROOT, and a change to either before publication is detected and rejects the operation",
+			"does_not_mean": "kernel-enforced read-only presentation of the snapshot or toolchain to descendants",
+			"deferred_hardened_guarantee": "read-only-source-and-toolchain",
+		},
+		"executable_graph": map[string]any{
+			"policy_field": nil,
+			"value":        "fixed-manager-selected-graph-with-identity-verification",
+			"means":        "the manager and worker start only the fixed four-node graph, package data cannot select or add a program, and every started program's identity is verified before and after execution",
+			"does_not_mean": "kernel-enforced allowlisting of the exact executable paths a descendant may run",
+			"deferred_hardened_guarantee": "exact-executable-allowlisting",
+		},
+		"private_write_confinement": map[string]any{
+			"policy_field": nil,
+			"value":        "manager-private-roots-and-verified-artifact",
+			"means":        "every manager-directed write target is an operation-private root and the single artifact is verified in private staging before publication",
+			"does_not_mean": "kernel-enforced confinement of every descendant write to the private build roots",
+			"deferred_hardened_guarantee": "private-build-root-only-writes",
+		},
+		"resource_bounds": map[string]any{
+			"policy_field": nil,
+			"value":        "parent-enforced-deadline-output-and-artifact-bounds",
+			"means":        "the parent bounds wall-clock time, combined output, and artifact size over the worker domain and applies every inventory control the platform marks available",
+			"does_not_mean": "hard aggregate process, memory, disk, time, and output bounds over every descendant",
+			"deferred_hardened_guarantee": "hard-aggregate-descendant-resource-bounds",
+		},
+		"capability_preflight": map[string]any{
+			"policy_field": nil,
+			"value":        "mandatory-control-preflight-only",
+			"means":        "the operation rejects before the worker when a mandatory portable control cannot be applied",
+			"does_not_mean": "terminal rejection before the worker when a hardened capability is absent",
+			"deferred_hardened_guarantee": "fail-closed-capability-preflight",
+		},
+	}
+
+	portableInput := validGoBuildInputV1()
+	hardenedInput := validGoBuildInputV1()
+	hardenedInput["policy"].(map[string]any)["execution_policy"] = reservedHardenedExecutionPolicy
+	legacyInput := legacyRC4GoBuildInputV1()
+	writeJSON(filepath.Join(dir, "go-host-execution-policy.json"), map[string]any{
+		"schema_version":                     1,
+		"protocol_version":                   protocolVersion,
+		"execution_policy":                   portableExecutionPolicy,
+		"reserved_hardened_execution_policy": reservedHardenedExecutionPolicy,
+		"hardened_profile_owner":             hardenedExecutionOwner,
+		"drivers":                            []any{"go-repository-v1", "go-v1"},
+		"process_graph": []any{
+			"manager-parent", "identity-verified-manager-owned-worker",
+			"fingerprinted-goroot-bin-go", "fingerprinted-goroot-pkg-tool-child",
+		},
+		"session_states":                     sessionStates,
+		"mandatory_controls":                 mandatoryControls,
+		"native_control_inventory":           nativeControlInventory,
+		"capability_evidence_record":         capabilityEvidenceRecord(inventoryControls),
+		"deferred_hardened_guarantees":       deferredGuarantees,
+		"deferred_capability_rejection_guards": rejectionGuards,
+		"failure_boundary":                   failureBoundary,
+		"policy_semantics":                   policySemantics,
+		"package_influence_cases":            packageInfluenceCases,
+		"identity_and_protocol_cases":        identityCases,
+		"capability_evidence_cases":          capabilityEvidenceCases,
+		"cache_identity": map[string]any{
+			"portable": map[string]any{
+				"execution_policy": portableExecutionPolicy,
+				"input":            portableInput,
+				"cache_key":        canonicalSHA256(portableInput),
+				"schema_valid":     true,
+			},
+			"reserved_hardened": map[string]any{
+				"execution_policy": reservedHardenedExecutionPolicy,
+				"input":            hardenedInput,
+				"cache_key":        canonicalSHA256(hardenedInput),
+				"schema_valid":     false,
+			},
+			"legacy_rc4_without_execution_policy": map[string]any{
+				"execution_policy": nil,
+				"input":            legacyInput,
+				"cache_key":        canonicalSHA256(legacyInput),
+				"schema_valid":     false,
+			},
+			"aliases": false,
+		},
+	})
+}
+
+func control(name, scope, requirement string) map[string]any {
+	return map[string]any{
+		"name": name, "scope": scope, "requirement": requirement,
+		"portable": true, "enforced": "always", "hardened_guarantee": false,
+	}
+}
+
+// availablePlatform describes an inventory control that the platform provides
+// through the named primitive.
+func availablePlatform(mechanism string) map[string]any {
+	return map[string]any{
+		"availability": "available", "mechanism": mechanism, "unavailable_reason": nil,
+	}
+}
+
+// unavailablePlatform describes an inventory control that the platform does not
+// provide as a private worker-domain control. Its absence is recorded, never a
+// rejection.
+func unavailablePlatform() map[string]any {
+	return map[string]any{
+		"availability": "unavailable", "mechanism": nil,
+		"unavailable_reason": unavailableNativeControlReason,
+	}
+}
+
+func nativeControl(name string, macos, windows map[string]any) map[string]any {
+	return map[string]any{
+		"name": name, "applied_when_available": true, "hardened_guarantee": false,
+		"platforms": map[string]any{"macos": macos, "windows": windows},
+	}
+}
+
+// capabilityEvidenceRecord closes the per-operation reporting record: its exact
+// fields, allowed states, probe timing, exposure, exclusion from every hashed
+// identity, and the consistency rules whose violation is an error. The examples
+// are derived from the inventory so a record and the inventory can never drift.
+func capabilityEvidenceRecord(inventoryControls []any) map[string]any {
+	examples := map[string]any{}
+	for _, platform := range []string{"macos", "windows"} {
+		entries := make([]any, 0, len(inventoryControls))
+		for _, raw := range inventoryControls {
+			item := raw.(map[string]any)
+			state := item["platforms"].(map[string]any)[platform].(map[string]any)
+			status := "unavailable"
+			if state["availability"] == "available" {
+				status = "applied"
+			}
+			entries = append(entries, map[string]any{
+				"name":         item["name"],
+				"availability": state["availability"],
+				"status":       status,
+				"probed_at":    "pre-worker-launch",
+			})
+		}
+		examples[platform] = map[string]any{
+			"record_version":   capabilityEvidenceRecordVersion,
+			"execution_policy": portableExecutionPolicy,
+			"platform":         platform,
+			"controls":         entries,
+		}
+	}
+	return map[string]any{
+		"record_version":       capabilityEvidenceRecordVersion,
+		"inventory_version":    nativeControlInventoryVersion,
+		"record_fields":        []any{"controls", "execution_policy", "platform", "record_version"},
+		"control_entry_fields": []any{"availability", "name", "probed_at", "status"},
+		"availability_states":  []any{"available", "unavailable"},
+		"status_states":        []any{"applied", "unavailable"},
+		"probe_timings":        []any{"pre-worker-launch"},
+		"entry_cardinality":    "exactly-one-per-inventory-control",
+		"result_only":          true,
+		"exposed_in":           []any{"dry-run-plan-result", "install-result", "status-result"},
+		"excluded_from":        []any{"cache-key", "conformance-claim", "install-marker", "receipt"},
+		"consistency_rules": []any{
+			evidenceRule("available-control-must-report-status-applied", "build_execution_capability_evidence_invalid"),
+			evidenceRule("unavailable-control-must-report-status-unavailable", "build_execution_capability_evidence_invalid"),
+			evidenceRule("exactly-one-entry-per-inventory-control", "build_execution_capability_evidence_invalid"),
+			evidenceRule("no-entry-outside-the-inventory", "build_execution_capability_evidence_invalid"),
+			evidenceRule("unknown-record-version-is-rejected", "build_execution_capability_evidence_invalid"),
+			evidenceRule("availability-probed-per-operation-before-worker-launch", "build_execution_capability_evidence_invalid"),
+			evidenceRule("no-deferred-hardened-guarantee-entry", "build_execution_hardened_claim_forbidden"),
+			evidenceRule("record-execution-policy-must-be-the-portable-identity", "build_execution_hardened_claim_forbidden"),
+		},
+		"examples": examples,
+	}
+}
+
+func evidenceRule(rule, expectedError string) map[string]any {
+	return map[string]any{"rule": rule, "expected_error": expectedError}
+}
+
+// evidenceCase builds one capability-evidence oracle. A case is valid exactly
+// when it reports one inventory control once with a consistent availability and
+// status pair under the portable record version and policy.
+func evidenceCase(name, controlName string, inInventory bool, entryCount int, availability, status any, hardenedClaimed bool, expectedError any) map[string]any {
+	return map[string]any{
+		"name":                       name,
+		"control":                    controlName,
+		"in_inventory":               inInventory,
+		"entry_count":                entryCount,
+		"record_version":             capabilityEvidenceRecordVersion,
+		"record_execution_policy":    portableExecutionPolicy,
+		"availability":               availability,
+		"status":                     status,
+		"hardened_guarantee_claimed": hardenedClaimed,
+		"record_valid":               expectedError == nil,
+		"build_permitted":            expectedError == nil,
+		"changes_cache_key":          false,
+		"expected_error":             expectedError,
+	}
+}
+
+func withEvidenceRecordVersion(item map[string]any, version string) map[string]any {
+	item["record_version"] = version
+	return item
+}
+
+func withEvidenceRecordExecutionPolicy(item map[string]any, policy string) map[string]any {
+	item["record_execution_policy"] = policy
+	return item
+}
+
+func deferredGuarantee(name, requirement string) map[string]any {
+	return map[string]any{
+		"name": name, "requirement": requirement, "deferred_to": hardenedExecutionOwner,
+		"portable_profile_claims": false, "rejects_portable_build": false,
+	}
+}
+
+func packageInfluenceCase(name, surface string) map[string]any {
+	return map[string]any{
+		"name": name, "surface": surface,
+		"manifest_field": nil, "descriptor_field": nil,
+		"expected_error": "build_execution_package_influence_forbidden",
+		"worker_started": false, "compiler_started": false, "published": false,
+	}
+}
+
+func identityCase(name, expectedError string, workerStarted, compilerStarted, published bool) map[string]any {
+	return map[string]any{
+		"name": name, "expected_error": expectedError,
+		"worker_started": workerStarted, "compiler_started": compilerStarted, "published": published,
+	}
+}
+

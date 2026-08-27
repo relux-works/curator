@@ -1,0 +1,55 @@
+----------------------------------------------------------------
+argv: kotlinc -d out main.kt @atfile 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 4475
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+logging: using Kotlin home directory /opt/homebrew/Cellar/kotlin/2.4.10/libexec
+logging: exception on loading scripting plugin: java.lang.ClassNotFoundException: org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingCompilerConfigurationComponentRegistrar
+logging: configuring the compilation environment
+logging: using JDK home inferred from java.home: /opt/homebrew/Cellar/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home
+logging: loading modules: [java.se, jdk.accessibility, jdk.attach, jdk.compiler, jdk.dynalink, jdk.httpserver, jdk.incubator.vector, jdk.jartool, jdk.javadoc, jdk.jconsole, jdk.jdi, jdk.jfr, jdk.jshell, jdk.management, jdk.management.jfr, jdk.net, jdk.nio.mapmode, jdk.sctp, jdk.security.auth, jdk.security.jgss, jdk.unsupported, jdk.unsupported.desktop, jdk.xml.dom, kotlin.stdlib, kotlin.script.runtime, kotlin.reflect, java.base, java.compiler, java.datatransfer, java.desktop, java.xml, java.instrument, java.logging, java.management, java.management.rmi, java.rmi, java.naming, java.net.http, java.prefs, java.scripting, java.security.jgss, java.security.sasl, java.sql, java.transaction.xa, java.sql.rowset, java.xml.crypto, jdk.internal.jvmstat, jdk.internal.opt, jdk.zipfs, jdk.internal.md, jdk.management.agent, jdk.jdwp.agent, jdk.internal.ed, jdk.internal.le]
+info: EXTENSIONS_STORAGE: org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar$ExtensionStorage@1283bb96
+DIAGNOSTIC_FACTORIES_STORAGE: org.jetbrains.kotlin.diagnostics.KtRegisteredDiagnosticFactoriesStorage@74f0ea28
+DIAGNOSTICS_COLLECTOR: org.jetbrains.kotlin.diagnostics.impl.DiagnosticsCollectorImpl@f6efaab
+MESSAGE_COLLECTOR_KEY: org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector@3c19aaa5
+PERF_MANAGER: org.jetbrains.kotlin.util.PerformanceManagerImpl@3349e9bb
+PRINT_VERSION: false
+SCRIPT_MODE: false
+REPL_MODE: false
+TREAT_WARNINGS_AS_ERRORS: false
+DISABLE_INLINE: false
+USE_FIR_EXTRA_CHECKERS: false
+METADATA_KLIB: false
+REPORT_OUTPUT_FILES: false
+INCREMENTAL_COMPILATION: false
+ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS: false
+IGNORE_CONST_OPTIMIZATION_ERRORS: false
+RENDER_DIAGNOSTIC_INTERNAL_NAME: false
+VERIFY_IR: NONE
+LANGUAGE_VERSION_SETTINGS: Language = 2.4, API = 2.4 allowFullyQualifiedNameInKClass:true headerModeType:any javaTypeEnhancementState:JavaTypeEnhancementState(jsr305=Jsr305Settings(globalLevel=WARN, migrationLevel=null, userDefinedLevelForSpecificAnnotation={}))
+USE_FIR: true
+USE_LIGHT_TREE: true
+DONT_SORT_SOURCE_FILES: false
+KOTLIN_PATHS: org.jetbrains.kotlin.utils.KotlinPathsFromHomeDir@55b699ef
+PLUGIN_COMPONENT_REGISTRARS:
+  org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingCompilerConfigurationComponentRegistrar@35d019a3
+COMPILER_PLUGIN_REGISTRARS:
+  org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingK2CompilerPluginRegistrar@3b07a0d6
+ALLOW_NO_SOURCE_FILES: false
+INCLUDE_RUNTIME: false
+NO_REFLECT: false
+FRIEND_PATHS:
+ADDITIONAL_JAVA_MODULES:
+  kotlin.stdlib
+  kotlin.script.runtime
+  kotlin.reflect
+----------------------------------------------------------------
+argv: kotlinc -d out @nonexistent-argfile main.kt 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 121
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+warning: argfile not found: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/argprobe/nonexistent-argfile

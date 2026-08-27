@@ -1,0 +1,27 @@
+Tool readiness check
+Date: 2026-07-30
+Command group exit code: 127
+
+Available:
+- task-board 0.23.0 at /Users/iv/.local/bin/task-board
+- git 2.50.1 at /usr/bin/git
+- ripgrep 15.2.0 at the Codex vendor path
+- Python 3.14.4 at /opt/homebrew/bin/python3
+- Go 1.25.5 darwin/arm64 at /Users/iv/.goenv/shims/go
+- uv 0.11.3 at /opt/homebrew/bin/uv
+- pytest 8.3.4 at /opt/homebrew/bin/pytest
+
+Unavailable from PATH:
+- mypy (zsh exit 127). Project-local invocation will be determined from the
+  repository configuration before static validation.
+
+Project environment:
+- The task worktree has no private .venv (probe exit 127).
+- The clean CocoaSkills clone supplies the canonical environment at
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python.
+- Python 3.14.4
+- pytest 9.0.3
+- mypy 2.1.0
+- build 1.5.0
+- twine 6.2.0
+- Project-environment probe exit 0.

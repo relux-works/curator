@@ -1,0 +1,20 @@
+### gofmt
+gofmt_exit=0
+### go build
+build_exit=0
+### go vet
+vet_exit=0
+### golangci-lint
+0 issues.
+lint_exit=0
+### GOOS=windows build
+win_build_exit=0
+### GOOS=linux build
+linux_build_exit=0
+### GOOS=linux vet
+linux_vet_exit=0
+### GOOS=windows vet (expected red, sibling-owned)
+# github.com/relux-works/curator/internal/runtimestore
+# [github.com/relux-works/curator/internal/runtimestore]
+vet: internal/runtimestore/targets_windows_test.go:97:14: undefined: decodeHelperOutput
+win_vet_exit=1

@@ -1,0 +1,171 @@
+s.s.....ss..ss...s.s.s.s.s.s.s.s.s.s.s.s.s.sss.ss..s....ssss......s..... [ 67%]
+........s...ss...ssss....s.s.ss...                                       [100%]
+65 passed, 41 skipped in 1.41s
+============================= test session starts =============================
+platform win32 -- Python 3.14.4, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\admin\csk-11yhth\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\admin\csk-11yhth
+configfile: pyproject.toml
+collecting ... collected 104 items / 91 deselected / 13 selected
+
+tests/test_shims.py::test_windows_launcher_forwards_arguments_and_preserves_errorlevel PASSED [  7%]
+tests/test_shims.py::test_unix_launcher_forwards_arguments_and_nonzero_exit_status[False] SKIPPED [ 15%]
+tests/test_shims.py::test_unix_launcher_forwards_arguments_and_nonzero_exit_status[True] SKIPPED [ 23%]
+tests/test_shims.py::test_windows_launcher_forwards_arguments_and_nonzero_exit_status[False] PASSED [ 30%]
+tests/test_shims.py::test_windows_launcher_forwards_arguments_and_nonzero_exit_status[True] PASSED [ 38%]
+tests/test_build_activation.py::test_windows_activation_quotes_the_executable_and_forwards_argv[project] PASSED [ 46%]
+tests/test_build_activation.py::test_windows_activation_quotes_the_executable_and_forwards_argv[global] PASSED [ 53%]
+tests/test_build_activation.py::test_activation_never_launches_the_built_artifact[project] SKIPPED [ 61%]
+tests/test_build_activation.py::test_activation_never_launches_the_built_artifact[global] SKIPPED [ 69%]
+tests/test_build_activation.py::test_activated_unix_command_forwards_argv_and_nonzero_exit_status[False] SKIPPED [ 76%]
+tests/test_build_activation.py::test_activated_unix_command_forwards_argv_and_nonzero_exit_status[True] SKIPPED [ 84%]
+tests/test_build_activation.py::test_activated_windows_command_forwards_argv_and_nonzero_exit_status[False] PASSED [ 92%]
+tests/test_build_activation.py::test_activated_windows_command_forwards_argv_and_nonzero_exit_status[True] PASSED [100%]
+
+================= 7 passed, 6 skipped, 91 deselected in 0.51s =================
+ss.........s............................................................ [  6%]
+..........................sss......s.............s...ss...ssss....s.s.ss [ 13%]
+...ssssssssssssssssssssssssssssssssssssssssss.......................ssss [ 20%]
+sssssssssssssssssssssssssss..........................s.................. [ 27%]
+........sss..................s.....s.s..ssss.s.......................... [ 34%]
+........................................................................ [ 41%]
+........ss...........ss.ss............ss...............sss.............. [ 48%]
+.....................sss...........................ssss.....sss......... [ 55%]
+.............................................................sssssssssss [ 62%]
+ssssss........................................ssssssssssssss.s.s.....ss. [ 69%]
+.ss...s.s.s.s.s.s.s.s.s.s.s.s.s.sss.ss..s....s.......................... [ 76%]
+........................................................................ [ 83%]
+...................................s.................................... [ 90%]
+.......................................................................s [ 97%]
+...........................                                              [100%]
+852 passed, 183 skipped, 1 deselected in 302.13s (0:05:02)
+ss.........s............................................................ [  6%]
+..........................sss......s.............s...ss...ssss....s.s.ss [ 13%]
+...ssssssssssssssssssssssssssssssssssssssssss.......................ssss [ 20%]
+sssssssssssssssssssssssssss..........................s.................. [ 27%]
+........sss..................s.....s.s..ssss.s.......................... [ 34%]
+........................................................................ [ 41%]
+........ss...........ss.ss............ss...............sss.............. [ 48%]
+.....................sss...........................ssss.....sss......... [ 55%]
+.............................................................sssssssssss [ 62%]
+ssssss........................................ssssssssssssss.Fs.s.....ss [ 69%]
+..ss...s.s.s.s.s.s.s.s.s.s.s.s.s.sss.ss..s....s......................... [ 76%]
+........................................................................ [ 83%]
+....................................s................................... [ 90%]
+........................................................................ [ 97%]
+s...........................                                             [100%]
+================================== FAILURES ===================================
+_________ test_powershell_hook_activates_and_restores_on_every_prompt _________
+
+tmp_path = WindowsPath('C:/Users/admin/AppData/Local/Temp/pytest-of-admin/pytest-43/test_powershell_hook_activates0')
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="PowerShell prompt integration runs on Windows")
+    def test_powershell_hook_activates_and_restores_on_every_prompt(tmp_path: Path) -> None:
+        executable = shutil.which("pwsh") or shutil.which("powershell")
+        if executable is None:
+            pytest.skip("PowerShell is unavailable")
+        project = tmp_path / "project"
+        nested = project / "nested"
+        outside = tmp_path / "outside"
+        nested.mkdir(parents=True)
+        outside.mkdir()
+        env_files.write_env_files(project)
+    
+        hook_path = tmp_path / "hook.ps1"
+        hook_path.write_text(shell_init.shell_init("powershell", include_global=False), encoding="utf-8")
+        script_path = tmp_path / "verify.ps1"
+        script_path.write_text(
+            r'''
+    $originalPath = $env:PATH
+    function global:prompt { return "ORIGINAL>" }
+    . $env:HOOK_PATH
+    Set-Location $env:NESTED
+    $firstPrompt = prompt
+    Write-Output "first=$($env:CSK_PROJECT_ROOT):$firstPrompt"
+    Set-Location $env:OUTSIDE
+    $secondPrompt = prompt
+    $restored = if ($env:PATH -eq $originalPath) { "restored" } else { "changed" }
+    $active = if ($env:CSK_ACTIVE_ENV) { $env:CSK_ACTIVE_ENV } else { "unset" }
+    Write-Output ("left={0}:{1}:{2}" -f $active, $restored, $secondPrompt)
+    ''',
+            encoding="utf-8",
+        )
+        environment = {
+            **os.environ,
+            "HOOK_PATH": str(hook_path),
+            "NESTED": str(nested),
+            "OUTSIDE": str(outside),
+        }
+        completed = subprocess.run(
+            [executable, "-NoProfile", "-File", str(script_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+>       assert completed.returncode == 0, completed.stderr
+E       AssertionError: Невозможно загрузить файл C:\Users\admin\AppData\Local\Temp\pytest-of-admin\pytest-43\test_powershell_hook_activates0\v
+E         erify.ps1, так как выполнение сценариев отключено в этой системе. Для получения дополнительных сведений см. about_Execu
+E         tion_Policies по адресу https:/go.microsoft.com/fwlink/?LinkID=135170.
+E             + CategoryInfo          : Ошибка безопасности: (:) [], ParentContainsErrorRecordException
+E             + FullyQualifiedErrorId : UnauthorizedAccess
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE', '-NoProfile', '-File', 'C:\\U...a0 безоп\xa0с\xadости: (:) [], ParentContainsErrorRecordException\n    + FullyQualifiedErrorId : UnauthorizedAccess\n').returncode
+
+tests\test_shell_init.py:307: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_shell_init.py::test_powershell_hook_activates_and_restores_on_every_prompt
+1 failed, 852 passed, 183 skipped in 288.76s (0:04:48)
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+src\csk\builds\_windows.py:25: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\builds\_windows.py:47: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\builds\_windows.py:61: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\builds\_windows.py:70: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:168: error: Module has no attribute "fcntl"  [attr-defined]
+src\csk\locking.py:216: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:217: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:218: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:781: error: Module has no attribute "flock"  [attr-defined]
+src\csk\locking.py:781: error: Module has no attribute "LOCK_EX"  [attr-defined]
+src\csk\locking.py:781: error: Module has no attribute "LOCK_NB"  [attr-defined]
+src\csk\locking.py:792: error: Module has no attribute "flock"  [attr-defined]
+src\csk\locking.py:792: error: Module has no attribute "LOCK_UN"  [attr-defined]
+src\csk\locking.py:798: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:799: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:800: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:801: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:836: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:837: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:838: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:839: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\locking.py:991: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\builds\source.py:215: error: Module has no attribute "O_NOFOLLOW"  [attr-defined]
+src\csk\builds\source.py:350: error: Module has no attribute "O_DIRECTORY"  [attr-defined]
+src\csk\builds\source.py:350: error: Module has no attribute "O_NOFOLLOW"  [attr-defined]
+src\csk\builds\source.py:464: error: Module has no attribute "O_NOFOLLOW"  [attr-defined]
+src\csk\config.py:394: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\transactions.py:1888: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\transactions.py:1889: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\transactions.py:1890: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\transactions.py:1950: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\transactions.py:1951: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\transactions.py:1952: error: Unused "type: ignore" comment  [unused-ignore]
+src\csk\builds\cache_posix.py:591: error: Returning Any from function declared to return "int"  [no-any-return]
+src\csk\builds\cache_posix.py:591: error: Module has no attribute "geteuid"; maybe "getpid"?  [attr-defined]
+src\csk\builds\cache_posix.py:1214: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1242: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1248: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1286: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1500: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1506: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1590: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1663: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1698: error: Module has no attribute "uname"; maybe "name"?  [attr-defined]
+src\csk\builds\cache_posix.py:1740: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1801: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1806: error: Module has no attribute "fchmod"; maybe "chmod"?  [attr-defined]
+src\csk\builds\cache_posix.py:1968: error: Name "result" is not defined  [name-defined]
+Found 48 errors in 6 files (checked 65 source files)

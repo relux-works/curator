@@ -1,0 +1,14 @@
+# cmd/curator before/after measurement (TASK-260729-1zex8r)
+
+## host barrier
+waited 0s for foreign Go/test processes to clear; still running: 0
+waited a further 30s for the 1-minute load average to fall below 6.0 (cap 900s)
+
+host at start:  8:19  up 5 days, 13:33, 63 users, load averages: 5.77 8.55 8.36
+top CPU consumers at start:
+    96.4 /System/Library/PrivateFrameworks/CoreSuggestions.framework/Versions/A/Support/suggestd
+    72.4 /Applications/GramDrive.app/Contents/MacOS/gramdrive-agent
+    38.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer
+
+## runs
+before-30m: warm-compile exit=0

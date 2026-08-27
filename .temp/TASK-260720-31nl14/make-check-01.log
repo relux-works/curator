@@ -1,0 +1,14 @@
+go vet ./...
+cmd/curator/main.go:5:2: missing go.sum entry for module providing package github.com/charmbracelet/bubbletea (imported by github.com/relux-works/curator/cmd/curator); to add:
+	go get github.com/relux-works/curator/cmd/curator
+internal/buildsource/buildsource.go:19:2: missing go.sum entry for module providing package golang.org/x/text/cases (imported by github.com/relux-works/curator/internal/buildsource); to add:
+	go get github.com/relux-works/curator/internal/buildsource
+internal/buildsource/buildsource.go:20:2: missing go.sum entry for module providing package golang.org/x/text/unicode/norm (imported by github.com/relux-works/curator/internal/buildsource); to add:
+	go get github.com/relux-works/curator/internal/buildsource
+internal/snapshot/lock_unix.go:8:2: missing go.sum entry for module providing package golang.org/x/sys/unix (imported by github.com/relux-works/curator/internal/buildcache); to add:
+	go get github.com/relux-works/curator/internal/buildcache
+internal/mcp/mcp.go:17:2: missing go.sum entry for module providing package github.com/BurntSushi/toml (imported by github.com/relux-works/curator/internal/mcp); to add:
+	go get github.com/relux-works/curator/internal/mcp
+internal/ui/model.go:8:2: missing go.sum entry for module providing package github.com/charmbracelet/lipgloss (imported by github.com/relux-works/curator/internal/ui); to add:
+	go get github.com/relux-works/curator/internal/ui
+make: *** [vet] Error 1

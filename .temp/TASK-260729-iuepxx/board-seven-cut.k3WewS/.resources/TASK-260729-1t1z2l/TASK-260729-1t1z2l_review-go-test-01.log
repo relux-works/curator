@@ -1,0 +1,1169 @@
+removed runtime skill-x/3333333333333333333333333333333333333333
+gc: 1 runtime entry removed, 0 build entries removed
+gc: 0 runtime entries removed, 0 build entries removed
+curator dev
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+curator: unknown command "frobnicate"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in
+  declare\ -a*)
+    _curator_prompt_present=0
+    for _curator_prompt_entry in "${PROMPT_COMMAND[@]}"; do
+      if [ "$_curator_prompt_entry" = "_curator_auto_env" ]; then
+        _curator_prompt_present=1
+        break
+      fi
+    done
+    if [ "$_curator_prompt_present" = "0" ]; then
+      PROMPT_COMMAND=("_curator_auto_env" "${PROMPT_COMMAND[@]}")
+    fi
+    unset _curator_prompt_present
+    unset _curator_prompt_entry
+    ;;
+  *)
+    case ";${PROMPT_COMMAND:-};" in
+      *";_curator_auto_env;"*) ;;
+      *) PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+    esac
+    ;;
+esac
+_curator_auto_env
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+curator: unsupported shell: fish
+curator: unsupported shell: fish
+wrote /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestShellInitInstallCachesHookWithoutConfig1261236976/001/manager home/hooks/curator.bash
+optional shell profile line: . '/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestShellInitInstallCachesHookWithoutConfig1261236976/001/manager home/hooks/curator.bash'
+error: skill.missing_skill_md (SKILL.md): required SKILL.md not found
+[
+  {
+    "severity": "error",
+    "code": "skill.missing_skill_md",
+    "path": "SKILL.md",
+    "message": "required SKILL.md not found"
+  }
+]
+wrote /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestBootstrapAndProjectCommands2918746313/001/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+added project app: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestBootstrapAndProjectCommands2918746313/003
+alias: app
+path: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestBootstrapAndProjectCommands2918746313/003
+skillfile: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestBootstrapAndProjectCommands2918746313/003/Skillfile.json
+skills: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestBootstrapAndProjectCommands2918746313/003/.agents/skills
+bin: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestBootstrapAndProjectCommands2918746313/003/.agents/bin
+kept existing config: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestBootstrapIfMissingKeepsExistingConfigWithoutParsing4187481662/001/config.json
+wrote /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestBootstrapIfMissingCreatesAbsentConfig3480502517/001/home/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+curator: bootstrap --if-missing and --force are mutually exclusive
+app: dry-run; no files modified
+initialized /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-1t1z2l/review-tmp/TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot185944294/001/home/global/Skillfile.json
+global: dry-run; no files modified
+--- FAIL: TestCLIEndToEndInstallStatusAndTamperCheck (0.11s)
+    main_test.go:301: git [commit -qm initial skill]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+FAIL
+FAIL	github.com/relux-works/curator/cmd/curator	1.459s
+ok  	github.com/relux-works/curator/internal/adapters	3.030s
+ok  	github.com/relux-works/curator/internal/audit	2.267s
+ok  	github.com/relux-works/curator/internal/buildcache	4.509s
+ok  	github.com/relux-works/curator/internal/buildmeta	(cached)
+ok  	github.com/relux-works/curator/internal/buildsource	2.675s
+ok  	github.com/relux-works/curator/internal/capabilities	(cached)
+--- FAIL: TestDiamondResolvesOnceProvidersFirst (0.10s)
+    closure_test.go:193: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestVersionConflictNamesBothChains (0.10s)
+    closure_test.go:220: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestSameCommitDifferentRefsUnify (0.10s)
+    closure_test.go:248: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestCycleFails (0.09s)
+    closure_test.go:269: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestActivationModesAndNarrowing (0.12s)
+    closure_test.go:292: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestBuildCommandsActivateLikeScriptsButSystemCommandsDoNot (0.16s)
+    closure_test.go:331: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestNarrowingUnknownCommandFails (0.14s)
+    closure_test.go:384: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestNarrowingSystemCommandFails (0.12s)
+    closure_test.go:396: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestCommandCollisions (0.12s)
+    closure_test.go:410: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestDevSubstitutionReplacesAndSkipsUnification (0.12s)
+    closure_test.go:471: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestFetchExistingIsScopedToReachedClosureAndDeduplicated (0.15s)
+    closure_test.go:512: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestScratchResolutionLeavesPersistentRootsAbsent (0.15s)
+    closure_test.go:547: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+FAIL
+FAIL	github.com/relux-works/curator/internal/closure	6.179s
+ok  	github.com/relux-works/curator/internal/config	1.911s
+ok  	github.com/relux-works/curator/internal/devsub	0.835s
+ok  	github.com/relux-works/curator/internal/envfiles	0.489s
+ok  	github.com/relux-works/curator/internal/gitignore	1.740s
+ok  	github.com/relux-works/curator/internal/gitops	4.478s
+ok  	github.com/relux-works/curator/internal/globalbins	4.048s
+ok  	github.com/relux-works/curator/internal/godriver	48.049s
+ok  	github.com/relux-works/curator/internal/hashing	1.179s
+ok  	github.com/relux-works/curator/internal/identifiers	(cached)
+ok  	github.com/relux-works/curator/internal/identity	(cached)
+--- FAIL: TestProjectManifestABAAroundTheReadRestartsClosure (0.16s)
+    aba_test.go:89: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalManifestABAAroundTheReadRestartsClosure (0.14s)
+    aba_test.go:120: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestSubstitutionsABAAroundTheReadRestartsClosure (0.14s)
+    aba_test.go:149: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestHybridActivationABAAroundTheReadRestartsClosure (0.14s)
+    aba_test.go:184: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestByteIdenticalRewriteDuringTheReadDoesNotRestart (0.14s)
+    aba_test.go:216: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestCommitOrdersTargetClassesWithConsumerLast (0.15s)
+    commit_test.go:195: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestConsumerLedgerIsAbsentAfterAFailedFirstInstallAndCommitsLastOnSuccess (0.21s)
+    commit_test.go:237: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestCachePublicationFailureLeavesInstallationAndProtectedCacheUntouched (0.21s)
+    commit_test.go:264: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestConcurrentProjectInstallsPreserveBothConsumers (0.23s)
+    commit_test.go:330: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRollbackCannotRestoreOverAnotherProjectsCommittedSharedTargets (0.28s)
+    commit_test.go:403: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRecoveryCompletesBeforeAnyNewMutation (0.18s)
+    commit_test.go:443: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestStaleInstalledGenerationRestartsInsteadOfApplyingTheOldPlan (0.23s)
+    commit_test.go:514: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestMaintenanceFailureAfterCommitIsAWarning (0.20s)
+    commit_test.go:565: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestNoSharedTargetChangesBeforeTheManagerHomeLock (0.18s)
+    commit_test.go:588: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalCommitCarriesNoConsumerLedger (0.19s)
+    commit_test.go:617: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestAdapterLedgerCommitsAfterTheMirrorsItClaims (0.17s)
+    commit_test.go:678: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestEndToEndInstall (0.15s)
+    install_test.go:126: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestBuildRootExcludedBeforeLocaleRenderingWithoutCompilerExecution (0.15s)
+    install_test.go:193: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook (0.16s)
+    install_test.go:269: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRuntimeLauncherCapturesDeclaredSystemDependency (0.15s)
+    install_test.go:313: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestSecondInstallIsUpToDate (0.16s)
+    install_test.go:357: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestTamperTriggersReinstall (0.16s)
+    install_test.go:374: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRemovedSkillCleanedUp (0.16s)
+    install_test.go:396: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestDryRunTouchesNothing (0.13s)
+    install_test.go:419: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGitignoreGateSkips (0.14s)
+    install_test.go:450: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestMissingSystemCommandFails (0.13s)
+    install_test.go:480: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestMovedTagWarningAndStrict (0.20s)
+    install_test.go:496: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRuntimeOnlyProviderGetsMarkerNoAdapter (0.14s)
+    install_test.go:528: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRuntimeOnlyProviderStillRequiresSkillMd (0.16s)
+    install_test.go:569: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestHybridSkillActivatesWithoutTouchingProjectStore (0.15s)
+    install_test.go:602: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestHybridShadowedByProjectDeclaration (0.16s)
+    install_test.go:639: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalInstall (0.17s)
+    install_test.go:665: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged (0.15s)
+    install_test.go:705: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalInstallUsesManifestLocaleAndAuditGate (0.14s)
+    install_test.go:737: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalStrictTagsDetectMovedTag (0.14s)
+    install_test.go:770: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestMcpRequirementGatesInstall (0.16s)
+    install_test.go:809: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestAuditGateBlocksUndeclaredNetwork (0.15s)
+    install_test.go:824: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestPostCommitMaintenanceRunsUnderTheHeldHomeLock (0.14s)
+    maintenance_test.go:18: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestPostCommitMaintenanceWarningsReachTheResult (0.13s)
+    maintenance_test.go:54: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestPostCommitMaintenanceMarksInFlightJournals (0.13s)
+    maintenance_test.go:80: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestProjectDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot (0.14s)
+    private_test.go:130: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot (0.17s)
+    private_test.go:171: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestDryRunRemovesItsOperationPrivateRootOnFailure (0.14s)
+    private_test.go:219: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalDryRunRemovesItsOperationPrivateRootOnFailure (0.14s)
+    private_test.go:238: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRealRunKeepsEveryEphemeralPathInOneOperationPrivateRoot (0.15s)
+    private_test.go:258: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalMcpFailureBlocksToolchainCacheAndBuild (0.15s)
+    private_test.go:283: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalRegistryFailureBlocksToolchainCacheAndBuild (0.15s)
+    private_test.go:307: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalMarkersCarryMcpAndAttestationEvidence (0.17s)
+    private_test.go:370: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRegistryRevocationDeniesInstall (0.17s)
+    registry_e2e_test.go:89: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestRegistryAttestationLandsInMarker (0.15s)
+    registry_e2e_test.go:98: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestStrictRegistryPolicyFailsUnknown (0.15s)
+    registry_e2e_test.go:111: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestStableDeclarationInputsCommitWithoutRestarting (0.13s)
+    revalidation_test.go:139: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestProjectDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState (0.14s)
+    revalidation_test.go:168: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestProjectDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure (0.14s)
+    revalidation_test.go:187: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState (0.14s)
+    revalidation_test.go:207: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure (0.13s)
+    revalidation_test.go:226: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolution (0.15s)
+    revalidation_test.go:248: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestDryRunPlansBuildsWithoutToolchainSessionOrPersistentState (0.14s)
+    stage_test.go:545: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalDryRunPlansBuildsWithoutSessionOrPersistentState (0.15s)
+    stage_test.go:619: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalStagingFailureLeavesGlobalScopeUnchanged (0.15s)
+    stage_test.go:659: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestDryRunReportsCacheHitWithoutBuilding (0.14s)
+    stage_test.go:697: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestCacheHitPerformsNoSourceAwareGoCommand (0.14s)
+    stage_test.go:720: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestStagingRunsProviderFirstAndCommandLexical (0.13s)
+    stage_test.go:739: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestStagedOutputsStayPrivateAndAreReleased (0.14s)
+    stage_test.go:763: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestSecondBuildFailurePreservesPriorInstallationAndLiveCache (0.13s)
+    stage_test.go:822: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestToolchainDriftAfterTheFinalBuildBlocksHandoffAndPreservesLiveState (0.14s)
+    stage_test.go:891: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalToolchainDriftAfterTheFinalBuildPreservesGlobalScope (0.15s)
+    stage_test.go:930: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestCacheHitOnlyPlanStillFinalizesToolchainTrust (0.14s)
+    stage_test.go:977: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestCacheInspectionIsBracketedByTheFrozenSource (0.14s)
+    stage_test.go:998: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestSourceMutationDuringStagingBlocksHandoffOfACacheHit (0.13s)
+    stage_test.go:1036: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestToolchainFailureBlocksEveryPersistentMutation (0.14s)
+    stage_test.go:1080: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestCorruptCacheEntryFailsBeforeAnyPersistentMutation (0.14s)
+    stage_test.go:1100: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestUnsupportedCacheProtectionFailsClosed (0.13s)
+    stage_test.go:1123: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestUntrustedCacheEntryIsRebuiltAndNeverReused (0.13s)
+    stage_test.go:1145: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestScriptOnlyInstallPerformsNoToolchainOrCacheWork (0.13s)
+    stage_test.go:1171: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestInjectedClockAndGenerationReaderDriveInstallMarkers (0.13s)
+    stage_test.go:1193: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestPlannedBuildAccessorsAreImmutable (0.13s)
+    stage_test.go:1217: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestReleaseTakesNoToolchainVerdictAfterLiveMutation (0.12s)
+    stage_test.go:1248: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGlobalReleaseTakesNoToolchainVerdictAfterLiveMutation (0.12s)
+    stage_test.go:1283: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestSessionReleaseFailureWarnsWithoutFailingACommittedInstall (0.14s)
+    stage_test.go:1323: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	23.601s
+--- FAIL: TestStableHybridActivationCommitsWithoutRestarting (0.19s)
+    activation_test.go:106: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestHybridDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleContext (0.20s)
+    activation_test.go:129: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestHybridDeclarationRetargetedBeforeHomeLockRestartsAndCommitsNoStaleContext (0.17s)
+    activation_test.go:150: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestHybridDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure (0.18s)
+    activation_test.go:171: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder (0.00s)
+    --- FAIL: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder/project-hybrid-auto (0.24s)
+        commit_atomicity_test.go:159: git [commit -qm init]: exit status 128
+            error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+            
+            fatal: failed to write commit object
+    --- FAIL: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder/global-auto (0.24s)
+        commit_atomicity_test.go:159: git [commit -qm init]: exit status 128
+            error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+            
+            fatal: failed to write commit object
+--- FAIL: TestAdapterMirrorLinksAreJournaledAndRestoredExactly (0.00s)
+    --- FAIL: TestAdapterMirrorLinksAreJournaledAndRestoredExactly/auto (0.20s)
+        commit_atomicity_test.go:235: git [commit -qm init]: exit status 128
+            error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+            
+            fatal: failed to write commit object
+    --- FAIL: TestAdapterMirrorLinksAreJournaledAndRestoredExactly/symlink (0.20s)
+        commit_atomicity_test.go:235: git [commit -qm init]: exit status 128
+            error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+            
+            fatal: failed to write commit object
+--- FAIL: TestStaleAdapterEntryIsRemovedBeforeTheConsumerLedger (0.00s)
+    --- FAIL: TestStaleAdapterEntryIsRemovedBeforeTheConsumerLedger/auto (0.26s)
+        commit_atomicity_test.go:331: git [commit -qm init]: exit status 128
+            error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+            
+            fatal: failed to write commit object
+    --- FAIL: TestStaleAdapterEntryIsRemovedBeforeTheConsumerLedger/symlink (0.26s)
+        commit_atomicity_test.go:331: git [commit -qm init]: exit status 128
+            error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+            
+            fatal: failed to write commit object
+    --- FAIL: TestStaleAdapterEntryIsRemovedBeforeTheConsumerLedger/copy (0.26s)
+        commit_atomicity_test.go:331: git [commit -qm init]: exit status 128
+            error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+            
+            fatal: failed to write commit object
+--- FAIL: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry (0.17s)
+    commit_atomicity_test.go:383: git [commit -qm init]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+FAIL
+FAIL	github.com/relux-works/curator/internal/install/atomicity	6.715s
+ok  	github.com/relux-works/curator/internal/interop	5.264s
+ok  	github.com/relux-works/curator/internal/locale	5.464s
+ok  	github.com/relux-works/curator/internal/managerlock	7.050s
+ok  	github.com/relux-works/curator/internal/manifest	5.989s
+ok  	github.com/relux-works/curator/internal/marker	6.145s
+ok  	github.com/relux-works/curator/internal/mcp	6.272s
+ok  	github.com/relux-works/curator/internal/protocoljson	(cached)
+ok  	github.com/relux-works/curator/internal/registry	7.511s
+ok  	github.com/relux-works/curator/internal/runtimestore	16.089s
+ok  	github.com/relux-works/curator/internal/scopes	5.532s
+ok  	github.com/relux-works/curator/internal/shell	5.839s
+ok  	github.com/relux-works/curator/internal/skillcheck	5.820s
+ok  	github.com/relux-works/curator/internal/skillspec	5.246s
+--- FAIL: TestGetCachesValidatedCommitTree (0.13s)
+    snapshot_test.go:54: git [commit -qm snapshot]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGetRepairsTamperedOrIncompleteCache (0.12s)
+    snapshot_test.go:90: git [commit -qm snapshot]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGetValidatesRepositoryBeforeReusingCache (0.11s)
+    snapshot_test.go:181: git [commit -qm snapshot]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestConcurrentGetPublishesOneValidSnapshot (0.10s)
+    snapshot_test.go:216: git [commit -qm snapshot]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestConcurrentGetRepairsPresentTamperedSnapshotAtomically (0.11s)
+    snapshot_test.go:249: git [commit -qm snapshot]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+--- FAIL: TestGetRepairsTamperedSelectionAndGenerationTypes (0.10s)
+    snapshot_test.go:349: git [commit -qm snapshot]: exit status 128
+        error: Enter passphrase for "/Users/iv/.ssh/ivan_relux_signing": Load key "/Users/iv/.ssh/ivan_relux_signing": incorrect passphrase supplied to decrypt private key?
+        
+        fatal: failed to write commit object
+FAIL
+FAIL	github.com/relux-works/curator/internal/snapshot	5.211s
+ok  	github.com/relux-works/curator/internal/staging	(cached)
+ok  	github.com/relux-works/curator/internal/transaction	19.632s
+ok  	github.com/relux-works/curator/internal/ui	(cached)
+ok  	github.com/relux-works/curator/internal/verr	(cached)
+ok  	github.com/relux-works/curator/internal/version	(cached)
+ok  	github.com/relux-works/curator/internal/whitelist	0.502s
+FAIL

@@ -1,0 +1,83 @@
+{
+  "id": "RUN-260729-be5947",
+  "task_id": "TASK-260729-3dr6hw",
+  "created_at": "2026-07-29T15:12:58.881269Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] researcher (claude)",
+  "role": "researcher",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-19-12-58_-analyst--researcher--claude-_TASK-260729-3dr6hw.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "1h30m0s",
+  "budget": 5,
+  "log_resource_name": "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-be5947.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260729-3dr6hw_cycle3-rework-record.md",
+    "TASK-260729-3dr6hw_cycle4-rework-record.md",
+    "TASK-260729-3dr6hw_cycle5-diagnosis.diff",
+    "TASK-260729-3dr6hw_cycle5-rework-record.md",
+    "TASK-260729-3dr6hw_install-race-timeout-diagnosis.md",
+    "TASK-260729-3dr6hw_race-timeout-diagnosis.md",
+    "TASK-260729-3dr6hw_review-verdict-cycle-1.md",
+    "TASK-260729-3dr6hw_review-verdict-cycle-2.md",
+    "TASK-260729-3dr6hw_review-verdict-cycle-3.md",
+    "TASK-260729-3dr6hw_review-verdict-cycle-4.md",
+    "TASK-260729-3dr6hw_review-verdict-cycle-5.md",
+    "TASK-260729-3dr6hw_review-verdict-cycle-6.md",
+    "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-6c03cf.log",
+    "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-6eee2a.log",
+    "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-840b17.log",
+    "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-856b0c.log",
+    "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-f0b15f.log",
+    "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-f12c23.log",
+    "TASK-260729-3dr6hw_spawn-log_-reviewer--reviewer--codex-_RUN-260729-1aebfd.log",
+    "TASK-260729-3dr6hw_spawn-log_-reviewer--reviewer--codex-_RUN-260729-2e14a7.log",
+    "TASK-260729-3dr6hw_spawn-log_-reviewer--reviewer--codex-_RUN-260729-330d04.log",
+    "TASK-260729-3dr6hw_spawn-log_-reviewer--reviewer--codex-_RUN-260729-697d2e.log",
+    "TASK-260729-3dr6hw_spawn-log_-reviewer--reviewer--codex-_RUN-260729-b0101b.log",
+    "TASK-260729-3dr6hw_spawn-log_-reviewer--reviewer--codex-_RUN-260729-b81614.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260729-3dr6hw_cycle3-rework-record.md": "111a234f7f916e9a216f95b7371fe61d5fd611211411755e85c831dafbeb393f",
+    "TASK-260729-3dr6hw_cycle4-rework-record.md": "d886eca5643ab831faa177c0313f6a0595b757765e469627671a961f865f715a",
+    "TASK-260729-3dr6hw_cycle5-diagnosis.diff": "ee6acd1d7d196fe8538668806a94ec214f267aa8b5a0cad929bb4dc0bfa670dc",
+    "TASK-260729-3dr6hw_cycle5-rework-record.md": "b1b70e8b9b9bc15313d33fb826f04360a18dec2fd6702cbee2b6d9bf47cfaeeb",
+    "TASK-260729-3dr6hw_install-race-timeout-diagnosis.md": "c4ba2c0ffb1c6206a1615a7fdf35242a84bd6ecaf8d325c9f4e1a38b47a09722",
+    "TASK-260729-3dr6hw_race-timeout-diagnosis.md": "a7e7b1e159d414bcba166761ff1687a6b88005e93c8e63863f09ad1efbf59cef",
+    "TASK-260729-3dr6hw_review-verdict-cycle-1.md": "a73fcab27249af4e45a24bd84d2736aa4c8a81fc8d00f832057b7a0595b1b476",
+    "TASK-260729-3dr6hw_review-verdict-cycle-2.md": "67de09a843e44d84143f77001ef7339864e846ab4565f22d1bca87afbf4c9c6e",
+    "TASK-260729-3dr6hw_review-verdict-cycle-3.md": "a8034d3ff5730686910c1106bc49252f82e762ed4d173f8e72b682b7fc8036b3",
+    "TASK-260729-3dr6hw_review-verdict-cycle-4.md": "b02ad2e1a1eb40d84d2ee030a5aa60401d6da5c497bb330b2d139507673ccaa5",
+    "TASK-260729-3dr6hw_review-verdict-cycle-5.md": "1ac4f7e767ad0f3af1aeae0313a409a510997b31e48441d793219ee854cb1413",
+    "TASK-260729-3dr6hw_review-verdict-cycle-6.md": "fa6902c57ab7cd0677430e6506febf21325700b6d5a5504d6d6c3422425671f3"
+  },
+  "require_outcome_artifact": true
+}

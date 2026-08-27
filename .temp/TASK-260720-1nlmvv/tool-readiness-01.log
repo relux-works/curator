@@ -1,0 +1,22 @@
+Command: command -v task-board go git rg && task-board --help && go version && git --version && rg --version
+Exit code: 0
+
+Resolved tools:
+- task-board: /Users/iv/.local/bin/task-board
+- go: /Users/iv/.goenv/shims/go
+- git: /usr/bin/git
+- rg: Codex bundled ripgrep
+
+Versions:
+- Go: go1.25.5 darwin/arm64
+- git: 2.50.1 (Apple Git-155)
+- ripgrep: 15.2.0
+
+task-board help rendered successfully and exposed q, m, resource, spawn, and handoff commands.
+
+Additional tester check:
+- Command: command -v golangci-lint && golangci-lint version
+- Exit code: 1
+- Result: no golangci-lint executable was available on this run's PATH. The
+  tester did not invoke or claim a new lint pass; cycle-3 producer evidence
+  already records the pinned v2.4.0 full-tree lint gate at exit 0.

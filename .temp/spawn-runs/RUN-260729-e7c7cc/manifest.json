@@ -1,0 +1,59 @@
+{
+  "id": "RUN-260729-e7c7cc",
+  "task_id": "TASK-260729-1zex8r",
+  "created_at": "2026-07-29T04:03:42.283997Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-08-03-42_-implementer--developer--claude-_TASK-260729-1zex8r.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260729-1zex8r_spawn-log_-implementer--developer--claude-_RUN-260729-e7c7cc.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260729-1zex8r_bench-fingerprint.txt",
+    "TASK-260729-1zex8r_fingerprint.diff",
+    "TASK-260729-1zex8r_fingerprint_equivalence_test.go",
+    "TASK-260729-1zex8r_spawn-log_-implementer--developer--claude-_RUN-260729-19d434.log",
+    "TASK-260729-1zex8r_spawn-log_-implementer--developer--claude-_RUN-260729-b1885e.log",
+    "TASK-260729-1zex8r_spawn-log_-tester--tester--codex-_RUN-260729-ecbe05.log",
+    "TASK-260729-1zex8r_spawn-log_-tester--tester--codex-_RUN-260729-fb2506.log",
+    "TASK-260729-1zex8r_tester-collection-race.md",
+    "TASK-260729-1zex8r_tester-mutation-regression.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260729-1zex8r_bench-fingerprint.txt": "c73ea8af20c1d43476178ccb3904bdc72f706d0d9a9655e2a5ce50ce51c6f077",
+    "TASK-260729-1zex8r_fingerprint.diff": "8cc0ff97e1c8f23e473840b099ec2cef51d325600c7a5fe945760a1cccbb4b01",
+    "TASK-260729-1zex8r_fingerprint_equivalence_test.go": "278b530eb985ae538b9181ede4bd415a9b7e3d5eb0c479b86134fb0ca9c77b18",
+    "TASK-260729-1zex8r_tester-collection-race.md": "54ae1673f22eff1f87eaad1d2dbd1cac11270d42eb46264ba47599b9f0d86fe0",
+    "TASK-260729-1zex8r_tester-mutation-regression.md": "dd8580e01c2a4c365ac6e05391cf1355d3fba4e0e7b35b6cc2749a4f2172f6f8"
+  },
+  "require_outcome_artifact": true
+}

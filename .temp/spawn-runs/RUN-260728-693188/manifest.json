@@ -1,0 +1,53 @@
+{
+  "id": "RUN-260728-693188",
+  "task_id": "TASK-260728-zb2s4z",
+  "created_at": "2026-07-28T01:22:52.776543Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-05-22-52_-implementer--developer--claude-_TASK-260728-zb2s4z.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "4h0m0s",
+  "log_resource_name": "TASK-260728-zb2s4z_spawn-log_-implementer--developer--claude-_RUN-260728-693188.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260728-zb2s4z_results.md",
+    "TASK-260728-zb2s4z_review-verdict.md",
+    "TASK-260728-zb2s4z_spawn-log_-implementer--developer--claude-_RUN-260728-b74827.log",
+    "TASK-260728-zb2s4z_spawn-log_-reviewer--reviewer--codex-_RUN-260728-3d25cb.log",
+    "TASK-260728-zb2s4z_spawn-log_-reviewer--reviewer--codex-_RUN-260728-bb3c17.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260728-zb2s4z_results.md": "676601a33d08e26060c00cf4cd7ecebf1f54a5016e6fb8c248173ce142352f85",
+    "TASK-260728-zb2s4z_review-verdict.md": "8e3624fa93a144982b03c5524cd3be69b601af1f81ebb976dffc4116239d8752"
+  },
+  "require_outcome_artifact": true
+}

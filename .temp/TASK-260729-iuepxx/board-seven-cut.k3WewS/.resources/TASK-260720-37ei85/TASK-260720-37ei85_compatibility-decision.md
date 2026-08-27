@@ -1,0 +1,3 @@
+# Compatibility decision
+
+The user-provided epic objective explicitly requires schemas 1 through 5 and existing behavior to remain compatible. Frozen schema v1 intentionally has additionalProperties true. Therefore schema v1 retains that deployed extension behavior: an incidental build_roots field may validate structurally but has no build semantics, while type build remains rejected. Schemas 2 through 5 reject build_roots and type build. Legacy schemas remain byte-frozen. Correct only new rc.4 prose that inaccurately claimed v1 rejects build_roots. This resolves the stop-the-line conflict without a legacy wire change or new reader rule.

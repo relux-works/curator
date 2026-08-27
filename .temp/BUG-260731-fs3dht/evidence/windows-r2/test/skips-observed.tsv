@@ -1,0 +1,64 @@
+package	test	class	verdict	reason
+internal/adapters	TestStaleSpecialFileIsReportedRatherThanRemoved	host-capability	allowed-host-capability	named pipes unavailable: named pipes are not available on this platform
+internal/buildcache	TestCacheRejectionClustersMapToStableCuratorOutcomes	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildcache	TestCandidateCacheOutcomeVocabulary	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildcache	TestCompilerFreeDryRunMissVector	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildcache	TestProtectedCacheHitVector	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildmeta	TestCandidateBuildMetadataArtifacts	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no expected/build-driver artifacts
+internal/buildmeta	TestCandidateBuildReceiptSchemaCase	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no build-receipt-v1 schema case
+internal/buildmeta	TestPortableExecutionPolicyIsTheOnlyAdmittedBuildInput	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/buildsource	TestBuildSourceConformanceVectors	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildsource	TestBuildSourceIdentityVectors	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/closure	TestBuildCommandOrderingConformanceVector	root-content	allowed-root-content	this conformance root publishes no build_order_cases group
+internal/globalbins	TestRefreshDoesNotOverwriteFormerlyManagedCommandReplacedByUser	platform-control	allowed-platform-control	Unix symlink ownership is exercised on Linux and macOS
+internal/globalbins	TestRefreshPublishesAndRemovesManagedUnixShims	platform-control	allowed-platform-control	Unix symlinks are exercised on Linux and macOS
+internal/godriver	TestCacheIdentityMatchesTheAcceptedVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+internal/godriver	TestCandidateGoV1SourceAwareContract	root-content	tolerated-by-ledger	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/godriver	TestCandidateRC4ToolchainArtifacts	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no expected/build-driver artifacts
+internal/godriver	TestCapabilityEvidenceCasesMatchTheAcceptedVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+internal/godriver	TestCapabilityEvidenceRecordMatchesTheAcceptedVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+internal/godriver	TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+internal/godriver	TestDriverRejectionClustersMapToStableCuratorErrors	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/godriver	TestFixedEnvironmentAndFiveDirectArgvFormsVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/godriver	TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+internal/godriver	TestMandatoryControlsMatchTheAcceptedVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+internal/godriver	TestNativeControlInventoryMatchesTheAcceptedVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+internal/godriver	TestPerFileSizeLimitIsReallyApplied	platform-control	tolerated-by-ledger	per-file-size-limit is available only on macOS in rc5-native-control-inventory-v1
+internal/godriver	TestPortableExecutionPolicyMatchesTheAcceptedVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+internal/godriver	TestRealGoV1VendoredBuildIsBoundedAndNotLaunched	opt-in	allowed-opt-in	set CURATOR_REAL_GO_BUILD_TEST=1 for the bounded native go-v1 integration
+internal/godriver	TestRealTrustedGoProbe	opt-in	allowed-opt-in	set CURATOR_REAL_GO_TEST=1 for the bounded native toolchain probe
+internal/godriver	TestToolchainIdentityVectors	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/godriver	TestValidPackageGraphVectors	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/hashing	TestCrossCheckTree	opt-in	tolerated-by-ledger	cross-check env not set
+internal/install	TestAuthoritativeCacheOutcomesDriveInstallation	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/install	TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/install	TestAuthoritativeDryRunCasesMutateNothingPersistent	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/install	TestDefaultToolchainProbeRemovesItsProbeRootOnSuccess	host-capability	allowed-host-capability	no trusted Go toolchain is resolvable here: go-v1 go_toolchain_missing: trusted GOROOT is not a real directory
+internal/install	TestInstallHelperProcess	helper-process	allowed-helper-process	helper process
+internal/install	TestRuntimeLauncherCapturesDeclaredSystemDependency	platform-control	allowed-platform-control	executes POSIX skill commands
+internal/install	TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook	platform-control	allowed-platform-control	executes POSIX skill commands
+internal/interop	TestManagerCompiledCacheMissDryRunVector	root-content	allowed-root-content	this conformance root publishes no compiled-cache-miss-is-read-only dry-run case
+internal/marker	TestAuthoritativeCompiledMarkerRoundTripsThroughWriter	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/marker	TestReadAuthoritativeMarkerV2SchemaCases	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/runtimestore	TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly	platform-control	tolerated-by-ledger	POSIX post-install launch fixture
+internal/runtimestore	TestPrepareScriptRuntimeReusesOnlyCompleteManagedTree	platform-control	allowed-platform-control	the POSIX script runtime is exercised on the unix runners
+internal/runtimestore	TestPrepareScriptRuntimeStagesIncompleteReplacementWithoutBuildRoots	platform-control	allowed-platform-control	the POSIX script runtime is exercised on the unix runners
+internal/runtimestore	TestPrepareSingleScriptStagesManagedBinWithoutCopyingSnapshotTree	platform-control	allowed-platform-control	the POSIX script runtime is exercised on the unix runners
+internal/runtimestore	TestUnixLauncherCarriesRuntimePathArgumentsAndExitStatus	platform-control	allowed-platform-control	executes a POSIX launcher
+internal/scopes	TestAuthoritativeGarbageCollectionRootsAreRetained	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/scopes	TestCollectSkipsTheBuildSweepOnUnprovableReferences/unreadable_global_skills_directory	host-capability	allowed-host-capability	this environment can read a mode-000 directory
+internal/scopes	TestCollectStaysFailSafeAcrossConsecutivePasses/unreadable_installed_skill_directory	host-capability	allowed-host-capability	this environment can inspect a mode-000 directory: GetFileAttributesEx C:\Users\RUNNER~1\AppData\Local\Temp\TestCollectStaysFailSafeAcrossConsecutivePassesunreadable_insta595764366\002\.agents\skills\skill-locked\.csk-install.json: The system cannot find the file specified.
+internal/shell	TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	platform-control	tolerated-by-ledger	native path comparison is covered by PowerShell on Windows
+internal/shell	TestPosixHookNormalizesGitBashConfigAndAvoidsDirname	platform-control	allowed-platform-control	native Git Bash paths are exercised by the Windows CI hook shape
+internal/shell	TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookSupportsNounsetProfiles/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestZshHookIsIdempotentAndDoesNotReenter	host-capability	allowed-host-capability	zsh is unavailable
+internal/skillcheck	TestBuildRootContentInContextVector	root-content	allowed-root-content	D:\a\curator\curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/skillspec	TestManifestAndFilesystemRejectionVectors	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/skillspec	TestPortablePathConformanceVectors	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/skillspec	TestSchemaSixMixedScriptAndBuildCommandsVector	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/skillspec	TestSchemaV6ConformanceCases	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/skillspec	TestSchemaV6FixtureParsingDoesNotExecuteGo	platform-control	allowed-platform-control	shell sentinel is Unix-only
+internal/whitelist	TestBuildRootContextExclusionConformanceFixture	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/whitelist	TestBuildRootExcludedFromAgentContextVector	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set

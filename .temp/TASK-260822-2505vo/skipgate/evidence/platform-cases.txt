@@ -1,0 +1,156 @@
+platform-case gate: GOOS=windows
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+
+FAIL  skip with an unrecognised reason on windows: internal/buildrepo :: TestEveryOperatorSelectionShapeReachesTheWrapperPolicy
+      reason: an operator agent socket is a unix-domain rendezvous point
+      add it to .github/ci/skip-classes.tsv with a class, or fix the case.
+FAIL  skip with an unrecognised reason on windows: internal/buildrepo :: TestOperatorSSHCredentialsAdmitOnlyResolvedObjectsOfTheRightKind
+      reason: cannot create a symbolic link here: nope
+      add it to .github/ci/skip-classes.tsv with a class, or fix the case.
+FAIL  skip with an unrecognised reason on windows: internal/config :: TestBuildSSHExpandedResolvesHome
+      reason: no home directory: nope
+      add it to .github/ci/skip-classes.tsv with a class, or fix the case.
+FAIL  skip with an unrecognised reason on windows: internal/install :: TestEveryConfiguredShapeReachesTheWrapperPolicy
+      reason: an operator agent socket is a unix-domain rendezvous point
+      add it to .github/ci/skip-classes.tsv with a class, or fix the case.
+FAIL  required case never ran on windows: internal/buildcache :: TestWindowsProtectedStateMatrix
+      required behaviour: Windows DACL protected-state matrix for the build cache
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/buildcache :: TestValidateWindowsSecurityPolicy
+      required behaviour: validates the Windows security-descriptor policy on cache state
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry
+      required behaviour: cache sweep refuses to traverse a reparse point inside an entry
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot
+      required behaviour: cache sweep refuses to traverse a reparsed cache root
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes
+      required behaviour: GC stays fail-safe when a Windows scope is redirected by a reparse point
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode
+      required behaviour: the installed `.cmd` wrapper forwards arguments, PATH and exit code through cmd.exe
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/runtimestore :: TestInstallSingleCommandAndShims
+      required behaviour: writes the `run.cmd` Windows launcher and asserts its `@echo off` payload
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/runtimestore :: TestRuntimeCommandPath
+      required behaviour: maps a `tool.cmd` Windows launcher back to its command name
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/config :: TestBootstrapAndAddProject
+      required behaviour: asserts the manager config is written with private (0o600) ownership bits on unix
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/buildsource :: TestFrozenTokenRejectsMutation
+      required behaviour: a frozen build source rejects mutation of the source tree
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+      required behaviour: a frozen build source rejects replacement of its root
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+      required behaviour: validated enumeration is ordered and refuses mutation during the callback
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/install :: TestDryRunTouchesNothing
+      required behaviour: proves a dry run leaves the source and target trees unwritten
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/whitelist :: TestRuntimeRootsExcludedFromContext
+      required behaviour: proves runtime roots stay outside the copied agent context
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+      required behaviour: worker resource limits stay inside the manager's declared bounds
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+      required behaviour: the probed native control set matches rc5-native-control-inventory-v1 exactly
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+      required behaviour: every native control seam failure rejects before the worker executes
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart
+      required behaviour: active-process-count-limit refuses the compiler natively; the inventory defines it for Windows only
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+      required behaviour: the toolchain executable identity rejects substitution and mutation
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/shell :: TestPowerShellHookRunsOnEveryPrompt
+      required behaviour: executes the PowerShell prompt hook end to end
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/envfiles :: TestWriteProjectShapesAndSourcing
+      required behaviour: sources the generated env file through a real shell on unix; shape-only on Windows
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/install :: TestEndToEndInstall
+      required behaviour: materialises the executable shim and env files of a full install
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+      required behaviour: creates a link (Windows: a reparse point) and asserts its target stays relative
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+      required behaviour: independent target namespaces reject overlapping paths (link-capability guarded)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+      required behaviour: a namespace alias introduced between saves is rejected (link-capability guarded)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+      required behaviour: recovery rejects target namespaces aliased while stopped (link-capability guarded)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+      required behaviour: a failure at every target class restores the prior state in reverse order
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+      required behaviour: a stale adapter removal rolls back to the exact prior entry
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+      required behaviour: adapter mirror links are journaled and restored exactly (link-capability guarded)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestCommitAndRollbackRestoreALinkExactly
+      required behaviour: an owned link is replaced and restored with the exact destination the host recorded, across a mode transition
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction
+      required behaviour: home-scoped recovery finishes an interrupted link commit instead of leaving it half-applied
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestEntryRemovalRestoresTheExactLink
+      required behaviour: a removal target puts the exact prior link back when a later class fails
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination
+      required behaviour: an owned mirror link and the directory it points at stay independent targets
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass
+      required behaviour: one validation pass reads each declared path's identity once and answers every later pair from that snapshot
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/transaction :: TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken
+      required behaviour: the pass snapshot completes the file identity Windows leaves deferred, so no comparison reads the filesystem and an unreadable one fails closed
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/interop :: TestGoldenContextCopy
+      required behaviour: the agent context copied for a skill matches the authoritative golden file list
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/godriver :: TestCandidateGoV1SourceAwareContract
+      required behaviour: the go-v1 driver honours the source-aware contract published by the supplied root
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically
+      required behaviour: a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly
+      required behaviour: a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery
+      required behaviour: compiled currentness, corrupt-cache repair, commit rollback and untrusted-state repair over one real installation
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand
+      required behaviour: project status resolves and classifies a compiled command reached only through a dependency
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand
+      required behaviour: an unusable Go toolchain is reported per compiled command as a warning, and `--check` turns it non-zero
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState
+      required behaviour: gc neither removes nor reports removing a cache entry a live marker references
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+      required behaviour: machine-wide status reports compiled currentness and fails `--check` for every non-current state
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+      required behaviour: machine-wide status resolves a compiled command no declaration names
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+FAIL  required case never ran on windows: internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+      required behaviour: an uncovered inventory platform (including linux) is rejected before the worker starts
+      a rename, a deleted test or a -run filter matching nothing all look like this.
+
+platform-case gate: 4 skips recorded in /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260822-2505vo/skipgate/evidence/skips-observed.tsv
+platform-case gate: FAILED

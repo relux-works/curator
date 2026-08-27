@@ -1,0 +1,20 @@
+=== H1. Foundation #Predicate (external plugin in Platforms tree) ===
+exit=0
+
+=== H2. is -Rmacro-loading a real flag? ===
+  -define-availability <macro>
+                          Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'
+  -dump-macro-expansions  Dumps the results of each macro expansion
+  -emit-macro-expansion-files <value>
+                          Specify when to emit macro expansion file: 'none', 'debug', or 'diagnostics'
+                          Path to a compiler plugin executable and a comma-separated list of module names where the macro types are declared
+                          Path to a dynamic library containing compiler plugins such as macros
+                          Path to resolved plugin configuration and a comma-separated list of module names where the macro types are declared. Library path and executable path can be empty if not used
+  -pc-macro               Apply the 'program counter simulation' macro
+  -Rmacro-loading         Emit remarks about loaded macro implementations
+  -verify-ignore-macro-note
+                          Skip verifying notes about macro location
+
+=== H3. dump loaded plugin via -Rmacro-loading on frontend directly ===
+<unknown>:0: remark: loaded macro implementation module 'FoundationMacros' from compiler plugin server '/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server' with shared library '/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins/libFoundationMacros.dylib'
+exit=0

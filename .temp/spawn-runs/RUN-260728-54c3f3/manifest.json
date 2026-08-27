@@ -1,0 +1,73 @@
+{
+  "id": "RUN-260728-54c3f3",
+  "task_id": "TASK-260720-2284br",
+  "created_at": "2026-07-28T16:12:55.107399Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-20-12-55_-reviewer--reviewer--codex-_TASK-260720-2284br.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "timeout": "2h0m0s",
+  "log_resource_name": "TASK-260720-2284br_spawn-log_-reviewer--reviewer--codex-_RUN-260728-54c3f3.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260720-2284br_gate-evidence-rework-1.tar.gz",
+    "TASK-260720-2284br_gate-evidence-rework-2.tar.gz",
+    "TASK-260720-2284br_gate-evidence-rework-3.tar.gz",
+    "TASK-260720-2284br_gate-evidence-rework-4.tar.gz",
+    "TASK-260720-2284br_gate-evidence.tar.gz",
+    "TASK-260720-2284br_implementation-notes-rework-1.md",
+    "TASK-260720-2284br_implementation-notes-rework-2.md",
+    "TASK-260720-2284br_implementation-notes-rework-3.md",
+    "TASK-260720-2284br_implementation-notes-rework-4.md",
+    "TASK-260720-2284br_implementation-notes.md",
+    "TASK-260720-2284br_review-evidence-cycle-4.tar.gz",
+    "TASK-260720-2284br_review-verdict-cycle-1.md",
+    "TASK-260720-2284br_review-verdict-cycle-2.md",
+    "TASK-260720-2284br_review-verdict-cycle-3.md",
+    "TASK-260720-2284br_review-verdict-cycle-4.md",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-023997.log",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-08f610.log",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-238d10.log",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-b80d71.log",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-bce7b9.log",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-ded7c1.log",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-e054e1.log",
+    "TASK-260720-2284br_spawn-log_-implementer--developer--claude-_RUN-260728-eb5a56.log",
+    "TASK-260720-2284br_spawn-log_-reviewer--reviewer--codex-_RUN-260728-0426e1.log",
+    "TASK-260720-2284br_spawn-log_-reviewer--reviewer--codex-_RUN-260728-2469cd.log",
+    "TASK-260720-2284br_spawn-log_-reviewer--reviewer--codex-_RUN-260728-27ac8a.log",
+    "TASK-260720-2284br_spawn-log_-reviewer--reviewer--codex-_RUN-260728-82f89d.log"
+  ]
+}

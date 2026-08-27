@@ -1,0 +1,40 @@
+package	test	class	verdict	reason
+cmd/curator	TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_restore_the_cache_when_the_commit_fails/install	host-capability	allowed-host-capability	this process can write through a read-only directory, so a commit failure cannot be injected
+cmd/curator	TestCompiledProjectStatusRepairRollbackRecovery/install_and_upgrade_restore_the_cache_when_the_commit_fails/upgrade	host-capability	allowed-host-capability	this process can write through a read-only directory, so a commit failure cannot be injected
+internal/adapters	TestStaleSpecialFileIsReportedRatherThanRemoved	host-capability	allowed-host-capability	named pipes unavailable: named pipes are not available on this platform
+internal/buildrepo	TestEveryOperatorSelectionShapeReachesTheWrapperPolicy	host-capability	allowed-host-capability	this host cannot create a short scratch directory: GetFileAttributesEx /tmp: The system cannot find the file specified.
+internal/buildrepo	TestNetworkAndLocalSHA1SHA256RawObjectParity	platform-control	allowed-platform-control	test transport wrapper is POSIX-only; production code is platform-neutral
+internal/buildrepo	TestOperatorSSHCredentialsAdmitOnlyResolvedObjectsOfTheRightKind	host-capability	allowed-host-capability	this host cannot create a short scratch directory: GetFileAttributesEx /tmp: The system cannot find the file specified.
+internal/buildrepo	TestProtectedArtifactHardLinkAndBoundaryFailClosed	platform-control	allowed-platform-control	hard-link count is enforced by the native Windows protected-root backend
+internal/buildrepo	TestRealGitPathResolvesLauncherWithoutWeakeningAdmission	platform-control	allowed-platform-control	controlled launcher symlink is a Unix regression fixture
+internal/buildrepo	TestSSHPolicyRefusesUnselectedAndUnverifiableRepositories	host-capability	allowed-host-capability	this host cannot create a short scratch directory: GetFileAttributesEx /tmp: The system cannot find the file specified.
+internal/buildrepo	TestSubstitutionAcquisitionSelectsRevisionBranchAndTag	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/buildrepo	TestSubstitutionNeverRetriesAnotherObjectFormat	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/buildrepo	TestTaggedAcquisitionUsesOnlyExactTagAndChecksTerminalCommit	platform-control	allowed-platform-control	test transport wrapper is POSIX-only
+internal/buildsource	TestBuildSourceIdentityVectors/build-source-special-file	host-capability	allowed-host-capability	this host cannot create the FIFO the vector needs
+internal/buildsource	TestBuildSourceIdentityVectors/duplicate-build-source-path	host-capability	allowed-host-capability	this host folds the alias into one directory member, so no duplicate encoded path is reachable
+internal/globalbins	TestRefreshDoesNotOverwriteFormerlyManagedCommandReplacedByUser	platform-control	allowed-platform-control	Unix symlink ownership is exercised on Linux and macOS
+internal/globalbins	TestRefreshPublishesAndRemovesManagedUnixShims	platform-control	allowed-platform-control	Unix symlinks are exercised on Linux and macOS
+internal/godriver	TestPerFileSizeLimitIsReallyApplied	platform-control	tolerated-by-ledger	per-file-size-limit is available only on macOS in rc5-native-control-inventory-v1
+internal/godriver	TestRealGoV1VendoredBuildIsBoundedAndNotLaunched	opt-in	allowed-opt-in	set CURATOR_REAL_GO_BUILD_TEST=1 for the bounded native go-v1 integration
+internal/godriver	TestRealTrustedGoProbe	opt-in	allowed-opt-in	set CURATOR_REAL_GO_TEST=1 for the bounded native toolchain probe
+internal/hashing	TestCrossCheckTree	opt-in	tolerated-by-ledger	cross-check env not set
+internal/install	TestEveryConfiguredShapeReachesTheWrapperPolicy	platform-control	allowed-platform-control	an operator agent socket is a unix-domain rendezvous point
+internal/install	TestInstallHelperProcess	helper-process	allowed-helper-process	helper process
+internal/install	TestRuntimeLauncherCapturesDeclaredSystemDependency	platform-control	allowed-platform-control	executes POSIX skill commands
+internal/install	TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook	platform-control	allowed-platform-control	executes POSIX skill commands
+internal/runtimestore	TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly	platform-control	tolerated-by-ledger	POSIX post-install launch fixture
+internal/runtimestore	TestPrepareScriptRuntimeReusesOnlyCompleteManagedTree	platform-control	allowed-platform-control	the POSIX script runtime is exercised on the unix runners
+internal/runtimestore	TestPrepareScriptRuntimeStagesIncompleteReplacementWithoutBuildRoots	platform-control	allowed-platform-control	the POSIX script runtime is exercised on the unix runners
+internal/runtimestore	TestPrepareSingleScriptStagesManagedBinWithoutCopyingSnapshotTree	platform-control	allowed-platform-control	the POSIX script runtime is exercised on the unix runners
+internal/runtimestore	TestUnixLauncherCarriesRuntimePathArgumentsAndExitStatus	platform-control	allowed-platform-control	executes a POSIX launcher
+internal/scopes	TestCollectSkipsTheBuildSweepOnUnprovableReferences/unreadable_global_skills_directory	host-capability	allowed-host-capability	this environment can read a mode-000 directory
+internal/scopes	TestCollectStaysFailSafeAcrossConsecutivePasses/unreadable_installed_skill_directory	host-capability	allowed-host-capability	this environment can inspect a mode-000 directory: GetFileAttributesEx C:\Users\RUNNER~1\AppData\Local\Temp\TestCollectStaysFailSafeAcrossConsecutivePassesunreadable_insta1863391811\002\.agents\skills\skill-locked\.csk-install.json: The system cannot find the file specified.
+internal/shell	TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects	platform-control	tolerated-by-ledger	native path comparison is covered by PowerShell on Windows
+internal/shell	TestPosixHookNormalizesGitBashConfigAndAvoidsDirname	platform-control	allowed-platform-control	native Git Bash paths are exercised by the Windows CI hook shape
+internal/shell	TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookSupportsNounsetProfiles/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestZshHookIsIdempotentAndDoesNotReenter	host-capability	allowed-host-capability	zsh is unavailable
+internal/skillspec	TestUnreadableManifestNeverFallsBackToRuntime	host-capability	allowed-host-capability	this host cannot create an unreadable file: mode 000 stays readable here
+internal/skillspec	TestUnreadableSnapshotNeverDegradesToEmptySpec	host-capability	allowed-host-capability	this environment can inspect a mode-000 directory

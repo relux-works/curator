@@ -1,0 +1,6 @@
+list-classes	exit=0	expected=0	cmd=hardened-probe --list-classes
+measure	exit=1	expected=0-or-1	cmd=hardened-probe --work-dir ... --evidence ... --report ...
+fail-closed-sweep	exit=1	expected=0-or-1	cmd=hardened-probe --fail-closed-sweep --quiet ...
+assert-rejected	exit=0	expected=0	cmd=hardened-probe --work-dir /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-05/work-assert-rejected --force-unavailable network-syscall-denial --expect rejected --quiet
+assert-established	exit=2	expected=2	cmd=hardened-probe --work-dir /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-05/work-assert-established --force-unavailable network-syscall-denial --expect established --quiet
+leftover-processes	count=0	expected=0	cmd=pgrep -f /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-05/hardened-probe

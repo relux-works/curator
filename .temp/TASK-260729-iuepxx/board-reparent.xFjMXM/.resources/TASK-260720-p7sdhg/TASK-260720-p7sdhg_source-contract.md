@@ -1,0 +1,1 @@
+Use sections 7 through 10 of TASK-260720-poa3ze_compile-only-build-drivers.md at accepted SHA-256 6308d99d8bdad4445841bc1cbd230cadbed0020012d0e9d38d877b413348f681 plus the landed compile-only decision from TASK-260720-3lo9jc dependencies. Preserve the accepted classifications and make the admission process stricter or equally strict, never broader by inference.

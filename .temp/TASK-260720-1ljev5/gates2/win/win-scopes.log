@@ -1,0 +1,74 @@
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/corrupt_consumer_registry
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/registry_of_an_unknown_schema
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/project_with_only_an_invalid_marker
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/unreadable_installed_skill_directory
+    gc_conservative_test.go:134: this environment can inspect a mode-000 directory: GetFileAttributesEx C:\Users\admin\AppData\Local\Temp\TestCollectStaysFailSafeAcrossConsecutivePassesunreadable_insta294675443\002\.agents\skills\skill-locked\.csk-install.json: The system cannot find the file specified.
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/installed_skill_replaced_by_a_file
+=== RUN   TestCollectStaysFailSafeAcrossConsecutivePasses/skill_root_replaced_by_a_file
+--- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses (0.09s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/corrupt_consumer_registry (0.00s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/registry_of_an_unknown_schema (0.01s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/project_with_only_an_invalid_marker (0.02s)
+    --- SKIP: TestCollectStaysFailSafeAcrossConsecutivePasses/unreadable_installed_skill_directory (0.01s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/installed_skill_replaced_by_a_file (0.02s)
+    --- PASS: TestCollectStaysFailSafeAcrossConsecutivePasses/skill_root_replaced_by_a_file (0.02s)
+=== RUN   TestNonDirectoryScopeMembersDoNotBlockMaintenance
+--- PASS: TestNonDirectoryScopeMembersDoNotBlockMaintenance (0.02s)
+=== RUN   TestRecordingAConsumerNeverOverwritesAnUntrustedRegistry
+--- PASS: TestRecordingAConsumerNeverOverwritesAnUntrustedRegistry (0.01s)
+=== RUN   TestParseConsumersAcceptsOnlyTheCanonicalRegistry
+--- PASS: TestParseConsumersAcceptsOnlyTheCanonicalRegistry (0.00s)
+=== RUN   TestCollectStaysFailSafeOnRedirectedWindowsScopes
+=== RUN   TestCollectStaysFailSafeOnRedirectedWindowsScopes/redirected_project_skill_root
+    gc_conservative_windows_test.go:29: symbolic links are unavailable to this account (symlink C:\Users\admin\AppData\Local\Temp\TestCollectStaysFailSafeOnRedirectedWindowsScopesredirected_pro3717890680\003 C:\Users\admin\AppData\Local\Temp\TestCollectStaysFailSafeOnRedirectedWindowsScopesredirected_pro3717890680\002\.agents\skills: A required privilege is not held by the client.); using a junction
+=== RUN   TestCollectStaysFailSafeOnRedirectedWindowsScopes/redirected_installed_skill
+    gc_conservative_windows_test.go:42: symbolic links are unavailable to this account (symlink C:\Users\admin\AppData\Local\Temp\TestCollectStaysFailSafeOnRedirectedWindowsScopesredirected_ins2433784670\003\skill-hidden C:\Users\admin\AppData\Local\Temp\TestCollectStaysFailSafeOnRedirectedWindowsScopesredirected_ins2433784670\002\.agents\skills\skill-hidden: A required privilege is not held by the client.); using a junction
+=== RUN   TestCollectStaysFailSafeOnRedirectedWindowsScopes/redirected_global_scope_root
+    gc_conservative_windows_test.go:54: symbolic links are unavailable to this account (symlink C:\Users\admin\AppData\Local\Temp\TestCollectStaysFailSafeOnRedirectedWindowsScopesredirected_glo874646294\003 C:\Users\admin\AppData\Local\Temp\TestCollectStaysFailSafeOnRedirectedWindowsScopesredirected_glo874646294\001\global\skills: A required privilege is not held by the client.); using a junction
+--- PASS: TestCollectStaysFailSafeOnRedirectedWindowsScopes (0.11s)
+    --- PASS: TestCollectStaysFailSafeOnRedirectedWindowsScopes/redirected_project_skill_root (0.04s)
+    --- PASS: TestCollectStaysFailSafeOnRedirectedWindowsScopes/redirected_installed_skill (0.04s)
+    --- PASS: TestCollectStaysFailSafeOnRedirectedWindowsScopes/redirected_global_scope_root (0.03s)
+=== RUN   TestCollectSweepsOnlyUnreferencedProtectedEntries
+--- PASS: TestCollectSweepsOnlyUnreferencedProtectedEntries (0.09s)
+=== RUN   TestCollectRetainsAJournalOwnedEntry
+--- PASS: TestCollectRetainsAJournalOwnedEntry (0.04s)
+=== RUN   TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead
+--- PASS: TestCollectRetainsBuildEntriesWhenAMarkerCannotBeRead (0.04s)
+=== RUN   TestCollectMarksBuildKeysFromEveryLiveScope
+--- PASS: TestCollectMarksBuildKeysFromEveryLiveScope (0.02s)
+=== RUN   TestCollectMarksRuntimeFromEverySupportedMarkerSchema
+--- PASS: TestCollectMarksRuntimeFromEverySupportedMarkerSchema (0.03s)
+=== RUN   TestCollectSkipsTheBuildSweepOnUnprovableReferences
+=== RUN   TestCollectSkipsTheBuildSweepOnUnprovableReferences/invalid_marker
+=== RUN   TestCollectSkipsTheBuildSweepOnUnprovableReferences/corrupt_consumer_registry
+=== RUN   TestCollectSkipsTheBuildSweepOnUnprovableReferences/unreadable_global_skills_directory
+    gc_test.go:205: this environment can read a mode-000 directory
+--- PASS: TestCollectSkipsTheBuildSweepOnUnprovableReferences (0.05s)
+    --- PASS: TestCollectSkipsTheBuildSweepOnUnprovableReferences/invalid_marker (0.02s)
+    --- PASS: TestCollectSkipsTheBuildSweepOnUnprovableReferences/corrupt_consumer_registry (0.01s)
+    --- SKIP: TestCollectSkipsTheBuildSweepOnUnprovableReferences/unreadable_global_skills_directory (0.02s)
+=== RUN   TestCollectRequiresTheHomeLock
+--- PASS: TestCollectRequiresTheHomeLock (0.02s)
+=== RUN   TestCollectPrunesConsumersInsideTheSamePass
+--- PASS: TestCollectPrunesConsumersInsideTheSamePass (0.05s)
+=== RUN   TestCollectReportsSweepFailuresWithoutLosingRuntimeWork
+--- PASS: TestCollectReportsSweepFailuresWithoutLosingRuntimeWork (0.03s)
+=== RUN   TestCollectForwardsTheSweepClockAndGrace
+--- PASS: TestCollectForwardsTheSweepClockAndGrace (0.00s)
+=== RUN   TestCollectResolvesTheRealStoreByDefault
+--- PASS: TestCollectResolvesTheRealStoreByDefault (0.00s)
+=== RUN   TestConsumersRoundTrip
+--- PASS: TestConsumersRoundTrip (0.01s)
+=== RUN   TestGcKeepsReferencedRuntime
+--- PASS: TestGcKeepsReferencedRuntime (0.02s)
+=== RUN   TestGcPrunesDeadConsumers
+--- PASS: TestGcPrunesDeadConsumers (0.04s)
+=== RUN   TestHybridDeclsRequireTargets
+--- PASS: TestHybridDeclsRequireTargets (0.01s)
+=== RUN   TestAppliesToProject
+--- PASS: TestAppliesToProject (0.00s)
+=== RUN   TestHybridAddRemove
+--- PASS: TestHybridAddRemove (0.02s)
+PASS

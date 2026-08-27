@@ -1,0 +1,79 @@
+{
+  "schema_version": 2,
+  "id": "RUN-260727-791dca",
+  "task_id": "TASK-260720-1zntv0",
+  "agent_name": "[analyst] solution-architect (codex)",
+  "agent_type": "codex",
+  "status": "completed",
+  "phase": "finalizing",
+  "summary": "Run completed successfully",
+  "created_at": "2026-07-27T17:11:15.309017Z",
+  "started_at": "2026-07-27T17:11:15.445413Z",
+  "completed_at": "2026-07-27T17:27:02.371078Z",
+  "last_heartbeat_at": "2026-07-27T17:27:02.371078Z",
+  "lifecycle_id": "RUN-260727-791dca",
+  "execution_continuity": {
+    "version": "execution_continuity_v1",
+    "effective_profile": "pedantic",
+    "profile_source": "compatibility_default",
+    "lifecycle_id": "RUN-260727-791dca",
+    "lifecycle_revision": 3,
+    "lane_hash": "6b5978e064d17cabd406b8c7fe4a9685011fa32786f79f61f81611861cb86722",
+    "lane_generation": 1,
+    "session_lineage": {
+      "current_provider_session_digest": "sha256:9980631e5e8c9170d1c71b079b2d4c1bb0ad5d2d48cef52322f5a969b222a508"
+    },
+    "reused": false,
+    "eligibility_reason": "fresh_policy",
+    "prompt_mode": "full",
+    "snapshot_digest": "sha256:cc0a9eae02b478fc50fd4a53dc520d06dcc9f5df352fa3eb13165c9820ab1621",
+    "review_attempt": 0,
+    "review_phase": "producer",
+    "review_evidence": {
+      "validation": {
+        "key": "validation_manifest/current",
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "findings": {
+        "key": "reviewer_findings/current",
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "resolution": {
+        "key": "producer_resolutions/current",
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    "usage": {
+      "available": true,
+      "input": 4577158,
+      "cached_input": 4261888,
+      "output": 30637
+    },
+    "wall_time": {
+      "run_duration_ms": 947062,
+      "lifecycle_elapsed_ms": 258533433
+    },
+    "session_count": 1,
+    "controlled_input_bytes": 10226
+  },
+  "lane_key": "6b5978e064d17cabd406b8c7fe4a9685011fa32786f79f61f81611861cb86722",
+  "lane_generation": 1,
+  "lane_lease_generation": 1,
+  "lane_action": "fresh",
+  "lane_reason": "fresh_policy",
+  "last_progress_at": "2026-07-27T17:27:02.371078Z",
+  "completion_reason": "success",
+  "last_event_seq": 486,
+  "exit_code": 0,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260727-21-11-15_-analyst--solution-architect--codex-_TASK-260720-1zntv0.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/TASK-260720-1zntv0/-analyst--solution-architect--codex-_RUN-260727-791dca.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260727-791dca/runner.log",
+  "max_parallel": 20,
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "provider": "codex",
+    "diagnostic_code": "composition_contract_unavailable"
+  }
+}

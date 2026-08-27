@@ -1,0 +1,79 @@
+{
+  "id": "RUN-260730-563eec",
+  "task_id": "TASK-260720-2g21eg",
+  "created_at": "2026-07-30T04:43:44.871094Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-08-43-44_-implementer--developer--claude-_TASK-260720-2g21eg.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260720-2g21eg_spawn-log_-implementer--developer--claude-_RUN-260730-563eec.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-2g21eg_focused-pytest.xml",
+    "TASK-260720-2g21eg_full-pytest.xml",
+    "TASK-260720-2g21eg_real-go-fixture.xml",
+    "TASK-260720-2g21eg_results.md",
+    "TASK-260720-2g21eg_review-rework-cycle-2.md",
+    "TASK-260720-2g21eg_review-verdict-cycle-2.md",
+    "TASK-260720-2g21eg_review-verdict.md",
+    "TASK-260720-2g21eg_reviewer-cycle2-focused-pytest.xml",
+    "TASK-260720-2g21eg_reviewer-cycle2-full-pytest.xml",
+    "TASK-260720-2g21eg_reviewer-cycle2-hygiene.log",
+    "TASK-260720-2g21eg_reviewer-cycle2-mypy.log",
+    "TASK-260720-2g21eg_reviewer-cycle2-native-identity-stress.log",
+    "TASK-260720-2g21eg_reviewer-cycle2-native-probe-gap.log",
+    "TASK-260720-2g21eg_reviewer-cycle2-pth-accepted-fixture.log",
+    "TASK-260720-2g21eg_reviewer-cycle2-pth-probe.log",
+    "TASK-260720-2g21eg_spawn-log_-implementer--developer--codex-_RUN-260730-015113.log",
+    "TASK-260720-2g21eg_spawn-log_-implementer--developer--codex-_RUN-260730-c1e639.log",
+    "TASK-260720-2g21eg_spawn-log_-reviewer--reviewer--codex-_RUN-260730-2d9409.log",
+    "TASK-260720-2g21eg_spawn-log_-reviewer--reviewer--codex-_RUN-260730-e777e2.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-2g21eg_focused-pytest.xml": "d2ff8ad666ad18494cea57895f1c31318269013bda17506f2d473f9334df835a",
+    "TASK-260720-2g21eg_full-pytest.xml": "a901d1d323084a43256e7264f07ecd2849c18cdce9124cdc4a06a6b095d0fcc0",
+    "TASK-260720-2g21eg_real-go-fixture.xml": "c17af8596f89969390d33c5ff6a171cc8740f9c97ffeacbd9344f391ab890d96",
+    "TASK-260720-2g21eg_results.md": "46172f7702f173a665934d197f1782fd5aa43296b446ba639bb4c03c853fc409",
+    "TASK-260720-2g21eg_review-rework-cycle-2.md": "bb8f58c3db7618fd59e2ef034d715dd37aa91f532b7281f88edefd5d82dc76f3",
+    "TASK-260720-2g21eg_review-verdict-cycle-2.md": "c955e200656b6fdc3316a572365a10efcb434108f998a08eb16e754fdc7f5a88",
+    "TASK-260720-2g21eg_review-verdict.md": "79908290612b90a1412c8e3b3820f570c85a062a0995cf25e2d670644e39e790",
+    "TASK-260720-2g21eg_reviewer-cycle2-focused-pytest.xml": "07e3a40e74013d46907d471fe933c5599051f0fed941ab446cfe3760794f0ed6",
+    "TASK-260720-2g21eg_reviewer-cycle2-full-pytest.xml": "2e535ec14a13acb229d4b1dae927220a6e1c2cf82b790d0ca2e71b79dd8755fa",
+    "TASK-260720-2g21eg_reviewer-cycle2-hygiene.log": "1084bc932652d7c3381192a8d0f2549c9cafeb474c5d5c4b778813661b016b20",
+    "TASK-260720-2g21eg_reviewer-cycle2-mypy.log": "61bd8cb9959645a85c4ae3dffd6695b2b000164bf38ab0bdef0fc9ba4a4072b6",
+    "TASK-260720-2g21eg_reviewer-cycle2-native-identity-stress.log": "bba95095ad20cf15814d0249cd5e916c635563b1d57326415ab792f58c8dc415",
+    "TASK-260720-2g21eg_reviewer-cycle2-native-probe-gap.log": "2416467c7e4405c181cc55bde73aff832ce38036da88f0caf35830e945df8a35",
+    "TASK-260720-2g21eg_reviewer-cycle2-pth-accepted-fixture.log": "a1135cc2009d684c0910c3069cfc49efa8e744be60d65de325bdc45b9c3cfb7f",
+    "TASK-260720-2g21eg_reviewer-cycle2-pth-probe.log": "62ff17a6ccd673199af067816d60ff8f66fb71e4993222cfecf3de02d6815ae3"
+  },
+  "require_outcome_artifact": true
+}

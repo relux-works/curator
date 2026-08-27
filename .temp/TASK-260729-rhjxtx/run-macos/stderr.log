@@ -1,0 +1,25 @@
+match       kotlin.negative.backend-is-not-native        expected=backend_identity         observed=backend_identity         early=true 
+not_run     kotlin.negative.metadata-future              expected=host_version             observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.negative.metadata-malformed           expected=representability         observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.negative.target-unknown               expected=target_representability  observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+not_run     kotlin.positive.version-and-target           expected=none                     observed=-                        early=false
+            reason: no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+match       rust.negative.msrv-future                    expected=host_version             observed=host_version             early=true 
+match       rust.negative.msrv-malformed                 expected=representability         observed=representability         early=true 
+match       rust.negative.selector-toolchain-nightly     expected=package_selector         observed=package_selector         early=true 
+match       rust.negative.selector-toolchain-path        expected=package_selector         observed=package_selector         early=true 
+match       rust.negative.target-std-absent              expected=target_host              observed=target_host              early=true 
+match       rust.negative.target-unknown                 expected=target_representability  observed=target_representability  early=true 
+match       rust.positive.msrv-below-host                expected=none                     observed=none                     early=true 
+match       swift.negative.manifest-is-a-program         expected=package_selector         observed=package_selector         early=true 
+match       swift.negative.selector-swift-version-file   expected=none                     observed=none                     early=true 
+match       swift.negative.target-stdlib-absent          expected=target_host              observed=target_host              early=true 
+match       swift.negative.target-unknown                expected=target_representability  observed=target_representability  early=true 
+match       swift.negative.tools-version-future          expected=host_version             observed=host_version             early=true 
+match       swift.negative.tools-version-malformed       expected=representability         observed=representability         early=true 
+match       swift.positive.tools-version-below-host      expected=none                     observed=none                     early=true 
+
+19 cases: 15 matched, 0 divergences, 4 not run; 1 toolchains unavailable, 0 wrong backend

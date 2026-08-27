@@ -1,0 +1,10 @@
+# Qualify manager releases for the specification gate
+
+## Description
+Establish a hard evidence gate between successful candidate interoperability tests and any change to curator-spec implementation pins.
+
+## Scope
+Perform a read-only qualification after protocol v6 candidate verification, both manager integration handoffs TASK-260720-1pvfj5 and TASK-260720-3s27te, both independent consumers, the black-box runner, and downstream documents are accepted. Resolve the published Curator and csk release tags to full immutable commits and bind them to the exact committed curator-spec candidate-suite digest they passed through caller-supplied candidate inputs while committed manager suite pins remained on the previous release. Attach a task-scoped evidence record. Do not edit workflows, pins, claims, tags, changelogs, or release assets. A working tree, branch name, mutable tag, local-only unrecorded pass, board status, planned version, or future commit is not release evidence. The protocol itself need not be released yet because this gate qualifies released manager revisions for the in-tree specification release gate.
+
+## Acceptance Criteria
+The outcome records each actual manager release version or tag, full commit ID, release URL and timestamp, released artifact identity where applicable, the exact committed curator-spec candidate revision and suite SHA-256 tested, and reproducible passing consumer, manager integration, cross-platform, and black-box results. Both manager releases consume the byte-identical candidate suite, every referenced commit exists in its public repository, and no committed manager suite pin advanced from the previous released protocol. The report states that this is pre-release protocol evidence, emits no conformance claim v2, and confirms that no curator-spec implementation pin changed before qualification. If either manager release, integration handoff, or exact-suite evidence is absent, the task records the exact missing external item, recommends no pin movement, and transitions to blocked rather than substituting a branch, guessed hash, local worktree commit, board state, or fabricated claim.

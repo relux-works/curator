@@ -1,0 +1,13 @@
+ok  	github.com/relux-works/curator/internal/buildsource	1.429s
+--- FAIL: TestFixedEnvironmentAndFiveDirectArgvFormsVector (0.82s)
+    --- FAIL: TestFixedEnvironmentAndFiveDirectArgvFormsVector/fixed_environment (0.81s)
+        builddriver_positive_conformance_test.go:209: closed environment GOARCH = "amd64", the suite publishes "arm64"
+--- FAIL: TestToolchainIdentityVectors (0.87s)
+    --- FAIL: TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link (0.00s)
+        builddriver_positive_conformance_test.go:268: materialized link target = "..\\bin\\go", <nil>; want exact protocol target "../bin/go"
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	278.789s
+ok  	github.com/relux-works/curator/internal/identifiers	0.840s
+ok  	github.com/relux-works/curator/internal/managerlock	2.601s
+FAIL
+REAL_EXIT_CODE=1

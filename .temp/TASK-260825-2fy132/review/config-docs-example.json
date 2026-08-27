@@ -1,0 +1,15 @@
+{
+  "schema_version": 1, "skills_root": "/tmp/skills", "projects": {},
+  "build_https": {
+    "git.example.com": {
+      "token": "git-credentials"
+    },
+    "git.example.com/portals": {
+      "token_env": "PORTALS_TOKEN",
+      "username": "oauth2"
+    },
+    "code.example.net/tools": {
+      "token": "keyring"
+    }
+  }
+}

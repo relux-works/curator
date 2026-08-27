@@ -1,0 +1,2031 @@
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index adb2e4958365bf1354f9fa613f1c2a87850ba36c..b2fcaf3283a634213c493a3143a8182a3629fbdb 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -1758,7 +1758,7 @@
+     },
+     {
+       "path": "vectors/manager-lifecycle.json",
+-      "sha256": "sha256:2ddbd2665a63f44dc0e03e060f4cd34bfde219a56b3192511fe1ef81047feedf"
++      "sha256": "sha256:25f573a40652dfaf6bb52818b2209c2f8c1e6aec2a7515023e0ac531c2d91289"
+     },
+     {
+       "path": "vectors/portable-paths.json",
+diff --git a/conformance/v1/vectors/manager-lifecycle.json b/conformance/v1/vectors/manager-lifecycle.json
+index 5272cc7539bcdd7c9969a4cc46a81ae9d430a0e4..0d37ef449a47f688598c0b6f738098a3e472208b 100644
+--- a/conformance/v1/vectors/manager-lifecycle.json
++++ b/conformance/v1/vectors/manager-lifecycle.json
+@@ -22,6 +22,223 @@
+       "outcome": "usage-error"
+     }
+   ],
++  "build_order_cases": [
++    {
++      "active_build_commands": {
++        "app": [
++          "golden-tool"
++        ],
++        "data-provider": [
++          "zeta-tool",
++          "alpha-tool",
++          "é-tool"
++        ],
++        "ui-provider": [
++          "beta-tool"
++        ]
++      },
++      "closure_edges": [
++        {
++          "consumer": "app",
++          "provider": "ui-provider"
++        },
++        {
++          "consumer": "app",
++          "provider": "data-provider"
++        }
++      ],
++      "expected_build_order": [
++        "data-provider/alpha-tool",
++        "data-provider/zeta-tool",
++        "data-provider/é-tool",
++        "ui-provider/beta-tool",
++        "app/golden-tool"
++      ],
++      "expected_provider_order": [
++        "data-provider",
++        "ui-provider",
++        "app"
++      ],
++      "name": "provider-first-and-lexical-command-order",
++      "ordering": "provider-first-kahn-then-unicode-scalar-command-name"
++    }
++  ],
++  "cache_publication_cases": [
++    {
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "manager_home_lock": true,
++      "merge_existing_entry": false,
++      "name": "publish-complete-immutable-entry-under-home-lock",
++      "publication": "atomic-complete-directory",
++      "receipt_sha256": "sha256:919fbbad8e6ce95532219fd952c2309d0d7026f85209650508fd6834af4020cd",
++      "result": "published"
++    },
++    {
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "name": "concurrent-identical-winner",
++      "result": "reuse-winner",
++      "staged_loser": "discard",
++      "winner_bytes_equal_staged": true,
++      "winner_modified": false,
++      "winner_validation": "exact-protected-entry"
++    },
++    {
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "install_targets_mutated": false,
++      "name": "concurrent-determinism-mismatch",
++      "result": "determinism-or-corruption-error",
++      "winner_bytes_equal_staged": false,
++      "winner_modified": false,
++      "winner_validation": "exact-protected-entry"
++    },
++    {
++      "adopt_or_repair_candidate": false,
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "existing_valid_entries_modified": false,
++      "manager_home_lock": true,
++      "name": "corrupt-live-entry",
++      "quarantine_allowed": true,
++      "result": "replace-from-verified-staging"
++    },
++    {
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "candidate_reused": false,
++      "chmod_then_adopt": false,
++      "embedded_hashes_match": true,
++      "name": "untrusted-cache-boundary",
++      "result": "rebuild-into-new-protected-state",
++      "status_current": false
++    }
++  ],
++  "compiled_build_fixture": {
++    "artifact": {
++      "path": "bin/golden-tool",
++      "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++      "size": 1234567
++    },
++    "build_input": {
++      "build_root": "build",
++      "build_source": {
++        "algorithm": "curator-build-source-v1",
++        "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++      },
++      "command": "golden-tool",
++      "driver": "go-v1",
++      "policy": {
++        "cgo": false,
++        "compiler_directives": "reject-nonstandard-cgo-import-dynamic-v1",
++        "execution_policy": "manager-worker-v1",
++        "host_objects": false,
++        "libgcc": "none",
++        "link_mode": "internal",
++        "module_mode": "vendor",
++        "network": "none",
++        "package_assembly": false,
++        "target_mode": "native",
++        "telemetry": "off-private",
++        "workspace": false
++      },
++      "schema_version": 1,
++      "source_dir": "build/cmd/golden-tool",
++      "target": {
++        "goarch": "arm64",
++        "goos": "darwin",
++        "tuning": {
++          "GOARM64": "v8.0"
++        }
++      },
++      "toolchain": {
++        "algorithm": "curator-go-toolchain-v1",
++        "content_sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
++        "go_relpath": "bin/go",
++        "go_version": "go version go1.26.1 darwin/arm64"
++      }
++    },
++    "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++    "execution_policy": "manager-worker-v1",
++    "logical_command": "golden-tool",
++    "receipt_sha256": "sha256:919fbbad8e6ce95532219fd952c2309d0d7026f85209650508fd6834af4020cd",
++    "source_vector": "build-drivers.json#/portable_identity",
++    "stored_receipt": {
++      "artifact": {
++        "path": "bin/golden-tool",
++        "sha256": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
++        "size": 1234567
++      },
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "input": {
++        "build_root": "build",
++        "build_source": {
++          "algorithm": "curator-build-source-v1",
++          "content_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
++        },
++        "command": "golden-tool",
++        "driver": "go-v1",
++        "policy": {
++          "cgo": false,
++          "compiler_directives": "reject-nonstandard-cgo-import-dynamic-v1",
++          "execution_policy": "manager-worker-v1",
++          "host_objects": false,
++          "libgcc": "none",
++          "link_mode": "internal",
++          "module_mode": "vendor",
++          "network": "none",
++          "package_assembly": false,
++          "target_mode": "native",
++          "telemetry": "off-private",
++          "workspace": false
++        },
++        "schema_version": 1,
++        "source_dir": "build/cmd/golden-tool",
++        "target": {
++          "goarch": "arm64",
++          "goos": "darwin",
++          "tuning": {
++            "GOARM64": "v8.0"
++          }
++        },
++        "toolchain": {
++          "algorithm": "curator-go-toolchain-v1",
++          "content_sha256": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
++          "go_relpath": "bin/go",
++          "go_version": "go version go1.26.1 darwin/arm64"
++        }
++      },
++      "schema_version": 1
++    }
++  },
++  "cross_project_cases": [
++    {
++      "commit_order": [
++        "project-alpha",
++        "project-beta"
++      ],
++      "consumer_ledger_after": [
++        "project-alpha",
++        "project-beta"
++      ],
++      "consumer_ledger_before": [],
++      "name": "two-project-success-preserves-both-consumers",
++      "private_builds_may_overlap": true,
++      "result": "success",
++      "shared_cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "shared_transactions_serialized": true
++    },
++    {
++      "consumer_ledger_after_rollback": [
++        "project-alpha"
++      ],
++      "consumer_ledger_before_failing_transaction": [
++        "project-alpha"
++      ],
++      "failing_project": "project-beta",
++      "name": "successful-project-survives-other-project-rollback",
++      "project_alpha_targets_unchanged": true,
++      "result": "project-beta-rolled-back",
++      "shared_cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "successful_project": "project-alpha"
++    }
++  ],
+   "dry_run_cases": [
+     {
+       "forbidden_persistent_effects": [
+@@ -52,6 +269,92 @@
+       ],
+       "name": "global-upgrade",
+       "scope": "global"
++    },
++    {
++      "allowed_go_commands": [
++        "telemetry-off",
++        "version",
++        "env"
++      ],
++      "artifact_executed": false,
++      "forbidden_go_commands": [
++        "list",
++        "build"
++      ],
++      "forbidden_persistent_effects": [
++        "source-checkout",
++        "snapshot-cache",
++        "response-cache",
++        "toolchain-probe-memo",
++        "module-cache",
++        "go-build-cache",
++        "compiled-artifact-cache",
++        "audit-state",
++        "registry-state",
++        "revocation-state",
++        "configuration",
++        "project-lock",
++        "cache-build-lock",
++        "manager-home-lock",
++        "journal",
++        "backup",
++        "quarantine",
++        "permission-repair",
++        "context-tree",
++        "runtime-tree",
++        "environment-file",
++        "install-marker",
++        "command-shim",
++        "adapter-ledger",
++        "adapter-mirror",
++        "consumer-ledger",
++        "gc-metadata"
++      ],
++      "logical_cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "name": "compiled-cache-miss-is-read-only",
++      "operation_private_state_after": "absent",
++      "reported_build_outcomes": [
++        "cache-hit",
++        "would-preflight-and-build",
++        "would-rebuild-untrusted-cache",
++        "corrupt",
++        "unsupported"
++      ],
++      "scope": "multi-project"
++    }
++  ],
++  "gc_cases": [
++    {
++      "artifact_executed": false,
++      "compiled_cache_mark_roots": [
++        "supported-valid-marker-v2",
++        "in-flight-journal"
++      ],
++      "entry_adopted": false,
++      "logical_cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "mark_roots": [
++        "registered-consumer",
++        "supported-valid-marker-v1",
++        "supported-valid-marker-v2",
++        "in-flight-journal"
++      ],
++      "name": "locked-mark-and-sweep-compiled-cache",
++      "only_lock": "manager-home-mutation-lock",
++      "protected_boundary_revalidated": true,
++      "receipt_content_alone_is_live_reference": false,
++      "result": "swept-unreferenced-old-entries",
++      "sweep_requires": [
++        "unreferenced",
++        "machine-local",
++        "older-than-grace-period"
++      ],
++      "uncertain_state_action": "retain-or-conservatively-quarantine-and-report"
++    },
++    {
++      "manager_home_lock": true,
++      "name": "post-commit-gc-failure-is-maintenance-warning",
++      "result": "installation-success-with-warning",
++      "successful_installation_rolled_back": false
+     }
+   ],
+   "launcher_cases": [
+@@ -86,6 +389,262 @@
+       ]
+     }
+   ],
++  "planning_cases": [
++    {
++      "failure_at_any_gate": {
++        "cache_lookup": false,
++        "go_commands": [],
++        "persistent_mutations": []
++      },
++      "name": "all-source-and-trust-gates-before-build",
++      "required_before_toolchain_or_cache": [
++        "complete-snapshot-tree-validation",
++        "dual-manifest-parse-and-schema-validation",
++        "runtime-build-root-and-source-dir-validation",
++        "static-build-root-context-and-runtime-exclusion",
++        "curator-build-source-v1",
++        "provider-first-closure",
++        "command-shim-portable-and-platform-collision-planning",
++        "source-allowlist-and-snapshot-checks",
++        "source-audit-policy",
++        "trusted-registry-resolution",
++        "attestation-revocation-and-moved-tag-policy"
++      ],
++      "result": "build-eligible",
++      "then": [
++        "trusted-toolchain-resolution-and-fingerprint",
++        "logical-cache-key-derivation",
++        "protected-cache-read-only-inspection",
++        "go-list",
++        "go-build"
++      ]
++    }
++  ],
++  "private_build_cases": [
++    {
++      "artifacts_executed": false,
++      "builds": [
++        {
++          "artifact_verified": true,
++          "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++          "command": "golden-tool",
++          "receipt_sha256": "sha256:919fbbad8e6ce95532219fd952c2309d0d7026f85209650508fd6834af4020cd",
++          "staging": "operation-private"
++        },
++        {
++          "artifact_verified": true,
++          "command": "second-tool",
++          "staging": "operation-private"
++        }
++      ],
++      "manager_home_lock_during_build": false,
++      "name": "all-misses-stage-and-verify-before-home-lock",
++      "result": "ready-to-publish",
++      "shared_mutations_before_all_verified": []
++    },
++    {
++      "events": [
++        "golden-tool-staged-and-verified",
++        "second-tool-go-list-passed",
++        "second-tool-go-build-failed",
++        "operation-private-staging-removed"
++      ],
++      "forbidden_effects": [
++        "recovery",
++        "cache-publication",
++        "quarantine",
++        "permission-repair",
++        "journal",
++        "target-swap",
++        "consumer-update",
++        "gc"
++      ],
++      "manager_home_lock_acquired": false,
++      "name": "second-build-failure-preserves-persistent-state",
++      "persistent_state_after": "persistent-generation-7",
++      "persistent_state_before": "persistent-generation-7",
++      "result": "build-failed"
++    }
++  ],
++  "recovery_cases": [
++    {
++      "backups_retained_until_recovery_succeeds": true,
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "expected_action": "verify-preimages-and-restore-reverse-commit-order",
++      "journal_owner": "global",
++      "journal_state": "partially-committed",
++      "journal_transaction_id": "transaction-global-17",
++      "name": "interrupted-global-journal-recovered-by-transaction-id",
++      "result": "restored",
++      "scan_scope": "all-incomplete-journals",
++      "successful_project_consumers_after": [
++        "project-alpha"
++      ],
++      "successful_project_consumers_before": [
++        "project-alpha"
++      ],
++      "triggering_project": "project-beta"
++    },
++    {
++      "manager_home_lock": true,
++      "name": "install-recovery-runs-after-private-builds",
++      "private_builds_verified": true,
++      "recovery_before_build": false,
++      "restart_if_plan_assumption_changed": true,
++      "result": "publication-may-proceed"
++    }
++  ],
++  "repair_cases": [
++    {
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "forbidden_shortcuts": [
++        "adopt-candidate",
++        "chmod-then-adopt",
++        "recalculate-marker-only",
++        "trust-self-consistent-receipt"
++      ],
++      "independent_conditions": [
++        "missing",
++        "corrupt",
++        "wrong-target",
++        "wrong-toolchain",
++        "untrusted-boundary"
++      ],
++      "name": "repair-rebuilds-invalid-compiled-entry",
++      "required_pipeline": [
++        "complete-snapshot-validation",
++        "static-context-exclusion",
++        "build-source-identity",
++        "provider-first-closure",
++        "source-audit",
++        "registry-and-attestation-gates",
++        "fixed-toolchain-and-process-graph",
++        "operation-private-build",
++        "protected-publication",
++        "journaled-commit"
++      ],
++      "result": "rebuilt-and-journaled"
++    }
++  ],
++  "schema_version": 1,
++  "status_cases": [
++    {
++      "artifact_executed": false,
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "mutations": [],
++      "name": "compiled-installation-current",
++      "receipt_sha256": "sha256:919fbbad8e6ce95532219fd952c2309d0d7026f85209650508fd6834af4020cd",
++      "result": "current",
++      "validated": [
++        "marker-schema",
++        "effective-plan",
++        "installed-content",
++        "static-build-root-exclusion",
++        "raw-snapshot-build-source",
++        "build-input",
++        "logical-cache-key",
++        "protected-boundary",
++        "canonical-receipt",
++        "artifact-path-hash-and-size"
++      ]
++    },
++    {
++      "adopt": false,
++      "artifact_executed": false,
++      "independent_conditions": [
++        "missing-raw-snapshot",
++        "context-visible-build-root",
++        "runtime-copied-build-root",
++        "untrusted-cache-boundary",
++        "unsupported-driver",
++        "unsupported-toolchain",
++        "corrupt-receipt",
++        "corrupt-artifact",
++        "wrong-native-target",
++        "build-source-mismatch",
++        "cache-key-mismatch",
++        "receipt-hash-mismatch",
++        "artifact-path-mismatch",
++        "artifact-hash-mismatch"
++      ],
++      "mutations": [],
++      "name": "compiled-currentness-failure-matrix",
++      "quarantine": false,
++      "repair": false,
++      "result": "non-current"
++    }
++  ],
++  "transaction_cases": [
++    {
++      "cache_build_lock_released_before_home_lock": true,
++      "expected_project_lock_order": [
++        "project-alpha",
++        "project-z",
++        "project-é"
++      ],
++      "forbidden_while_holding_home_lock": [
++        "project-lock",
++        "cache-build-lock"
++      ],
++      "input_project_identities": [
++        "project-é",
++        "project-z",
++        "project-alpha"
++      ],
++      "maximum_cache_build_locks": 1,
++      "name": "deterministic-lock-order",
++      "result": "locks-acquired",
++      "then_manager_home_lock": true,
++      "then_optional_cache_build_lock": true
++    },
++    {
++      "backups_retained_until_consumer_durable": true,
++      "cache_key": "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b",
++      "canonical_identifier_order": "unsigned-utf8-bytewise-within-class",
++      "consumer_ledger_committed_last": true,
++      "expected_commit_order": [
++        "context-and-marker/project-alpha",
++        "context-and-marker/project-beta",
++        "runtime-shim-environment/project-alpha",
++        "adapter-and-mirror/project-alpha",
++        "stale-removal/project-alpha",
++        "consumer-ledger/machine"
++      ],
++      "name": "deterministic-target-order-and-consumer-last",
++      "result": "committed",
++      "target_class_order": [
++        "context-and-marker",
++        "runtime-shim-environment",
++        "adapter-and-mirror",
++        "stale-removal",
++        "consumer-ledger"
++      ]
++    },
++    {
++      "commit_order": [
++        "context-and-marker/project-alpha",
++        "context-and-marker/project-beta",
++        "runtime-shim-environment/project-alpha",
++        "adapter-and-mirror/project-alpha",
++        "stale-removal/project-alpha",
++        "consumer-ledger/machine"
++      ],
++      "existing_valid_cache_entries_modified": false,
++      "expected_restore_order": [
++        "consumer-ledger/machine",
++        "stale-removal/project-alpha",
++        "adapter-and-mirror/project-alpha",
++        "runtime-shim-environment/project-alpha",
++        "context-and-marker/project-beta",
++        "context-and-marker/project-alpha"
++      ],
++      "manager_home_lock_held_through_rollback": true,
++      "name": "reverse-rollback-under-home-lock",
++      "require_current_digest_equals_desired_before_restore": true,
++      "result": "rolled-back",
++      "unknown_state_overwritten": false
++    }
++  ],
+   "upgrade_cases": [
+     {
+       "exclude": [
+diff --git a/release/1.0.0-rc.5.json b/release/1.0.0-rc.5.json
+index ecc67803eb4f999aa984bb045f25fcf0113943d4..cbb942a6ebfd7d962d95fa0cfef706a7479fb50a 100644
+--- a/release/1.0.0-rc.5.json
++++ b/release/1.0.0-rc.5.json
+@@ -1,6 +1,6 @@
+ {
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c",
++    "manifest_sha256": "sha256:cb02172dca20e33509891bde88da021b946b590c4267decdf7d6b566012a239b",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v3": {
+@@ -13,7 +13,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:b6f56aacc0e37dcc6692f73f641bff761e89b645adfe20a47a06d81c6fda204c"
++    "required_manifest_sha256": "sha256:cb02172dca20e33509891bde88da021b946b590c4267decdf7d6b566012a239b"
+   },
+   "execution_policy": {
+     "capability_evidence_record_version": "capability-evidence-v1",
+diff --git a/tools/generate-vectors/main.go b/tools/generate-vectors/main.go
+index dd6ca5acd9eb989257fb7d43b19130f555d00b39..d687068b77d0ebe21191cd437369e06f7eb11341 100644
+--- a/tools/generate-vectors/main.go
++++ b/tools/generate-vectors/main.go
+@@ -581,7 +581,19 @@ func writeManagerConfigVectors(dir, pinned string) {
+ }
+ 
+ func writeManagerLifecycleVectors(dir string) {
++	identity := newBuildDriverIdentityFixture()
+ 	writeJSON(filepath.Join(dir, "manager-lifecycle.json"), map[string]any{
++		"schema_version": 1,
++		"compiled_build_fixture": map[string]any{
++			"source_vector":    "build-drivers.json#/portable_identity",
++			"execution_policy": portableExecutionPolicy,
++			"build_input":      identity.buildInput,
++			"cache_key":        identity.cacheKey,
++			"stored_receipt":   identity.receipt,
++			"receipt_sha256":   identity.receiptHash,
++			"artifact":         identity.receipt["artifact"],
++			"logical_command":  "golden-tool",
++		},
+ 		"launcher_cases": []any{
+ 			map[string]any{
+ 				"name": "skill-command-without-shell-activation", "platforms": []any{"unix", "windows"},
+@@ -607,10 +619,331 @@ func writeManagerLifecycleVectors(dir string) {
+ 		"dry_run_cases": []any{
+ 			map[string]any{"name": "project-upgrade", "scope": "project", "forbidden_persistent_effects": []any{"source-fetch", "source-clone", "snapshot-cache", "response-cache", "audit-state", "registry-state", "configuration", "runtime", "project-artifacts"}},
+ 			map[string]any{"name": "global-upgrade", "scope": "global", "forbidden_persistent_effects": []any{"source-fetch", "source-clone", "snapshot-cache", "response-cache", "audit-state", "registry-state", "configuration", "runtime", "global-artifacts"}},
+-		},
++			compiledDryRunCase(identity),
++		},
++		"planning_cases":          compiledPlanningCases(),
++		"build_order_cases":       compiledBuildOrderCases(),
++		"private_build_cases":     compiledPrivateBuildCases(identity),
++		"cache_publication_cases": compiledCachePublicationCases(identity),
++		"cross_project_cases":     compiledCrossProjectCases(identity),
++		"transaction_cases":       compiledTransactionCases(identity),
++		"recovery_cases":          compiledRecoveryCases(identity),
++		"status_cases":            compiledStatusCases(identity),
++		"repair_cases":            compiledRepairCases(identity),
++		"gc_cases":                compiledGCCases(identity),
+ 	})
+ }
+ 
++type buildDriverIdentityFixture struct {
++	buildInput  map[string]any
++	cacheKey    string
++	receipt     map[string]any
++	receiptHash string
++}
++
++func newBuildDriverIdentityFixture() buildDriverIdentityFixture {
++	buildInput := validGoBuildInputV1()
++	cacheKey := sha256Identity(canonicalBytes(buildInput))
++	receipt := validBuildReceiptV1()
++	receipt["cache_key"] = cacheKey
++	receipt["input"] = cloneMap(buildInput)
++	return buildDriverIdentityFixture{
++		buildInput:  buildInput,
++		cacheKey:    cacheKey,
++		receipt:     receipt,
++		receiptHash: sha256Identity(canonicalBytes(receipt)),
++	}
++}
++
++func compiledPlanningCases() []any {
++	gates := []any{
++		"complete-snapshot-tree-validation",
++		"dual-manifest-parse-and-schema-validation",
++		"runtime-build-root-and-source-dir-validation",
++		"static-build-root-context-and-runtime-exclusion",
++		"curator-build-source-v1",
++		"provider-first-closure",
++		"command-shim-portable-and-platform-collision-planning",
++		"source-allowlist-and-snapshot-checks",
++		"source-audit-policy",
++		"trusted-registry-resolution",
++		"attestation-revocation-and-moved-tag-policy",
++	}
++	return []any{
++		map[string]any{
++			"name": "all-source-and-trust-gates-before-build", "result": "build-eligible",
++			"required_before_toolchain_or_cache": gates,
++			"then": []any{
++				"trusted-toolchain-resolution-and-fingerprint",
++				"logical-cache-key-derivation",
++				"protected-cache-read-only-inspection",
++				"go-list",
++				"go-build",
++			},
++			"failure_at_any_gate": map[string]any{
++				"go_commands": []any{}, "cache_lookup": false, "persistent_mutations": []any{},
++			},
++		},
++	}
++}
++
++func compiledBuildOrderCases() []any {
++	return []any{
++		map[string]any{
++			"name": "provider-first-and-lexical-command-order",
++			"closure_edges": []any{
++				map[string]any{"consumer": "app", "provider": "ui-provider"},
++				map[string]any{"consumer": "app", "provider": "data-provider"},
++			},
++			"active_build_commands": map[string]any{
++				"app":           []any{"golden-tool"},
++				"data-provider": []any{"zeta-tool", "alpha-tool", "é-tool"},
++				"ui-provider":   []any{"beta-tool"},
++			},
++			"expected_provider_order": []any{"data-provider", "ui-provider", "app"},
++			"expected_build_order": []any{
++				"data-provider/alpha-tool",
++				"data-provider/zeta-tool",
++				"data-provider/é-tool",
++				"ui-provider/beta-tool",
++				"app/golden-tool",
++			},
++			"ordering": "provider-first-kahn-then-unicode-scalar-command-name",
++		},
++	}
++}
++
++func compiledDryRunCase(identity buildDriverIdentityFixture) any {
++	return map[string]any{
++		"name": "compiled-cache-miss-is-read-only", "scope": "multi-project",
++		"logical_cache_key":       identity.cacheKey,
++		"allowed_go_commands":     []any{"telemetry-off", "version", "env"},
++		"forbidden_go_commands":   []any{"list", "build"},
++		"reported_build_outcomes": []any{"cache-hit", "would-preflight-and-build", "would-rebuild-untrusted-cache", "corrupt", "unsupported"},
++		"forbidden_persistent_effects": []any{
++			"source-checkout", "snapshot-cache", "response-cache", "toolchain-probe-memo",
++			"module-cache", "go-build-cache", "compiled-artifact-cache", "audit-state",
++			"registry-state", "revocation-state", "configuration", "project-lock",
++			"cache-build-lock", "manager-home-lock", "journal", "backup", "quarantine",
++			"permission-repair", "context-tree", "runtime-tree", "environment-file",
++			"install-marker", "command-shim", "adapter-ledger", "adapter-mirror",
++			"consumer-ledger", "gc-metadata",
++		},
++		"operation_private_state_after": "absent",
++		"artifact_executed":             false,
++	}
++}
++
++func compiledPrivateBuildCases(identity buildDriverIdentityFixture) []any {
++	return []any{
++		map[string]any{
++			"name": "all-misses-stage-and-verify-before-home-lock", "result": "ready-to-publish",
++			"builds": []any{
++				map[string]any{"command": "golden-tool", "cache_key": identity.cacheKey, "staging": "operation-private", "artifact_verified": true, "receipt_sha256": identity.receiptHash},
++				map[string]any{"command": "second-tool", "staging": "operation-private", "artifact_verified": true},
++			},
++			"manager_home_lock_during_build": false, "shared_mutations_before_all_verified": []any{},
++			"artifacts_executed": false,
++		},
++		map[string]any{
++			"name": "second-build-failure-preserves-persistent-state", "result": "build-failed",
++			"events": []any{
++				"golden-tool-staged-and-verified",
++				"second-tool-go-list-passed",
++				"second-tool-go-build-failed",
++				"operation-private-staging-removed",
++			},
++			"persistent_state_before":    "persistent-generation-7",
++			"persistent_state_after":     "persistent-generation-7",
++			"manager_home_lock_acquired": false,
++			"forbidden_effects": []any{
++				"recovery", "cache-publication", "quarantine", "permission-repair", "journal",
++				"target-swap", "consumer-update", "gc",
++			},
++		},
++	}
++}
++
++func compiledCachePublicationCases(identity buildDriverIdentityFixture) []any {
++	return []any{
++		map[string]any{
++			"name": "publish-complete-immutable-entry-under-home-lock", "result": "published",
++			"cache_key": identity.cacheKey, "receipt_sha256": identity.receiptHash,
++			"manager_home_lock": true, "publication": "atomic-complete-directory", "merge_existing_entry": false,
++		},
++		map[string]any{
++			"name": "concurrent-identical-winner", "result": "reuse-winner",
++			"cache_key": identity.cacheKey, "winner_validation": "exact-protected-entry",
++			"winner_bytes_equal_staged": true, "staged_loser": "discard", "winner_modified": false,
++		},
++		map[string]any{
++			"name": "concurrent-determinism-mismatch", "result": "determinism-or-corruption-error",
++			"cache_key": identity.cacheKey, "winner_validation": "exact-protected-entry",
++			"winner_bytes_equal_staged": false, "install_targets_mutated": false, "winner_modified": false,
++		},
++		map[string]any{
++			"name": "corrupt-live-entry", "result": "replace-from-verified-staging",
++			"cache_key": identity.cacheKey, "manager_home_lock": true,
++			"quarantine_allowed": true, "adopt_or_repair_candidate": false, "existing_valid_entries_modified": false,
++		},
++		map[string]any{
++			"name": "untrusted-cache-boundary", "result": "rebuild-into-new-protected-state",
++			"cache_key": identity.cacheKey, "embedded_hashes_match": true,
++			"chmod_then_adopt": false, "candidate_reused": false, "status_current": false,
++		},
++	}
++}
++
++func compiledCrossProjectCases(identity buildDriverIdentityFixture) []any {
++	return []any{
++		map[string]any{
++			"name": "two-project-success-preserves-both-consumers", "result": "success",
++			"private_builds_may_overlap": true, "shared_transactions_serialized": true,
++			"shared_cache_key":       identity.cacheKey,
++			"commit_order":           []any{"project-alpha", "project-beta"},
++			"consumer_ledger_before": []any{},
++			"consumer_ledger_after":  []any{"project-alpha", "project-beta"},
++		},
++		map[string]any{
++			"name": "successful-project-survives-other-project-rollback", "result": "project-beta-rolled-back",
++			"successful_project": "project-alpha", "failing_project": "project-beta",
++			"shared_cache_key":                           identity.cacheKey,
++			"consumer_ledger_before_failing_transaction": []any{"project-alpha"},
++			"consumer_ledger_after_rollback":             []any{"project-alpha"},
++			"project_alpha_targets_unchanged":            true,
++		},
++	}
++}
++
++func compiledTransactionCases(identity buildDriverIdentityFixture) []any {
++	commitOrder := []any{
++		"context-and-marker/project-alpha",
++		"context-and-marker/project-beta",
++		"runtime-shim-environment/project-alpha",
++		"adapter-and-mirror/project-alpha",
++		"stale-removal/project-alpha",
++		"consumer-ledger/machine",
++	}
++	return []any{
++		map[string]any{
++			"name": "deterministic-lock-order", "result": "locks-acquired",
++			"input_project_identities":       []any{"project-é", "project-z", "project-alpha"},
++			"expected_project_lock_order":    []any{"project-alpha", "project-z", "project-é"},
++			"then_optional_cache_build_lock": true, "maximum_cache_build_locks": 1,
++			"cache_build_lock_released_before_home_lock": true, "then_manager_home_lock": true,
++			"forbidden_while_holding_home_lock": []any{"project-lock", "cache-build-lock"},
++		},
++		map[string]any{
++			"name": "deterministic-target-order-and-consumer-last", "result": "committed",
++			"cache_key": identity.cacheKey,
++			"target_class_order": []any{
++				"context-and-marker", "runtime-shim-environment", "adapter-and-mirror", "stale-removal", "consumer-ledger",
++			},
++			"canonical_identifier_order":     "unsigned-utf8-bytewise-within-class",
++			"expected_commit_order":          commitOrder,
++			"consumer_ledger_committed_last": true, "backups_retained_until_consumer_durable": true,
++		},
++		map[string]any{
++			"name": "reverse-rollback-under-home-lock", "result": "rolled-back",
++			"commit_order":                                         commitOrder,
++			"expected_restore_order":                               reverseAny(commitOrder),
++			"manager_home_lock_held_through_rollback":              true,
++			"require_current_digest_equals_desired_before_restore": true,
++			"unknown_state_overwritten":                            false, "existing_valid_cache_entries_modified": false,
++		},
++	}
++}
++
++func compiledRecoveryCases(identity buildDriverIdentityFixture) []any {
++	return []any{
++		map[string]any{
++			"name": "interrupted-global-journal-recovered-by-transaction-id", "result": "restored",
++			"triggering_project": "project-beta", "journal_owner": "global",
++			"journal_transaction_id": "transaction-global-17", "cache_key": identity.cacheKey,
++			"journal_state": "partially-committed", "scan_scope": "all-incomplete-journals",
++			"expected_action":                          "verify-preimages-and-restore-reverse-commit-order",
++			"successful_project_consumers_before":      []any{"project-alpha"},
++			"successful_project_consumers_after":       []any{"project-alpha"},
++			"backups_retained_until_recovery_succeeds": true,
++		},
++		map[string]any{
++			"name": "install-recovery-runs-after-private-builds", "result": "publication-may-proceed",
++			"private_builds_verified": true, "recovery_before_build": false,
++			"manager_home_lock": true, "restart_if_plan_assumption_changed": true,
++		},
++	}
++}
++
++func compiledStatusCases(identity buildDriverIdentityFixture) []any {
++	nonCurrent := []any{
++		"missing-raw-snapshot", "context-visible-build-root", "runtime-copied-build-root",
++		"untrusted-cache-boundary", "unsupported-driver", "unsupported-toolchain",
++		"corrupt-receipt", "corrupt-artifact", "wrong-native-target", "build-source-mismatch",
++		"cache-key-mismatch", "receipt-hash-mismatch", "artifact-path-mismatch", "artifact-hash-mismatch",
++	}
++	return []any{
++		map[string]any{
++			"name": "compiled-installation-current", "result": "current",
++			"cache_key": identity.cacheKey, "receipt_sha256": identity.receiptHash,
++			"validated": []any{
++				"marker-schema", "effective-plan", "installed-content", "static-build-root-exclusion",
++				"raw-snapshot-build-source", "build-input", "logical-cache-key", "protected-boundary",
++				"canonical-receipt", "artifact-path-hash-and-size",
++			},
++			"artifact_executed": false, "mutations": []any{},
++		},
++		map[string]any{
++			"name": "compiled-currentness-failure-matrix", "result": "non-current",
++			"independent_conditions": nonCurrent,
++			"artifact_executed":      false, "quarantine": false, "repair": false, "adopt": false, "mutations": []any{},
++		},
++	}
++}
++
++func compiledRepairCases(identity buildDriverIdentityFixture) []any {
++	return []any{
++		map[string]any{
++			"name": "repair-rebuilds-invalid-compiled-entry", "result": "rebuilt-and-journaled",
++			"cache_key":              identity.cacheKey,
++			"independent_conditions": []any{"missing", "corrupt", "wrong-target", "wrong-toolchain", "untrusted-boundary"},
++			"required_pipeline": []any{
++				"complete-snapshot-validation", "static-context-exclusion", "build-source-identity",
++				"provider-first-closure", "source-audit", "registry-and-attestation-gates",
++				"fixed-toolchain-and-process-graph", "operation-private-build", "protected-publication", "journaled-commit",
++			},
++			"forbidden_shortcuts": []any{"adopt-candidate", "chmod-then-adopt", "recalculate-marker-only", "trust-self-consistent-receipt"},
++		},
++	}
++}
++
++func compiledGCCases(identity buildDriverIdentityFixture) []any {
++	return []any{
++		map[string]any{
++			"name": "locked-mark-and-sweep-compiled-cache", "result": "swept-unreferenced-old-entries",
++			"only_lock": "manager-home-mutation-lock", "protected_boundary_revalidated": true,
++			"logical_cache_key":                       identity.cacheKey,
++			"mark_roots":                              []any{"registered-consumer", "supported-valid-marker-v1", "supported-valid-marker-v2", "in-flight-journal"},
++			"compiled_cache_mark_roots":               []any{"supported-valid-marker-v2", "in-flight-journal"},
++			"receipt_content_alone_is_live_reference": false,
++			"sweep_requires":                          []any{"unreferenced", "machine-local", "older-than-grace-period"},
++			"uncertain_state_action":                  "retain-or-conservatively-quarantine-and-report",
++			"artifact_executed":                       false, "entry_adopted": false,
++		},
++		map[string]any{
++			"name": "post-commit-gc-failure-is-maintenance-warning", "result": "installation-success-with-warning",
++			"manager_home_lock": true, "successful_installation_rolled_back": false,
++		},
++	}
++}
++
++func reverseAny(values []any) []any {
++	reversed := make([]any, len(values))
++	for index := range values {
++		reversed[len(values)-1-index] = values[index]
++	}
++	return reversed
++}
++
+ func writeExternalRepositoryFixtures(suite string) {
+ 	fixtures := filepath.Join(suite, "fixtures", "external-repository")
+ 	sha256Commit := strings.Repeat("a", 64)
+diff --git a/tools/generate-vectors/main_test.go b/tools/generate-vectors/main_test.go
+index 6a377aac7d3cb204b2eeec06a1178f817388e953..0b4e798108a318f8bece22b4cd7d06fe9dce02ac 100644
+--- a/tools/generate-vectors/main_test.go
++++ b/tools/generate-vectors/main_test.go
+@@ -1892,6 +1892,265 @@ func TestRegistryAndAuditSchemasRemainSourceEvidenceOnly(t *testing.T) {
+ 	}
+ }
+ 
++func TestManagerLifecycleReusesPortableBuildDriverIdentity(t *testing.T) {
++	root := repositoryRoot(t)
++	lifecycle := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "manager-lifecycle.json"))
++	buildDrivers := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "build-drivers.json"))
++	fixture := lifecycle["compiled_build_fixture"].(map[string]any)
++	identity := buildDrivers["portable_identity"].(map[string]any)
++
++	if lifecycle["schema_version"] != json.Number("1") {
++		t.Fatalf("manager lifecycle schema version = %#v, want 1", lifecycle["schema_version"])
++	}
++	if fixture["source_vector"] != "build-drivers.json#/portable_identity" {
++		t.Fatalf("lifecycle fixture does not identify its source vector: %#v", fixture)
++	}
++	for lifecycleField, buildDriverField := range map[string]string{
++		"execution_policy": "execution_policy",
++		"build_input":      "build_input",
++		"cache_key":        "cache_key",
++		"stored_receipt":   "stored_receipt",
++		"receipt_sha256":   "receipt_sha256",
++		"artifact":         "artifact",
++	} {
++		if !reflect.DeepEqual(fixture[lifecycleField], identity[buildDriverField]) {
++			t.Fatalf("lifecycle %s does not reuse build-driver %s", lifecycleField, buildDriverField)
++		}
++	}
++	buildInput := fixture["build_input"].(map[string]any)
++	policy := buildInput["policy"].(map[string]any)
++	if fixture["execution_policy"] != portableExecutionPolicy ||
++		policy["execution_policy"] != portableExecutionPolicy {
++		t.Fatalf("lifecycle fixture is not bound to %q: %#v", portableExecutionPolicy, fixture)
++	}
++	if fixture["logical_command"] != buildInput["command"] {
++		t.Fatalf("lifecycle logical command is inconsistent with the reused input: %#v", fixture)
++	}
++}
++
++func TestManagerLifecyclePlanningOrderAndCompiledDryRun(t *testing.T) {
++	root := repositoryRoot(t)
++	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "manager-lifecycle.json"))
++
++	planning := namedObjects(t, vector["planning_cases"])
++	assertNamedSet(t, planning, []string{"all-source-and-trust-gates-before-build"})
++	plan := planning["all-source-and-trust-gates-before-build"]
++	wantGates := []any{
++		"complete-snapshot-tree-validation",
++		"dual-manifest-parse-and-schema-validation",
++		"runtime-build-root-and-source-dir-validation",
++		"static-build-root-context-and-runtime-exclusion",
++		"curator-build-source-v1",
++		"provider-first-closure",
++		"command-shim-portable-and-platform-collision-planning",
++		"source-allowlist-and-snapshot-checks",
++		"source-audit-policy",
++		"trusted-registry-resolution",
++		"attestation-revocation-and-moved-tag-policy",
++	}
++	if got := plan["required_before_toolchain_or_cache"]; !reflect.DeepEqual(got, wantGates) {
++		t.Fatalf("compiled planning gate order = %#v, want %#v", got, wantGates)
++	}
++	then := plan["then"].([]any)
++	if !reflect.DeepEqual(then[len(then)-2:], []any{"go-list", "go-build"}) {
++		t.Fatalf("source-aware build commands do not follow all planning gates: %#v", then)
++	}
++	failure := plan["failure_at_any_gate"].(map[string]any)
++	if len(failure["go_commands"].([]any)) != 0 || failure["cache_lookup"] != false || len(failure["persistent_mutations"].([]any)) != 0 {
++		t.Fatalf("planning gate failure is not side-effect free: %#v", failure)
++	}
++
++	orders := namedObjects(t, vector["build_order_cases"])
++	assertNamedSet(t, orders, []string{"provider-first-and-lexical-command-order"})
++	order := orders["provider-first-and-lexical-command-order"]
++	if got, want := order["expected_provider_order"], []any{"data-provider", "ui-provider", "app"}; !reflect.DeepEqual(got, want) {
++		t.Fatalf("provider order = %#v, want %#v", got, want)
++	}
++	if got, want := order["expected_build_order"], []any{
++		"data-provider/alpha-tool", "data-provider/zeta-tool", "data-provider/é-tool",
++		"ui-provider/beta-tool", "app/golden-tool",
++	}; !reflect.DeepEqual(got, want) {
++		t.Fatalf("build order = %#v, want %#v", got, want)
++	}
++
++	dryRuns := namedObjects(t, vector["dry_run_cases"])
++	compiled := dryRuns["compiled-cache-miss-is-read-only"]
++	if !reflect.DeepEqual(compiled["allowed_go_commands"], []any{"telemetry-off", "version", "env"}) ||
++		!reflect.DeepEqual(compiled["forbidden_go_commands"], []any{"list", "build"}) {
++		t.Fatalf("compiled dry-run Go command boundary = %#v", compiled)
++	}
++	for _, state := range []any{
++		"audit-state", "registry-state", "toolchain-probe-memo", "compiled-artifact-cache",
++		"project-lock", "cache-build-lock", "manager-home-lock", "journal", "runtime-tree",
++		"context-tree", "install-marker", "command-shim", "adapter-ledger", "adapter-mirror",
++		"consumer-ledger", "gc-metadata",
++	} {
++		if !containsValue(compiled["forbidden_persistent_effects"].([]any), state) {
++			t.Fatalf("compiled dry-run does not forbid mutation of %q", state)
++		}
++	}
++	if compiled["operation_private_state_after"] != "absent" || compiled["artifact_executed"] != false {
++		t.Fatalf("compiled dry-run cleanup/execution outcome = %#v", compiled)
++	}
++}
++
++func TestManagerLifecyclePrivateBuildPublicationAndCrossProjectIsolation(t *testing.T) {
++	root := repositoryRoot(t)
++	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "manager-lifecycle.json"))
++
++	privateBuilds := namedObjects(t, vector["private_build_cases"])
++	assertNamedSet(t, privateBuilds, []string{
++		"all-misses-stage-and-verify-before-home-lock",
++		"second-build-failure-preserves-persistent-state",
++	})
++	staged := privateBuilds["all-misses-stage-and-verify-before-home-lock"]
++	if staged["manager_home_lock_during_build"] != false || len(staged["shared_mutations_before_all_verified"].([]any)) != 0 {
++		t.Fatalf("private builds enter shared mutation too early: %#v", staged)
++	}
++	failed := privateBuilds["second-build-failure-preserves-persistent-state"]
++	if failed["persistent_state_before"] != failed["persistent_state_after"] || failed["manager_home_lock_acquired"] != false {
++		t.Fatalf("second build failure changed persistent state: %#v", failed)
++	}
++	if !reflect.DeepEqual(failed["events"], []any{
++		"golden-tool-staged-and-verified", "second-tool-go-list-passed", "second-tool-go-build-failed", "operation-private-staging-removed",
++	}) {
++		t.Fatalf("second build failure trace is ambiguous: %#v", failed["events"])
++	}
++
++	publication := namedObjects(t, vector["cache_publication_cases"])
++	assertNamedSet(t, publication, []string{
++		"publish-complete-immutable-entry-under-home-lock", "concurrent-identical-winner",
++		"concurrent-determinism-mismatch", "corrupt-live-entry", "untrusted-cache-boundary",
++	})
++	if publication["publish-complete-immutable-entry-under-home-lock"]["publication"] != "atomic-complete-directory" ||
++		publication["publish-complete-immutable-entry-under-home-lock"]["merge_existing_entry"] != false {
++		t.Fatal("protected publication does not require atomic immutable entries")
++	}
++	if publication["concurrent-identical-winner"]["result"] != "reuse-winner" || publication["concurrent-identical-winner"]["staged_loser"] != "discard" {
++		t.Fatal("identical cache race winner is not explicit")
++	}
++	if publication["concurrent-determinism-mismatch"]["result"] != "determinism-or-corruption-error" || publication["concurrent-determinism-mismatch"]["install_targets_mutated"] != false {
++		t.Fatal("cache determinism mismatch outcome is not isolated")
++	}
++	if publication["corrupt-live-entry"]["result"] != "replace-from-verified-staging" || publication["corrupt-live-entry"]["adopt_or_repair_candidate"] != false {
++		t.Fatal("corrupt live cache handling is not explicit")
++	}
++	if publication["untrusted-cache-boundary"]["result"] != "rebuild-into-new-protected-state" || publication["untrusted-cache-boundary"]["candidate_reused"] != false {
++		t.Fatal("untrusted boundary handling is not explicit")
++	}
++
++	projects := namedObjects(t, vector["cross_project_cases"])
++	assertNamedSet(t, projects, []string{
++		"two-project-success-preserves-both-consumers",
++		"successful-project-survives-other-project-rollback",
++	})
++	if got, want := projects["two-project-success-preserves-both-consumers"]["consumer_ledger_after"], []any{"project-alpha", "project-beta"}; !reflect.DeepEqual(got, want) {
++		t.Fatalf("two-project consumer ledger = %#v, want %#v", got, want)
++	}
++	rollback := projects["successful-project-survives-other-project-rollback"]
++	if !reflect.DeepEqual(rollback["consumer_ledger_after_rollback"], []any{"project-alpha"}) || rollback["project_alpha_targets_unchanged"] != true {
++		t.Fatalf("failed project rollback did not preserve the successful project: %#v", rollback)
++	}
++}
++
++func TestManagerLifecycleTransactionsRecoveryStatusRepairAndGC(t *testing.T) {
++	root := repositoryRoot(t)
++	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "manager-lifecycle.json"))
++
++	transactions := namedObjects(t, vector["transaction_cases"])
++	assertNamedSet(t, transactions, []string{
++		"deterministic-lock-order", "deterministic-target-order-and-consumer-last", "reverse-rollback-under-home-lock",
++	})
++	locks := transactions["deterministic-lock-order"]
++	if got, want := locks["expected_project_lock_order"], []any{"project-alpha", "project-z", "project-é"}; !reflect.DeepEqual(got, want) {
++		t.Fatalf("project lock order = %#v, want %#v", got, want)
++	}
++	if locks["cache_build_lock_released_before_home_lock"] != true || locks["then_manager_home_lock"] != true {
++		t.Fatalf("cache/home lock ordering is incomplete: %#v", locks)
++	}
++	targets := transactions["deterministic-target-order-and-consumer-last"]
++	commitOrder := targets["expected_commit_order"].([]any)
++	if commitOrder[len(commitOrder)-1] != "consumer-ledger/machine" || targets["consumer_ledger_committed_last"] != true {
++		t.Fatalf("consumer is not last in commit order: %#v", targets)
++	}
++	rollback := transactions["reverse-rollback-under-home-lock"]
++	wantRestore := reverseAny(rollback["commit_order"].([]any))
++	if !reflect.DeepEqual(rollback["expected_restore_order"], wantRestore) || rollback["manager_home_lock_held_through_rollback"] != true {
++		t.Fatalf("rollback is not reverse and locked: %#v", rollback)
++	}
++
++	recovery := namedObjects(t, vector["recovery_cases"])
++	assertNamedSet(t, recovery, []string{
++		"interrupted-global-journal-recovered-by-transaction-id", "install-recovery-runs-after-private-builds",
++	})
++	global := recovery["interrupted-global-journal-recovered-by-transaction-id"]
++	if global["journal_owner"] != "global" || global["scan_scope"] != "all-incomplete-journals" ||
++		!reflect.DeepEqual(global["successful_project_consumers_after"], []any{"project-alpha"}) {
++		t.Fatalf("global journal recovery is incomplete: %#v", global)
++	}
++	if recovery["install-recovery-runs-after-private-builds"]["recovery_before_build"] != false {
++		t.Fatal("install recovery is incorrectly modeled as a pre-build pass")
++	}
++
++	status := namedObjects(t, vector["status_cases"])
++	assertNamedSet(t, status, []string{"compiled-installation-current", "compiled-currentness-failure-matrix"})
++	if status["compiled-installation-current"]["result"] != "current" || status["compiled-installation-current"]["artifact_executed"] != false {
++		t.Fatal("compiled current status outcome is incomplete")
++	}
++	wantNonCurrent := []any{
++		"missing-raw-snapshot", "context-visible-build-root", "runtime-copied-build-root", "untrusted-cache-boundary",
++		"unsupported-driver", "unsupported-toolchain", "corrupt-receipt", "corrupt-artifact", "wrong-native-target",
++		"build-source-mismatch", "cache-key-mismatch", "receipt-hash-mismatch", "artifact-path-mismatch", "artifact-hash-mismatch",
++	}
++	nonCurrent := status["compiled-currentness-failure-matrix"]
++	if !reflect.DeepEqual(nonCurrent["independent_conditions"], wantNonCurrent) || len(nonCurrent["mutations"].([]any)) != 0 {
++		t.Fatalf("compiled non-current matrix = %#v", nonCurrent)
++	}
++
++	repair := namedObjects(t, vector["repair_cases"])
++	assertNamedSet(t, repair, []string{"repair-rebuilds-invalid-compiled-entry"})
++	rebuild := repair["repair-rebuilds-invalid-compiled-entry"]
++	if got, want := rebuild["independent_conditions"], []any{"missing", "corrupt", "wrong-target", "wrong-toolchain", "untrusted-boundary"}; !reflect.DeepEqual(got, want) {
++		t.Fatalf("repair matrix = %#v, want %#v", got, want)
++	}
++	for _, step := range []any{"complete-snapshot-validation", "source-audit", "registry-and-attestation-gates", "operation-private-build", "protected-publication", "journaled-commit"} {
++		if !containsValue(rebuild["required_pipeline"].([]any), step) {
++			t.Fatalf("repair pipeline misses %q", step)
++		}
++	}
++
++	gc := namedObjects(t, vector["gc_cases"])
++	assertNamedSet(t, gc, []string{"locked-mark-and-sweep-compiled-cache", "post-commit-gc-failure-is-maintenance-warning"})
++	sweep := gc["locked-mark-and-sweep-compiled-cache"]
++	if sweep["only_lock"] != "manager-home-mutation-lock" || sweep["protected_boundary_revalidated"] != true || sweep["receipt_content_alone_is_live_reference"] != false {
++		t.Fatalf("locked GC boundary/reference model = %#v", sweep)
++	}
++	if sweep["artifact_executed"] != false || sweep["entry_adopted"] != false {
++		t.Fatalf("GC executes or adopts cache content: %#v", sweep)
++	}
++	if gc["post-commit-gc-failure-is-maintenance-warning"]["successful_installation_rolled_back"] != false {
++		t.Fatal("post-commit GC warning incorrectly rolls back installation")
++	}
++}
++
++func TestManagerLifecycleGenerationIsDeterministic(t *testing.T) {
++	one := t.TempDir()
++	two := t.TempDir()
++	writeManagerLifecycleVectors(one)
++	writeManagerLifecycleVectors(two)
++	left, err := os.ReadFile(filepath.Join(one, "manager-lifecycle.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	right, err := os.ReadFile(filepath.Join(two, "manager-lifecycle.json"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.Equal(left, right) {
++		t.Fatal("manager lifecycle generation is not deterministic")
++	}
++}
++
+ func TestGeneratedGoBuildFixtureContextAndIdentity(t *testing.T) {
+ 	root := repositoryRoot(t)
+ 	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "build-drivers.json"))
+diff --git a/tools/release_gate.py b/tools/release_gate.py
+index d7762d7f596c955c19d3afe79462247012f58f2d..97b268ee239bfd4584c9837d6ddc77dd23140772 100644
+--- a/tools/release_gate.py
++++ b/tools/release_gate.py
+@@ -12,6 +12,7 @@ from pathlib import Path
+ from typing import Any
+ 
+ from jsonschema import Draft202012Validator, FormatChecker
++from referencing import Registry, Resource
+ 
+ 
+ ROOT = Path(__file__).resolve().parents[1]
+@@ -37,6 +38,90 @@ RETIRED_DESCRIPTOR_STEM = "curator" + "-build"
+ # The schema-6 build-source digest algorithm namespace shares the retired stem
+ # but is a different, byte-frozen identifier.
+ BUILD_SOURCE_ALGORITHM_NAMESPACE = RETIRED_DESCRIPTOR_STEM + "-source"
++PROTOCOL_VERSION = "1.0.0-rc.5"
++CLAIM_PROTOCOL_VERSIONS = {
++    1: "1.0.0-rc.3",
++    2: "1.0.0-rc.4",
++    3: PROTOCOL_VERSION,
++}
++CLAIM_HISTORY_FROZEN_SHA256 = {
++    "schemas/v1/conformance-claim-v1.schema.json": "c9f49460618ccc8b1d7d2dfaf760fc6ad3a53a870a6685a685ddc148d3c87b3f",
++    "conformance/v1/schema-cases/conformance-claim-v1/valid.json": "799682489be118331135d91798db90b8d020cbb703207331824ab113f037693c",
++    "conformance/v1/schema-cases/conformance-claim-v1/invalid.json": "de9568757a2bb89c87702e47f6d9c162df24f5ee964f1ef49b9e191ed94b7017",
++    "schemas/v1/conformance-claim-v2.schema.json": "4c05a97a1aa9f7dafe629a406a853239928413e79e95488ac2b20ebd0c52a38c",
++    "conformance/v1/schema-cases/conformance-claim-v2/invalid-duplicate-classes.json": "2d74783021873fb41b0176205835624e56db4fa7fb3c0435c8dbcd0e05b58fc0",
++    "conformance/v1/schema-cases/conformance-claim-v2/invalid-protocol-version-rc3.json": "5558db5556576993d4abe93c0f4849380591f71c25173a77f2493448fbe11eef",
++    "conformance/v1/schema-cases/conformance-claim-v2/invalid-result-fail.json": "eeeecc9577f418b78a9a5edbaea9d6294d30f1d06886d6af9f56e64e271d8268",
++    "conformance/v1/schema-cases/conformance-claim-v2/invalid-schema-version-1.json": "aa5588297fb49d39eb39ca3052f6f97bb67236608b72cc9d0478b043cce6562f",
++    "conformance/v1/schema-cases/conformance-claim-v2/invalid-unknown-field.json": "d10459fefb4b07aa1ade03a0627fbcfe9cd790c99d5d6374c9de15c5f22dc9a3",
++    "conformance/v1/schema-cases/conformance-claim-v2/invalid.json": "79d244335cb2ddfb9c831aa38c31c6ca37c89f0704ad61a19032882b1bec8604",
++    "conformance/v1/schema-cases/conformance-claim-v2/valid.json": "f7e7cc86f33ea03ee9bb4d149e1dba29cf34f5ceaf5504df8a9e91c659a1835f",
++}
++RC5_REQUIRED_FILES = {
++    "decisions/0004-compile-only-build-drivers.md",
++    "schemas/v1/agent-skill-v6.schema.json",
++    "schemas/v1/csk-skill-v6.schema.json",
++    "schemas/v1/build-receipt-v1.schema.json",
++    "schemas/v1/install-marker-v2.schema.json",
++    "schemas/v1/conformance-claim-v1.schema.json",
++    "schemas/v1/conformance-claim-v2.schema.json",
++    "schemas/v1/conformance-claim-v3.schema.json",
++    "conformance/v1/schema-cases/index.json",
++    "conformance/v1/vectors/build-drivers.json",
++    "conformance/v1/vectors/manager-lifecycle.json",
++    "release/1.0.0-rc.5.json",
++}
++RC5_REQUIRED_MANIFEST_FILES = {
++    "schema-cases/index.json",
++    "vectors/build-drivers.json",
++    "vectors/manager-lifecycle.json",
++}
++RC5_REQUIRED_INDEXED_SCHEMAS = {
++    "agent-skill-v6.schema.json",
++    "csk-skill-v6.schema.json",
++    "build-receipt-v1.schema.json",
++    "install-marker-v2.schema.json",
++    "conformance-claim-v2.schema.json",
++    "conformance-claim-v3.schema.json",
++}
++RC5_MANAGER_DRY_RUN_CASES = {"compiled-cache-miss-is-read-only"}
++RC5_MANAGER_LIFECYCLE_CASES = {
++    "planning_cases": {"all-source-and-trust-gates-before-build"},
++    "build_order_cases": {"provider-first-and-lexical-command-order"},
++    "private_build_cases": {
++        "all-misses-stage-and-verify-before-home-lock",
++        "second-build-failure-preserves-persistent-state",
++    },
++    "cache_publication_cases": {
++        "publish-complete-immutable-entry-under-home-lock",
++        "concurrent-identical-winner",
++        "concurrent-determinism-mismatch",
++        "corrupt-live-entry",
++        "untrusted-cache-boundary",
++    },
++    "cross_project_cases": {
++        "two-project-success-preserves-both-consumers",
++        "successful-project-survives-other-project-rollback",
++    },
++    "transaction_cases": {
++        "deterministic-lock-order",
++        "deterministic-target-order-and-consumer-last",
++        "reverse-rollback-under-home-lock",
++    },
++    "recovery_cases": {
++        "interrupted-global-journal-recovered-by-transaction-id",
++        "install-recovery-runs-after-private-builds",
++    },
++    "status_cases": {
++        "compiled-installation-current",
++        "compiled-currentness-failure-matrix",
++    },
++    "repair_cases": {"repair-rebuilds-invalid-compiled-entry"},
++    "gc_cases": {
++        "locked-mark-and-sweep-compiled-cache",
++        "post-commit-gc-failure-is-maintenance-warning",
++    },
++}
+ 
+ 
+ class ReleaseFailure(RuntimeError):
+@@ -44,10 +129,268 @@ class ReleaseFailure(RuntimeError):
+ 
+ 
+ def load_json(path: Path) -> Any:
++    def object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
++        value: dict[str, Any] = {}
++        for key, item in pairs:
++            if key in value:
++                raise ReleaseFailure(f"{path}: duplicate JSON key {key!r}")
++            value[key] = item
++        return value
++
+     try:
+-        return json.loads(path.read_text(encoding="utf-8"))
++        return json.loads(
++            path.read_text(encoding="utf-8"),
++            object_pairs_hook=object_pairs,
++        )
+     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+-        raise ReleaseFailure(f"could not read {path.relative_to(ROOT)}: {exc}") from exc
++        try:
++            label = path.relative_to(ROOT)
++        except ValueError:
++            label = path
++        raise ReleaseFailure(f"could not read {label}: {exc}") from exc
++
++
++def sha256_identity(path: Path) -> str:
++    try:
++        return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
++    except OSError as exc:
++        raise ReleaseFailure(f"could not hash {path}: {exc}") from exc
++
++
++def current_suite_sha256() -> str:
++    return sha256_identity(ROOT / "conformance" / "v1" / "manifest.json")
++
++
++def named_cases(values: Any, label: str, required: set[str]) -> dict[str, dict[str, Any]]:
++    if not isinstance(values, list):
++        raise ReleaseFailure(f"{label} must be an array")
++    names = [
++        item.get("name") if isinstance(item, dict) else None
++        for item in values
++    ]
++    if any(not isinstance(name, str) or not name for name in names):
++        raise ReleaseFailure(f"{label} cases require non-empty names")
++    if len(names) != len(set(names)):
++        raise ReleaseFailure(f"{label} case names must be unique")
++    missing = sorted(required - set(names))
++    if missing:
++        raise ReleaseFailure(f"{label} is missing lifecycle cases: {missing}")
++    return {item["name"]: item for item in values}
++
++
++def validate_manifest_inventory() -> None:
++    suite = ROOT / "conformance" / "v1"
++    manifest = load_json(suite / "manifest.json")
++    if manifest.get("protocol_version") != PROTOCOL_VERSION:
++        raise ReleaseFailure(f"conformance manifest is not {PROTOCOL_VERSION}")
++    entries = manifest.get("files")
++    if not isinstance(entries, list):
++        raise ReleaseFailure("conformance manifest files must be an array")
++    paths: list[str] = []
++    hashes: dict[str, str] = {}
++    for entry in entries:
++        if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
++            raise ReleaseFailure("conformance manifest entry shape is invalid")
++        relative = entry.get("path")
++        digest = entry.get("sha256")
++        if not isinstance(relative, str) or not relative or not isinstance(digest, str):
++            raise ReleaseFailure("conformance manifest entry identity is invalid")
++        paths.append(relative)
++        hashes[relative] = digest
++    if paths != sorted(paths) or len(paths) != len(set(paths)):
++        raise ReleaseFailure("conformance manifest paths must be sorted and unique")
++
++    actual = sorted(
++        path.relative_to(suite).as_posix()
++        for path in suite.rglob("*")
++        if path.is_file()
++        and path.name != "manifest.json"
++        and "__pycache__" not in path.parts
++    )
++    if paths != actual:
++        raise ReleaseFailure("conformance manifest inventory is incomplete or stale")
++    missing_required = sorted(RC5_REQUIRED_MANIFEST_FILES - set(paths))
++    if missing_required:
++        raise ReleaseFailure(
++            f"{PROTOCOL_VERSION} manifest omits required files: {missing_required}"
++        )
++    for relative in paths:
++        if hashes[relative] != sha256_identity(suite / relative):
++            raise ReleaseFailure(f"conformance manifest hash is stale: {relative}")
++
++
++def validate_manager_lifecycle_release_surface() -> None:
++    suite = ROOT / "conformance" / "v1"
++    manager = load_json(suite / "vectors" / "manager-lifecycle.json")
++    build_drivers = load_json(suite / "vectors" / "build-drivers.json")
++    if not isinstance(manager, dict) or manager.get("schema_version") != 1:
++        raise ReleaseFailure("manager lifecycle vector is not schema 1")
++    named_cases(
++        manager.get("dry_run_cases"),
++        "manager compiled dry run",
++        RC5_MANAGER_DRY_RUN_CASES,
++    )
++    for field, required in RC5_MANAGER_LIFECYCLE_CASES.items():
++        named_cases(
++            manager.get(field),
++            f"manager lifecycle {field}",
++            required,
++        )
++
++    fixture = manager.get("compiled_build_fixture")
++    identity = (
++        build_drivers.get("portable_identity")
++        if isinstance(build_drivers, dict)
++        else None
++    )
++    if not isinstance(fixture, dict) or not isinstance(identity, dict):
++        raise ReleaseFailure("compiled lifecycle/build-driver identity is missing")
++    if fixture.get("source_vector") != "build-drivers.json#/portable_identity":
++        raise ReleaseFailure("compiled lifecycle fixture has a stale source vector")
++    if (
++        fixture.get("execution_policy") != PORTABLE_EXECUTION_POLICY
++        or identity.get("execution_policy") != PORTABLE_EXECUTION_POLICY
++    ):
++        raise ReleaseFailure("compiled lifecycle has a stale execution policy")
++    for lifecycle_field, identity_field in {
++        "execution_policy": "execution_policy",
++        "build_input": "build_input",
++        "cache_key": "cache_key",
++        "stored_receipt": "stored_receipt",
++        "receipt_sha256": "receipt_sha256",
++        "artifact": "artifact",
++    }.items():
++        if fixture.get(lifecycle_field) != identity.get(identity_field):
++            raise ReleaseFailure(
++                f"compiled lifecycle {lifecycle_field} differs from build-driver {identity_field}"
++            )
++    build_input = identity.get("build_input")
++    if (
++        not isinstance(build_input, dict)
++        or not isinstance(build_input.get("policy"), dict)
++        or build_input["policy"].get("execution_policy")
++        != PORTABLE_EXECUTION_POLICY
++        or fixture.get("logical_command") != build_input.get("command")
++    ):
++        raise ReleaseFailure("compiled lifecycle fixture is not bound to its portable input")
++
++
++def validate_protocol_artifacts(version: str) -> None:
++    if version != PROTOCOL_VERSION:
++        return
++
++    missing = sorted(path for path in RC5_REQUIRED_FILES if not (ROOT / path).is_file())
++    if missing:
++        raise ReleaseFailure(
++            f"{PROTOCOL_VERSION} required artifacts are missing: {missing}"
++        )
++
++    schema_expectations = {
++        "agent-skill-v6.schema.json": (6, None),
++        "csk-skill-v6.schema.json": (6, None),
++        "build-receipt-v1.schema.json": (1, None),
++        "install-marker-v2.schema.json": (2, None),
++        "conformance-claim-v1.schema.json": (1, CLAIM_PROTOCOL_VERSIONS[1]),
++        "conformance-claim-v2.schema.json": (2, CLAIM_PROTOCOL_VERSIONS[2]),
++        "conformance-claim-v3.schema.json": (3, CLAIM_PROTOCOL_VERSIONS[3]),
++    }
++    schemas = ROOT / "schemas" / "v1"
++    for name, (schema_version, protocol_version) in schema_expectations.items():
++        schema = load_json(schemas / name)
++        properties = schema.get("properties")
++        if not isinstance(properties, dict):
++            raise ReleaseFailure(f"{name} has no properties")
++        if properties.get("schema_version") != {"const": schema_version}:
++            raise ReleaseFailure(f"{name} has the wrong schema_version identity")
++        if (
++            protocol_version is not None
++            and properties.get("protocol_version") != {"const": protocol_version}
++        ):
++            raise ReleaseFailure(f"{name} has the wrong protocol_version identity")
++    marker = load_json(schemas / "install-marker-v2.schema.json")
++    if marker.get("properties", {}).get("skill_schema_version", {}).get("maximum") != 6:
++        raise ReleaseFailure("install-marker-v2 does not admit manifest schema 6")
++
++    for relative, expected in CLAIM_HISTORY_FROZEN_SHA256.items():
++        actual = sha256_identity(ROOT / relative).removeprefix("sha256:")
++        if actual != expected:
++            raise ReleaseFailure(f"historical claim artifact changed: {relative}")
++
++    validate_manifest_inventory()
++    index = load_json(ROOT / "conformance" / "v1" / "schema-cases" / "index.json")
++    if not isinstance(index, list):
++        raise ReleaseFailure("schema-case index must be an array")
++    indexed = {
++        item.get("schema")
++        for item in index
++        if isinstance(item, dict) and isinstance(item.get("schema"), str)
++    }
++    missing_schemas = sorted(RC5_REQUIRED_INDEXED_SCHEMAS - indexed)
++    if missing_schemas:
++        raise ReleaseFailure(
++            f"{PROTOCOL_VERSION} schema-case index is incomplete: {missing_schemas}"
++        )
++
++    validate_manager_lifecycle_release_surface()
++    decision = (
++        ROOT / "decisions" / "0004-compile-only-build-drivers.md"
++    ).read_text(encoding="utf-8")
++    for required_text in (
++        "# Decision 0004:",
++        "Manifest schema 6",
++        "go-v1",
++        "## Rejected alternatives",
++    ):
++        if required_text not in decision:
++            raise ReleaseFailure(
++                f"decision 0004 is stale: missing {required_text!r}"
++            )
++
++
++def validate_conformance_claim(path: Path, version: str) -> None:
++    schema_version = {
++        protocol_version: version_number
++        for version_number, protocol_version in CLAIM_PROTOCOL_VERSIONS.items()
++    }.get(version)
++    if schema_version is None:
++        raise ReleaseFailure(f"claim verification is not defined for {version}")
++    schemas: dict[str, Any] = {}
++    for schema_path in sorted((ROOT / "schemas" / "v1").glob("*.json")):
++        document = load_json(schema_path)
++        schema_id = document.get("$id")
++        if isinstance(schema_id, str):
++            schemas[schema_id] = document
++    registry = Registry().with_resources(
++        (
++            schema_id,
++            Resource.from_contents(document),
++        )
++        for schema_id, document in schemas.items()
++    )
++    claim_schema = load_json(
++        ROOT
++        / "schemas"
++        / "v1"
++        / f"conformance-claim-v{schema_version}.schema.json"
++    )
++    claim = load_json(path)
++    errors = sorted(
++        Draft202012Validator(
++            claim_schema,
++            registry=registry,
++            format_checker=FormatChecker(),
++        ).iter_errors(claim),
++        key=lambda item: list(item.absolute_path),
++    )
++    if errors:
++        raise ReleaseFailure(
++            f"{path}: invalid {version} conformance claim: {errors[0].message}"
++        )
++    expected_suite = current_suite_sha256()
++    if claim.get("suite_sha256") != expected_suite:
++        raise ReleaseFailure(
++            f"{path}: suite_sha256 does not identify the current {version} suite"
++        )
+ 
+ 
+ def git(*arguments: str) -> str:
+@@ -201,12 +544,16 @@ def main() -> int:
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--version", required=True)
+     parser.add_argument("--commit", default="HEAD")
++    parser.add_argument("--claim", action="append", type=Path, default=[])
+     arguments = parser.parse_args()
+     try:
+         release_commit = git("rev-parse", f"{arguments.commit}^{{commit}}")
+         validate_checkout(release_commit)
+         validate_version(arguments.version)
+         validate_repository_descriptor(arguments.version)
++        validate_protocol_artifacts(arguments.version)
++        for claim in arguments.claim:
++            validate_conformance_claim(claim, arguments.version)
+         if "-" not in arguments.version:
+             validate_reviews(arguments.version, release_commit)
+     except ReleaseFailure as exc:
+diff --git a/tools/test_release_gate.py b/tools/test_release_gate.py
+index 48090322588423f17188cbc768e98a1aa6d7a72b..6466d920b98757b0ba7ec215872a92a6556e9121 100644
+--- a/tools/test_release_gate.py
++++ b/tools/test_release_gate.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ 
+ import json
+ import hashlib
++import shutil
+ import subprocess
+ import tempfile
+ import unittest
+@@ -271,5 +272,175 @@ class StableReleaseGateTests(unittest.TestCase):
+                 release_gate.validate_version(version)
+ 
+ 
++class ProtocolRC5ReleaseGateTests(unittest.TestCase):
++    VERSION = "1.0.0-rc.5"
++
++    def setUp(self) -> None:
++        self.temporary = tempfile.TemporaryDirectory()
++        self.root = Path(self.temporary.name)
++        shutil.copytree(
++            SOURCE_ROOT,
++            self.root,
++            dirs_exist_ok=True,
++            ignore=shutil.ignore_patterns(".git", "__pycache__"),
++        )
++        self.root_patch = patch.object(release_gate, "ROOT", self.root)
++        self.root_patch.start()
++
++    def tearDown(self) -> None:
++        self.root_patch.stop()
++        self.temporary.cleanup()
++
++    @staticmethod
++    def _write_json(path: Path, value: object) -> None:
++        path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
++
++    def _refresh_manifest_entry(self, relative: str) -> None:
++        suite = self.root / "conformance" / "v1"
++        path = suite / relative
++        manifest_path = suite / "manifest.json"
++        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
++        for entry in manifest["files"]:
++            if entry["path"] == relative:
++                entry["sha256"] = (
++                    "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
++                )
++                break
++        else:
++            self.fail(f"manifest does not list {relative}")
++        self._write_json(manifest_path, manifest)
++
++    def _valid_claim(self) -> dict[str, object]:
++        claim = json.loads(
++            (
++                self.root
++                / "conformance"
++                / "v1"
++                / "schema-cases"
++                / "conformance-claim-v3"
++                / "valid.json"
++            ).read_text(encoding="utf-8")
++        )
++        claim["suite_sha256"] = release_gate.current_suite_sha256()
++        return claim
++
++    def test_accepts_complete_rc5_artifact_set(self) -> None:
++        release_gate.validate_protocol_artifacts(self.VERSION)
++
++    def test_rejects_each_missing_required_artifact(self) -> None:
++        for relative in sorted(release_gate.RC5_REQUIRED_FILES):
++            with self.subTest(path=relative):
++                path = self.root / relative
++                payload = path.read_bytes()
++                path.unlink()
++                try:
++                    with self.assertRaises(release_gate.ReleaseFailure):
++                        release_gate.validate_protocol_artifacts(self.VERSION)
++                finally:
++                    path.parent.mkdir(parents=True, exist_ok=True)
++                    path.write_bytes(payload)
++
++    def test_rejects_renamed_v6_schema(self) -> None:
++        source = self.root / "schemas" / "v1" / "agent-skill-v6.schema.json"
++        source.rename(source.with_name("agent-skill-v6-renamed.schema.json"))
++        with self.assertRaisesRegex(
++            release_gate.ReleaseFailure, "required artifacts are missing"
++        ):
++            release_gate.validate_protocol_artifacts(self.VERSION)
++
++    def test_rejects_missing_required_manifest_entry(self) -> None:
++        manifest_path = self.root / "conformance" / "v1" / "manifest.json"
++        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
++        manifest["files"] = [
++            entry
++            for entry in manifest["files"]
++            if entry["path"] != "vectors/manager-lifecycle.json"
++        ]
++        self._write_json(manifest_path, manifest)
++        with self.assertRaises(release_gate.ReleaseFailure):
++            release_gate.validate_protocol_artifacts(self.VERSION)
++
++    def test_rejects_removed_lifecycle_case_with_updated_manifest_hash(self) -> None:
++        relative = "vectors/manager-lifecycle.json"
++        path = self.root / "conformance" / "v1" / relative
++        vector = json.loads(path.read_text(encoding="utf-8"))
++        vector["recovery_cases"] = [
++            case
++            for case in vector["recovery_cases"]
++            if case["name"]
++            != "interrupted-global-journal-recovered-by-transaction-id"
++        ]
++        self._write_json(path, vector)
++        self._refresh_manifest_entry(relative)
++        with self.assertRaisesRegex(release_gate.ReleaseFailure, "lifecycle"):
++            release_gate.validate_protocol_artifacts(self.VERSION)
++
++    def test_rejects_stale_compiled_fixture_with_updated_manifest_hash(self) -> None:
++        relative = "vectors/manager-lifecycle.json"
++        path = self.root / "conformance" / "v1" / relative
++        vector = json.loads(path.read_text(encoding="utf-8"))
++        vector["compiled_build_fixture"]["execution_policy"] = "hardened-worker-v1"
++        self._write_json(path, vector)
++        self._refresh_manifest_entry(relative)
++        with self.assertRaisesRegex(release_gate.ReleaseFailure, "lifecycle"):
++            release_gate.validate_protocol_artifacts(self.VERSION)
++
++    def test_rejects_redefined_claim_v1_and_v2_history(self) -> None:
++        for schema_name, protocol_version in (
++            ("conformance-claim-v1.schema.json", self.VERSION),
++            ("conformance-claim-v2.schema.json", self.VERSION),
++        ):
++            with self.subTest(schema=schema_name):
++                path = self.root / "schemas" / "v1" / schema_name
++                payload = path.read_bytes()
++                schema = json.loads(payload)
++                schema["properties"]["protocol_version"]["const"] = protocol_version
++                self._write_json(path, schema)
++                try:
++                    with self.assertRaises(release_gate.ReleaseFailure):
++                        release_gate.validate_protocol_artifacts(self.VERSION)
++                finally:
++                    path.write_bytes(payload)
++
++    def test_rejects_claim_v3_transition_mismatch(self) -> None:
++        path = self.root / "schemas" / "v1" / "conformance-claim-v3.schema.json"
++        schema = json.loads(path.read_text(encoding="utf-8"))
++        schema["properties"]["protocol_version"]["const"] = "1.0.0-rc.4"
++        self._write_json(path, schema)
++        with self.assertRaises(release_gate.ReleaseFailure):
++            release_gate.validate_protocol_artifacts(self.VERSION)
++
++    def test_accepts_claim_for_current_rc5_suite(self) -> None:
++        path = self.root / "claim.json"
++        self._write_json(path, self._valid_claim())
++        release_gate.validate_conformance_claim(path, self.VERSION)
++
++    def test_rejects_stale_suite_hash_as_rc5_evidence(self) -> None:
++        claim = self._valid_claim()
++        claim["suite_sha256"] = "sha256:" + "0" * 64
++        path = self.root / "claim.json"
++        self._write_json(path, claim)
++        with self.assertRaisesRegex(
++            release_gate.ReleaseFailure, "current 1.0.0-rc.5 suite"
++        ):
++            release_gate.validate_conformance_claim(path, self.VERSION)
++
++    def test_rejects_duplicate_suite_hash_in_rc5_claim(self) -> None:
++        claim = self._valid_claim()
++        stale_suite = "sha256:" + "0" * 64
++        payload = json.dumps(claim)
++        payload = payload.replace(
++            f'"suite_sha256": "{claim["suite_sha256"]}"',
++            (
++                f'"suite_sha256": "{claim["suite_sha256"]}", '
++                f'"suite_sha256": "{stale_suite}"'
++            ),
++        )
++        path = self.root / "claim.json"
++        path.write_text(payload, encoding="utf-8")
++        with self.assertRaisesRegex(release_gate.ReleaseFailure, "duplicate JSON key"):
++            release_gate.validate_conformance_claim(path, self.VERSION)
++
++
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/tools/test_validate.py b/tools/test_validate.py
+index 23c88aad2b231192476149e57250b39e0643b785..d0af9432746619905167f7095ca0aaffc1a0e331 100644
+--- a/tools/test_validate.py
++++ b/tools/test_validate.py
+@@ -638,6 +638,79 @@ class RepositoryDescriptorIdentityTests(unittest.TestCase):
+         self.assertFalse(record["additionalProperties"])
+ 
+ 
++class ManagerLifecycleValidationTests(unittest.TestCase):
++    def vectors(self) -> tuple[dict, dict]:
++        lifecycle = validate.load_json(
++            validate.SUITE / "vectors" / "manager-lifecycle.json"
++        )
++        build_drivers = validate.load_json(
++            validate.SUITE / "vectors" / "build-drivers.json"
++        )
++        return lifecycle, build_drivers
++
++    def test_candidate_requires_all_22_compiled_lifecycle_cases(self) -> None:
++        lifecycle, build_drivers = self.vectors()
++        self.assertEqual(
++            sum(
++                len(names)
++                for names in validate.MANAGER_COMPILED_LIFECYCLE_CASES.values()
++            ),
++            21,
++        )
++        self.assertIn(
++            "compiled-cache-miss-is-read-only",
++            validate.MANAGER_COMPILED_DRY_RUN_CASES,
++        )
++        validate.validate_manager_lifecycle_vectors(lifecycle, build_drivers)
++
++    def test_each_compiled_lifecycle_group_fails_closed(self) -> None:
++        for field, required in validate.MANAGER_COMPILED_LIFECYCLE_CASES.items():
++            for name in sorted(required):
++                with self.subTest(field=field, name=name):
++                    lifecycle, build_drivers = self.vectors()
++                    lifecycle[field] = [
++                        case for case in lifecycle[field] if case["name"] != name
++                    ]
++                    with self.assertRaises(validate.ValidationFailure):
++                        validate.validate_manager_lifecycle_vectors(
++                            lifecycle, build_drivers
++                        )
++
++    def test_compiled_dry_run_fails_closed(self) -> None:
++        lifecycle, build_drivers = self.vectors()
++        lifecycle["dry_run_cases"] = [
++            case
++            for case in lifecycle["dry_run_cases"]
++            if case["name"] != "compiled-cache-miss-is-read-only"
++        ]
++        with self.assertRaises(validate.ValidationFailure):
++            validate.validate_manager_lifecycle_vectors(lifecycle, build_drivers)
++
++    def test_lifecycle_schema_and_portable_identity_fail_closed(self) -> None:
++        mutations = {
++            "schema version": lambda lifecycle: lifecycle.__setitem__(
++                "schema_version", 2
++            ),
++            "source vector": lambda lifecycle: lifecycle[
++                "compiled_build_fixture"
++            ].__setitem__("source_vector", "build-drivers.json#/cache_identity"),
++            "execution policy": lambda lifecycle: lifecycle[
++                "compiled_build_fixture"
++            ].__setitem__("execution_policy", "hardened-worker-v1"),
++            "cache key": lambda lifecycle: lifecycle[
++                "compiled_build_fixture"
++            ].__setitem__("cache_key", "sha256:" + "0" * 64),
++        }
++        for label, mutate in mutations.items():
++            with self.subTest(label=label):
++                lifecycle, build_drivers = self.vectors()
++                mutate(lifecycle)
++                with self.assertRaises(validate.ValidationFailure):
++                    validate.validate_manager_lifecycle_vectors(
++                        lifecycle, build_drivers
++                    )
++
++
+ class BuildDriverGoldenSuiteTests(unittest.TestCase):
+     PORTABLE_CACHE_KEY = (
+         "sha256:529370122ae11e2e961d5265b1a020e046bcd43165b2eb96b05e73a51187ac9b"
+diff --git a/tools/validate.py b/tools/validate.py
+index dd513f61a731e1536baa2373b2afe8168f70c16a..b01d41eb2fceb19487322c18a3d55c6ff439a4b3 100644
+--- a/tools/validate.py
++++ b/tools/validate.py
+@@ -1555,6 +1555,44 @@ TOOLCHAIN_CASES = {
+     "selected-go-outside-goroot",
+     "toolchain-tree-mutation-during-use",
+ }
++MANAGER_COMPILED_DRY_RUN_CASES = {"compiled-cache-miss-is-read-only"}
++MANAGER_COMPILED_LIFECYCLE_CASES = {
++    "planning_cases": {"all-source-and-trust-gates-before-build"},
++    "build_order_cases": {"provider-first-and-lexical-command-order"},
++    "private_build_cases": {
++        "all-misses-stage-and-verify-before-home-lock",
++        "second-build-failure-preserves-persistent-state",
++    },
++    "cache_publication_cases": {
++        "publish-complete-immutable-entry-under-home-lock",
++        "concurrent-identical-winner",
++        "concurrent-determinism-mismatch",
++        "corrupt-live-entry",
++        "untrusted-cache-boundary",
++    },
++    "cross_project_cases": {
++        "two-project-success-preserves-both-consumers",
++        "successful-project-survives-other-project-rollback",
++    },
++    "transaction_cases": {
++        "deterministic-lock-order",
++        "deterministic-target-order-and-consumer-last",
++        "reverse-rollback-under-home-lock",
++    },
++    "recovery_cases": {
++        "interrupted-global-journal-recovered-by-transaction-id",
++        "install-recovery-runs-after-private-builds",
++    },
++    "status_cases": {
++        "compiled-installation-current",
++        "compiled-currentness-failure-matrix",
++    },
++    "repair_cases": {"repair-rebuilds-invalid-compiled-entry"},
++    "gc_cases": {
++        "locked-mark-and-sweep-compiled-cache",
++        "post-commit-gc-failure-is-maintenance-warning",
++    },
++}
+ 
+ 
+ def frame_build_source(records: list[tuple[str, bytes]]) -> bytes:
+@@ -1654,6 +1692,60 @@ def validate_build_driver_vectors() -> None:
+     validate_build_driver_cases(vector, cache_key, receipt_hash)
+ 
+ 
++def validate_manager_lifecycle_vectors(manager: Any, build_drivers: Any) -> None:
++    """Require the complete schema-6 compiled lifecycle surface.
++
++    The lifecycle vector deliberately reuses the current portable go-v1
++    identity. Keeping this check separate from manifest hashing prevents a
++    self-consistent regeneration from silently certifying a dropped lifecycle
++    group or a stale pre-execution-policy identity.
++    """
++    if not isinstance(manager, dict) or manager.get("schema_version") != 1:
++        raise ValidationFailure("manager lifecycle vector is not schema 1")
++    require_named_cases(
++        manager.get("dry_run_cases"),
++        "manager compiled dry run",
++        MANAGER_COMPILED_DRY_RUN_CASES,
++    )
++    for field, required in MANAGER_COMPILED_LIFECYCLE_CASES.items():
++        require_named_cases(manager.get(field), f"manager lifecycle {field}", required)
++
++    if not isinstance(build_drivers, dict):
++        raise ValidationFailure("compiled lifecycle build-driver vector is missing")
++    fixture = manager.get("compiled_build_fixture")
++    identity = build_drivers.get("portable_identity")
++    if not isinstance(fixture, dict) or not isinstance(identity, dict):
++        raise ValidationFailure("compiled lifecycle/build-driver identity is missing")
++    if fixture.get("source_vector") != "build-drivers.json#/portable_identity":
++        raise ValidationFailure("compiled lifecycle fixture has a stale source vector")
++    if (
++        fixture.get("execution_policy") != PORTABLE_EXECUTION_POLICY
++        or identity.get("execution_policy") != PORTABLE_EXECUTION_POLICY
++    ):
++        raise ValidationFailure("compiled lifecycle does not name the portable execution policy")
++    build_input = identity.get("build_input")
++    if (
++        not isinstance(build_input, dict)
++        or not isinstance(build_input.get("policy"), dict)
++        or build_input["policy"].get("execution_policy") != PORTABLE_EXECUTION_POLICY
++    ):
++        raise ValidationFailure("compiled lifecycle portable input omits its execution policy")
++    for lifecycle_field, identity_field in {
++        "execution_policy": "execution_policy",
++        "build_input": "build_input",
++        "cache_key": "cache_key",
++        "stored_receipt": "stored_receipt",
++        "receipt_sha256": "receipt_sha256",
++        "artifact": "artifact",
++    }.items():
++        if fixture.get(lifecycle_field) != identity.get(identity_field):
++            raise ValidationFailure(
++                f"compiled lifecycle {lifecycle_field} differs from build-driver {identity_field}"
++            )
++    if fixture.get("logical_command") != build_input.get("command"):
++        raise ValidationFailure("compiled lifecycle logical command differs from its build input")
++
++
+ def validate_build_driver_cache_identity(vector: Any, portable_input: Any, portable_key: str) -> None:
+     """Prove the portable identity misses the two non-portable inputs.
+ 
+@@ -1986,7 +2078,11 @@ def validate_vector_semantics() -> None:
+     require_named_cases(
+         manager.get("dry_run_cases"),
+         "manager dry run",
+-        {"project-upgrade", "global-upgrade"},
++        {"project-upgrade", "global-upgrade", *MANAGER_COMPILED_DRY_RUN_CASES},
++    )
++    validate_manager_lifecycle_vectors(
++        manager,
++        load_json(SUITE / "vectors" / "build-drivers.json"),
+     )
+ 
+     acquisition = load_json(SUITE / "vectors" / "external-repository-acquisition.json")

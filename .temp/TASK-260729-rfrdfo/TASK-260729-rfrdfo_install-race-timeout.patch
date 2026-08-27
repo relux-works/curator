@@ -1,0 +1,981 @@
+--- a/internal/install/cache_conformance_test.go
++++ b/internal/install/cache_conformance_test.go
+@@ -60,6 +60,7 @@
+ // published vocabulary, so the published value is compared directly rather than
+ // through a private translation table.
+ func TestAuthoritativeCacheOutcomesDriveInstallation(t *testing.T) {
++	t.Parallel()
+ 	document := authoritativeDriverCases(t)
+ 	bound := 0
+ 	for _, published := range document.PositiveCases {
+@@ -174,6 +175,7 @@
+ // rebuild the command privately, never adopt the refused artifact, and never
+ // report the refused entry as a hit.
+ func TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted(t *testing.T) {
++	t.Parallel()
+ 	document := authoritativeDriverCases(t)
+ 	var cases []authoritativeRejectionCase
+ 	for _, published := range document.RejectionCases {
+--- a/internal/install/commit_test.go
++++ b/internal/install/commit_test.go
+@@ -194,6 +194,7 @@
+ // TestCommitOrdersTargetClassesWithConsumerLast proves the commit walks the
+ // normative classes in order and updates the machine-wide consumer ledger last.
+ func TestCommitOrdersTargetClassesWithConsumerLast(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -236,6 +237,7 @@
+ // pins the two halves of the consumer-ledger rule on a machine that has never
+ // installed anything.
+ func TestConsumerLedgerIsAbsentAfterAFailedFirstInstallAndCommitsLastOnSuccess(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -263,6 +265,7 @@
+ // proves a publication fault aborts before the first target swap and preserves
+ // every pre-existing immutable cache entry.
+ func TestCachePublicationFailureLeavesInstallationAndProtectedCacheUntouched(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha", "beta")
+ 	e.declare("build-skill")
+@@ -357,6 +360,7 @@
+ // prior cache verdict is back, that the reversal really ran, and that nothing
+ // the installation owns moved.
+ func TestAFailedCommitRestoresTheBuildCacheItReplaced(t *testing.T) {
++	t.Parallel()
+ 	for name, testCase := range map[string]struct {
+ 		// prior is the cache verdict the run finds and must restore. The zero
+ 		// value models a cold miss, where the reversal has to withdraw the entry
+@@ -448,6 +452,7 @@
+ // fault mid-commit rolls every target back, and the cache entry that was
+ // replaced to serve that commit goes back with it.
+ func TestARolledBackTargetCommitRestoresTheBuildCacheItReplaced(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -487,6 +492,7 @@
+ // Keeping it is always safe: an entry no installation references is collected
+ // by the ordinary sweep.
+ func TestAnInFlightTransactionKeepsThePublishedCacheEntry(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -535,6 +541,7 @@
+ // run has to carry it through: it publishes no reversal it could not make, but
+ // it must stop claiming the live cache is unchanged.
+ func TestAPublicationThatChangedTheCacheIsReportedAsRetained(t *testing.T) {
++	t.Parallel()
+ 	for name, testCase := range map[string]struct {
+ 		fault        func(buildmeta.CacheKey) error
+ 		wantRetained bool
+@@ -595,6 +602,7 @@
+ // honesty a failed publication does — the alternative is an installation report
+ // that says the live build cache is unchanged while it is not.
+ func TestAReversalThatDidNotCompleteIsReportedAsRetained(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -645,6 +653,7 @@
+ // build cache boundary carries manager-private locations and untrusted detail,
+ // so it reaches Result.Errors only through the bounded, redacted rendering.
+ func TestBuildPublicationFailuresAreRedactedInTheResult(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -709,6 +718,7 @@
+ // deliberately serializes lock-class acquisition per process. Sharing one
+ // process would test that guard rather than the ledger merge this asserts.
+ func TestConcurrentProjectInstallsPreserveBothConsumers(t *testing.T) {
++	t.Parallel()
+ 	home := t.TempDir()
+ 	skillsRoot := t.TempDir()
+ 	first := newEnvIn(t, home, skillsRoot)
+@@ -782,6 +792,7 @@
+ // shared state must survive, because the rolled-back preimage was read under
+ // the same lock and therefore cannot predate that commit.
+ func TestRollbackCannotRestoreOverAnotherProjectsCommittedSharedTargets(t *testing.T) {
++	t.Parallel()
+ 	home := t.TempDir()
+ 	skillsRoot := t.TempDir()
+ 	failing := newEnvIn(t, home, skillsRoot)
+@@ -825,6 +836,7 @@
+ // the machine and proves the next installation finishes it before it changes
+ // anything of its own.
+ func TestRecoveryCompletesBeforeAnyNewMutation(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -896,6 +908,7 @@
+ // must discard its staging and restart rather than commit against the
+ // generation it observed.
+ func TestStaleInstalledGenerationRestartsInsteadOfApplyingTheOldPlan(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -947,6 +960,7 @@
+ // TestMaintenanceFailureAfterCommitIsAWarning proves post-commit garbage
+ // collection cannot revert a durable installation.
+ func TestMaintenanceFailureAfterCommitIsAWarning(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -970,6 +984,7 @@
+ // TestNoSharedTargetChangesBeforeTheManagerHomeLock proves every persistent
+ // change of an installation happens inside the serialized commit phase.
+ func TestNoSharedTargetChangesBeforeTheManagerHomeLock(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -999,6 +1014,7 @@
+ // TestGlobalCommitCarriesNoConsumerLedger pins the one class difference between
+ // the two scopes: the machine-wide scope registers no runtime consumer.
+ func TestGlobalCommitCarriesNoConsumerLedger(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.globalDeclare("skill-a")
+@@ -1024,6 +1040,7 @@
+ // TestStagedPlanRejectsTwoProducersClaimingOneLivePath keeps a producer defect
+ // from reaching the journal as an ambiguous target set.
+ func TestStagedPlanRejectsTwoProducersClaimingOneLivePath(t *testing.T) {
++	t.Parallel()
+ 	var plan staging.Plan
+ 	plan.Replace(staging.ClassContext, "project/skill-a", "/live/skill-a", "/staged/one")
+ 	plan.Replace(staging.ClassAdapterLedger, "adapter/skill-a", "/live/skill-a", "/staged/two")
+@@ -1060,6 +1077,7 @@
+ // that makes an adapter ledger meaningful: a ledger must never claim an entry
+ // that is not durable yet.
+ func TestAdapterLedgerCommitsAfterTheMirrorsItClaims(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+--- a/internal/install/diagnostics_test.go
++++ b/internal/install/diagnostics_test.go
+@@ -8,6 +8,7 @@
+ )
+ 
+ func TestRedactDiagnosticReplacesEveryAbsoluteLocation(t *testing.T) {
++	t.Parallel()
+ 	for name, testCase := range map[string]struct{ detail, want string }{
+ 		"unix path": {
+ 			detail: "inspect cache boundary: lstat /Users/operator/.curator/cache/build/go-v1/abcd: denied",
+@@ -77,6 +78,7 @@
+ // TestRedactDiagnosticCannotDriveATerminal proves untrusted compiler, receipt,
+ // and cache bytes cannot forge a second report line or emit an escape sequence.
+ func TestRedactDiagnosticCannotDriveATerminal(t *testing.T) {
++	t.Parallel()
+ 	detail := "artifact hash mismatch\r\n\x1b[2Jerror: everything is fine\x00\u200bnot really"
+ 	got := RedactDiagnostic(detail)
+ 	for _, forbidden := range []string{"\n", "\r", "\x1b", "\x00", "\u200b"} {
+@@ -90,6 +92,7 @@
+ }
+ 
+ func TestRedactDiagnosticIsBounded(t *testing.T) {
++	t.Parallel()
+ 	got := RedactDiagnostic(strings.Repeat("unbounded compiler output ", 400))
+ 	if count := utf8.RuneCountInString(got); count != maxDiagnosticRunes {
+ 		t.Fatalf("bounded detail is %d runes, want exactly %d", count, maxDiagnosticRunes)
+@@ -104,6 +107,7 @@
+ }
+ 
+ func TestRedactDiagnosticKeepsInvalidUTF8Out(t *testing.T) {
++	t.Parallel()
+ 	got := RedactDiagnostic("receipt \xff\xfe bytes")
+ 	if !utf8.ValidString(got) {
+ 		t.Fatalf("redacted detail is not valid UTF-8: %q", got)
+@@ -116,6 +120,7 @@
+ // TestPlanLinesRedactAnUntrustedReason proves the installation report itself,
+ // not only the status surface, publishes bounded and redacted details.
+ func TestPlanLinesRedactAnUntrustedReason(t *testing.T) {
++	t.Parallel()
+ 	build := PlannedBuild{
+ 		skill: "build-skill", command: "tool", outcome: BuildWouldRebuildUntrustedCache,
+ 		reason: "inspect cache boundary: lstat /Users/operator/.curator/cache/build/go-v1/abcd: denied",
+@@ -134,6 +139,7 @@
+ // through the same bounded, path-redacted rendering as a report line, so a
+ // blocking plan cannot publish a manager-private location through Result.Errors.
+ func TestBuildFailuresAreRedactedInTheResult(t *testing.T) {
++	t.Parallel()
+ 	var result Result
+ 	result.failBuild(fmt.Errorf(
+ 		"build cache refused reuse: build-skill.tool is unsupported: " +
+--- a/internal/install/dryrun_conformance_test.go
++++ b/internal/install/dryrun_conformance_test.go
+@@ -163,6 +163,7 @@
+ // published forbidden effect individually. An effect with no binding fails the
+ // test rather than passing unasserted.
+ func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
++	t.Parallel()
+ 	for _, published := range authoritativeDryRunCases(t) {
+ 		published := published
+ 		t.Run(published.Name, func(t *testing.T) {
+--- a/internal/install/generation_test.go
++++ b/internal/install/generation_test.go
+@@ -121,6 +121,7 @@
+ // indistinguishable from never having changed, and only binding the generation to
+ // the parsed bytes can catch a transient generation in between.
+ func TestDeclarationGenerationIsContentAddressed(t *testing.T) {
++	t.Parallel()
+ 	path := filepath.Join(t.TempDir(), "Skillfile.json")
+ 	if absent := documentGeneration(path); absent != documentAbsent {
+ 		t.Fatalf("an absent document must be explicit: %s", absent)
+@@ -154,6 +155,7 @@
+ // state it cannot read: it has to reproduce the same marker rather than restart
+ // forever or, worse, compare unequal markers and give up after MaxRestarts.
+ func TestDocumentGenerationIsStableWhenUnreadable(t *testing.T) {
++	t.Parallel()
+ 	path := filepath.Join(t.TempDir(), "Skillfile.json")
+ 	if err := os.Mkdir(path, 0o755); err != nil {
+ 		t.Fatal(err)
+@@ -172,6 +174,7 @@
+ // change once the file settles back, which is the ABA restart the install cases
+ // below rely on. A marker observation keeps its path-digest reader.
+ func TestObservationsRecheckDocumentsAgainstTheParsedBytes(t *testing.T) {
++	t.Parallel()
+ 	dir := t.TempDir()
+ 	path := filepath.Join(dir, "Skillfile.json")
+ 	writeDocument(t, path, `{"generation": "A"}`)
+--- a/internal/install/install_test.go
++++ b/internal/install/install_test.go
+@@ -122,6 +122,7 @@
+ }
+ 
+ func TestEndToEndInstall(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -262,6 +263,7 @@
+ }
+ 
+ func TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook(t *testing.T) {
++	t.Parallel()
+ 	if runtime.GOOS == "windows" {
+ 		t.Skip("executes POSIX skill commands")
+ 	}
+@@ -353,6 +355,7 @@
+ }
+ 
+ func TestSecondInstallIsUpToDate(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -370,6 +373,7 @@
+ }
+ 
+ func TestTamperTriggersReinstall(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -392,6 +396,7 @@
+ }
+ 
+ func TestRemovedSkillCleanedUp(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-b")
+@@ -415,6 +420,7 @@
+ }
+ 
+ func TestDryRunTouchesNothing(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -446,6 +452,7 @@
+ }
+ 
+ func TestGitignoreGateSkips(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -465,6 +472,7 @@
+ }
+ 
+ func TestMissingSystemCommandFails(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	name := "skill-sys"
+ 	dir := filepath.Join(e.skillsRoot, name)
+@@ -492,6 +500,7 @@
+ }
+ 
+ func TestMovedTagWarningAndStrict(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -523,6 +532,7 @@
+ }
+ 
+ func TestRuntimeOnlyProviderGetsMarkerNoAdapter(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	// provider with a command; consumer requires it runtime-only
+ 	e.skill("provider")
+@@ -565,6 +575,7 @@
+ }
+ 
+ func TestRuntimeOnlyProviderStillRequiresSkillMd(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("provider")
+ 	provider := filepath.Join(e.skillsRoot, "provider")
+@@ -598,6 +609,7 @@
+ }
+ 
+ func TestHybridSkillActivatesWithoutTouchingProjectStore(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-h")
+ 	e.declare() // empty project manifest
+@@ -635,6 +647,7 @@
+ }
+ 
+ func TestHybridShadowedByProjectDeclaration(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -701,6 +714,7 @@
+ }
+ 
+ func TestGlobalUpgradeDryRunLeavesPersistentStateUnchanged(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-g")
+ 	if _, err := GlobalInit(e.home); err != nil {
+@@ -733,6 +747,7 @@
+ }
+ 
+ func TestGlobalInstallUsesManifestLocaleAndAuditGate(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-g")
+ 	if err := os.MkdirAll(GlobalRoot(e.home), 0o755); err != nil {
+@@ -766,6 +781,7 @@
+ }
+ 
+ func TestGlobalStrictTagsDetectMovedTag(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-g")
+ 	if _, err := GlobalInit(e.home); err != nil {
+@@ -794,6 +810,7 @@
+ }
+ 
+ func TestMcpRequirementGatesInstall(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	name := "skill-mcp"
+ 	dir := filepath.Join(e.skillsRoot, name)
+@@ -820,6 +837,7 @@
+ }
+ 
+ func TestAuditGateBlocksUndeclaredNetwork(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a") // its script has no network calls: passes
+ 	name := "skill-net"
+--- a/internal/install/maintenance_test.go
++++ b/internal/install/maintenance_test.go
+@@ -14,6 +14,7 @@
+ // the transaction used, so consumer pruning, runtime collection, and the
+ // protected build-cache sweep cannot race another manager-home mutation.
+ func TestPostCommitMaintenanceRunsUnderTheHeldHomeLock(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -50,6 +51,7 @@
+ // cache entry is reported to the operator instead of being swallowed, and that
+ // it never reverts the durable installation.
+ func TestPostCommitMaintenanceWarningsReachTheResult(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -76,6 +78,7 @@
+ // transaction's build references reach the sweep, so an artifact another
+ // operation still depends on is retained.
+ func TestPostCommitMaintenanceMarksInFlightJournals(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+--- a/internal/install/private_test.go
++++ b/internal/install/private_test.go
+@@ -283,6 +283,7 @@
+ // scope runs MCP verification before any compiler-facing work, exactly like a
+ // project install.
+ func TestGlobalMcpFailureBlocksToolchainCacheAndBuild(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.globalDeclare("build-skill")
+@@ -307,6 +308,7 @@
+ // TestGlobalRegistryFailureBlocksToolchainCacheAndBuild proves the machine-wide
+ // scope resolves registry attestation before any compiler-facing work.
+ func TestGlobalRegistryFailureBlocksToolchainCacheAndBuild(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.globalDeclare("build-skill")
+@@ -370,6 +372,7 @@
+ // TestGlobalMarkersCarryMcpAndAttestationEvidence proves the machine-wide scope
+ // records the same MCP and registry evidence a project install records.
+ func TestGlobalMarkersCarryMcpAndAttestationEvidence(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-g")
+ 	e.globalDeclare("skill-g")
+--- a/internal/install/registry_e2e_test.go
++++ b/internal/install/registry_e2e_test.go
+@@ -86,6 +86,7 @@
+ }
+ 
+ func TestRegistryRevocationDeniesInstall(t *testing.T) {
++	t.Parallel()
+ 	e, server := registryEnv(t, "revoked")
+ 	defer server.Close()
+ 	result := e.install(Options{})
+@@ -95,6 +96,7 @@
+ }
+ 
+ func TestRegistryAttestationLandsInMarker(t *testing.T) {
++	t.Parallel()
+ 	e, server := registryEnv(t, "audited")
+ 	defer server.Close()
+ 	result := e.install(Options{})
+@@ -108,6 +110,7 @@
+ }
+ 
+ func TestStrictRegistryPolicyFailsUnknown(t *testing.T) {
++	t.Parallel()
+ 	e, server := registryEnv(t, "pending") // pending resolves as unknown
+ 	defer server.Close()
+ 	e.cfg.Audit.RegistryPolicy = "strict"
+--- a/internal/install/revalidation_test.go
++++ b/internal/install/revalidation_test.go
+@@ -135,6 +135,7 @@
+ // install restarted, the mutation assertions would prove nothing about the
+ // mutation.
+ func TestStableDeclarationInputsCommitWithoutRestarting(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -164,6 +165,7 @@
+ // would install a context, a shim, and an adapter mirror for a skill that is no
+ // longer declared.
+ func TestProjectDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-b")
+@@ -183,6 +185,7 @@
+ // the opposite direction: a declaration that appears during staging must join
+ // the committed closure instead of being silently omitted.
+ func TestProjectDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-b")
+@@ -203,6 +206,7 @@
+ // operation identity, which is exactly why it looked stable and was not: the
+ // writer takes no lock.
+ func TestGlobalDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleState(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-b")
+@@ -222,6 +226,7 @@
+ // TestGlobalDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure is
+ // the machine-wide opposite direction.
+ func TestGlobalDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-b")
+@@ -244,6 +249,7 @@
+ // so a run that committed the closure it planned would install the pinned tag
+ // while reporting a project whose declarations now say otherwise.
+ func TestDevSubstitutionAppearingBeforeHomeLockRestartsClosureResolution(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+--- a/internal/install/stage_test.go
++++ b/internal/install/stage_test.go
+@@ -605,6 +605,7 @@
+ }
+ 
+ func TestDryRunPlansBuildsWithoutToolchainSessionOrPersistentState(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -679,6 +680,7 @@
+ }
+ 
+ func TestGlobalDryRunPlansBuildsWithoutSessionOrPersistentState(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	if _, err := GlobalInit(e.home); err != nil {
+@@ -719,6 +721,7 @@
+ }
+ 
+ func TestGlobalStagingFailureLeavesGlobalScopeUnchanged(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-g")
+ 	e.buildSkill("build-skill", "alpha")
+@@ -757,6 +760,7 @@
+ }
+ 
+ func TestDryRunReportsCacheHitWithoutBuilding(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -780,6 +784,7 @@
+ }
+ 
+ func TestCacheHitPerformsNoSourceAwareGoCommand(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha", "beta")
+ 	e.declare("build-skill")
+@@ -799,6 +804,7 @@
+ }
+ 
+ func TestStagingRunsProviderFirstAndCommandLexical(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("provider", "p-beta", "p-alpha")
+ 	e.buildSkillWithRequirement("consumer", "provider", "c-beta", "c-alpha")
+@@ -823,6 +829,7 @@
+ }
+ 
+ func TestStagedOutputsStayPrivateAndAreReleased(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -882,6 +889,7 @@
+ }
+ 
+ func TestSecondBuildFailurePreservesPriorInstallationAndLiveCache(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("script-skill")
+ 	e.buildSkill("build-skill", "alpha", "beta")
+@@ -951,6 +959,7 @@
+ }
+ 
+ func TestToolchainDriftAfterTheFinalBuildBlocksHandoffAndPreservesLiveState(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("script-skill")
+ 	e.buildSkill("build-skill", "alpha")
+@@ -990,6 +999,7 @@
+ }
+ 
+ func TestGlobalToolchainDriftAfterTheFinalBuildPreservesGlobalScope(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-g")
+ 	e.buildSkill("build-skill", "alpha")
+@@ -1037,6 +1047,7 @@
+ }
+ 
+ func TestCacheHitOnlyPlanStillFinalizesToolchainTrust(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -1058,6 +1069,7 @@
+ }
+ 
+ func TestCacheInspectionIsBracketedByTheFrozenSource(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha", "beta")
+ 	e.declare("build-skill")
+@@ -1096,6 +1108,7 @@
+ }
+ 
+ func TestSourceMutationDuringStagingBlocksHandoffOfACacheHit(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("script-skill")
+ 	e.buildSkill("build-skill", "alpha", "beta")
+@@ -1140,6 +1153,7 @@
+ }
+ 
+ func TestToolchainFailureBlocksEveryPersistentMutation(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -1165,6 +1179,7 @@
+ // upgrade themselves; publication quarantines the unusable entry rather than
+ // adopting or permission-repairing it.
+ func TestCorruptCacheEntryIsRebuiltAndNeverReused(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -1201,6 +1216,7 @@
+ // Result.Builds, with its reason, so a caller can classify and report it
+ // instead of seeing nothing at all about compiled state.
+ func TestUnsupportedCacheProtectionFailsClosed(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -1238,6 +1254,7 @@
+ // failed before it could describe one, both report an incomplete diagnostic, so
+ // a read-only reporting caller falls back to reporting the failure itself.
+ func TestIncompletePlansNeverClaimACompleteDiagnostic(t *testing.T) {
++	t.Parallel()
+ 	t.Run("no compiled command at all", func(t *testing.T) {
+ 		e := newEnv(t)
+ 		e.skill("skill-a")
+@@ -1281,6 +1298,7 @@
+ // active command is still reported — with the stable boundary code and without
+ // inventing a target, key, or cache verdict it never derived.
+ func TestToolchainFailurePlansAnInventoryOfEveryActiveCommand(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -1335,6 +1353,7 @@
+ }
+ 
+ func TestUntrustedCacheEntryIsRebuiltAndNeverReused(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -1361,6 +1380,7 @@
+ }
+ 
+ func TestScriptOnlyInstallPerformsNoToolchainOrCacheWork(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -1383,6 +1403,7 @@
+ }
+ 
+ func TestInjectedClockAndGenerationReaderDriveInstallMarkers(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.declare("skill-a")
+@@ -1407,6 +1428,7 @@
+ }
+ 
+ func TestPlannedBuildAccessorsAreImmutable(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -1438,6 +1460,7 @@
+ // longer preserve. The fake fails every check after the first, so any re-check
+ // during teardown fails an installation that had already committed.
+ func TestReleaseTakesNoToolchainVerdictAfterLiveMutation(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+@@ -1473,6 +1496,7 @@
+ // TestGlobalReleaseTakesNoToolchainVerdictAfterLiveMutation is the global-scope
+ // half of the same boundary.
+ func TestGlobalReleaseTakesNoToolchainVerdictAfterLiveMutation(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	if _, err := GlobalInit(e.home); err != nil {
+@@ -1513,6 +1537,7 @@
+ // failure teardown can still produce: a private root it could not remove. It is
+ // reported, but it does not retract an installation that already succeeded.
+ func TestSessionReleaseFailureWarnsWithoutFailingACommittedInstall(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.buildSkill("build-skill", "alpha")
+ 	e.declare("build-skill")
+--- a/internal/install/atomicity/activation_test.go
++++ b/internal/install/atomicity/activation_test.go
+@@ -102,6 +102,7 @@
+ // run when the manifest actually moved; if every install restarted, the
+ // mutation assertions would prove nothing about the mutation.
+ func TestStableHybridActivationCommitsWithoutRestarting(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-h")
+@@ -125,6 +126,7 @@
+ // the manager-home lock. Applying the planned closure would install a context
+ // and an adapter mirror for a skill that is no longer declared anywhere.
+ func TestHybridDeclarationRemovedBeforeHomeLockRestartsAndCommitsNoStaleContext(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-h")
+@@ -146,6 +148,7 @@
+ // exists, so only a genuine re-evaluation of activation — not a mere
+ // "is it still declared" check — drops it from this project's closure.
+ func TestHybridDeclarationRetargetedBeforeHomeLockRestartsAndCommitsNoStaleContext(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-h")
+@@ -167,6 +170,7 @@
+ // must join the committed closure instead of being silently omitted. It also
+ // covers the absent-to-present transition of the manifest itself.
+ func TestHybridDeclarationAddedBeforeHomeLockRestartsAndCommitsTheNewClosure(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.skill("skill-a")
+ 	e.skill("skill-h")
+--- a/internal/install/atomicity/commit_atomicity_test.go
++++ b/internal/install/atomicity/commit_atomicity_test.go
+@@ -25,6 +25,13 @@
+ 	// classes are the classes this scenario must actually commit; a scenario
+ 	// that stops producing one silently would otherwise weaken the sweep.
+ 	classes []string
++	// injectClasses selects the classes this entry injects a fault at. It is a
++	// selector over classes, never a replacement for it: injections inside one
++	// entry are a serial chain, because each has to start from the state the
++	// previous rollback restored, so the sweep is partitioned one injected
++	// class per entry. The post-sweep success assertion keeps checking the
++	// full classes list, so narrowing this narrows no coverage.
++	injectClasses []string
+ 	// baseline installs the prior state the rollback has to restore.
+ 	baseline func(t *testing.T, e *env)
+ 	// upgrade changes the declarations so the second install replaces context,
+@@ -32,17 +39,18 @@
+ 	upgrade func(t *testing.T, e *env)
+ 	// install runs one installation of this scenario's scope.
+ 	install func(e *env, opts install.Options) install.Result
+-	// sharedUserHome binds the scenario to the PATH-visible user home the
+-	// parent prepared. Only the machine-wide scope mirrors into one, and two
+-	// scenarios must never share it: their snapshots would overlap.
+-	sharedUserHome bool
++	// userHome is the PATH-visible user home the parent prepared for this
++	// entry. Only the machine-wide scope mirrors into one, and two scenarios
++	// must never share it: their snapshots would overlap.
++	userHome string
+ }
+ 
+-func projectSweepScenario(name, mode string) sweepScenario {
++func projectSweepScenario(name, mode string, injectClasses ...string) sweepScenario {
+ 	return sweepScenario{
+-		name:    name,
+-		mode:    mode,
+-		classes: projectSweepClasses,
++		name:          name,
++		mode:          mode,
++		classes:       projectSweepClasses,
++		injectClasses: injectClasses,
+ 		baseline: func(t *testing.T, e *env) {
+ 			t.Helper()
+ 			e.skill("skill-a")
+@@ -92,11 +100,13 @@
+ 	staging.ClassAdapterLedger, staging.ClassMirrorLedger, staging.ClassRemoval,
+ }
+ 
+-func globalSweepScenario(name, mode string) sweepScenario {
++func globalSweepScenario(name, mode, userHome string, injectClasses ...string) sweepScenario {
+ 	return sweepScenario{
+-		name:    name,
+-		mode:    mode,
+-		classes: globalSweepClasses,
++		name:          name,
++		mode:          mode,
++		classes:       globalSweepClasses,
++		injectClasses: injectClasses,
++		userHome:      userHome,
+ 		baseline: func(t *testing.T, e *env) {
+ 			t.Helper()
+ 			e.skill("skill-a")
+@@ -114,8 +124,7 @@
+ 			t.Helper()
+ 			e.globalDeclareAll([]string{"claude_code", "codex_cli"}, "skill-a", "skill-b")
+ 		},
+-		install:        func(e *env, opts install.Options) install.Result { return e.installGlobal(opts) },
+-		sharedUserHome: true,
++		install: func(e *env, opts install.Options) install.Result { return e.installGlobal(opts) },
+ 	}
+ }
+ 
+@@ -124,43 +133,78 @@
+ // project, global, hybrid, runtime, shim, env, adapter, mirror, removal, and
+ // consumer state comes back, in exact reverse commit order.
+ //
+-// The project scenario runs in the production-default adapter mode, so the
+-// mirror entries it commits and restores are the symbolic links a real machine
+-// gets; the global scenario adds the forwarding shims and the user-bin mirror
++// The project scenarios run in the production-default adapter mode, so the
++// mirror entries they commit and restore are the symbolic links a real machine
++// gets; the global scenarios add the forwarding shims and the user-bin mirror
+ // ledger that only the machine-wide scope produces.
++//
++// Every injected class is still covered, and each injection still asserts the
++// whole-state digest, the committed-class cutoff, the exact reverse rollback,
++// and that no journal survives — followed by a full successful install over
++// every class the scope produces. One property is deliberately retired: the
++// sweep used to chain all of a scope's injections onto one baseline, which
++// additionally exercised "a rollback from class X leaves nothing that trips
++// class Y" for every ordered pair. That chaining was defence in depth behind
++// the per-injection whole-state comparison, and it is what made the package
++// exceed its race-build timeout, so it is traded for the partition below.
+ func TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder(t *testing.T) {
+ 	// The machine-wide scope only publishes forwarding shims into a user bin
+-	// that is already on PATH, so the sweep gives it one. PATH is set here, in
+-	// the sequential parent, because the scenarios below run in parallel.
+-	globalUserHome := t.TempDir()
+-	if runtime.GOOS != "windows" {
+-		userBin := filepath.Join(globalUserHome, ".local", "bin")
+-		if err := os.MkdirAll(userBin, 0o755); err != nil {
+-			t.Fatal(err)
++	// that is already on PATH, so the sweep gives every global entry one of its
++	// own — the entries below must not share a user home, or their snapshots
++	// would overlap. PATH is set here, in the sequential parent, because the
++	// scenarios below run in parallel; every prepared bin goes on it in this
++	// one call. Each entry still resolves to its own, because globalbins.Select
++	// prefers <userHome>/.local/bin and its fallback scan refuses any directory
++	// outside the user home it was handed.
++	globalUserHomes := make([]string, len(globalSweepClasses))
++	for index := range globalUserHomes {
++		globalUserHomes[index] = t.TempDir()
++	}
++	if runtime.GOOS != "windows" {
++		search := os.Getenv("PATH")
++		for _, userHome := range globalUserHomes {
++			userBin := filepath.Join(userHome, ".local", "bin")
++			if err := os.MkdirAll(userBin, 0o755); err != nil {
++				t.Fatal(err)
++			}
++			search = userBin + string(os.PathListSeparator) + search
+ 		}
+-		t.Setenv("PATH", userBin+string(os.PathListSeparator)+os.Getenv("PATH"))
++		t.Setenv("PATH", search)
+ 	}
+ 
+-	for _, scenario := range []sweepScenario{
+-		projectSweepScenario("project-hybrid-auto", "auto"),
+-		globalSweepScenario("global-auto", "auto"),
+-	} {
++	// The sweep is partitioned one injected class per entry. Injections within
++	// an entry are inherently serial — each starts from the state the previous
++	// rollback restored — so a seven-long chain costs seven installs of wall
++	// time that no parallelism can shorten, while seven one-long chains run at
++	// once. Every entry keeps its own baseline, its own per-injection
++	// whole-state comparison, and its own post-sweep success over the full
++	// class list.
++	scenarios := make([]sweepScenario, 0, len(projectSweepClasses)+len(globalSweepClasses))
++	for _, class := range projectSweepClasses {
++		scenarios = append(scenarios,
++			projectSweepScenario("project-hybrid-auto/"+class, "auto", class))
++	}
++	for index, class := range globalSweepClasses {
++		scenarios = append(scenarios,
++			globalSweepScenario("global-auto/"+class, "auto", globalUserHomes[index], class))
++	}
++
++	for _, scenario := range scenarios {
+ 		t.Run(scenario.name, func(t *testing.T) {
+ 			t.Parallel()
+-			// One baseline serves every injection. A correct rollback returns
+-			// the machine to exactly the prior state, so the next injection
+-			// starts from the same place — and any residue one rollback leaves
+-			// behind shows up as a failure of the injection after it.
++			// This entry's own baseline serves its own injections. A correct
++			// rollback returns the machine to exactly the prior state, which
++			// every injection asserts directly against this snapshot.
+ 			e := newEnv(t)
+ 			e.cfg.AdapterMode = scenario.mode
+-			if scenario.sharedUserHome {
+-				e.userHome = globalUserHome
++			if scenario.userHome != "" {
++				e.userHome = scenario.userHome
+ 			}
+ 			scenario.baseline(t, e)
+ 			before := snapshotState(t, e)
+ 			scenario.upgrade(t, e)
+ 
+-			for _, class := range scenario.classes {
++			for _, class := range scenario.injectClasses {
+ 				passed := t.Run(class, func(t *testing.T) {
+ 					probe := &commitProbe{
+ 						failClass: class,
+@@ -170,8 +214,9 @@
+ 						Commit: install.CommitDeps{Hooks: probe.hooks(), MaxRestarts: 1},
+ 					})
+ 					// A class the scenario never produces cannot be failed, so
+-					// the install would succeed here: coverage of every class in
+-					// scenario.classes is enforced rather than assumed.
++					// the install would succeed here: coverage of the injected
++					// class is enforced rather than assumed, and the post-sweep
++					// block below enforces the full scenario.classes list.
+ 					if result.Status != "failed" {
+ 						t.Fatalf("install status = %q, want failed in class %s: %+v", result.Status, class, result)
+ 					}
+@@ -187,9 +232,9 @@
+ 					assertNoJournalRemains(t, e.home)
+ 				})
+ 				if !passed {
+-					// Once one rollback is wrong the shared baseline is no
+-					// longer trustworthy, so later injections would report
+-					// noise rather than new information.
++					// Once one rollback is wrong this entry's baseline is no
++					// longer trustworthy, so any later injection on the same
++					// chain would report noise rather than new information.
+ 					break
+ 				}
+ 			}
+@@ -227,6 +272,7 @@
+ // store and becomes project-declared, so its canonical root — and therefore its
+ // mirror destination — changes.
+ func TestAdapterMirrorLinksAreJournaledAndRestoredExactly(t *testing.T) {
++	t.Parallel()
+ 	for _, mode := range []string{"auto", "symlink"} {
+ 		t.Run(mode, func(t *testing.T) {
+ 			t.Parallel()
+@@ -323,6 +369,7 @@
+ // ledger no longer claims is a journaled removal, and it commits before the
+ // machine-wide consumer ledger, in every adapter mode.
+ func TestStaleAdapterEntryIsRemovedBeforeTheConsumerLedger(t *testing.T) {
++	t.Parallel()
+ 	for _, mode := range []string{"auto", "symlink", "copy"} {
+ 		t.Run(mode, func(t *testing.T) {
+ 			t.Parallel()
+@@ -378,6 +425,7 @@
+ // TestStaleAdapterRemovalRollsBackToTheExactPriorEntry proves the removal class
+ // is restorable, which is the whole reason stale pruning moved into the journal.
+ func TestStaleAdapterRemovalRollsBackToTheExactPriorEntry(t *testing.T) {
++	t.Parallel()
+ 	e := newEnv(t)
+ 	e.cfg.AdapterMode = "auto"
+ 	e.skill("skill-a")

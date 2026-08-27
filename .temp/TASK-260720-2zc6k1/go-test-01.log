@@ -1,0 +1,5 @@
+--- FAIL: TestConformanceClaimV2SchemaAndGeneratedCases (0.00s)
+    main_test.go:70: generated conformance claim v2 = map[string]interface {}{"classes":[]interface {}{"core", "manager"}, "created_at":"2026-07-20T00:00:00Z", "implementation":"example-manager", "implementation_version":"1.0", "operating_systems":[]interface {}{"linux"}, "protocol_version":"1.0.0-rc.4", "result":"pass", "schema_version":"2", "suite_sha256":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}, want map[string]interface {}{"classes":[]interface {}{"core", "manager"}, "created_at":"2026-07-20T00:00:00Z", "implementation":"example-manager", "implementation_version":"1.0", "operating_systems":[]interface {}{"linux"}, "protocol_version":"1.0.0-rc.4", "result":"pass", "schema_version":2, "suite_sha256":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}
+FAIL
+FAIL	github.com/relux-works/curator-spec/tools/generate-vectors	0.264s
+FAIL

@@ -1,0 +1,81 @@
+{
+  "id": "RUN-260825-325ae9",
+  "task_id": "TASK-260825-2fy132",
+  "created_at": "2026-08-25T01:13:45.975695Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-terra",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "codex",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "service_tier": "default",
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-05-13-45_-implementer--developer--codex-_TASK-260825-2fy132.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "control_root": "/Users/iv/Developer/ReluxWorks/curator",
+  "execution_root": "/Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260825-39h6vz/worktree",
+  "story_id": "STORY-260825-39h6vz",
+  "workspace": {
+    "workspace_id": "WS-30c4b651e0b4",
+    "story_id": "STORY-260825-39h6vz",
+    "branch_ref": "refs/heads/task-board/story/STORY-260825-39h6vz",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260825-39h6vz/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "timeout": "40m0s",
+  "supervision": {
+    "check_every_minutes": 5,
+    "idle_deadline_minutes": 0,
+    "max_runtime_minutes": 0,
+    "on_deadline": "park"
+  },
+  "log_resource_name": "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-325ae9.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260825-2fy132_blocker.md",
+    "TASK-260825-2fy132_change-request_rev1.patch",
+    "TASK-260825-2fy132_results.md",
+    "TASK-260825-2fy132_review-verdict.md",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-1b209e.log",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-6e408e.log",
+    "TASK-260825-2fy132_spawn-log_-reviewer--reviewer--claude-_RUN-260825-53327c.log",
+    "TASK-260825-2fy132_verification.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260825-2fy132_blocker.md": "0e05cc714307a0bd0d905dcadd3d8683a66c29fc2c21ab7a632a9db2a977e529",
+    "TASK-260825-2fy132_results.md": "8e73083126e3086501eca2a9f81c330aba342d42d83c38f32d7eadace0ae03e0",
+    "TASK-260825-2fy132_review-verdict.md": "97f120ae866853139465903fffae5c18482e4d4093ebaf89724c11d8bf225d78",
+    "TASK-260825-2fy132_verification.md": "b1bdfbd38ff551c7907256a565b5907d555bc9c72b2ff61ef061070e7baaffd3"
+  },
+  "require_outcome_artifact": true,
+  "recovery_root_run_id": "RUN-260825-325ae9"
+}

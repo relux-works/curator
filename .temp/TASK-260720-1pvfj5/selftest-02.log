@@ -1,0 +1,43 @@
+== platform-case gate ==
+ok    windows: every required case ran, tolerated skips only     (exit 0)
+ok    linux: every required case ran, tolerated skips only       (exit 0)
+ok    windows: a skipped reparse-point case is rejected          (exit 1)
+ok    windows: a skipped .cmd launcher case is rejected          (exit 1)
+ok    linux: a skipped no-follow case is rejected                (exit 1)
+ok    a required case that never ran is rejected (rename or -run filter) (exit 1)
+ok    a required case that failed is rejected                    (exit 1)
+ok    an undeclared skip is rejected                             (exit 1)
+ok    a ledger-tolerated skip is accepted                        (exit 0)
+ok    subtest results resolve to their parent case               (exit 0)
+ok    test output that looks like a result event is not parsed as one (exit 0)
+ok    a pending row is not enforced while its case is absent     (exit 0)
+ok    a pending row becomes fatal once its case runs             (exit 1)
+ok    a pending case that lands already skipping is still fatal  (exit 1)
+ok    an unknown ledger status is rejected                       (exit 1)
+ok    shipped ledger is satisfiable on linux                     (exit 0)
+ok    shipped ledger is satisfiable on darwin                    (exit 0)
+ok    shipped ledger is satisfiable on windows                   (exit 0)
+ok    no case appears twice in the shipped ledger                (exit 0)
+
+== candidate suite: revision shape ==
+ok    a branch name is rejected as a candidate pin               (exit 1)
+ok    a tag is rejected as a candidate pin                       (exit 1)
+ok    HEAD is rejected as a candidate pin                        (exit 1)
+ok    a short hash is rejected as a candidate pin                (exit 1)
+ok    uppercase hex is rejected as a candidate pin               (exit 1)
+ok    a placeholder is rejected as a candidate pin               (exit 1)
+ok    an empty revision is rejected                              (exit 1)
+ok    the null commit is rejected                                (exit 1)
+ok    a candidate equal to the committed pin is refused          (exit 1)
+ok    a full 40-hex revision is accepted                         (exit 0)
+
+== candidate suite: identity and evidence ==
+ok    a root without manifest.json is rejected                   (exit 1)
+ok    a nonexistent root is rejected                             (exit 1)
+ok    a well-formed candidate root is recorded                   (exit 0)
+ok    a matching expected manifest digest is accepted            (exit 0)
+ok    a mismatched expected manifest digest aborts the run       (exit 1)
+ok    a candidate identical to the committed pin is refused      (exit 1)
+ok    evidence records revision, digests and both disclaimers    (exit 0)
+
+gate-selftest: 36 passed, 0 failed

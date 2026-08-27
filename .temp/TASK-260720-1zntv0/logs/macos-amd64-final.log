@@ -1,0 +1,49 @@
+go version go1.25.5 darwin/amd64
+=== build ===
+BUILD_EXIT=0
+=== vet ===
+VET_EXIT=0
+=== test full ===
+ok  	github.com/relux-works/curator/cmd/curator	1.125s
+ok  	github.com/relux-works/curator/internal/adapters	1.458s
+ok  	github.com/relux-works/curator/internal/audit	0.666s
+ok  	github.com/relux-works/curator/internal/buildcache	3.056s
+ok  	github.com/relux-works/curator/internal/buildmeta	1.546s
+ok  	github.com/relux-works/curator/internal/buildsource	2.172s
+ok  	github.com/relux-works/curator/internal/capabilities	1.327s
+ok  	github.com/relux-works/curator/internal/closure	7.724s
+ok  	github.com/relux-works/curator/internal/config	0.842s
+ok  	github.com/relux-works/curator/internal/devsub	0.485s
+ok  	github.com/relux-works/curator/internal/envfiles	1.107s
+ok  	github.com/relux-works/curator/internal/gitignore	1.619s
+ok  	github.com/relux-works/curator/internal/gitops	2.591s
+ok  	github.com/relux-works/curator/internal/globalbins	1.575s
+ok  	github.com/relux-works/curator/internal/godriver	47.016s
+ok  	github.com/relux-works/curator/internal/hashing	1.559s
+ok  	github.com/relux-works/curator/internal/identifiers	1.723s
+ok  	github.com/relux-works/curator/internal/identity	1.519s
+ok  	github.com/relux-works/curator/internal/install	20.732s
+ok  	github.com/relux-works/curator/internal/interop	1.421s
+ok  	github.com/relux-works/curator/internal/locale	1.610s
+ok  	github.com/relux-works/curator/internal/manifest	1.644s
+ok  	github.com/relux-works/curator/internal/marker	1.338s
+ok  	github.com/relux-works/curator/internal/mcp	1.404s
+ok  	github.com/relux-works/curator/internal/protocoljson	1.413s
+ok  	github.com/relux-works/curator/internal/registry	3.238s
+ok  	github.com/relux-works/curator/internal/runtimestore	11.686s
+ok  	github.com/relux-works/curator/internal/scopes	1.657s
+ok  	github.com/relux-works/curator/internal/shell	1.822s
+ok  	github.com/relux-works/curator/internal/skillcheck	1.079s
+ok  	github.com/relux-works/curator/internal/skillspec	1.088s
+ok  	github.com/relux-works/curator/internal/snapshot	3.390s
+ok  	github.com/relux-works/curator/internal/ui	1.589s
+ok  	github.com/relux-works/curator/internal/verr	1.399s
+ok  	github.com/relux-works/curator/internal/version	1.557s
+ok  	github.com/relux-works/curator/internal/whitelist	1.500s
+TEST_EXIT=0
+=== real go build integration ===
+=== RUN   TestRealGoV1VendoredBuildIsBoundedAndNotLaunched
+--- PASS: TestRealGoV1VendoredBuildIsBoundedAndNotLaunched (23.10s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	23.601s
+REAL_EXIT=0

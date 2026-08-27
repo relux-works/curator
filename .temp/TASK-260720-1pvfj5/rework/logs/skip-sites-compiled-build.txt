@@ -1,0 +1,361 @@
+########## linux
+--- internal/godriver
+    TestBuildFailsClosedWhenTheGoChildCannotStart                  boundary_test.go:268  active-process-count-limit is available only on Windows in rc5-native-control-inventory-v1
+    loadHostExecutionVector                                        build_conformance_test.go:154  CURATOR_CONFORMANCE_ROOT is not set
+    loadHostExecutionVector                                        build_conformance_test.go:159  %s is a pre-revision root and publishes no portable execution-policy vector
+    TestCandidateGoV1SourceAwareContract                           build_conformance_test.go:461  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateGoV1SourceAwareContract                           build_conformance_test.go:466  %s publishes no build-drivers vector
+    TestBuildRejectsHardLinkedArtifact                             build_test.go:236  hard links across the staging filesystem are unavailable: %v
+    TestPerFileSizeLimitIsReallyApplied                            build_test.go:434  per-file-size-limit is available only on macOS in rc5-native-control-inventory-v1
+    TestRealGoV1VendoredBuildIsBoundedAndNotLaunched               build_test.go:450  set CURATOR_REAL_GO_BUILD_TEST=1 for the bounded native go-v1 integration
+    loadPositiveVectors                                            builddriver_positive_conformance_test.go:85  CURATOR_CONFORMANCE_ROOT is not set
+    loadPositiveVectors                                            builddriver_positive_conformance_test.go:89  %s publishes no build-drivers vector
+    TestFixedEnvironmentAndFiveDirectArgvFormsVector               builddriver_positive_conformance_test.go:116  this conformance root publishes no fixed argument vectors
+    TestFixedEnvironmentAndFiveDirectArgvFormsVector               builddriver_positive_conformance_test.go:174  this conformance root publishes no fixed environment
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:217  this conformance root publishes no toolchain cases
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:271  this host cannot create a non-UTF-8 filename: %v
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:287  this host cannot create the symbolic link the vector needs: %v
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:298  this host cannot create the symbolic link the vector needs: %v
+    materializeToolchain                                           builddriver_positive_conformance_test.go:343  this host cannot create the symbolic link the vector needs: %v
+    loadDriverRejections                                           builddriver_rejection_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    loadDriverRejections                                           builddriver_rejection_conformance_test.go:37  %s publishes no build-drivers vector
+    driverRejectionMappings                                        builddriver_rejection_conformance_test.go:307  this host cannot create the symbolic link the vector needs: %v
+    symlinkOrSkip                                                  fingerprint_equivalence_test.go:222  symlink unavailable: %v
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:422  hashes the whole host GOROOT
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:426  no GOROOT available
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:429  GOROOT %s unreadable: %v
+    TestFingerprintReportsUnreadableDirectoryIdentically           fingerprint_equivalence_test.go:1004  root ignores directory permissions
+    benchmarkRoot                                                  fingerprint_equivalence_test.go:1025  no GOROOT available
+    benchmarkRoot                                                  fingerprint_equivalence_test.go:1028  GOROOT %s unreadable: %v
+    TestCandidateRC4ToolchainArtifacts                             fingerprint_test.go:82  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateRC4ToolchainArtifacts                             fingerprint_test.go:86  %s publishes no expected/build-driver artifacts
+    TestFingerprintRejectsEscapingAndAbsoluteLinks                 fingerprint_test.go:118  symlink unavailable: %v
+    TestFingerprintRejectsDanglingLink                             fingerprint_test.go:135  symlink unavailable: %v
+    TestFingerprintRejectsInvalidUnicodePath                       fingerprint_unix_test.go:61  filesystem rejects invalid UTF-8 names: %v
+    TestVerifyArtifactRejectsHardLinks                             graph_test.go:90  hard links unavailable: %v
+    TestCandidateLinkOutsideDerivedGOROOTFails                     session_test.go:217  symlink unavailable: %v
+    TestRealTrustedGoProbe                                         session_test.go:410  set CURATOR_REAL_GO_TEST=1 for the bounded native toolchain probe
+    HELPERS: ['benchmarkRoot', 'driverRejectionMappings', 'loadDriverRejections', 'loadHostExecutionVector', 'loadPositiveVectors', 'materializeToolchain', 'symlinkOrSkip']
+--- internal/buildcache
+    makeCacheSpecialFile                                           builddriver_conformance_unix_test.go:16  this host cannot create the FIFO the vector needs: %v
+    loadCachePositiveCases                                         builddriver_positive_conformance_test.go:27  CURATOR_CONFORMANCE_ROOT is not set
+    loadCachePositiveCases                                         builddriver_positive_conformance_test.go:31  %s publishes no build-drivers vector
+    TestProtectedCacheHitVector                                    builddriver_positive_conformance_test.go:55  this conformance root publishes no protected cache-hit vector
+    TestCompilerFreeDryRunMissVector                               builddriver_positive_conformance_test.go:101  this conformance root publishes no compiler-free dry-run vector
+    loadCacheRejections                                            builddriver_rejection_conformance_test.go:34  CURATOR_CONFORMANCE_ROOT is not set
+    loadCacheRejections                                            builddriver_rejection_conformance_test.go:38  %s publishes no build-drivers vector
+    cacheRejectionMappings                                         builddriver_rejection_conformance_test.go:245  this host cannot create the symbolic link the vector needs: %v
+    newTestStore                                                   cache_test.go:444  persistent protection is unsupported on this platform
+    newSweepStore                                                  collect_test.go:26  this host cannot create manager-protected state: %v
+    TestCandidateCacheOutcomeVocabulary                            conformance_test.go:13  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateCacheOutcomeVocabulary                            conformance_test.go:44  this conformance root publishes no cache_publication_cases group
+    HELPERS: ['cacheRejectionMappings', 'loadCachePositiveCases', 'loadCacheRejections', 'makeCacheSpecialFile', 'newSweepStore', 'newTestStore']
+--- internal/buildsource
+    loadBuildSourceCases                                           builddriver_conformance_test.go:96  CURATOR_CONFORMANCE_ROOT is not set
+    loadBuildSourceCases                                           builddriver_conformance_test.go:100  %s publishes no build-drivers vector
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:128  this conformance root publishes no build-source cases
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:196  this conformance root publishes no install-marker regression payloads
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:220  this host cannot create a non-UTF-8 filename: %v
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:238  this host folds the alias into one directory member, so no duplicate encoded path is reach
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:249  this host cannot create the symbolic link the vector needs: %v
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:258  this host cannot create the FIFO the vector needs
+    TestRejectsInvalidPathsLinksAndCollisions                      buildsource_test.go:143  symlink unavailable: %v
+    TestRejectsInvalidPathsLinksAndCollisions                      buildsource_test.go:158  symlink unavailable: %v
+    TestFrozenTokenRejectsMutation                                 buildsource_test.go:228  symlink unavailable: %v
+    TestWithValidatedOrdersCallbackAndRejectsMutation              buildsource_test.go:289  symlink unavailable: %v
+    TestBuildSourceConformanceVectors                              conformance_test.go:14  CURATOR_CONFORMANCE_ROOT is not set
+    HELPERS: ['loadBuildSourceCases']
+--- internal/buildmeta
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:66  CURATOR_CONFORMANCE_ROOT is not set
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:70  %s publishes no build-drivers vector
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:80  %s publishes no portable execution-policy cache identity
+    TestPortableExecutionPolicyIsTheOnlyAdmittedBuildInput         builddriver_policy_conformance_test.go:126  this root publishes no portable-execution-policy positive vector
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:105  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:109  %s publishes no expected/build-driver artifacts
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:113  %s is a pre-revision root without the portable execution policy
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:140  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:145  %s publishes no build-receipt-v1 schema case
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:158  %s is a pre-revision root without the portable execution policy
+    HELPERS: ['loadPolicyVectors']
+--- internal/install
+    authoritativeDriverCases                                       cache_conformance_test.go:45  CURATOR_CONFORMANCE_ROOT is not set
+    TestInstallHelperProcess                                       commit_test.go:772  helper process
+    authoritativeDryRunCases                                       dryrun_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook     install_test.go:268  executes POSIX skill commands
+    TestRuntimeLauncherCapturesDeclaredSystemDependency            install_test.go:312  executes POSIX skill commands
+    TestDefaultToolchainProbeRemovesItsProbeRootOnSuccess          stage_test.go:1586  no trusted Go toolchain is resolvable here: %v
+    HELPERS: ['authoritativeDriverCases', 'authoritativeDryRunCases']
+--- internal/install/atomicity
+    TestAdapterMirrorLinksAreJournaledAndRestoredExactly           commit_atomicity_test.go:292  %s mode did not produce a link on this filesystem: %s
+--- internal/transaction
+    mustSymlink                                                    entry_test.go:15  symlinks unavailable: %v
+    TestValidateIndependentTargetNamespacesRejectsOverlappingPaths namespace_pass_test.go:158  filesystem does not support hard links: %v
+    TestValidateIndependentTargetNamespacesRejectsOverlappingPaths namespace_pass_test.go:170  filesystem does not support symbolic links: %v
+    TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves     namespace_pass_test.go:234  filesystem does not support hard links: %v
+    TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves     namespace_pass_test.go:246  filesystem does not support symbolic links: %v
+    TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped   namespace_pass_test.go:315  filesystem does not support symbolic links: %v
+    TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON       recovery_corruption_test.go:174  symlink unavailable: %v
+    TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces   validation_test.go:218  symlink unavailable: %v
+    TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces   validation_test.go:241  hard links unavailable: %v
+    HELPERS: ['mustSymlink']
+--- internal/interop
+    suiteRoot                                                      golden_test.go:37  CURATOR_CONFORMANCE_ROOT is not set
+    HELPERS: ['suiteRoot']
+--- internal/runtimestore
+    TestCandidateManagerLauncherContract                           conformance_test.go:14  CURATOR_CONFORMANCE_ROOT is not set
+    authoritativeLauncherCases                                     launcher_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    TestUnixLauncherCarriesRuntimePathArgumentsAndExitStatus       runtimestore_test.go:148  executes a POSIX launcher
+    TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly targets_test.go:216  POSIX post-install launch fixture
+    HELPERS: ['authoritativeLauncherCases']
+--- internal/scopes
+    authoritativeGCCases                                           gc_conformance_test.go:36  CURATOR_CONFORMANCE_ROOT is not set
+    TestCollectStaysFailSafeAcrossConsecutivePasses                gc_conservative_test.go:169  this environment can inspect a mode-000 directory: %v
+    publishRealEntry                                               gc_integration_test.go:178  this platform cannot publish a protected cache entry: %v
+    TestCollectSkipsTheBuildSweepOnUnprovableReferences            gc_test.go:205  this environment can read a mode-000 directory
+    HELPERS: ['authoritativeGCCases', 'publishRealEntry']
+--- internal/closure
+    TestClosureOrderingConformanceVector                           conformance_test.go:16  CURATOR_CONFORMANCE_ROOT is not set
+    TestBuildCommandOrderingConformanceVector                      conformance_test.go:60  CURATOR_CONFORMANCE_ROOT is not set
+    TestBuildCommandOrderingConformanceVector                      conformance_test.go:87  this conformance root publishes no build_order_cases group
+########## darwin
+--- internal/godriver
+    TestBuildFailsClosedWhenTheGoChildCannotStart                  boundary_test.go:268  active-process-count-limit is available only on Windows in rc5-native-control-inventory-v1
+    loadHostExecutionVector                                        build_conformance_test.go:154  CURATOR_CONFORMANCE_ROOT is not set
+    loadHostExecutionVector                                        build_conformance_test.go:159  %s is a pre-revision root and publishes no portable execution-policy vector
+    TestCandidateGoV1SourceAwareContract                           build_conformance_test.go:461  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateGoV1SourceAwareContract                           build_conformance_test.go:466  %s publishes no build-drivers vector
+    TestBuildRejectsHardLinkedArtifact                             build_test.go:236  hard links across the staging filesystem are unavailable: %v
+    TestPerFileSizeLimitIsReallyApplied                            build_test.go:434  per-file-size-limit is available only on macOS in rc5-native-control-inventory-v1
+    TestRealGoV1VendoredBuildIsBoundedAndNotLaunched               build_test.go:450  set CURATOR_REAL_GO_BUILD_TEST=1 for the bounded native go-v1 integration
+    loadPositiveVectors                                            builddriver_positive_conformance_test.go:85  CURATOR_CONFORMANCE_ROOT is not set
+    loadPositiveVectors                                            builddriver_positive_conformance_test.go:89  %s publishes no build-drivers vector
+    TestFixedEnvironmentAndFiveDirectArgvFormsVector               builddriver_positive_conformance_test.go:116  this conformance root publishes no fixed argument vectors
+    TestFixedEnvironmentAndFiveDirectArgvFormsVector               builddriver_positive_conformance_test.go:174  this conformance root publishes no fixed environment
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:217  this conformance root publishes no toolchain cases
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:271  this host cannot create a non-UTF-8 filename: %v
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:287  this host cannot create the symbolic link the vector needs: %v
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:298  this host cannot create the symbolic link the vector needs: %v
+    materializeToolchain                                           builddriver_positive_conformance_test.go:343  this host cannot create the symbolic link the vector needs: %v
+    loadDriverRejections                                           builddriver_rejection_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    loadDriverRejections                                           builddriver_rejection_conformance_test.go:37  %s publishes no build-drivers vector
+    driverRejectionMappings                                        builddriver_rejection_conformance_test.go:307  this host cannot create the symbolic link the vector needs: %v
+    symlinkOrSkip                                                  fingerprint_equivalence_test.go:222  symlink unavailable: %v
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:422  hashes the whole host GOROOT
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:426  no GOROOT available
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:429  GOROOT %s unreadable: %v
+    TestFingerprintReportsUnreadableDirectoryIdentically           fingerprint_equivalence_test.go:1004  root ignores directory permissions
+    benchmarkRoot                                                  fingerprint_equivalence_test.go:1025  no GOROOT available
+    benchmarkRoot                                                  fingerprint_equivalence_test.go:1028  GOROOT %s unreadable: %v
+    TestCandidateRC4ToolchainArtifacts                             fingerprint_test.go:82  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateRC4ToolchainArtifacts                             fingerprint_test.go:86  %s publishes no expected/build-driver artifacts
+    TestFingerprintRejectsEscapingAndAbsoluteLinks                 fingerprint_test.go:118  symlink unavailable: %v
+    TestFingerprintRejectsDanglingLink                             fingerprint_test.go:135  symlink unavailable: %v
+    TestFingerprintRejectsInvalidUnicodePath                       fingerprint_unix_test.go:61  filesystem rejects invalid UTF-8 names: %v
+    TestVerifyArtifactRejectsHardLinks                             graph_test.go:90  hard links unavailable: %v
+    TestCandidateLinkOutsideDerivedGOROOTFails                     session_test.go:217  symlink unavailable: %v
+    TestRealTrustedGoProbe                                         session_test.go:410  set CURATOR_REAL_GO_TEST=1 for the bounded native toolchain probe
+    HELPERS: ['benchmarkRoot', 'driverRejectionMappings', 'loadDriverRejections', 'loadHostExecutionVector', 'loadPositiveVectors', 'materializeToolchain', 'symlinkOrSkip']
+--- internal/buildcache
+    makeCacheSpecialFile                                           builddriver_conformance_unix_test.go:16  this host cannot create the FIFO the vector needs: %v
+    loadCachePositiveCases                                         builddriver_positive_conformance_test.go:27  CURATOR_CONFORMANCE_ROOT is not set
+    loadCachePositiveCases                                         builddriver_positive_conformance_test.go:31  %s publishes no build-drivers vector
+    TestProtectedCacheHitVector                                    builddriver_positive_conformance_test.go:55  this conformance root publishes no protected cache-hit vector
+    TestCompilerFreeDryRunMissVector                               builddriver_positive_conformance_test.go:101  this conformance root publishes no compiler-free dry-run vector
+    loadCacheRejections                                            builddriver_rejection_conformance_test.go:34  CURATOR_CONFORMANCE_ROOT is not set
+    loadCacheRejections                                            builddriver_rejection_conformance_test.go:38  %s publishes no build-drivers vector
+    cacheRejectionMappings                                         builddriver_rejection_conformance_test.go:245  this host cannot create the symbolic link the vector needs: %v
+    newTestStore                                                   cache_test.go:444  persistent protection is unsupported on this platform
+    newSweepStore                                                  collect_test.go:26  this host cannot create manager-protected state: %v
+    TestCandidateCacheOutcomeVocabulary                            conformance_test.go:13  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateCacheOutcomeVocabulary                            conformance_test.go:44  this conformance root publishes no cache_publication_cases group
+    HELPERS: ['cacheRejectionMappings', 'loadCachePositiveCases', 'loadCacheRejections', 'makeCacheSpecialFile', 'newSweepStore', 'newTestStore']
+--- internal/buildsource
+    loadBuildSourceCases                                           builddriver_conformance_test.go:96  CURATOR_CONFORMANCE_ROOT is not set
+    loadBuildSourceCases                                           builddriver_conformance_test.go:100  %s publishes no build-drivers vector
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:128  this conformance root publishes no build-source cases
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:196  this conformance root publishes no install-marker regression payloads
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:220  this host cannot create a non-UTF-8 filename: %v
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:238  this host folds the alias into one directory member, so no duplicate encoded path is reach
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:249  this host cannot create the symbolic link the vector needs: %v
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:258  this host cannot create the FIFO the vector needs
+    TestRejectsInvalidPathsLinksAndCollisions                      buildsource_test.go:143  symlink unavailable: %v
+    TestRejectsInvalidPathsLinksAndCollisions                      buildsource_test.go:158  symlink unavailable: %v
+    TestFrozenTokenRejectsMutation                                 buildsource_test.go:228  symlink unavailable: %v
+    TestWithValidatedOrdersCallbackAndRejectsMutation              buildsource_test.go:289  symlink unavailable: %v
+    TestBuildSourceConformanceVectors                              conformance_test.go:14  CURATOR_CONFORMANCE_ROOT is not set
+    HELPERS: ['loadBuildSourceCases']
+--- internal/buildmeta
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:66  CURATOR_CONFORMANCE_ROOT is not set
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:70  %s publishes no build-drivers vector
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:80  %s publishes no portable execution-policy cache identity
+    TestPortableExecutionPolicyIsTheOnlyAdmittedBuildInput         builddriver_policy_conformance_test.go:126  this root publishes no portable-execution-policy positive vector
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:105  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:109  %s publishes no expected/build-driver artifacts
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:113  %s is a pre-revision root without the portable execution policy
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:140  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:145  %s publishes no build-receipt-v1 schema case
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:158  %s is a pre-revision root without the portable execution policy
+    HELPERS: ['loadPolicyVectors']
+--- internal/install
+    authoritativeDriverCases                                       cache_conformance_test.go:45  CURATOR_CONFORMANCE_ROOT is not set
+    TestInstallHelperProcess                                       commit_test.go:772  helper process
+    authoritativeDryRunCases                                       dryrun_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook     install_test.go:268  executes POSIX skill commands
+    TestRuntimeLauncherCapturesDeclaredSystemDependency            install_test.go:312  executes POSIX skill commands
+    TestDefaultToolchainProbeRemovesItsProbeRootOnSuccess          stage_test.go:1586  no trusted Go toolchain is resolvable here: %v
+    HELPERS: ['authoritativeDriverCases', 'authoritativeDryRunCases']
+--- internal/install/atomicity
+    TestAdapterMirrorLinksAreJournaledAndRestoredExactly           commit_atomicity_test.go:292  %s mode did not produce a link on this filesystem: %s
+--- internal/transaction
+    mustSymlink                                                    entry_test.go:15  symlinks unavailable: %v
+    TestValidateIndependentTargetNamespacesRejectsOverlappingPaths namespace_pass_test.go:158  filesystem does not support hard links: %v
+    TestValidateIndependentTargetNamespacesRejectsOverlappingPaths namespace_pass_test.go:170  filesystem does not support symbolic links: %v
+    TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves     namespace_pass_test.go:234  filesystem does not support hard links: %v
+    TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves     namespace_pass_test.go:246  filesystem does not support symbolic links: %v
+    TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped   namespace_pass_test.go:315  filesystem does not support symbolic links: %v
+    TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON       recovery_corruption_test.go:174  symlink unavailable: %v
+    TestBuildJournalRejectsCaseAliasesOnCaseInsensitiveDarwinFilesystem validation_darwin_test.go:18  test filesystem is case-sensitive
+    TestBuildJournalRejectsNormalizationAliasesOnNormalizationInsensitiveDarwinFilesystem validation_darwin_test.go:40  test filesystem distinguishes canonical Unicode spellings
+    TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces   validation_test.go:218  symlink unavailable: %v
+    TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces   validation_test.go:241  hard links unavailable: %v
+    HELPERS: ['mustSymlink']
+--- internal/interop
+    suiteRoot                                                      golden_test.go:37  CURATOR_CONFORMANCE_ROOT is not set
+    HELPERS: ['suiteRoot']
+--- internal/runtimestore
+    TestCandidateManagerLauncherContract                           conformance_test.go:14  CURATOR_CONFORMANCE_ROOT is not set
+    authoritativeLauncherCases                                     launcher_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    TestUnixLauncherCarriesRuntimePathArgumentsAndExitStatus       runtimestore_test.go:148  executes a POSIX launcher
+    TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly targets_test.go:216  POSIX post-install launch fixture
+    HELPERS: ['authoritativeLauncherCases']
+--- internal/scopes
+    authoritativeGCCases                                           gc_conformance_test.go:36  CURATOR_CONFORMANCE_ROOT is not set
+    TestCollectStaysFailSafeAcrossConsecutivePasses                gc_conservative_test.go:169  this environment can inspect a mode-000 directory: %v
+    publishRealEntry                                               gc_integration_test.go:178  this platform cannot publish a protected cache entry: %v
+    TestCollectSkipsTheBuildSweepOnUnprovableReferences            gc_test.go:205  this environment can read a mode-000 directory
+    HELPERS: ['authoritativeGCCases', 'publishRealEntry']
+--- internal/closure
+    TestClosureOrderingConformanceVector                           conformance_test.go:16  CURATOR_CONFORMANCE_ROOT is not set
+    TestBuildCommandOrderingConformanceVector                      conformance_test.go:60  CURATOR_CONFORMANCE_ROOT is not set
+    TestBuildCommandOrderingConformanceVector                      conformance_test.go:87  this conformance root publishes no build_order_cases group
+########## windows
+--- internal/godriver
+    TestBuildFailsClosedWhenTheGoChildCannotStart                  boundary_test.go:268  active-process-count-limit is available only on Windows in rc5-native-control-inventory-v1
+    loadHostExecutionVector                                        build_conformance_test.go:154  CURATOR_CONFORMANCE_ROOT is not set
+    loadHostExecutionVector                                        build_conformance_test.go:159  %s is a pre-revision root and publishes no portable execution-policy vector
+    TestCandidateGoV1SourceAwareContract                           build_conformance_test.go:461  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateGoV1SourceAwareContract                           build_conformance_test.go:466  %s publishes no build-drivers vector
+    TestBuildRejectsHardLinkedArtifact                             build_test.go:236  hard links across the staging filesystem are unavailable: %v
+    TestPerFileSizeLimitIsReallyApplied                            build_test.go:434  per-file-size-limit is available only on macOS in rc5-native-control-inventory-v1
+    TestRealGoV1VendoredBuildIsBoundedAndNotLaunched               build_test.go:450  set CURATOR_REAL_GO_BUILD_TEST=1 for the bounded native go-v1 integration
+    loadPositiveVectors                                            builddriver_positive_conformance_test.go:85  CURATOR_CONFORMANCE_ROOT is not set
+    loadPositiveVectors                                            builddriver_positive_conformance_test.go:89  %s publishes no build-drivers vector
+    TestFixedEnvironmentAndFiveDirectArgvFormsVector               builddriver_positive_conformance_test.go:116  this conformance root publishes no fixed argument vectors
+    TestFixedEnvironmentAndFiveDirectArgvFormsVector               builddriver_positive_conformance_test.go:174  this conformance root publishes no fixed environment
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:217  this conformance root publishes no toolchain cases
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:271  this host cannot create a non-UTF-8 filename: %v
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:287  this host cannot create the symbolic link the vector needs: %v
+    TestToolchainIdentityVectors                                   builddriver_positive_conformance_test.go:298  this host cannot create the symbolic link the vector needs: %v
+    materializeToolchain                                           builddriver_positive_conformance_test.go:343  this host cannot create the symbolic link the vector needs: %v
+    loadDriverRejections                                           builddriver_rejection_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    loadDriverRejections                                           builddriver_rejection_conformance_test.go:37  %s publishes no build-drivers vector
+    driverRejectionMappings                                        builddriver_rejection_conformance_test.go:307  this host cannot create the symbolic link the vector needs: %v
+    symlinkOrSkip                                                  fingerprint_equivalence_test.go:222  symlink unavailable: %v
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:422  hashes the whole host GOROOT
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:426  no GOROOT available
+    TestFingerprintTraversalMatchesLegacyOnRealToolchain           fingerprint_equivalence_test.go:429  GOROOT %s unreadable: %v
+    TestFingerprintReportsUnreadableDirectoryIdentically           fingerprint_equivalence_test.go:1004  root ignores directory permissions
+    benchmarkRoot                                                  fingerprint_equivalence_test.go:1025  no GOROOT available
+    benchmarkRoot                                                  fingerprint_equivalence_test.go:1028  GOROOT %s unreadable: %v
+    TestCandidateRC4ToolchainArtifacts                             fingerprint_test.go:82  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateRC4ToolchainArtifacts                             fingerprint_test.go:86  %s publishes no expected/build-driver artifacts
+    TestFingerprintRejectsEscapingAndAbsoluteLinks                 fingerprint_test.go:118  symlink unavailable: %v
+    TestFingerprintRejectsDanglingLink                             fingerprint_test.go:135  symlink unavailable: %v
+    TestVerifyArtifactRejectsHardLinks                             graph_test.go:90  hard links unavailable: %v
+    TestCandidateLinkOutsideDerivedGOROOTFails                     session_test.go:217  symlink unavailable: %v
+    TestRealTrustedGoProbe                                         session_test.go:410  set CURATOR_REAL_GO_TEST=1 for the bounded native toolchain probe
+    HELPERS: ['benchmarkRoot', 'driverRejectionMappings', 'loadDriverRejections', 'loadHostExecutionVector', 'loadPositiveVectors', 'materializeToolchain', 'symlinkOrSkip']
+--- internal/buildcache
+    loadCachePositiveCases                                         builddriver_positive_conformance_test.go:27  CURATOR_CONFORMANCE_ROOT is not set
+    loadCachePositiveCases                                         builddriver_positive_conformance_test.go:31  %s publishes no build-drivers vector
+    TestProtectedCacheHitVector                                    builddriver_positive_conformance_test.go:55  this conformance root publishes no protected cache-hit vector
+    TestCompilerFreeDryRunMissVector                               builddriver_positive_conformance_test.go:101  this conformance root publishes no compiler-free dry-run vector
+    loadCacheRejections                                            builddriver_rejection_conformance_test.go:34  CURATOR_CONFORMANCE_ROOT is not set
+    loadCacheRejections                                            builddriver_rejection_conformance_test.go:38  %s publishes no build-drivers vector
+    cacheRejectionMappings                                         builddriver_rejection_conformance_test.go:245  this host cannot create the symbolic link the vector needs: %v
+    newTestStore                                                   cache_test.go:444  persistent protection is unsupported on this platform
+    newSweepStore                                                  collect_test.go:26  this host cannot create manager-protected state: %v
+    linkDirectoryForTest                                           collect_windows_test.go:26  this host cannot create a directory reparse point: %v: %s
+    TestCandidateCacheOutcomeVocabulary                            conformance_test.go:13  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateCacheOutcomeVocabulary                            conformance_test.go:44  this conformance root publishes no cache_publication_cases group
+    TestWindowsProtectedStateMatrix                                protection_windows_test.go:100  creating Windows symlink requires host support: %v
+    HELPERS: ['cacheRejectionMappings', 'linkDirectoryForTest', 'loadCachePositiveCases', 'loadCacheRejections', 'newSweepStore', 'newTestStore']
+--- internal/buildsource
+    loadBuildSourceCases                                           builddriver_conformance_test.go:96  CURATOR_CONFORMANCE_ROOT is not set
+    loadBuildSourceCases                                           builddriver_conformance_test.go:100  %s publishes no build-drivers vector
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:128  this conformance root publishes no build-source cases
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:196  this conformance root publishes no install-marker regression payloads
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:220  this host cannot create a non-UTF-8 filename: %v
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:238  this host folds the alias into one directory member, so no duplicate encoded path is reach
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:249  this host cannot create the symbolic link the vector needs: %v
+    TestBuildSourceIdentityVectors                                 builddriver_conformance_test.go:258  this host cannot create the FIFO the vector needs
+    TestRejectsInvalidPathsLinksAndCollisions                      buildsource_test.go:143  symlink unavailable: %v
+    TestRejectsInvalidPathsLinksAndCollisions                      buildsource_test.go:158  symlink unavailable: %v
+    TestFrozenTokenRejectsMutation                                 buildsource_test.go:228  symlink unavailable: %v
+    TestWithValidatedOrdersCallbackAndRejectsMutation              buildsource_test.go:289  symlink unavailable: %v
+    TestBuildSourceConformanceVectors                              conformance_test.go:14  CURATOR_CONFORMANCE_ROOT is not set
+    HELPERS: ['loadBuildSourceCases']
+--- internal/buildmeta
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:66  CURATOR_CONFORMANCE_ROOT is not set
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:70  %s publishes no build-drivers vector
+    loadPolicyVectors                                              builddriver_policy_conformance_test.go:80  %s publishes no portable execution-policy cache identity
+    TestPortableExecutionPolicyIsTheOnlyAdmittedBuildInput         builddriver_policy_conformance_test.go:126  this root publishes no portable-execution-policy positive vector
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:105  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:109  %s publishes no expected/build-driver artifacts
+    TestCandidateBuildMetadataArtifacts                            buildmeta_test.go:113  %s is a pre-revision root without the portable execution policy
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:140  CURATOR_CONFORMANCE_ROOT is not set
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:145  %s publishes no build-receipt-v1 schema case
+    TestCandidateBuildReceiptSchemaCase                            buildmeta_test.go:158  %s is a pre-revision root without the portable execution policy
+    HELPERS: ['loadPolicyVectors']
+--- internal/install
+    authoritativeDriverCases                                       cache_conformance_test.go:45  CURATOR_CONFORMANCE_ROOT is not set
+    TestInstallHelperProcess                                       commit_test.go:772  helper process
+    authoritativeDryRunCases                                       dryrun_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    TestRuntimeLauncherResolvesSkillDependencyWithoutShellHook     install_test.go:268  executes POSIX skill commands
+    TestRuntimeLauncherCapturesDeclaredSystemDependency            install_test.go:312  executes POSIX skill commands
+    TestDefaultToolchainProbeRemovesItsProbeRootOnSuccess          stage_test.go:1586  no trusted Go toolchain is resolvable here: %v
+    HELPERS: ['authoritativeDriverCases', 'authoritativeDryRunCases']
+--- internal/install/atomicity
+    TestAdapterMirrorLinksAreJournaledAndRestoredExactly           commit_atomicity_test.go:292  %s mode did not produce a link on this filesystem: %s
+--- internal/transaction
+    mustSymlink                                                    entry_test.go:15  symlinks unavailable: %v
+    TestValidateIndependentTargetNamespacesRejectsOverlappingPaths namespace_pass_test.go:158  filesystem does not support hard links: %v
+    TestValidateIndependentTargetNamespacesRejectsOverlappingPaths namespace_pass_test.go:170  filesystem does not support symbolic links: %v
+    TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves     namespace_pass_test.go:234  filesystem does not support hard links: %v
+    TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves     namespace_pass_test.go:246  filesystem does not support symbolic links: %v
+    TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped   namespace_pass_test.go:315  filesystem does not support symbolic links: %v
+    TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON       recovery_corruption_test.go:174  symlink unavailable: %v
+    TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces   validation_test.go:218  symlink unavailable: %v
+    TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces   validation_test.go:241  hard links unavailable: %v
+    HELPERS: ['mustSymlink']
+--- internal/interop
+    suiteRoot                                                      golden_test.go:37  CURATOR_CONFORMANCE_ROOT is not set
+    HELPERS: ['suiteRoot']
+--- internal/runtimestore
+    TestCandidateManagerLauncherContract                           conformance_test.go:14  CURATOR_CONFORMANCE_ROOT is not set
+    authoritativeLauncherCases                                     launcher_conformance_test.go:33  CURATOR_CONFORMANCE_ROOT is not set
+    TestUnixLauncherCarriesRuntimePathArgumentsAndExitStatus       runtimestore_test.go:148  executes a POSIX launcher
+    TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly targets_test.go:216  POSIX post-install launch fixture
+    HELPERS: ['authoritativeLauncherCases']
+--- internal/scopes
+    authoritativeGCCases                                           gc_conformance_test.go:36  CURATOR_CONFORMANCE_ROOT is not set
+    TestCollectStaysFailSafeAcrossConsecutivePasses                gc_conservative_test.go:169  this environment can inspect a mode-000 directory: %v
+    linkDirectoryForTest                                           gc_conservative_windows_test.go:78  this host cannot create a directory reparse point: %v: %s
+    publishRealEntry                                               gc_integration_test.go:178  this platform cannot publish a protected cache entry: %v
+    protectedTestHome                                              gc_integration_windows_test.go:22  this host cannot create manager-protected state: %v
+    TestCollectSkipsTheBuildSweepOnUnprovableReferences            gc_test.go:205  this environment can read a mode-000 directory
+    HELPERS: ['authoritativeGCCases', 'linkDirectoryForTest', 'protectedTestHome', 'publishRealEntry']
+--- internal/closure
+    TestClosureOrderingConformanceVector                           conformance_test.go:16  CURATOR_CONFORMANCE_ROOT is not set
+    TestBuildCommandOrderingConformanceVector                      conformance_test.go:60  CURATOR_CONFORMANCE_ROOT is not set
+    TestBuildCommandOrderingConformanceVector                      conformance_test.go:87  this conformance root publishes no build_order_cases group

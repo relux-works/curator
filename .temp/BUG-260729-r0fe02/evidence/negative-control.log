@@ -1,0 +1,18 @@
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.01s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read (0.00s)
+        --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/before_the_first_chunk (0.00s)
+            fingerprint_equivalence_test.go:572: legacy go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, scoped go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading
+        --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/after_a_partial_chunk (0.00s)
+            fingerprint_equivalence_test.go:572: legacy go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, scoped go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading
+        --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_inside_a_record_read/after_the_last_chunk (0.00s)
+            fingerprint_equivalence_test.go:572: legacy go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, scoped go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading
+--- FAIL: TestDigestCopyDiagnosticPrecedence (0.00s)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_before_the_first_byte (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_mid-file (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+    --- FAIL: TestDigestCopyDiagnosticPrecedence/abandoned_after_the_last_byte (0.00s)
+        fingerprint_equivalence_test.go:674: code = "toolchain_mutated", want "toolchain_timeout" (error go-v1 toolchain_mutated: toolchain file "bin/go" changed while reading)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	0.893s
+FAIL

@@ -1,0 +1,58 @@
+{
+  "id": "RUN-260823-00b0c3",
+  "task_id": "TASK-260822-3nvx91",
+  "created_at": "2026-08-23T09:41:23.380303Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "medium",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "codex",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "service_tier": "default",
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260823-13-41-23_-implementer--developer--codex-_TASK-260822-3nvx91.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "timeout": "25m0s",
+  "log_resource_name": "TASK-260822-3nvx91_spawn-log_-implementer--developer--codex-_RUN-260823-00b0c3.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260822-3nvx91_results.md",
+    "TASK-260822-3nvx91_review-verdict.md",
+    "TASK-260822-3nvx91_spawn-log_-implementer--developer--claude-_RUN-260822-8195d6.log",
+    "TASK-260822-3nvx91_spawn-log_-implementer--developer--codex-_RUN-260823-48db47.log",
+    "TASK-260822-3nvx91_spawn-log_-reviewer--reviewer--codex-_RUN-260823-d31ef8.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260822-3nvx91_results.md": "1cc03c08e07e2a65bb03aa2b3ae6e6c839a9395cb8319ef78c991ee1a875b988",
+    "TASK-260822-3nvx91_review-verdict.md": "0fe5a4dc244c7cadb423d7d659722d3cc17ff6e657872e02b4d999dd58b3ae70"
+  },
+  "require_outcome_artifact": true
+}

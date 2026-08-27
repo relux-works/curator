@@ -1,0 +1,189 @@
+{
+  "alignment": {
+    "p1_no_widening": true,
+    "p2_no_narrowing": true,
+    "security_partition_empty": false
+  },
+  "controls": [
+    {
+      "failed": true,
+      "findings": 3,
+      "id": "C1-lead-only-recognition"
+    },
+    {
+      "failed": true,
+      "findings": 1,
+      "id": "C2-substring-recognition"
+    },
+    {
+      "failed": true,
+      "findings": 7,
+      "id": "C3-exit-status-as-semantics"
+    },
+    {
+      "failed": true,
+      "findings": 3,
+      "id": "C4-build-as-the-isolated-command"
+    },
+    {
+      "failed": true,
+      "findings": 1,
+      "id": "C5-unearned-path-closure-zero"
+    },
+    {
+      "failed": true,
+      "findings": 2,
+      "id": "C6-plugin-closure-unchecked"
+    },
+    {
+      "failed": true,
+      "findings": 16,
+      "id": "C7-lenient-plan-parsing"
+    },
+    {
+      "failed": true,
+      "findings": 1,
+      "id": "C8-lexical-containment"
+    },
+    {
+      "failed": true,
+      "findings": 3,
+      "id": "C9-collapsing-module-name-derivation"
+    }
+  ],
+  "structural": [
+    {
+      "id": "S1-path-closure",
+      "verdict": "match"
+    },
+    {
+      "id": "S2-harness-sensitivity",
+      "verdict": "match"
+    },
+    {
+      "id": "S2b-required-closure-is-four-members",
+      "verdict": "match"
+    },
+    {
+      "id": "S3-job-plan-verification-is-total",
+      "verdict": "match"
+    },
+    {
+      "id": "S3b-linker-resolution",
+      "verdict": "match"
+    },
+    {
+      "id": "S4-plugin-path-closure",
+      "verdict": "match"
+    },
+    {
+      "id": "S5-declared-sdk-would-open-a-plugin-tree",
+      "verdict": "match"
+    },
+    {
+      "id": "S6-external-platform-macro-unavailable",
+      "verdict": "match"
+    },
+    {
+      "id": "S7-toolchain-macro-loads-in-process",
+      "verdict": "match"
+    },
+    {
+      "id": "S8-graph-phase-executes-no-package-code",
+      "verdict": "match"
+    },
+    {
+      "id": "S9-manifest-is-a-program",
+      "verdict": "match"
+    },
+    {
+      "id": "S10-tools-version-is-header-only",
+      "verdict": "match"
+    },
+    {
+      "id": "S10b-upstream-scans-into-string-literals",
+      "verdict": "match"
+    },
+    {
+      "id": "S11-representability-is-not-admission",
+      "verdict": "match"
+    },
+    {
+      "id": "S12-unserved-target-fails-before-any-frontend",
+      "verdict": "match"
+    },
+    {
+      "id": "S13-artifact-class",
+      "verdict": "match"
+    },
+    {
+      "id": "S14-output-path-is-the-only-moving-input",
+      "verdict": "match"
+    },
+    {
+      "id": "S15-swift-version-file-is-inert",
+      "verdict": "match"
+    },
+    {
+      "id": "S16-compile-writes-nothing-into-the-source-tree",
+      "verdict": "match"
+    },
+    {
+      "id": "S17-graph-and-compile-vectors-differ-by-one-token",
+      "verdict": "match"
+    },
+    {
+      "id": "S18-malformed-plans-are-rejected",
+      "verdict": "match"
+    },
+    {
+      "id": "S19-symlink-escape-is-caught-by-resolved-containment",
+      "verdict": "match"
+    },
+    {
+      "id": "S20-absent-plugin-path-that-appears-before-the-permit-is-caught",
+      "verdict": "match"
+    },
+    {
+      "id": "S21-bound-executable-that-changes-before-the-permit-is-caught",
+      "verdict": "match"
+    },
+    {
+      "id": "S22-the-real-plan-verifies-under-the-strict-grammar",
+      "verdict": "match"
+    },
+    {
+      "id": "S23-module-name-derivation-is-total-and-collision-free",
+      "verdict": "match"
+    },
+    {
+      "id": "S24-module-prefix-is-reserved-in-the-measured-closure",
+      "verdict": "match"
+    },
+    {
+      "id": "S25-response-files-are-live-and-unreachable",
+      "verdict": "match"
+    },
+    {
+      "id": "S26-sdk-derived-plugin-tree-stays-in-operation-private-state",
+      "verdict": "match"
+    },
+    {
+      "id": "S27-a-control-byte-in-a-source-name-breaks-the-plan-grammar",
+      "verdict": "match"
+    }
+  ],
+  "summary": {
+    "cases": 23,
+    "closure_checks": 32,
+    "closure_failures": 0,
+    "controls_failing_as_required": 9,
+    "controls_total": 9,
+    "divergences": 0,
+    "green": true,
+    "matched": 23,
+    "not_run": 0,
+    "structural_divergences": 0,
+    "structural_total": 30
+  }
+}

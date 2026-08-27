@@ -1,0 +1,40 @@
+TASK-260728-12pnm1 gate transcript
+Each command run standalone. Exit codes are the real ones; nothing is piped through tee.
+Host: macOS 26.5 arm64; Go go1.25.5; Rust 1.91.0 / cargo 1.91.0
+
+== probe module: .temp/TASK-260728-12pnm1/probe ==
+gofmt -l .                       exit=0  (no output above = formatted)
+go vet ./...                     exit=0
+go build ./...                   exit=0
+ok  	rustboundaryprobe	0.234s
+go test -count=1 ./...           exit=0
+golangci-lint                    NOT RUN: not installed on this host
+
+== probe runs ==
+probe, macOS, SDK pinned         exit=0  green: true
+probe, toolchain absent          exit=0  18 cases not_run, nothing installed
+
+== curator repository ==
+go build ./...                   exit=0
+go vet ./...                     exit=0
+go test ./...                    exit=0
+gofmt -l .                       exit=0  lists 4 vendored third-party files under .temp/TASK-260720-1zntv0/, another task's scratch tree; 0 from this task
+make check                       exit=2  EXPECTED-RED: fails at its gofmt stage on those same 4 vendored files; no tracked project file was modified by this task
+
+== curator-spec ==
+validate.py, clean 57c1f56       exit=0  baseline: 30 schemas, 93 vector files
+validate.py, task worktree       exit=1  EXPECTED-RED, attributed below
+
+Attribution for the two expected-red gates:
+  make check     -> gofmt stage, 4 files, all under .temp/TASK-260720-1zntv0/cycle2/curator/vendor/
+  validate.py    -> its schema, manifest, review-evidence and vector-semantics checks all pass;
+                    the link check reports 3 broken links, all inside docs/external-build-repositories.md
+                    and docs/portable-go-execution-policy.md, which were copied into this worktree from
+                    another task's in-flight tree to close the link graph reachable from decision 0007.
+                    They point at release/1.0.0-rc.5.json and conformance/v1/vectors/go-host-execution-policy.json,
+                    neither of which exists at base commit 57c1f56. The clean-tree baseline above exits 0,
+                    and the scoped check below shows 0 broken links in the two documents this task authored.
+
+scoped link check over the two authored documents:
+  4 local links scanned, 0 broken
+  exit=0

@@ -1,0 +1,215 @@
+=== group 1: revision-3 discovery/guard forms — the defect ===
+A rev3 $(shell go list|grep) on a failing go list              expected=0 actual=0  PASS
+      | load: parse internal/scopes/gc.go: syntax error
+      | BAD_PKGS=[github.com/relux-works/curator/cmd/curator github.com/relux-works/curator/internal/install]
+      | recipe body ran: discovery did NOT fail closed
+
+B rev3 'go list | grep -q' guard on a failing go list          expected=0 actual=0  PASS
+      | load: parse internal/scopes/gc.go: syntax error
+      | bad-guard: reported ok
+
+=== group 2: revision-4 require-toolchain — the cycle-3 F1 defect ===
+C rev4 accepts GO from rootA paired with GOFMT from rootB      expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | rev4 require-toolchain: ACCEPTED
+
+D rev4 accepts a launcher whose GOROOT is not the approved root expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootB
+      | rev4 require-toolchain: ACCEPTED
+
+E rev4 accepts a wrapper-forced GOTOOLCHAIN=auto               expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | rev4 require-toolchain: ACCEPTED
+
+=== group 3: corrected recipes — healthy must pass ===
+F corrected: healthy native host                               expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=off
+      | require-toolchain: ok
+      | linux-package-guard: ok
+      | test-linux: 3 of 4 packages (excluded: github.com/relux-works/curator/internal/godriver)
+      | STUB go test test -count=1 -timeout 30m github.com/relux-works/curator/cmd/curator github.com/relux-works/curator/internal/install github.com/relux-works/curator/internal/adapters
+
+G corrected: healthy hosted runner (setup-go shape)            expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=off
+      | require-toolchain: ok
+      | linux-package-guard: ok
+
+=== group 4: corrected recipes — must fail closed ===
+H go list fails mid-listing                                    expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=off
+      | require-toolchain: ok
+      | load: parse internal/scopes/gc.go: syntax error
+      | guard: go list ./... failed; cannot validate the Linux exclusion
+      | make: *** [linux-package-guard] Error 1
+
+I native host with no GOROOT_EXPECTED                          expected=2 actual=2  PASS
+      | toolchain: GOROOT_EXPECTED is required on a native host (see 5.0)
+      | make: *** [require-toolchain] Error 1
+
+J relative GO on a native host                                 expected=2 actual=2  PASS
+      | toolchain: GO must be an absolute path; got: go
+      | make: *** [require-toolchain] Error 1
+
+K launcher reports go1.25.1, go.mod needs 1.25.5               expected=2 actual=2  PASS
+      | toolchain: go version go1.25.1 darwin/arm64
+      | toolchain: expected go1.25.5, got: go version go1.25.1 darwin/arm64
+      | make: *** [require-toolchain] Error 1
+
+L reported GOROOT != approved GOROOT_EXPECTED                  expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootB
+      | toolchain: GOROOT drift: reported /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootB != approved /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | make: *** [require-toolchain] Error 1
+
+M GOFMT comes from a different root than the launcher          expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: formatter /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootB/bin/gofmt is not /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA/bin/gofmt
+      | make: *** [require-toolchain] Error 1
+
+N wrapper-forced GOTOOLCHAIN=auto                              expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: GOTOOLCHAIN=auto
+      | toolchain: GOTOOLCHAIN=auto, not local -- an implicit toolchain download is possible
+      | make: *** [require-toolchain] Error 1
+
+O wrapper-forced user GOENV file                               expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=/Users/u/Library/Application Support/go/env
+      | toolchain: GOENV=/Users/u/Library/Application Support/go/env, not off -- a per-user go env file can inject GOFLAGS/GOTOOLCHAIN
+      | make: *** [require-toolchain] Error 1
+
+P go.mod drifts to 1.25.4 while the Makefile pins go1.25.5     expected=2 actual=2  PASS
+      | toolchain: go.mod requires go1.25.4 but the Makefile pins go1.25.5
+      | make: *** [require-toolchain] Error 1
+
+=== group 5: the hosted Make exception must not bypass identity ===
+Q hosted runner, GOFMT from a different root                   expected=2 actual=2  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: formatter /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootB/bin/gofmt is not /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA/bin/gofmt
+      | make: *** [require-toolchain] Error 1
+
+=== group 6: F3 source staging ===
+R rev4 unchecked tar|tar pipeline hides a failed producer      expected=0 actual=0  PASS
+      | rev4 staging: completed, 1 of 3 files present
+
+S corrected staging rejects the same failed producer           expected=1 actual=1  PASS
+      | stage: origin enumerated 3 files
+      | stage: source archive creation failed rc=1
+
+T corrected staging catches a MISSING file after extraction    expected=1 actual=1  PASS
+      | stage: origin enumerated 3 files
+      | shasum: ./b.txt: No such file or directory
+      | stage: per-file verification failed (changed or missing)
+
+U corrected staging catches an EXTRA file after extraction     expected=1 actual=1  PASS
+      | stage: origin enumerated 3 files
+      | stage: destination has 4 files, origin enumerated 3
+
+=== group 7 (cycle 5, F2): origin enumeration ===
+V rev5 find|sort|xargs hides a failing find                    expected=0 actual=0  PASS
+      | rev5 enumeration: completed, 2 of 3 files
+
+W corrected enumeration, healthy origin                        expected=0 actual=0  PASS
+      | stage: origin enumerated 3 files
+
+X corrected enumeration rejects a partial-then-failing find    expected=1 actual=1  PASS
+      | stage: origin path enumeration failed rc=1
+
+Y corrected enumeration rejects a failing sort                 expected=1 actual=1  PASS
+      | stage: origin path sort failed rc=1
+
+Z corrected enumeration rejects a failing digest producer      expected=1 actual=1  PASS
+      | stage: origin digest generation failed rc=1
+
+AA a failed enumeration produces NO archive                    expected=0 actual=0  PASS
+      | stage: origin path enumeration failed rc=1
+      | assert: staging failed rc=1 and produced no archive
+
+=== group 8 (cycle 5, F1): the hosted toolchain-identity step ===
+AB hosted identity step, healthy POSIX runner                  expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=off
+      | ci-toolchain-identity: ok
+
+AC hosted identity step rejects go1.25.1                       expected=1 actual=1  PASS
+      | toolchain: go version go1.25.1 darwin/arm64
+      | toolchain: expected go1.25.5, got: go version go1.25.1 darwin/arm64
+
+AD hosted identity step rejects a forced GOTOOLCHAIN=auto      expected=1 actual=1  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: GOTOOLCHAIN=auto
+      | toolchain: GOTOOLCHAIN=auto, not local
+
+AE hosted identity step rejects a user GOENV file              expected=1 actual=1  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=/Users/u/Library/Application Support/go/env
+      | toolchain: GOENV=/Users/u/Library/Application Support/go/env, not off
+
+AF hosted identity step rejects a cross-root gofmt             expected=1 actual=1  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: formatter /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/fmtonly/gofmt is not /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA/bin/gofmt
+
+AG identity step, Windows-shape root (backslash, .exe, hard link) expected=0 actual=0  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668\rootW
+      | toolchain: GOTOOLCHAIN=local
+      | toolchain: GOENV=off
+      | ci-toolchain-identity: ok
+
+AH Windows-shape root, cross-root gofmt                        expected=1 actual=1  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668\rootW
+      | toolchain: formatter /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/winpath-badfmt/gofmt is not /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668ootW/bin/gofmt
+
+AI identity step rejects a shim launcher outside GOROOT        expected=1 actual=1  PASS
+      | toolchain: go version go1.25.5 darwin/arm64
+      | toolchain: GOROOT=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA
+      | toolchain: launcher /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/shim/go is not /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T//osjeay-verify-recipes.51668/rootA/bin/go
+
+AJ identity step rejects go.mod drift to 1.25.4                expected=1 actual=1  PASS
+      | toolchain: go.mod requires go1.25.4 but this workflow pins go1.25.5
+
+=== group 9 (cycle 5, F3): W2 empty-root precondition (ssh/scp stubbed) ===
+AK W2 on an absent base creates it, proves empty, transports   expected=0 actual=0  PASS
+      | W2: base created and proved empty
+      | W3: transport complete
+
+AL W2 stops on a stale pre-existing base, before transport     expected=0 actual=0  PASS
+      | W2: base already exists on the remote host; run W9, confirm absence, then re-run W2
+      | assert: W2 failed rc=1 and nothing crossed the wire
+
+AM W2 stops when the created base is not empty, before transport expected=0 actual=0  PASS
+      | W2: base is not empty after creation (1 entries); a stale file would join the suite input
+      | assert: W2 failed rc=1 and nothing crossed the wire
+
+AN W9 removes the base and confirms absence                    expected=0 actual=0  PASS
+      | W9: base removed and absence confirmed
+
+AO W9 rejects a cleanup that reported success but left the base expected=1 actual=1  PASS
+      | W9: base still present after cleanup; do NOT retry the lane
+
+-----------------------------------------------------------
+ALL 41 EXPECTATIONS MET

@@ -1,0 +1,69 @@
+{
+  "id": "RUN-260729-967659",
+  "task_id": "TASK-260720-z9j4c9",
+  "created_at": "2026-07-29T21:37:15.578149Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-01-37-15_-implementer--developer--codex-_TASK-260720-z9j4c9.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-z9j4c9_spawn-log_-implementer--developer--codex-_RUN-260729-967659.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-z9j4c9_csk-build-components.puml",
+    "TASK-260720-z9j4c9_csk-build-components.svg",
+    "TASK-260720-z9j4c9_results.md",
+    "TASK-260720-z9j4c9_review-verdict.md",
+    "TASK-260720-z9j4c9_reviewer-diff-check.log",
+    "TASK-260720-z9j4c9_reviewer-focused-pytest.log",
+    "TASK-260720-z9j4c9_reviewer-mypy.log",
+    "TASK-260720-z9j4c9_reviewer-schema1-build-field-probe.log",
+    "TASK-260720-z9j4c9_reviewer-tool-readiness.log",
+    "TASK-260720-z9j4c9_spawn-log_-implementer--developer--codex-_RUN-260729-577eea.log",
+    "TASK-260720-z9j4c9_spawn-log_-reviewer--reviewer--codex-_RUN-260729-0f97f6.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-z9j4c9_csk-build-components.puml": "a2d3bc2dc9fc1044f7cc1b85349a7e92040ac737a536f6a96c65657a971465f1",
+    "TASK-260720-z9j4c9_csk-build-components.svg": "9dc8f283eb0ed8ff31c0ba906b2e3602ad0a725f6b8e59ff7eb18e450f06dab8",
+    "TASK-260720-z9j4c9_results.md": "494b18b82d32cb5f60abab9c1917bca9b47f1a63ffa4b26cf0b19a695d67459a",
+    "TASK-260720-z9j4c9_review-verdict.md": "d5ee74a2ef551569ad080216897d8d29345058903af7cd53d0c17fea6ea449c2",
+    "TASK-260720-z9j4c9_reviewer-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "TASK-260720-z9j4c9_reviewer-focused-pytest.log": "d5e44ad2fd9b2208360c812421463b1713280ab7910fea65dbb2be8adbb4a569",
+    "TASK-260720-z9j4c9_reviewer-mypy.log": "070c9c331a2e491aabe528a802fadba01ab960cc6017b0199149ee76a8b866b5",
+    "TASK-260720-z9j4c9_reviewer-schema1-build-field-probe.log": "eb91f48984b25dc891da0927d2627dccce3acc180e97ba8406beb6fdc9a6a5aa",
+    "TASK-260720-z9j4c9_reviewer-tool-readiness.log": "cbca68be5946074d475634922df58f0f850699d48ddd62f8ff1349c2e64ea934"
+  },
+  "require_outcome_artifact": true
+}

@@ -1,0 +1,86 @@
+# TASK-260728-168smo Kotlin host evidence
+# host: Darwin 25.5.0 arm64
+# date-free by design; see board resource for run context
+----------------------------------------------------------------
+argv: kotlinc -version 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 38
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+info: kotlinc-jvm 2.4.10 (JRE 26.0.1)
+----------------------------------------------------------------
+argv: ls /opt/homebrew/Cellar/kotlin/2.4.10/libexec/lib 
+exit: 0
+stdout_bytes: 1536
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+allopen-compiler-plugin.jar
+annotations-13.0.jar
+assignment-compiler-plugin.jar
+compose-compiler-plugin.jar
+jklib-compiler.jar
+jvm-abi-gen.jar
+kotlin-annotation-processing-cli.jar
+kotlin-annotation-processing-runtime.jar
+kotlin-annotation-processing.jar
+kotlin-annotations-jvm-sources.jar
+kotlin-annotations-jvm.jar
+kotlin-compiler.jar
+kotlin-daemon-client.jar
+kotlin-daemon.jar
+kotlin-main-kts.jar
+kotlin-metadata-jvm-sources.jar
+kotlin-metadata-jvm.jar
+kotlin-preloader.jar
+kotlin-reflect-sources.jar
+kotlin-reflect.jar
+kotlin-runner.jar
+kotlin-script-runtime-sources.jar
+kotlin-script-runtime.jar
+kotlin-scripting-common.jar
+kotlin-scripting-compiler-impl.jar
+kotlin-scripting-compiler.jar
+kotlin-scripting-jvm.jar
+kotlin-serialization-compiler-plugin.jar
+kotlin-stdlib-jdk7-sources.jar
+kotlin-stdlib-jdk7.jar
+kotlin-stdlib-jdk8-sources.jar
+kotlin-stdlib-jdk8.jar
+kotlin-stdlib-js-sources.jar
+kotlin-stdlib-js.klib
+kotlin-stdlib-sources.jar
+kotlin-stdlib-wasm-js.klib
+kotlin-stdlib.jar
+kotlin-test-js-sources.jar
+kotlin-test-js.klib
+kotlin-test-junit-sources.jar
+--- stderr (first 40 lines) ---
+----------------------------------------------------------------
+argv: ls /opt/homebrew/Cellar/kotlin/2.4.10/libexec 
+exit: 0
+stdout_bytes: 18
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+bin
+build.txt
+lib
+--- stderr (first 40 lines) ---
+----------------------------------------------------------------
+argv: file /opt/homebrew/Cellar/kotlin/2.4.10/libexec/bin/kotlinc-jvm 
+exit: 0
+stdout_bytes: 114
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+/opt/homebrew/Cellar/kotlin/2.4.10/libexec/bin/kotlinc-jvm: Bourne-Again shell script text executable, ASCII text
+--- stderr (first 40 lines) ---
+----------------------------------------------------------------
+argv: java -version 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 158
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+openjdk version "26.0.1" 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 26.0.1)
+OpenJDK 64-Bit Server VM Homebrew (build 26.0.1, mixed mode, sharing)

@@ -1,0 +1,407 @@
+TASK-260728-168smo — command evidence, rework cycle 3
+=====================================================
+
+This cycle qualifies windows/amd64. Records W1-W16 below are the qualification.
+The macOS records M1-M19 of cycle 2 are retained unchanged in
+TASK-260728-168smo_command-evidence.log (cycle 2) and are summarised here only
+where cycle 3 corrects or extends them (records C1-C3).
+
+Raw host logs and the ETW parse are in TASK-260728-168smo_probe.tar.gz under
+win-evidence/ ; every PowerShell suite that produced them is under win/.
+
+
+Host
+----
+DESKTOP-3PBO632, reached over `ssh win`, OpenSSH, default shell cmd.exe
+Microsoft Windows 10 Pro, 10.0.19045.6456, PROCESSOR_ARCHITECTURE=AMD64
+Windows PowerShell 5.1.19041.6456, running account DESKTOP-3PBO632\admin
+  SID S-1-5-21-2566270768-74292453-1896159616-1001, elevated
+Before the run: no java.exe on PATH, no %USERPROFILE%\.konan, 78.7 GB free
+All work in one private directory C:\kn168, removed afterwards.
+
+
+Subjects
+--------
+Official JetBrains release v2.4.10, GitHub release asset
+  kotlin-native-prebuilt-windows-x86_64-2.4.10.zip           222,016,219 B
+published checksum asset ...zip.sha256 (64 B)
+  ce99eba1f4faec1d77f4bbd747bb722404ef11f2c349ec70c59d4c002859380f
+locally computed
+  ce99eba1f4faec1d77f4bbd747bb722404ef11f2c349ec70c59d4c002859380f   MATCH
+
+Eclipse Temurin, Adoptium API assets/latest/21/hotspot?os=windows&arch=x64
+  release jdk-21.0.11+10
+  OpenJDK21U-jdk_x64_windows_hotspot_21.0.11_10.zip          205,073,954 B
+published checksum (Adoptium API `binary.package.checksum`)
+  d3625e7cadf23787ea540229544b6e2ab494b3b54da1801879e583e1dfee0a64
+locally computed
+  d3625e7cadf23787ea540229544b6e2ab494b3b54da1801879e583e1dfee0a64   MATCH
+
+
+Shorthands
+----------
+  <b>     = C:\kn168\b                       the curated bundle
+  <java>  = <b>\jdk\bin\java.exe
+  <jar>   = <b>\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar
+  <main>  = org.jetbrains.kotlin.cli.utilities.MainKt
+  <jvm>   = -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8
+            -Duser.language=en -Duser.country=US -Dkonan.home=<b>\kotlin-native
+  <ov>    = C:\kn168\ov                      the operation-private overlay
+  src\main.kt   = fun main() { println("curator-kotlin-native-probe") }
+  src2\main.kt  = import platform.posix.getpid
+                  import platform.windows.GetTickCount
+                  fun main() { println("curator-kotlin-native-probe " +
+                                       getpid() + " " + GetTickCount()) }
+
+Unless stated otherwise every compile below ran with
+  PATH  = C:\kn168\emptybin      (an empty manager-owned directory)
+  TEMP  = TMP = C:\kn168\stg     (operation-private staging)
+  KONAN_USE_INTERNAL_SERVER, JDK_JAVA_OPTIONS, JAVA_TOOL_OPTIONS,
+  _JAVA_OPTIONS, CLASSPATH, JAVA_HOME, JAVACMD, JAVA_OPTS, KOTLIN_HOME,
+  KOTLIN_COMPILER, KOTLIN_TOOL, KOTLIN_RUNNER,
+  LIBCLANG_DISABLE_CRASH_RECOVERY   all removed from the environment.
+
+
+W1 — the Windows distribution contains no regular executable
+------------------------------------------------------------
+  <b>\kotlin-native\bin  ->  13 entries
+    cinterop  cinterop.bat  generate-platform  generate-platform.bat
+    klib  klib.bat  konan-lldb  konanc  konanc.bat  kotlinc-native
+    kotlinc-native.bat  run_konan  run_konan.bat
+  Get-ChildItem <b>\kotlin-native -Recurse -File -Include *.exe   ->  count=0
+  <b>\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar
+                                                            83,903,904 B
+Consequence: decision 0007 section 3 cannot be satisfied by the vendor archive
+on Windows either. Cycle 1 established the same for macOS.
+
+W2 — run_konan.bat is inadmissible (source read)
+-------------------------------------------------
+  JAVA_HOME -> %JAVA_HOME%\bin\java.exe if it exists, else the bare name `java`
+    resolved by cmd.exe through PATH
+  every -D argument and the payload of every -J argument is appended to the JVM
+  _TOOL_CLASS selects the compiler main class
+  sets LIBCLANG_DISABLE_CRASH_RECOVERY=1
+  konanc.bat is `call %~dps0run_konan.bat konanc %*`
+
+W3 — the bundle
+----------------
+  <b>\jdk\bin\java.exe        50,344 B   Archive, LinkType=(none)
+  layout  jdk\  kotlin-native\  konan-data\
+  curated tree            27,867 files   2,456,792,320 B
+  tree digest (SHA-256 over "<relpath> <sha256>\n" lines, sorted by relpath)
+    63d96ff7c488e713dedbf7029237cfc6cd030ae4c1caf11c8ba2274395badae3
+  The same digest was recomputed three times across the run, including once
+  after the tree had been disturbed (a probe deleted dependencies\.extracted)
+  and rebuilt from the same inputs. Curation is byte-reproducible.
+
+W4 — Stage A probe P1, konanc -version                 exit 0
+--------------------------------------------------------------
+  <java> <jvm> -cp <jar> <main> konanc -version
+  stdout  23 B
+    hex 4b6f746c696e2f4e61746976653a20322e342e31300d0a
+        = "Kotlin/Native: 2.4.10" CR LF
+  stderr  50 B
+        info: kotlinc-native 2.4.10 (JRE 21.0.11+10-LTS)
+  macOS cycle 2 measured the same line with an LF terminator, 22 B. The
+  normalization therefore splits lines on LF or CRLF with the terminator
+  excluded.
+
+W5 — Stage A probe P2, konanc -list-targets            exit 0
+--------------------------------------------------------------
+  <java> <jvm> -cp <jar> <main> konanc -list-targets
+  stdout  131 B, 8 lines
+    linux_x64
+    linux_arm32_hfp (deprecated)
+    linux_arm64
+    mingw_x64 (default)
+    android_x86
+    android_x64
+    android_arm32
+    android_arm64
+  stderr  0 B
+  Exactly one line carries (default): mingw_x64  ->  (windows, amd64)
+
+W6 — both probes are independent of the hydrated closure
+---------------------------------------------------------
+  W4 and W5 re-run with KONAN_DATA_DIR = C:\kn168\probe-data (empty), working
+  directory C:\kn168\probe-wd (empty)
+  -> both exit 0, byte-identical output
+  -> entries in the data directory afterwards: 0
+Consequence: Stage A can run both before cache lookup and before any compiler
+work, and neither can mutate the closure.
+
+W7 — konan.properties, relevant keys
+-------------------------------------
+  dependenciesUrl = https://download.jetbrains.com/kotlin/native
+  airplaneMode = false
+  toolchainDependency.mingw_x64 = msys2-mingw-w64-x86_64-2
+  targetToolchain.mingw_x64     = $toolchainDependency.mingw_x64
+  targetSysRoot.mingw_x64       = $toolchainDependency.mingw_x64
+  llvm.mingw_x64.user           = llvm-21-x86_64-windows-essentials-150
+  (no additionalToolsDir.mingw_x64)
+  targetToolchain.linux_x64     = $gccToolchain.linux_x64/x86_64-unknown-linux-gnu
+  targetSysRoot.linux_x64       = $gccToolchain.linux_x64/.../sysroot
+  occurrences of `remote:internal` in the file: 11, all Apple entries
+No mingw_x64 or linux_x64 input is remote:internal and none names a host SDK.
+
+W8 — hydration, one online run                         exit 0, 68.6 s
+----------------------------------------------------------------------
+  KONAN_DATA_DIR=<b>\konan-data
+  <java> <jvm> -cp <jar> <main> konanc -produce program -target mingw_x64 \
+      -o C:\kn168\out\hyd C:\kn168\src\main.kt
+  downloaded from https://download.jetbrains.com/kotlin/native :
+    lldb-2-windows.zip                              54,796,930 B
+    msys2-mingw-w64-x86_64-2.zip                   135,111,082 B
+    llvm-21-x86_64-windows-essentials-150.zip      275,594,763 B
+    libffi-3.3-windows-x64-1.zip                       111,136 B
+  extracted into <b>\konan-data\dependencies
+  no checksum or signature verification is reported by the compiler
+  produced C:\kn168\out\hyd.exe   570,368 B
+Hydration is an operator act performed once, outside every Curator operation.
+
+W9 — dependencies\.extracted is REQUIRED
+-----------------------------------------
+  with every dependency directory present and .extracted deleted:
+    <java> <jvm> -cp <jar> <main> konanc \
+        -Xoverride-konan-properties=airplaneMode=true -produce program \
+        -target mingw_x64 -o out\noext src\main.kt
+    -> exit 2
+       Details: Internal error in file lowering: java.io.FileNotFoundException:
+       Cannot find a dependency locally: lldb-2-windows.
+       Set `airplaneMode = false` in konan.properties to download it.
+       "Downloading dependency" lines: 0
+  with .extracted restored (103 B: four dependency names, LF-separated,
+  trailing LF)
+    -> identical command, exit 0, artifact produced, 0 download lines
+  Restoring the file reproduced the W3 tree digest exactly, which is what
+  proves the reconstruction is byte-identical to the hydrated original.
+
+W10 — a compile mutates the bundle in exactly one place
+-------------------------------------------------------
+  KONAN_DATA_DIR=<b>\konan-data (writable), airplaneMode=true, exit 0, 18.1 s
+  file-list diff against the curated baseline:
+    => /konan-data/dependencies/cache/.lock   0 B      (added)
+    no other addition, removal, or change in 27,867 files
+  removing that one file restored the digest 63d96ff7...dae3 exactly
+
+W11 — a write-denied bundle data directory fails the compile
+-------------------------------------------------------------
+  icacls <b> /deny "*<SID>:(OI)(CI)(DE,DC,WD,AD,WEA,WA)" /T /C
+    -> 41,822 files processed, 0 failed
+  exec probe   <java> -version                     exit 0
+  write probe  [IO.File]::WriteAllText(<b>\konan-data\wt.tmp)   denied
+  append probe [IO.File]::AppendAllText(<b>\...\.extracted)     denied
+  compile with KONAN_DATA_DIR=<b>\konan-data       exit 2
+    Details: Internal error in file lowering: java.io.IOException: Access denied
+  NOTE, and it is why obligation K-11 exists: an earlier form of the same ACE,
+  icacls ... /deny "...(W,D,DC)", denied SYNCHRONIZE as part of the simple
+  right W and made java.exe unrunnable ("Access is denied" on process start).
+  And with the corrected ACE a delete of a bundle file still SUCCEEDED, because
+  the same account holds Full Control through BUILTIN\Administrators, which
+  grants FILE_DELETE_CHILD on the parent directory. A per-user deny is not
+  sufficient; the bundle must be owned by an account the manager does not run
+  as.
+
+W12 — the operation-private overlay                    exit 0
+--------------------------------------------------------------
+  <ov>\dependencies\<name>  = directory junctions to <b>\konan-data\dependencies\<name>
+                              (New-Item -ItemType Junction), 4 entries
+  <ov>\dependencies\cache   = a fresh empty writable directory, NOT a junction
+  <ov>\dependencies\.extracted = a 103 B copy
+  KONAN_DATA_DIR=<ov>, bundle write-denied
+    -> exit 0, artifact produced
+  overlay contents after the compile, excluding the junction payloads:
+    \dependencies                  <DIR>
+    \dependencies\cache            <DIR>
+    \dependencies\.extracted       103 B
+    \dependencies\cache\.lock      0 B
+  bundle tree digest after every operation in the run:
+    63d96ff7c488e713dedbf7029237cfc6cd030ae4c1caf11c8ba2274395badae3
+    27,867 files      BUNDLE UNCHANGED = True
+
+W13 — complete process inventory of a successful compile (A3)
+--------------------------------------------------------------
+  logman create trace kn168 -p Microsoft-Windows-Kernel-Process 0x10 \
+      -o trace\f.etl -ets -bs 128 -nb 64 256
+  <the W12 compile>                                            exit 0
+  <a deliberately external C:\Windows\System32\where.exe>      tracer control
+  logman stop kn168 -ets
+  tracerpt trace\f.etl -o trace\f.xml -of XML -y
+  ProcessStart events (EventID 1, keyword WINEVENT_KEYWORD_PROCESS) in the
+  window: 13. Each carries ProcessID, ParentProcessID and ImageName as an NT
+  device path, resolved to a drive letter through QueryDosDevice.
+
+  every distinct image in the window, classified:
+    [IN-BUNDLE]  x1  C:\kn168\b\jdk\bin\java.exe
+    [IN-BUNDLE]  x2  C:\kn168\b\konan-data\dependencies\
+                       llvm-21-x86_64-windows-essentials-150\bin\clang++.exe
+    [IN-BUNDLE]  x1  C:\kn168\b\konan-data\dependencies\
+                       llvm-21-x86_64-windows-essentials-150\bin\ld.lld.exe
+    [OUTSIDE]    x1  C:\Users\admin\AppData\Local\Programs\Pulsar\go-librespot.exe
+    [OUTSIDE]    x1  C:\Windows\System32\cmd.exe
+    [OUTSIDE]    x1  C:\Windows\System32\conhost.exe
+    [OUTSIDE]    x1  C:\Windows\System32\logman.exe
+    [OUTSIDE]    x3  C:\Windows\System32\OpenSSH\sshd.exe
+    [OUTSIDE]    x1  C:\Windows\System32\where.exe
+    [OUTSIDE]    x1  C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+
+  transitive descendants of the compiler JVM, by parent-PID closure:
+    2 distinct images, both IN-BUNDLE
+      clang++.exe
+      ld.lld.exe
+
+  The OUTSIDE images are the measurement harness itself (sshd, powershell, cmd,
+  conhost, logman, where) plus one unrelated background application already
+  running on the host; none is a descendant of the compiler JVM.
+  TRACER CONTROL: where.exe present in the trace = True.
+  No cmd.exe, powershell.exe, link.exe, cl.exe, lib.exe, vswhere.exe, Visual
+  Studio activation script or MSYS shell appears below the compile.
+  The overlay materialises dependencies as junctions and the kernel reports the
+  resolved target, so an image reached through the overlay is recorded at its
+  bundle path.
+
+W14 — artifact class, by-products, and imports (A5, A6)
+--------------------------------------------------------
+  -o C:\kn168\out\f1   ->  f1.exe   570,368 B    (K-4: suffix .exe)
+  produced files beside it: none
+  operation-private staging after the compile: only the JVM's own
+    hsperfdata_admin\ directory; no konan_temp*, no .klib, no debug bundle
+  PE parse, done by reading the image (no tool executed):
+    MZ / PE\0\0, optional-header magic 0x20b (PE32+), machine 0x8664 (AMD64)
+    import directory:  KERNEL32.dll, msvcrt.dll
+  run f1.exe        -> exit 0, stdout "curator-kotlin-native-probe"
+
+  platform-library sample, src2\main.kt, same vector           exit 0
+    plat.exe   582,656 B   machine 0x8664
+    import directory:  KERNEL32.dll, msvcrt.dll
+    ADDED vs the plain program: (none)
+    run plat.exe    -> exit 0, stdout "curator-kotlin-native-probe 2600 796142062"
+  windows/amd64 base-installation allow-list = { KERNEL32.dll, msvcrt.dll }
+  It is exactly what was measured. Widening it for USER32.dll, ADVAPI32.dll,
+  GDIPLUS.dll, OPENGL32.dll or WINHTTP.dll requires a re-qualification run of A6
+  whose sample actually produces the import.
+
+W15 — PATH discipline and the launcher control (A2)
+----------------------------------------------------
+  every compile in this record ran with PATH = C:\kn168\emptybin (empty)
+    -> exit 0.  Zero PATH resolutions are required.
+  paired control, same PATH:
+    cmd /c "<b>\kotlin-native\bin\konanc.bat" -version
+    -> exit 9009, stdout 0 B, stderr 97 B
+       '"java"' is not recognized as an internal or external command,
+       operable program or batch file.
+  The control fires, so the zero is evidence rather than an absence.
+
+W16 — no download, twice (A4)
+------------------------------
+  (a) in-process, airplaneMode=true, empty data directory
+      -> exit 2, "Cannot find a dependency locally: lldb-2-windows"
+         "Downloading dependency" lines: 0
+         entries created in the data directory: 4, all empty scaffold
+           \dependencies <DIR>
+           \dependencies\cache <DIR>
+           \dependencies\.extracted     0 B
+           \dependencies\cache\.lock    0 B
+  (b) host network denial, scoped to the bundle JDK
+      netsh advfirewall firewall add rule name=kn168-deny-java-out dir=out
+        action=block program="<java>" enable=yes profile=any        -> Ok.
+      control: empty data dir, airplaneMode=false, network denied  -> exit 2
+        Downloading dependency https://download.jetbrains.com/kotlin/native/
+          lldb-2-windows.zip to <ov-empty2>\dependencies\cache\lldb-2-windows.zip
+        Cannot download a dependency ...: java.net.SocketException:
+          Permission denied: getsockopt
+        Waiting 3.0 / 6.0 / ... / 27.0 sec and trying again (attempt: N/10)
+        nothing obtained; the compile fails
+      subject: hydrated overlay, airplaneMode=true, network denied -> exit 0
+        "Downloading dependency" lines: 0
+      netsh advfirewall firewall delete rule name=kn168-deny-java-out
+        -> Deleted 1 rule(s). Ok.
+      rule present after cleanup = False
+  Both layers hold, and the control proves the denial bites.
+
+W17 — @-response-file expansion, Windows
+-----------------------------------------
+  working directory C:\kn168\argprobe, containing
+    inject    = "-version"
+    @inject   = "-version"
+  <java> <jvm> -cp <jar> <main> konanc <token>
+
+  token                exit  stdout                    stderr
+  @inject                 0  23 B "Kotlin/Native: 2.4.10"   -
+  @.\inject               0  23 B same                      -
+  @C:\kn168\argprobe\inject
+                          0  23 B same                      -
+  C:\kn168\argprobe\@inject
+                          1   0 B    error: source entry is not a Kotlin file:
+                                     C:/kn168/argprobe/@inject
+  .\@inject               1   0 B    same
+  @nonexistent            1   0 B    error: you have not specified any
+                                     compilation arguments. No output has been
+                                     produced.
+
+  Expansion is decided by the FIRST CHARACTER of the argv token; the @ is
+  stripped and the remainder is the response-file path, absolute or not. The
+  last row shows the missing response file does not itself abort argument
+  processing — that run failed only because no argument survived it. macOS
+  cycle 2 measured `warning: argfile not found` for the same token alongside
+  other arguments, which is the same conclusion: a partial mitigation fails
+  silently.
+
+
+C1 — correction to the cycle-2 macOS process-closure claim
+-----------------------------------------------------------
+Re-reading the cycle-2 reproduction archive:
+  evidence/run7-enumeration.log  seeded from an EMPTY allow file; recorded
+    /bin/bash and /usr/bin/xcrun as required; its raw tail additionally shows
+      /bin/bash: /usr/bin/xcode-select: Operation not permitted
+      /bin/bash: /usr/libexec/PlistBuddy: Operation not permitted
+      xcrun: error: can't exec '<Xcode>/Contents/Developer/usr/bin/xcodebuild'
+    then stopped, because the xcrun denial message has a different shape than
+    the JVM's and the extractor could not parse a program name from it.
+  evidence/run8-enumeration.log  seeded with those four; added
+      <Xcode>/.../XcodeDefault.xctoolchain/usr/bin/ld
+      <Xcode>/.../XcodeDefault.xctoolchain/usr/bin/dsymutil
+    and reached SUCCESS at iteration 3.
+  evidence/allowed-externals.txt  final content, SIX paths — correct for what
+    that file is: the sufficient set for the path that succeeded.
+Union observed = 7. Sufficient set = 6. The difference is path-dependent: with
+/usr/bin/xcode-select allowed, the compiler does not fall back to
+`xcrun xcodebuild -version`. The cycle-2 prose said "exactly seven"; that claim
+is WITHDRAWN. No completeness claim is made for macOS. The exclusion does not
+need one: the first external executable already violates decision 0008 section 6
+item 3, four of the observed paths are absolute OS paths compiled into the
+compiler, and the cache-identity ground is independent of the process count.
+
+C2 — method consequence
+------------------------
+Iterative denial proves "required on the path taken" and "this set is
+sufficient". It cannot prove "no other executable is ever spawned". That is
+enough to EXCLUDE a tuple and not enough to ADMIT one, so acceptance
+requirement A3 now demands a kernel-level trace that records every process
+start by resolved image path, and names iterative denial as inadmissible for
+admission. W13 is that trace for windows/amd64.
+
+C3 — retained macOS facts, unchanged
+-------------------------------------
+  konan.properties declares the Apple toolchain, sysroot and addon as
+    remote:internal; XcodePartsProvider has exactly two implementations,
+    InternalServer (KONAN_USE_INTERNAL_SERVER, repo.labs.intellij.net) and
+    Local (the host Xcode)
+  with ignoreXcodeVersionCheck=true and targetToolchain / targetSysRoot /
+    additionalToolsDir all overridden to absolute local paths, the compile still
+    fails Cannot run program "/usr/bin/xcrun" at
+    CurrentXcode.getToolchain(Xcode.kt:92) <-
+    AppleConfigurablesImpl.getAbsoluteTargetToolchain(Apple.kt:45)
+  -o app produces app.kexe plus an app.kexe.dSYM by-product directory
+  import platform.Foundation adds /usr/lib/libresolv.9.dylib to the artifact's
+    dynamic dependency set
+
+
+Host footprint after the run
+-----------------------------
+  the write-deny ACE was lifted from the bundle
+  the ETW session kn168 was stopped
+  the scoped outbound firewall rule was deleted and its absence verified
+  C:\kn168 was removed in full
+  %USERPROFILE%\.konan was never created
+  no software was installed, no persistent PATH or profile was modified

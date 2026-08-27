@@ -1,0 +1,561 @@
+{
+ "fixture_version": "rust-boundary-fixture-v1",
+ "task": "TASK-260728-12pnm1",
+ "host": {
+  "operating_system": "macos",
+  "architecture": "arm64",
+  "probe_go_version": "go1.25.5"
+ },
+ "toolchain": {
+  "root": "/nonexistent/toolchain",
+  "available": false,
+  "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+  "cargo_path": "/nonexistent/toolchain/bin/cargo",
+  "rustc_path": "/nonexistent/toolchain/bin/rustc"
+ },
+ "cases": [
+  {
+   "case": {
+    "id": "accept.two-component",
+    "literal": "\"1.85\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.three-component",
+    "literal": "\"1.85.0\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.bare-major-edition-2015",
+    "literal": "\"1\"",
+    "edition": "2015",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true,
+    "note": "grammar-representable; edition 2015 has the lowest floor"
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.edition-2018-at-floor",
+    "literal": "\"1.31\"",
+    "edition": "2018",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.edition-2024-at-floor",
+    "literal": "\"1.85\"",
+    "edition": "2024",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.above-host",
+    "literal": "\"1.99\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 4,
+    "compared": true,
+    "note": "isolation witness: representable and above the resolved toolchain, so a command that reports it cannot be applying the host gate"
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "document.float",
+    "literal": "1.85",
+    "edition": "2021",
+    "toml_type_phrase": "floating point `1.85`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "document.integer",
+    "literal": "1",
+    "edition": "2021",
+    "toml_type_phrase": "integer `1`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "document.boolean",
+    "literal": "true",
+    "edition": "2021",
+    "toml_type_phrase": "boolean `true`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.prerelease",
+    "literal": "\"1.85.0-beta\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.nonnumeric",
+    "literal": "\"not-a-version\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.build-metadata",
+    "literal": "\"1.85.0+build\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.four-components",
+    "literal": "\"1.85.0.1\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.track-token",
+    "literal": "\"stable\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.empty",
+    "literal": "\"\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "edition.bare-major-2018",
+    "literal": "\"1\"",
+    "edition": "2018",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false,
+    "note": "independence witness: the grammar layer accepts this value, the edition floor does not"
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "edition.below-2021",
+    "literal": "\"1.31\"",
+    "edition": "2021",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "edition.below-2024",
+    "literal": "\"1.56\"",
+    "edition": "2024",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  }
+ ],
+ "host_gate_cases": [
+  {
+   "case": {
+    "id": "hostgate.above-resolved",
+    "literal": "\"1.99\"",
+    "edition": "2021",
+    "expect_layer": "host-gate",
+    "curator_class": 4,
+    "compared": true,
+    "note": "same value as accept.above-host; the isolated command reports it, the corroborating command gates on it"
+   },
+   "status": "not_run",
+   "reason": "missing regular executable /nonexistent/toolchain/bin/cargo",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  }
+ ],
+ "alignment": {
+  "security_partition_empty": false,
+  "p1_no_widening": false,
+  "p2_no_narrowing": false
+ },
+ "closure": null,
+ "controls": null,
+ "structural": null,
+ "summary": {
+  "cases": 19,
+  "matched": 0,
+  "divergences": 0,
+  "not_run": 19,
+  "closure_checks": 0,
+  "closure_failures": 0,
+  "controls_total": 0,
+  "controls_failing_as_required": 0,
+  "structural_total": 0,
+  "structural_divergences": 0,
+  "green": false
+ }
+}

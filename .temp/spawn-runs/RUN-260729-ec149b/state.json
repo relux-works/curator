@@ -1,0 +1,29 @@
+{
+  "id": "RUN-260729-ec149b",
+  "task_id": "TASK-260729-35tb37",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "agent_type": "codex",
+  "status": "failed",
+  "phase": "finalizing",
+  "summary": "creating autonomous recovery successor: run RUN-260729-ec149b requires a goal-bound successor but has no active goal",
+  "created_at": "2026-07-29T12:47:02.800644Z",
+  "started_at": "2026-07-29T12:47:03.011103Z",
+  "completed_at": "2026-07-29T12:53:28.644354Z",
+  "last_heartbeat_at": "2026-07-29T12:53:28.644354Z",
+  "last_progress_at": "2026-07-29T12:53:28.644354Z",
+  "completion_reason": "failure",
+  "last_event_seq": 202,
+  "exit_code": 1,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-16-47-02_-reviewer--reviewer--codex-_TASK-260729-35tb37.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/TASK-260729-35tb37/-reviewer--reviewer--codex-_RUN-260729-ec149b.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260729-ec149b/runner.log",
+  "error": "creating autonomous recovery successor: run RUN-260729-ec149b requires a goal-bound successor but has no active goal",
+  "max_parallel": 20,
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "provider": "codex",
+    "diagnostic_code": "composition_contract_unavailable"
+  }
+}

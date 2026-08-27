@@ -1,0 +1,52 @@
+{
+  "id": "RUN-260826-99683f",
+  "task_id": "BUG-260823-1vx45a",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "agent_type": "codex",
+  "status": "completed",
+  "phase": "finalizing",
+  "summary": "Run completed successfully",
+  "created_at": "2026-08-26T20:33:53.887221Z",
+  "started_at": "2026-08-26T20:33:54.294053Z",
+  "completed_at": "2026-08-26T20:38:35.626343Z",
+  "last_heartbeat_at": "2026-08-26T20:38:35.626343Z",
+  "last_progress_at": "2026-08-26T20:38:35.626343Z",
+  "completion_reason": "success",
+  "last_event_seq": 153,
+  "exit_code": 0,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260827-00-33-53_-reviewer--reviewer--codex-_BUG-260823-1vx45a.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260823-1vx45a/-reviewer--reviewer--codex-_RUN-260826-99683f.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260826-99683f/runner.log",
+  "max_parallel": 20,
+  "story_id": "STORY-260712-31558c",
+  "workspace": {
+    "workspace_id": "WS-de51037274d6",
+    "story_id": "STORY-260712-31558c",
+    "branch_ref": "refs/heads/task-board/story/STORY-260712-31558c",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260712-31558c/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "provider": "codex",
+    "producer_version": "v1.6.1",
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "recovery_root_run_id": "RUN-260826-99683f",
+  "provider_attempts": [
+    {
+      "attempt": 1,
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "group": "codex-plan",
+      "started_at": "2026-08-26T20:33:54.541584Z",
+      "completed_at": "2026-08-26T20:38:35.411381Z",
+      "exit_code": 0,
+      "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260823-1vx45a/-reviewer--reviewer--codex-_RUN-260826-99683f.log"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+2026-07-21 rework verification
+
+Attempted command: diff -qr <accepted-predecessor-path> <task-worktree-path>
+Result: zsh: command not found: diff
+Impact: no product or test impact. Provenance comparison was rerun with the already-verified git executable using git diff --no-index --quiet.
+
+The isolated worktree shell did not expose git through PATH (`zsh: command not found: git`) even though readiness resolved it to `/usr/bin/git` from the project root. The comparison therefore uses the verified absolute executable `/usr/bin/git`.
+
+The same intermittent isolated-shell PATH issue later omitted Go (`zsh: command not found: go`). Platform compilation therefore uses the verified absolute executable `/opt/homebrew/bin/go`.

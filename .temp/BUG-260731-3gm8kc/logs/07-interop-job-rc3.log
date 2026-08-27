@@ -1,0 +1,123 @@
+=== RUN   TestGoldenMarkerObject
+--- PASS: TestGoldenMarkerObject (0.00s)
+=== RUN   TestGoldenSnapshotHash
+--- PASS: TestGoldenSnapshotHash (0.00s)
+=== RUN   TestGoldenContextCopy
+--- PASS: TestGoldenContextCopy (0.00s)
+=== RUN   TestSkillManifestResolutionVectors
+=== RUN   TestSkillManifestResolutionVectors/canonical-only
+=== RUN   TestSkillManifestResolutionVectors/legacy-only
+=== RUN   TestSkillManifestResolutionVectors/equal-dual-manifests
+=== RUN   TestSkillManifestResolutionVectors/conflicting-dual-manifests
+=== RUN   TestSkillManifestResolutionVectors/invalid-canonical-does-not-fallback
+=== RUN   TestSkillManifestResolutionVectors/invalid-legacy-does-not-hide-behind-canonical
+=== RUN   TestSkillManifestResolutionVectors/runtime-fallback-without-modern-manifest
+=== RUN   TestSkillManifestResolutionVectors/pure-context-without-manifest
+--- PASS: TestSkillManifestResolutionVectors (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/canonical-only (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/legacy-only (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/equal-dual-manifests (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/conflicting-dual-manifests (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/invalid-canonical-does-not-fallback (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/invalid-legacy-does-not-hide-behind-canonical (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/runtime-fallback-without-modern-manifest (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/pure-context-without-manifest (0.00s)
+=== RUN   TestGoldenRegistryObjects
+--- PASS: TestGoldenRegistryObjects (0.00s)
+=== RUN   TestCanonicalJSONVectors
+--- PASS: TestCanonicalJSONVectors (0.00s)
+=== RUN   TestSourceIdentityVectors
+--- PASS: TestSourceIdentityVectors (0.00s)
+=== RUN   TestIdentifierVectors
+--- PASS: TestIdentifierVectors (0.00s)
+=== RUN   TestLocaleSelectorVectors
+--- PASS: TestLocaleSelectorVectors (0.00s)
+=== RUN   TestManagerConfigVectors
+=== RUN   TestManagerConfigVectors/minimal-defaults
+=== RUN   TestManagerConfigVectors/canonical-registry-and-zero-cache
+=== RUN   TestManagerConfigVectors/unknown-top-level
+=== RUN   TestManagerConfigVectors/invalid-project-key
+=== RUN   TestManagerConfigVectors/invalid-project-alias
+=== RUN   TestManagerConfigVectors/unknown-project-field
+=== RUN   TestManagerConfigVectors/duplicate-agents
+=== RUN   TestManagerConfigVectors/unknown-registry-field
+=== RUN   TestManagerConfigVectors/malformed-pinned-key
+=== RUN   TestManagerConfigVectors/insecure-registry
+=== RUN   TestManagerConfigVectors/duplicate-canonical-registry
+=== RUN   TestManagerConfigVectors/empty-preferred-locale
+=== RUN   TestManagerConfigVectors/negative-cache-ttl
+=== RUN   TestManagerConfigVectors/oversize-backend-request
+=== RUN   TestManagerConfigVectors/unknown-source-policy-field
+--- PASS: TestManagerConfigVectors (0.00s)
+    --- PASS: TestManagerConfigVectors/minimal-defaults (0.00s)
+    --- PASS: TestManagerConfigVectors/canonical-registry-and-zero-cache (0.00s)
+    --- PASS: TestManagerConfigVectors/unknown-top-level (0.00s)
+    --- PASS: TestManagerConfigVectors/invalid-project-key (0.00s)
+    --- PASS: TestManagerConfigVectors/invalid-project-alias (0.00s)
+    --- PASS: TestManagerConfigVectors/unknown-project-field (0.00s)
+    --- PASS: TestManagerConfigVectors/duplicate-agents (0.00s)
+    --- PASS: TestManagerConfigVectors/unknown-registry-field (0.00s)
+    --- PASS: TestManagerConfigVectors/malformed-pinned-key (0.00s)
+    --- PASS: TestManagerConfigVectors/insecure-registry (0.00s)
+    --- PASS: TestManagerConfigVectors/duplicate-canonical-registry (0.00s)
+    --- PASS: TestManagerConfigVectors/empty-preferred-locale (0.00s)
+    --- PASS: TestManagerConfigVectors/negative-cache-ttl (0.00s)
+    --- PASS: TestManagerConfigVectors/oversize-backend-request (0.00s)
+    --- PASS: TestManagerConfigVectors/unknown-source-policy-field (0.00s)
+=== RUN   TestManagerLifecycleVectors
+--- PASS: TestManagerLifecycleVectors (0.00s)
+=== RUN   TestManagerCompiledCacheMissDryRunVector
+    golden_test.go:617: this conformance root publishes no compiled-cache-miss-is-read-only dry-run case
+--- SKIP: TestManagerCompiledCacheMissDryRunVector (0.00s)
+=== RUN   TestGoldenFederationSemantics
+--- PASS: TestGoldenFederationSemantics (0.00s)
+=== RUN   TestRegistryClientRetryVectors
+=== RUN   TestRegistryClientRetryVectors/get-network
+=== RUN   TestRegistryClientRetryVectors/get-rate-limit
+=== RUN   TestRegistryClientRetryVectors/get-unavailable
+=== RUN   TestRegistryClientRetryVectors/get-conflict
+=== RUN   TestRegistryClientRetryVectors/post-idempotent-unavailable
+=== RUN   TestRegistryClientRetryVectors/post-unsafe-unavailable
+=== RUN   TestRegistryClientRetryVectors/post-idempotent-bad-request
+--- PASS: TestRegistryClientRetryVectors (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/get-network (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/get-rate-limit (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/get-unavailable (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/get-conflict (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/post-idempotent-unavailable (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/post-unsafe-unavailable (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/post-idempotent-bad-request (0.00s)
+=== RUN   TestRegistryClientRetryExecutionPolicy
+--- PASS: TestRegistryClientRetryExecutionPolicy (0.00s)
+=== RUN   TestRegistryClientSnapshotTransitionVectors
+=== RUN   TestRegistryClientSnapshotTransitionVectors/advance-after-key-rotation
+=== RUN   TestRegistryClientSnapshotTransitionVectors/restore-rollback
+=== RUN   TestRegistryClientSnapshotTransitionVectors/equal-version-repeat
+=== RUN   TestRegistryClientSnapshotTransitionVectors/equal-version-equivocation
+--- PASS: TestRegistryClientSnapshotTransitionVectors (0.13s)
+    --- PASS: TestRegistryClientSnapshotTransitionVectors/advance-after-key-rotation (0.04s)
+    --- PASS: TestRegistryClientSnapshotTransitionVectors/restore-rollback (0.03s)
+    --- PASS: TestRegistryClientSnapshotTransitionVectors/equal-version-repeat (0.04s)
+    --- PASS: TestRegistryClientSnapshotTransitionVectors/equal-version-equivocation (0.03s)
+=== RUN   TestRegistryClientPaginationRejectionVectors
+=== RUN   TestRegistryClientPaginationRejectionVectors/repeated-cursor
+=== RUN   TestRegistryClientPaginationRejectionVectors/oversize-cursor
+=== RUN   TestRegistryClientPaginationRejectionVectors/record-limit
+=== RUN   TestRegistryClientPaginationRejectionVectors/oversize-response
+--- PASS: TestRegistryClientPaginationRejectionVectors (0.02s)
+    --- PASS: TestRegistryClientPaginationRejectionVectors/repeated-cursor (0.00s)
+    --- PASS: TestRegistryClientPaginationRejectionVectors/oversize-cursor (0.00s)
+    --- PASS: TestRegistryClientPaginationRejectionVectors/record-limit (0.00s)
+    --- PASS: TestRegistryClientPaginationRejectionVectors/oversize-response (0.01s)
+=== RUN   TestRegistryClientRollbackStateVectors
+=== RUN   TestRegistryClientRollbackStateVectors/missing-on-first-use
+=== RUN   TestRegistryClientRollbackStateVectors/deleted-after-prior-use
+=== RUN   TestRegistryClientRollbackStateVectors/corrupted-existing-state
+=== RUN   TestRegistryClientRollbackStateVectors/unavailable-state-directory
+--- PASS: TestRegistryClientRollbackStateVectors (0.09s)
+    --- PASS: TestRegistryClientRollbackStateVectors/missing-on-first-use (0.03s)
+    --- PASS: TestRegistryClientRollbackStateVectors/deleted-after-prior-use (0.03s)
+    --- PASS: TestRegistryClientRollbackStateVectors/corrupted-existing-state (0.03s)
+    --- PASS: TestRegistryClientRollbackStateVectors/unavailable-state-directory (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/interop	0.527s

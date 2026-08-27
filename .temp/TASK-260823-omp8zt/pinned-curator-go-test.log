@@ -1,0 +1,466 @@
+=== RUN   TestGoldenMarkerObject
+--- PASS: TestGoldenMarkerObject (0.00s)
+=== RUN   TestGoldenSnapshotHash
+--- PASS: TestGoldenSnapshotHash (0.00s)
+=== RUN   TestGoldenContextCopy
+--- PASS: TestGoldenContextCopy (0.00s)
+=== RUN   TestSkillManifestResolutionVectors
+=== RUN   TestSkillManifestResolutionVectors/canonical-only
+=== RUN   TestSkillManifestResolutionVectors/legacy-only
+=== RUN   TestSkillManifestResolutionVectors/equal-dual-manifests
+=== RUN   TestSkillManifestResolutionVectors/conflicting-dual-manifests
+=== RUN   TestSkillManifestResolutionVectors/invalid-canonical-does-not-fallback
+=== RUN   TestSkillManifestResolutionVectors/invalid-legacy-does-not-hide-behind-canonical
+=== RUN   TestSkillManifestResolutionVectors/runtime-fallback-without-modern-manifest
+=== RUN   TestSkillManifestResolutionVectors/pure-context-without-manifest
+--- PASS: TestSkillManifestResolutionVectors (0.01s)
+    --- PASS: TestSkillManifestResolutionVectors/canonical-only (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/legacy-only (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/equal-dual-manifests (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/conflicting-dual-manifests (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/invalid-canonical-does-not-fallback (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/invalid-legacy-does-not-hide-behind-canonical (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/runtime-fallback-without-modern-manifest (0.00s)
+    --- PASS: TestSkillManifestResolutionVectors/pure-context-without-manifest (0.00s)
+=== RUN   TestGoldenRegistryObjects
+--- PASS: TestGoldenRegistryObjects (0.00s)
+=== RUN   TestCanonicalJSONVectors
+--- PASS: TestCanonicalJSONVectors (0.00s)
+=== RUN   TestSourceIdentityVectors
+--- PASS: TestSourceIdentityVectors (0.00s)
+=== RUN   TestIdentifierVectors
+--- PASS: TestIdentifierVectors (0.00s)
+=== RUN   TestLocaleSelectorVectors
+--- PASS: TestLocaleSelectorVectors (0.00s)
+=== RUN   TestManagerConfigVectors
+=== RUN   TestManagerConfigVectors/minimal-defaults
+=== RUN   TestManagerConfigVectors/canonical-registry-and-zero-cache
+=== RUN   TestManagerConfigVectors/unknown-top-level
+=== RUN   TestManagerConfigVectors/invalid-project-key
+=== RUN   TestManagerConfigVectors/invalid-project-alias
+=== RUN   TestManagerConfigVectors/unknown-project-field
+=== RUN   TestManagerConfigVectors/duplicate-agents
+=== RUN   TestManagerConfigVectors/unknown-registry-field
+=== RUN   TestManagerConfigVectors/malformed-pinned-key
+=== RUN   TestManagerConfigVectors/insecure-registry
+=== RUN   TestManagerConfigVectors/duplicate-canonical-registry
+=== RUN   TestManagerConfigVectors/empty-preferred-locale
+=== RUN   TestManagerConfigVectors/negative-cache-ttl
+=== RUN   TestManagerConfigVectors/oversize-backend-request
+=== RUN   TestManagerConfigVectors/unknown-source-policy-field
+--- PASS: TestManagerConfigVectors (0.00s)
+    --- PASS: TestManagerConfigVectors/minimal-defaults (0.00s)
+    --- PASS: TestManagerConfigVectors/canonical-registry-and-zero-cache (0.00s)
+    --- PASS: TestManagerConfigVectors/unknown-top-level (0.00s)
+    --- PASS: TestManagerConfigVectors/invalid-project-key (0.00s)
+    --- PASS: TestManagerConfigVectors/invalid-project-alias (0.00s)
+    --- PASS: TestManagerConfigVectors/unknown-project-field (0.00s)
+    --- PASS: TestManagerConfigVectors/duplicate-agents (0.00s)
+    --- PASS: TestManagerConfigVectors/unknown-registry-field (0.00s)
+    --- PASS: TestManagerConfigVectors/malformed-pinned-key (0.00s)
+    --- PASS: TestManagerConfigVectors/insecure-registry (0.00s)
+    --- PASS: TestManagerConfigVectors/duplicate-canonical-registry (0.00s)
+    --- PASS: TestManagerConfigVectors/empty-preferred-locale (0.00s)
+    --- PASS: TestManagerConfigVectors/negative-cache-ttl (0.00s)
+    --- PASS: TestManagerConfigVectors/oversize-backend-request (0.00s)
+    --- PASS: TestManagerConfigVectors/unknown-source-policy-field (0.00s)
+=== RUN   TestManagerLifecycleVectors
+--- PASS: TestManagerLifecycleVectors (0.00s)
+=== RUN   TestManagerCompiledCacheMissDryRunVector
+--- PASS: TestManagerCompiledCacheMissDryRunVector (0.00s)
+=== RUN   TestGoldenFederationSemantics
+--- PASS: TestGoldenFederationSemantics (0.00s)
+=== RUN   TestRegistryClientRetryVectors
+=== RUN   TestRegistryClientRetryVectors/get-network
+=== RUN   TestRegistryClientRetryVectors/get-rate-limit
+=== RUN   TestRegistryClientRetryVectors/get-unavailable
+=== RUN   TestRegistryClientRetryVectors/get-conflict
+=== RUN   TestRegistryClientRetryVectors/post-idempotent-unavailable
+=== RUN   TestRegistryClientRetryVectors/post-unsafe-unavailable
+=== RUN   TestRegistryClientRetryVectors/post-idempotent-bad-request
+--- PASS: TestRegistryClientRetryVectors (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/get-network (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/get-rate-limit (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/get-unavailable (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/get-conflict (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/post-idempotent-unavailable (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/post-unsafe-unavailable (0.00s)
+    --- PASS: TestRegistryClientRetryVectors/post-idempotent-bad-request (0.00s)
+=== RUN   TestRegistryClientRetryExecutionPolicy
+--- PASS: TestRegistryClientRetryExecutionPolicy (0.00s)
+=== RUN   TestRegistryClientSnapshotTransitionVectors
+=== RUN   TestRegistryClientSnapshotTransitionVectors/advance-after-key-rotation
+=== RUN   TestRegistryClientSnapshotTransitionVectors/restore-rollback
+=== RUN   TestRegistryClientSnapshotTransitionVectors/equal-version-repeat
+=== RUN   TestRegistryClientSnapshotTransitionVectors/equal-version-equivocation
+--- PASS: TestRegistryClientSnapshotTransitionVectors (0.18s)
+    --- PASS: TestRegistryClientSnapshotTransitionVectors/advance-after-key-rotation (0.08s)
+    --- PASS: TestRegistryClientSnapshotTransitionVectors/restore-rollback (0.03s)
+    --- PASS: TestRegistryClientSnapshotTransitionVectors/equal-version-repeat (0.04s)
+    --- PASS: TestRegistryClientSnapshotTransitionVectors/equal-version-equivocation (0.03s)
+=== RUN   TestRegistryClientPaginationRejectionVectors
+=== RUN   TestRegistryClientPaginationRejectionVectors/repeated-cursor
+=== RUN   TestRegistryClientPaginationRejectionVectors/oversize-cursor
+=== RUN   TestRegistryClientPaginationRejectionVectors/record-limit
+=== RUN   TestRegistryClientPaginationRejectionVectors/oversize-response
+--- PASS: TestRegistryClientPaginationRejectionVectors (0.02s)
+    --- PASS: TestRegistryClientPaginationRejectionVectors/repeated-cursor (0.00s)
+    --- PASS: TestRegistryClientPaginationRejectionVectors/oversize-cursor (0.00s)
+    --- PASS: TestRegistryClientPaginationRejectionVectors/record-limit (0.00s)
+    --- PASS: TestRegistryClientPaginationRejectionVectors/oversize-response (0.01s)
+=== RUN   TestRegistryClientRollbackStateVectors
+=== RUN   TestRegistryClientRollbackStateVectors/missing-on-first-use
+=== RUN   TestRegistryClientRollbackStateVectors/deleted-after-prior-use
+=== RUN   TestRegistryClientRollbackStateVectors/corrupted-existing-state
+=== RUN   TestRegistryClientRollbackStateVectors/unavailable-state-directory
+--- PASS: TestRegistryClientRollbackStateVectors (0.09s)
+    --- PASS: TestRegistryClientRollbackStateVectors/missing-on-first-use (0.03s)
+    --- PASS: TestRegistryClientRollbackStateVectors/deleted-after-prior-use (0.03s)
+    --- PASS: TestRegistryClientRollbackStateVectors/corrupted-existing-state (0.03s)
+    --- PASS: TestRegistryClientRollbackStateVectors/unavailable-state-directory (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/interop	0.874s
+=== RUN   TestDiamondResolvesOnceProvidersFirst
+--- PASS: TestDiamondResolvesOnceProvidersFirst (0.47s)
+=== RUN   TestVersionConflictNamesBothChains
+--- PASS: TestVersionConflictNamesBothChains (0.50s)
+=== RUN   TestSameCommitDifferentRefsUnify
+--- PASS: TestSameCommitDifferentRefsUnify (0.42s)
+=== RUN   TestCycleFails
+--- PASS: TestCycleFails (0.31s)
+=== RUN   TestActivationModesAndNarrowing
+--- PASS: TestActivationModesAndNarrowing (0.32s)
+=== RUN   TestBuildCommandsActivateLikeScriptsButSystemCommandsDoNot
+--- PASS: TestBuildCommandsActivateLikeScriptsButSystemCommandsDoNot (0.32s)
+=== RUN   TestBuildCommandNamesUseBytewiseLexicalOrder
+--- PASS: TestBuildCommandNamesUseBytewiseLexicalOrder (0.00s)
+=== RUN   TestNarrowingUnknownCommandFails
+--- PASS: TestNarrowingUnknownCommandFails (0.28s)
+=== RUN   TestNarrowingSystemCommandFails
+--- PASS: TestNarrowingSystemCommandFails (0.28s)
+=== RUN   TestCommandCollisions
+--- PASS: TestCommandCollisions (0.29s)
+=== RUN   TestBuildCommandCollisions
+=== RUN   TestBuildCommandCollisions/build_versus_build
+=== RUN   TestBuildCommandCollisions/build_versus_script
+--- PASS: TestBuildCommandCollisions (0.00s)
+    --- PASS: TestBuildCommandCollisions/build_versus_build (0.00s)
+    --- PASS: TestBuildCommandCollisions/build_versus_script (0.00s)
+=== RUN   TestAllowlistGatesNetworkClone
+--- PASS: TestAllowlistGatesNetworkClone (0.00s)
+=== RUN   TestDevSubstitutionReplacesAndSkipsUnification
+--- PASS: TestDevSubstitutionReplacesAndSkipsUnification (0.35s)
+=== RUN   TestMissingRepoWithoutGitFails
+--- PASS: TestMissingRepoWithoutGitFails (0.00s)
+=== RUN   TestFetchExistingIsScopedToReachedClosureAndDeduplicated
+--- PASS: TestFetchExistingIsScopedToReachedClosureAndDeduplicated (0.43s)
+=== RUN   TestScratchResolutionLeavesPersistentRootsAbsent
+--- PASS: TestScratchResolutionLeavesPersistentRootsAbsent (0.22s)
+=== RUN   TestClosureOrderingConformanceVector
+--- PASS: TestClosureOrderingConformanceVector (0.00s)
+=== RUN   TestBuildCommandOrderingConformanceVector
+--- PASS: TestBuildCommandOrderingConformanceVector (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/closure	5.316s
+=== RUN   TestSchemaV6BuildManifestAliasesAndMixedCommands
+=== RUN   TestSchemaV6BuildManifestAliasesAndMixedCommands/agent-skill.json
+=== RUN   TestSchemaV6BuildManifestAliasesAndMixedCommands/csk-skill.json
+--- PASS: TestSchemaV6BuildManifestAliasesAndMixedCommands (0.00s)
+    --- PASS: TestSchemaV6BuildManifestAliasesAndMixedCommands/agent-skill.json (0.00s)
+    --- PASS: TestSchemaV6BuildManifestAliasesAndMixedCommands/csk-skill.json (0.00s)
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/missing_driver
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/unknown_driver
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/missing_source_dir
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/source_dir_dot
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/mixed_script
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/mixed_system
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/args
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/env
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/flags
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/output
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/toolchain
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/hooks
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/scripts
+=== RUN   TestSchemaV6BuildCommandClosedShapeDiagnostics/tags
+--- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics (0.03s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/missing_driver (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/unknown_driver (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/missing_source_dir (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/source_dir_dot (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/mixed_script (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/mixed_system (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/args (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/env (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/flags (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/output (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/toolchain (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/hooks (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/scripts (0.00s)
+    --- PASS: TestSchemaV6BuildCommandClosedShapeDiagnostics/tags (0.00s)
+=== RUN   TestLegacyRuntimeFallbackRejectsBuildObject
+--- PASS: TestLegacyRuntimeFallbackRejectsBuildObject (0.00s)
+=== RUN   TestSchemaV6BuildRootDiagnostics
+=== RUN   TestSchemaV6BuildRootDiagnostics/missing_root
+=== RUN   TestSchemaV6BuildRootDiagnostics/root_is_file
+=== RUN   TestSchemaV6BuildRootDiagnostics/dot_root
+=== RUN   TestSchemaV6BuildRootDiagnostics/escaped_root
+=== RUN   TestSchemaV6BuildRootDiagnostics/duplicate_roots
+=== RUN   TestSchemaV6BuildRootDiagnostics/overlapping_roots
+=== RUN   TestSchemaV6BuildRootDiagnostics/equal_runtime_overlap
+=== RUN   TestSchemaV6BuildRootDiagnostics/contained_runtime_overlap
+=== RUN   TestSchemaV6BuildRootDiagnostics/unused_root
+=== RUN   TestSchemaV6BuildRootDiagnostics/missing_roots_declaration
+--- PASS: TestSchemaV6BuildRootDiagnostics (0.02s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/missing_root (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/root_is_file (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/dot_root (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/escaped_root (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/duplicate_roots (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/overlapping_roots (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/equal_runtime_overlap (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/contained_runtime_overlap (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/unused_root (0.00s)
+    --- PASS: TestSchemaV6BuildRootDiagnostics/missing_roots_declaration (0.00s)
+=== RUN   TestSchemaV6BuildPathAndModuleDiagnostics
+=== RUN   TestSchemaV6BuildPathAndModuleDiagnostics/escaped_source
+=== RUN   TestSchemaV6BuildPathAndModuleDiagnostics/outside_root
+=== RUN   TestSchemaV6BuildPathAndModuleDiagnostics/missing_source
+=== RUN   TestSchemaV6BuildPathAndModuleDiagnostics/source_is_file
+=== RUN   TestSchemaV6BuildPathAndModuleDiagnostics/missing_root_go_mod
+=== RUN   TestSchemaV6BuildPathAndModuleDiagnostics/intervening_module
+--- PASS: TestSchemaV6BuildPathAndModuleDiagnostics (0.01s)
+    --- PASS: TestSchemaV6BuildPathAndModuleDiagnostics/escaped_source (0.00s)
+    --- PASS: TestSchemaV6BuildPathAndModuleDiagnostics/outside_root (0.00s)
+    --- PASS: TestSchemaV6BuildPathAndModuleDiagnostics/missing_source (0.00s)
+    --- PASS: TestSchemaV6BuildPathAndModuleDiagnostics/source_is_file (0.00s)
+    --- PASS: TestSchemaV6BuildPathAndModuleDiagnostics/missing_root_go_mod (0.00s)
+    --- PASS: TestSchemaV6BuildPathAndModuleDiagnostics/intervening_module (0.00s)
+=== RUN   TestSchemaV6AllowsSourceDirEqualBuildRoot
+--- PASS: TestSchemaV6AllowsSourceDirEqualBuildRoot (0.00s)
+=== RUN   TestSchemaV6UsesEveryBuildRoot
+--- PASS: TestSchemaV6UsesEveryBuildRoot (0.00s)
+=== RUN   TestSchemaV6SystemCommandSchemaChecksRemainVersionGated
+=== RUN   TestSchemaV6SystemCommandSchemaChecksRemainVersionGated/non-identifier_command
+=== RUN   TestSchemaV6SystemCommandSchemaChecksRemainVersionGated/empty_hint
+--- PASS: TestSchemaV6SystemCommandSchemaChecksRemainVersionGated (0.00s)
+    --- PASS: TestSchemaV6SystemCommandSchemaChecksRemainVersionGated/non-identifier_command (0.00s)
+    --- PASS: TestSchemaV6SystemCommandSchemaChecksRemainVersionGated/empty_hint (0.00s)
+=== RUN   TestSchemaV6RejectsLinkedBuildPaths
+=== RUN   TestSchemaV6RejectsLinkedBuildPaths/build_root
+=== RUN   TestSchemaV6RejectsLinkedBuildPaths/source_directory
+--- PASS: TestSchemaV6RejectsLinkedBuildPaths (0.00s)
+    --- PASS: TestSchemaV6RejectsLinkedBuildPaths/build_root (0.00s)
+    --- PASS: TestSchemaV6RejectsLinkedBuildPaths/source_directory (0.00s)
+=== RUN   TestSchemaV6RejectsLinkedGoMod
+--- PASS: TestSchemaV6RejectsLinkedGoMod (0.00s)
+=== RUN   TestSchemaV6BuildDiagnosticsAreStable
+--- PASS: TestSchemaV6BuildDiagnosticsAreStable (0.02s)
+=== RUN   TestManifestAndFilesystemRejectionVectors
+=== RUN   TestManifestAndFilesystemRejectionVectors/build-root-special-file
+=== RUN   TestManifestAndFilesystemRejectionVectors/build-root-symlink
+=== RUN   TestManifestAndFilesystemRejectionVectors/escaped-source-dir
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-args
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-env
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-hooks
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-output
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-toolchain
+=== RUN   TestManifestAndFilesystemRejectionVectors/missing-build-root-directory
+=== RUN   TestManifestAndFilesystemRejectionVectors/missing-build-roots
+=== RUN   TestManifestAndFilesystemRejectionVectors/mixed-script-build-shape
+=== RUN   TestManifestAndFilesystemRejectionVectors/overlapping-build-roots
+=== RUN   TestManifestAndFilesystemRejectionVectors/root-build-root
+=== RUN   TestManifestAndFilesystemRejectionVectors/root-source-dir
+=== RUN   TestManifestAndFilesystemRejectionVectors/runtime-overlapping-build-root
+=== RUN   TestManifestAndFilesystemRejectionVectors/schema-5-build-command
+=== RUN   TestManifestAndFilesystemRejectionVectors/source-link
+=== RUN   TestManifestAndFilesystemRejectionVectors/source-not-directory
+=== RUN   TestManifestAndFilesystemRejectionVectors/source-outside-root
+=== RUN   TestManifestAndFilesystemRejectionVectors/source-special-file
+=== RUN   TestManifestAndFilesystemRejectionVectors/unknown-driver
+=== RUN   TestManifestAndFilesystemRejectionVectors/unused-build-root
+--- PASS: TestManifestAndFilesystemRejectionVectors (0.05s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/build-root-special-file (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/build-root-symlink (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/escaped-source-dir (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-args (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-env (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-hooks (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-output (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-toolchain (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/missing-build-root-directory (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/missing-build-roots (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/mixed-script-build-shape (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/overlapping-build-roots (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/root-build-root (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/root-source-dir (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/runtime-overlapping-build-root (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/schema-5-build-command (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/source-link (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/source-not-directory (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/source-outside-root (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/source-special-file (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/unknown-driver (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/unused-build-root (0.00s)
+=== RUN   TestSchemaSixMixedScriptAndBuildCommandsVector
+--- PASS: TestSchemaSixMixedScriptAndBuildCommandsVector (0.00s)
+=== RUN   TestPortablePathConformanceVectors
+--- PASS: TestPortablePathConformanceVectors (0.00s)
+=== RUN   TestSchemaV6ConformanceCases
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/valid.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-missing-driver.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-missing-source-dir.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-root-dot.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-source-dir-dot.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-unsupported-driver.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-mixed-script.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-mixed-system.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-args.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-env.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-flags.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-hooks.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-output.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-scripts.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-tags.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-toolchain.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-build-repositories.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-repository.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-target.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-driver.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-repository.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-target.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-driver.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v8-top-level-execution-policy.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v8-top-level-interpreter.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v8-command-execution-policy.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v8-command-interpreter.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/valid.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-missing-driver.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-missing-source-dir.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-root-dot.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-source-dir-dot.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-unsupported-driver.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-mixed-script.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-mixed-system.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-args.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-env.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-flags.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-hooks.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-output.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-scripts.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-tags.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-toolchain.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-build-repositories.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-repository.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-target.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-driver.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-repository.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-target.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-driver.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v8-top-level-execution-policy.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v8-top-level-interpreter.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v8-command-execution-policy.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v8-command-interpreter.json
+--- PASS: TestSchemaV6ConformanceCases (0.18s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/valid.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-missing-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-missing-source-dir.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-root-dot.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-source-dir-dot.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-unsupported-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-mixed-script.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-mixed-system.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-args.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-env.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-flags.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-hooks.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-output.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-scripts.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-tags.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-toolchain.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-build-repositories.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-repository.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-target.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-repository.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-target.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-driver.json (0.01s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v8-top-level-execution-policy.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v8-top-level-interpreter.json (0.01s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v8-command-execution-policy.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v8-command-interpreter.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/valid.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-missing-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-missing-source-dir.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-root-dot.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-source-dir-dot.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-unsupported-driver.json (0.01s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-mixed-script.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-mixed-system.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-args.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-env.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-flags.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-hooks.json (0.01s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-output.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-scripts.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-tags.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-toolchain.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-build-repositories.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-repository.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-target.json (0.01s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-repository.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-target.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v8-top-level-execution-policy.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v8-top-level-interpreter.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v8-command-execution-policy.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v8-command-interpreter.json (0.00s)
+=== RUN   TestSchemaV6FixtureParsingDoesNotExecuteGo
+--- PASS: TestSchemaV6FixtureParsingDoesNotExecuteGo (0.00s)
+=== RUN   TestPureContextSkill
+--- PASS: TestPureContextSkill (0.00s)
+=== RUN   TestCanonicalManifestResolution
+=== RUN   TestCanonicalManifestResolution/canonical_only
+=== RUN   TestCanonicalManifestResolution/equal_dual_files_select_canonical
+=== RUN   TestCanonicalManifestResolution/conflicting_dual_files_fail_closed
+=== RUN   TestCanonicalManifestResolution/invalid_peer_does_not_fall_back
+=== RUN   TestCanonicalManifestResolution/invalid_peer_does_not_fall_back/agent-skill.json
+=== RUN   TestCanonicalManifestResolution/invalid_peer_does_not_fall_back/csk-skill.json
+--- PASS: TestCanonicalManifestResolution (0.00s)
+    --- PASS: TestCanonicalManifestResolution/canonical_only (0.00s)
+    --- PASS: TestCanonicalManifestResolution/equal_dual_files_select_canonical (0.00s)
+    --- PASS: TestCanonicalManifestResolution/conflicting_dual_files_fail_closed (0.00s)
+    --- PASS: TestCanonicalManifestResolution/invalid_peer_does_not_fall_back (0.00s)
+        --- PASS: TestCanonicalManifestResolution/invalid_peer_does_not_fall_back/agent-skill.json (0.00s)
+        --- PASS: TestCanonicalManifestResolution/invalid_peer_does_not_fall_back/csk-skill.json (0.00s)
+=== RUN   TestSchemaVersionValidation
+--- PASS: TestSchemaVersionValidation (0.00s)
+=== RUN   TestUnknownTopLevelFieldsRejectedFromV2
+--- PASS: TestUnknownTopLevelFieldsRejectedFromV2 (0.00s)
+=== RUN   TestCapabilitiesRequiredFromV3
+--- PASS: TestCapabilitiesRequiredFromV3 (0.00s)
+=== RUN   TestRuntimeRoots
+--- PASS: TestRuntimeRoots (0.01s)
+=== RUN   TestScriptCommands
+--- PASS: TestScriptCommands (0.01s)
+=== RUN   TestSystemCommands
+--- PASS: TestSystemCommands (0.00s)
+=== RUN   TestDependenciesGating
+--- PASS: TestDependenciesGating (0.00s)
+=== RUN   TestCommandDependencies
+--- PASS: TestCommandDependencies (0.00s)
+=== RUN   TestRequirements
+--- PASS: TestRequirements (0.00s)
+=== RUN   TestMcpServers
+--- PASS: TestMcpServers (0.00s)
+=== RUN   TestLegacyRuntimeFallback
+--- PASS: TestLegacyRuntimeFallback (0.00s)
+=== RUN   TestLegacyManifestWinsOverRuntimeFallback
+--- PASS: TestLegacyManifestWinsOverRuntimeFallback (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/skillspec	1.956s

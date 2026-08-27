@@ -1,0 +1,128 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+#< CLIXML
+go version go1.25.5 windows/amd64
+git version 2.51.0.windows.1
+=== build ===
+BUILD_EXIT=0
+=== vet ===
+VET_EXIT=0
+=== test full ===
+ok  	github.com/relux-works/curator/cmd/curator	4.555s
+ok  	github.com/relux-works/curator/internal/adapters	1.152s
+ok  	github.com/relux-works/curator/internal/audit	1.217s
+--- FAIL: TestPublishAndInspectExactProtectedHit (0.02s)
+    cache_test.go:55: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestPublishAndInspectExactProtectedHit986447033\001 owner does not match the effective user
+--- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState (0.07s)
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/receipt_trailing_newline (0.02s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStatereceipt_trailin2262798847\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/artifact_bytes (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStateartifact_bytes3332189405\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/missing_receipt (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStatemissing_receipt598221472\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/oversized_receipt (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStateoversized_recei4261456288\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/unexpected_entry (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStateunexpected_entr692162043\001 owner does not match the effective user
+    --- FAIL: TestInspectRejectsCorruptReceiptAndArtifactState/recorded_receipt_hash (0.01s)
+        cache_test.go:135: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestInspectRejectsCorruptReceiptAndArtifactStaterecorded_receip3718385037\001 owner does not match the effective user
+--- FAIL: TestPublishQuarantinesCorruptEntryBeforeReplacement (0.01s)
+    cache_test.go:181: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestPublishQuarantinesCorruptEntryBeforeReplacement511844449\001 owner does not match the effective user
+--- FAIL: TestAtomicPublicationIdenticalRace (0.04s)
+    cache_test.go:235: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestAtomicPublicationIdenticalRace2753352216\001 owner does not match the effective user
+--- FAIL: TestAtomicPublicationConflictingRace (0.03s)
+    cache_test.go:282: unexpected publication error: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestAtomicPublicationConflictingRace3312156871\001 owner does not match the effective user
+--- FAIL: TestWindowsProtectedStateMatrix (0.08s)
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_grants_another_principal_mutation_rights (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_grants_another_principa689820949\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_denies_owner_mutation_rights (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_denies_owner_mutation_r3843720067\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_has_applicable_group_deny (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_has_applicable_group_de4206908808\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_has_inherit-only_owner_allow (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_has_inherit-only_owner_1985852918\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_owner_lacks_required_mutation_rights (0.03s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_owner_lacks_required_mu2441641384\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_hard_link (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_hard_link2216618355\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_special_file (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_special_file3371887954\001 owner does not match the effective user
+    --- FAIL: TestWindowsProtectedStateMatrix/artifact_reparse_point (0.01s)
+        protection_windows_test.go:110: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestWindowsProtectedStateMatrixartifact_reparse_point1417240854\001 owner does not match the effective user
+--- FAIL: TestExplicitQuarantineMovesEntryAndMissingIsNoop (0.01s)
+    validation_test.go:106: prepare protected cache root: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestExplicitQuarantineMovesEntryAndMissingIsNoop3475040733\001 owner does not match the effective user
+FAIL
+FAIL	github.com/relux-works/curator/internal/buildcache	1.416s
+ok  	github.com/relux-works/curator/internal/buildmeta	1.276s
+--- FAIL: TestRejectsInvalidPathsLinksAndCollisions (1.32s)
+    --- FAIL: TestRejectsInvalidPathsLinksAndCollisions/invalid_protocol_path (1.31s)
+        buildsource_test.go:135: Validate error = <nil>
+        testing.go:1369: TempDir RemoveAll cleanup: unlinkat C:\Users\admin\AppData\Local\Temp\TestRejectsInvalidPathsLinksAndCollisionsinvalid_protocol_path993902799\001: The process cannot access the file because it is being used by another process.
+--- FAIL: TestFrozenTokenRejectsRootReplacement (0.00s)
+    buildsource_test.go:256: rename C:\Users\admin\AppData\Local\Temp\TestFrozenTokenRejectsRootReplacement4171738374\001\snapshot C:\Users\admin\AppData\Local\Temp\TestFrozenTokenRejectsRootReplacement4171738374\001\old: The process cannot access the file because it is being used by another process.
+FAIL
+FAIL	github.com/relux-works/curator/internal/buildsource	2.699s
+ok  	github.com/relux-works/curator/internal/capabilities	1.140s
+ok  	github.com/relux-works/curator/internal/closure	23.327s
+ok  	github.com/relux-works/curator/internal/config	2.015s
+ok  	github.com/relux-works/curator/internal/devsub	1.204s
+ok  	github.com/relux-works/curator/internal/envfiles	1.151s
+ok  	github.com/relux-works/curator/internal/gitignore	2.000s
+ok  	github.com/relux-works/curator/internal/gitops	5.015s
+--- FAIL: TestSafeSelectionFeedsStagedForwardingTargetWithoutLiveMutation (0.06s)
+    globalbins_test.go:223: validate staged script runtime: script command is not executable: tool
+FAIL
+FAIL	github.com/relux-works/curator/internal/globalbins	1.573s
+ok  	github.com/relux-works/curator/internal/godriver	95.346s
+ok  	github.com/relux-works/curator/internal/hashing	1.057s
+ok  	github.com/relux-works/curator/internal/identifiers	0.992s
+ok  	github.com/relux-works/curator/internal/identity	1.084s
+ok  	github.com/relux-works/curator/internal/install	36.234s
+ok  	github.com/relux-works/curator/internal/interop	3.017s
+ok  	github.com/relux-works/curator/internal/locale	1.297s
+ok  	github.com/relux-works/curator/internal/manifest	1.703s
+ok  	github.com/relux-works/curator/internal/marker	1.393s
+ok  	github.com/relux-works/curator/internal/mcp	1.461s
+ok  	github.com/relux-works/curator/internal/protocoljson	1.053s
+ok  	github.com/relux-works/curator/internal/registry	4.517s
+--- FAIL: TestPrepareScriptRuntimeStagesIncompleteReplacementWithoutBuildRoots (0.11s)
+    targets_test.go:42: validate staged script runtime: script command is not executable: tool
+--- FAIL: TestPrepareScriptRuntimeReusesOnlyCompleteManagedTree (0.03s)
+    targets_test.go:79: complete runtime not reused: {Commands:map[] Desired:<nil> Replacement:false}, validate staged script runtime: script command is not executable: tool
+--- FAIL: TestPrepareSingleScriptStagesManagedBinWithoutCopyingSnapshotTree (0.02s)
+    targets_test.go:106: validate staged script runtime: script command is not executable: tool
+--- FAIL: TestShimTransitionMatrixIsDeterministicAndManagerScoped (0.01s)
+    targets_test.go:163: Windows compiled artifact must have an .exe suffix
+--- FAIL: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode (0.67s)
+    targets_windows_test.go:95: global-canonical wrapper exit = exit status 1; output:
+        "\"C:\Users\admin\AppData\Local\Temp\TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode652333572\001\call global-canonical.cmd\"" не является внутренней или внешней
+        командой, исполняемой программой или пакетным файлом.
+FAIL
+FAIL	github.com/relux-works/curator/internal/runtimestore	2.172s
+ok  	github.com/relux-works/curator/internal/scopes	1.358s
+--- FAIL: TestPowerShellHookRunsOnEveryPrompt (0.61s)
+    shell_test.go:393: hook execution: exit status 1
+        Невозможно загрузить файл C:\Users\admin\AppData\Local\Temp\TestPowerShellHookRunsOnEveryPrompt328202712\001\test.ps1, 
+        так как выполнение сценариев отключено в этой системе. Для получения дополнительных сведений см. about_Execution_Polici
+        es по адресу https:/go.microsoft.com/fwlink/?LinkID=135170.
+            + CategoryInfo          : Ошибка безопасности: (:) [], ParentContainsErrorRecordException
+            + FullyQualifiedErrorId : UnauthorizedAccess
+FAIL
+FAIL	github.com/relux-works/curator/internal/shell	1.730s
+ok  	github.com/relux-works/curator/internal/skillcheck	1.425s
+ok  	github.com/relux-works/curator/internal/skillspec	3.805s
+ok  	github.com/relux-works/curator/internal/snapshot	9.236s
+ok  	github.com/relux-works/curator/internal/ui	1.203s
+ok  	github.com/relux-works/curator/internal/verr	0.950s
+ok  	github.com/relux-works/curator/internal/version	0.928s
+ok  	github.com/relux-works/curator/internal/whitelist	0.899s
+FAIL
+TEST_EXIT=1
+=== real go build integration ===
+=== RUN   TestRealGoV1VendoredBuildIsBoundedAndNotLaunched
+--- PASS: TestRealGoV1VendoredBuildIsBoundedAndNotLaunched (45.73s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	46.500s
+REAL_EXIT=0
+<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04"><Obj S="progress" RefId="0"><TN RefId="0"><T>System.Management.Automation.PSCustomObject</T><T>System.Object</T></TN><MS><I64 N="SourceId">1</I64><PR N="Record"><AV>Подготовка модулей к первому использованию.</AV><AI>0</AI><Nil /><PI>-1</PI><PC>-1</PC><T>Completed</T><SR>-1</SR><SD> </SD></PR></MS></Obj><Obj S="progress" RefId="1"><TNRef RefId="0" /><MS><I64 N="SourceId">1</I64><PR N="Record"><AV>Подготовка модулей к первому использованию.</AV><AI>0</AI><Nil /><PI>-1</PI><PC>-1</PC><T>Completed</T><SR>-1</SR><SD> </SD></PR></MS></Obj></Objs>

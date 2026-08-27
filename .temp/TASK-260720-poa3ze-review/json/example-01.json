@@ -1,0 +1,25 @@
+{
+  "snapshotDirectory": {
+    "oneOf": [
+      {"const": "."},
+      {"$ref": "#/$defs/portablePath"}
+    ]
+  },
+  "buildCommandV6": {
+    "type": "object",
+    "required": ["type", "driver", "source_dir"],
+    "properties": {
+      "type": {"const": "build"},
+      "driver": {"const": "go-v1"},
+      "source_dir": {"$ref": "#/$defs/snapshotDirectory"}
+    },
+    "additionalProperties": false
+  },
+  "commandV6": {
+    "oneOf": [
+      {"$ref": "#/$defs/scriptCommand"},
+      {"$ref": "#/$defs/systemCommand"},
+      {"$ref": "#/$defs/buildCommandV6"}
+    ]
+  }
+}

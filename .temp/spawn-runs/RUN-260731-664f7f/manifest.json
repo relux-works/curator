@@ -1,0 +1,170 @@
+{
+  "id": "RUN-260731-664f7f",
+  "task_id": "BUG-260731-11bpa4",
+  "created_at": "2026-07-31T08:53:42.929615Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260731-12-53-38_-implementer--developer--claude-_BUG-260731-11bpa4.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "BUG-260731-11bpa4_spawn-log_-implementer--developer--claude-_RUN-260731-664f7f.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "BUG-260731-11bpa4_spawn-log_-implementer--developer--claude-_RUN-260731-03a9fd.log",
+    "BUG-260731-11bpa4_spawn-log_-implementer--developer--claude-_RUN-260731-ef90cf.log"
+  ],
+  "require_outcome_artifact": true,
+  "launch_goal": {
+    "version": "board-goal-v1",
+    "id": "GOAL-260731-e730a0",
+    "kind": "role_handoff",
+    "owner": {
+      "role": {
+        "role": "developer",
+        "archetype": "implementer",
+        "start_status": "development",
+        "end_status": "to-review"
+      },
+      "agent": "[implementer] developer (claude)",
+      "run_id": "RUN-260731-664f7f",
+      "parent_goal_id": "GOAL-260731-f6f304",
+      "parent_goal_revision": 1
+    },
+    "scope": {
+      "requested_ids": [
+        "BUG-260731-11BPA4"
+      ],
+      "resolved_leaf_items": [
+        {
+          "id": "BUG-260731-11bpa4",
+          "title": "BUG-260731-11bpa4: curator-windows-test-vet-compile-break",
+          "review_policy": "required",
+          "baseline_status": "backlog"
+        }
+      ]
+    },
+    "role_policy": {
+      "handoff_end_status": "to-review"
+    },
+    "objective_intent": "Execute BUG-260731-11bpa4 within the active board delivery scope",
+    "objective": "Intent summary (non-authoritative): Execute BUG-260731-11bpa4 within the active board delivery scope\nReview-policy snapshot: BUG-260731-11bpa4=required\n\nEnvironment contract: Act with maximum autonomy and keep progressing through recoverable work without asking for routine confirmation. After surfacing final board evidence for a satisfied success predicate, clear the provider goal through its successful-completion path; never early-clear it to evade acceptance. If the requested outcome objectively does not fit, never force it or fake a fit: make the next optimal assumption only when it is unambiguously derivable; otherwise invoke the repository's existing **Stop-The-Line: No Forced Fits** boundary, persist its evidence packet, and surface only the exact human-only decision or external input needed.\n\nKeep working on board scope BUG-260731-11bpa4 until every assigned item reaches the role end status `to-review` with all task acceptance criteria and checklist gates satisfied and a new or updated task-scoped outcome artifact, or the repository's existing **Stop-The-Line: No Forced Fits** boundary is evidenced. Routine failed checks, recoverable runtime errors, and rework remain continuation signals; they are not successful handoff.",
+    "provider_condition": "Own the latest active revision of board goal **GOAL-260731-e730a0** for run **RUN-260731-664f7f** through its board-defined success predicate. Before nested spawn, at every directive checkpoint, and before claiming success, run `task-board spawn goal RUN-260731-664f7f`; treat the returned objective, resolved scope, and revision as authoritative and surface them with the required board acceptance evidence. A stale revision, cancelled/superseded goal, or missing scoped acceptance evidence is not success.",
+    "success_predicate": "role_handoff",
+    "stop_boundary_ref": "Stop-The-Line: No Forced Fits",
+    "revision": 1,
+    "mutation": {
+      "kind": "created",
+      "reason": "Goal-bound tracked spawn launch",
+      "actor_context": {
+        "kind": "agent",
+        "actor_id": "[implementer] developer (claude)",
+        "run_id": "RUN-260731-33a385"
+      },
+      "authority": "agent_discretion"
+    },
+    "created_at": "2026-07-31T08:53:36.53705Z"
+  },
+  "managed_session_launch": {
+    "contract": "task-board.claude-session-launch-v1",
+    "primary_session_plan": {
+      "contract": "agents-infra.primary-session-launch-plan",
+      "schema_version": 1,
+      "status": "ok",
+      "producer": {
+        "version": "dev",
+        "commit": "unknown"
+      },
+      "provider": "claude",
+      "project_dir": "/Users/iv/Developer/ReluxWorks/curator",
+      "executable": "/Users/iv/.local/bin/claude",
+      "launch_variants": {
+        "interactive": {
+          "argv": [
+            "--dangerously-skip-permissions",
+            "--model",
+            "claude-opus-5"
+          ]
+        },
+        "managed_host": {
+          "kind": "claude-pty",
+          "argv": [
+            "--dangerously-skip-permissions",
+            "--model",
+            "claude-opus-5"
+          ]
+        },
+        "managed_client": {
+          "argv": []
+        }
+      },
+      "resolved": {
+        "model": {
+          "value": "claude-opus-5",
+          "source": "cli:--model"
+        },
+        "reasoning": {
+          "value": null,
+          "source": "native"
+        },
+        "yolo": {
+          "value": true,
+          "source": "cli:--dangerously-skip-permissions"
+        },
+        "sandbox": {
+          "value": null,
+          "source": "not_applicable"
+        },
+        "profile": {
+          "value": null,
+          "source": "not_applicable"
+        },
+        "approval": {
+          "value": "bypass-permissions",
+          "source": "cli:--dangerously-skip-permissions"
+        },
+        "mcp": {
+          "servers": []
+        }
+      },
+      "required_env_names": [],
+      "sources": []
+    },
+    "term": "xterm-256color",
+    "rows": 40,
+    "cols": 120,
+    "owner_run": {
+      "run_id": "RUN-260731-664f7f",
+      "task_id": "BUG-260731-11bpa4",
+      "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+      "delivery_goal_id": "GOAL-260731-e730a0"
+    }
+  }
+}

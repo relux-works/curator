@@ -1,0 +1,75 @@
+ M src/csk/builds/cache_posix.py
+ M tests/test_build_cache_posix.py
+task/TASK-260720-2jfnz6-protected-posix-build-cache
+0d6ad16fce35c1bd8854511e13766cd236908e3b
+495ad021847529ce5a544dba415ca2fe19949539
+495ad021847529ce5a544dba415ca2fe19949539
+495ad021847529ce5a544dba415ca2fe19949539
+worktree /Users/iv/Developer/Wildberries/cocoaskills
+HEAD 495ad021847529ce5a544dba415ca2fe19949539
+branch refs/heads/main
+
+worktree /Users/iv/Developer/ReluxWorks/cocoaskills-production
+HEAD d2db86ce0c999da97829e4900c50f7350b777015
+branch refs/heads/agent/registry-client-production
+
+worktree /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+HEAD d0d91788bc01c6590dec49a0dd296a78e95fd44b
+branch refs/heads/task/TASK-260720-z2z795-transaction-engine
+
+worktree /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z9j4c9/worktree
+HEAD dd76b570f88339fd1d659c02950e68b17f6ba834
+branch refs/heads/task/TASK-260720-z9j4c9-schema-v6
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2dnqw2/worktree
+HEAD 495ad021847529ce5a544dba415ca2fe19949539
+branch refs/heads/task/TASK-260720-2dnqw2-canonical-build-metadata
+
+worktree /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3j8pp5/worktree
+HEAD 1d28910f5bb276ff58e2a102e06968bd7640abe3
+branch refs/heads/task/TASK-260720-3j8pp5-toolchain-identity
+
+worktree /Users/iv/Developer/Wildberries/.worktrees/cocoaskills-agent-skill
+HEAD 9064b23429e3805a4c865e76dc7d782dfe9356a1
+branch refs/heads/agent/agent-skill-manifest
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/csk-runtime-command-fix/cocoaskills-wb
+HEAD 10a758509374e75827e53b7bb43532a08f998e5f
+branch refs/heads/fix/shell-neutral-onboarding
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-2g21eg/worktree
+HEAD 495ad021847529ce5a544dba415ca2fe19949539
+branch refs/heads/task/TASK-260720-2g21eg-go-v1-compile-driver
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-2jfnz6/worktree
+HEAD 0d6ad16fce35c1bd8854511e13766cd236908e3b
+branch refs/heads/task/TASK-260720-2jfnz6-protected-posix-build-cache
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-3c0ss2/worktree
+HEAD 97a0ed870782b48eebc5a9c25a9cfa8fea5ff245
+branch refs/heads/task/TASK-260720-3c0ss2-build-source-identity
+
+worktree /Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-poa3ze/origin-main-worktree
+HEAD 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+detached
+
+ src/csk/builds/cache_posix.py   | 642 ++++++++++++++++++++++++++--------------
+ tests/test_build_cache_posix.py | 254 +++++++++++++++-
+ 2 files changed, 680 insertions(+), 216 deletions(-)
+428	214	src/csk/builds/cache_posix.py
+252	2	tests/test_build_cache_posix.py
+d5936a40bc6628f37a7b5e485ff5651d11cd38ec939b27cb81e2cf4b9c6f0821  src/csk/builds/cache.py
+6068d2c772de0a2d9497bbc36def0f6ffe7d87ff26d21cf637208ec13d72a369  src/csk/builds/cache_posix.py
+aedbe7fd6a03c31f30cbc48609bf6124b2686a7d50c90b429af6b251800b8f13  tests/test_build_cache_posix.py
+     205 src/csk/builds/cache.py
+    1800 src/csk/builds/cache_posix.py
+     944 tests/test_build_cache_posix.py
+    2949 total
+0d6ad16 (HEAD -> task/TASK-260720-2jfnz6-protected-posix-build-cache, origin/task/TASK-260720-2jfnz6-protected-posix-build-cache) feat(builds): add protected POSIX cache
+495ad02 (origin/main, origin/HEAD, task/TASK-260720-2g21eg-go-v1-compile-driver, task/TASK-260720-2dnqw2-canonical-build-metadata, main) feat(builds): add canonical build metadata
+97a0ed8 (task/TASK-260720-3c0ss2-build-source-identity) fix(builds): harden Windows source identity
+1d28910 (task/TASK-260720-3j8pp5-toolchain-identity) fix(builds): stabilize Windows toolchain scans
+d5d16bf feat(builds): add trusted Go toolchain identity
+2734bef feat(builds): add source identity boundary
+dd76b57 (task/TASK-260720-z9j4c9-schema-v6) Add schema v6 build model
+6fc2fd9 (tag: v0.12.5, wb/main, wb/HEAD) Pin landed rc.3 protocol

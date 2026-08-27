@@ -1,0 +1,43 @@
+{
+  "id": "RUN-260731-7dca5f",
+  "task_id": "BUG-260731-lepevi",
+  "agent_name": "[implementer] developer (claude)",
+  "agent_type": "claude",
+  "status": "cancelled",
+  "phase": "finalizing",
+  "summary": "Claude did not acknowledge the native goal directive within 30s; successor RUN-260731-dbbe43",
+  "created_at": "2026-07-31T08:54:18.552815Z",
+  "started_at": "2026-07-31T08:54:19.051325Z",
+  "completed_at": "2026-07-31T09:47:38.775945Z",
+  "last_heartbeat_at": "2026-07-31T09:47:38.775945Z",
+  "last_progress_at": "2026-07-31T09:47:38.775945Z",
+  "completion_reason": "cancelled",
+  "last_event_seq": 1615,
+  "last_acknowledged_directive": "RUN-260731-7dca5f:nudge:c6316a",
+  "exit_code": 1,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260731-12-53-40_-implementer--developer--claude-_BUG-260731-lepevi.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260731-lepevi/-implementer--developer--claude-_RUN-260731-7dca5f.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260731-7dca5f/runner.log",
+  "error": "Claude did not acknowledge the native goal directive within 30s; successor RUN-260731-dbbe43",
+  "max_parallel": 20,
+  "active_goal_ref": {
+    "id": "GOAL-260731-68850a",
+    "revision": 1
+  },
+  "goal_run_signal": {
+    "code": "provider_runtime_failure",
+    "providerStatus": "goal_still_active",
+    "detail": "Claude did not acknowledge the native goal directive within 30s",
+    "recoverable": true
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "provider": "claude",
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "goal_disposition": "superseded_by_autonomous_recovery",
+  "goal_disposition_reason": "Claude did not acknowledge the native goal directive within 30s; successor RUN-260731-dbbe43",
+  "goal_disposition_at": "2026-07-31T09:47:38.775945Z"
+}

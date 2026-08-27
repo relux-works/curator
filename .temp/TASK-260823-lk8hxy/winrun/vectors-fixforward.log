@@ -1,0 +1,57 @@
+=== RUN   TestBuildSourceIdentityVectors
+=== RUN   TestBuildSourceIdentityVectors/fixture-exact-build-source
+=== RUN   TestBuildSourceIdentityVectors/domain-prefix-ordering-framing-empty-binary-and-root-marker
+=== RUN   TestBuildSourceIdentityVectors/mode-and-timestamp-are-non-inputs
+=== RUN   TestBuildSourceIdentityVectors/invalid-unicode-build-source-path
+=== RUN   TestBuildSourceIdentityVectors/duplicate-build-source-path
+    builddriver_conformance_test.go:239: this host folds the alias into one directory member, so no duplicate encoded path is reachable
+=== RUN   TestBuildSourceIdentityVectors/build-source-symbolic-link
+=== RUN   TestBuildSourceIdentityVectors/build-source-special-file
+    builddriver_conformance_test.go:259: this host cannot create the FIFO the vector needs
+=== RUN   TestBuildSourceIdentityVectors/build-source-mutation-during-use
+=== RUN   TestBuildSourceIdentityVectors/legacy-nul-stream-structural-collision
+=== RUN   TestBuildSourceIdentityVectors/root-marker-bytes-are-build-input
+--- PASS: TestBuildSourceIdentityVectors (0.04s)
+    --- PASS: TestBuildSourceIdentityVectors/fixture-exact-build-source (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/domain-prefix-ordering-framing-empty-binary-and-root-marker (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/mode-and-timestamp-are-non-inputs (0.01s)
+    --- PASS: TestBuildSourceIdentityVectors/invalid-unicode-build-source-path (0.00s)
+    --- SKIP: TestBuildSourceIdentityVectors/duplicate-build-source-path (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/build-source-symbolic-link (0.00s)
+    --- SKIP: TestBuildSourceIdentityVectors/build-source-special-file (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/build-source-mutation-during-use (0.01s)
+    --- PASS: TestBuildSourceIdentityVectors/legacy-nul-stream-structural-collision (0.01s)
+    --- PASS: TestBuildSourceIdentityVectors/root-marker-bytes-are-build-input (0.01s)
+PASS
+ok  	github.com/relux-works/curator/internal/buildsource	0.761s
+=== RUN   TestToolchainIdentityVectors
+=== RUN   TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link
+    builddriver_positive_conformance_test.go:268: materialized link target = "..\\bin\\go", <nil>; want exact protocol target "../bin/go"
+=== RUN   TestToolchainIdentityVectors/crlf-version-normalizes-to-lf-identity
+=== RUN   TestToolchainIdentityVectors/toolchain-mode-and-timestamp-are-non-inputs
+=== RUN   TestToolchainIdentityVectors/toolchain-version-missing-terminal-lf
+=== RUN   TestToolchainIdentityVectors/toolchain-version-multiple-terminal-newlines
+=== RUN   TestToolchainIdentityVectors/invalid-unicode-toolchain-path
+=== RUN   TestToolchainIdentityVectors/duplicate-toolchain-path
+=== RUN   TestToolchainIdentityVectors/escaping-toolchain-link
+=== RUN   TestToolchainIdentityVectors/absolute-toolchain-link
+=== RUN   TestToolchainIdentityVectors/dangling-toolchain-link
+=== RUN   TestToolchainIdentityVectors/selected-go-outside-goroot
+=== RUN   TestToolchainIdentityVectors/toolchain-tree-mutation-during-use
+--- FAIL: TestToolchainIdentityVectors (2.05s)
+    --- FAIL: TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/crlf-version-normalizes-to-lf-identity (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-mode-and-timestamp-are-non-inputs (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-version-missing-terminal-lf (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-version-multiple-terminal-newlines (0.00s)
+    --- PASS: TestToolchainIdentityVectors/invalid-unicode-toolchain-path (0.00s)
+    --- PASS: TestToolchainIdentityVectors/duplicate-toolchain-path (0.00s)
+    --- PASS: TestToolchainIdentityVectors/escaping-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/absolute-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/dangling-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/selected-go-outside-goroot (0.01s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-tree-mutation-during-use (2.03s)
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	2.955s
+FAIL
+REAL_EXIT_CODE=1

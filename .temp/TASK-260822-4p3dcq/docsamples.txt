@@ -1,0 +1,55 @@
+=== RUN   TestDocSampleFailClosed
+=====FAIL-CLOSED=====
+build_repository_ssh_credential_missing: external build repositories need SSH credentials:
+  git.example.test/portals/app (command "build-tool" of skill "portals")
+  git.example.test/portals/agent (command "build-agent" of skill "portals")
+  other.example.test/tools/kit (command "build-kit" of skill "infra")
+detected on this host:
+  SSH agent at /run/agent.sock holding 2 keys
+  ~/.ssh/id_ed25519.pub
+  ~/.ssh/work.pub
+select credentials with one of:
+  curator config build-ssh add git.example.test/portals --agent --identity ~/.ssh/id_ed25519.pub
+  curator config build-ssh add git.example.test/portals --agent
+  curator config build-ssh add git.example.test/portals --identity ~/.ssh/id_ed25519.pub
+  curator config build-ssh add git.example.test/portals --identity ~/.ssh/work.pub
+  curator config build-ssh add other.example.test/tools --agent --identity ~/.ssh/id_ed25519.pub
+  curator config build-ssh add other.example.test/tools --agent
+  curator config build-ssh add other.example.test/tools --identity ~/.ssh/id_ed25519.pub
+  curator config build-ssh add other.example.test/tools --identity ~/.ssh/work.pub
+or pass --build-ssh-agent/--build-ssh-identity, or set CURATOR_BUILD_SSH_AGENT/CURATOR_BUILD_SSH_IDENTITY
+=====END=====
+--- PASS: TestDocSampleFailClosed (0.00s)
+=== RUN   TestDocSampleNoCandidates
+=====NO-CANDIDATES=====
+build_repository_ssh_credential_missing: external build repositories need SSH credentials:
+  git.example.test/portals/app (command "build-tool" of skill "portals")
+no SSH agent and no ~/.ssh/*.pub identity were detected on this host
+select credentials with one of:
+  curator config build-ssh add git.example.test/portals --agent --identity ~/.ssh/<key>.pub
+  curator config build-ssh add git.example.test/portals --agent
+or pass --build-ssh-agent/--build-ssh-identity, or set CURATOR_BUILD_SSH_AGENT/CURATOR_BUILD_SSH_IDENTITY
+=====END=====
+--- PASS: TestDocSampleNoCandidates (0.00s)
+=== RUN   TestDocSamplePrompt
+=====PROMPT=====
+
+build_repository_ssh_credential_missing: git.example.test/portals/app needs SSH credentials (command "build-tool" of skill "portals")
+  1) agent, pinned to ~/.ssh/id_ed25519.pub  [default]
+  2) SSH agent at /run/agent.sock holding 2 keys, any key it holds
+  3) identity ~/.ssh/id_ed25519.pub
+  4) identity ~/.ssh/work.pub
+  m) enter an identity path
+  q) abort
+credential [1-4, m, q] (default 1): scope [git.example.test/portals] (q to abort): recorded build_ssh scope git.example.test/portals
+=====END=====
+resolve error: <nil>; recorded: [{Scope:git.example.test/portals Agent:true AgentSocket: Identity:~/.ssh/id_ed25519.pub KnownHosts:}]
+--- PASS: TestDocSamplePrompt (0.00s)
+=== RUN   TestDocSampleProvenance
+=====PROVENANCE=====
+external build ssh: git.example.test/portals/app (command "build-tool" of skill "portals") <- config scope "git.example.test/portals"
+err: <nil>
+=====END=====
+--- PASS: TestDocSampleProvenance (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/install	(cached)

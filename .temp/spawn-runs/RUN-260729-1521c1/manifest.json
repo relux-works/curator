@@ -1,0 +1,60 @@
+{
+  "id": "RUN-260729-1521c1",
+  "task_id": "BUG-260729-r0fe02",
+  "created_at": "2026-07-29T19:55:16.583203Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-23-55-16_-implementer--developer--codex-_BUG-260729-r0fe02.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "BUG-260729-r0fe02_spawn-log_-implementer--developer--codex-_RUN-260729-1521c1.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "BUG-260729-r0fe02_gatelogs.tar.gz",
+    "BUG-260729-r0fe02_patch.diff",
+    "BUG-260729-r0fe02_results.md",
+    "BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-1f4480.log",
+    "BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-3afcd3.log",
+    "BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-4752b2.log",
+    "BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-eb4053.log",
+    "BUG-260729-r0fe02_spawn-log_-implementer--developer--claude-_RUN-260729-f6ebe7.log"
+  ],
+  "initial_outcome_digests": {
+    "BUG-260729-r0fe02_gatelogs.tar.gz": "60c0c6614a7ac7f1fdc85df3cf7f62fe678ea4e793d61d9cba91c38e97e00525",
+    "BUG-260729-r0fe02_patch.diff": "462f1ff0326f74540eeb2815cc80542c55f47b35c6b1baef17b80b8815709c28",
+    "BUG-260729-r0fe02_results.md": "dc033b8ac21a22d7d1af00b426a12d6e9693d66b6639306d15c2c148a90b1a98"
+  },
+  "require_outcome_artifact": true
+}

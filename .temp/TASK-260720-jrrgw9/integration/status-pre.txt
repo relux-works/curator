@@ -1,0 +1,105 @@
+ M README.md
+ M cmd/curator/main.go
+ M cmd/curator/main_test.go
+ M go.mod
+ M internal/adapters/adapters.go
+ M internal/adapters/adapters_test.go
+ M internal/closure/closure.go
+ M internal/closure/closure_test.go
+ M internal/closure/conformance_test.go
+ M internal/devsub/devsub.go
+ M internal/envfiles/envfiles.go
+ M internal/gitignore/gitignore.go
+ M internal/globalbins/globalbins.go
+ M internal/globalbins/globalbins_test.go
+ M internal/install/global.go
+ M internal/install/install.go
+ M internal/install/install_test.go
+ M internal/interop/golden_test.go
+ M internal/manifest/manifest.go
+ M internal/marker/marker.go
+ M internal/marker/marker_test.go
+ M internal/protocoljson/json_test.go
+ M internal/registry/registry.go
+ M internal/runtimestore/runtimestore.go
+ M internal/scopes/consumers.go
+ M internal/scopes/gc.go
+ M internal/scopes/hybrid.go
+ M internal/skillcheck/skillcheck.go
+ M internal/skillcheck/skillcheck_test.go
+ M internal/skillspec/conformance_test.go
+ M internal/skillspec/parse.go
+ M internal/skillspec/parse_test.go
+ M internal/skillspec/types.go
+ M internal/snapshot/snapshot.go
+ M internal/snapshot/snapshot_test.go
+ M internal/whitelist/whitelist.go
+ M internal/whitelist/whitelist_test.go
+?? cmd/curator/builds.go
+?? cmd/curator/builds_test.go
+?? cmd/curator/gc_test.go
+?? cmd/curator/global_status_test.go
+?? cmd/curator/lifecycle_conformance_test.go
+?? cmd/curator/status_test.go
+?? internal/adapters/fifo_other_test.go
+?? internal/adapters/fifo_unix_test.go
+?? internal/adapters/stage.go
+?? internal/buildcache/
+?? internal/buildmeta/
+?? internal/buildsource/
+?? internal/envfiles/stage.go
+?? internal/globalbins/stage.go
+?? internal/godriver/
+?? internal/install/aba_test.go
+?? internal/install/atomicity/
+?? internal/install/builddeps.go
+?? internal/install/cache_conformance_test.go
+?? internal/install/commit.go
+?? internal/install/commit_test.go
+?? internal/install/diagnostics.go
+?? internal/install/diagnostics_test.go
+?? internal/install/dryrun_conformance_test.go
+?? internal/install/generation.go
+?? internal/install/generation_test.go
+?? internal/install/maintenance_test.go
+?? internal/install/plan.go
+?? internal/install/private.go
+?? internal/install/private_test.go
+?? internal/install/revalidation_test.go
+?? internal/install/stage.go
+?? internal/install/stage_test.go
+?? internal/install/targets.go
+?? internal/managerlock/
+?? internal/marker/marker_v2_test.go
+?? internal/protocoljson/ccj.go
+?? internal/runtimestore/conformance_test.go
+?? internal/runtimestore/launcher_conformance_test.go
+?? internal/runtimestore/scripts.go
+?? internal/runtimestore/targets.go
+?? internal/runtimestore/targets_test.go
+?? internal/runtimestore/targets_unix_test.go
+?? internal/runtimestore/targets_windows_test.go
+?? internal/scopes/gc_conformance_test.go
+?? internal/scopes/gc_conservative_test.go
+?? internal/scopes/gc_conservative_unix_test.go
+?? internal/scopes/gc_conservative_windows_test.go
+?? internal/scopes/gc_integration_other_test.go
+?? internal/scopes/gc_integration_test.go
+?? internal/scopes/gc_integration_windows_test.go
+?? internal/scopes/gc_test.go
+?? internal/scopes/redirect_other.go
+?? internal/scopes/redirect_windows.go
+?? internal/scopes/stage.go
+?? internal/skillcheck/builddriver_context_conformance_test.go
+?? internal/skillspec/build_test.go
+?? internal/skillspec/builddriver_conformance_other_test.go
+?? internal/skillspec/builddriver_conformance_test.go
+?? internal/skillspec/builddriver_conformance_unix_test.go
+?? internal/snapshot/lock.go
+?? internal/snapshot/lock_unix.go
+?? internal/snapshot/lock_windows.go
+?? internal/staging/
+?? internal/transaction/
+?? internal/whitelist/builddriver_context_conformance_test.go
+?? internal/whitelist/conformance_test.go
+?? task-board.config.json

@@ -1,0 +1,51 @@
+{
+  "id": "RUN-260729-856b0c",
+  "task_id": "TASK-260729-3dr6hw",
+  "created_at": "2026-07-29T13:09:03.231361Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] researcher (claude)",
+  "role": "researcher",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-17-09-03_-analyst--researcher--claude-_TASK-260729-3dr6hw.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-856b0c.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260729-3dr6hw_install-race-timeout-diagnosis.md",
+    "TASK-260729-3dr6hw_review-verdict-cycle-1.md",
+    "TASK-260729-3dr6hw_spawn-log_-analyst--researcher--claude-_RUN-260729-6c03cf.log",
+    "TASK-260729-3dr6hw_spawn-log_-reviewer--reviewer--codex-_RUN-260729-697d2e.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260729-3dr6hw_install-race-timeout-diagnosis.md": "c51b1edf8233e66c36dce7765be084be6c678ce6d86935aceb32e0d89b6f3889",
+    "TASK-260729-3dr6hw_review-verdict-cycle-1.md": "a73fcab27249af4e45a24bd84d2736aa4c8a81fc8d00f832057b7a0595b1b476"
+  },
+  "require_outcome_artifact": true
+}

@@ -1,0 +1,342 @@
+=== RUN   TestPrepareCanonicalJournalReferencedKeysAndCommitCleanup
+--- PASS: TestPrepareCanonicalJournalReferencedKeysAndCommitCleanup (2.21s)
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/before_backup
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/after_backup
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/before_install
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/after_install
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/target_committed
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/before_backup
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/after_backup
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/before_install
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/after_install
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/target_committed
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/before_backup
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/after_backup
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/before_install
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/after_install
+=== RUN   TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/target_committed
+--- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse (36.26s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/before_backup (1.90s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/after_backup (2.09s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/before_install (2.45s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/after_install (1.99s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/target_committed (2.20s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/before_backup (2.23s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/after_backup (2.25s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/before_install (2.57s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/after_install (2.49s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/target_committed (2.52s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/before_backup (2.82s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/after_backup (2.95s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/before_install (2.54s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/after_install (2.45s)
+    --- PASS: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/target_committed (2.82s)
+=== RUN   TestJournalStateIsDurableBeforeEachNextSwap
+--- PASS: TestJournalStateIsDurableBeforeEachNextSwap (1.63s)
+=== RUN   TestRollbackDesiredDigestMismatchPreservesUnknownBytes
+--- PASS: TestRollbackDesiredDigestMismatchPreservesUnknownBytes (2.70s)
+=== RUN   TestDirectoryReplacementAndGenerationExpectation
+--- PASS: TestDirectoryReplacementAndGenerationExpectation (0.68s)
+=== RUN   TestCreationAndRemovalRollbackRestoreExactPreimages
+--- PASS: TestCreationAndRemovalRollbackRestoreExactPreimages (1.03s)
+=== RUN   TestRecoveryProcessesTransactionIDsAndRollbackStateDeterministically
+--- PASS: TestRecoveryProcessesTransactionIDsAndRollbackStateDeterministically (0.99s)
+=== RUN   TestDurableRemovalCleansCrashTombWhenOriginalIsAbsent
+--- PASS: TestDurableRemovalCleansCrashTombWhenOriginalIsAbsent (0.01s)
+=== RUN   TestDurableRemovalPreservesUnprovenCrashTomb
+--- PASS: TestDurableRemovalPreservesUnprovenCrashTomb (0.01s)
+=== RUN   TestAPIsRequireHeldHomeLock
+--- PASS: TestAPIsRequireHeldHomeLock (0.00s)
+=== RUN   TestConcurrentDigestAndReferencedKeyReads
+--- PASS: TestConcurrentDigestAndReferencedKeyReads (5.08s)
+=== RUN   TestPrepareSyncsStagedParentBeforePreparedJournal
+=== RUN   TestPrepareSyncsStagedParentBeforePreparedJournal/regular_file
+=== RUN   TestPrepareSyncsStagedParentBeforePreparedJournal/directory
+--- PASS: TestPrepareSyncsStagedParentBeforePreparedJournal (0.75s)
+    --- PASS: TestPrepareSyncsStagedParentBeforePreparedJournal/regular_file (0.23s)
+    --- PASS: TestPrepareSyncsStagedParentBeforePreparedJournal/directory (0.51s)
+=== RUN   TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal
+=== RUN   TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal/regular_file
+=== RUN   TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal/directory
+--- PASS: TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal (0.74s)
+    --- PASS: TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal/regular_file (0.27s)
+    --- PASS: TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal/directory (0.47s)
+=== RUN   TestRollbackCorruptionBranchesNeverOverwriteUnknownState
+=== RUN   TestRollbackCorruptionBranchesNeverOverwriteUnknownState/unknown_live_bytes
+=== RUN   TestRollbackCorruptionBranchesNeverOverwriteUnknownState/committed_target_disappeared
+=== RUN   TestRollbackCorruptionBranchesNeverOverwriteUnknownState/unknown_captured_rollback_bytes
+=== RUN   TestRollbackCorruptionBranchesNeverOverwriteUnknownState/live_and_rollback_both_exist
+=== RUN   TestRollbackCorruptionBranchesNeverOverwriteUnknownState/backup_changed
+--- PASS: TestRollbackCorruptionBranchesNeverOverwriteUnknownState (2.01s)
+    --- PASS: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/unknown_live_bytes (0.43s)
+    --- PASS: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/committed_target_disappeared (0.48s)
+    --- PASS: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/unknown_captured_rollback_bytes (0.33s)
+    --- PASS: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/live_and_rollback_both_exist (0.44s)
+    --- PASS: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/backup_changed (0.32s)
+=== RUN   TestCommitRecoveryRejectsAmbiguousPendingBackups
+=== RUN   TestCommitRecoveryRejectsAmbiguousPendingBackups/live_and_backup
+=== RUN   TestCommitRecoveryRejectsAmbiguousPendingBackups/wrong_backup_digest
+--- PASS: TestCommitRecoveryRejectsAmbiguousPendingBackups (0.52s)
+    --- PASS: TestCommitRecoveryRejectsAmbiguousPendingBackups/live_and_backup (0.23s)
+    --- PASS: TestCommitRecoveryRejectsAmbiguousPendingBackups/wrong_backup_digest (0.30s)
+=== RUN   TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON
+=== RUN   TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON/noncanonical
+=== RUN   TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON/unknown_field
+=== RUN   TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON/multiple_values
+=== RUN   TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON/symlink
+--- PASS: TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON (0.70s)
+    --- PASS: TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON/noncanonical (0.19s)
+    --- PASS: TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON/unknown_field (0.18s)
+    --- PASS: TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON/multiple_values (0.17s)
+    --- PASS: TestLoadJournalRejectsNoncanonicalUnknownAndMultipleJSON/symlink (0.16s)
+=== RUN   TestSubprocessCrashRecoveryAtSwapBoundaries
+=== RUN   TestSubprocessCrashRecoveryAtSwapBoundaries/after_backup
+=== RUN   TestSubprocessCrashRecoveryAtSwapBoundaries/after_install
+--- PASS: TestSubprocessCrashRecoveryAtSwapBoundaries (1.99s)
+    --- PASS: TestSubprocessCrashRecoveryAtSwapBoundaries/after_backup (0.95s)
+    --- PASS: TestSubprocessCrashRecoveryAtSwapBoundaries/after_install (1.04s)
+=== RUN   TestSubprocessCrashRecoveryDuringPreparation
+=== RUN   TestSubprocessCrashRecoveryDuringPreparation/file
+=== RUN   TestSubprocessCrashRecoveryDuringPreparation/directory
+--- PASS: TestSubprocessCrashRecoveryDuringPreparation (0.73s)
+    --- PASS: TestSubprocessCrashRecoveryDuringPreparation/file (0.26s)
+    --- PASS: TestSubprocessCrashRecoveryDuringPreparation/directory (0.47s)
+=== RUN   TestSubprocessCrashRecoveryAfterStagingChunkSync
+=== RUN   TestSubprocessCrashRecoveryAfterStagingChunkSync/1
+=== RUN   TestSubprocessCrashRecoveryAfterStagingChunkSync/2
+--- PASS: TestSubprocessCrashRecoveryAfterStagingChunkSync (0.57s)
+    --- PASS: TestSubprocessCrashRecoveryAfterStagingChunkSync/1 (0.30s)
+    --- PASS: TestSubprocessCrashRecoveryAfterStagingChunkSync/2 (0.27s)
+=== RUN   TestPreparingRecoveryPreservesConcurrentStagingState
+=== RUN   TestPreparingRecoveryPreservesConcurrentStagingState/replaced_partial_file
+=== RUN   TestPreparingRecoveryPreservesConcurrentStagingState/added_directory_entry
+--- PASS: TestPreparingRecoveryPreservesConcurrentStagingState (0.47s)
+    --- PASS: TestPreparingRecoveryPreservesConcurrentStagingState/replaced_partial_file (0.18s)
+    --- PASS: TestPreparingRecoveryPreservesConcurrentStagingState/added_directory_entry (0.29s)
+=== RUN   TestPreparingRecoveryPreservesChangedDurableStagingPrefix
+=== RUN   TestPreparingRecoveryPreservesChangedDurableStagingPrefix/shorter_prefix
+=== RUN   TestPreparingRecoveryPreservesChangedDurableStagingPrefix/longer_prefix
+=== RUN   TestPreparingRecoveryPreservesChangedDurableStagingPrefix/same-size_changed_bytes
+--- PASS: TestPreparingRecoveryPreservesChangedDurableStagingPrefix (0.54s)
+    --- PASS: TestPreparingRecoveryPreservesChangedDurableStagingPrefix/shorter_prefix (0.17s)
+    --- PASS: TestPreparingRecoveryPreservesChangedDurableStagingPrefix/longer_prefix (0.18s)
+    --- PASS: TestPreparingRecoveryPreservesChangedDurableStagingPrefix/same-size_changed_bytes (0.19s)
+=== RUN   TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead
+=== RUN   TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead/shorter_than_acknowledged
+=== RUN   TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead/longer_than_authorized
+=== RUN   TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead/changed_authorized_size
+=== RUN   TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead/replacement
+--- PASS: TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead (1.05s)
+    --- PASS: TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead/shorter_than_acknowledged (0.37s)
+    --- PASS: TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead/longer_than_authorized (0.25s)
+    --- PASS: TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead/changed_authorized_size (0.22s)
+    --- PASS: TestPreparingRecoveryPreservesStateOutsideStagingWriteAhead/replacement (0.20s)
+=== RUN   TestTransactionCrashHelper
+--- PASS: TestTransactionCrashHelper (0.00s)
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/transaction_id
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/project
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/no_targets
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/empty_build_key
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/duplicate_build_key
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/class
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/identifier
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/duplicate_key
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/no_expectation
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/two_expectations
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/bad_digest
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/empty_live
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/generation_escape
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/source_is_live
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/source_absent
+=== RUN   TestBuildJournalRejectsInvalidPlansAndTargets/duplicate_live
+--- PASS: TestBuildJournalRejectsInvalidPlansAndTargets (0.01s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/transaction_id (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/project (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/no_targets (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/empty_build_key (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/duplicate_build_key (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/class (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/identifier (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/duplicate_key (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/no_expectation (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/two_expectations (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/bad_digest (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/empty_live (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/generation_escape (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/source_is_live (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/source_absent (0.00s)
+    --- PASS: TestBuildJournalRejectsInvalidPlansAndTargets/duplicate_live (0.00s)
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/schema
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/project
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/phase
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/removal_outside_cleanup
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/removal_without_entries
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/entries_without_removal
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/invalid_removal_entries
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/noncanonical_removal
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/keys
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/targets
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/target_text
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/target_order
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/relative_live
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/sidecar_parent
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/noncanonical_sidecar
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/expectation
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/preimage_digest
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/generation_text
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/generation_escape
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/desired_digest
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/desired_absence_with_staging
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/backup_digest
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/state
+=== RUN   TestValidateJournalRejectsEveryNoncanonicalFieldCluster/target_namespace_overlap
+--- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster (0.27s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/schema (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/project (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/phase (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/removal_outside_cleanup (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/removal_without_entries (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/entries_without_removal (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/invalid_removal_entries (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/noncanonical_removal (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/keys (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/targets (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/target_text (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/target_order (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/relative_live (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/sidecar_parent (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/noncanonical_sidecar (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/expectation (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/preimage_digest (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/generation_text (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/generation_escape (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/desired_digest (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/desired_absence_with_staging (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/backup_digest (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/state (0.00s)
+    --- PASS: TestValidateJournalRejectsEveryNoncanonicalFieldCluster/target_namespace_overlap (0.01s)
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/bytes_without_digest
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/digest_without_bytes
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/negative_bytes
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/inactive_progress
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/uncreated_progress
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/absent_digest
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/invalid_digest
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/write_bytes_without_digest
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/write_digest_without_bytes
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/write_not_beyond_acknowledged_bytes
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/write_exceeds_one_chunk
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/negative_write_bytes
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/absent_write_digest
+=== RUN   TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/invalid_write_digest
+--- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress (0.03s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/bytes_without_digest (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/digest_without_bytes (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/negative_bytes (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/inactive_progress (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/uncreated_progress (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/absent_digest (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/invalid_digest (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/write_bytes_without_digest (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/write_digest_without_bytes (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/write_not_beyond_acknowledged_bytes (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/write_exceeds_one_chunk (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/negative_write_bytes (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/absent_write_digest (0.00s)
+    --- PASS: TestValidateJournalRejectsNoncanonicalStagingPrefixProgress/invalid_write_digest (0.00s)
+=== RUN   TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces
+=== RUN   TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/nested_directory_target
+=== RUN   TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/directory_symlink_alias
+=== RUN   TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/file_hard-link_alias
+=== RUN   TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/cross-target_live_and_sidecar_collision
+=== RUN   TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/live_collides_with_own_sidecar
+=== RUN   TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/live_collides_with_cleanup_tomb
+=== RUN   TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/live_overlaps_journal_namespace
+--- PASS: TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces (0.13s)
+    --- PASS: TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/nested_directory_target (0.02s)
+    --- PASS: TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/directory_symlink_alias (0.02s)
+    --- PASS: TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/file_hard-link_alias (0.02s)
+    --- PASS: TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/cross-target_live_and_sidecar_collision (0.02s)
+    --- PASS: TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/live_collides_with_own_sidecar (0.01s)
+    --- PASS: TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/live_collides_with_cleanup_tomb (0.02s)
+    --- PASS: TestBuildJournalRejectsOverlappingAndAliasedTargetNamespaces/live_overlaps_journal_namespace (0.02s)
+=== RUN   TestPrepareFaultAndPreparingRecoveryCleanStagingWithoutLiveMutation
+--- PASS: TestPrepareFaultAndPreparingRecoveryCleanStagingWithoutLiveMutation (0.39s)
+=== RUN   TestCleanupPhaseRecoveryRetainsDesiredAndRemovesBackups
+--- PASS: TestCleanupPhaseRecoveryRetainsDesiredAndRemovesBackups (0.44s)
+=== RUN   TestCleanupPreservesUnknownOrSimultaneousTombs
+=== RUN   TestCleanupPreservesUnknownOrSimultaneousTombs/commit_cleanup
+=== RUN   TestCleanupPreservesUnknownOrSimultaneousTombs/restart_cleanup
+--- PASS: TestCleanupPreservesUnknownOrSimultaneousTombs (0.53s)
+    --- PASS: TestCleanupPreservesUnknownOrSimultaneousTombs/commit_cleanup (0.26s)
+    --- PASS: TestCleanupPreservesUnknownOrSimultaneousTombs/restart_cleanup (0.28s)
+=== RUN   TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary
+=== RUN   TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/direct_after_tomb_rename
+=== RUN   TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/restart_after_tomb_rename
+=== RUN   TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/direct_during_recursive_removal
+=== RUN   TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/restart_during_recursive_removal
+--- PASS: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary (2.23s)
+    --- PASS: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/direct_after_tomb_rename (0.51s)
+    --- PASS: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/restart_after_tomb_rename (0.61s)
+    --- PASS: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/direct_during_recursive_removal (0.53s)
+    --- PASS: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/restart_during_recursive_removal (0.58s)
+=== RUN   TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb
+=== RUN   TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb/after_cleanup_rename
+=== RUN   TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb/during_cleanup_removal
+--- PASS: TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb (1.13s)
+    --- PASS: TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb/after_cleanup_rename (0.56s)
+    --- PASS: TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb/during_cleanup_removal (0.56s)
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=false/added
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=false/replaced
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=true/added
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=true/replaced
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=false/added
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=false/replaced
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=true/added
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=true/replaced
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=false/added
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=false/replaced
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=true/added
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=true/replaced
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=false/added
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=false/replaced
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=true/added
+=== RUN   TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=true/replaced
+--- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState (10.02s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=false/added (0.52s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=false/replaced (0.63s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=true/added (0.52s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=true/replaced (0.51s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=false/added (0.53s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=false/replaced (0.50s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=true/added (0.51s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=true/replaced (0.52s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=false/added (0.88s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=false/replaced (0.97s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=true/added (0.68s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=true/replaced (0.58s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=false/added (0.59s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=false/replaced (0.68s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=true/added (0.75s)
+    --- PASS: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=true/replaced (0.65s)
+=== RUN   TestRestartDiscoversAndFinishesJournalCleanupTomb
+--- PASS: TestRestartDiscoversAndFinishesJournalCleanupTomb (0.28s)
+=== RUN   TestDigestCopyAndNoReplaceRejectUnsafeOrUnknownPaths
+--- PASS: TestDigestCopyAndNoReplaceRejectUnsafeOrUnknownPaths (0.00s)
+=== RUN   TestBuildJournalRejectsCaseInsensitiveLiveAliases
+--- PASS: TestBuildJournalRejectsCaseInsensitiveLiveAliases (0.02s)
+=== RUN   TestWindowsRegularAndTreeDurability
+--- PASS: TestWindowsRegularAndTreeDurability (0.02s)
+=== RUN   TestWindowsJournalRemovalUsesPersistedModeAndPreservesChangedBytes
+=== RUN   TestWindowsJournalRemovalUsesPersistedModeAndPreservesChangedBytes/canonical
+=== RUN   TestWindowsJournalRemovalUsesPersistedModeAndPreservesChangedBytes/changed_bytes
+--- PASS: TestWindowsJournalRemovalUsesPersistedModeAndPreservesChangedBytes (0.09s)
+    --- PASS: TestWindowsJournalRemovalUsesPersistedModeAndPreservesChangedBytes/canonical (0.04s)
+    --- PASS: TestWindowsJournalRemovalUsesPersistedModeAndPreservesChangedBytes/changed_bytes (0.05s)
+PASS
+coverage: 74.4% of statements

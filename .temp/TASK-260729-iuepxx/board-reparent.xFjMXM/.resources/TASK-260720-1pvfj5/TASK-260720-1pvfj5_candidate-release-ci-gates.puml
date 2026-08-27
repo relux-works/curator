@@ -1,0 +1,43 @@
+@startuml
+!theme plain
+
+title TASK-260720-1pvfj5 — candidate CI and released-suite pin gates
+
+start
+
+partition "Candidate implementation CI" #LightBlue {
+  :Receive an explicit immutable candidate\nrevision or CURATOR_CONFORMANCE_ROOT;
+  :Keep Curator's committed protocol checkout\nat the currently qualified release;
+  :Run schema-v6/build cases on\nLinux, macOS, and Windows;
+  :Run race, vet, gofmt, and golangci-lint gates;
+}
+
+if (All candidate gates pass\nwith exact suite digest?) then (yes)
+  :Attach candidate evidence to\nTASK-260720-1pvfj5;
+else (no)
+  :Return exact failed case, platform,\nor quality-gate evidence;
+  stop
+endif
+
+note right
+  Candidate evidence is not a protocol release,
+  conformance claim, or official suite pin.
+end note
+
+partition "Manager and specification release evidence" #Wheat {
+  :Qualify actual Curator and csk releases\nagainst the candidate suite\nTASK-260720-3pvihp;
+  :Pin those released managers in curator-spec\nand qualify the published protocol release\nTASK-260720-vs6den / TASK-260720-25d05o;
+}
+
+if (Published protocol release\nevidence is valid?) then (yes)
+  partition "Official Curator pin" #LightGreen {
+    :Promote and audit Curator's committed suite pin\nTASK-260720-38l1sy;
+    :Require the released suite with no skipped\ncompiled-build cases on all three OS jobs;
+  }
+else (no)
+  :Leave the committed Curator suite pin unchanged;
+  stop
+endif
+
+stop
+@enduml

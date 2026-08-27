@@ -1,0 +1,776 @@
+{
+  "fixture_version": "swift-boundary-fixture-v1",
+  "task": "TASK-260728-1yhuqi",
+  "host": {
+    "operating_system": "darwin",
+    "architecture": "arm64",
+    "probe_go_version": "go1.25.5"
+  },
+  "toolchain": {
+    "available": false,
+    "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+    "root": "",
+    "swiftc_path": "",
+    "swift_path": "",
+    "frontend_path": "",
+    "clang_path": "",
+    "linker_path": "",
+    "platform_root": "",
+    "declared_sdk": "",
+    "presented_sdk": "",
+    "compiler_version": "",
+    "compiler_tag": "",
+    "normalized_version": "",
+    "target_triple": "",
+    "target_unversioned_triple": "",
+    "runtime_library_paths": null,
+    "stdlib_present": false,
+    "compiler_version_suffix": "",
+    "native_target_admission": {
+      "triple": "",
+      "probe": {
+        "argv": null,
+        "dir": "",
+        "env_delta": null,
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "raw_runtime_library_paths": null,
+      "entries": null,
+      "identity_members": null,
+      "in_closure": 0,
+      "base_installation": 0,
+      "rejections": null,
+      "p1_equals_p2": false
+    }
+  },
+  "cases": [
+    {
+      "case": {
+        "id": "canonical-current",
+        "manifest_prefix": "// swift-tools-version:0.0.0\n",
+        "display": "// swift-tools-version:\u003ccompiler\u003e",
+        "curator_expected": "accepted",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": false,
+        "host_gate": false,
+        "note": "the resolved toolchain's own version is admissible"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "canonical-6.0",
+        "manifest_prefix": "// swift-tools-version:6.0\n",
+        "display": "// swift-tools-version:6.0",
+        "curator_expected": "accepted",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": false,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "canonical-floor",
+        "manifest_prefix": "// swift-tools-version:4.0\n",
+        "display": "// swift-tools-version:4.0",
+        "curator_expected": "accepted",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": false,
+        "host_gate": false,
+        "note": "lowest tools version the resolved toolchain still supports"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "below-floor-3.1",
+        "manifest_prefix": "// swift-tools-version:3.1\n",
+        "display": "// swift-tools-version:3.1",
+        "curator_expected": "rejected-unsupported-floor",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "rejected-unsupported-floor",
+        "security_partition": false,
+        "host_gate": false,
+        "note": "representable and unsupported: the isolated command has no floor"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "below-floor-1.0",
+        "manifest_prefix": "// swift-tools-version:1.0\n",
+        "display": "// swift-tools-version:1.0",
+        "curator_expected": "rejected-unsupported-floor",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "rejected-unsupported-floor",
+        "security_partition": false,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "above-host-99.0",
+        "manifest_prefix": "// swift-tools-version:99.0\n",
+        "display": "// swift-tools-version:99.0",
+        "curator_expected": "host-gate",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "host-gate",
+        "security_partition": false,
+        "host_gate": true,
+        "note": "the isolated command reports 99.0.0 with exit 0, so it cannot be applying the host gate"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "grammar-one-component",
+        "manifest_prefix": "// swift-tools-version:6\n",
+        "display": "// swift-tools-version:6",
+        "curator_expected": "rejected-grammar",
+        "isolated_expected": "rejected-grammar",
+        "corroborating_expected": "rejected-grammar",
+        "security_partition": false,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "grammar-four-components",
+        "manifest_prefix": "// swift-tools-version:6.0.0.0\n",
+        "display": "// swift-tools-version:6.0.0.0",
+        "curator_expected": "rejected-grammar",
+        "isolated_expected": "rejected-grammar",
+        "corroborating_expected": "rejected-grammar",
+        "security_partition": false,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "grammar-not-a-version",
+        "manifest_prefix": "// swift-tools-version:notaversion\n",
+        "display": "// swift-tools-version:notaversion",
+        "curator_expected": "rejected-grammar",
+        "isolated_expected": "rejected-grammar",
+        "corroborating_expected": "rejected-grammar",
+        "security_partition": false,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "missing-specifier",
+        "manifest_prefix": "// swift-tools-version:\n",
+        "display": "// swift-tools-version:",
+        "curator_expected": "rejected-missing-specifier",
+        "isolated_expected": "rejected-missing-specifier",
+        "corroborating_expected": "rejected-missing-specifier",
+        "security_partition": false,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "absent-header",
+        "manifest_prefix": "",
+        "display": "\u003cno header\u003e",
+        "curator_expected": "rejected-absent-header",
+        "isolated_expected": "rejected-absent-header",
+        "corroborating_expected": "rejected-absent-header",
+        "security_partition": false,
+        "host_gate": false,
+        "note": "upstream falls back to 3.1.0 and refuses it; the diagnostic names 'package.swift'"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "bom-header",
+        "manifest_prefix": "﻿// swift-tools-version:6.0\n",
+        "display": "\u003cBOM\u003e// swift-tools-version:6.0",
+        "curator_expected": "rejected-absent-header",
+        "isolated_expected": "rejected-absent-header",
+        "corroborating_expected": "rejected-absent-header",
+        "security_partition": false,
+        "host_gate": false,
+        "note": "a byte-order mark defeats upstream's own recognition too, so this is not a narrowing"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "carriage-return",
+        "manifest_prefix": "// swift-tools-version:6.0\r\n",
+        "display": "// swift-tools-version:6.0\u003cCR\u003e",
+        "curator_expected": "accepted",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": false,
+        "host_gate": false,
+        "note": "one trailing CR is stripped before the canonical comparison"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "later-specification-ignored",
+        "manifest_prefix": "// swift-tools-version:6.0\n// swift-tools-version:99.0\n",
+        "display": "// swift-tools-version:6.0 / // swift-tools-version:99.0",
+        "curator_expected": "accepted",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": false,
+        "host_gate": false,
+        "note": "line 1 decides for both: measured, upstream reports 6.0.0 and never reaches the line-2 value"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "specification-inside-a-single-line-string",
+        "manifest_prefix": "import PackageDescription\nlet s = \"// swift-tools-version:9.9\"\n",
+        "display": "let s = \"// swift-tools-version:9.9\"",
+        "curator_expected": "rejected-absent-header",
+        "isolated_expected": "rejected-absent-header",
+        "corroborating_expected": "rejected-absent-header",
+        "security_partition": false,
+        "host_gate": false,
+        "note": "the line does not begin with the comment marker, so neither upstream nor Curator sees a specification"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "F-no-space-after-slashes",
+        "manifest_prefix": "//swift-tools-version:6.0\n",
+        "display": "//swift-tools-version:6.0",
+        "curator_expected": "rejected-non-canonical-header",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": true,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "F-uppercase-keyword",
+        "manifest_prefix": "// SWIFT-TOOLS-VERSION:6.0\n",
+        "display": "// SWIFT-TOOLS-VERSION:6.0",
+        "curator_expected": "rejected-non-canonical-header",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": true,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "F-leading-zero",
+        "manifest_prefix": "// swift-tools-version:06.0\n",
+        "display": "// swift-tools-version:06.0",
+        "curator_expected": "rejected-non-canonical-header",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": true,
+        "host_gate": false,
+        "note": "upstream silently normalises 06.0 to 6.0.0"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "F-prerelease-suffix",
+        "manifest_prefix": "// swift-tools-version:6.0-beta\n",
+        "display": "// swift-tools-version:6.0-beta",
+        "curator_expected": "rejected-non-canonical-header",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": true,
+        "host_gate": false,
+        "note": "upstream silently discards the prerelease component"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "F-build-suffix",
+        "manifest_prefix": "// swift-tools-version:6.0+build\n",
+        "display": "// swift-tools-version:6.0+build",
+        "curator_expected": "rejected-non-canonical-header",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": true,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "F-extra-whitespace",
+        "manifest_prefix": "//   swift-tools-version:  6.0\n",
+        "display": "//   swift-tools-version:  6.0",
+        "curator_expected": "rejected-non-canonical-header",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": true,
+        "host_gate": false
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "F-below-line-one",
+        "manifest_prefix": "import Foundation\n// swift-tools-version:6.0\n",
+        "display": "import Foundation / // swift-tools-version:6.0",
+        "curator_expected": "rejected-absent-header",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": true,
+        "host_gate": false,
+        "note": "upstream finds the specification below manifest code; Curator reads line 1 and stops"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    },
+    {
+      "case": {
+        "id": "F-inside-a-multi-line-string-literal",
+        "manifest_prefix": "import PackageDescription\nlet unused = \"\"\"\n// swift-tools-version:6.0\n\"\"\"\n",
+        "display": "let unused = \"\"\" / // swift-tools-version:6.0 / \"\"\"",
+        "curator_expected": "rejected-absent-header",
+        "isolated_expected": "accepted",
+        "corroborating_expected": "accepted",
+        "security_partition": true,
+        "host_gate": false,
+        "note": "measured: upstream's scan reports the value from inside a string literal, so a whole-file scan would let arbitrary manifest body bytes set the compared version"
+      },
+      "status": "not_run",
+      "reason": "toolchain root ../absent-toolchain does not carry ../absent-toolchain/usr/bin/swiftc",
+      "curator": "",
+      "isolated": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "corroborating": {
+        "class": "",
+        "exit": 0,
+        "excerpt": "",
+        "recognised": false
+      },
+      "agreed": false,
+      "matched_expectation": false,
+      "runs": null
+    }
+  ],
+  "host_gate_cases": null,
+  "alignment": {
+    "security_partition_empty": false,
+    "p1_no_widening": false,
+    "p2_no_narrowing": false
+  },
+  "closure": null,
+  "controls": null,
+  "structural": null,
+  "summary": {
+    "cases": 23,
+    "matched": 0,
+    "divergences": 0,
+    "not_run": 23,
+    "closure_checks": 0,
+    "closure_failures": 0,
+    "controls_total": 0,
+    "controls_failing_as_required": 0,
+    "structural_total": 0,
+    "structural_divergences": 0,
+    "native_target_admission_ok": false,
+    "green": true
+  }
+}

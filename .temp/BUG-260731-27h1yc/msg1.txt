@@ -1,0 +1,43 @@
+The Windows lane's `go vet` step aborted every job before a single test ran, so
+these five packages had never executed on windows-latest. With the vet break
+repaired they ran for the first time and failed by the dozen. Nothing here is a
+Windows regression; it is the first time any of it was measured.
+
+internal/install and internal/install/atomicity pinned `Platform: "unix"` in
+every fixture. On a Windows host that is not a portable default, it is a shape
+the platform cannot build: a unix script runtime is validated for a POSIX
+execute bit no file on Windows carries, and a natively compiled artifact is
+refused against a unix shim. Every baseline install failed before it asserted
+anything, which is what took out 69 of the 70 cases. The platform is now derived
+from the host, shim assertions name the launcher the host actually writes
+(`.cmd` on Windows), and the user-bin forwarding-shim cases prepare their PATH
+on every runner instead of exempting Windows from a class they are there to
+cover.
+
+internal/identity refused an ordinary local Windows checkout. `C:\repos\skill`
+reached the scp-style fallback, which forbids a backslash in the path part, so
+the drive colon was read as a host separator and the source came back
+"malformed or unsupported network source". `C:/repos/skill` was already local by
+the single-letter-host rule; the backslash spelling now is too. This is a real
+product defect, not a test expectation: `curator` could not install from a local
+path on Windows at all.
+
+internal/buildsource had two cases whose vectors do not exist on Windows.
+`bad:name` opens an NTFS alternate data stream, so the entry that landed was the
+perfectly portable name `bad` and the case asserted nothing; the Windows vector
+is a trailing dot, which PortableComponent refuses precisely because Win32
+normalisation strips it, created through the extended-length prefix that
+bypasses that normalisation. And a frozen root cannot be renamed away on
+Windows at all — os.OpenRoot takes no FILE_SHARE_DELETE, so the kernel pins the
+directory for the life of the token. That refusal is now asserted, and the
+replacement is driven the way the platform does allow one, by repointing a
+directory reparse point in the path prefix, so both runners reach the same
+Recheck assertion.
+
+internal/install's rename-replacement case had the same shape: Windows holds an
+open declaration document against replacement, so the rename settles the moment
+the read closes rather than inside it. All three properties it asserts are
+unchanged.
+
+No case is deleted, skipped or platform-excluded, and `.github/ci/platform-cases.tsv`
+and `.github/ci/skip-classes.tsv` are untouched.

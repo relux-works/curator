@@ -1,0 +1,39 @@
+platform-case gate: GOOS=linux
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+platform-case gate: excluded packages (not run here): internal/godriver 
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+ok    internal/buildcache :: TestUnixProtectedStateMatrix
+ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+ok    internal/buildsource :: TestRejectsSpecialFile
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+ok    internal/interop :: TestGoldenContextCopy
+excl  internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker (package not executed on linux)
+
+platform-case gate: 33 skips recorded in .temp/ci-evidence/race/skips-observed.tsv
+platform-case gate: ok

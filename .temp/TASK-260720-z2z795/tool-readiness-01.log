@@ -1,0 +1,50 @@
+command -v task-board
+exit 0
+/Users/iv/.local/bin/task-board
+
+git --version
+exit 0
+git version 2.50.1 (Apple Git-155)
+
+python3 --version
+exit 0
+Python 3.14.4
+
+pytest --version
+exit 0
+pytest 8.3.4
+
+python3 -m mypy --version
+exit 1
+/opt/homebrew/opt/python@3.14/bin/python3.14: No module named mypy
+
+Note: global mypy is unavailable. The project environment will be inspected
+before selecting the required strict mypy command.
+
+/opt/homebrew/bin/python3.11 --version
+exit 0
+Python 3.11.14
+
+/opt/homebrew/bin/python3.11 -m pytest --version
+exit 0
+pytest 8.3.4
+
+/opt/homebrew/bin/python3.11 -m build --version
+exit 0
+build 1.2.2.post1 (/opt/homebrew/lib/python3.11/site-packages/build)
+
+/Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python -m mypy --version
+exit 0
+mypy 2.3.0 (compiled: yes)
+
+uvx --offline ruff --version
+exit 0
+ruff 0.16.0
+
+tailscale version
+exit 0 (CLI-level failure despite process status)
+The Tailscale CLI failed to start: The operation couldn’t be completed.
+(Tailscale.CLIError error 1.)
+
+Note: Tailscale CLI cannot be used for Windows runner diagnostics in this
+session because it does not produce a usable version or status response.

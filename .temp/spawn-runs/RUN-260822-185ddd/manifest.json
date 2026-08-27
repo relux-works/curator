@@ -1,0 +1,75 @@
+{
+  "id": "RUN-260822-185ddd",
+  "task_id": "TASK-260822-27bvo4",
+  "created_at": "2026-08-22T19:11:17.361908Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "opus",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "opus"
+    },
+    "resolved": {
+      "model": "opus"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260822-23-11-17_-implementer--developer--claude-_TASK-260822-27bvo4.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "40m0s",
+  "log_resource_name": "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-185ddd.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260822-27bvo4_darwin-mutant-no-canonicalization.log",
+    "TASK-260822-27bvo4_review-RUN-1f3d1d.md",
+    "TASK-260822-27bvo4_review-darwin-mutant-no-canonical.log",
+    "TASK-260822-27bvo4_review-darwin-prefix-evalsymlinks.log",
+    "TASK-260822-27bvo4_review-windows-identity-postfix.log",
+    "TASK-260822-27bvo4_review-windows-prefix-red.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-1e48d3.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-507162.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-50e157.log",
+    "TASK-260822-27bvo4_spawn-log_-implementer--developer--claude-_RUN-260822-5ca017.log",
+    "TASK-260822-27bvo4_spawn-log_-reviewer--reviewer--claude-_RUN-260822-1f3d1d.log",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization-RUN-507162.md",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization.md",
+    "TASK-260822-27bvo4_symlink-launcher.patch",
+    "TASK-260822-27bvo4_verification-RUN-50e157.md",
+    "TASK-260822-27bvo4_windows-identity-tests.log",
+    "TASK-260822-27bvo4_windows-prefix-baseline-red.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260822-27bvo4_darwin-mutant-no-canonicalization.log": "c15a6bbc5bf2ae2d445d04e0665292cbaf4d06f39515782216aa25a469b71bab",
+    "TASK-260822-27bvo4_review-RUN-1f3d1d.md": "636a4babf8580a2ff8caf47741d75e3414b5a917e211c1259af329d26229f9e9",
+    "TASK-260822-27bvo4_review-darwin-mutant-no-canonical.log": "813ad5a05a6edad68ecfa05a521d10288a4b077a3ab48e80129f6acbc60e227e",
+    "TASK-260822-27bvo4_review-darwin-prefix-evalsymlinks.log": "90314fef3dfce35644076f2ae9bb9d3e6767af9c3495072387d0e6047e5ecdac",
+    "TASK-260822-27bvo4_review-windows-identity-postfix.log": "7f0d03c1a358bd6419b80fcc52f4f10fbd2487212d7245496e7fb7071c16d884",
+    "TASK-260822-27bvo4_review-windows-prefix-red.log": "c180cabccfc8c917a5fe623f7e38cd4c79532b0595a6bbd59468dab2cc0750b6",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization-RUN-507162.md": "24e6451a1fe45ac5bfe15a27976154372fbccffa3bc37bb835c7445932d23c05",
+    "TASK-260822-27bvo4_symlink-launcher-canonicalization.md": "0d5af153de79f26500445aab7b139b63e82769fdad65a56717f6da3d7486a28c",
+    "TASK-260822-27bvo4_symlink-launcher.patch": "790caf3ee5cd462527145a21c86070af17639a7282fe19e8fe8b4725bc4c48b5",
+    "TASK-260822-27bvo4_verification-RUN-50e157.md": "22eec8803a1d7ba406bc790f59bc8be487f13e1cf7575ed354452ea0c97492b6",
+    "TASK-260822-27bvo4_windows-identity-tests.log": "a2bd0df9cd132c5fc2f0d5490c3bb57ee26b1e3a848d46abc807a512271facc3",
+    "TASK-260822-27bvo4_windows-prefix-baseline-red.log": "ff6e1883510665d410213751ce06bed1e4f4bb271360170bee37057ccd8457cd"
+  },
+  "require_outcome_artifact": true
+}

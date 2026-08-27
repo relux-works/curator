@@ -1,0 +1,20 @@
+Tool readiness checkpoint for TASK-260720-poa3ze rework run RUN-260719-6c67a3
+Date: 2026-07-20
+
+zsh: /opt/homebrew/bin/zsh — zsh 5.9 (arm-apple-darwin21.3.0)
+git: /usr/bin/git — git version 2.50.1 (Apple Git-155)
+rg: Codex vendor path — ripgrep 15.1.0 (rev af60c2de9d)
+jq: /opt/homebrew/bin/jq — jq-1.8.1
+task-board: /Users/iv/.local/bin/task-board — 0.20.1-15-g5e2c927
+curl: /usr/bin/curl — curl 8.7.1
+perl: /usr/bin/perl — perl 5.34.1; Digest::SHA, File::Find, and Fcntl loaded successfully
+make: /usr/bin/make — GNU Make 3.81
+uv: /opt/homebrew/bin/uv — uv 0.11.3
+
+Each command resolved successfully and produced expected version output.
+
+Recoverable smoke-command failures:
+
+- First fixed-driver marker build attempt used an invalid second fixture path derived from OLDPWD and failed with `zsh:cd:9: no such file or directory`. The rerun used an explicit task root and passed.
+- First independent Perl digest attempt reused the stat cache after `-l` and failed with `The stat preceding -l _ wasn't an lstat`. The rerun used explicit `lstat` plus `S_ISREG` and matched both Go digests.
+- Direct `make validate` in curator-spec selected a Python environment without the declared `jsonschema` dependency and failed with `ModuleNotFoundError: No module named 'jsonschema'`. The authoritative rerun used `uv run --isolated --with-requirements requirements-dev.txt make validate` and passed all gates.

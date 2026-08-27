@@ -1,0 +1,461 @@
+# TASK-260728-168smo — command evidence
+#
+# Host: Darwin 25.5.0 arm64, macOS 26.5
+# Kotlin: kotlinc-jvm 2.4.10 (Homebrew, /opt/homebrew/Cellar/kotlin/2.4.10)
+# JDK:    OpenJDK 26.0.1 (/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home)
+# Kotlin/Native: ABSENT (kotlinc-native, konanc, ~/.konan all absent)
+#
+# Every command below was run standalone; the recorded exit code is the real
+# status of the command under test, not of a pipeline.
+# Nothing was installed, downloaded, updated, activated, or switched.
+
+################ 1. Host inventory and launcher shape ################
+# TASK-260728-168smo Kotlin host evidence
+# host: Darwin 25.5.0 arm64
+# date-free by design; see board resource for run context
+----------------------------------------------------------------
+argv: kotlinc -version 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 38
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+info: kotlinc-jvm 2.4.10 (JRE 26.0.1)
+----------------------------------------------------------------
+argv: ls /opt/homebrew/Cellar/kotlin/2.4.10/libexec/lib 
+exit: 0
+stdout_bytes: 1536
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+allopen-compiler-plugin.jar
+annotations-13.0.jar
+assignment-compiler-plugin.jar
+compose-compiler-plugin.jar
+jklib-compiler.jar
+jvm-abi-gen.jar
+kotlin-annotation-processing-cli.jar
+kotlin-annotation-processing-runtime.jar
+kotlin-annotation-processing.jar
+kotlin-annotations-jvm-sources.jar
+kotlin-annotations-jvm.jar
+kotlin-compiler.jar
+kotlin-daemon-client.jar
+kotlin-daemon.jar
+kotlin-main-kts.jar
+kotlin-metadata-jvm-sources.jar
+kotlin-metadata-jvm.jar
+kotlin-preloader.jar
+kotlin-reflect-sources.jar
+kotlin-reflect.jar
+kotlin-runner.jar
+kotlin-script-runtime-sources.jar
+kotlin-script-runtime.jar
+kotlin-scripting-common.jar
+kotlin-scripting-compiler-impl.jar
+kotlin-scripting-compiler.jar
+kotlin-scripting-jvm.jar
+kotlin-serialization-compiler-plugin.jar
+kotlin-stdlib-jdk7-sources.jar
+kotlin-stdlib-jdk7.jar
+kotlin-stdlib-jdk8-sources.jar
+kotlin-stdlib-jdk8.jar
+kotlin-stdlib-js-sources.jar
+kotlin-stdlib-js.klib
+kotlin-stdlib-sources.jar
+kotlin-stdlib-wasm-js.klib
+kotlin-stdlib.jar
+kotlin-test-js-sources.jar
+kotlin-test-js.klib
+kotlin-test-junit-sources.jar
+--- stderr (first 40 lines) ---
+----------------------------------------------------------------
+argv: ls /opt/homebrew/Cellar/kotlin/2.4.10/libexec 
+exit: 0
+stdout_bytes: 18
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+bin
+build.txt
+lib
+--- stderr (first 40 lines) ---
+----------------------------------------------------------------
+argv: file /opt/homebrew/Cellar/kotlin/2.4.10/libexec/bin/kotlinc-jvm 
+exit: 0
+stdout_bytes: 114
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+/opt/homebrew/Cellar/kotlin/2.4.10/libexec/bin/kotlinc-jvm: Bourne-Again shell script text executable, ASCII text
+--- stderr (first 40 lines) ---
+----------------------------------------------------------------
+argv: java -version 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 158
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+openjdk version "26.0.1" 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 26.0.1)
+OpenJDK 64-Bit Server VM Homebrew (build 26.0.1, mixed mode, sharing)
+
+################ 2. Kotlin CLI surface (-help / -X) ################
+----------------------------------------------------------------
+argv: kotlinc -help 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 3926
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+Usage: kotlinc-jvm <options> <source files>
+where possible options include:
+  -classpath (-cp) <path>    List of directories and JAR/ZIP archives to search for user class files.
+  -d <directory|jar>         Destination for generated class files.
+  -expression (-e)           Evaluate the given string as a Kotlin script.
+  -include-runtime           Include the Kotlin runtime in the resulting JAR.
+  -java-parameters           Generate metadata for Java 1.8 reflection on method parameters.
+  -jdk-home <path>           Include a custom JDK from the specified location in the classpath instead of the default 'JAVA_HOME'.
+  -jvm-default {enable|no-compatibility|disable}
+                             Emit JVM default methods for interface declarations with bodies. The default is 'enable'.
+                             -jvm-default=enable              Generate default methods for non-abstract interface declarations, as well as 'DefaultImpls' classes with
+                                                              static methods for compatibility with code compiled in the 'disable' mode.
+                                                              This is the default behavior since language version 2.2.
+                             -jvm-default=no-compatibility    Generate default methods for non-abstract interface declarations. Do not generate 'DefaultImpls' classes.
+                             -jvm-default=disable             Do not generate JVM default methods. This is the default behavior up to language version 2.1.
+  -jvm-target <version>      The target version of the generated JVM bytecode (1.8 and 9–26), with 1.8 as the default.
+  -module-name <name>        Name of the generated '.kotlin_module' file.
+  -no-jdk                    Don't automatically include the Java runtime in the classpath.
+  -no-reflect                Don't automatically include the Kotlin reflection dependency in the classpath.
+  -no-stdlib                 Don't automatically include the Kotlin/JVM stdlib and Kotlin reflection dependencies in the classpath.
+  -script-templates <fully qualified class name[,]>
+                             Script definition template classes.
+  -P plugin:<pluginId>:<optionName>=<value>
+                             Pass an option to a plugin.
+  -api-version <version>     Allow using declarations from only the specified version of bundled libraries.
+  -kotlin-home <path>        Path to the Kotlin compiler home directory used for the discovery of runtime libraries.
+  -language-version <version> Provide source compatibility with the specified version of Kotlin.
+  -opt-in <fq.name>          Enable API usages that require opt-in with an opt-in requirement marker with the given fully qualified name.
+  -progressive               Enable progressive compiler mode.
+                             In this mode, deprecations and bug fixes for unstable code take effect immediately
+                             instead of going through a graceful migration cycle.
+                             Code written in progressive mode is backward compatible; however, code written without
+                             progressive mode enabled may cause compilation errors in progressive mode.
+  -script                    Evaluate the given Kotlin script (*.kts) file.
+  -Werror                    Report an error if there are any warnings.
+  -Wextra                    Enable extra checkers for K2.
+  -X                         Print a synopsis of advanced options.
+  -help (-h)                 Print a synopsis of standard options.
+  -nowarn                    Don't generate any warnings.
+  -verbose                   Enable verbose logging output.
+----------------------------------------------------------------
+argv: kotlinc -X 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 28108
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+Usage: kotlinc-jvm <options> <source files>
+where advanced options include:
+  -Xabi-stability={stable|unstable}
+                             When using unstable compiler features such as FIR, use 'stable' to mark generated class files as stable
+                             to prevent diagnostics from being reported when using stable compilers at the call site.
+                             When using the JVM IR backend, conversely, use 'unstable' to mark generated class files as unstable
+                             to force diagnostics to be reported.
+  -Xadd-modules=<module[,]>  Root modules to resolve in addition to the initial modules, or all modules on the module path if <module> is ALL-MODULE-PATH.
+  -Xallow-no-source-files    Allow the set of source files to be empty.
+  -Xallow-unstable-dependencies Do not report errors on classes in dependencies that were compiled by an unstable version of the Kotlin compiler.
+  -Xannotations-in-metadata  Write annotations on declarations into the metadata (in addition to the JVM bytecode), and read annotations from the metadata if they are present.
+  -Xassertions={always-enable|always-disable|jvm|legacy}
+                             'kotlin.assert' call behavior:
+                             -Xassertions=always-enable:  enable, ignore JVM assertion settings;
+                             -Xassertions=always-disable: disable, ignore JVM assertion settings;
+                             -Xassertions=jvm:            enable, depend on JVM assertion settings;
+                             -Xassertions=legacy:         calculate the condition on each call, the behavior depends on JVM assertion settings in the kotlin package;
+                             default: legacy
+  -Xbackend-threads=<N>      Run codegen phase in N parallel threads.
+                             0 means use one thread per processor core.
+                             The default value is 1.
+  -Xbuild-file=<path>        Path to the .xml build file to compile.
+  -Xdebug                    Enable debug mode for compilation.
+                             Currently this includes spilling all variables in a suspending context regardless of whether they are alive.
+                             If API Level >= 2.2 -- no-op.
+  -Xdefault-script-extension=<script filename extension>
+                             Compile expressions and unrecognized scripts passed with the -script argument as scripts with the given filename extension.
+  -Xdisable-standard-script  Disable standard Kotlin scripting support.
+  -Xemit-jvm-type-annotations Emit JVM type annotations in bytecode.
+  -Xenhance-type-parameter-types-to-def-not-null
+                             Enhance not-null-annotated type parameter types to definitely-non-nullable types ('@NotNull T' => 'T & Any').
+  -Xenhanced-coroutines-debugging
+                             Generate additional linenumber instruction for compiler-generated code
+                             inside suspend functions and lambdas to distinguish them from user code by debugger.
+  -Xfriend-paths=<path>      Paths to output directories for friend modules (modules whose internals should be visible).
+  -Xgenerate-strict-metadata-version
+                             Generate metadata with strict version semantics (see the KDoc entry on 'Metadata.extraInt').
+  -Xignored-annotations-for-bridges=<fq.name>|*
+                             Do not copy these annotations to the bridge methods from their targets.
+  -Xindy-allow-annotated-lambdas Allow using 'invokedynamic' for lambda expressions with annotations
+
+################ 3. Response-file (@argfile) expansion ################
+----------------------------------------------------------------
+argv: kotlinc -d out main.kt @atfile 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 4475
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+logging: using Kotlin home directory /opt/homebrew/Cellar/kotlin/2.4.10/libexec
+logging: exception on loading scripting plugin: java.lang.ClassNotFoundException: org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingCompilerConfigurationComponentRegistrar
+logging: configuring the compilation environment
+logging: using JDK home inferred from java.home: /opt/homebrew/Cellar/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home
+logging: loading modules: [java.se, jdk.accessibility, jdk.attach, jdk.compiler, jdk.dynalink, jdk.httpserver, jdk.incubator.vector, jdk.jartool, jdk.javadoc, jdk.jconsole, jdk.jdi, jdk.jfr, jdk.jshell, jdk.management, jdk.management.jfr, jdk.net, jdk.nio.mapmode, jdk.sctp, jdk.security.auth, jdk.security.jgss, jdk.unsupported, jdk.unsupported.desktop, jdk.xml.dom, kotlin.stdlib, kotlin.script.runtime, kotlin.reflect, java.base, java.compiler, java.datatransfer, java.desktop, java.xml, java.instrument, java.logging, java.management, java.management.rmi, java.rmi, java.naming, java.net.http, java.prefs, java.scripting, java.security.jgss, java.security.sasl, java.sql, java.transaction.xa, java.sql.rowset, java.xml.crypto, jdk.internal.jvmstat, jdk.internal.opt, jdk.zipfs, jdk.internal.md, jdk.management.agent, jdk.jdwp.agent, jdk.internal.ed, jdk.internal.le]
+info: EXTENSIONS_STORAGE: org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar$ExtensionStorage@1283bb96
+DIAGNOSTIC_FACTORIES_STORAGE: org.jetbrains.kotlin.diagnostics.KtRegisteredDiagnosticFactoriesStorage@74f0ea28
+DIAGNOSTICS_COLLECTOR: org.jetbrains.kotlin.diagnostics.impl.DiagnosticsCollectorImpl@f6efaab
+MESSAGE_COLLECTOR_KEY: org.jetbrains.kotlin.cli.common.messages.GroupingMessageCollector@3c19aaa5
+PERF_MANAGER: org.jetbrains.kotlin.util.PerformanceManagerImpl@3349e9bb
+PRINT_VERSION: false
+SCRIPT_MODE: false
+REPL_MODE: false
+TREAT_WARNINGS_AS_ERRORS: false
+DISABLE_INLINE: false
+USE_FIR_EXTRA_CHECKERS: false
+METADATA_KLIB: false
+REPORT_OUTPUT_FILES: false
+INCREMENTAL_COMPILATION: false
+ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS: false
+IGNORE_CONST_OPTIMIZATION_ERRORS: false
+RENDER_DIAGNOSTIC_INTERNAL_NAME: false
+VERIFY_IR: NONE
+LANGUAGE_VERSION_SETTINGS: Language = 2.4, API = 2.4 allowFullyQualifiedNameInKClass:true headerModeType:any javaTypeEnhancementState:JavaTypeEnhancementState(jsr305=Jsr305Settings(globalLevel=WARN, migrationLevel=null, userDefinedLevelForSpecificAnnotation={}))
+USE_FIR: true
+USE_LIGHT_TREE: true
+DONT_SORT_SOURCE_FILES: false
+KOTLIN_PATHS: org.jetbrains.kotlin.utils.KotlinPathsFromHomeDir@55b699ef
+PLUGIN_COMPONENT_REGISTRARS:
+  org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingCompilerConfigurationComponentRegistrar@35d019a3
+COMPILER_PLUGIN_REGISTRARS:
+  org.jetbrains.kotlin.scripting.compiler.plugin.ScriptingK2CompilerPluginRegistrar@3b07a0d6
+ALLOW_NO_SOURCE_FILES: false
+INCLUDE_RUNTIME: false
+NO_REFLECT: false
+FRIEND_PATHS:
+ADDITIONAL_JAVA_MODULES:
+  kotlin.stdlib
+  kotlin.script.runtime
+  kotlin.reflect
+----------------------------------------------------------------
+argv: kotlinc -d out @nonexistent-argfile main.kt 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 121
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+warning: argfile not found: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/argprobe/nonexistent-argfile
+
+################ 3b. Escalation: @argfile -> -script -> code execution ################
+----------------------------------------------------------------
+argv: kotlinc @inject exec.kts 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+RESULT: EXEC-MARKER PRESENT — package code executed at build time, exit 0
+
+################ 3c. Absolute and ./ forms do not expand ################
+----------------------------------------------------------------
+argv: kotlinc /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/argprobe/@abs exec2.kts 
+exit: 1
+stdout_bytes: 0
+stderr_bytes: 120
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+error: source entry is not a Kotlin file: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/argprobe/@abs
+----------------------------------------------------------------
+argv: kotlinc ./@abs exec2.kts 
+exit: 1
+stdout_bytes: 0
+stderr_bytes: 120
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+error: source entry is not a Kotlin file: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/argprobe/@abs
+RESULT: neither form expanded; both exit 1 with 'source entry is not a Kotlin file'
+
+################ 4. .kts in the source set (no -script) ################
+----------------------------------------------------------------
+argv: kotlinc -d out main.kt evil.kts 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+----------------------------------------------------------------
+argv: kotlinc -d out srcroot 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+RESULT: Evil.class produced, marker ABSENT — compiled, not executed
+
+################ 5. PATH resolutions: control vs pinned ################
+
+--- CONTROL: the shipped Kotlin launcher ---
+argv: env -i HOME=<home> PATH=<shims>:/bin \
+      /opt/homebrew/Cellar/kotlin/2.4.10/libexec/bin/kotlinc -d out <abs>/main.kt
+exit: 127
+PATH resolutions recorded: 4
+uname 
+dirname /opt/homebrew/Cellar/kotlin/2.4.10/libexec/bin/kotlinc
+java -version
+java -Xmx512M -Xms128M -noverify -cp //lib/kotlin-preloader.jar org.jetbrains.kotlin.preloading.Preloader -cp //lib/kotlin-compiler.jar org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -d out /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/argprobe/main.kt
+
+(plus `bash`, resolved from PATH by the script's `#!/usr/bin/env bash` shebang;
+ `env` itself resolves from the absolute path /usr/bin/env)
+
+--- PINNED: the JDK's own java, -cp into the Kotlin distribution ---
+argv: env -i HOME=<home> PATH=<shims> \
+      <jdk_root>/bin/java \
+        -cp <kotlin_root>/lib/kotlin-preloader.jar \
+        org.jetbrains.kotlin.preloading.Preloader \
+        -cp <kotlin_root>/lib/kotlin-compiler.jar \
+        org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+        -d out3 <abs>/main.kt
+exit: 0
+PATH resolutions recorded: 0
+artifact: out3/MainKt.class produced
+
+RESULT: the control fires (4 resolutions) and the pinned form records 0.
+Without the control firing, the zero would prove nothing.
+
+file <jdk_root>/bin/java -> Mach-O 64-bit executable arm64
+
+################ 6. JDK probe streams ################
+----------------------------------------------------------------
+argv: /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home/bin/java -version 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 158
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+openjdk version "26.0.1" 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 26.0.1)
+OpenJDK 64-Bit Server VM Homebrew (build 26.0.1, mixed mode, sharing)
+----------------------------------------------------------------
+argv: /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home/bin/java --version 
+exit: 0
+stdout_bytes: 148
+stderr_bytes: 0
+--- stdout (first 40 lines) ---
+openjdk 26.0.1 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 26.0.1)
+OpenJDK 64-Bit Server VM Homebrew (build 26.0.1, mixed mode, sharing)
+--- stderr (first 40 lines) ---
+----------------------------------------------------------------
+argv: /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home/bin/java -XshowSettings:properties -version 
+exit: 0
+stdout_bytes: 0
+stderr_bytes: 2251
+--- stdout (first 40 lines) ---
+--- stderr (first 40 lines) ---
+Property settings:
+    file.encoding = UTF-8
+    file.separator = /
+    java.class.path = 
+    java.class.version = 70.0
+    java.home = /opt/homebrew/Cellar/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home
+    java.io.tmpdir = /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/
+    java.library.path = /Users/iv/Library/Java/Extensions
+        /Library/Java/Extensions
+        /Network/Library/Java/Extensions
+        /System/Library/Java/Extensions
+        /usr/lib/java
+        .
+    java.runtime.name = OpenJDK Runtime Environment
+    java.runtime.version = 26.0.1
+    java.specification.name = Java Platform API Specification
+    java.specification.vendor = Oracle Corporation
+    java.specification.version = 26
+    java.vendor = Homebrew
+    java.vendor.url = https://github.com/Homebrew/homebrew-core/issues
+    java.vendor.url.bug = https://github.com/Homebrew/homebrew-core/issues
+    java.vendor.version = Homebrew
+    java.version = 26.0.1
+    java.version.date = 2026-04-21
+    java.vm.compressedOopsMode = Non-zero disjoint base
+    java.vm.info = mixed mode, sharing
+    java.vm.name = OpenJDK 64-Bit Server VM
+    java.vm.specification.name = Java Virtual Machine Specification
+    java.vm.specification.vendor = Oracle Corporation
+    java.vm.specification.version = 26
+    java.vm.vendor = Homebrew
+    java.vm.version = 26.0.1
+    jdk.debug = release
+    line.separator = \n 
+    native.encoding = UTF-8
+    os.arch = aarch64
+    os.name = Mac OS X
+    os.version = 26.5
+    path.separator = :
+    stderr.encoding = UTF-8
+
+################ 7. JVM environment injection ################
+----------------------------------------------------------------
+argv: /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home/bin/java --version 
+exit: 0
+stdout_bytes: 148
+stderr_bytes: 2205
+--- stdout (first 40 lines) ---
+openjdk 26.0.1 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 26.0.1)
+OpenJDK 64-Bit Server VM Homebrew (build 26.0.1, mixed mode, sharing)
+--- stderr (first 40 lines) ---
+NOTE: Picked up JDK_JAVA_OPTIONS: -Dprobe.marker=IV168SMO -XshowSettings:properties
+Property settings:
+    file.encoding = UTF-8
+    file.separator = /
+    java.class.path = 
+    java.class.version = 70.0
+    java.home = /opt/homebrew/Cellar/openjdk/26.0.1/libexec/openjdk.jdk/Contents/Home
+    java.io.tmpdir = /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/
+    java.library.path = /Users/iv/Library/Java/Extensions
+        /Library/Java/Extensions
+        /Network/Library/Java/Extensions
+        /System/Library/Java/Extensions
+        /usr/lib/java
+        .
+    java.runtime.name = OpenJDK Runtime Environment
+    java.runtime.version = 26.0.1
+    java.specification.name = Java Platform API Specification
+    java.specification.vendor = Oracle Corporation
+    java.specification.version = 26
+    java.vendor = Homebrew
+    java.vendor.url = https://github.com/Homebrew/homebrew-core/issues
+    java.vendor.url.bug = https://github.com/Homebrew/homebrew-core/issues
+    java.vendor.version = Homebrew
+    java.version = 26.0.1
+    java.version.date = 2026-04-21
+    java.vm.compressedOopsMode = Non-zero disjoint base
+    java.vm.info = mixed mode, sharing
+    java.vm.name = OpenJDK 64-Bit Server VM
+    java.vm.specification.name = Java Virtual Machine Specification
+    java.vm.specification.vendor = Oracle Corporation
+    java.vm.specification.version = 26
+    java.vm.vendor = Homebrew
+    java.vm.version = 26.0.1
+    jdk.debug = release
+    line.separator = \n 
+    native.encoding = UTF-8
+    os.arch = aarch64
+    os.name = Mac OS X
+    os.version = 26.5
+    path.separator = :
+----------------------------------------------------------------
+argv: /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home/bin/java --version 
+exit: 0
+stdout_bytes: 148
+stderr_bytes: 53
+--- stdout (first 40 lines) ---
+openjdk 26.0.1 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 26.0.1)
+OpenJDK 64-Bit Server VM Homebrew (build 26.0.1, mixed mode, sharing)
+--- stderr (first 40 lines) ---
+Picked up JAVA_TOOL_OPTIONS: -Dprobe.marker=IV168SMO

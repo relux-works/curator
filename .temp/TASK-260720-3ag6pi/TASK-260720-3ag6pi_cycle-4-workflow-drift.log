@@ -1,0 +1,58 @@
+TASK-260720-3ag6pi — review cycle 4 workflow-drift evidence
+Date: 2026-07-30
+
+Retained drift fixture:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/reviewer-cycle-3/workflow-negative
+  HEAD ddb181ca3b8e243f212e90ff26fcabe2234fb669
+  Modified fixture files:
+    release/1.0.0-rc.6.json
+    tools/generate-vectors/main.go
+
+Old workflow scope reproduction:
+  command: git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json
+  exit code: 0
+  result: EXPECTED GREEN BUG — rc.6 metadata drift was invisible.
+
+Corrected workflow scope:
+  command: git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json
+  exit code: 1
+  result: EXPECTED RED — rc.6 metadata drift was detected.
+  detected diff:
+    release/1.0.0-rc.6.json created_at
+    - 2026-07-30T00:00:00Z
+    + 2026-07-31T00:00:00Z
+
+Post-change command inventory:
+  Makefile:13
+    git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json
+  .github/workflows/ci.yml:56
+    git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json
+  .github/workflows/release.yml:49
+    git diff --exit-code -- conformance/v1 release/1.0.0-rc.5.json release/1.0.0-rc.6.json
+
+Durable regression assertion:
+  tools.test_validate.WorkflowRegenerationScopeTests
+  - extracts the single regeneration diff scope from the Makefile and both workflows;
+  - requires the canonical inventory to include conformance/v1, rc.5 metadata,
+    and rc.6 metadata;
+  - requires both workflow scopes to equal the Makefile scope exactly.
+
+Focused-test command ledger:
+  1. python3 -B -m unittest tools.test_validate.WorkflowRegenerationScopeTests -v
+     exit code: 1
+     diagnostic: system Python lacked jsonschema; no test executed.
+  2. pinned-venv python -B -m unittest tools.test_validate.WorkflowRegenerationScopeTests -v
+     exit code: 1
+     diagnostic: the first extractor handled bare shell lines but not CI's inline
+     "run:" command. The test correctly exposed the parser defect.
+  3. pinned-venv python -B -m unittest tools.test_validate.WorkflowRegenerationScopeTests -v
+     exit code: 0
+     result: 1 test passed.
+  4. make validate
+     exit code: 0
+     result: the regression assertion passed in the 60-test Python suite.
+
+Safety:
+  The negative fixture executed only Git diff operations. It did not execute
+  package-provided code, stage or commit changes, create a claim, or create
+  release evidence.

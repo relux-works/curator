@@ -1,0 +1,256 @@
+TASK-260720-z2z795 INDEPENDENT REVIEW VALIDATION
+run: RUN-260730-b732c0
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+signed HEAD: a5ec015c0b5b51149c81a679ce259920a3523374
+accepted base: 6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+reviewer source edits: none
+
+RUN CONTROL
+
+task-board spawn goal RUN-260730-b732c0
+  Active Goal: none (run is not goal-bound)
+
+task-board spawn directives RUN-260730-b732c0
+  acknowledged nudge cdf7c1:
+  independently verify F_GETPATH canonicalization, total timeout including
+  preparation, deterministic interleaving, 20 fresh-process handoffs, and
+  preservation of the accepted Windows test-only patch.
+
+PROVENANCE
+
+task-board prerequisite query:
+  TASK-260720-1pvfj5 enforce-cross-platform-ci-gates: done
+
+git verify-commit HEAD
+exit: 0
+output:
+  Good "git" signature for oparin@me.com with ECDSA key
+  SHA256:V6JiKG7J29mjsvikcLoSVp0bLa77VTsFy12gnLO81cM
+
+git merge-base --is-ancestor
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12 HEAD
+exit: 0
+
+local origin/main:
+  138ab82a9a8cda8de3ca260a535c25c4f7dc054f
+merge base of task HEAD and local origin/main:
+  495ad021847529ce5a544dba415ca2fe19949539
+meaning:
+  origin/main advanced independently after the preserved signed task branch;
+  this reviewer did not fetch, reset, rebase, stage, commit, or push.
+
+CURRENT DELTA
+
+git status --short --branch
+exit: 0
+output:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/locking.py
+   M tests/test_locking.py
+   M tests/test_transactions.py
+
+git diff --name-status
+exit: 0
+output:
+  M src/csk/locking.py
+  M tests/test_locking.py
+  M tests/test_transactions.py
+
+git diff --cached --name-status
+exit: 0
+output:
+  empty
+
+SOURCE SHA-256
+
+4a743347eefb084f1051dfbf5d1528eaf64c0e5188aaa9aafcf13461352433c9  src/csk/locking.py
+6f5712bf7d0cf8cafdabc7fe5811e918b20ed7c564eb27b23591880dcf5cb6b2  src/csk/transactions.py
+e354cafcee95ba3891638651ecbe3ef40d10a76a2c41170ffbc7020284c04d29  tests/test_locking.py
+ea56a97b97b3fddb34fc47099728c45f930117922fb709c454a64a16bc5ecb65  tests/test_transactions.py
+
+The tests/test_transactions.py hash exactly matches the previously accepted
+Windows permission-stimulus patch recorded by RUN-260730-0c7fda.
+
+CODE REVIEW
+
+Darwin canonicalization:
+  _canonicalize_darwin_existing_path opens the already-resolved existing path
+  with O_EVTONLY/O_CLOEXEC/O_NOFOLLOW, obtains the kernel-stored spelling with
+  F_GETPATH, rejects empty or non-absolute results, and verifies the returned
+  path still names the same object. It performs no parent-directory scan.
+
+Total deadline:
+  _ExclusiveFileLock.__enter__ establishes deadline before
+  _prepare_for_acquire. It checks deadline exhaustion after preparation and
+  after lock-directory creation; the retry sleep is capped by remaining time.
+  Preparation expiry occurs before process reservation, while later failures
+  retain the existing reservation cleanup path.
+
+Deterministic interleaving:
+  test_concurrent_home_preparation_avoids_canonicalization_stampede constructs
+  twelve same-home locks, synchronizes all preparation calls at a barrier,
+  rejects every pre-lock parent scan, and proves all consumers finish.
+
+Normative fit:
+  /Users/iv/Developer/ReluxWorks/curator-spec/profiles/manager.md sections
+  2.5-2.6 require canonical ordered project locks, build-before-home ordering,
+  one manager-home mutation lock, deterministic consumer-last commit, reverse
+  rollback, and recovery under the home lock. The reviewed rework preserves
+  those already accepted boundaries.
+
+REPAIRED BOUNDARY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_lock_timeout_includes_acquisition_preparation
+  tests/test_locking.py::test_darwin_canonical_identity_does_not_scan_parent_directories
+  tests/test_locking.py::test_concurrent_home_preparation_avoids_canonicalization_stampede
+  tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+exit: 0
+output:
+  4 passed in 1.02s
+
+FRESH-PROCESS HANDOFF STRESS
+
+command:
+  repeat in twenty independent /opt/homebrew/bin/python3.11 pytest processes:
+  tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+exit: 0
+output:
+  iterations 01 through 20 passed
+aggregate wall time:
+  15.686s
+
+PRIOR REVIEWER REGRESSIONS
+
+command:
+  exact 14-case selection covering failed reentry cleanup, release handoff,
+  partial-staging recovery, durable staging intent, completed staging recovery,
+  and foreign staging-byte defense
+exit: 0
+output:
+  14 passed in 1.08s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  exact canonical ordering, lock-order, journal completeness, recovery,
+  reverse rollback, concurrent consumer, stale-preimage, and generation
+  selection
+exit: 0
+output:
+  13 passed in 4.47s
+
+FOCUSED LOCKING AND TRANSACTION PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  132 passed, 4 skipped in 10.57s
+skip boundary:
+  real-Windows-only cases
+
+STRICT MYPY 2.1
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output:
+  Success: no issues found in 62 source files
+
+STRICT MYPY 2.3
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output:
+  Success: no issues found in 62 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output:
+  4 files already formatted
+
+FULL PYTHON 3.14 PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output:
+  811 passed, 58 skipped in 105.18s
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m build
+  --outdir
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-z2z795/review-RUN-260730-b732c0/build
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730.tar.gz
+  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730-py3-none-any.whl
+
+BUILD SHA-256
+
+2df262c4d192407bff6abd34cdf2660253f363056238db49f71fb4df7789bbc8  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730-py3-none-any.whl
+c2048b5cd39e6cf8c165a23a2de13d0c186ecdd8b88f72e79ff21915a76b8b3c  cocoaskills-0.12.6.dev10+ga5ec015c0.d20260730.tar.gz
+
+Wheel source SHA-256:
+  4a743347eefb084f1051dfbf5d1528eaf64c0e5188aaa9aafcf13461352433c9  csk/locking.py
+  6f5712bf7d0cf8cafdabc7fe5811e918b20ed7c564eb27b23591880dcf5cb6b2  csk/transactions.py
+
+DIFF AND STAGING CHECKS
+
+git diff --check
+exit: 0
+
+git diff --cached --check
+exit: 0
+
+git diff --cached --quiet
+exit: 0
+meaning:
+  nothing is staged
+
+PLATFORM / PUBLICATION BOUNDARY
+
+The review ran on macOS. The Darwin F_GETPATH path and concurrent handoff were
+exercised on the real host. Real Windows CI cannot run against unstaged bytes;
+the accepted Windows test-only patch is byte-identical and its local
+platform-identity simulations remain covered by the focused and full suites.
+The commit-owning mover should commit only the reviewed hashes and run the real
+Windows Python 3.11-3.14 matrix before publication.
+
+No source edit, SSH, stage, commit, push, tag, release, pin change, or
+commit_ack occurred.
+
+VERDICT
+
+accepted -> done

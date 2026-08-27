@@ -1,0 +1,732 @@
+removed runtime skill-x/3333333333333333333333333333333333333333
+gc: 1 runtime entry removed, 0 build entries removed
+gc: 0 runtime entries removed, 0 build entries removed
+curator dev
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+curator: unknown command "frobnicate"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in
+  declare\ -a*)
+    _curator_prompt_present=0
+    for _curator_prompt_entry in "${PROMPT_COMMAND[@]}"; do
+      if [ "$_curator_prompt_entry" = "_curator_auto_env" ]; then
+        _curator_prompt_present=1
+        break
+      fi
+    done
+    if [ "$_curator_prompt_present" = "0" ]; then
+      PROMPT_COMMAND=("_curator_auto_env" "${PROMPT_COMMAND[@]}")
+    fi
+    unset _curator_prompt_present
+    unset _curator_prompt_entry
+    ;;
+  *)
+    case ";${PROMPT_COMMAND:-};" in
+      *";_curator_auto_env;"*) ;;
+      *) PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+    esac
+    ;;
+esac
+_curator_auto_env
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+curator: unsupported shell: fish
+curator: unsupported shell: fish
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestShellInitInstallCachesHookWithoutConfig2957370128/001/manager home/hooks/curator.bash
+optional shell profile line: . '/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestShellInitInstallCachesHookWithoutConfig2957370128/001/manager home/hooks/curator.bash'
+error: skill.missing_skill_md (SKILL.md): required SKILL.md not found
+[
+  {
+    "severity": "error",
+    "code": "skill.missing_skill_md",
+    "path": "SKILL.md",
+    "message": "required SKILL.md not found"
+  }
+]
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1110206706/001/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+added project app: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1110206706/003
+alias: app
+path: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1110206706/003
+skillfile: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1110206706/003/Skillfile.json
+skills: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1110206706/003/.agents/skills
+bin: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1110206706/003/.agents/bin
+kept existing config: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapIfMissingKeepsExistingConfigWithoutParsing218328894/001/config.json
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapIfMissingCreatesAbsentConfig3142724869/001/home/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+curator: bootstrap --if-missing and --force are mutually exclusive
+app: generated paths are not ignored by git; missing entries: .agents/, .codex/skills/; skipped
+initialized /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot3513204341/001/home/global/Skillfile.json
+global: dry-run; no files modified
+app: skill-a tag v1 14abd6c context=yes commands=[] via=<project> installed
+app: skill-a up-to-date
+app: skill-a content-drift
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+panic: test timed out after 10m0s
+	running tests:
+		TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands (1s)
+
+goroutine 1631 [running]:
+testing.(*M).startAlarm.func1()
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2682 +0x2b0
+created by time.goFunc
+	/Users/iv/.goenv/versions/1.25.5/src/time/sleep.go:215 +0x38
+
+goroutine 1 [chan receive]:
+testing.(*T).Run(0x14000102fc0, {0x102d410b7?, 0x14000257af8?}, 0x102ede998)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2005 +0x378
+testing.runTests.func1(0x14000102fc0)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2477 +0x38
+testing.tRunner(0x14000102fc0, 0x14000257c28)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+testing.runTests(0x14000118180, {0x10324f260, 0x41, 0x41}, {0x7?, 0x14000117640?, 0x1032569c0?})
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2475 +0x3b8
+testing.(*M).Run(0x140002ae500)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:2337 +0x530
+github.com/relux-works/curator/cmd/curator.TestMain(0x102ee9d60?)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/status_test.go:35 +0x94
+main.main()
+	_testmain.go:175 +0x88
+
+goroutine 1996 [runnable]:
+syscall.syscall(0x140002ee000?, 0xce?, 0x14000536978?, 0x1029ba8bc?)
+	/Users/iv/.goenv/versions/1.25.5/src/runtime/sys_darwin.go:27 +0x40
+syscall.Lstat({0x140002ee000?, 0x1029ba414?}, 0x14000b82038)
+	/Users/iv/.goenv/versions/1.25.5/src/syscall/zsyscall_darwin_arm64.go:1944 +0x6c
+os.lstatNolog.func1(...)
+	/Users/iv/.goenv/versions/1.25.5/src/os/stat_unix.go:45
+os.ignoringEINTR(...)
+	/Users/iv/.goenv/versions/1.25.5/src/os/file_posix.go:256
+os.lstatNolog({0x140002ee000, 0xce})
+	/Users/iv/.goenv/versions/1.25.5/src/os/stat_unix.go:44 +0x50
+os.Lstat({0x140002ee000, 0xce})
+	/Users/iv/.goenv/versions/1.25.5/src/os/stat.go:26 +0x30
+github.com/relux-works/curator/internal/transaction.namespaceIdentity({{0x14000545dd8, 0x8}, {0x140001aef30, 0x13}, {0x140002ee000, 0xce}, {0x140004d9ea0, 0xd6}, 0x1, 0x1, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:198 +0x40
+github.com/relux-works/curator/internal/transaction.namespacePathsOverlap({{0x14000545c58, 0x8}, {0x140001aed68, 0x15}, {0x140002d9ba0, 0xc9}, {0x140004d9dc0, 0xd1}, 0x0, 0x1, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:182 +0xfc
+github.com/relux-works/curator/internal/transaction.validateIndependentTargetNamespaces({0x140005d0a88, 0x6, 0x14000812090?}, {0x0, 0x0, 0x102d1b55c?})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/namespace.go:104 +0x590
+github.com/relux-works/curator/internal/transaction.validateJournal(0x14000bae160)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:344 +0x1294
+github.com/relux-works/curator/internal/transaction.(*Engine).validateJournal(0x1400030cde0, 0x14000bae160)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:351 +0x2c
+github.com/relux-works/curator/internal/transaction.(*Engine).saveJournal(0x1400030cde0, 0x14000bae160)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/journal.go:72 +0x38
+github.com/relux-works/curator/internal/transaction.(*Engine).commitTarget(0x1400030cde0, 0x14000bae160, 0x1)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/engine.go:401 +0x3e0
+github.com/relux-works/curator/internal/transaction.(*Engine).commit(0x1400030cde0, 0x14000bae160)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/engine.go:330 +0xd0
+github.com/relux-works/curator/internal/transaction.(*Engine).resume(0x1400030cde0?, 0x140007e4f30?)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/engine.go:312 +0x10c
+github.com/relux-works/curator/internal/transaction.(*Engine).Commit(0x1400030cde0, {0x102ee3820?, 0x140004ae6f8?}, {0x140007e4f30, 0x28})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/transaction/engine.go:280 +0xfc
+github.com/relux-works/curator/internal/install.runCommit({_, _}, {{0x102d189d9, 0x3}, {0x1400072e46f, 0x7c}, {0x14000a08000, 0x7f}, {{0x102ee59c0, 0x140004d0da0}, ...}, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/commit.go:664 +0xcc4
+github.com/relux-works/curator/internal/install.projectAttempt(_, {_, _}, {_, _}, {0x0, 0x0, 0x0, 0x0, 0x0, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:555 +0x38d4
+github.com/relux-works/curator/internal/install.Project.func2()
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:159 +0x9c
+github.com/relux-works/curator/internal/install.runWithRestarts({0x102d189d9, 0x3}, {{0x102ee5998, 0x140001a7810}, {0x102ee7148, 0x1400030cde0}, {0x102ee69e0, 0x140004d0a00}, _, {_, ...}, ...}, ...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:169 +0xd8
+github.com/relux-works/curator/internal/install.Project(_, {_, _}, {_, _}, {0x0, 0x0, 0x0, 0x0, 0x0, ...})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/internal/install/install.go:158 +0x424
+github.com/relux-works/curator/cmd/curator.cmdInstallMode({0x140004bff40?, 0x103658000?, 0x1033385c0?}, 0x0)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/main.go:520 +0x30c
+github.com/relux-works/curator/cmd/curator.cmdInstall(...)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/main.go:491
+github.com/relux-works/curator/cmd/curator.run({0x140004bff30?, 0x2?, 0x14000363e80?})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/main.go:104 +0x484
+github.com/relux-works/curator/cmd/curator.capture(0x1400093c000, {0x140004bff30, 0x2, 0x2})
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/status_test.go:58 +0x1f8
+github.com/relux-works/curator/cmd/curator.TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(0x1400093c000)
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/status_test.go:1430 +0x60
+testing.tRunner(0x1400093c000, 0x102ede998)
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1934 +0xc8
+created by testing.(*T).Run in goroutine 1
+	/Users/iv/.goenv/versions/1.25.5/src/testing/testing.go:1997 +0x364
+
+goroutine 2076 [IO wait]:
+internal/poll.runtime_pollWait(0x103765600, 0x72)
+	/Users/iv/.goenv/versions/1.25.5/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0x14000781260?, 0x140007d1000?, 0x1)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0x14000781260, {0x140007d1000, 0x200, 0x200})
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:165 +0x1e0
+os.(*File).read(...)
+	/Users/iv/.goenv/versions/1.25.5/src/os/file_posix.go:29
+os.(*File).Read(0x140004ae598, {0x140007d1000?, 0x0?, 0x14000a82f80?})
+	/Users/iv/.goenv/versions/1.25.5/src/os/file.go:144 +0x68
+io.ReadAll({0x102ee3780, 0x140004ae598})
+	/Users/iv/.goenv/versions/1.25.5/src/io/io.go:712 +0x78
+github.com/relux-works/curator/cmd/curator.capture.func2()
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/status_test.go:56 +0x54
+created by github.com/relux-works/curator/cmd/curator.capture in goroutine 1996
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/status_test.go:56 +0x1e8
+
+goroutine 2075 [IO wait]:
+internal/poll.runtime_pollWait(0x1036cca00, 0x72)
+	/Users/iv/.goenv/versions/1.25.5/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0x140007811a0?, 0x140007d0e00?, 0x1)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0x140007811a0, {0x140007d0e00, 0x200, 0x200})
+	/Users/iv/.goenv/versions/1.25.5/src/internal/poll/fd_unix.go:165 +0x1e0
+os.(*File).read(...)
+	/Users/iv/.goenv/versions/1.25.5/src/os/file_posix.go:29
+os.(*File).Read(0x140004ae588, {0x140007d0e00?, 0x0?, 0x654279636167654c?})
+	/Users/iv/.goenv/versions/1.25.5/src/os/file.go:144 +0x68
+io.ReadAll({0x102ee3780, 0x140004ae588})
+	/Users/iv/.goenv/versions/1.25.5/src/io/io.go:712 +0x78
+github.com/relux-works/curator/cmd/curator.capture.func1()
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/status_test.go:55 +0x54
+created by github.com/relux-works/curator/cmd/curator.capture in goroutine 1996
+	/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-jrrgw9/worktree/cmd/curator/status_test.go:55 +0x190
+FAIL	github.com/relux-works/curator/cmd/curator	600.591s
+ok  	github.com/relux-works/curator/internal/adapters	5.471s
+ok  	github.com/relux-works/curator/internal/audit	2.636s
+ok  	github.com/relux-works/curator/internal/buildcache	2.537s
+ok  	github.com/relux-works/curator/internal/buildmeta	1.606s
+ok  	github.com/relux-works/curator/internal/buildsource	2.360s
+ok  	github.com/relux-works/curator/internal/capabilities	4.440s
+ok  	github.com/relux-works/curator/internal/closure	6.565s
+ok  	github.com/relux-works/curator/internal/config	7.487s
+ok  	github.com/relux-works/curator/internal/devsub	3.500s
+ok  	github.com/relux-works/curator/internal/envfiles	6.031s
+ok  	github.com/relux-works/curator/internal/gitignore	2.185s
+ok  	github.com/relux-works/curator/internal/gitops	3.932s
+ok  	github.com/relux-works/curator/internal/globalbins	7.823s
+ok  	github.com/relux-works/curator/internal/godriver	72.516s
+ok  	github.com/relux-works/curator/internal/hashing	8.099s
+ok  	github.com/relux-works/curator/internal/identifiers	6.804s
+ok  	github.com/relux-works/curator/internal/identity	6.625s
+ok  	github.com/relux-works/curator/internal/install	411.094s
+ok  	github.com/relux-works/curator/internal/install/atomicity	543.719s
+ok  	github.com/relux-works/curator/internal/interop	7.732s
+ok  	github.com/relux-works/curator/internal/locale	6.973s
+ok  	github.com/relux-works/curator/internal/managerlock	7.915s
+ok  	github.com/relux-works/curator/internal/manifest	6.680s
+ok  	github.com/relux-works/curator/internal/marker	6.194s
+ok  	github.com/relux-works/curator/internal/mcp	5.890s
+ok  	github.com/relux-works/curator/internal/protocoljson	5.754s
+ok  	github.com/relux-works/curator/internal/registry	6.911s
+ok  	github.com/relux-works/curator/internal/runtimestore	23.887s
+ok  	github.com/relux-works/curator/internal/scopes	6.023s
+ok  	github.com/relux-works/curator/internal/shell	6.023s
+ok  	github.com/relux-works/curator/internal/skillcheck	5.811s
+ok  	github.com/relux-works/curator/internal/skillspec	4.852s
+ok  	github.com/relux-works/curator/internal/snapshot	6.475s
+ok  	github.com/relux-works/curator/internal/staging	4.443s
+ok  	github.com/relux-works/curator/internal/transaction	26.348s
+ok  	github.com/relux-works/curator/internal/ui	4.612s
+ok  	github.com/relux-works/curator/internal/verr	4.911s
+ok  	github.com/relux-works/curator/internal/version	4.969s
+ok  	github.com/relux-works/curator/internal/whitelist	4.238s
+FAIL

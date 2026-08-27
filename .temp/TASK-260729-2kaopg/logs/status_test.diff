@@ -1,0 +1,449 @@
+7d6
+< 	"fmt"
+11d9
+< 	"sort"
+16d13
+< 	"github.com/relux-works/curator/internal/adapters"
+18d14
+< 	"github.com/relux-works/curator/internal/buildmeta"
+21d16
+< 	"github.com/relux-works/curator/internal/install"
+24d18
+< 	"github.com/relux-works/curator/internal/scopes"
+660,770d653
+< 	}
+< }
+< 
+< // TestInstallAndUpgradeRestoreTheCacheWhenTheCommitFails is the other half of
+< // the repair contract, driven end to end through the real commands.
+< //
+< // The refusal case above fails a gate *before* the repair. This one lets the
+< // repair happen — the corrupt entry is really quarantined and a rebuilt entry
+< // really goes live — and then fails the durable commit that needed it. A run
+< // that committed nothing must also have displaced nothing, or the previous
+< // installation would silently change what `status` says about it: from
+< // `corrupt-build-cache`, which install repairs, to receipt or artifact drift
+< // against an entry nobody asked for.
+< //
+< // The commit is failed by taking away write access to the context store the
+< // first target class swaps in, which is the last moment a real installation can
+< // still fail without leaving a durable transaction behind.
+< func TestInstallAndUpgradeRestoreTheCacheWhenTheCommitFails(t *testing.T) {
+< 	for _, command := range []string{"install", "upgrade"} {
+< 		t.Run(command, func(t *testing.T) {
+< 			project, home := compiledProject(t)
+< 			if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+< 				t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+< 			}
+< 			installed := filepath.Join(project, ".agents", "skills", "build-skill")
+< 			before := marker.Read(installed)
+< 			if before == nil || len(before.Builds) != 1 {
+< 				t.Fatalf("first install did not record compiled state: %+v", before)
+< 			}
+< 
+< 			corruptCacheArtifact(t, home)
+< 			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+< 				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+< 				t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
+< 			}
+< 			corruptArtifact := liveArtifactBytes(t, home)
+< 			installedBefore := installedFingerprint(t, project, home)
+< 
+< 			store := filepath.Join(project, ".agents", "skills")
+< 			denyWrites(t, store)
+< 			code, stdout, stderr := capture(t, command, "app")
+< 			restoreWrites(t, store)
+< 			if code != exitFail {
+< 				t.Fatalf("%s over an unwritable context store = %d, want %d\nstdout:\n%s\nstderr:\n%s",
+< 					command, code, exitFail, stdout, stderr)
+< 			}
+< 
+< 			// The case only proves anything if the repair really did publish before
+< 			// the commit failed. Publication quarantines the corrupt entry and the
+< 			// reversal withdraws the replacement the same way, so exactly one
+< 			// withdrawn entry is left behind for the ordinary sweep.
+< 			if withdrawn := quarantinedEntries(t, home); withdrawn != 1 {
+< 				t.Fatalf("withdrawn cache entries = %d, want exactly the one this run published", withdrawn)
+< 			}
+< 			// Nothing half-built survives in the shared cache root either: a
+< 			// publication that failed or was reversed leaves no private staging
+< 			// directory behind for the next run to trip over.
+< 			if staged := stagedEntries(t, home); staged != 0 {
+< 				t.Fatalf("private staging directories left in the shared cache root = %d, want 0", staged)
+< 			}
+< 
+< 			// Exact restoration: the entry the run displaced is live again, with
+< 			// the bytes it had, and the installation is untouched.
+< 			if got := liveArtifactBytes(t, home); got != corruptArtifact {
+< 				t.Fatal("a failed commit did not restore the build cache entry it replaced")
+< 			}
+< 			if len(cacheEntries(t, home)) != 1 {
+< 				t.Fatalf("a failed commit left %d live protected entries, want 1", len(cacheEntries(t, home)))
+< 			}
+< 			if failed := marker.Read(installed); failed == nil ||
+< 				failed.Builds["build-tool"] != before.Builds["build-tool"] {
+< 				t.Fatalf("a failed commit changed the previous compiled state: %+v", failed)
+< 			}
+< 			// The marker is only one class of what an installation commits. The
+< 			// launcher bytes the previous install placed, its adapter mirrors, the
+< 			// machine runtime, and the consumer ledger all have to be at the exact
+< 			// value the run found them at.
+< 			if got := installedFingerprint(t, project, home); got != installedBefore {
+< 				t.Fatalf("a failed commit changed installed state\nbefore:\n%s\nafter:\n%s",
+< 					installedBefore, got)
+< 			}
+< 			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
+< 				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+< 				t.Fatalf("the previous installation no longer reports the state it had:\n%s", stdout)
+< 			}
+< 
+< 			// The ordinary reconciliation path still repairs it afterwards.
+< 			if code, stdout, stderr := capture(t, command, "app"); code != exitOK {
+< 				t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
+< 			}
+< 			if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
+< 				t.Fatalf("status --check after the repair = %d, want %d", code, exitOK)
+< 			}
+< 		})
+< 	}
+< }
+< 
+< // installedFingerprint digests every class of state one installation commits:
+< // the project tree it owns, the agent adapter mirrors it publishes, and the
+< // machine-level runtime, hybrid store, and consumer ledger. A run that failed
+< // must leave the whole map at its prior value, not just the parts a single
+< // assertion happens to look at.
+< func installedFingerprint(t *testing.T, project, home string) string {
+< 	t.Helper()
+< 	paths := map[string]string{
+< 		"project/agents":         filepath.Join(project, ".agents"),
+< 		"project/adapters":       filepath.Join(project, ".claude", "skills"),
+< 		"project/adapters-codex": filepath.Join(project, filepath.FromSlash(adapters.AgentPaths["codex_cli"])),
+< 		"home/runtime":           filepath.Join(home, "runtime"),
+< 		"home/hybrid":            scopes.HybridSkillsRoot(home),
+< 		"home/consumers":         filepath.Join(home, scopes.ConsumersName),
+772,785d654
+< 	records := make([]string, 0, len(paths))
+< 	for name, path := range paths {
+< 		digest := pathDigest(t, path)
+< 		// A fingerprint of nothing would compare equal to a fingerprint of
+< 		// nothing, so the two classes that always exist after an installation are
+< 		// required to be there. The adapter mirrors and the hybrid store depend on
+< 		// what the project declares and may legitimately be absent.
+< 		if digest == "absent" && (name == "project/agents" || name == "home/consumers") {
+< 			t.Fatalf("%s is missing, so this fingerprint would compare equal to anything", name)
+< 		}
+< 		records = append(records, name+"="+digest)
+< 	}
+< 	sort.Strings(records)
+< 	return strings.Join(records, "\n")
+788,953d656
+< // pathDigest reads one path exactly as it is. A symbolic link is digested by
+< // its destination rather than followed, so a mirror that was replaced,
+< // re-pointed, or removed shows up as a change instead of resolving to the same
+< // canonical bytes.
+< func pathDigest(t *testing.T, path string) string {
+< 	t.Helper()
+< 	info, err := os.Lstat(path)
+< 	if os.IsNotExist(err) {
+< 		return "absent"
+< 	}
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	switch {
+< 	case info.Mode()&os.ModeSymlink != 0:
+< 		target, err := os.Readlink(path)
+< 		if err != nil {
+< 			t.Fatal(err)
+< 		}
+< 		return "link:" + filepath.ToSlash(target)
+< 	case info.IsDir():
+< 		entries, err := os.ReadDir(path)
+< 		if err != nil {
+< 			t.Fatal(err)
+< 		}
+< 		members := make([]string, 0, len(entries))
+< 		for _, entry := range entries {
+< 			members = append(members, entry.Name()+"="+pathDigest(t, filepath.Join(path, entry.Name())))
+< 		}
+< 		sort.Strings(members)
+< 		return "dir[" + strings.Join(members, ",") + "]"
+< 	default:
+< 		payload, err := os.ReadFile(path) // #nosec G304 -- test fixture path
+< 		if err != nil {
+< 			t.Fatal(err)
+< 		}
+< 		sum := sha256.Sum256(payload)
+< 		return fmt.Sprintf("file:%s:%s", info.Mode().Perm(), hex.EncodeToString(sum[:]))
+< 	}
+< }
+< 
+< // liveArtifactBytes reads the single artifact of the single live protected
+< // entry, so a test can prove which bytes a reversal put back.
+< func liveArtifactBytes(t *testing.T, home string) string {
+< 	t.Helper()
+< 	entries := cacheEntries(t, home)
+< 	if len(entries) != 1 {
+< 		t.Fatalf("live protected entries = %d, want exactly 1", len(entries))
+< 	}
+< 	matches, err := filepath.Glob(filepath.Join(entries[0], "bin", "*"))
+< 	if err != nil || len(matches) != 1 {
+< 		t.Fatalf("protected entry %s does not hold exactly one artifact: %v %v", entries[0], matches, err)
+< 	}
+< 	payload, err := os.ReadFile(matches[0]) // #nosec G304 -- test fixture path
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	sum := sha256.Sum256(payload)
+< 	return hex.EncodeToString(sum[:])
+< }
+< 
+< // replaceCacheEntry rewrites the single live protected entry into a different
+< // but equally valid entry for the same logical key: new artifact bytes and the
+< // canonical receipt that exactly describes them.
+< //
+< // It is the one way protected state can move without ever looking broken, so it
+< // is the case a currentness check can only catch by re-reading the cache.
+< func replaceCacheEntry(t *testing.T, home string, input buildmeta.Input) {
+< 	t.Helper()
+< 	entries := cacheEntries(t, home)
+< 	if len(entries) != 1 {
+< 		t.Fatalf("live protected entries = %d, want exactly 1", len(entries))
+< 	}
+< 	entry := entries[0]
+< 	relative, err := buildmeta.ArtifactPath(input.Command, input.Target.GOOS)
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	payload := []byte("a different artifact, described exactly by its own receipt")
+< 	digest := sha256.Sum256(payload)
+< 	receipt, err := buildmeta.NewReceipt(input, buildmeta.Artifact{
+< 		Path: relative, SHA256: "sha256:" + hex.EncodeToString(digest[:]), Size: int64(len(payload)),
+< 	})
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	receiptBytes, err := receipt.CanonicalBytes()
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	artifact := filepath.Join(entry, filepath.FromSlash(relative))
+< 	if err := os.Chmod(artifact, 0o700); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if err := os.WriteFile(artifact, payload, 0o700); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	receiptPath := filepath.Join(entry, buildcache.ReceiptFilename)
+< 	if err := os.Chmod(receiptPath, 0o600); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if err := os.WriteFile(receiptPath, receiptBytes, 0o600); err != nil {
+< 		t.Fatal(err)
+< 	}
+< }
+< 
+< // quarantinedEntries counts the cache entries that were moved aside rather than
+< // deleted, which is how both a replacement and its reversal withdraw one.
+< func quarantinedEntries(t *testing.T, home string) int {
+< 	t.Helper()
+< 	return cacheRootPrefixCount(t, home, ".quarantine-")
+< }
+< 
+< // stagedEntries counts the private staging directories left in the shared cache
+< // root. A publication owns its staging on every path, so this is always zero
+< // once a run has released the manager-home lock.
+< func stagedEntries(t *testing.T, home string) int {
+< 	t.Helper()
+< 	return cacheRootPrefixCount(t, home, ".stage-")
+< }
+< 
+< func cacheRootPrefixCount(t *testing.T, home, prefix string) int {
+< 	t.Helper()
+< 	entries, err := os.ReadDir(filepath.Join(home, "cache", "build", "go-v1"))
+< 	if err != nil {
+< 		t.Fatalf("protected build cache is missing: %v", err)
+< 	}
+< 	count := 0
+< 	for _, entry := range entries {
+< 		if strings.HasPrefix(entry.Name(), prefix) {
+< 			count++
+< 		}
+< 	}
+< 	return count
+< }
+< 
+< // denyWrites makes one directory unwritable and proves it really is, so a case
+< // that depends on a write failing cannot pass vacuously — a privileged process
+< // ignores the mode entirely.
+< func denyWrites(t *testing.T, dir string) {
+< 	t.Helper()
+< 	info, err := os.Stat(dir)
+< 	if err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	if err := os.Chmod(dir, 0o500); err != nil {
+< 		t.Fatal(err)
+< 	}
+< 	t.Cleanup(func() { _ = os.Chmod(dir, info.Mode().Perm()) })
+< 	probe := filepath.Join(dir, ".curator-write-probe")
+< 	if err := os.WriteFile(probe, []byte("probe"), 0o600); err == nil {
+< 		_ = os.Remove(probe)
+< 		if err := os.Chmod(dir, info.Mode().Perm()); err != nil {
+< 			t.Fatal(err)
+< 		}
+< 		t.Skip("this process can write through a read-only directory, so a commit failure cannot be injected")
+< 	}
+< }
+< 
+< func restoreWrites(t *testing.T, dir string) {
+< 	t.Helper()
+< 	if err := os.Chmod(dir, 0o755); err != nil {
+< 		t.Fatal(err)
+< 	}
+< }
+< 
+1051,1058d753
+< 	// Everything that was already established when the toolchain was consulted
+< 	// is reported. Build sources are validated before the toolchain is touched
+< 	// and the driver is closed by the schema, so a row that omitted them would
+< 	// be hiding identity it had.
+< 	if row.Driver != "go-v1" || row.BuildRoot != "assets/build-tool" ||
+< 		row.SourceDir != "assets/build-tool/cmd/tool" || row.BuildSource.ContentSHA256 == "" {
+< 		t.Fatalf("toolchain row dropped identities the plan already had: %+v", row)
+< 	}
+1072,1090d766
+< 	// The human line and the JSON row carry the same identities, field for field.
+< 	for _, want := range []string{
+< 		"driver=" + row.Driver, "root=" + row.BuildRoot, "dir=" + row.SourceDir,
+< 		"source=" + row.BuildSource.Algorithm + ":" + row.BuildSource.ContentSHA256,
+< 	} {
+< 		if !strings.Contains(human, want) {
+< 			t.Fatalf("human status does not report %q:\n%s", want, human)
+< 		}
+< 	}
+< 	// The cache outcome is the row's own planner verdict and is reported; the
+< 	// identities that depend on the toolchain are not published at all.
+< 	if !strings.Contains(human, "cache="+row.CacheOutcome) {
+< 		t.Fatalf("human status does not report the planner outcome %q:\n%s", row.CacheOutcome, human)
+< 	}
+< 	for _, absent := range []string{"target=", "key=", "artifact="} {
+< 		if strings.Contains(human, absent) {
+< 			t.Fatalf("human status published %q for a command nothing was derived for:\n%s", absent, human)
+< 		}
+< 	}
+1093,1205d768
+< 	}
+< }
+< 
+< // TestStatusReportsProtectedCacheStateThatMovedDuringTheCheck closes the other
+< // half of the classification window.
+< //
+< // Install markers are fingerprinted around the whole run, but a marker is only
+< // half the evidence a compiled verdict is derived from: the protected cache is
+< // inspected once, during a read-only plan that holds no lock, and an entry that
+< // is removed, corrupted, or loses its provable protection afterwards changes
+< // every verdict taken from it without touching a single marker byte.
+< //
+< // The cache really moves here, between the plan and the classification, exactly
+< // as a concurrent install, sweep, or permission change would move it. Nothing
+< // rewrites a marker, so a verdict that stays authoritative could only have come
+< // from evidence nobody re-read.
+< func TestStatusReportsProtectedCacheStateThatMovedDuringTheCheck(t *testing.T) {
+< 	project, home := compiledProject(t)
+< 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+< 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+< 	}
+< 	cfg, code := loadConfig()
+< 	if code != exitOK {
+< 		t.Fatalf("loading the configuration = %d", code)
+< 	}
+< 
+< 	// The same read-only plan `status` takes, and the same marker fingerprint
+< 	// it opens the window with.
+< 	planned := install.Project(cfg, project, "app", install.Options{DryRun: true})
+< 	if planned.Status != "ok" || len(planned.Builds) != 1 {
+< 		t.Fatalf("read-only plan = %+v", planned)
+< 	}
+< 	facts := factsList(planned.Builds)
+< 	before := markerDigests(statusStores(cfg, project)...)
+< 
+< 	drift, rows := statusReport(cfg, project, facts, before)
+< 	if len(rows) != 1 || rows[0].State != buildCurrent {
+< 		t.Fatalf("settled compiled state = %+v", rows)
+< 	}
+< 	if checkFailed(drift, rows) {
+< 		t.Fatal("a settled compiled installation failed --check")
+< 	}
+< 
+< 	for name, move := range map[string]func(t *testing.T, input buildmeta.Input){
+< 		"the protected entry is corrupted": func(t *testing.T, _ buildmeta.Input) {
+< 			corruptCacheArtifact(t, home)
+< 		},
+< 		"the protected entry is removed": func(t *testing.T, _ buildmeta.Input) {
+< 			for _, entry := range cacheEntries(t, home) {
+< 				if err := os.RemoveAll(entry); err != nil {
+< 					t.Fatal(err)
+< 				}
+< 			}
+< 		},
+< 		"the protected boundary stops being provable": func(t *testing.T, _ buildmeta.Input) {
+< 			for _, entry := range cacheEntries(t, home) {
+< 				if err := os.Chmod(entry, 0o777); err != nil {
+< 					t.Fatal(err)
+< 				}
+< 			}
+< 		},
+< 		// The hardest case: the entry is still a valid hit for the same logical
+< 		// key, so nothing about it looks broken — only its receipt identity moved.
+< 		// Without the recheck this publishes a stale *drift* verdict
+< 		// (corrupt-build-receipt against the marker) rather than a stale current
+< 		// one, which is just as wrong and far less obvious.
+< 		"the protected entry is replaced by another valid one": func(t *testing.T, input buildmeta.Input) {
+< 			replaceCacheEntry(t, home, input)
+< 		},
+< 	} {
+< 		t.Run(name, func(t *testing.T) {
+< 			// Each case opens its own window: a preceding case restored the
+< 			// installation through a real reinstall, which legitimately rewrites
+< 			// the marker this fingerprint has to be taken from.
+< 			planned := install.Project(cfg, project, "app", install.Options{DryRun: true})
+< 			if planned.Status != "ok" || len(planned.Builds) != 1 {
+< 				t.Fatalf("read-only plan = %+v", planned)
+< 			}
+< 			facts := factsList(planned.Builds)
+< 			before := markerDigests(statusStores(cfg, project)...)
+< 			markerPath := filepath.Join(project, ".agents", "skills", "build-skill", marker.Name)
+< 			marked, err := os.ReadFile(markerPath) // #nosec G304 -- test fixture path
+< 			if err != nil {
+< 				t.Fatal(err)
+< 			}
+< 
+< 			move(t, planned.Builds[0].Expectation().Input)
+< 			t.Cleanup(func() { reinstall(t) })
+< 
+< 			// The marker is deliberately untouched, so only the cache recheck can
+< 			// have produced the verdict below.
+< 			after, err := os.ReadFile(markerPath) // #nosec G304 -- test fixture path
+< 			if err != nil {
+< 				t.Fatal(err)
+< 			}
+< 			if string(after) != string(marked) {
+< 				t.Fatal("the case moved the install marker, so it proves nothing about the cache recheck")
+< 			}
+< 
+< 			drift, rows := statusReport(cfg, project, facts, before)
+< 			if len(rows) != 1 || rows[0].State != buildStateChanged {
+< 				t.Fatalf("moved compiled state = %+v", rows)
+< 			}
+< 			if !strings.Contains(rows[0].Detail, "build cache") {
+< 				t.Fatalf("the row does not say what moved: %+v", rows[0])
+< 			}
+< 			if drift["build-skill"] != buildStateChanged {
+< 				t.Fatalf("skills = %v, want build-skill %q", drift, buildStateChanged)
+< 			}
+< 			if !checkFailed(drift, rows) {
+< 				t.Fatal("compiled state that moved during the check passed --check")
+< 			}
+< 		})

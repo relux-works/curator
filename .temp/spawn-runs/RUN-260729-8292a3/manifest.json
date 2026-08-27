@@ -1,0 +1,58 @@
+{
+  "id": "RUN-260729-8292a3",
+  "task_id": "TASK-260720-3j8pp5",
+  "created_at": "2026-07-29T23:36:03.514761Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-03-36-03_-reviewer--reviewer--codex-_TASK-260720-3j8pp5.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-3j8pp5_spawn-log_-reviewer--reviewer--codex-_RUN-260729-8292a3.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260720-3j8pp5_focused-pytest-rework.log",
+    "TASK-260720-3j8pp5_focused-pytest.log",
+    "TASK-260720-3j8pp5_implementation-evidence.md",
+    "TASK-260720-3j8pp5_mypy-rework.log",
+    "TASK-260720-3j8pp5_mypy.log",
+    "TASK-260720-3j8pp5_review-verdict.md",
+    "TASK-260720-3j8pp5_reviewer-tool-readiness.md",
+    "TASK-260720-3j8pp5_reviewer-validation.log",
+    "TASK-260720-3j8pp5_rework-evidence.md",
+    "TASK-260720-3j8pp5_spawn-log_-implementer--developer--codex-_RUN-260729-2aa05c.log",
+    "TASK-260720-3j8pp5_spawn-log_-implementer--developer--codex-_RUN-260729-479e4e.log",
+    "TASK-260720-3j8pp5_spawn-log_-reviewer--reviewer--codex-_RUN-260729-688e43.log",
+    "TASK-260720-3j8pp5_telemetry-repoint-reproduction.log"
+  ]
+}

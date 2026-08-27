@@ -1,0 +1,12 @@
+{"Action":"output","Package":"github.com/relux-works/curator/internal/buildrepo","Test":"TestEveryOperatorSelectionShapeReachesTheWrapperPolicy","Output":"    credentials_test.go:48: an operator agent socket is a unix-domain rendezvous point\n"}
+{"Action":"skip","Package":"github.com/relux-works/curator/internal/buildrepo","Test":"TestEveryOperatorSelectionShapeReachesTheWrapperPolicy"}
+{"Action":"output","Package":"github.com/relux-works/curator/internal/install","Test":"TestEveryConfiguredShapeReachesTheWrapperPolicy","Output":"    buildssh_test.go:53: an operator agent socket is a unix-domain rendezvous point\n"}
+{"Action":"skip","Package":"github.com/relux-works/curator/internal/install","Test":"TestEveryConfiguredShapeReachesTheWrapperPolicy"}
+{"Action":"output","Package":"github.com/relux-works/curator/internal/config","Test":"TestBuildSSHExpandedResolvesHome","Output":"    buildssh_test.go:320: no home directory: nope\n"}
+{"Action":"skip","Package":"github.com/relux-works/curator/internal/config","Test":"TestBuildSSHExpandedResolvesHome"}
+{"Action":"output","Package":"github.com/relux-works/curator/internal/buildrepo","Test":"TestOperatorSSHCredentialsAdmitOnlyResolvedObjectsOfTheRightKind","Output":"    credentials_test.go:207: this host cannot create a symbolic link: nope\n"}
+{"Action":"skip","Package":"github.com/relux-works/curator/internal/buildrepo","Test":"TestOperatorSSHCredentialsAdmitOnlyResolvedObjectsOfTheRightKind"}
+{"Action":"output","Package":"github.com/relux-works/curator/internal/install","Test":"TestConfiguredAgentResolvesToTheLiveSocket","Output":"    buildssh_test.go:59: this host cannot create a short scratch directory: nope\n"}
+{"Action":"skip","Package":"github.com/relux-works/curator/internal/install","Test":"TestConfiguredAgentResolvesToTheLiveSocket"}
+{"Action":"output","Package":"github.com/relux-works/curator/internal/buildrepo","Test":"TestSSHPolicyRefusesUnselectedAndUnverifiableRepositories","Output":"    credentials_test.go:52: this host cannot create an agent socket: nope\n"}
+{"Action":"skip","Package":"github.com/relux-works/curator/internal/buildrepo","Test":"TestSSHPolicyRefusesUnselectedAndUnverifiableRepositories"}

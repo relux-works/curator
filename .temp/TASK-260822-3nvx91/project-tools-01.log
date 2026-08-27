@@ -1,0 +1,15 @@
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:1:.PHONY: validate regenerate regenerate-check release-check
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:3:validate:
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:4:	python3 tools/validate.py
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:5:	python3 -B -m unittest discover -s tools -p 'test_*.py'
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:6:	go test ./tools/...
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:8:regenerate:
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:9:	go run ./tools/generate-vectors -root .
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:11:regenerate-check:
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:12:	go run ./tools/generate-vectors -root .
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/Makefile:15:release-check: validate regenerate-check
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/README.md:16:requirements, and a cryptographically verifiable audit-registry protocol.
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/README.md:31:## Specification set
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/README.md:60:## Implementations
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/README.md:73:## Release status
+/Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260822-1pm1c9/prose-worktree/README.md:90:## About Relux Works

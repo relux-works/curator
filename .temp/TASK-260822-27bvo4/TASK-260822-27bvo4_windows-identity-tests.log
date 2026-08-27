@@ -1,0 +1,36 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+=== RUN   TestExecutableIdentityRejectsSubstitutionAndMutation
+--- PASS: TestExecutableIdentityRejectsSubstitutionAndMutation (0.02s)
+=== RUN   TestExecutableIdentityResolvesALauncherLink
+=== RUN   TestExecutableIdentityResolvesALauncherLink/shim_symlink_on_PATH
+=== RUN   TestExecutableIdentityResolvesALauncherLink/chain_of_shim_symlinks
+=== RUN   TestExecutableIdentityResolvesALauncherLink/symlinked_install_directory
+=== RUN   TestExecutableIdentityResolvesALauncherLink/unclean_relative_spelling_of_the_link
+--- PASS: TestExecutableIdentityResolvesALauncherLink (0.02s)
+    --- PASS: TestExecutableIdentityResolvesALauncherLink/shim_symlink_on_PATH (0.00s)
+    --- PASS: TestExecutableIdentityResolvesALauncherLink/chain_of_shim_symlinks (0.00s)
+    --- PASS: TestExecutableIdentityResolvesALauncherLink/symlinked_install_directory (0.00s)
+    --- PASS: TestExecutableIdentityResolvesALauncherLink/unclean_relative_spelling_of_the_link (0.00s)
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/dangling_launcher_link
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_directory
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_an_empty_file
+=== RUN   TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_hard-linked_file
+--- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink (0.05s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/dangling_launcher_link (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_directory (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_an_empty_file (0.00s)
+    --- PASS: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/launcher_link_to_a_hard-linked_file (0.01s)
+=== RUN   TestExecutableIdentityResolvesARealSymlinkedProcessLaunch
+    identity_test.go:235: os.Executable reported "C:\\Users\\admin\\AppData\\Local\\Temp\\TestExecutableIdentityResolvesARealSymlinkedProcessLaunch1768775142\\001\\curator.exe" for a launch through "C:\\Users\\admin\\AppData\\Local\\Temp\\TestExecutableIdentityResolvesARealSymlinkedProcessLaunch1768775142\\001\\curator.exe"
+--- PASS: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch (0.46s)
+=== RUN   TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction
+    identity_windows_test.go:47: EvalSymlinks("C:\\Users\\admin\\AppData\\Local\\Temp\\TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJ3788345828\\002\\current\\curator.exe") = "", The system cannot find the path specified.
+--- PASS: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction (0.04s)
+=== RUN   TestExecutableIdentityStillRejectsSubstitutionBehindAJunction
+--- PASS: TestExecutableIdentityStillRejectsSubstitutionBehindAJunction (0.06s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	1.463s
+GO_TEST_EXIT=0

@@ -1,0 +1,629 @@
+Candidate suite (windows-latest)	Set up job	﻿2026-08-23T13:02:55.7604544Z Current runner version: '2.336.0'
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7960471Z ##[group]Runner Image Provisioner
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7961354Z Hosted Compute Agent
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7961926Z Version: 20260729.566
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7962533Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7963220Z Build Date: 2026-07-29T19:17:02Z
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7964214Z Worker ID: {3fb0f9c8-5094-4e31-91d9-e624cbf71b06}
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7964890Z Azure Region: eastus
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7965413Z ##[endgroup]
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7966753Z ##[group]Operating System
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7967343Z Microsoft Windows Server 2025
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7967933Z 10.0.26100
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7968417Z Datacenter
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7968886Z ##[endgroup]
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7969414Z ##[group]Runner Image
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7969975Z Image: windows-2025-vs2026
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7970528Z Version: 20260818.207.1
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7971905Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260818.207/images/windows/Windows2025-VS2026-Readme.md
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7974004Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260818.207
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7975031Z ##[endgroup]
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7976233Z ##[group]GITHUB_TOKEN Permissions
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7978270Z Contents: read
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7978941Z Metadata: read
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7979482Z ##[endgroup]
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7981597Z Secret source: Actions
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.7982663Z Prepare workflow directory
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.9404585Z Prepare all required actions
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:55.9454280Z Getting action download info
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:56.1149330Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:56.3911894Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:56.6983678Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Candidate suite (windows-latest)	Set up job	2026-08-23T13:02:57.8098264Z Complete job name: Candidate suite (windows-latest)
+Candidate suite (windows-latest)	Run actions/checkout@v4	﻿2026-08-23T13:02:59.0628433Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0639889Z ##[group]Run actions/checkout@v4
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0641007Z with:
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0641782Z   submodules: true
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0642932Z   repository: relux-works/curator
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0650894Z   token: ***
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0651667Z   ssh-strict: true
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0652445Z   ssh-user: git
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0653220Z   persist-credentials: true
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0654087Z   clean: true
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0654855Z   sparse-checkout-cone-mode: true
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0655789Z   fetch-depth: 1
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0656608Z   fetch-tags: false
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0657435Z   show-progress: true
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0658270Z   lfs: false
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0659109Z   set-safe-directory: true
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0660041Z   allow-unsafe-pr-checkout: false
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0661354Z env:
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0662204Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0663562Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0664508Z   GOENV: off
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.0665277Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.2820750Z Syncing repository: relux-works/curator
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.2823475Z ##[group]Getting Git version info
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.2824627Z Working directory is 'D:\a\curator\curator'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.3624404Z [command]"C:\Program Files\Git\bin\git.exe" version
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.7689323Z git version 2.55.0.windows.4
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.7738330Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.7789689Z Temporarily overriding HOME='D:\a\_temp\14b39d7a-b0e0-4d94-bb5d-4d0453cb5777' before making global git config changes
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.7881596Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.7882461Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.8430592Z Deleting the contents of 'D:\a\curator\curator'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.8437634Z ##[group]Initializing the repository
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.8447147Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.9550287Z Initialized empty Git repository in D:/a/curator/curator/.git/
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:59.9601986Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:00.0404273Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:00.0404915Z ##[group]Disabling automatic garbage collection
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:00.0414962Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:00.0725117Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:00.0725755Z ##[group]Setting up auth
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:00.0738592Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:00.1040576Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:01.6242383Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:01.6484677Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:02.1932805Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:02.2236607Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:02.7504515Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:02.7807482Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:02.7808093Z ##[group]Fetching the repository
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:02.7822449Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +465467009c59990b62d493c4a2bef1f9585b1b33:refs/remotes/origin/fix/TASK-260823-3c27d3-windows-staged-script-binding
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.8370682Z From https://github.com/relux-works/curator
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.8372035Z  * [new ref]         465467009c59990b62d493c4a2bef1f9585b1b33 -> origin/fix/TASK-260823-3c27d3-windows-staged-script-binding
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.8416913Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.8417503Z ##[group]Determining the checkout info
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.8419920Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.8429888Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.8865227Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.9171110Z ##[group]Checking out the ref
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:04.9182456Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B fix/TASK-260823-3c27d3-windows-staged-script-binding refs/remotes/origin/fix/TASK-260823-3c27d3-windows-staged-script-binding
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.1395814Z Switched to a new branch 'fix/TASK-260823-3c27d3-windows-staged-script-binding'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.1461161Z branch 'fix/TASK-260823-3c27d3-windows-staged-script-binding' set up to track 'origin/fix/TASK-260823-3c27d3-windows-staged-script-binding'.
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.1512048Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.1512456Z ##[group]Setting up auth for fetching submodules
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.1522570Z [command]"C:\Program Files\Git\bin\git.exe" config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.1833939Z [command]"C:\Program Files\Git\bin\git.exe" config --global --unset-all url.https://github.com/.insteadOf
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.2141340Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf git@github.com:
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.2448140Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf org-261817730@github.com:
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.2742552Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.2743025Z ##[group]Fetching submodules
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.2754303Z [command]"C:\Program Files\Git\bin\git.exe" submodule sync
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:05.8014241Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 submodule update --init --force --depth=1
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:06.3043086Z Submodule 'agents/skills/skill-go-testing-tools' (https://github.com/relux-works/skill-go-testing-tools.git) registered for path 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:06.3565436Z Cloning into 'D:/a/curator/curator/agents/skills/skill-go-testing-tools'...
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:07.3980542Z From https://github.com/relux-works/skill-go-testing-tools
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:07.3981396Z  * branch            21585d0e937cae47e54a788d8ae36b1780eae47f -> FETCH_HEAD
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:07.4910880Z Submodule path 'agents/skills/skill-go-testing-tools': checked out '21585d0e937cae47e54a788d8ae36b1780eae47f'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:07.5006098Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local gc.auto 0"
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:08.0000154Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:08.0624118Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:08.0625124Z ##[group]Persisting credentials for submodules
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:08.0640383Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :\""
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:08.5886260Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:08.6770032Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "sh -c \"git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url\""
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:09.1837145Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:09.2613402Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:09.2766558Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'"
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:09.7581965Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:09.8038345Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'org-261817730@github.com:'"
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:10.3408798Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:10.3857340Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:10.4283596Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+Candidate suite (windows-latest)	Run actions/checkout@v4	2026-08-23T13:03:10.4538761Z 465467009c59990b62d493c4a2bef1f9585b1b33
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	﻿2026-08-23T13:03:10.7879465Z ##[group]Run bash .github/ci/candidate-suite.sh verify-inputs "$CANDIDATE_REF" "$CANDIDATE_ROOT_INPUT"
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.7880518Z ^[[36;1mbash .github/ci/candidate-suite.sh verify-inputs "$CANDIDATE_REF" "$CANDIDATE_ROOT_INPUT"^[[0m
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.7991798Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.7992217Z env:
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.7992446Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.7992729Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.7992934Z   GOENV: off
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.7993167Z   CANDIDATE_REF: 859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.7993470Z   CANDIDATE_ROOT_INPUT: 
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:10.8040489Z ##[endgroup]
+Candidate suite (windows-latest)	Reject ambiguous candidate inputs	2026-08-23T13:03:11.1060938Z candidate-suite: candidate input accepted (exactly one revision or root)
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	﻿2026-08-23T13:03:11.4744410Z ##[group]Run bash .github/ci/candidate-suite.sh verify-ref "$CANDIDATE_REF"
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.4745052Z ^[[36;1mbash .github/ci/candidate-suite.sh verify-ref "$CANDIDATE_REF"^[[0m
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.4897644Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.4898047Z env:
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.4898279Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.4898571Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.4898763Z   GOENV: off
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.4899010Z   CANDIDATE_REF: 859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.4899294Z ##[endgroup]
+Candidate suite (windows-latest)	Reject a non-immutable candidate revision	2026-08-23T13:03:11.6399909Z candidate-suite: revision accepted (immutable, full 40-hex): 859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Check out the candidate suite	﻿2026-08-23T13:03:12.1993037Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1995257Z ##[group]Run actions/checkout@v4
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1995493Z with:
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1995696Z   repository: relux-works/curator-spec
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1995972Z   ref: 859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1996244Z   path: candidate-spec
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1998821Z   token: ***
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1999023Z   ssh-strict: true
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1999214Z   ssh-user: git
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1999404Z   persist-credentials: true
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1999625Z   clean: true
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.1999826Z   sparse-checkout-cone-mode: true
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2000063Z   fetch-depth: 1
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2000256Z   fetch-tags: false
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2000509Z   show-progress: true
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2000710Z   lfs: false
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2000878Z   submodules: false
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2001063Z   set-safe-directory: true
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2001289Z   allow-unsafe-pr-checkout: false
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2001510Z env:
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2001717Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2001989Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2002179Z   GOENV: off
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.2002343Z ##[endgroup]
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.3924244Z Syncing repository: relux-works/curator-spec
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.3932941Z ##[group]Getting Git version info
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.3933726Z Working directory is 'D:\a\curator\curator\candidate-spec'
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.4651401Z [command]"C:\Program Files\Git\bin\git.exe" version
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.4916729Z git version 2.55.0.windows.4
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.4960514Z ##[endgroup]
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5009478Z Temporarily overriding HOME='D:\a\_temp\26a34a2d-1ead-4860-84f1-f96bf4a4cf1b' before making global git config changes
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5010590Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5011261Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\candidate-spec
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5279429Z ##[group]Initializing the repository
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5289108Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator\candidate-spec
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5630634Z Initialized empty Git repository in D:/a/curator/curator/candidate-spec/.git/
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5676609Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator-spec
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5966893Z ##[endgroup]
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5967299Z ##[group]Disabling automatic garbage collection
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.5976410Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.6272675Z ##[endgroup]
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.6273199Z ##[group]Setting up auth
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.6285922Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:12.6609893Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:13.1719833Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:13.2004968Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:13.7416363Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:13.7704403Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.2975626Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.3271959Z ##[endgroup]
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.3272482Z ##[group]Fetching the repository
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.3284473Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.6414129Z From https://github.com/relux-works/curator-spec
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.6414849Z  * branch            859727b103ed175ff214cbb64641f4686d8c6a68 -> FETCH_HEAD
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.6455782Z ##[endgroup]
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.6456457Z ##[group]Determining the checkout info
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.6458617Z ##[endgroup]
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.6468354Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.6793272Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.7077346Z ##[group]Checking out the ref
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.7086879Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9156149Z Note: switching to '859727b103ed175ff214cbb64641f4686d8c6a68'.
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9156669Z 
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9156974Z You are in 'detached HEAD' state. You can look around, make experimental
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9157700Z changes and commit them, and you can discard any commits you make in this
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9158437Z state without impacting any branches by switching back to a branch.
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9159189Z 
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9159462Z If you want to create a new branch to retain commits you create, you may
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9160132Z do so (now or later) by using -c with the switch command. Example:
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9160571Z 
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9160739Z   git switch -c <new-branch-name>
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9161013Z 
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9161146Z Or undo this operation with:
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9161365Z 
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9161464Z   git switch -
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9161636Z 
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9161949Z Turn off this advice by setting config variable advice.detachedHead to false
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9162433Z 
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9162653Z HEAD is now at 859727b Add schema 8 rc.9 candidate metadata
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9219630Z ##[endgroup]
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9532630Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+Candidate suite (windows-latest)	Check out the candidate suite	2026-08-23T13:03:14.9783130Z 859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	﻿2026-08-23T13:03:15.0186260Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0187590Z ##[group]Run actions/checkout@v4
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0188514Z with:
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0188712Z   repository: relux-works/curator-spec
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0188989Z   ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0189265Z   path: protocol-spec
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0191698Z   token: ***
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0192130Z   ssh-strict: true
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0192324Z   ssh-user: git
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0192517Z   persist-credentials: true
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0192752Z   clean: true
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0192959Z   sparse-checkout-cone-mode: true
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0193201Z   fetch-depth: 1
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0193392Z   fetch-tags: false
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0193781Z   show-progress: true
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0194015Z   lfs: false
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0194184Z   submodules: false
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0194370Z   set-safe-directory: true
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0194596Z   allow-unsafe-pr-checkout: false
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0194815Z env:
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0195020Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0195309Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0195486Z   GOENV: off
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.0195651Z ##[endgroup]
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.1279467Z Syncing repository: relux-works/curator-spec
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.1289351Z ##[group]Getting Git version info
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.1290113Z Working directory is 'D:\a\curator\curator\protocol-spec'
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.2036789Z [command]"C:\Program Files\Git\bin\git.exe" version
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.2303974Z git version 2.55.0.windows.4
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.2348884Z ##[endgroup]
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.2365781Z Temporarily overriding HOME='D:\a\_temp\44db75d7-8530-406d-b9aa-514e9040b86d' before making global git config changes
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.2367047Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.2380458Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.2678904Z ##[group]Initializing the repository
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.2688426Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator\protocol-spec
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.3010917Z Initialized empty Git repository in D:/a/curator/curator/protocol-spec/.git/
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.3055266Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator-spec
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.3438634Z ##[endgroup]
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.3439074Z ##[group]Disabling automatic garbage collection
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.3449037Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.3735627Z ##[endgroup]
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.3736182Z ##[group]Setting up auth
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.3748269Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.4036147Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.9442452Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:15.9727489Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:16.4707534Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:16.4998674Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.0288369Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.0583506Z ##[endgroup]
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.0583952Z ##[group]Fetching the repository
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.0595542Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.4896817Z From https://github.com/relux-works/curator-spec
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.4897576Z  * branch            00b1688a9b2457ca397a0bb550acf47cad8ee967 -> FETCH_HEAD
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.4937472Z ##[endgroup]
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.4938149Z ##[group]Determining the checkout info
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.4939955Z ##[endgroup]
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.4949512Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.5262937Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.5542020Z ##[group]Checking out the ref
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.5551104Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6267758Z Note: switching to '00b1688a9b2457ca397a0bb550acf47cad8ee967'.
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6268306Z 
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6268617Z You are in 'detached HEAD' state. You can look around, make experimental
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6269351Z changes and commit them, and you can discard any commits you make in this
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6270075Z state without impacting any branches by switching back to a branch.
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6270523Z 
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6270809Z If you want to create a new branch to retain commits you create, you may
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6271496Z do so (now or later) by using -c with the switch command. Example:
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6271888Z 
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6272069Z   git switch -c <new-branch-name>
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6272325Z 
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6272440Z Or undo this operation with:
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6272668Z 
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6272771Z   git switch -
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6272943Z 
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6273259Z Turn off this advice by setting config variable advice.detachedHead to false
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6273755Z 
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6274072Z HEAD is now at 00b1688 Adopt agent-skill.json as the canonical manifest (#11)
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6332794Z ##[endgroup]
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6659445Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+Candidate suite (windows-latest)	Checkout the committed released pin for comparison	2026-08-23T13:03:17.6924798Z 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Run actions/setup-go@v5	﻿2026-08-23T13:03:17.7290628Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7292011Z ##[group]Run actions/setup-go@v5
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7292255Z with:
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7292739Z   go-version-file: go.mod
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7292963Z   check-latest: false
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7295402Z   token: ***
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7295581Z   cache: true
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7295763Z env:
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7295975Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7296265Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7296446Z   GOENV: off
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.7296628Z ##[endgroup]
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.8984132Z Setup go version spec 1.25.5
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.8996275Z Attempting to download 1.25.5...
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.9184171Z (node:6860) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:17.9185779Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:18.3010276Z matching 1.25.5...
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:18.3052169Z Acquiring 1.25.5 from https://github.com/actions/go-versions/releases/download/1.25.5-19880500865/go-1.25.5-win32-x64.zip
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:18.8341874Z Extracting Go...
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:18.9381957Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command "$ErrorActionPreference = 'Stop' ; try { Add-Type -AssemblyName System.IO.Compression.ZipFile } catch { } ; try { [System.IO.Compression.ZipFile]::ExtractToDirectory('D:\a\_temp\go-1.25.5-win32-x64.zip', 'D:\a\_temp\5c772d7b-3b19-41d0-8588-946c35ab3fbd', $true) } catch { if (($_.Exception.GetType().FullName -eq 'System.Management.Automation.MethodException') -or ($_.Exception.GetType().FullName -eq 'System.Management.Automation.RuntimeException') ){ Expand-Archive -LiteralPath 'D:\a\_temp\go-1.25.5-win32-x64.zip' -DestinationPath 'D:\a\_temp\5c772d7b-3b19-41d0-8588-946c35ab3fbd' -Force } else { throw $_ } } ;"
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:23.5251420Z Successfully extracted go to D:\a\_temp\5c772d7b-3b19-41d0-8588-946c35ab3fbd
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:23.5252268Z Adding to the cache ...
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.3057738Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64 => D:\hostedtoolcache\windows\go\1.25.5\x64
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.3061651Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64.complete => D:\hostedtoolcache\windows\go\1.25.5\x64.complete
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.3063054Z Successfully cached go to C:\hostedtoolcache\windows\go\1.25.5\x64
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.3070674Z Added go to the path
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.3074057Z Successfully set up Go version 1.25.5
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.6259179Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOMODCACHE
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.6309716Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOCACHE
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.6570168Z C:\Users\runneradmin\go\pkg\mod
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.6601303Z C:\Users\runneradmin\AppData\Local\go-build
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.8474077Z Cache hit for: setup-go-Windows-x64-go-1.25.5-a83679499ba324054710aba827b097460d875f30e10d8aab956eabc0616f4046
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:33.8605439Z (node:6860) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:34.2823735Z Received 65971802 of 65971802 (100.0%), 158.1 MBs/sec
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:34.2825466Z Cache Size: ~63 MB (65971802 B)
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:34.2925694Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/cdf1ea00-3f66-4a51-899b-5a0515342330/cache.tzst -P -C D:/a/curator/curator --force-local --use-compress-program "zstd -d"
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.6526723Z Cache restored successfully
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.6584342Z Cache restored from key: setup-go-Windows-x64-go-1.25.5-a83679499ba324054710aba827b097460d875f30e10d8aab956eabc0616f4046
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.6602937Z go version go1.25.5 windows/amd64
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.6603155Z 
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.6603469Z ##[group]go env
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9469866Z set AR=ar
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9470231Z set CC=gcc
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9470579Z set CGO_CFLAGS=-O2 -g
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9470936Z set CGO_CPPFLAGS=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9471276Z set CGO_CXXFLAGS=-O2 -g
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9471570Z set CGO_ENABLED=1
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9471831Z set CGO_FFLAGS=-O2 -g
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9472184Z set CGO_LDFLAGS=-O2 -g
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9472480Z set CXX=g++
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9472733Z set GCCGO=gccgo
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9473478Z set GO111MODULE=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9473778Z set GOAMD64=v1
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9474052Z set GOARCH=amd64
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9474327Z set GOAUTH=netrc
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9474585Z set GOBIN=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9474946Z set GOCACHE=C:\Users\runneradmin\AppData\Local\go-build
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9475434Z set GOCACHEPROG=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9475725Z set GODEBUG=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9475945Z set GOENV=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9476116Z set GOEXE=.exe
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9476305Z set GOEXPERIMENT=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9476515Z set GOFIPS140=off
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9476689Z set GOFLAGS=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9477415Z set GOGCCFLAGS=-m64 -mthreads -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=C:\Users\RUNNER~1\AppData\Local\Temp\go-build2225950788=/tmp/go-build -gno-record-gcc-switches
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9478148Z set GOHOSTARCH=amd64
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9478634Z set GOHOSTOS=windows
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9478837Z set GOINSECURE=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9479045Z set GOMOD=D:\a\curator\curator\go.mod
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9479479Z set GOMODCACHE=C:\Users\runneradmin\go\pkg\mod
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9479903Z set GONOPROXY=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9480187Z set GONOSUMDB=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9480404Z set GOOS=windows
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9480763Z set GOPATH=C:\Users\runneradmin\go
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9481267Z set GOPRIVATE=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9481552Z set GOPROXY=https://proxy.golang.org,direct
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9482045Z set GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9482340Z set GOSUMDB=sum.golang.org
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9482569Z set GOTELEMETRY=local
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9482883Z set GOTELEMETRYDIR=C:\Users\runneradmin\AppData\Roaming\go\telemetry
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9483249Z set GOTMPDIR=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9483433Z set GOTOOLCHAIN=local
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9483774Z set GOTOOLDIR=C:\hostedtoolcache\windows\go\1.25.5\x64\pkg\tool\windows_amd64
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9484143Z set GOVCS=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9484323Z set GOVERSION=go1.25.5
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9484516Z set GOWORK=
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9484714Z set PKG_CONFIG=pkg-config
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9484850Z 
+Candidate suite (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:47.9485184Z ##[endgroup]
+Candidate suite (windows-latest)	Verify Go toolchain identity	﻿2026-08-23T13:03:47.9764412Z ##[group]Run bash .github/ci/toolchain-identity.sh
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:47.9764902Z ^[[36;1mbash .github/ci/toolchain-identity.sh^[[0m
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:47.9780337Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:47.9780733Z env:
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:47.9780964Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:47.9781259Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:47.9781875Z   GOENV: off
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:47.9782057Z ##[endgroup]
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:48.3567048Z toolchain: go version go1.25.5 windows/amd64
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:48.4039744Z toolchain: GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:48.4982105Z toolchain: GOTOOLCHAIN=local
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:48.5450008Z toolchain: GOENV=<none>
+Candidate suite (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:48.5450804Z ci-toolchain-identity: ok
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	﻿2026-08-23T13:03:48.5727281Z ##[group]Run set -u
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5727836Z ^[[36;1mset -u^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5728080Z ^[[36;1mif [ -n "$CANDIDATE_ROOT_INPUT" ]; then^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5728391Z ^[[36;1m  root="$CANDIDATE_ROOT_INPUT"^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5728642Z ^[[36;1melse^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5728917Z ^[[36;1m  root="$GITHUB_WORKSPACE/candidate-spec/conformance/v1"^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5729235Z ^[[36;1mfi^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5729437Z ^[[36;1mecho "root=$root" >>"$GITHUB_OUTPUT"^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5729702Z ^[[36;1m^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5730019Z ^[[36;1mpin_manifest="$GITHUB_WORKSPACE/protocol-spec/conformance/v1/manifest.json"^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5730449Z ^[[36;1mif command -v shasum >/dev/null 2>&1; then^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5730858Z ^[[36;1m  PIN_MANIFEST_SHA256="$(shasum -a 256 <"$pin_manifest" | awk '{print $1}')"^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5731241Z ^[[36;1melse^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5731544Z ^[[36;1m  PIN_MANIFEST_SHA256="$(sha256sum <"$pin_manifest" | awk '{print $1}')"^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5731940Z ^[[36;1mfi^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5732135Z ^[[36;1mexport PIN_MANIFEST_SHA256^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5732533Z ^[[36;1mbash .github/ci/candidate-suite.sh record "$root" .temp/ci-evidence/candidate^[[0m
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5746280Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5746668Z env:
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5746897Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5747187Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5747380Z   GOENV: off
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5747891Z   CANDIDATE_REF: 859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5748191Z   CANDIDATE_ROOT_INPUT: 
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5748630Z   CANDIDATE_EXPECTED_MANIFEST_SHA256: sha256:782d6868f6d9725f7bf38d3fb1944f307f2d5d9c060b8816b0f55a5c2e97f11f
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:03:48.5749094Z ##[endgroup]
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.0766006Z candidate-suite: manifest digest matches the supplied expectation
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2009601Z # CANDIDATE PROTOCOL SUITE EVIDENCE -- NOT A RELEASE
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2010252Z #
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2010737Z # This file records the identity of an explicitly supplied, non-default
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2011549Z # candidate protocol suite. It is NOT a published release, NOT a release
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2012318Z # claim and NOT a conformance claim, and it must not be cited as any of
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2013055Z # them. The committed default pin is unchanged by this run; promoting it
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2013880Z # is owned by TASK-260720-38l1sy after TASK-260720-25d05o qualifies the
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2014976Z # release.
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2015288Z #
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2015730Z candidate_revision      859727b103ed175ff214cbb64641f4686d8c6a68
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2016457Z candidate_root          D:\a\curator\curator/candidate-spec/conformance/v1
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2017808Z protocol_version        1.0.0-rc.9
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2018573Z manifest_sha256         sha256:782d6868f6d9725f7bf38d3fb1944f307f2d5d9c060b8816b0f55a5c2e97f11f
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2019528Z tree_sha256             sha256:f88a76263040c90470be8f18c110927267ac5862f7e25b3b161bcd5ef97319f3
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2020193Z file_count              692
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2020711Z committed_released_pin  00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2021290Z runner_goos             windows
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2021672Z runner_goarch           amd64
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2022057Z evidence_class          candidate-only
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2022705Z release_claim           none
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2023071Z conformance_claim       none
+Candidate suite (windows-latest)	Resolve and record the candidate suite identity	2026-08-23T13:04:20.2023808Z candidate-suite: identity recorded at .temp/ci-evidence/candidate/candidate-suite-identity.txt
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	﻿2026-08-23T13:04:20.2224474Z ##[group]Run bash .github/ci/test-gate.sh .temp/ci-evidence/test
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2224989Z ^[[36;1mbash .github/ci/test-gate.sh .temp/ci-evidence/test^[[0m
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2237725Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2238108Z env:
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2238338Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2238633Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2238828Z   GOENV: off
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2239136Z   CURATOR_CONFORMANCE_ROOT: D:\a\curator\curator/candidate-spec/conformance/v1
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2239516Z   CI_REQUIRE_FULL_ROOT: 1
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.2240166Z ##[endgroup]
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.3704276Z test-gate: flags=<none> timeout=30m
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.3704822Z test-gate: conformance root=D:\a\curator\curator/candidate-spec/conformance/v1
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:20.3705144Z 
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:41.9029220Z suite-plan: GOOS=windows
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:41.9029757Z suite-plan: root=D:\a\curator\curator/candidate-spec/conformance/v1
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:41.9030513Z suite-plan: platform qualification read from the root's own vectors/conformance-claim-v3-qualification.json
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:41.9031106Z 
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:41.9031113Z 
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:41.9031291Z suite-plan: served=41 deferred=0 excluded=0
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:41.9032260Z suite-plan: CI_REQUIRE_FULL_ROOT=1 -- every package must be served by this root
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:04:41.9033396Z suite-plan: ok
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:14.3086659Z test-gate: stage served exit=1 (stream: .temp/ci-evidence/test/go-test-served.json)
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:14.3089797Z 
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:14.3090743Z test-gate: go test overall exit=1 (merged stream: .temp/ci-evidence/test/go-test.json)
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:14.3091194Z 
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2968484Z platform-case gate: GOOS=windows
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2969734Z platform-case gate: ledger=.github/ci/platform-cases.tsv
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2972737Z 
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2973721Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2975828Z ok    internal/buildcache :: TestValidateWindowsSecurityPolicy
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2976734Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2978766Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2980657Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2984944Z ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2986039Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2987853Z ok    internal/runtimestore :: TestRuntimeCommandPath
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2988707Z ok    internal/config :: TestBootstrapAndAddProject
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2989866Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2991191Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2992263Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2995203Z ok    internal/install :: TestDryRunTouchesNothing
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2996097Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2996984Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2998488Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.2999670Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3000990Z ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3003089Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3005396Z ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3006366Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3007064Z ok    internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3009427Z ok    internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3010084Z ok    internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3010832Z ok    internal/godriver :: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3011611Z ok    internal/godriver :: TestExecutableIdentityStillRejectsSubstitutionBehindAJunction
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3012194Z ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3012666Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3014059Z ok    internal/install :: TestEndToEndInstall
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3015206Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3016176Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3017261Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3018291Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3019460Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3020592Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3021659Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3022585Z ok    internal/transaction :: TestCommitAndRollbackRestoreALinkExactly
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3023767Z ok    internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3024689Z ok    internal/transaction :: TestEntryRemovalRestoresTheExactLink
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3026000Z ok    internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3027105Z ok    internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3028176Z ok    internal/transaction :: TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3029258Z ok    internal/interop :: TestGoldenContextCopy
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3029951Z ok    internal/godriver :: TestCandidateGoV1SourceAwareContract
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3030857Z ok    internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3031822Z ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3032753Z ok    cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3033655Z ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3034589Z ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3035541Z ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3036239Z ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3037021Z ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3037651Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3037973Z 
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3038277Z platform-case gate: 39 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3038745Z platform-case gate: ok
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3038933Z 
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3039119Z test-gate: go test exit=1, platform-case gate exit=0
+Candidate suite (windows-latest)	Candidate suite + platform-case gate	2026-08-23T13:31:15.3055909Z ##[error]Process completed with exit code 1.
+Candidate suite (windows-latest)	Upload candidate evidence	﻿2026-08-23T13:31:15.3288291Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3289811Z ##[group]Run actions/upload-artifact@v4
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3290158Z with:
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3290450Z   name: candidate-evidence-windows-latest
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3290748Z   path: .temp/ci-evidence/
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3291031Z   if-no-files-found: warn
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3291386Z   compression-level: 6
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3291653Z   overwrite: false
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3291919Z   include-hidden-files: false
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3292215Z env:
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3292489Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3292836Z   GOTOOLCHAIN: local
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3293074Z   GOENV: off
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.3293325Z ##[endgroup]
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.5293636Z (node:6844) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.5294940Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.5422512Z With the provided path, there will be 17 files uploaded
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.5428881Z Artifact name is valid!
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.5430209Z Root directory input is valid!
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.7282196Z Beginning upload of artifact content to blob storage
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.8248826Z (node:6844) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.8899347Z Uploaded bytes 360300
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.9084338Z Finished uploading artifact content to blob storage!
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.9085283Z SHA256 digest of uploaded artifact zip is 1672a4d9d567bbd570fe00b899a59f94784c12fdc06d55fd91ebfb75d7ad7978
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:15.9088239Z Finalizing artifact upload
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:16.1135206Z Artifact candidate-evidence-windows-latest.zip successfully finalized. Artifact ID 9493999925
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:16.1137580Z Artifact candidate-evidence-windows-latest has been successfully uploaded! Final size is 360300 bytes. Artifact ID is 9493999925
+Candidate suite (windows-latest)	Upload candidate evidence	2026-08-23T13:31:16.1148150Z Artifact download URL: https://github.com/relux-works/curator/actions/runs/32641159145/artifacts/9493999925
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	﻿2026-08-23T13:31:16.1524774Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:16.1526185Z Post job cleanup.
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:16.3343643Z [command]"C:\Program Files\Git\bin\git.exe" version
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:16.3635859Z git version 2.55.0.windows.4
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:16.3699501Z Temporarily overriding HOME='D:\a\_temp\007e9d43-38b2-4085-8e2a-3acaae50ad89' before making global git config changes
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:16.3700375Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:16.3710791Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:16.4013012Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:16.4307288Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:17.0376298Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:17.0634374Z http.https://github.com/.extraheader
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:17.0676683Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:17.0968066Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:17.6282589Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (windows-latest)	Post Checkout the committed released pin for comparison	2026-08-23T13:31:17.6574484Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Candidate suite (windows-latest)	Post Check out the candidate suite	﻿2026-08-23T13:31:18.2916240Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:18.2917617Z Post job cleanup.
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:18.4706218Z [command]"C:\Program Files\Git\bin\git.exe" version
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:18.4984380Z git version 2.55.0.windows.4
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:18.5048844Z Temporarily overriding HOME='D:\a\_temp\c0abb6df-3c2c-46ac-8d23-cd522b3ac169' before making global git config changes
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:18.5050116Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:18.5060338Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\candidate-spec
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:18.5373142Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:18.5673818Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:19.1020240Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:19.1276021Z http.https://github.com/.extraheader
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:19.1319382Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:19.1624968Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:20.5726832Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (windows-latest)	Post Check out the candidate suite	2026-08-23T13:31:20.6062339Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	﻿2026-08-23T13:31:21.2461566Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:21.2462880Z Post job cleanup.
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:21.4242389Z [command]"C:\Program Files\Git\bin\git.exe" version
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:21.4509253Z git version 2.55.0.windows.4
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:21.4577749Z Temporarily overriding HOME='D:\a\_temp\d3d3a261-9143-449c-8284-74cecd7b5eed' before making global git config changes
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:21.4579318Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:21.4588760Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:21.4882118Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:21.5172098Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.0781021Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.1675921Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.1926483Z http.https://github.com/.extraheader
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.1969376Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.2279533Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.7307101Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.7948392Z http.https://github.com/.extraheader
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.8459964Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:22.8745454Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:23.3935137Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:23.4266753Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Candidate suite (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:31:23.4504695Z [command]"C:\Program Files\Git\bin\git.exe" config --file D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (windows-latest)	Complete job	﻿2026-08-23T13:31:23.4993979Z Cleaning up orphan processes
+Candidate suite (windows-latest)	Complete job	2026-08-23T13:31:23.5588805Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

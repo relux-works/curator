@@ -1,0 +1,333 @@
+{
+  "schema_version": 2,
+  "id": "RUN-260727-62e8e5",
+  "task_id": "TASK-260728-1a52au",
+  "created_at": "2026-07-27T20:48:49.563672Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] doc-writer (codex)",
+  "role": "doc-writer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "lifecycle_id": "RUN-260727-62e8e5",
+  "provider_session_digest": "sha256:a486786a2014c24764ba75bf95ea43c8e753d2a5ec4b15cb8e7a11903883ca31",
+  "lane_key": "eab3932278e525137043bbd5843b17641ae40ccb90fa207bcaa6f150d24a8b05",
+  "lane_generation": 2,
+  "lane_lease_generation": 2,
+  "execution_continuity": {
+    "policy": {
+      "selected_spawn_key": "spawn",
+      "config_key": "spawn.execution_policy",
+      "profile": {
+        "value": "pedantic",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.profile"
+      },
+      "sessions": {
+        "producer": {
+          "value": "fresh",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.producer"
+        },
+        "reviewer": {
+          "value": "fresh",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.reviewer"
+        },
+        "max_resumes": {
+          "value": 4,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.max_resumes"
+        },
+        "max_age": {
+          "value": "24h",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.max_age"
+        },
+        "fresh_fallback": {
+          "value": true,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.fresh_fallback"
+        }
+      },
+      "context": {
+        "rework": {
+          "value": "full",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.context.rework"
+        }
+      },
+      "review": {
+        "max_attempts": {
+          "value": null,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.review.max_attempts"
+        },
+        "after_limit": {
+          "value": "pause",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.review.after_limit"
+        },
+        "primary_attempt_limit": null,
+        "final_audit_reserve": 0
+      }
+    },
+    "review_phase": "producer",
+    "board": {
+      "mode": "local",
+      "location": "/Users/iv/Developer/ReluxWorks/curator/.task-board"
+    }
+  },
+  "input_snapshot": {
+    "version": "input_snapshot_v1",
+    "entries": [
+      {
+        "type": "checklist",
+        "name": "definition_of_done",
+        "key": "checklist/definition_of_done",
+        "length": 593,
+        "digest": "sha256:8c1e02f3084e358522dd23768e7d3984844944714126bac29e8adb56ce0a8adf",
+        "body_base64": "WyJNYXAgZXZlcnkgYXJjaGl0ZWN0dXJlLXY2IG5vcm1hdGl2ZSBzZWN0aW9uIHRvIG93bmVkIHNwZWMgdGV4dCBhbmQgcmVjb3JkIGV4Y2x1c2lvbnMiLCJSdW4gcHJvdG9jb2wgZG9jdW1lbnRhdGlvbiBhbmQgZnVsbCBjdXJhdG9yLXNwZWMgdmFsaWRhdGlvbiBnYXRlcyIsIkltcGxlbWVudGF0aW9uIG1hdGNoZXMgQUMiLCJTb2x1dGlvbiBmaXRzIHByb2plY3QgYXJjaGl0ZWN0dXJlIiwiVGVzdHMgZ3JlZW4iLCJJZiByZXZpZXcgZG9lcyBub3QgYWNjZXB0IHRoZSB3b3JrIOKAlCB2ZXJkaWN0IGV2aWRlbmNlIGFkZGVkIGFuZCBzdGF0dXMgcm91dGVkIGJ5IHRoZSBleHBsaWNpdCB2ZXJkaWN0IGJyYW5jaGVzIiwiRG9jcyB1cGRhdGVkIGFuZCBjb25zaXN0ZW50IHdpdGggY3VycmVudCBjb2RlIiwiTm8gZGlzY3JlcGFuY2llcyBiZXR3ZWVuIGNvZGUgYW5kIGRlc2NyaXB0aW9uIiwiUmVzdWx0IGxpbmtlZCBhcyBhIG5ldyB0YXNrLXNjb3BlZCBvdXRjb21lIHJlc291cmNlIiwiSW1wb3J0YW50IGZpbmRpbmdzLCBkZWNpc2lvbnMsIGFub21hbGllcywgb3IgcmVncmVzc2lvbnMgcmVjb3JkZWQgaW4gbG9nYm9vayB3aGVuIHJlbGV2YW50Il0="
+      },
+      {
+        "type": "execution_policy",
+        "name": "digest",
+        "key": "execution_policy/digest",
+        "length": 71,
+        "digest": "sha256:631dca31732b29a626b42e07097ae1301645ac06894e609be1e3f52549f88596",
+        "body_base64": "c2hhMjU2OjcwOTVkY2E3MzExOTk5MzdmODE2MWE2NDdjYzBmNWUzMzJmZmNiNjc3NDE5MmE1MTEyNTBkMTkxMDVlMTczM2I="
+      },
+      {
+        "type": "final_audit_assignment",
+        "name": "current",
+        "key": "final_audit_assignment/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "goal",
+        "name": "revision",
+        "key": "goal/revision",
+        "length": 4,
+        "digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "body_base64": "bnVsbA=="
+      },
+      {
+        "type": "next_action",
+        "name": "reason",
+        "key": "next_action/reason",
+        "length": 19,
+        "digest": "sha256:55a5a2639bb0de5203614268f40be03b27c95a0eb7f55b2499f8d3f1b7533be0",
+        "body_base64": "Ym9hcmRfc3RhdHVzOnRvLWRldg=="
+      },
+      {
+        "type": "post_rework_validation",
+        "name": "current",
+        "key": "post_rework_validation/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "precondition_resource",
+        "name": "TASK-260728-1a52au_architecture-v6-precondition.md",
+        "key": "precondition_resource/TASK-260728-1a52au_architecture-v6-precondition.md",
+        "length": 395,
+        "digest": "sha256:eded94046ab2a360d869c0d1b502378b67bb582be8159bbbf83e2abb3f067c3f",
+        "body_base64": "QmluZGluZyBhcmNoaXRlY3R1cmU6IC50YXNrLWJvYXJkLy5yZXNvdXJjZXMvVEFTSy0yNjA3MjAtMW52b21tL1RBU0stMjYwNzIwLTFudm9tbV9leHRlcm5hbC1idWlsZC1yZXBvc2l0b3JpZXMtYXJjaGl0ZWN0dXJlLXY2Lm1kLCBTSEEtMjU2IDJhYmFlNzdkODBlYmE2Nzg5Zjk5MTFkYjdlOTcyMjU5NWI0ZjIxYmE0NzM5MWNhOWVhZmQwMDY0YWYwM2Q2N2UuIEluZGVwZW5kZW50IGFjY2VwdGFuY2U6IC50YXNrLWJvYXJkLy5yZXNvdXJjZXMvVEFTSy0yNjA3MjAtMW52b21tL1RBU0stMjYwNzIwLTFudm9tbV9leHRlcm5hbC1idWlsZC1yZXBvc2l0b3JpZXMtcmV2aWV3LXY2Lm1kLiBJbXBsZW1lbnQgdGhlIGFjY2VwdGVkIHBhY2tldCB3aXRob3V0IHJlb3BlbmluZyByYy40IHNlbWFudGljcy4="
+      },
+      {
+        "type": "precondition_resource_description",
+        "name": "TASK-260728-1a52au_architecture-v6-precondition.md",
+        "key": "precondition_resource_description/TASK-260728-1a52au_architecture-v6-precondition.md",
+        "length": 66,
+        "digest": "sha256:c34484f5ed46217f0f9fdcf4ede29799922f658aa9c2bad34c54c577928afec7",
+        "body_base64": "QWNjZXB0ZWQgZXh0ZXJuYWwtYnVpbGQtcmVwb3NpdG9yeSBhcmNoaXRlY3R1cmUgYW5kIHJldmlldyBwb2ludGVy"
+      },
+      {
+        "type": "producer_resolutions",
+        "name": "current",
+        "key": "producer_resolutions/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "reviewer_authorization",
+        "name": "current",
+        "key": "reviewer_authorization/current",
+        "length": 13,
+        "digest": "sha256:2e2f92c499978b499f71fc5adf3448d4e094f35055ad2a7303212bcc1bff5570",
+        "body_base64": "eyJydW5faWQiOiIifQ=="
+      },
+      {
+        "type": "reviewer_findings",
+        "name": "current",
+        "key": "reviewer_findings/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "role",
+        "name": "body",
+        "key": "role/body",
+        "length": 1790,
+        "digest": "sha256:0a54315f7f5ea6c627aaf50f02d6930f1914a55b4f3894306e6be0bc6acb5eb3",
+        "body_base64": "IyBkb2Mtd3JpdGVyCgojIyBEZXNjcmlwdGlvbgoKV3JpdGVzIGFuZCB1cGRhdGVzIGRvY3VtZW50YXRpb24g4oCUIFJFQURNRSwgU0tJTEwubWQsIHJlZmVyZW5jZXMsIENIQU5HRUxPRy4gUmVhZHMgc3BlY3MsIHRhc2tzLCBhbmQgY29kZSB0byB1bmRlcnN0YW5kIGNvbnRleHQuIFVzZXMgZG9tYWluIHNraWxscyBmb3IgdW5kZXJzdGFuZGluZyBvbmx5LgoKIyMgRGVsaXZlcmFibGUKClVwZGF0ZWQgZG9jdW1lbnRhdGlvbiBmaWxlcy4KRmluYWwgaHVtYW4tZmFjaW5nIHdvcmRpbmcgbXVzdCBzYXkgInJlYWR5IGZvciByZXZpZXciIG9yICJoYW5kZWQgb2ZmIHRvIHJldmlldyIsIG5vdCAiZG9uZSIsICJjb21wbGV0ZSIsICJmaW5pc2hlZCIsICJmaW5hbCIsIG9yICLQs9C+0YLQvtCy0L4iLCB3aGVuIHRoZSBib2FyZCBzdGF0dXMgaXMgYHRvLXJldmlld2AuCgojIyBTdGFuZGluZyBPcmRlcnMKCiMjIyBFdmlkZW5jZSBIb25lc3R5IENvbnRyYWN0CgoxLiBSdW4gZWFjaCB2YWxpZGF0aW9uIG9yIGdhdGUgY29tbWFuZCBkaXJlY3RseSBhcyBhIHN0YW5kYWxvbmUgcHJvY2Vzcy4gRG8gbm90IHBpcGUgaXQgdGhyb3VnaCBgdGVlYDsgZG8gbm90IHVzZSBhIHBpcGUgY2hhaW4gdW5sZXNzIGBwaXBlZmFpbGAgaXMgZW5hYmxlZCBhbmQgdGhlIGdhdGUgY29tbWFuZCdzIHJlYWwgc3RhdHVzIGlzIHByZXNlcnZlZC4KMi4gUmVwb3J0IHRoZSByZWFsIGV4aXQgY29kZSBvZiBldmVyeSB2YWxpZGF0aW9uIG9yIGdhdGUgY29tbWFuZC4KMy4gUmVwb3J0IGV4cGVjdGVkLXJlZCBnYXRlcyB0cnV0aGZ1bGx5IGFzIGZhaWxpbmc6IHdoZW4gYSBjb21tYW5kIGlzIGV4cGVjdGVkIHRvIGZhaWwgKGZvciBleGFtcGxlLCBgZ28gdGVzdGAgaW4gYSBwYWNrYWdlLWxlc3MgbW9kdWxlKSwgZ2l2ZSBpdHMgcmVhbCBub24temVybyBleGl0IGNvZGUgYW5kIGEgb25lLWxpbmUgZXhwZWN0ZWQtZmFpbHVyZSByYXRpb25hbGU7IG5ldmVyIHByZXNlbnQgaXQgYXMgcGFzc2luZy4KNC4gQ2hlY2sgYSBjaGVja2xpc3QgaXRlbSB0aWVkIHRvIGEgY29tbWFuZCBvbmx5IGFmdGVyIHRoYXQgZXhhY3QgY29tbWFuZCBoYXMgYWN0dWFsbHkgcnVuIGdyZWVuIHdpdGggZXhpdCBjb2RlIDAuIElmIGl0IGRpZCBub3QgcnVuIG9yIGRpZCBub3QgZXhpdCAwLCBsZWF2ZSB0aGUgaXRlbSB1bmNoZWNrZWQuCgojIyBTdGF0dXMgVHJhbnNpdGlvbnMKCi0gKipzdGFydF9zdGF0dXM6KiogYGRldmVsb3BtZW50YAotICoqZW5kX3N0YXR1czoqKiBgdG8tcmV2aWV3YCAocmV2aWV3IGhhbmRvZmYsIG5vdCBhY2NlcHRlZCBkb25lKQoKIyMgRGVmaW5pdGlvbiBvZiBEb25lCgotIERvY3MgdXBkYXRlZCBhbmQgY29uc2lzdGVudCB3aXRoIGN1cnJlbnQgY29kZQotIE5vIGRpc2NyZXBhbmNpZXMgYmV0d2VlbiBjb2RlIGFuZCBkZXNjcmlwdGlvbgotIFJlc3VsdCBsaW5rZWQgdmlhIGB0YXNrLWJvYXJkIG0gJ2FkZF9yZXNvdXJjZSguLi4pJ2Agb3IgYHRhc2stYm9hcmQgcmVzb3VyY2UgYWRkIC4uLmAgd2l0aCBhIHRhc2stc2NvcGVkIG5hbWUgc3VjaCBhcyBgVEFTSy0yNjAyMTgtYWJjMTIzX2RvY3MubWRgCi0gSW1wb3J0YW50IGZpbmRpbmdzLCBkZWNpc2lvbnMsIGFub21hbGllcywgb3IgcmVncmVzc2lvbnMgcmVjb3JkZWQgaW4gYGxvZ2Jvb2tgIHdoZW4gdGhlIHRhc2sgdW5jb3ZlcnMgdGhlbQoKIyMgQ29uc3RyYWludHMKCkRvZXMgTk9UIG1vZGlmeSBjb2RlLiBSZWFkLW9ubHkgYWNjZXNzIHRvIGNvZGUsIHNwZWNzLCB0YXNrcy4gV3JpdGVzIG9ubHkgZG9jdW1lbnRhdGlvbiBmaWxlcy4="
+      },
+      {
+        "type": "role",
+        "name": "metadata",
+        "key": "role/metadata",
+        "length": 150,
+        "digest": "sha256:e6f6c437eed1b27c6902e14e66353541447fb689aaa9973d1708002b092d817a",
+        "body_base64": "eyJhcmNoZXR5cGUiOiJpbXBsZW1lbnRlciIsImRlc2NyaXB0aW9uIjoiV3JpdGVzIGFuZCB1cGRhdGVzIGRvY3VtZW50YXRpb24iLCJlbmRfc3RhdHVzIjoidG8tcmV2aWV3IiwibmFtZSI6ImRvYy13cml0ZXIiLCJzdGFydF9zdGF0dXMiOiJkZXZlbG9wbWVudCJ9"
+      },
+      {
+        "type": "skill",
+        "name": "Domain skills as needed to understand what is being documented",
+        "key": "skill/Domain skills as needed to understand what is being documented",
+        "length": 83,
+        "digest": "sha256:253de0087941cc33774ee7970904e3162434ca9d9d3f604168ff451a2064158f",
+        "body_base64": "eyJuYW1lIjoiRG9tYWluIHNraWxscyBhcyBuZWVkZWQgdG8gdW5kZXJzdGFuZCB3aGF0IGlzIGJlaW5nIGRvY3VtZW50ZWQiLCJwYXRoIjoiIn0="
+      },
+      {
+        "type": "skill",
+        "name": "project-management",
+        "key": "skill/project-management",
+        "length": 91,
+        "digest": "sha256:8d1bab60e478d47f7d2ae88871b9a86b0911c06c1bdfa38e7c8c627b91c9fbae",
+        "body_base64": "eyJuYW1lIjoicHJvamVjdC1tYW5hZ2VtZW50IiwicGF0aCI6Ii9Vc2Vycy9pdi8uY2xhdWRlL3NraWxscy9wcm9qZWN0LW1hbmFnZW1lbnQvU0tJTEwubWQifQ=="
+      },
+      {
+        "type": "task",
+        "name": "acceptance_criteria",
+        "key": "task/acceptance_criteria",
+        "length": 541,
+        "digest": "sha256:f881f76fca3797119b1a6e5b5f3abfab7b984ff274530eb05e01c5e6da2a01d1",
+        "body_base64": "Tm9ybWF0aXZlIHRleHQgdXNlcyBNVVNUL01VU1QgTk9UIGxhbmd1YWdlIGZvciBldmVyeSBhY2NlcHRlZCBib3VuZGFyeTsgc2NoZW1hcyAxLTYsIGdvLXYxLCByZWNlaXB0IHYxLCBtYXJrZXIgdjEvdjIsIGFuZCByYy40IGFyZSBleHBsaWNpdGx5IGZyb3plbjsgZXhhY3Qgc291cmNlIGFjY2VzcywgcHJvdGVjdGVkIG9mZmxpbmUgc25hcHNob3QsIGF1ZGl0LWJlZm9yZS1jYWNoZS9jb21waWxlciwgbWFuYWdlci1kZXJpdmVkIGNvbW1hbmQvb3V0cHV0LCBjcmVkZW50aWFsIGFuZCBzaWduaW5nIG93bmVyc2hpcCwgbW9ub3JlcG8gdGFyZ2V0IHNlbGVjdGlvbiwgdHlwZWQgZmFpbHVyZXMsIGFuZCBmdXR1cmUgY2xvc2VkLWRyaXZlciBydWxlcyBhcmUgY29tcGxldGUgYW5kIGludGVybmFsbHkgY29uc2lzdGVudDsgcHJvdG9jb2wgdmFsaWRhdGlvbiBhbmQgZG9jdW1lbnRhdGlvbiBjaGVja3MgcGFzczsgYW4gb3V0Y29tZSByZXNvdXJjZSBtYXBzIGV2ZXJ5IGFyY2hpdGVjdHVyZS12NiBzZWN0aW9uIHRvIHRoZSByZXN1bHRpbmcgc3BlYyB0ZXh0Lg=="
+      },
+      {
+        "type": "task",
+        "name": "description",
+        "key": "task/description",
+        "length": 426,
+        "digest": "sha256:913acbccdb5293330d6c364a663df6cbee7ce858fa1a84d815a8f8a41a96877b",
+        "body_base64": "VHJhbnNsYXRlIHRoZSBhY2NlcHRlZCBleHRlcm5hbC1idWlsZC1yZXBvc2l0b3J5IGFyY2hpdGVjdHVyZSBpbnRvIGN1cmF0b3Itc3BlYyBub3JtYXRpdmUgZGVjaXNpb24gYW5kIGNvcmUgc2VjdXJpdHkgdGV4dC4gRGVmaW5lIHNjaGVtYS03IHZlcnNpb25pbmcsIGZpcnN0LWNsYXNzIGJ1aWxkX3JlcG9zaXRvcmllcywgZGVjbGFyZWQvZWZmZWN0aXZlIHNvdXJjZSBpZGVudGl0eSwgaW1tdXRhYmxlIG9iamVjdC1mb3JtYXQgcGx1cyBmdWxsLWNvbW1pdCBsb2Nrcywgb3B0aW9uYWwgZXhhY3QtdGFnIGFzc2VydGlvbiwgcmVwb3NpdG9yeSBkZXNjcmlwdG9yIHRydXN0IGJvdW5kYXJ5LCBhdWRpdCBlcXVpdmFsZW5jZSwgZmFpbHVyZSB0YXhvbm9teSwgc2lnbmluZyBvd25lcnNoaXAsIGFuZCBjbG9zZWQgZnV0dXJlLWRyaXZlciBhZG1pc3Npb24u"
+      },
+      {
+        "type": "task",
+        "name": "scope",
+        "key": "task/scope",
+        "length": 283,
+        "digest": "sha256:378e308fdb72a0733aae7baf1e8b3c8c20619144e440c105327e24b74ac4fa40",
+        "body_base64": "Y3VyYXRvci1zcGVjIGRlY2lzaW9uIHJlY29yZHMgYW5kIG5vcm1hdGl2ZSBwcm90b2NvbC9zZWN1cml0eSBwcm9zZSBvbmx5LiBVc2UgYXJjaGl0ZWN0dXJlLXY2IFNIQS0yNTYgMmFiYWU3N2Q4MGViYTY3ODlmOTkxMWRiN2U5NzIyNTk1YjRmMjFiYTQ3MzkxY2E5ZWFmZDAwNjRhZjAzZDY3ZSBhbmQgaXRzIGFjY2VwdGVkIHJldmlldyBhcyBiaW5kaW5nIGlucHV0LiBEbyBub3QgaW1wbGVtZW50IHNjaGVtYXMsIGdlbmVyYXRlZCB2ZWN0b3JzLCBvciBtYW5hZ2VyIGNvZGUgaW4gdGhpcyB0YXNrLg=="
+      },
+      {
+        "type": "task",
+        "name": "title",
+        "key": "task/title",
+        "length": 63,
+        "digest": "sha256:9c2ff290ca6a9f93c2d1a47a037b540e7e21212a7ba023f1ea4f9aa89439e3dd",
+        "body_base64": "VEFTSy0yNjA3MjgtMWE1MmF1OiBzY2hlbWEtdjctZXh0ZXJuYWwtcmVwb3NpdG9yeS1jb3JlLWNvbnRyYWN0"
+      },
+      {
+        "type": "validation_manifest",
+        "name": "current",
+        "key": "validation_manifest/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      }
+    ],
+    "root_digest": "sha256:e3e75dd7f1738928e131226ca68e9eb4b6e2b0c07146348a39a3ea7142be1dda"
+  },
+  "prompt_template_data": {
+    "task_id": "TASK-260728-1a52au",
+    "task_title": "TASK-260728-1a52au: schema-v7-external-repository-core-contract",
+    "task_description": "Translate the accepted external-build-repository architecture into curator-spec normative decision and core security text. Define schema-7 versioning, first-class build_repositories, declared/effective source identity, immutable object-format plus full-commit locks, optional exact-tag assertion, repository descriptor trust boundary, audit equivalence, failure taxonomy, signing ownership, and closed future-driver admission.",
+    "task_scope": "curator-spec decision records and normative protocol/security prose only. Use architecture-v6 SHA-256 2abae77d80eba6789f9911db7e9722595b4f21ba47391ca9eafd0064af03d67e and its accepted review as binding input. Do not implement schemas, generated vectors, or manager code in this task.",
+    "task_ac": "Normative text uses MUST/MUST NOT language for every accepted boundary; schemas 1-6, go-v1, receipt v1, marker v1/v2, and rc.4 are explicitly frozen; exact source access, protected offline snapshot, audit-before-cache/compiler, manager-derived command/output, credential and signing ownership, monorepo target selection, typed failures, and future closed-driver rules are complete and internally consistent; protocol validation and documentation checks pass; an outcome resource maps every architecture-v6 section to the resulting spec text.",
+    "parent_id": "STORY-260728-10wxx2",
+    "agent_name": "[implementer] doc-writer (codex)",
+    "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+    "precondition_resources": [
+      {
+        "name": "TASK-260728-1a52au_architecture-v6-precondition.md",
+        "description": "Accepted external-build-repository architecture and review pointer",
+        "content": "Binding architecture: .task-board/.resources/TASK-260720-1nvomm/TASK-260720-1nvomm_external-build-repositories-architecture-v6.md, SHA-256 2abae77d80eba6789f9911db7e9722595b4f21ba47391ca9eafd0064af03d67e. Independent acceptance: .task-board/.resources/TASK-260720-1nvomm/TASK-260720-1nvomm_external-build-repositories-review-v6.md. Implement the accepted packet without reopening rc.4 semantics."
+      }
+    ],
+    "role_name": "doc-writer",
+    "role_body": "# doc-writer\n\n## Description\n\nWrites and updates documentation — README, SKILL.md, references, CHANGELOG. Reads specs, tasks, and code to understand context. Uses domain skills for understanding only.\n\n## Deliverable\n\nUpdated documentation files.\nFinal human-facing wording must say \"ready for review\" or \"handed off to review\", not \"done\", \"complete\", \"finished\", \"final\", or \"готово\", when the board status is `to-review`.\n\n## Standing Orders\n\n### Evidence Honesty Contract\n\n1. Run each validation or gate command directly as a standalone process. Do not pipe it through `tee`; do not use a pipe chain unless `pipefail` is enabled and the gate command's real status is preserved.\n2. Report the real exit code of every validation or gate command.\n3. Report expected-red gates truthfully as failing: when a command is expected to fail (for example, `go test` in a package-less module), give its real non-zero exit code and a one-line expected-failure rationale; never present it as passing.\n4. Check a checklist item tied to a command only after that exact command has actually run green with exit code 0. If it did not run or did not exit 0, leave the item unchecked.\n\n## Status Transitions\n\n- **start_status:** `development`\n- **end_status:** `to-review` (review handoff, not accepted done)\n\n## Definition of Done\n\n- Docs updated and consistent with current code\n- No discrepancies between code and description\n- Result linked via `task-board m 'add_resource(...)'` or `task-board resource add ...` with a task-scoped name such as `TASK-260218-abc123_docs.md`\n- Important findings, decisions, anomalies, or regressions recorded in `logbook` when the task uncovers them\n\n## Constraints\n\nDoes NOT modify code. Read-only access to code, specs, tasks. Writes only documentation files.",
+    "archetype": "implementer",
+    "skills": [
+      {
+        "name": "project-management",
+        "path": "/Users/iv/.claude/skills/project-management/SKILL.md"
+      },
+      {
+        "name": "Domain skills as needed to understand what is being documented",
+        "path": ""
+      }
+    ],
+    "start_status": "development",
+    "end_status": "to-review",
+    "task_dod_content": "- Map every architecture-v6 normative section to owned spec text and record exclusions\n- Run protocol documentation and full curator-spec validation gates\n- Implementation matches AC\n- Solution fits project architecture\n- Tests green\n- If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches",
+    "dod_content": "- [ ] Map every architecture-v6 normative section to owned spec text and record exclusions\n- [ ] Run protocol documentation and full curator-spec validation gates\n- [ ] Implementation matches AC\n- [ ] Solution fits project architecture\n- [ ] Tests green\n- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches\n- [ ] Docs updated and consistent with current code\n- [ ] No discrepancies between code and description\n- [ ] Result linked as a new task-scoped outcome resource\n- [ ] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant"
+  },
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "continuation": {
+    "mode": "fresh",
+    "prompt_mode": "full"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-00-48-49_-implementer--doc-writer--codex-_TASK-260728-1a52au.md",
+  "base_prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-continuity/base-prompts/RUN-260727-62e8e5.md",
+  "prompt_mode": "full",
+  "snapshot_digest": "sha256:e3e75dd7f1738928e131226ca68e9eb4b6e2b0c07146348a39a3ea7142be1dda",
+  "prompt_artifact_dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-continuity/prompts/RUN-260727-62e8e5",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260728-1a52au_spawn-log_-implementer--doc-writer--codex-_RUN-260727-62e8e5.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260728-1a52au_core-contract-outcome.md",
+    "TASK-260728-1a52au_core-contract-review.md",
+    "TASK-260728-1a52au_spawn-log_-implementer--doc-writer--codex-_RUN-260727-a527c3.log",
+    "TASK-260728-1a52au_spawn-log_-reviewer--reviewer--codex-_RUN-260727-39b7e2.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260728-1a52au_core-contract-outcome.md": "7c65cda5095a722c1fc83742476b373b2a4942d3d2aef07f4490c4ef12630b85",
+    "TASK-260728-1a52au_core-contract-review.md": "8170a8968bccdf65f80be26d99bc557ac384697414c2c5a8445053698cacc9e4"
+  },
+  "require_outcome_artifact": true
+}

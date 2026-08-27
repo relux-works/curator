@@ -1,0 +1,11 @@
+suite-plan: GOOS=linux
+suite-plan: root=/home/runner/work/curator/curator/candidate-spec/conformance/v1
+suite-plan: platform qualification read from the root's own vectors/conformance-claim-v3-qualification.json
+
+excl  internal/godriver
+      excluded on linux by the root's own vectors/conformance-claim-v3-qualification.json
+      the exclusion is asserted by TestProbeRejectsAnUncoveredPlatformBeforeTheWorker, which still runs and must pass
+
+suite-plan: served=40 deferred=0 excluded=1
+suite-plan: CI_REQUIRE_FULL_ROOT=1 -- every package must be served by this root
+suite-plan: ok

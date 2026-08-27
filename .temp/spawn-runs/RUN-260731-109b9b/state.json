@@ -1,0 +1,42 @@
+{
+  "id": "RUN-260731-109b9b",
+  "task_id": "BUG-260731-3gm8kc",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "agent_type": "claude",
+  "status": "cancelled",
+  "phase": "finalizing",
+  "summary": "Claude did not acknowledge the native goal directive within 30s; successor RUN-260731-7d213b",
+  "created_at": "2026-07-31T09:07:29.935956Z",
+  "started_at": "2026-07-31T09:07:30.541134Z",
+  "completed_at": "2026-07-31T09:22:58.611684Z",
+  "last_heartbeat_at": "2026-07-31T09:22:58.611684Z",
+  "last_progress_at": "2026-07-31T09:22:58.611684Z",
+  "completion_reason": "cancelled",
+  "last_event_seq": 475,
+  "exit_code": 1,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260731-12-53-36_-reviewer--reviewer--claude-_BUG-260731-3gm8kc.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260731-3gm8kc/-reviewer--reviewer--claude-_RUN-260731-109b9b.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260731-109b9b/runner.log",
+  "error": "Claude did not acknowledge the native goal directive within 30s; successor RUN-260731-7d213b",
+  "max_parallel": 20,
+  "active_goal_ref": {
+    "id": "GOAL-260731-de9afd",
+    "revision": 1
+  },
+  "goal_run_signal": {
+    "code": "provider_runtime_failure",
+    "providerStatus": "goal_still_active",
+    "detail": "Claude did not acknowledge the native goal directive within 30s",
+    "recoverable": true
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "provider": "claude",
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "goal_disposition": "superseded_by_autonomous_recovery",
+  "goal_disposition_reason": "Claude did not acknowledge the native goal directive within 30s; successor RUN-260731-7d213b",
+  "goal_disposition_at": "2026-07-31T09:22:58.611684Z"
+}

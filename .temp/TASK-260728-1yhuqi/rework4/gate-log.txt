@@ -1,0 +1,99 @@
+# TASK-260728-1yhuqi rework cycle 4 gate log
+date: 2026-07-29T03:45:34Z
+host: macOS 26.5 arm64
+swift: swift-driver version: 1.148.6 Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)
+go: go version go1.25.5 darwin/arm64
+
+--- probe: gofmt -l ---
+exit=0
+
+--- probe: go vet ./... ---
+exit=0
+
+--- probe: go test -count=1 ./... ---
+ok  	swiftboundaryprobe	1.182s
+exit=0
+
+--- probe: go build ---
+exit=0
+
+--- native probe run ---
+cases: 23, matched 23, divergences 0, not run 0
+alignment: P1 no-widening=true P2 no-narrowing=true (security partition empty=false)
+closure: 32 checks, 0 yielded a verdict (must be 0)
+controls: 15 of 15 failing as required
+structural: 62 checks, 0 divergences
+native target admission (P2 arm64-apple-macosx26.0): ok=true in-closure=1 base-installation=1 p1==p2=true
+green: true
+exit=0
+
+--- degraded run (no resolvable toolchain) ---
+swift-boundary-fixture-v1: toolchain unavailable, 23 cases not run; nothing was installed
+exit=0
+
+--- expected-red controls, each replayed individually (each MUST exit 1) ---
+C1   exit=1  C1-lead-only-recognition: failed=true findings=3 below-floor-3.1 isolated=accepted(want accepted) corroborating=unknown(want rejected-unsupported-floor); below-floor-1.0 isola
+C2   exit=1  C2-substring-recognition: failed=true findings=1 substring yielded rejected-grammar where exact yielded unknown
+C3   exit=1  C3-exit-status-as-semantics: failed=true findings=7 below-floor-3.1 collapsed to rejected-grammar (want rejected-unsupported-floor); below-floor-1.0 collapsed to rejected-gram
+C4   exit=1  C4-build-as-the-isolated-command: failed=true findings=3 below-floor-3.1 isolated=rejected-unsupported-floor under the wrong command; below-floor-1.0 isolated=rejected-unsuppo
+C5   exit=1  C5-unearned-path-closure-zero: failed=true findings=1 pinned exit=0 hits=0; sensitivity control exit=1 hits=0
+C6   exit=1  C6-plugin-closure-unchecked: failed=true findings=2 the declared SDK path derives 2 distinct live plugin paths outside every fingerprinted root
+C7   exit=1  C7-lenient-plan-parsing: failed=true findings=16 the retired scan admits 16 of 20 malformed plans the strict verifier rejects (20 rejected): plugin-flag-without-value, plugin-
+C8   exit=1  C8-lexical-containment: failed=true findings=1 /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/run-c4-red/structural/c8root/bin/ld is lexically inside the root
+C9   exit=1  C9-collapsing-module-name-derivation: failed=true findings=3 [my-tool my.tool my_tool] all map to "my_tool"; [a.b-c a-b.c] all map to "a_b_c"; [9.tool 9-tool] all map to "_9_t
+C10  exit=1  C10-prefix-only-banner-parser: failed=true findings=17 the retired parser admits 17 banner values the whole-value grammar rejects: BV09 "Apple Swift version 6.3.2 x", BV10 "Ap
+C11  exit=1  C11-lenient-runtime-library-admission: failed=true findings=6 the retired rule admits 6 of 6 runtime-library shapes the closed rule rejects: empty list, out-of-closure directo
+C12  exit=1  C12-cr-normalizing-plan-splitter: failed=true findings=4 the retired splitter admits 4 of 4 plan shapes the physical-line grammar rejects: unterminated final line, CRLF, bare 
+C13  exit=1  C13-macro-source-admitted-without-stage-b: failed=true findings=1 without curator-swift-source-admission-v1 the macro-selecting source is admitted (permit granted=true), the c
+C14  exit=1  C14-path-shape-only-totality: failed=true findings=14 the retired verifier admits 14 unknown-channel vectors the closed grammar rejects: unknown flag, unknown joined flag with
+C15  exit=1  C15-multi-command-compile-under-v2: failed=true findings=3 the retired plan-execution design starts 4 manager commands for this source set (1 graph + 3 plan jobs: swift-fronte
+
+--- curator repo: gofmt -l . (expected-red; attribution below) ---
+exit=2 paths=754
+  paths under .temp/TASK-260728-1yhuqi : 0
+  paths outside .temp/                 : 0
+  modified tracked files               : 0
+
+--- spec validate.py, task worktree ---
+validation failed: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1yhuqi/curator-spec-worktree/docs/external-build-repositories.md: broken local link: ../release/1.0.0-rc.5.json
+exit=1
+
+--- spec validate.py, clean baseline at 57c1f56 ---
+validated 30 schemas and 93 vector files
+exit=0
+
+--- spec validate.py link-check attribution ---
+Documents this task authored:
+  docs/swift-build-drivers.md                      4 links, 0 broken 
+  decisions/0011-swift-driver-pair.md              2 links, 0 broken 
+Documents copied in, NOT authored by this task:
+  docs/external-build-repositories.md              6 links, 1 broken ['../release/1.0.0-rc.5.json']
+  docs/portable-go-execution-policy.md             6 links, 2 broken ['../conformance/v1/vectors/go-host-execution-policy.json', '../conformance/v1/vectors/go-host-execution-policy.json']
+  docs/compiled-build-toolchain-requirements.md    8 links, 0 broken 
+
+--- probe tarball round-trip ---
+sources: 21 non-test go files, 9 test files
+test functions: 63
+lines: 8662
+ok  	swiftboundaryprobe	0.702s
+exit=0
+tarball sha256: 3446bfa42c24bad7102982b0b5e117f9a7f31cf9b3956c45eed37bb1510ba16b
+
+--- worktree hygiene ---
+spec worktree staged files: 0
+spec worktree tracked modifications: 0
+curator repo tracked modifications: 0
+nothing committed, pinned, published or installed on any host
+
+--- artifact digests ---
+decision  sha256: c00fd2e85b504414aaa342ff01462a4d4b0fa387244a00a9e75d1198df705c02
+reference sha256: fdac4c02ec55491afa59140dfe091bc29ed2c1005d5472be4789c259a8129236
+probe.tar.gz sha256: 3446bfa42c24bad7102982b0b5e117f9a7f31cf9b3956c45eed37bb1510ba16b
+spec worktree copies match the board artifacts byte for byte
+
+--- curator repo gates ---
+go build ./... exit=0
+go vet ./...   exit=0
+go test ./...  exit=0
+make check     exit=2 (fails at the same gofmt stage; 0 files from this task)
+golangci-lint  not installed on this host (command not found)

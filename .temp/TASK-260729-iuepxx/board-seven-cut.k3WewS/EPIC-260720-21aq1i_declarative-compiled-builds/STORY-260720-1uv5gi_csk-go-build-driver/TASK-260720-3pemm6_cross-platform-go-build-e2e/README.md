@@ -1,0 +1,10 @@
+# Add cross-platform Go build end-to-end tests
+
+## Description
+Add a minimal real Go skill fixture and end-to-end tests that prove csk can install, cache, activate, launch, repair, and roll back compiled commands on Linux, macOS, and Windows.
+
+## Scope
+Own new cocoaskills test fixtures, end-to-end and process-level tests, and .github/workflows/ci.yml changes needed to select an accepted Go 1.23-or-newer release family and run the exact candidate suite without advancing the default committed curator-spec release pin. Cross-platform candidate qualification may accept an explicit immutable curator-spec revision or pre-materialized CURATOR_CONFORMANCE_ROOT as a non-default caller input, and must record its suite digest. Exercise project, global, hybrid, mixed script and build commands, and platform shims with real subprocesses. Use injected failures and fake toolchains only for negative paths. Do not change product semantics except narrowly scoped testability hooks routed to owning tasks; the released-suite pin belongs to TASK-260720-1utsx8 after TASK-260720-25d05o.
+
+## Acceptance Criteria
+A valid vendored Go command builds without network, launches only after explicit invocation, receives exact forwarded arguments, returns its exit status, and works through project and global shims on Unix and Windows. Tests prove cache hit without go list or go build, rebuild on source, toolchain, target, policy, receipt or artifact change, no rebuild on irrelevant mode or timestamp change, dry-run byte purity, build-two failure isolation, target-swap rollback, interrupted recovery, identical concurrent publisher handling, and two-project consumer preservation. CI runs the real fixture on ubuntu, macOS, and Windows across the supported Python matrix with explicit Go setup and an exact caller-supplied candidate-suite revision or root, records the suite digest as non-release evidence, preserves the previous released default pin, and has no unexpected skip or xfail. Full relevant pytest and strict mypy pass.

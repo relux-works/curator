@@ -1,0 +1,59 @@
+=== B1. swiftc --version STDOUT (od) ===
+0000000    A   p   p   l   e       S   w   i   f   t       v   e   r   s
+0000020    i   o   n       6   .   3   .   2       (   s   w   i   f   t
+0000040    l   a   n   g   -   6   .   3   .   2   .   1   .   1   0   8
+0000060        c   l   a   n   g   -   2   1   0   0   .   1   .   1   .
+0000100    1   0   1   )  \n   T   a   r   g   e   t   :       a   r   m
+0000120    6   4   -   a   p   p   l   e   -   m   a   c   o   s   x   2
+=== B2. swiftc --version STDERR (od) ===
+0000000    s   w   i   f   t   -   d   r   i   v   e   r       v   e   r
+0000020    s   i   o   n   :       1   .   1   4   8   .   6       A   p
+0000040    p   l   e       S   w   i   f   t       v   e   r   s   i   o
+0000060    n       6   .   3   .   2       (   s   w   i   f   t   l   a
+0000100    n   g   -   6   .   3   .   2   .   1   .   1   0   8       c
+0000120    l   a   n   g   -   2   1   0   0   .   1   .   1   .   1   0
+=== B3. swift-driver --version merged ===
+0000000    s   w   i   f   t   -   d   r   i   v   e   r       v   e   r
+0000020    s   i   o   n   :       1   .   1   4   8   .   6       A   p
+0000040    p   l   e       S   w   i   f   t       v   e   r   s   i   o
+0000060    n       6   .   3   .   2       (   s   w   i   f   t   l   a
+0000100    n   g   -   6   .   3   .   2   .   1   .   1   0   8       c
+0000120    l   a   n   g   -   2   1   0   0   .   1   .   1   .   1   0
+0000140    1   )  \n   T   a   r   g   e   t   :       a   r   m   6   4
+0000160    -   a   p   p   l   e   -   m   a   c   o   s   x   2   6   .
+=== C. print-target-info WITH -sdk ===
+{
+  "compilerVersion": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)",
+  "swiftCompilerTag": "swiftlang-6.3.2.1.108",
+  "target": {
+    "triple": "arm64-apple-macosx26.0",
+    "unversionedTriple": "arm64-apple-macosx",
+    "moduleTriple": "arm64-apple-macos",
+    "platform": "macosx",
+    "arch": "arm64",
+    "pointerWidthInBits": 64,
+    "pointerWidthInBytes": 8,
+    "swiftRuntimeCompatibilityVersion": "6.2",
+    "compatibilityLibraries": [ ],
+    "openbsdBTCFIEnabled": false,
+    "librariesRequireRPath": false
+  },
+  "paths": {
+    "sdkPath": "/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+    "runtimeLibraryPaths": [
+      "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx",
+      "/usr/lib/swift"
+    ],
+    "runtimeLibraryImportPaths": [
+      "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx",
+      "/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/swift"
+    ],
+    "runtimeResourcePath": "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift"
+  }
+}
+=== D. print-target-info with -target unversioned ===
+{
+ "triple": "arm64-apple-macosx26.0",
+ "unversioned": "arm64-apple-macosx",
+ "sdkPath": "/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+}

@@ -1,0 +1,71 @@
+{
+  "id": "RUN-260826-1a42c7",
+  "task_id": "BUG-260823-1vx45a",
+  "agent_name": "[implementer] developer (codex)",
+  "agent_type": "codex",
+  "status": "completed",
+  "phase": "finalizing",
+  "summary": "Run completed successfully",
+  "created_at": "2026-08-26T20:07:56.093832Z",
+  "started_at": "2026-08-26T20:07:58.771113Z",
+  "completed_at": "2026-08-26T20:33:04.041449Z",
+  "last_heartbeat_at": "2026-08-26T20:33:04.041449Z",
+  "last_progress_at": "2026-08-26T20:33:04.041449Z",
+  "completion_reason": "success",
+  "last_event_seq": 766,
+  "exit_code": 0,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260827-00-07-56_-implementer--developer--codex-_BUG-260823-1vx45a.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260823-1vx45a/-implementer--developer--codex-_RUN-260826-1a42c7.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260826-1a42c7/runner.log",
+  "max_parallel": 20,
+  "story_id": "STORY-260712-31558c",
+  "workspace": {
+    "workspace_id": "WS-de51037274d6",
+    "story_id": "STORY-260712-31558c",
+    "branch_ref": "refs/heads/task-board/story/STORY-260712-31558c",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260712-31558c/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "change_request": {
+    "id": "CR-BUG-260823-1vx45a-1",
+    "element_id": "BUG-260823-1vx45a",
+    "revision": 1,
+    "state": "ready",
+    "kind": "story_final",
+    "repository_delta": "present",
+    "branch_ref": "refs/heads/task-board/story/STORY-260712-31558c",
+    "base_oid": "903af23ad0d0fa21328c0a2100e17968bbac6f1e",
+    "candidate_tree_oid": "c932e23ac28ee2e9605c554d6c0c267567b0ef4e",
+    "diff_resource_name": "BUG-260823-1vx45a_change-request_rev1.patch",
+    "diff_sha256": "69afc9230e4fa0e0453a0249fcfd10a778eb4b725652193b10221a5b848a77d8",
+    "changed_paths": [
+      "LOGBOOK.md",
+      "internal/managerlock/managerlock_test.go"
+    ],
+    "producer_run_id": "RUN-260826-1a42c7",
+    "workspace_id": "WS-de51037274d6"
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "provider": "codex",
+    "producer_version": "v1.6.1",
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "recovery_root_run_id": "RUN-260826-1a42c7",
+  "provider_attempts": [
+    {
+      "attempt": 1,
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "group": "codex-plan",
+      "started_at": "2026-08-26T20:07:58.933654Z",
+      "completed_at": "2026-08-26T20:32:58.574652Z",
+      "exit_code": 0,
+      "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260823-1vx45a/-implementer--developer--codex-_RUN-260826-1a42c7.log"
+    }
+  ]
+}

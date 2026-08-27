@@ -1,0 +1,754 @@
+==============================================================================
+RUN 1 — macOS 26.5, arm64 (primary host)
+==============================================================================
+host              : macos/arm64 (darwin/arm64)
+os version        : 26.5
+probe go version  : go1.25.5
+fixture version   : toolchain-probe-fixture-v1
+summary           : 19 cases, 15 matched, 0 divergences, 4 not run; 1 toolchains unavailable, 0 wrong backend
+
+------------------------------------------------------------------------------
+TOOLCHAIN rust  availability=available
+  declaration     : channel=probe_explicit_root root=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin
+                    primary_relpath=bin/cargo present=True path_searched=False
+  version command : /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc -vV
+  exit code       : 0
+  stdout          : rustc 1.91.0 (f8297e351 2025-10-28)
+                    binary: rustc
+                    commit-hash: f8297e351a40c1439a467bbbb6879088047f50b3
+                    commit-date: 2025-10-28
+                    host: aarch64-apple-darwin
+                    release: 1.91.0
+                    LLVM version: 21.1.2
+  normalization   : rule=rust.rustc.vV.release stream=stdout verified=True
+  pattern         : ^release: (0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$
+  canonical       : 1.91.0 prerelease=False native='release: 1.91.0'
+  native target   : reported='aarch64-apple-darwin' stable_form='aarch64-apple-darwin'
+                    source: rustc --print host-tuple
+  metadata source : Cargo.toml  readable_without_execution=True
+                    reader: cargo metadata --no-deps --format-version 1 --offline
+                    - package.rust-version: compared (measured=True)
+                    - workspace.package.rust-version: compared (measured=False)
+  metadata source : rust-toolchain.toml  readable_without_execution=True
+                    reader: read the file; never hand it to a shim
+                    - toolchain.path: forbidden (measured=True)
+                    - toolchain.channel: compared (measured=True)
+                    - toolchain.components: ignored (measured=False)
+                    - toolchain.targets: ignored (measured=False)
+                    - toolchain.profile: ignored (measured=False)
+  metadata source : rust-toolchain  readable_without_execution=True
+                    reader: read the file
+                    - <bare channel string>: compared (measured=False)
+  note            : `rustc -vV` also carries `host:`, identical to `--print host-tuple` on the probed toolchain; `--print host-tuple` is the narrower surface and is preferred.
+  note            : The Rust host tuple carries no platform-version component, so unlike the Swift target triple it is directly usable as a native-target identity.
+  note            : Measured: cargo resolves `rustc` by name and fails with "could not execute process `rustc -vV` (never executed)" under a minimal PATH that excludes the trusted root's bin directory. The driver MUST pass RUSTC explicitly, or the second node of its process graph is chosen by PATH order rather than by the fingerprinted closure.
+
+------------------------------------------------------------------------------
+TOOLCHAIN swift  availability=available
+  declaration     : channel=probe_explicit_root root=/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain
+                    primary_relpath=usr/bin/swift present=True path_searched=False
+  version command : /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -print-target-info
+  exit code       : 0
+  stdout          : {
+                      "compilerVersion": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)",
+                      "swiftCompilerTag": "swiftlang-6.3.2.1.108",
+                      "target": {
+                        "triple": "arm64-apple-macosx26.0",
+                        "unversionedTriple": "arm64-apple-macosx",
+                        "moduleTriple": "arm64-apple-macos",
+                        "platform": "macosx",
+                        "arch": "arm64",
+                        "pointerWidthInBits": 64,
+                        "pointerWidthInBytes": 8,
+                        "swiftRuntimeCompatibilityVersion": "6.2",
+                        "compatibilityLibraries": [ ],
+                        "openbsdBTCFIEnabled": false,
+                        "librariesRequireRPath": false
+                      },
+                      "paths": {
+                        "runtimeLibraryPaths": [
+                          "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx",
+                          "/usr/lib/swift"
+                        ],
+                        "runtimeLibraryImportPaths": [
+                          "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx"
+                        ],
+                        "runtimeResourcePath": "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift"
+                      }
+                    }
+  normalization   : rule=swift.print-target-info.compilerVersion stream=stdout verified=True
+  pattern         : ^(?:Apple )?Swift version (0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:\.(0|[1-9][0-9]*))?(-[0-9A-Za-z.]+)? \([^()]*\)$
+  canonical       : 6.3.2 prerelease=False native='Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)'
+  native target   : reported='arm64-apple-macosx26.0' stable_form='arm64-apple-macosx'
+                    host-varying: platform version 26.0
+                    source: swiftc -print-target-info, target.triple and target.unversionedTriple
+  metadata source : Package.swift (// swift-tools-version header)  readable_without_execution=True
+                    reader: swift package tools-version
+                    evidence: measured: returns exit 0 and the normalized tools version for a manifest carrying a Swift syntax error and for a manifest whose body is a fatalError, so it reads the header line and neither compiles nor runs the manifest
+                    - swift-tools-version: compared (measured=True)
+  metadata source : Package.swift (body)  readable_without_execution=False
+                    reader: swift package dump-package
+                    evidence: measured: dump-package compiles Package.swift with swiftc into a `<name>-manifest` executable and runs it; the fatalError fixture reports `Fatal error: PROBE-MANIFEST-EXECUTED`
+                    - <entire manifest program>: forbidden (measured=True)
+  metadata source : .swift-version  readable_without_execution=True
+                    reader: read the file
+                    evidence: measured: the Xcode-provided swift driver ignores it; it is honored by the swiftly version manager, which the trusted-resolution rule already forbids
+                    - <bare version string>: compared (measured=True)
+  note            : `swift --version` splits one banner across two streams: stderr carries "swift-driver version: 1.148.6 " and stdout carries the version line. A normalization rule that reads the merged stream sees them concatenated into a single line, so the rule must name its stream.
+  note            : `target.triple` carries a platform-version component supplied by the selected SDK, so it is not stable across hosts with different SDKs; `target.unversionedTriple` is the form a native-target identity should bind.
+  note            : SwiftPM compiles the manifest with a different platform version than the compiler reports for the host, which is a second reason the versioned triple is not an identity.
+
+------------------------------------------------------------------------------
+TOOLCHAIN kotlin  availability=unavailable
+  declaration     : channel=probe_explicit_root root=(none supplied)
+                    primary_relpath=bin/kotlinc-native present=False path_searched=False
+  reason          : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  guidance        : toolchain.kotlin-native.absent.primary-source
+  metadata source : (undecided)  readable_without_execution=False
+                    evidence: not measured: no Kotlin/Native distribution was reachable on either probed host, and the single metadata file and field are owned by the artifact-model decision
+                    - <one file, one field, named by TASK-260728-168smo>: compared (measured=False)
+  metadata source : build.gradle / build.gradle.kts / settings.gradle*  readable_without_execution=False
+                    evidence: not measured on a Kotlin/Native root; recorded because the mainstream Kotlin build path is a general-purpose script engine and reading it is package-selected code execution by construction
+                    - <entire build script>: forbidden (measured=False)
+  note            : The Kotlin compiler present on this host reports backend "jvm" on stderr with an `info:` prefix and an empty stdout. A version probe that reads stdout gets nothing, and a probe that accepts any `kotlinc` banner would admit a front end that cannot produce a native executable. The Kotlin entry's probe must name the stderr stream and its normalization must require the backend token.
+
+==============================================================================
+CASES
+==============================================================================
+------------------------------------------------------------------------------
+kotlin.negative.backend-is-not-native  [negative]  verdict=match
+  title           : a Kotlin compiler on the host is a JVM front end, not Kotlin/Native
+  expected class  : backend_identity
+  observed class  : backend_identity
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  $ /opt/homebrew/bin/kotlinc -version
+      exit code   : 0
+      stderr      : info: kotlinc-jvm 2.4.10 (JRE 26.0.1)
+  manager obligation : The Kotlin compiler present on this host reports backend "jvm" on stderr with an `info:` prefix and an empty stdout. A version probe that reads stdout gets nothing, and a probe that accepts any `kotlinc` banner would admit a front end that cannot produce a native executable. The Kotlin entry's probe must name the stderr stream and its normalization must require the backend token.
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+kotlin.negative.metadata-future  [negative]  verdict=not_run
+  title           : Kotlin metadata field above the resolved toolchain
+  expected class  : host_version
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+kotlin.negative.metadata-malformed  [negative]  verdict=not_run
+  title           : malformed Kotlin metadata field
+  expected class  : representability
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+kotlin.negative.target-unknown  [negative]  verdict=not_run
+  title           : target the Kotlin/Native compiler does not know
+  expected class  : target_representability
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+kotlin.positive.version-and-target  [positive]  verdict=not_run
+  title           : Kotlin/Native version and native target probe
+  expected class  : none
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+rust.negative.msrv-future  [negative]  verdict=match
+  title           : Cargo.toml rust-version above the resolved toolchain
+  expected class  : host_version
+  observed class  : host_version
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : rs/probe-future/Cargo.toml  sha256=2f38217fc65154984af134cb059478c9d8b034f5cb68f1c63d0a7bb2e10880d4  bytes=89
+  fixture         : rs/probe-future/src/main.rs  sha256=536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4  bytes=13
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline
+      env         : CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/cargo-target/probe-future RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      exit code   : 0
+      stdout      : {"packages":[{"name":"probe-future","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/rs/probe-future#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-future","src_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/rs/probe-future/src/main.rs","edition":"2021","doc":true,"doctest":false,"test":true}],"features":{},"manifest_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/rs/probe-future/Cargo.toml","metadata":null,"publish":null,"authors":[],"categori  ...[truncated in this log; full excerpt in the fixture JSON]
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline
+      env         : CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/cargo-target/probe-future RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      exit code   : 101
+      stderr      : error: rustc 1.91.0 is not supported by the following package:
+                      probe-future@0.1.0 requires rustc 1.99
+  manager obligation : Read packages[].rust_version from `cargo metadata --no-deps` in the graph phase and compare it against the resolved toolchain identity. Cargo's own rejection is a build-time error, so a driver that waits for it has already entered the compile phase.
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.msrv-malformed  [negative]  verdict=match
+  title           : Cargo.toml rust-version that is not a version
+  expected class  : representability
+  observed class  : representability
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : rs/probe-malformed/Cargo.toml  sha256=ed862e4156a4bdff8619378916837cca406a53d51c1d6e9f74b4d61220abf892  bytes=101
+  fixture         : rs/probe-malformed/src/main.rs  sha256=536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4  bytes=13
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline
+      env         : CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/cargo-target/probe-malformed RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      exit code   : 101
+      stderr      : error: unexpected prerelease field, expected a version like "1.32"
+                     --> Cargo.toml:5:16
+                      |
+                    5 | rust-version = "not-a-version"
+                      |                ^^^^^^^^^^^^^^^
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline
+      env         : CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/cargo-target/probe-malformed RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      exit code   : 101
+      stderr      : error: unexpected prerelease field, expected a version like "1.32"
+                     --> Cargo.toml:5:16
+                      |
+                    5 | rust-version = "not-a-version"
+                      |                ^^^^^^^^^^^^^^^
+  manager obligation : No comparison is needed: the graph command already refuses the manifest, so this is a Stage B file-shape rejection with no host input.
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.selector-toolchain-nightly  [negative]  verdict=match
+  title           : rust-toolchain.toml channel makes the shim attempt an install
+  expected class  : package_selector
+  observed class  : package_selector
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : rs/probe-tc-nightly/Cargo.toml  sha256=f2392621e6e8c2eda6aecfa883f6c1ea0b2561dafd37cb18ceddf3d6b079501e  bytes=93
+  fixture         : rs/probe-tc-nightly/rust-toolchain.toml  sha256=2ce1c1fe5e79a52424c9d88d99f5a2c95dcf5b4f4a82431bb9e5710cfb39e184  bytes=32
+  fixture         : rs/probe-tc-nightly/src/main.rs  sha256=536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4  bytes=13
+  $ /Users/iv/.cargo/bin/rustc --version
+      env         : RUSTUP_DIST_SERVER=http://127.0.0.1:1 RUSTUP_UPDATE_ROOT=http://127.0.0.1:1
+      exit code   : 1
+      stderr      : info: syncing channel updates for 'nightly-aarch64-apple-darwin'
+                    error: failed to download file error=Reqwest(reqwest::Error { kind: Request, url: "http://127.0.0.1:1/dist/channel-rust-nightly.toml.sha256", source: hyper_util::client::legacy::Error(Connect, ConnectError("tcp connect error", Os { code: 61, kind: ConnectionRefused, message: "Connection refused" })) })
+                    error: could not download file from 'http://127.0.0.1:1/dist/channel-rust-nightly.toml.sha256' to '/Users/iv/.rustup/tmp/2hitna5o3ivam0i4_file': error downloading file: error sending request for url (http://127.0.0.1:1/dist/channel-rust-nightly.toml.sha256): client error (Connect): tcp connect error: Connection refused (os error   ...[truncated in this log; full excerpt in the fixture JSON]
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc --version
+      exit code   : 0
+      stdout      : rustc 1.91.0 (f8297e351 2025-10-28)
+  manager obligation : Resolve the concrete toolchain root directly and never through a version-manager shim. rust-toolchain.toml is then inert: the same directory that redirects the shim leaves a directly resolved rustc unchanged.
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.selector-toolchain-path  [negative]  verdict=match
+  title           : rust-toolchain.toml path selects the compiler through the shim
+  expected class  : package_selector
+  observed class  : package_selector
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : rs/probe-tc-path/Cargo.toml  sha256=9aae2e72bec511880e07e0c8ae2ce1d7fb09b49e06227f16785aace7879fab05  bytes=90
+  fixture         : rs/probe-tc-path/rust-toolchain.toml  sha256=ac02a418a16f26158e6dd36df3b3ca1b663c7912bd1604e10b63e88f046a2514  bytes=47
+  fixture         : rs/probe-tc-path/src/main.rs  sha256=536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4  bytes=13
+  $ /Users/iv/.cargo/bin/rustc --version
+      exit code   : 1
+      stderr      : error: invalid toolchain: the path '/nonexistent/trusted/root' has no bin/ directory
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc --version
+      exit code   : 0
+      stdout      : rustc 1.91.0 (f8297e351 2025-10-28)
+  manager obligation : Resolve the concrete toolchain root directly and never through a version-manager shim. rust-toolchain.toml is then inert: the same directory that redirects the shim leaves a directly resolved rustc unchanged.
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.target-std-absent  [negative]  verdict=match
+  title           : known target triple whose standard library is not in the trusted tree
+  expected class  : target_host
+  observed class  : target_host
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : True
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc --print target-libdir --target x86_64-unknown-linux-gnu
+      exit code   : 0
+      stdout      : /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/x86_64-unknown-linux-gnu/lib
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --target x86_64-unknown-linux-gnu
+      env         : CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/cargo-target/target-x86_64-unknown-linux-gnu RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      exit code   : 101
+      stderr      :    Compiling probe-positive v0.1.0 (/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/rs/probe-positive)
+                    error[E0463]: can't find crate for `std`
+                      |
+                      = note: the `x86_64-unknown-linux-gnu` target may not be installed
+                      = help: consider downloading the target with `rustup target add x86_64-unknown-linux-gnu`
+                    
+                    For more information about this error, try `rustc --explain E0463`.
+                    error: could not compile `probe-positive` (bin "probe-positive") due to 1 previous error
+  manager obligation : Membership in `rustc --print target-list` is representability only. Admission requires the manager to stat <root>/lib/rustlib/<target>/lib inside the fingerprinted tree; `rustc --print target-libdir` returns exit 0 and a path for a target whose standard library is absent.
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.target-unknown  [negative]  verdict=match
+  title           : target triple the compiler does not know
+  expected class  : target_representability
+  observed class  : target_representability
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc --print target-libdir --target not-a-real-target
+      exit code   : 1
+      stderr      : error: error loading target specification: could not find specification for target "not-a-real-target"
+                      |
+                      = help: run `rustc --print target-list` for a list of built-in targets
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --target not-a-real-target
+      env         : CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/cargo-target/target-not-a-real-target RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      exit code   : 101
+      stderr      : error: failed to run `rustc` to learn about target-specific information
+                    
+                    Caused by:
+                      process didn't exit successfully: `/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc - --crate-name ___ --print=file-names --target not-a-real-target --crate-type bin --crate-type rlib --crate-type dylib --crate-type cdylib --crate-type staticlib --crate-type proc-macro --print=sysroot --print=split-debuginfo --print=crate-name --print=cfg -Wwarnings` (exit status: 1)
+                      --- stderr
+                      error: error loading target specification: could not find specification for target "not-a-real-target"
+                        |
+                        = help: run `rustc --print target-list` for a list of built-in targets
+  manager obligation : An unknown triple is refused by `rustc --print target-libdir --target <t>` with a non-zero exit before any compilation, so representability needs no extra manager check.
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.positive.msrv-below-host  [positive]  verdict=match
+  title           : valid Cargo.toml whose rust-version is below the resolved toolchain
+  expected class  : none
+  observed class  : none
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : rs/probe-positive/Cargo.toml  sha256=25a3d22da1073c708ecea201aa53fd7df59c23af8a7fc1d514f463ed9d07b6c1  bytes=91
+  fixture         : rs/probe-positive/src/main.rs  sha256=536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4  bytes=13
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline
+      env         : CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/cargo-target/probe-positive RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      exit code   : 0
+      stdout      : {"packages":[{"name":"probe-positive","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/rs/probe-positive#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-positive","src_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/rs/probe-positive/src/main.rs","edition":"2021","doc":true,"doctest":false,"test":true}],"features":{},"manifest_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/rs/probe-positive/Cargo.toml","metadata":null,"publish":null,"authors":[]  ...[truncated in this log; full excerpt in the fixture JSON]
+  $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline
+      env         : CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/cargo-target/probe-positive RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      exit code   : 0
+      stderr      :    Compiling probe-positive v0.1.0 (/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/rs/probe-positive)
+                        Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+swift.negative.manifest-is-a-program  [negative]  verdict=match
+  title           : reading the manifest body executes package-authored code
+  expected class  : package_selector
+  observed class  : package_selector
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : sw/fatal/Package.swift  sha256=37f4458b9288f771b46ea299b9eb8b83e3acf303809fc3d2caef5baf707ab8c2  bytes=173
+  fixture         : sw/fatal/Sources/probe/main.swift  sha256=3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4  bytes=11
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package tools-version
+      exit code   : 0
+      stdout      : 6.0.0
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package dump-package
+      exit code   : 1
+      stderr      : error: 'fatal': Invalid manifest (compiled with: ["/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc", "-vfsoverlay", "/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TemporaryDirectory.tDSqP2/vfs.yaml", "-L", "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/pm/ManifestAPI", "-lPackageDescription", "-Xlinker", "-rpath", "-Xlinker", "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/pm/ManifestAPI", "-target", "arm64-apple-macosx14.0", "-plugin-path", "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swif  ...[truncated in this log; full excerpt in the fixture JSON]
+  manager obligation : Never invoke `swift package dump-package`, `describe`, `resolve`, or `build` to learn what a package declares. Measured on this host: dump-package compiled the manifest (true) and executed it (true), while `swift package tools-version` returned the header from the same directory without doing either. A Swift driver's graph phase is therefore limited to the header, and the target/product set must come from the manager-owned wire surface rather than from the manifest.
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.selector-swift-version-file  [negative]  verdict=match
+  title           : .swift-version does not redirect a directly resolved toolchain
+  expected class  : none
+  observed class  : none
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : sw/swiftver/.swift-version  sha256=a3cd6b827c4a4e7e7601c9aace0a77a7915cfa18b8b039139b1dcbb1c4b22c0d  bytes=6
+  fixture         : sw/swiftver/Package.swift  sha256=625be46dfe855fb169e194dd257cc862e2e099224ea9ea743571f7388f552cc1  bytes=135
+  fixture         : sw/swiftver/Sources/probe/main.swift  sha256=3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4  bytes=11
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift --version
+      exit code   : 0
+      stdout      : Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)
+                    Target: arm64-apple-macosx26.0
+      stderr      : swift-driver version: 1.148.6 
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift --version
+      exit code   : 0
+      stdout      : Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)
+                    Target: arm64-apple-macosx26.0
+      stderr      : swift-driver version: 1.148.6 
+  manager obligation : `.swift-version` is honored by the swiftly version manager, not by a directly resolved toolchain. Measured on this host the file changed nothing, which is the property that lets the driver classify the field `compared` rather than `forbidden`: it is an assertion the manager reads and never honors.
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.target-stdlib-absent  [negative]  verdict=match
+  title           : known target triple whose standard library this toolchain cannot load
+  expected class  : target_host
+  observed class  : target_host
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : True
+  fixture         : sw/target/main.swift  sha256=3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4  bytes=11
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -print-target-info -target x86_64-unknown-linux-gnu
+      exit code   : 0
+      stdout      : {
+                      "compilerVersion": "Apple Swift version 6.3.2 (swiftlang-6.3.2.1.108 clang-2100.1.1.101)",
+                      "swiftCompilerTag": "swiftlang-6.3.2.1.108",
+                      "target": {
+                        "triple": "x86_64-unknown-linux-gnu",
+                        "unversionedTriple": "x86_64-unknown-linux-gnu",
+                        "moduleTriple": "x86_64-unknown-linux-gnu",
+                        "platform": "linux",
+                        "arch": "x86_64",
+                        "pointerWidthInBits": 64,
+                        "pointerWidthInBytes": 8,
+                        "compatibilityLibraries": [ ],
+                        "openbsdBTCFIEnabled": false,
+                        "librariesRequireRPath": false
+                      },
+                      "paths": {
+                        "runtimeLibraryPaths": [
+                          "/Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/linux"
+                        ],
+                        "runtimeLibraryImpor  ...[truncated in this log; full excerpt in the fixture JSON]
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -target x86_64-unknown-linux-gnu -c /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/sw/target/main.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/sw/target/main.o
+      exit code   : 1
+      stderr      : <unknown>:0: warning: libc not found for 'x86_64-unknown-linux-gnu'; C stdlib may be unavailable
+                    <unknown>:0: error: unable to load standard library for target 'x86_64-unknown-linux-gnu'
+  manager obligation : A triple accepted by `-print-target-info` is only representable. Measured on this host, `-print-target-info -target x86_64-unknown-linux-gnu` exits 0 while compiling for it fails with `unable to load standard library for target`. The early gate is to stat the paths.runtimeLibraryPaths that the same command reports: for a target this toolchain cannot serve, they do not exist inside the trusted tree.
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.target-unknown  [negative]  verdict=match
+  title           : target triple the compiler does not know
+  expected class  : target_representability
+  observed class  : target_representability
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : sw/target/main.swift  sha256=3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4  bytes=11
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -print-target-info -target not-a-real-triple
+      exit code   : 1
+      stderr      : error: unknown target 'not-a-real-triple'
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -target not-a-real-triple -c /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/sw/target/main.swift -o /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rhjxtx/run-macos/work/sw/target/main.o
+      exit code   : 1
+      stderr      : error: unknown target 'not-a-real-triple'
+  manager obligation : An unknown triple is refused by `-print-target-info` with a non-zero exit and `unknown target`, before any compilation.
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.tools-version-future  [negative]  verdict=match
+  title           : Package.swift tools version above the resolved toolchain
+  expected class  : host_version
+  observed class  : host_version
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : sw/future/Package.swift  sha256=9b46ee62d61f8c864b61373ab9684e83f889b7a66153891d588f4989582e2fa1  bytes=136
+  fixture         : sw/future/Sources/probe/main.swift  sha256=3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4  bytes=11
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package tools-version
+      exit code   : 0
+      stdout      : 99.0.0
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build
+      exit code   : 1
+      stderr      : error: 'future': package 'future' is using Swift tools version 99.0.0 but the installed version is 6.3.2
+                    error: 'future': package 'future' is using Swift tools version 99.0.0 but the installed version is 6.3.2
+  manager obligation : Read the tools version with `swift package tools-version` in the graph phase and compare it against the resolved toolchain identity. Unlike cargo, SwiftPM also rejects it itself before compiling, so this preflight removes a wasted process rather than a security gap.
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.tools-version-malformed  [negative]  verdict=match
+  title           : Package.swift tools version that is not a version
+  expected class  : representability
+  observed class  : representability
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : sw/malformed/Package.swift  sha256=908b0f8e54562c7cf7826c7198d1626f38c68b49376dccd6c37eab163c203202  bytes=145
+  fixture         : sw/malformed/Sources/probe/main.swift  sha256=3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4  bytes=11
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package tools-version
+      exit code   : 1
+      stderr      : error: the Swift tools version 'not-a-version' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build
+      exit code   : 1
+      stderr      : error: 'malformed': the Swift tools version 'not-a-version' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+                    error: 'malformed': the Swift tools version 'not-a-version' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the lowest Swift version supported by the project
+                    error: the Swift tools version 'not-a-version' is misspelt or otherwise invalid; consider replacing it with '// swift-tools-version: 6.3.2' to specify the current Swift toolchain version as the   ...[truncated in this log; full excerpt in the fixture JSON]
+  manager obligation : The header is refused by the reader command itself, with no host input, so this is a Stage B file-shape rejection.
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.positive.tools-version-below-host  [positive]  verdict=match
+  title           : Package.swift tools version below the resolved toolchain
+  expected class  : none
+  observed class  : none
+  decidable before compiler work : True (expected True)
+  upstream rejects after compilation started : False
+  fixture         : sw/positive/Package.swift  sha256=625be46dfe855fb169e194dd257cc862e2e099224ea9ea743571f7388f552cc1  bytes=135
+  fixture         : sw/positive/Sources/probe/main.swift  sha256=3ea9650e46227359de69ff326ae334336c559061ed6eca0807da33e156ea37f4  bytes=11
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift package tools-version
+      exit code   : 0
+      stdout      : 6.0.0
+  $ /Applications/Xcode_26_5.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift build
+      exit code   : 0
+      stdout      : Building for debugging...
+                    [0/6] Write sources
+                    [1/6] Write probe-entitlement.plist
+                    [2/6] Write swift-version-45881B103DA9D485.txt
+                    [4/8] Compiling probe main.swift
+                    [5/8] Emitting module probe
+                    [5/8] Write Objects.LinkFileList
+                    [6/8] Linking probe
+                    [7/8] Applying probe
+                    Build complete! (0.59s)
+  consumers       : TASK-260728-1yhuqi
+
+==============================================================================
+INSTALLATION GUIDANCE INPUTS (manager-owned; never executed by the probe)
+==============================================================================
+- toolchain.rust.absent.primary-source
+    toolchain      : rust
+    reason code    : build_toolchain_unavailable
+    primary source : https://www.rust-lang.org/tools/install  (Rust Project (rust-lang.org))
+    operator action: The operator installs a Rust release toolchain from the Rust Project's own distribution and then configures the concrete toolchain root in manager-owned configuration. The root is the directory carrying bin/rustc and bin/cargo, never a rustup shim directory and never a PATH entry.
+    auto_install   : False
+- toolchain.swift.absent.primary-source
+    toolchain      : swift
+    reason code    : build_toolchain_unavailable
+    primary source : https://www.swift.org/install/  (Swift Project (swift.org))
+    operator action: The operator installs a Swift release toolchain from the Swift Project's own distribution, or on macOS uses the toolchain inside an installed Xcode, and then configures the concrete toolchain root in manager-owned configuration. The root is the directory carrying usr/bin/swiftc, never a swiftly shim and never DEVELOPER_DIR or TOOLCHAINS.
+    auto_install   : False
+- toolchain.kotlin-native.absent.primary-source
+    toolchain      : kotlin
+    reason code    : build_toolchain_unavailable
+    primary source : https://github.com/JetBrains/kotlin/releases  (JetBrains (Kotlin release distribution))
+    operator action: The operator installs a Kotlin/Native release distribution published by JetBrains and configures its concrete root in manager-owned configuration. The Kotlin compiler shipped by a general package manager is normally the JVM front end and does not satisfy this requirement; a JVM front end is reported as wrong_backend rather than accepted.
+    auto_install   : False
+
+
+==============================================================================
+RUN 2 — Windows 10.0.19045, amd64, SSH alias `win` (reachable secondary host)
+==============================================================================
+host              : windows/amd64 (windows/amd64)
+os version        : Microsoft Windows [Version 10.0.19045.6456]
+probe go version  : go1.25.5
+fixture version   : toolchain-probe-fixture-v1
+summary           : 19 cases, 0 matched, 0 divergences, 19 not run; 3 toolchains unavailable, 0 wrong backend
+
+------------------------------------------------------------------------------
+TOOLCHAIN rust  availability=unavailable
+  declaration     : channel=probe_explicit_root root=(none supplied)
+                    primary_relpath=bin\cargo.exe present=False path_searched=False
+  reason          : no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+  guidance        : toolchain.rust.absent.primary-source
+  metadata source : Cargo.toml  readable_without_execution=True
+                    reader: cargo metadata --no-deps --format-version 1 --offline
+                    - package.rust-version: compared (measured=True)
+                    - workspace.package.rust-version: compared (measured=False)
+  metadata source : rust-toolchain.toml  readable_without_execution=True
+                    reader: read the file; never hand it to a shim
+                    - toolchain.path: forbidden (measured=True)
+                    - toolchain.channel: compared (measured=True)
+                    - toolchain.components: ignored (measured=False)
+                    - toolchain.targets: ignored (measured=False)
+                    - toolchain.profile: ignored (measured=False)
+  metadata source : rust-toolchain  readable_without_execution=True
+                    reader: read the file
+                    - <bare channel string>: compared (measured=False)
+
+------------------------------------------------------------------------------
+TOOLCHAIN swift  availability=unavailable
+  declaration     : channel=probe_explicit_root root=(none supplied)
+                    primary_relpath=usr\bin\swift.exe present=False path_searched=False
+  reason          : no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+  guidance        : toolchain.swift.absent.primary-source
+  metadata source : Package.swift (// swift-tools-version header)  readable_without_execution=True
+                    reader: swift package tools-version
+                    evidence: measured: returns exit 0 and the normalized tools version for a manifest carrying a Swift syntax error and for a manifest whose body is a fatalError, so it reads the header line and neither compiles nor runs the manifest
+                    - swift-tools-version: compared (measured=True)
+  metadata source : Package.swift (body)  readable_without_execution=False
+                    reader: swift package dump-package
+                    evidence: measured: dump-package compiles Package.swift with swiftc into a `<name>-manifest` executable and runs it; the fatalError fixture reports `Fatal error: PROBE-MANIFEST-EXECUTED`
+                    - <entire manifest program>: forbidden (measured=True)
+  metadata source : .swift-version  readable_without_execution=True
+                    reader: read the file
+                    evidence: measured: the Xcode-provided swift driver ignores it; it is honored by the swiftly version manager, which the trusted-resolution rule already forbids
+                    - <bare version string>: compared (measured=True)
+
+------------------------------------------------------------------------------
+TOOLCHAIN kotlin  availability=unavailable
+  declaration     : channel=probe_explicit_root root=(none supplied)
+                    primary_relpath=bin\kotlinc-native.bat present=False path_searched=False
+  reason          : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  guidance        : toolchain.kotlin-native.absent.primary-source
+  metadata source : (undecided)  readable_without_execution=False
+                    evidence: not measured: no Kotlin/Native distribution was reachable on either probed host, and the single metadata file and field are owned by the artifact-model decision
+                    - <one file, one field, named by TASK-260728-168smo>: compared (measured=False)
+  metadata source : build.gradle / build.gradle.kts / settings.gradle*  readable_without_execution=False
+                    evidence: not measured on a Kotlin/Native root; recorded because the mainstream Kotlin build path is a general-purpose script engine and reading it is package-selected code execution by construction
+                    - <entire build script>: forbidden (measured=False)
+
+==============================================================================
+CASES
+==============================================================================
+------------------------------------------------------------------------------
+kotlin.negative.backend-is-not-native  [negative]  verdict=not_run
+  title           : a Kotlin compiler on the host is a JVM front end, not Kotlin/Native
+  expected class  : backend_identity
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+kotlin.negative.metadata-future  [negative]  verdict=not_run
+  title           : Kotlin metadata field above the resolved toolchain
+  expected class  : host_version
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+kotlin.negative.metadata-malformed  [negative]  verdict=not_run
+  title           : malformed Kotlin metadata field
+  expected class  : representability
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+kotlin.negative.target-unknown  [negative]  verdict=not_run
+  title           : target the Kotlin/Native compiler does not know
+  expected class  : target_representability
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+kotlin.positive.version-and-target  [positive]  verdict=not_run
+  title           : Kotlin/Native version and native target probe
+  expected class  : none
+  observed class  : (not measured)
+  not run because : no trusted Kotlin/Native root was supplied to the probe, and none was found by the operator on either probed host; the probe does not search PATH, KOTLIN_HOME, ~/.konan, sdkman, or a package manager for one, and it never installs
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-168smo
+------------------------------------------------------------------------------
+rust.negative.msrv-future  [negative]  verdict=not_run
+  title           : Cargo.toml rust-version above the resolved toolchain
+  expected class  : host_version
+  observed class  : (not measured)
+  not run because : no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.msrv-malformed  [negative]  verdict=not_run
+  title           : Cargo.toml rust-version that is not a version
+  expected class  : representability
+  observed class  : (not measured)
+  not run because : no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.selector-toolchain-nightly  [negative]  verdict=not_run
+  title           : rust-toolchain.toml channel makes the shim attempt an install
+  expected class  : package_selector
+  observed class  : (not measured)
+  not run because : no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.selector-toolchain-path  [negative]  verdict=not_run
+  title           : rust-toolchain.toml path selects the compiler through the shim
+  expected class  : package_selector
+  observed class  : (not measured)
+  not run because : no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.target-std-absent  [negative]  verdict=not_run
+  title           : known target triple whose standard library is not in the trusted tree
+  expected class  : target_host
+  observed class  : (not measured)
+  not run because : no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.negative.target-unknown  [negative]  verdict=not_run
+  title           : target triple the compiler does not know
+  expected class  : target_representability
+  observed class  : (not measured)
+  not run because : no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+rust.positive.msrv-below-host  [positive]  verdict=not_run
+  title           : valid Cargo.toml whose rust-version is below the resolved toolchain
+  expected class  : none
+  observed class  : (not measured)
+  not run because : no trusted Rust root was supplied to the probe; the probe does not search PATH, an inherited environment, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-12pnm1
+------------------------------------------------------------------------------
+swift.negative.manifest-is-a-program  [negative]  verdict=not_run
+  title           : reading the manifest body executes package-authored code
+  expected class  : package_selector
+  observed class  : (not measured)
+  not run because : no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.selector-swift-version-file  [negative]  verdict=not_run
+  title           : .swift-version does not redirect a directly resolved toolchain
+  expected class  : package_selector
+  observed class  : (not measured)
+  not run because : no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.target-stdlib-absent  [negative]  verdict=not_run
+  title           : known target triple whose standard library this toolchain cannot load
+  expected class  : target_host
+  observed class  : (not measured)
+  not run because : no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.target-unknown  [negative]  verdict=not_run
+  title           : target triple the compiler does not know
+  expected class  : target_representability
+  observed class  : (not measured)
+  not run because : no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.tools-version-future  [negative]  verdict=not_run
+  title           : Package.swift tools version above the resolved toolchain
+  expected class  : host_version
+  observed class  : (not measured)
+  not run because : no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.negative.tools-version-malformed  [negative]  verdict=not_run
+  title           : Package.swift tools version that is not a version
+  expected class  : representability
+  observed class  : (not measured)
+  not run because : no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-1yhuqi
+------------------------------------------------------------------------------
+swift.positive.tools-version-below-host  [positive]  verdict=not_run
+  title           : Package.swift tools version below the resolved toolchain
+  expected class  : none
+  observed class  : (not measured)
+  not run because : no trusted Swift root was supplied to the probe; the probe does not search PATH, DEVELOPER_DIR, TOOLCHAINS, or a version-manager shim for one
+  decidable before compiler work : False (expected True)
+  upstream rejects after compilation started : False
+  consumers       : TASK-260728-1yhuqi
+
+==============================================================================
+INSTALLATION GUIDANCE INPUTS (manager-owned; never executed by the probe)
+==============================================================================
+- toolchain.rust.absent.primary-source
+    toolchain      : rust
+    reason code    : build_toolchain_unavailable
+    primary source : https://www.rust-lang.org/tools/install  (Rust Project (rust-lang.org))
+    operator action: The operator installs a Rust release toolchain from the Rust Project's own distribution and then configures the concrete toolchain root in manager-owned configuration. The root is the directory carrying bin/rustc and bin/cargo, never a rustup shim directory and never a PATH entry.
+    auto_install   : False
+- toolchain.swift.absent.primary-source
+    toolchain      : swift
+    reason code    : build_toolchain_unavailable
+    primary source : https://www.swift.org/install/  (Swift Project (swift.org))
+    operator action: The operator installs a Swift release toolchain from the Swift Project's own distribution, or on macOS uses the toolchain inside an installed Xcode, and then configures the concrete toolchain root in manager-owned configuration. The root is the directory carrying usr/bin/swiftc, never a swiftly shim and never DEVELOPER_DIR or TOOLCHAINS.
+    auto_install   : False
+- toolchain.kotlin-native.absent.primary-source
+    toolchain      : kotlin
+    reason code    : build_toolchain_unavailable
+    primary source : https://github.com/JetBrains/kotlin/releases  (JetBrains (Kotlin release distribution))
+    operator action: The operator installs a Kotlin/Native release distribution published by JetBrains and configures its concrete root in manager-owned configuration. The Kotlin compiler shipped by a general package manager is normally the JVM front end and does not satisfy this requirement; a JVM front end is reported as wrong_backend rather than accepted.
+    auto_install   : False
+

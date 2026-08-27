@@ -1,0 +1,28 @@
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/build_root_reached_agent-facing_context
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/recorded_build-source_identity_no_longer_matches_the_frozen_snapshot
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/logical_key_recorded_by_the_marker_was_derived_from_another_build_input
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/marker_records_no_build_for_the_command_the_closure_activates
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/protected_cache_entry_cannot_be_interpreted
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/protected_cache_holds_no_entry_for_the_recorded_key
+--- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck (102.03s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/build_root_reached_agent-facing_context (9.66s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/recorded_build-source_identity_no_longer_matches_the_frozen_snapshot (9.49s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/logical_key_recorded_by_the_marker_was_derived_from_another_build_input (9.46s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/marker_records_no_build_for_the_command_the_closure_activates (9.51s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/protected_cache_entry_cannot_be_interpreted (21.98s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/protected_cache_holds_no_entry_for_the_recorded_key (21.97s)
+=== RUN   TestGlobalStatusReportsAnUnusableToolchainPerCompiledCommand
+--- PASS: TestGlobalStatusReportsAnUnusableToolchainPerCompiledCommand (13.73s)
+=== RUN   TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+--- PASS: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand (25.79s)
+=== RUN   TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands
+--- PASS: TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands (1.14s)
+=== RUN   TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent
+--- PASS: TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent (0.00s)
+=== RUN   TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven
+--- PASS: TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven (1.01s)
+=== RUN   TestGlobalStatusRejectsPositionalArguments
+--- PASS: TestGlobalStatusRejectsPositionalArguments (0.12s)
+PASS
+ok  	github.com/relux-works/curator/cmd/curator	144.489s

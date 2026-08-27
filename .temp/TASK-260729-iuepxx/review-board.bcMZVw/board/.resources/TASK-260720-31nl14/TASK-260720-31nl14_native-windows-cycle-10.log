@@ -1,0 +1,185 @@
+--- FAIL: TestPrepareCanonicalJournalReferencedKeysAndCommitCleanup (1.95s)
+    engine_test.go:67: sync C:\Users\admin\AppData\Local\Temp\TestPrepareCanonicalJournalReferencedKeysAndCommitCleanup3718908562\001\live\.curator-txn-9d848f5770ccfbcf6db1cca4fbb1a5e7-000.backup: Access is denied.
+        sync C:\Users\admin\AppData\Local\Temp\TestPrepareCanonicalJournalReferencedKeysAndCommitCleanup3718908562\001\live\one: Access is denied.
+--- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse (24.12s)
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/before_backup (2.47s)
+        engine_test.go:146: rolled-back journal remains: <nil>
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/after_backup (1.57s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-0after_507577411\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-0after_507577411\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/before_install (1.28s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-0before4165938536\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-0before4165938536\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/after_install (1.61s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-0after_959712060\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-0after_959712060\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-0/target_committed (1.60s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-0target3418673300\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-0target3418673300\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/before_backup (1.45s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1before2465753165\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1before2465753165\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/after_backup (1.67s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1after_1494436927\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1after_1494436927\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/before_install (1.59s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1before2626936694\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1before2626936694\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/after_install (1.47s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1after_4243086397\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1after_4243086397\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-1/target_committed (1.75s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1target2073299639\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-1target2073299639\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/before_backup (1.30s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2before450933075\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2before450933075\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/after_backup (1.90s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2after_1676349092\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2after_1676349092\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/before_install (1.37s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2before3562100890\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2before3562100890\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/after_install (1.46s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2after_3366180741\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2after_3366180741\001\live\0: Access is denied., want injected
+    --- FAIL: TestFaultAtEveryTargetBoundaryRollsBackInReverse/target-2/target_committed (1.63s)
+        engine_test.go:127: commit error = sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2target2672564348\001\live\.curator-txn-1bf6a87a9e359aba83c033bac93eee31-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestFaultAtEveryTargetBoundaryRollsBackInReversetarget-2target2672564348\001\live\0: Access is denied., want injected
+--- FAIL: TestJournalStateIsDurableBeforeEachNextSwap (0.61s)
+    engine_test.go:182: sync C:\Users\admin\AppData\Local\Temp\TestJournalStateIsDurableBeforeEachNextSwap4054995702\001\live\.curator-txn-6b0321d80b2cdf013c3023254c5c7734-000.backup: Access is denied.
+        sync C:\Users\admin\AppData\Local\Temp\TestJournalStateIsDurableBeforeEachNextSwap4054995702\001\live\a: Access is denied.
+--- FAIL: TestRollbackDesiredDigestMismatchPreservesUnknownBytes (1.55s)
+    engine_test.go:209: commit error = sync C:\Users\admin\AppData\Local\Temp\TestRollbackDesiredDigestMismatchPreservesUnknownBytes902363651\001\live\.curator-txn-3976afb634683233573d17ee5e5e168d-000.backup: Access is denied.
+        sync C:\Users\admin\AppData\Local\Temp\TestRollbackDesiredDigestMismatchPreservesUnknownBytes902363651\001\live\a: Access is denied., want injected plus implementation-corruption
+--- FAIL: TestDirectoryReplacementAndGenerationExpectation (0.45s)
+    engine_test.go:245: sync C:\Users\admin\AppData\Local\Temp\TestDirectoryReplacementAndGenerationExpectation1993361396\001\live\.curator-txn-11407a68ec0b78ec297089b6b9e4e01c-000.backup\bin\tool: Access is denied.
+        sync C:\Users\admin\AppData\Local\Temp\TestDirectoryReplacementAndGenerationExpectation1993361396\001\live\runtime\bin\tool: Access is denied.
+--- FAIL: TestCreationAndRemovalRollbackRestoreExactPreimages (0.54s)
+    engine_test.go:283: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCreationAndRemovalRollbackRestoreExactPreimages2706868724\001\live\created: Access is denied.
+        transaction implementation-corruption: durable removal refused C:\Users\admin\AppData\Local\Temp\TestCreationAndRemovalRollbackRestoreExactPreimages2706868724\001\home\state\transactions\v1\txn-create-remove.json digest sha256:f4aeed71315c293769e2ec8eceda2ead89ae940d285c8ed221ac77bb163c8324, want sha256:f52b61148f67af494adcba8a60e462ae26702a0f0b6105ed33011105b6ef7b52, want injected
+--- FAIL: TestRecoveryProcessesTransactionIDsAndRollbackStateDeterministically (0.48s)
+    engine_test.go:311: recover transaction txn-a: sync C:\Users\admin\AppData\Local\Temp\TestRecoveryProcessesTransactionIDsAndRollbackStateDeterministic247716311\001\live\.curator-txn-bb8f1e14a4285ed217cdca07b9ab798e-000.backup: Access is denied.
+        sync C:\Users\admin\AppData\Local\Temp\TestRecoveryProcessesTransactionIDsAndRollbackStateDeterministic247716311\001\live\txn-a: Access is denied.
+--- FAIL: TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal (0.61s)
+    --- FAIL: TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal/regular_file (0.26s)
+        preparation_durability_test.go:96: failed staging exposed a journal: <nil>
+    --- FAIL: TestPrepareStagedParentSyncFailureDoesNotPublishPreparedJournal/directory (0.35s)
+        preparation_durability_test.go:96: failed staging exposed a journal: <nil>
+--- FAIL: TestRollbackCorruptionBranchesNeverOverwriteUnknownState (1.68s)
+    --- FAIL: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/unknown_live_bytes (0.23s)
+        recovery_corruption_test.go:78: commit = sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStateunknown511550068\001\live\.curator-txn-5c3ad81b708d043f4f2e6806f227a1f8-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStateunknown511550068\001\live\target: Access is denied.
+    --- FAIL: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/committed_target_disappeared (0.34s)
+        recovery_corruption_test.go:78: commit = sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStatecommitt3852295718\001\live\.curator-txn-5c3ad81b708d043f4f2e6806f227a1f8-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStatecommitt3852295718\001\live\target: Access is denied.
+    --- FAIL: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/unknown_captured_rollback_bytes (0.42s)
+        recovery_corruption_test.go:78: commit = sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStateunknown469014571\001\live\.curator-txn-5c3ad81b708d043f4f2e6806f227a1f8-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStateunknown469014571\001\live\target: Access is denied.
+    --- FAIL: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/live_and_rollback_both_exist (0.40s)
+        recovery_corruption_test.go:78: commit = sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStatelive_an4098483240\001\live\.curator-txn-5c3ad81b708d043f4f2e6806f227a1f8-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStatelive_an4098483240\001\live\target: Access is denied.
+    --- FAIL: TestRollbackCorruptionBranchesNeverOverwriteUnknownState/backup_changed (0.29s)
+        recovery_corruption_test.go:78: commit = sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStatebackup_1436735049\001\live\.curator-txn-5c3ad81b708d043f4f2e6806f227a1f8-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestRollbackCorruptionBranchesNeverOverwriteUnknownStatebackup_1436735049\001\live\target: Access is denied.
+--- FAIL: TestSubprocessCrashRecoveryAtSwapBoundaries (1.34s)
+    --- FAIL: TestSubprocessCrashRecoveryAtSwapBoundaries/after_backup (0.69s)
+        subprocess_test.go:66: helper exit = exit status 1, want 86
+    --- FAIL: TestSubprocessCrashRecoveryAtSwapBoundaries/after_install (0.66s)
+        subprocess_test.go:66: helper exit = exit status 1, want 86
+--- FAIL: TestSubprocessCrashRecoveryDuringPreparation (0.60s)
+    --- FAIL: TestSubprocessCrashRecoveryDuringPreparation/file (0.24s)
+        subprocess_test.go:133: recover transaction txn-prepare-crash: transaction implementation-corruption: durable removal refused C:\Users\admin\AppData\Local\Temp\TestSubprocessCrashRecoveryDuringPreparationfile3972386067\001\home\state\transactions\v1\txn-prepare-crash.json digest sha256:66b98bad2f4aef29cf807fe603c9e025172deb4412bea34d744d38d4c802b682, want sha256:ea3bb8ac51bfc30668d8578e16c2642e9cf69b397f5c0b03eb2fdbb540168a54
+    --- FAIL: TestSubprocessCrashRecoveryDuringPreparation/directory (0.36s)
+        subprocess_test.go:133: recover transaction txn-prepare-crash: transaction implementation-corruption: durable removal refused C:\Users\admin\AppData\Local\Temp\TestSubprocessCrashRecoveryDuringPreparationdirectory3578865852\001\home\state\transactions\v1\txn-prepare-crash.json digest sha256:5b192148d47d57205fc729ec69dc3dd2209da3a004b01952c2d0c69f77b6b5c2, want sha256:52dad2de0a74225212c0ba04f1358a539dd96d1e28aeab9d3defa7f46a96671a
+--- FAIL: TestSubprocessCrashRecoveryAfterStagingChunkSync (0.47s)
+    --- FAIL: TestSubprocessCrashRecoveryAfterStagingChunkSync/1 (0.22s)
+        subprocess_test.go:187: recover transaction txn-prepare-write-ahead: transaction implementation-corruption: durable removal refused C:\Users\admin\AppData\Local\Temp\TestSubprocessCrashRecoveryAfterStagingChunkSync1147300085\001\home\state\transactions\v1\txn-prepare-write-ahead.json digest sha256:207cd5976ab97f3fe5fa5801c912fed41e57e136679f2d80846e23e2b3c4f752, want sha256:226b479732c8bf1c5d3ec652ebbea025c62df83c4ef174f57a6d40e7a05f300e
+    --- FAIL: TestSubprocessCrashRecoveryAfterStagingChunkSync/2 (0.25s)
+        subprocess_test.go:187: recover transaction txn-prepare-write-ahead: transaction implementation-corruption: durable removal refused C:\Users\admin\AppData\Local\Temp\TestSubprocessCrashRecoveryAfterStagingChunkSync22253865355\001\home\state\transactions\v1\txn-prepare-write-ahead.json digest sha256:ef34088c6bf56572d39195adff50c7c8d1131c323bc0620811fa6bf83a58421d, want sha256:7cd54907a241d88ff638422aee0af6d751139c131aeeda830ddfd706f211711b
+--- FAIL: TestPrepareFaultAndPreparingRecoveryCleanStagingWithoutLiveMutation (0.26s)
+    validation_test.go:329: aborted preparation journal remains: <nil>
+--- FAIL: TestCleanupPhaseRecoveryRetainsDesiredAndRemovesBackups (0.28s)
+    validation_test.go:376: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupPhaseRecoveryRetainsDesiredAndRemovesBackups4055850517\001\live\.curator-txn-0fd1a97bd83a625ee0e42ab902dfdfe7-000.backup: Access is denied.
+        sync C:\Users\admin\AppData\Local\Temp\TestCleanupPhaseRecoveryRetainsDesiredAndRemovesBackups4055850517\001\live\target: Access is denied.
+--- FAIL: TestCleanupPreservesUnknownOrSimultaneousTombs (0.55s)
+    --- FAIL: TestCleanupPreservesUnknownOrSimultaneousTombs/commit_cleanup (0.28s)
+        validation_test.go:431: cleanup error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupPreservesUnknownOrSimultaneousTombscommit_cleanup3619941387\001\live\.curator-txn-7d7f754f67ece7d94347891652d783f1-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupPreservesUnknownOrSimultaneousTombscommit_cleanup3619941387\001\live\target: Access is denied., want implementation-corruption
+    --- FAIL: TestCleanupPreservesUnknownOrSimultaneousTombs/restart_cleanup (0.27s)
+        validation_test.go:425: paused commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupPreservesUnknownOrSimultaneousTombsrestart_cleanup3169630724\001\live\.curator-txn-7d7f754f67ece7d94347891652d783f1-000.backup: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupPreservesUnknownOrSimultaneousTombsrestart_cleanup3169630724\001\live\target: Access is denied.
+--- FAIL: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary (2.18s)
+    --- FAIL: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/direct_after_tomb_rename (0.48s)
+        validation_test.go:503: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBounda3746111941\001\live\.curator-txn-15b2b9ab28d310300e4449cf81749d56-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBounda3746111941\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/restart_after_tomb_rename (0.56s)
+        validation_test.go:503: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBounda2275977292\001\live\.curator-txn-15b2b9ab28d310300e4449cf81749d56-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBounda2275977292\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/direct_during_recursive_removal (0.46s)
+        validation_test.go:503: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBounda2743095603\001\live\.curator-txn-15b2b9ab28d310300e4449cf81749d56-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBounda2743095603\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBoundary/restart_during_recursive_removal (0.67s)
+        validation_test.go:503: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBounda798759425\001\live\.curator-txn-15b2b9ab28d310300e4449cf81749d56-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryResumesOwnedDirectoryTombAtEveryRemovalBounda798759425\001\live\target\a: Access is denied., want cleanup fault
+--- FAIL: TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb (0.86s)
+    --- FAIL: TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb/after_cleanup_rename (0.39s)
+        validation_test.go:579: commit error = sync C:\Users\admin\AppData\Local\Temp\TestRollbackCleanupRecoveryResumesOwnedDirectoryTombafter_clean2174754200\001\live\.curator-txn-0a23881ecf18d8fe90bd5e7623ecc0e0-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestRollbackCleanupRecoveryResumesOwnedDirectoryTombafter_clean2174754200\001\live\target\a: Access is denied., want rollback and cleanup faults
+    --- FAIL: TestRollbackCleanupRecoveryResumesOwnedDirectoryTomb/during_cleanup_removal (0.47s)
+        validation_test.go:579: commit error = sync C:\Users\admin\AppData\Local\Temp\TestRollbackCleanupRecoveryResumesOwnedDirectoryTombduring_clea3888428689\001\live\.curator-txn-0a23881ecf18d8fe90bd5e7623ecc0e0-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestRollbackCleanupRecoveryResumesOwnedDirectoryTombduring_clea3888428689\001\live\target\a: Access is denied., want rollback and cleanup faults
+--- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState (6.98s)
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=false/added (0.44s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa3576846852\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa3576846852\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=false/replaced (0.40s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa1144619268\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa1144619268\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=true/added (0.41s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa382908618\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa382908618\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/after_cleanup_rename/restart=true/replaced (0.40s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa580118517\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa580118517\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=false/added (0.41s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa1343888819\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa1343888819\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=false/replaced (0.39s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa2805743654\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa2805743654\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=true/added (0.40s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa3616362620\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa3616362620\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=false/during_cleanup_removal/restart=true/replaced (0.50s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa1801292886\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=fa1801292886\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=false/added (0.55s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr3267060483\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr3267060483\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=false/replaced (0.55s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr1225559825\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr1225559825\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=true/added (0.47s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr3341053811\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr3341053811\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/after_cleanup_rename/restart=true/replaced (0.42s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr4182550075\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr4182550075\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=false/added (0.40s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr3567181400\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr3567181400\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=false/replaced (0.41s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr2863313115\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr2863313115\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=true/added (0.43s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr2704452510\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr2704452510\001\live\target\a: Access is denied., want cleanup fault
+    --- FAIL: TestCleanupRecoveryPreservesConcurrentOwnedTombState/rollback=true/during_cleanup_removal/restart=true/replaced (0.40s)
+        validation_test.go:642: commit error = sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr378492318\001\live\.curator-txn-f5c7c9b2fad3ab0e947e8e9baa783cfb-000.backup\a: Access is denied.
+            sync C:\Users\admin\AppData\Local\Temp\TestCleanupRecoveryPreservesConcurrentOwnedTombStaterollback=tr378492318\001\live\target\a: Access is denied., want cleanup fault
+--- FAIL: TestRestartDiscoversAndFinishesJournalCleanupTomb (0.23s)
+    validation_test.go:708: commit = sync C:\Users\admin\AppData\Local\Temp\TestRestartDiscoversAndFinishesJournalCleanupTomb2268560760\001\live\.curator-txn-5c3ad81b708d043f4f2e6806f227a1f8-000.backup: Access is denied.
+        sync C:\Users\admin\AppData\Local\Temp\TestRestartDiscoversAndFinishesJournalCleanupTomb2268560760\001\live\target: Access is denied.
+FAIL
+coverage: 69.9% of statements

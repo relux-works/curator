@@ -1,0 +1,308 @@
+WORK=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/go-build1783180976
+cd /Users/iv/Developer/ReluxWorks/curator
+git status --porcelain
+cd /Users/iv/Developer/ReluxWorks/curator
+git -c log.showsignature=false log -1 --format=%H:%ct
+cd /Users/iv/Developer/ReluxWorks/curator; git config extensions.objectformat
+0.013s # cd /Users/iv/Developer/ReluxWorks/curator; git config extensions.objectformat
+cd /Users/iv/Developer/ReluxWorks/curator; git -c log.showsignature=false log --no-decorate -n1 '--format=format:%H %ct %D' c06aa1a15e4093410a686ff0ce4f579fba59dec1 --
+0.027s # cd /Users/iv/Developer/ReluxWorks/curator; git -c log.showsignature=false log --no-decorate -n1 '--format=format:%H %ct %D' c06aa1a15e4093410a686ff0ce4f579fba59dec1 --
+cd /Users/iv/Developer/ReluxWorks/curator; git for-each-ref --format %(refname) refs/tags --merged c06aa1a15e4093410a686ff0ce4f579fba59dec1
+0.035s # cd /Users/iv/Developer/ReluxWorks/curator; git for-each-ref --format %(refname) refs/tags --merged c06aa1a15e4093410a686ff0ce4f579fba59dec1
+cd /Users/iv/Developer/ReluxWorks/curator; git -c log.showsignature=false log --no-decorate -n1 '--format=format:%H %ct %D' c06aa1a15e40 --
+0.018s # cd /Users/iv/Developer/ReluxWorks/curator; git -c log.showsignature=false log --no-decorate -n1 '--format=format:%H %ct %D' c06aa1a15e40 --
+cd /Users/iv/Developer/ReluxWorks/curator; git cat-file blob c06aa1a15e4093410a686ff0ce4f579fba59dec1:go.mod
+0.017s # cd /Users/iv/Developer/ReluxWorks/curator; git cat-file blob c06aa1a15e4093410a686ff0ce4f579fba59dec1:go.mod
+mkdir -p $WORK/b001/
+cat >/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/go-build1783180976/b001/importcfg << 'EOF' # internal
+# import config
+packagefile bufio=/Users/iv/Library/Caches/go-build/59/59111dc08d719f9ac4c1a45483a343ec8663a34023511ddc0029e99048db6c4d-d
+packagefile encoding/json=/Users/iv/Library/Caches/go-build/68/6880654506a1ff1110844b85e0e1ef3bb38689b0e53cca6d735c620c7f645ee6-d
+packagefile flag=/Users/iv/Library/Caches/go-build/7c/7c42885ae4380bbf6b0dee578e42089a87925e41e9ce36b165d8bc65e33c8da5-d
+packagefile fmt=/Users/iv/Library/Caches/go-build/94/946431d450d82779cb0c625dc7782426f29fffef6d9e7581bd3812558f6c49e9-d
+packagefile github.com/charmbracelet/bubbletea=/Users/iv/Library/Caches/go-build/d4/d4c9b4c9772bae5e1a4eb77c285713fc74627a48d86ea281c9a4b8722228645d-d
+packagefile github.com/relux-works/curator/internal/adapters=/Users/iv/Library/Caches/go-build/2c/2c12dab4775e8fdcbabeb93181b4ebbbb3abfabdeff804cadfe756252b4adcab-d
+packagefile github.com/relux-works/curator/internal/audit=/Users/iv/Library/Caches/go-build/9a/9ab104b8dd01302cf792b9f8be5741e86316cb5122c3fb211d72c6f9df2f9f72-d
+packagefile github.com/relux-works/curator/internal/closure=/Users/iv/Library/Caches/go-build/fb/fbff2191986621a4f98a96af9a21d6b6459913788bae25055fb72607e33f0d0c-d
+packagefile github.com/relux-works/curator/internal/config=/Users/iv/Library/Caches/go-build/85/854f79cfb2d19857eb3b0fbab76448f10fcc5951b67178c7bfc8a7e035a4e235-d
+packagefile github.com/relux-works/curator/internal/devsub=/Users/iv/Library/Caches/go-build/8f/8fb86a295f2275252910441a96426ee0d2d769fed682fde1ff693c785f81dbbc-d
+packagefile github.com/relux-works/curator/internal/gitignore=/Users/iv/Library/Caches/go-build/6e/6e3a4486c397a33d4b2ca8e228172ae0685a54a22b911aae0e4997bd1d09fa62-d
+packagefile github.com/relux-works/curator/internal/gitops=/Users/iv/Library/Caches/go-build/42/42776e8e162643dd709c177b37a809b02c7af044977cc7b7711f7ff044123ca3-d
+packagefile github.com/relux-works/curator/internal/hashing=/Users/iv/Library/Caches/go-build/3d/3d6d52598788491f972e2156f600c7b31e008d70b4154fdcd79a5c15053aac62-d
+packagefile github.com/relux-works/curator/internal/install=/Users/iv/Library/Caches/go-build/55/55e5bdffa3d79da1a35182f5e65c1eacf19d88116cc06d093e94be4f0e83c398-d
+packagefile github.com/relux-works/curator/internal/manifest=/Users/iv/Library/Caches/go-build/4d/4d027bc0074c5902d7289ad68dc4512441a9ce43c48680dd3819b44f99432140-d
+packagefile github.com/relux-works/curator/internal/marker=/Users/iv/Library/Caches/go-build/36/365ed88ae4a23e1f0c634150fc1fe6b38a4caf5ac28c35ed4202fd84df3328e3-d
+packagefile github.com/relux-works/curator/internal/registry=/Users/iv/Library/Caches/go-build/e6/e6af9bbc437e96329d49e079b2e660030bc2d7a0fa3b2d245b1ac5005190174c-d
+packagefile github.com/relux-works/curator/internal/scopes=/Users/iv/Library/Caches/go-build/84/848e38ad06cd8cc707da8c57df3fb5ade0ff50c1fd00cc9c16ad0e529457cee0-d
+packagefile github.com/relux-works/curator/internal/shell=/Users/iv/Library/Caches/go-build/07/07f7e6efdcc860316cfe9fe7e5886699da92ac8ac605ad7427ff1be479e9f665-d
+packagefile github.com/relux-works/curator/internal/skillcheck=/Users/iv/Library/Caches/go-build/38/38279d898b2db6d3029babdcf257fadded4ab383931765c7f056fc4fcfa2e777-d
+packagefile github.com/relux-works/curator/internal/ui=/Users/iv/Library/Caches/go-build/87/871193daf625e99cc99ca7a0d209a23d6576e6136572bade9ea8af110efc10b2-d
+packagefile github.com/relux-works/curator/internal/version=/Users/iv/Library/Caches/go-build/1e/1e6022175b88e6604c90ea8a65b8a15a424745bdf61745fe0fd0aae5a5bc0bf8-d
+packagefile os=/Users/iv/Library/Caches/go-build/60/60c114cd4c23a5539690f838932d8656aaa5ae01ccdaa363bf7fa7e3f4f62543-d
+packagefile path/filepath=/Users/iv/Library/Caches/go-build/f2/f21f3127dc9d5bd982b02c3a92d88fd867e61e94aaac2e4bcdcad76f99b65d3c-d
+packagefile sort=/Users/iv/Library/Caches/go-build/c4/c4613dc29bace0faf28ad1879cd9f2aa7321d2185608bee28a7b5f3b2496525e-d
+packagefile strings=/Users/iv/Library/Caches/go-build/16/1676272cc769823c094bfbb64b1dba85642bf908d4ca6729e15ffca9502a37c8-d
+packagefile time=/Users/iv/Library/Caches/go-build/cc/cc4fa4cfd1df3e09a239476e7389459eee94c57e26d34b0340c966ed61767e45-d
+packagefile runtime=/Users/iv/Library/Caches/go-build/98/9893da71725f2257b626417f443e9a2b5cc39e19f1856fe02d3876d6449c4b99-d
+EOF
+cd /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-poa3ze/origin-main-worktree
+/Users/iv/.goenv/versions/1.25.5/pkg/tool/darwin_arm64/compile -o $WORK/b001/_pkg_.a -trimpath "$WORK/b001=>" -p main -lang=go1.25 -complete -buildid KQpu8XJ3bb9pf2gHafV8/KQpu8XJ3bb9pf2gHafV8 -goversion go1.25.5 -c=4 -shared -nolocalimports -importcfg $WORK/b001/importcfg -pack ./cmd/curator/main.go
+go tool buildid -w $WORK/b001/_pkg_.a # internal
+cp $WORK/b001/_pkg_.a /Users/iv/Library/Caches/go-build/2d/2d80330bd26ca00bccc4b281c6b7c88304ee5bcec3595ae39780eee19841d9f6-d # internal
+cat >/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/go-build1783180976/b001/importcfg.link << 'EOF' # internal
+packagefile github.com/relux-works/curator/cmd/curator=/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/go-build1783180976/b001/_pkg_.a
+packagefile bufio=/Users/iv/Library/Caches/go-build/59/59111dc08d719f9ac4c1a45483a343ec8663a34023511ddc0029e99048db6c4d-d
+packagefile encoding/json=/Users/iv/Library/Caches/go-build/68/6880654506a1ff1110844b85e0e1ef3bb38689b0e53cca6d735c620c7f645ee6-d
+packagefile flag=/Users/iv/Library/Caches/go-build/7c/7c42885ae4380bbf6b0dee578e42089a87925e41e9ce36b165d8bc65e33c8da5-d
+packagefile fmt=/Users/iv/Library/Caches/go-build/94/946431d450d82779cb0c625dc7782426f29fffef6d9e7581bd3812558f6c49e9-d
+packagefile github.com/charmbracelet/bubbletea=/Users/iv/Library/Caches/go-build/d4/d4c9b4c9772bae5e1a4eb77c285713fc74627a48d86ea281c9a4b8722228645d-d
+packagefile github.com/relux-works/curator/internal/adapters=/Users/iv/Library/Caches/go-build/2c/2c12dab4775e8fdcbabeb93181b4ebbbb3abfabdeff804cadfe756252b4adcab-d
+packagefile github.com/relux-works/curator/internal/audit=/Users/iv/Library/Caches/go-build/9a/9ab104b8dd01302cf792b9f8be5741e86316cb5122c3fb211d72c6f9df2f9f72-d
+packagefile github.com/relux-works/curator/internal/closure=/Users/iv/Library/Caches/go-build/fb/fbff2191986621a4f98a96af9a21d6b6459913788bae25055fb72607e33f0d0c-d
+packagefile github.com/relux-works/curator/internal/config=/Users/iv/Library/Caches/go-build/85/854f79cfb2d19857eb3b0fbab76448f10fcc5951b67178c7bfc8a7e035a4e235-d
+packagefile github.com/relux-works/curator/internal/devsub=/Users/iv/Library/Caches/go-build/8f/8fb86a295f2275252910441a96426ee0d2d769fed682fde1ff693c785f81dbbc-d
+packagefile github.com/relux-works/curator/internal/gitignore=/Users/iv/Library/Caches/go-build/6e/6e3a4486c397a33d4b2ca8e228172ae0685a54a22b911aae0e4997bd1d09fa62-d
+packagefile github.com/relux-works/curator/internal/gitops=/Users/iv/Library/Caches/go-build/42/42776e8e162643dd709c177b37a809b02c7af044977cc7b7711f7ff044123ca3-d
+packagefile github.com/relux-works/curator/internal/hashing=/Users/iv/Library/Caches/go-build/3d/3d6d52598788491f972e2156f600c7b31e008d70b4154fdcd79a5c15053aac62-d
+packagefile github.com/relux-works/curator/internal/install=/Users/iv/Library/Caches/go-build/55/55e5bdffa3d79da1a35182f5e65c1eacf19d88116cc06d093e94be4f0e83c398-d
+packagefile github.com/relux-works/curator/internal/manifest=/Users/iv/Library/Caches/go-build/4d/4d027bc0074c5902d7289ad68dc4512441a9ce43c48680dd3819b44f99432140-d
+packagefile github.com/relux-works/curator/internal/marker=/Users/iv/Library/Caches/go-build/36/365ed88ae4a23e1f0c634150fc1fe6b38a4caf5ac28c35ed4202fd84df3328e3-d
+packagefile github.com/relux-works/curator/internal/registry=/Users/iv/Library/Caches/go-build/e6/e6af9bbc437e96329d49e079b2e660030bc2d7a0fa3b2d245b1ac5005190174c-d
+packagefile github.com/relux-works/curator/internal/scopes=/Users/iv/Library/Caches/go-build/84/848e38ad06cd8cc707da8c57df3fb5ade0ff50c1fd00cc9c16ad0e529457cee0-d
+packagefile github.com/relux-works/curator/internal/shell=/Users/iv/Library/Caches/go-build/07/07f7e6efdcc860316cfe9fe7e5886699da92ac8ac605ad7427ff1be479e9f665-d
+packagefile github.com/relux-works/curator/internal/skillcheck=/Users/iv/Library/Caches/go-build/38/38279d898b2db6d3029babdcf257fadded4ab383931765c7f056fc4fcfa2e777-d
+packagefile github.com/relux-works/curator/internal/ui=/Users/iv/Library/Caches/go-build/87/871193daf625e99cc99ca7a0d209a23d6576e6136572bade9ea8af110efc10b2-d
+packagefile github.com/relux-works/curator/internal/version=/Users/iv/Library/Caches/go-build/1e/1e6022175b88e6604c90ea8a65b8a15a424745bdf61745fe0fd0aae5a5bc0bf8-d
+packagefile os=/Users/iv/Library/Caches/go-build/60/60c114cd4c23a5539690f838932d8656aaa5ae01ccdaa363bf7fa7e3f4f62543-d
+packagefile path/filepath=/Users/iv/Library/Caches/go-build/f2/f21f3127dc9d5bd982b02c3a92d88fd867e61e94aaac2e4bcdcad76f99b65d3c-d
+packagefile sort=/Users/iv/Library/Caches/go-build/c4/c4613dc29bace0faf28ad1879cd9f2aa7321d2185608bee28a7b5f3b2496525e-d
+packagefile strings=/Users/iv/Library/Caches/go-build/16/1676272cc769823c094bfbb64b1dba85642bf908d4ca6729e15ffca9502a37c8-d
+packagefile time=/Users/iv/Library/Caches/go-build/cc/cc4fa4cfd1df3e09a239476e7389459eee94c57e26d34b0340c966ed61767e45-d
+packagefile runtime=/Users/iv/Library/Caches/go-build/98/9893da71725f2257b626417f443e9a2b5cc39e19f1856fe02d3876d6449c4b99-d
+packagefile bytes=/Users/iv/Library/Caches/go-build/9b/9b3064b43dee5111e73257eaf11d11250c306a22d81d624f686a7e026dd099b6-d
+packagefile errors=/Users/iv/Library/Caches/go-build/6d/6dcebf77e6589a0ce1250450206c818a22580b1286025a2be7adee5fa469141f-d
+packagefile io=/Users/iv/Library/Caches/go-build/dd/dd726905c8728c6ce00ae4f5098ce40bc65ea25499968b3180627040c1175cc4-d
+packagefile unicode/utf8=/Users/iv/Library/Caches/go-build/88/886c6f0a5e9285d9467c3dd6cb105302cf67e105886e0e30cc308488ba5555ae-d
+packagefile cmp=/Users/iv/Library/Caches/go-build/c4/c428cee8d9e0ee8ae6182793fe8c8e545cdbd067d71acfb0d04d1365901289f4-d
+packagefile encoding=/Users/iv/Library/Caches/go-build/22/223f097cedf597a3242560e948a1c670f5af90d8052fd5ead99ff4345a535302-d
+packagefile encoding/base64=/Users/iv/Library/Caches/go-build/c0/c01ec59b8f428f9400e6d9787bbc16af2462e466cfd2c74cc92f405d0bf166b3-d
+packagefile math=/Users/iv/Library/Caches/go-build/c9/c925fef6c4724612ebd282d64c8722166649ee8341bb4a46480dc3ecec1153e4-d
+packagefile reflect=/Users/iv/Library/Caches/go-build/5b/5b6cfee7bb9b6ee1852d6dd0cc482fb373c4f194ca129a9ad8a32aa419c7f4a7-d
+packagefile slices=/Users/iv/Library/Caches/go-build/fb/fb4639c805b7662aae8ff4ec4ffb6833132b653ba1d76d9ccb5db5351771ac50-d
+packagefile strconv=/Users/iv/Library/Caches/go-build/d7/d778319a002fdd4efe2d8defbbd1cee3893c2a89b59866f242af227f24977d84-d
+packagefile sync=/Users/iv/Library/Caches/go-build/88/885d0afb045593c9918bd596912f19e1e94d5da7d600459ec26d0a2a3b35dfe5-d
+packagefile unicode=/Users/iv/Library/Caches/go-build/14/140ea3d5e8ae80d35ea98b930a3bf829c08cf550262760abc107faaf494f8664-d
+packagefile unicode/utf16=/Users/iv/Library/Caches/go-build/d7/d787f461675fd798a07132784c8540d6896ab3545731b07f81a434de4ddd81cc-d
+packagefile internal/fmtsort=/Users/iv/Library/Caches/go-build/07/07bcb1cc57d8d8eb8b7d57fa7817b74bd8721da671709bbf478c42601ebf4c8b-d
+packagefile context=/Users/iv/Library/Caches/go-build/a5/a59442ddae017a0b22e394b57ac79c3e57600ba4c0d529b75977dcc7ceadbd4a-d
+packagefile github.com/charmbracelet/lipgloss=/Users/iv/Library/Caches/go-build/c4/c428d7b3bfa0cebcdce53b07ab42e29b53f6e9866bb2bd559684a0a4f35f205c-d
+packagefile github.com/charmbracelet/x/ansi=/Users/iv/Library/Caches/go-build/6f/6fbb5b92206464382ee6fbe6b3f0f69f17959c549705d866bcd29a194f136108-d
+packagefile github.com/charmbracelet/x/term=/Users/iv/Library/Caches/go-build/d6/d698eff0bff831a429bdd4e26c902c7f913e6b2dcf7b33929cff33e08085d896-d
+packagefile github.com/muesli/ansi/compressor=/Users/iv/Library/Caches/go-build/f0/f0ee718ec6e51048d3f1c2745cdac310367d6090da62746dff8e509b46bf85fe-d
+packagefile github.com/muesli/cancelreader=/Users/iv/Library/Caches/go-build/14/1442139ff3dff81197c918fee607446b1904f5b3314ad90e9a713c481c59541f-d
+packagefile log=/Users/iv/Library/Caches/go-build/3e/3ef93972b11179f4d0de81bd4356ee4aa74b1db0dafa9277505621ccbc205ce1-d
+packagefile os/exec=/Users/iv/Library/Caches/go-build/de/de3377bd261894c83ef4a4934a8a729de8d2b2925f4d5424e0845236a357e945-d
+packagefile os/signal=/Users/iv/Library/Caches/go-build/a9/a92477f5ea54d10f4e86b4375ed866cdc68aa8e22d146cfa53ec52a7ec8ee5ac-d
+packagefile regexp=/Users/iv/Library/Caches/go-build/ff/ffcd24659d8875635e89fb561cab956509d9273d16d81ba5e33fdcd56be8f4d7-d
+packagefile runtime/debug=/Users/iv/Library/Caches/go-build/63/63f34d92cbba839a16d6451540f3e06af40b6b23e8e1631994f46648a258c751-d
+packagefile sync/atomic=/Users/iv/Library/Caches/go-build/34/34219d0b9f699b33e1eb53bfefc2f7862d06433045f12bff5ee6878b6e179447-d
+packagefile syscall=/Users/iv/Library/Caches/go-build/e1/e10c61ed690f802d99e986d5301c4ec7fe12996a2726e497ced12cbcb7712eda-d
+packagefile github.com/relux-works/curator/internal/identifiers=/Users/iv/Library/Caches/go-build/7b/7bc62b4d85c076cbb0ec3caf7c1169bb3ae5d68f7b34acbc6f91885abd55b793-d
+packagefile github.com/relux-works/curator/internal/protocoljson=/Users/iv/Library/Caches/go-build/c4/c450ebdf7be3fa8d1e8830d1806be4075f674e66631db1330074b22bab056be8-d
+packagefile github.com/relux-works/curator/internal/capabilities=/Users/iv/Library/Caches/go-build/bb/bb4c28d968629fdff7a63f35a02284bcc4e7e110dfa8c3b4d07d37648f843f1d-d
+packagefile github.com/relux-works/curator/internal/identity=/Users/iv/Library/Caches/go-build/51/51172208cb01870223699477abca85c86a333bf6f18ead221f359280d9484152-d
+packagefile github.com/relux-works/curator/internal/skillspec=/Users/iv/Library/Caches/go-build/68/6894f9f1a801285c2635094b6712483bf8b82d70fe069fefc67739ab445213f5-d
+packagefile github.com/relux-works/curator/internal/snapshot=/Users/iv/Library/Caches/go-build/2f/2f78b7f99f752d86ea4fbf1f70ba0ee795e78d836de5a502067ce9daf3bcb832-d
+packagefile github.com/relux-works/curator/internal/verr=/Users/iv/Library/Caches/go-build/de/de66c14fea113261d34fa6c3acd435831a18da75744970827e137470c43dee03-d
+packagefile net=/Users/iv/Library/Caches/go-build/d6/d68cf5cc9846aaf39de9fd748006a6ec68319eeda3850c98a21789bfda2c7a22-d
+packagefile net/url=/Users/iv/Library/Caches/go-build/82/828903e2eaa44501ae26d6b4417e63df9a5b5980dbe0981acae8feb90be78e21-d
+packagefile archive/tar=/Users/iv/Library/Caches/go-build/75/752cda897884eb0c47bba9e5e324cf8d0fc57f581ebcae0a9c1a00018be94d74-d
+packagefile crypto/sha256=/Users/iv/Library/Caches/go-build/ff/ff5a204be35eed93dc7e167cc37339b9b5e5b5644c2265144f44a7efbf69efe7-d
+packagefile encoding/hex=/Users/iv/Library/Caches/go-build/64/64774d4134cd8350e41fde9dfca090816d8d8fb3a0f21fc59b7428412505b456-d
+packagefile io/fs=/Users/iv/Library/Caches/go-build/34/347f546e4ed8a854a68cd39724031b48c1e137d2b8161c25cb26ff90a1337be8-d
+packagefile github.com/relux-works/curator/internal/envfiles=/Users/iv/Library/Caches/go-build/a3/a332838941451a12e2db183ff379fec0329da32a87faa2914015d423d722cb32-d
+packagefile github.com/relux-works/curator/internal/globalbins=/Users/iv/Library/Caches/go-build/8a/8a7e3c215f7c857f6dd13cb805bf02e2490dceb79d0ab8d998b3597720f92cb3-d
+packagefile github.com/relux-works/curator/internal/locale=/Users/iv/Library/Caches/go-build/28/286cb1f08a5e39c9f726e38527dfd71c19e2394d41dcf0c4cf70cd1ff814b658-d
+packagefile github.com/relux-works/curator/internal/mcp=/Users/iv/Library/Caches/go-build/93/935178716dc2769cf685ad8d4a7d680a83e5d99da634f95becc21bafe1b85a27-d
+packagefile github.com/relux-works/curator/internal/runtimestore=/Users/iv/Library/Caches/go-build/b2/b27a094cbcc57419207066e7289cb9d0eaa6d5dca19c74955d391419c7587516-d
+packagefile github.com/relux-works/curator/internal/whitelist=/Users/iv/Library/Caches/go-build/f5/f594d91ed7c2ab7bcc41293d7cbd50cdef7c4b077860c5b57c2bc86e27339f8f-d
+packagefile crypto/ed25519=/Users/iv/Library/Caches/go-build/4d/4dc3716847aeeb95959cfaeea0fa34e051f449e5ceee3d22e0f69e427910664e-d
+packagefile net/http=/Users/iv/Library/Caches/go-build/87/87bc8cf62712ccf4bdef7289be785f0a44b94c63807a450415f349e86cd40fed-d
+packagefile internal/bytealg=/Users/iv/Library/Caches/go-build/77/7782824a7483b8e5c8c69c93fc7564595b21d070929e5de76f3a408681930515-d
+packagefile internal/filepathlite=/Users/iv/Library/Caches/go-build/88/88c78e883702089c3b38d39c5c5e8e7bff00fbad064343e8a8abccc8e4cddf84-d
+packagefile internal/itoa=/Users/iv/Library/Caches/go-build/46/4630513081e6d8c00f6faf1b9617871438a7249a173ee4456253fbb592a1bded-d
+packagefile internal/poll=/Users/iv/Library/Caches/go-build/74/7490b8adb52afa32b54f8a7938f7dce10ef8d379ea5b621dd06ad15f367bbf4b-d
+packagefile internal/stringslite=/Users/iv/Library/Caches/go-build/fb/fbf172c8e47c1ff865ba18fb87108d823c272a3a08cea261611681fa950d419e-d
+packagefile internal/syscall/execenv=/Users/iv/Library/Caches/go-build/1a/1a12a1d04929a85d7b0d5f55fdcef3f60111e9594d4c26893c9e82724a3d4a4d-d
+packagefile internal/syscall/unix=/Users/iv/Library/Caches/go-build/4a/4a67c3b612717ef89b6fd52fa49e2d1dc8044a04a0a8ba3d3c766f41979fdc7b-d
+packagefile internal/testlog=/Users/iv/Library/Caches/go-build/88/88d8c03e3c739101cbc19da4a4f5579fb9edfaa74128b258a64b1deea3f339d4-d
+packagefile internal/reflectlite=/Users/iv/Library/Caches/go-build/cf/cf05d03830c1eb4410b1d5102773fc06e32c46179db01900e408f9d2c4f0057a-d
+packagefile math/bits=/Users/iv/Library/Caches/go-build/32/32687994f5f12a3451b0f1e1dd45234cfae6c1c2080b3433d052ef29d1d77ad5-d
+packagefile internal/abi=/Users/iv/Library/Caches/go-build/16/168a54955c25ef083e832256f3d4767631140da95d96140f7c65a4993a40969e-d
+packagefile iter=/Users/iv/Library/Caches/go-build/44/44502ba8e4cd026231a31f3f2074be7e71c6e686c60286d1f21642a4def3cc98-d
+packagefile internal/godebug=/Users/iv/Library/Caches/go-build/97/9733dd138bcb77bbb92962c1c431fd692bbd4bb69883fcb0c8e4df312aeaa6e2-d
+packagefile internal/byteorder=/Users/iv/Library/Caches/go-build/b6/b6303218c6aa528e4aa3c036cbfb712eb149a42df7bcd2c48b135de92534d82f-d
+packagefile internal/chacha8rand=/Users/iv/Library/Caches/go-build/b4/b481f2bcad4445191367fda6faa4a1f69f8d4b6be5fa39cea222a4429a9ccb60-d
+packagefile internal/coverage/rtcov=/Users/iv/Library/Caches/go-build/4a/4afc3d9f65646c6decc75b5b5e9a771d60b14e9f4c08b4be0e13388cf33b96d4-d
+packagefile internal/cpu=/Users/iv/Library/Caches/go-build/9d/9db9a3635336c048b4b9bb7ccf7dfa2d0f83f1397fc538e86b5eb9df56a7de51-d
+packagefile internal/goarch=/Users/iv/Library/Caches/go-build/ec/ecf80b4e46c38e060c04d00394ad099a6626c223b32aa586f49fa950939b9d29-d
+packagefile internal/godebugs=/Users/iv/Library/Caches/go-build/bc/bc3292822c90abbb85b0c9f3d10b7b8b85282bfd3cd38b88ef25ff1439c0794f-d
+packagefile internal/goexperiment=/Users/iv/Library/Caches/go-build/a2/a234a0cfb5b56bd025c6178eda8fed29ef54049c28eff2ab1be2527798ba5e9c-d
+packagefile internal/goos=/Users/iv/Library/Caches/go-build/77/77e9ca83cf758acbb4305a8a3071d5ca90dca443f83e5c56e46f2579ba8119c6-d
+packagefile internal/profilerecord=/Users/iv/Library/Caches/go-build/99/992c553e7e964421d5e9d58e2d2f8f906a4efd73ab8adcd1ee0e360dcc35fdf6-d
+packagefile internal/runtime/atomic=/Users/iv/Library/Caches/go-build/1d/1dd632118447dc4edf2b6562527aa15d455e75c9771cb57ed0315510d92122f5-d
+packagefile internal/runtime/exithook=/Users/iv/Library/Caches/go-build/96/96940620519499079e9575242c1bdf057a1d7f37843535f063786c1489b2bdce-d
+packagefile internal/runtime/gc=/Users/iv/Library/Caches/go-build/ff/fff3aa4d291d76fe1ae93943b23cbaa3e62c720aea92eb097ec8a1425a7162a0-d
+packagefile internal/runtime/maps=/Users/iv/Library/Caches/go-build/40/40bb471e7e6a825de4b8d6ef42f8c86912777f8c10fccd3e4648416e399fea54-d
+packagefile internal/runtime/math=/Users/iv/Library/Caches/go-build/9e/9ed9523f1c7a96416e22b9b78b43342980b57d830051de470c299a76b9f88942-d
+packagefile internal/runtime/strconv=/Users/iv/Library/Caches/go-build/9c/9cf6e2db0151d30e1bfaa6f892f8d52e1b813ee1e47af42a150955c81411af77-d
+packagefile internal/runtime/sys=/Users/iv/Library/Caches/go-build/75/75dec2c13e23ad633b302060b767716b79362e6e73563c63660b299c85b32415-d
+packagefile internal/trace/tracev2=/Users/iv/Library/Caches/go-build/c4/c4d77252863c66ceed4ff4ea26bc8ebb27bc6f02b6b9275e341fc10dd9a96ed0-d
+packagefile internal/race=/Users/iv/Library/Caches/go-build/84/846b009a6fcb1d18038c3892e9632542a8e961487d2b59a7d28269ae7def7762-d
+packagefile internal/unsafeheader=/Users/iv/Library/Caches/go-build/5c/5cc32e98fb1f3cb5c7adae54c21c69f96595cd3ac3096f2f421311a7ba6feea6-d
+packagefile internal/sync=/Users/iv/Library/Caches/go-build/ba/bad1b040091dac460e32a80ea8dd84c94241d53bb7e21692b26199b3b8fb0e74-d
+packagefile internal/synctest=/Users/iv/Library/Caches/go-build/f2/f2bfa438eff676a16674b472b7843fce68bf60313f9114812340023856f40dfa-d
+packagefile github.com/charmbracelet/x/cellbuf=/Users/iv/Library/Caches/go-build/10/10a8dd5f9a1fa8b4652ef6ed05577b87a997a2f5ac00ce8494ee75ad534d6153-d
+packagefile github.com/muesli/termenv=/Users/iv/Library/Caches/go-build/5d/5d21136b164481cbeccc6389dd53409498b6017150d207571c62f4bc57080552-d
+packagefile github.com/rivo/uniseg=/Users/iv/Library/Caches/go-build/88/88090931dd9c14b13d015a0a5cc0caded9737b14714a5d842c1e02335b88a0e0-d
+packagefile github.com/charmbracelet/x/ansi/parser=/Users/iv/Library/Caches/go-build/27/27425b8bf9054e8ca137ad02ba0393e21bae9952e746298dfea0882fad2c3181-d
+packagefile github.com/lucasb-eyer/go-colorful=/Users/iv/Library/Caches/go-build/4a/4aaaae234a793d5eda4a07a865108ec8f15f8235eb5e960650d26420e3362761-d
+packagefile github.com/mattn/go-runewidth=/Users/iv/Library/Caches/go-build/72/7266eafbe22eec55c1822c9811efc8a6020086ef4e53505944060699439de055-d
+packagefile image/color=/Users/iv/Library/Caches/go-build/eb/eb1f16b29af944c0494f4e397849c2ec2015ebdefc12abdde40b38333447b071-d
+packagefile path=/Users/iv/Library/Caches/go-build/00/007f012d763fdaeecacfe2bfe3d20d6d5e6f5124f651814952569fcdfa15f5fa-d
+packagefile golang.org/x/sys/unix=/Users/iv/Library/Caches/go-build/f3/f3352f95f4b53cb35b68f7dd024e0df2ed34de7266b3cab8c6aac34deb28f1c1-d
+packagefile github.com/muesli/ansi=/Users/iv/Library/Caches/go-build/f0/f091209d9af39860b782456a86260f3beaa5b4aeb194fcae0f0ed4cd17cda743-d
+packagefile log/internal=/Users/iv/Library/Caches/go-build/ac/ace3bedfb748b65cb200690fc19ba1f1216428e296afeaeeaa2b037ecbab8a87-d
+packagefile regexp/syntax=/Users/iv/Library/Caches/go-build/30/301ab80ac7b5aca43482c23e6838d1817a1a2ab71691bd84652b505765169835-d
+packagefile internal/asan=/Users/iv/Library/Caches/go-build/df/dfbb081a37dc000f9f1ceb734f2666b8991b133a26f0514dfea68919f7492e37-d
+packagefile internal/msan=/Users/iv/Library/Caches/go-build/45/45e90905b1e047fb87a9c27e98cc2573aebd546b479bb2c77275fa1e9fd53f5b-d
+packagefile internal/oserror=/Users/iv/Library/Caches/go-build/db/db0606e42eb104f312f2ddb0c1e96bd08b58bd63bab141a8955d87fc2ac4f9f7-d
+packagefile vendor/golang.org/x/net/dns/dnsmessage=/Users/iv/Library/Caches/go-build/cd/cd03a92279ea1024a3176e6bbef3e83063987a84f576f086c695c33e1bdf0620-d
+packagefile internal/nettrace=/Users/iv/Library/Caches/go-build/cd/cdd3bcf96daaaf44120544bc902747bf18b0fce8657b5e6837f041bc0810dd65-d
+packagefile internal/routebsd=/Users/iv/Library/Caches/go-build/b3/b3ca5a773e67cb5ef195fe0f33c97b692c47f4c8ee00cb1260be59e5cf73ee05-d
+packagefile internal/singleflight=/Users/iv/Library/Caches/go-build/72/729bf38245e3f3358f042f443a42871ac989ce3bb130c97a45387468846391e1-d
+packagefile net/netip=/Users/iv/Library/Caches/go-build/90/90b97672254607a7855c5e0103dd752f590a87bfd962c11697c218f9e8efb75f-d
+packagefile maps=/Users/iv/Library/Caches/go-build/19/197cb9c1dc298e5ac107a1c8bf5fb487a8cdbe2c92d2865b5a15749583871ced-d
+packagefile os/user=/Users/iv/Library/Caches/go-build/02/02cb3c68b67eefb2d5c048281a767e572f3f043482f3b577a1076382692845e7-d
+packagefile crypto=/Users/iv/Library/Caches/go-build/54/54bfa51b5daa2973c89c6dc979a32a46e108c951c35fd181bde6ce52c0d366bd-d
+packagefile crypto/internal/boring=/Users/iv/Library/Caches/go-build/38/388a4c3100db1891249577c82f171ab53f6734b07bbb0b574f3333339d6ea7c2-d
+packagefile crypto/internal/fips140/sha256=/Users/iv/Library/Caches/go-build/4b/4b88de797af8242110f40591fa08ea25101b5055f0e1877bebb6be062a90b22f-d
+packagefile hash=/Users/iv/Library/Caches/go-build/5c/5ced3b40a5c2fd95e457742692307dc4fe857ca745911d93793f942f150f3b72-d
+packagefile github.com/BurntSushi/toml=/Users/iv/Library/Caches/go-build/28/288ffa1d8063155ddb175ff20801fc7a716b3f8756cdb1b56bea75f3a888cd65-d
+packagefile crypto/internal/fips140/ed25519=/Users/iv/Library/Caches/go-build/61/61a46efa426f3148ef6dbe614a199c2baac068ab79f842d4279b3d6b229a38d3-d
+packagefile crypto/internal/fips140cache=/Users/iv/Library/Caches/go-build/7d/7dfba44202a1d81183a5857643933174296d0f3c2a6e37f7d80bb19bd8e59043-d
+packagefile crypto/internal/fips140only=/Users/iv/Library/Caches/go-build/0d/0dcd1b57418f5a9c840b3bd9e212684e8b1803957926db283b38c8c6bb85afab-d
+packagefile crypto/rand=/Users/iv/Library/Caches/go-build/b1/b11171e5e05ebf7ca348788046bbab5babbcf0bdf13bbb5da741080d0f6cfdf9-d
+packagefile crypto/subtle=/Users/iv/Library/Caches/go-build/b1/b1162bbd1439b71719f310f35ee1f48e0b5c2ca99456770770437661b3ba1938-d
+packagefile compress/gzip=/Users/iv/Library/Caches/go-build/66/664d51bf1c7f0215c6727dbbcaa542c42180351884125a383bd5cfddebe6d6fe-d
+packagefile container/list=/Users/iv/Library/Caches/go-build/47/4728e9435e01459ac076dfed5b73a1f079c589a8dcdcfb5d8addb446d0579baf-d
+packagefile crypto/tls=/Users/iv/Library/Caches/go-build/b3/b3dffc0388a54206dce998a2d6e2b0f87a36992b1141a966d487f9c30ca60065-d
+packagefile encoding/binary=/Users/iv/Library/Caches/go-build/cc/ccf1029e733661ae8301228a4fd8c1c409aad4b644abddf7c9b7e6e951c6fd7a-d
+packagefile vendor/golang.org/x/net/http/httpguts=/Users/iv/Library/Caches/go-build/00/00517a7baddb4f5444fe2554483a300012232c32f8991fda56b15fa01579e6cf-d
+packagefile vendor/golang.org/x/net/http/httpproxy=/Users/iv/Library/Caches/go-build/a3/a300f4a2ef180b0d4ba44995024e6cc0c06247ded6af32f000529ded7cfae73d-d
+packagefile vendor/golang.org/x/net/http2/hpack=/Users/iv/Library/Caches/go-build/79/790c3d8b94863988ad426baa93c4a95dd312c20123e9c1a195c19ae78dff99fb-d
+packagefile vendor/golang.org/x/net/idna=/Users/iv/Library/Caches/go-build/e0/e02976b7f29f58db0d9fda8ab09f4ed58ad1b72636a169d74edb51b00b9d133f-d
+packagefile math/rand=/Users/iv/Library/Caches/go-build/b7/b73f31e09c7bca170b25b568b81e250046afc87af79deca9405fac39bc82b124-d
+packagefile mime=/Users/iv/Library/Caches/go-build/b8/b8b6b9fac2c47d744256d148c68c9a0e44581c975e42e2433677df6b6cb56700-d
+packagefile mime/multipart=/Users/iv/Library/Caches/go-build/d0/d034209b8d06f412f5284a737af98a2e6b77f923176290136e190e884329cd78-d
+packagefile net/http/httptrace=/Users/iv/Library/Caches/go-build/47/47d3b9b864e3635e73ab1e2f92d4406d9417ca15e8d8d5fbf30e417c19908317-d
+packagefile net/http/internal=/Users/iv/Library/Caches/go-build/1e/1e16e3cb432b5ed66dc3a49579787c7cb52b6c2729e7291572d7c40b868a55ec-d
+packagefile net/http/internal/ascii=/Users/iv/Library/Caches/go-build/55/5515b6480583ffc0b40e1a2302a833de2a676d6a2264f4364e8f35cd6794400b-d
+packagefile net/http/internal/httpcommon=/Users/iv/Library/Caches/go-build/91/91eba92bdf3301b34f59e8dee1bdf2b107255b1aac3d2190f8bdac26aff5f188-d
+packagefile net/textproto=/Users/iv/Library/Caches/go-build/e9/e9d63672383a0f72534f507757dfcdd06ceb06a0fa712994b3560e6b4f9edf09-d
+packagefile internal/bisect=/Users/iv/Library/Caches/go-build/d8/d80ca492de68822ab52cf36647dc5933873b9795b97a543ae6282466bf59d1bc-d
+packagefile github.com/charmbracelet/colorprofile=/Users/iv/Library/Caches/go-build/e6/e643bfb085292f9fe5d5b3f8c66c8d837f272478c6fa7f39b5d1385861ff583d-d
+packagefile image=/Users/iv/Library/Caches/go-build/20/2091be17251f8b719cd9438e8437fbb78ed3c286b558ac6896ac93b0bd1e211d-d
+packagefile github.com/aymanbagabas/go-osc52/v2=/Users/iv/Library/Caches/go-build/76/76128bf7d97674ec716a7c7b26cd910eb78270d97647d3d350a7bf96cb308094-d
+packagefile github.com/mattn/go-isatty=/Users/iv/Library/Caches/go-build/c4/c435e22fbe7660d015a98916605f73faeb5b5476658f3be6366c67ab99c0121c-d
+packagefile text/template=/Users/iv/Library/Caches/go-build/5c/5ccd4574847af3f6d87f3d411326d8acd08cd86f032ef3e167b6a25d18e64046-d
+packagefile database/sql/driver=/Users/iv/Library/Caches/go-build/62/628e15c4fce0d689859c364cf27b903dc602f24ca33ce84dc4e64d2337fdd4af-d
+packagefile unique=/Users/iv/Library/Caches/go-build/57/578c38a7de2f11a35684b0e622e11b146ed74b3fef453516d995d503aaf2ac0d-d
+packagefile crypto/cipher=/Users/iv/Library/Caches/go-build/55/5566d0c5e59eb8375f84c8b5c7b1bc202b77656134a7e140364ed5949e9f100b-d
+packagefile crypto/internal/boring/sig=/Users/iv/Library/Caches/go-build/87/8774d2f726b201d1d0b8a314f206ddcdb2a1b7377493091d673d7b44983cd770-d
+packagefile crypto/internal/fips140=/Users/iv/Library/Caches/go-build/4d/4df8406c732ec1bdd77a63138362f02f5c8ad783bebc492b632f92f756ddb039-d
+packagefile crypto/internal/fips140deps/byteorder=/Users/iv/Library/Caches/go-build/c3/c386e4f9bb011ce32d63d6507437304443d6f2da94cfdc6a60bf5f0d2d7751ae-d
+packagefile crypto/internal/fips140deps/cpu=/Users/iv/Library/Caches/go-build/4d/4d42df7aeb52048c2d93751ab737bb493be6a47fc744678b37f5d3079ae18e4e-d
+packagefile crypto/internal/impl=/Users/iv/Library/Caches/go-build/89/89181171fdf14f0864bed42d9b5f9cc9867b41335bad51047cab77beb7a09e91-d
+packagefile github.com/BurntSushi/toml/internal=/Users/iv/Library/Caches/go-build/16/16a4d485a9d6c2f36d29eed5ef92f75648bef3dfd84c77d4727ae86c3d0d2148-d
+packagefile crypto/internal/fips140/check=/Users/iv/Library/Caches/go-build/1e/1e9ba6bcc238c0a2a2d777765df07a9ce0b75c1ce95d0c9f8108433a10e0d608-d
+packagefile crypto/internal/fips140/drbg=/Users/iv/Library/Caches/go-build/90/907d7a739d595e866b74daaa7b1945424ae8b666fa155a81b7d2c76c1354f8e7-d
+packagefile crypto/internal/fips140/edwards25519=/Users/iv/Library/Caches/go-build/be/bedcf6ac7387bcb8dd76cded7182f7770a32d690e6ced1f631536a2b8fc93ad1-d
+packagefile crypto/internal/fips140/sha512=/Users/iv/Library/Caches/go-build/92/9207a2e2491a08fb90bacdac783a71467d5c6bd00b03545b1e751246c5d26f19-d
+packagefile weak=/Users/iv/Library/Caches/go-build/fc/fcb16467f8d7c6e700b739dda10dda7d608132879c8df1d6171b83ea8cd37374-d
+packagefile crypto/internal/fips140/sha3=/Users/iv/Library/Caches/go-build/ec/ec87b0592be71aa737776c5a65ce3740cf15a43afe484ba9e0c10fb9a81441d0-d
+packagefile crypto/internal/randutil=/Users/iv/Library/Caches/go-build/3e/3e42fb94a3c7681d4ea033e256b552865eae80d3ee8e67105ac29e3fb0fc7f5b-d
+packagefile crypto/internal/sysrand=/Users/iv/Library/Caches/go-build/5b/5bacbdfaea1d1b1197f7478c10de9ca64cef880238b9db6a1c495c5b8a9ad681-d
+packagefile math/big=/Users/iv/Library/Caches/go-build/d2/d2128c00f3fcbcd2c5adcd00cc0a4b6ae1c487b71c62ab07e2943e9f47435435-d
+packagefile crypto/internal/fips140/subtle=/Users/iv/Library/Caches/go-build/1c/1c398dbdfc2da6b75d868c6db19eb556f19d4a4e84264c509d8a141f50976466-d
+packagefile compress/flate=/Users/iv/Library/Caches/go-build/e4/e4c38f9841d3ba86b0e565f885960531aca4e24b70b327e83cce4b98694222f7-d
+packagefile hash/crc32=/Users/iv/Library/Caches/go-build/ca/cac0579b2f101d9d7c8e3e5e8814d5747897cebfb8e702f836fcf9e38171d6ad-d
+packagefile crypto/aes=/Users/iv/Library/Caches/go-build/5e/5e0eecb2631bfb54d02dc97831de4239b881462171d229d4cf47786397c38d70-d
+packagefile crypto/des=/Users/iv/Library/Caches/go-build/57/57961d8a466e96543c048b7f62dde68a0482449ffebee2d442491f5b95240ec6-d
+packagefile crypto/ecdh=/Users/iv/Library/Caches/go-build/d0/d071be78370c091a113357d27ce40bd1ecd1c622d0f2196d1bdc5a8e85d6a8ee-d
+packagefile crypto/ecdsa=/Users/iv/Library/Caches/go-build/de/de8d4c9272d6c3eb047dc819694b53bddcd791fe9a2447ae52461ef81dff3908-d
+packagefile crypto/elliptic=/Users/iv/Library/Caches/go-build/17/175b514cf19cafb42543b84d7405a61936e299c3085fd4851c28fa74d563f81b-d
+packagefile crypto/hkdf=/Users/iv/Library/Caches/go-build/e0/e01fb39ae4ab414086297b1d1272dd1c2ed0b3e47d68fc8a719999b25ca518fb-d
+packagefile crypto/hmac=/Users/iv/Library/Caches/go-build/7c/7c672eb3a4408ff53951f6cb3ea531ca51fa820fbd80cf2a5a96a39ccc09e5c4-d
+packagefile crypto/internal/fips140/aes=/Users/iv/Library/Caches/go-build/a4/a4121bcef50f927279afa13f971f4ca075ef98592b98c3a51f7b92dba0f9e7c3-d
+packagefile crypto/internal/fips140/aes/gcm=/Users/iv/Library/Caches/go-build/2e/2e98c0affa53ec7157d4889020a0ede8e54d18d56acbc27961a589e7da322be3-d
+packagefile crypto/internal/fips140/mlkem=/Users/iv/Library/Caches/go-build/e5/e5f4ca4f1b56b3430077a92ca9dc9c0af887b89e0e3320c60b33ff5e82cd2a51-d
+packagefile crypto/internal/fips140/tls12=/Users/iv/Library/Caches/go-build/fa/fa57e8a43eca66d52a33a982419b7b68c4ed5917450311d18eba2c18d217cec7-d
+packagefile crypto/internal/fips140/tls13=/Users/iv/Library/Caches/go-build/9e/9e04f630b27b7016b7a16d7fb19edaeafadf8e2eeae135f1492b1196e5cad2cb-d
+packagefile crypto/internal/hpke=/Users/iv/Library/Caches/go-build/5f/5f506ed100882fe55820669cc43ccda5d4373562aebadf958cde4bd08f3fce10-d
+packagefile crypto/md5=/Users/iv/Library/Caches/go-build/b9/b9951de7870290c3fcdd36732980309e64e4810fcf2ac9d99eb2e92c19217bc9-d
+packagefile crypto/rc4=/Users/iv/Library/Caches/go-build/0c/0cc9e10e44a9b6d5f58c9f2f73140aed1fe25e042378ae81174e8d29e41bf9d2-d
+packagefile crypto/rsa=/Users/iv/Library/Caches/go-build/5e/5e235f8c692381287ba1d22d0170aec286a4727f449f5ef053b89fc0856955aa-d
+packagefile crypto/sha1=/Users/iv/Library/Caches/go-build/6d/6d827913cfc7331bf58f9148c8748b0966876d8b97199a2076249ea96c0ac3fa-d
+packagefile crypto/sha512=/Users/iv/Library/Caches/go-build/7f/7fe78529c8ede491c3c6f643ac3bbf55576e8dfedbb218c29bf67f3eac17dac8-d
+packagefile crypto/tls/internal/fips140tls=/Users/iv/Library/Caches/go-build/b2/b23f3a8174c7b5f74e2f461f985a8c8983c44a052e509e6632b671814a9bf25d-d
+packagefile crypto/x509=/Users/iv/Library/Caches/go-build/8e/8ed179407dc0bfa8cf2add2ffd106a338933826648242c09baaaa26f45f2b600-d
+packagefile encoding/pem=/Users/iv/Library/Caches/go-build/1c/1cb46be6b3480d033189ed6d9280be8ed16e0ddaabb881107f723f1ce700d7da-d
+packagefile vendor/golang.org/x/crypto/chacha20poly1305=/Users/iv/Library/Caches/go-build/02/02fedde4d354c6bf4ad2df53b7115d7320352ad31daa31a65c2c64524121a7a6-d
+packagefile vendor/golang.org/x/crypto/cryptobyte=/Users/iv/Library/Caches/go-build/1f/1fec938076693a86d51fd987b85ccadefad60e1ed30188a7b90ab86afeb3ff7c-d
+packagefile vendor/golang.org/x/text/secure/bidirule=/Users/iv/Library/Caches/go-build/70/70aead77928af3b80be10902ca8a0787ef116e90e6fca69db5b88a5240b7399a-d
+packagefile vendor/golang.org/x/text/unicode/bidi=/Users/iv/Library/Caches/go-build/c1/c1130b84f5ef32a11e2160024a90f92d07b0753f93f921f3f57b44f92531ac2d-d
+packagefile vendor/golang.org/x/text/unicode/norm=/Users/iv/Library/Caches/go-build/c0/c009037c37335b76ad96f4bf7b64f800a57e6d7d8ab4c686337c4d4112378b3a-d
+packagefile mime/quotedprintable=/Users/iv/Library/Caches/go-build/5f/5fb236021978233ff488880dd9286ca2d532e0dc0b90bab0a289cffefda3767e-d
+packagefile github.com/xo/terminfo=/Users/iv/Library/Caches/go-build/dc/dc221c1885bf0d8947d2577137361832346a9df620418c66a1a0f80f35bebbff-d
+packagefile text/template/parse=/Users/iv/Library/Caches/go-build/dc/dca0e5faf15c3fcbda2aa47fcf312413e972eb9e630cca50f1cb215de7692626-d
+packagefile crypto/internal/fips140/alias=/Users/iv/Library/Caches/go-build/e1/e1c22b32e37207d6c1d947000206d75cf23ab90cacb235f41c1d09c04f4ef8c8-d
+packagefile crypto/internal/fips140deps/godebug=/Users/iv/Library/Caches/go-build/14/149b249586c8a5f7addd52085d3757c6df78821945b9ff280f5b5c48e36c8831-d
+packagefile crypto/internal/fips140/hmac=/Users/iv/Library/Caches/go-build/36/36bbff87a7722f97d83a1842083fa922e2a21e5c206ff7b51a61802ac34403ee-d
+packagefile crypto/internal/entropy=/Users/iv/Library/Caches/go-build/4a/4a31b091fa438ea2cb2315e3b361703e266c528d165a6c0f4ac0c5030d274e38-d
+packagefile crypto/internal/fips140/edwards25519/field=/Users/iv/Library/Caches/go-build/47/47f0f0f34f408020c045fd0b8fd64201f4f5ba82f68c83e4bdda560ae1f11b1b-d
+packagefile math/rand/v2=/Users/iv/Library/Caches/go-build/53/530e0f7be94efbf187a3a77c3efd845517550a411aee69f5a1d48883931acdfd-d
+packagefile crypto/internal/fips140/ecdh=/Users/iv/Library/Caches/go-build/db/db8a4c1017d3882d73073d8890eee7316eea57ef140925567a5e49635704a222-d
+packagefile crypto/internal/boring/bbig=/Users/iv/Library/Caches/go-build/0b/0b36ae439b667a9a4a4a8257926a4786adbdd3251da66b81229bf253d76082ce-d
+packagefile crypto/internal/fips140/ecdsa=/Users/iv/Library/Caches/go-build/d5/d54498874cfdbedfbff3beabf3897e58be9c50b233091a573bd0180fdb410786-d
+packagefile crypto/internal/fips140/nistec=/Users/iv/Library/Caches/go-build/db/dbd928e130f45de953863efcabe5133a25083ff495f78b6a4e0708e9af761ccc-d
+packagefile crypto/internal/fips140hash=/Users/iv/Library/Caches/go-build/23/23cf69cf2f6f74ac1d9e3a2f7276e25fc058b0e7a82d7db37b4c30aa5484ca91-d
+packagefile vendor/golang.org/x/crypto/cryptobyte/asn1=/Users/iv/Library/Caches/go-build/b3/b3b596575b3c4c6b3726e4882b8fdde16558a1030086a2ab00533397cc535124-d
+packagefile crypto/internal/fips140/hkdf=/Users/iv/Library/Caches/go-build/d6/d6785f5d9bef29204c4c8e7d81d92848f217f2d0ab3f44a9ea91541a03be1b02-d
+packagefile crypto/internal/fips140/bigmod=/Users/iv/Library/Caches/go-build/15/15c0596b7315344603c2fa1145a0e18e6820b1d7ab72dacab38582866991841d-d
+packagefile crypto/internal/fips140/rsa=/Users/iv/Library/Caches/go-build/42/4283cf1abff8dad1e3d0e894e8a55b5d7bccb10b80d55b72b358695d851e14b1-d
+packagefile crypto/fips140=/Users/iv/Library/Caches/go-build/24/2475b682304fc4d1f81a1dd8e1234f9253c54dfd7c9688fccb43ee076026a38b-d
+packagefile crypto/dsa=/Users/iv/Library/Caches/go-build/08/0871f4d6a5b24ff6b1b26d802b199678adc3f3adbe866eac5482d70628180b41-d
+packagefile crypto/x509/internal/macos=/Users/iv/Library/Caches/go-build/d3/d326f679c76c0fae584ef88e2928690c3249b2c904fc56fed73960bfe732d662-d
+packagefile crypto/x509/pkix=/Users/iv/Library/Caches/go-build/d8/d87cf9d02ab2c3d7527aaffa0256794d8b9fd27e2904601a11e8059249a7bc3a-d
+packagefile encoding/asn1=/Users/iv/Library/Caches/go-build/f2/f2c410f1aa758abbc8b29788ec70b400e8931695611993204a51975e9ff5eb67-d
+packagefile vendor/golang.org/x/crypto/chacha20=/Users/iv/Library/Caches/go-build/b7/b73d163e715d3fda3d829a8b7de2bd3b0b883f16ac4b1078aa0e6ebbc0c76eb1-d
+packagefile vendor/golang.org/x/crypto/internal/alias=/Users/iv/Library/Caches/go-build/b4/b47f5caca666cbffe82fa198a452ac4555657d15f822cdc8fb89389992dd4efa-d
+packagefile vendor/golang.org/x/crypto/internal/poly1305=/Users/iv/Library/Caches/go-build/39/399a485308b0557f0f4fca0ccbd4fa971396cd0c49737ce185c0774f5b24fabb-d
+packagefile vendor/golang.org/x/text/transform=/Users/iv/Library/Caches/go-build/96/9642f6238ca99538be6339bc6bcd4c65a9de1850cf0b1d55c9cdc192306d873d-d
+packagefile io/ioutil=/Users/iv/Library/Caches/go-build/86/86d0df9a1d52c0919db225be4e5f562905b85e5623b5d74a7b1764e2d13eee6e-d
+packagefile crypto/internal/fips140/nistec/fiat=/Users/iv/Library/Caches/go-build/7f/7f9424ca1754a46644f1b4c5f331c644a60c6afbd8f80e565b01bc619c9bd020-d
+packagefile crypto/sha3=/Users/iv/Library/Caches/go-build/39/39e6a10bc8d2d48d623df8a4dc0d67e8ea3645c347d1017c4d532d9c3b378b4b-d
+packagefile internal/saferio=/Users/iv/Library/Caches/go-build/c0/c05bbcef9fe03685b7cccc92e10eac484d1bab34814f4c6403b5112e393fa5ca-d
+modinfo "0w\xaf\f\x92t\b\x02A\xe1\xc1\a\xe6\xd6\x18\xe6path\tgithub.com/relux-works/curator/cmd/curator\nmod\tgithub.com/relux-works/curator\tv0.1.2-0.20260713131718-c06aa1a15e40+dirty\t\ndep\tgithub.com/BurntSushi/toml\tv1.6.0\th1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=\ndep\tgithub.com/aymanbagabas/go-osc52/v2\tv2.0.1\th1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=\ndep\tgithub.com/charmbracelet/bubbletea\tv1.3.10\th1:otUDHWMMzQSB0Pkc87rm691KZ3SWa4KUlvF9nRvCICw=\ndep\tgithub.com/charmbracelet/colorprofile\tv0.2.3-0.20250311203215-f60798e515dc\th1:4pZI35227imm7yK2bGPcfpFEmuY1gc2YSTShr4iJBfs=\ndep\tgithub.com/charmbracelet/lipgloss\tv1.1.0\th1:vYXsiLHVkK7fp74RkV7b2kq9+zDLoEU4MZoFqR/noCY=\ndep\tgithub.com/charmbracelet/x/ansi\tv0.10.1\th1:rL3Koar5XvX0pHGfovN03f5cxLbCF2YvLeyz7D2jVDQ=\ndep\tgithub.com/charmbracelet/x/cellbuf\tv0.0.13-0.20250311204145-2c3ea96c31dd\th1:vy0GVL4jeHEwG5YOXDmi86oYw2yuYUGqz6a8sLwg0X8=\ndep\tgithub.com/charmbracelet/x/term\tv0.2.1\th1:AQeHeLZ1OqSXhrAWpYUtZyX1T3zVxfpZuEQMIQaGIAQ=\ndep\tgithub.com/lucasb-eyer/go-colorful\tv1.2.0\th1:1nnpGOrhyZZuNyfu1QjKiUICQ74+3FNCN69Aj6K7nkY=\ndep\tgithub.com/mattn/go-isatty\tv0.0.20\th1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=\ndep\tgithub.com/mattn/go-runewidth\tv0.0.16\th1:E5ScNMtiwvlvB5paMFdw9p4kSQzbXFikJ5SQO6TULQc=\ndep\tgithub.com/muesli/ansi\tv0.0.0-20230316100256-276c6243b2f6\th1:ZK8zHtRHOkbHy6Mmr5D264iyp3TiX5OmNcI5cIARiQI=\ndep\tgithub.com/muesli/cancelreader\tv0.2.2\th1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELUXHmA=\ndep\tgithub.com/muesli/termenv\tv0.16.0\th1:S5AlUN9dENB57rsbnkPyfdGuWIlkmzJjbFf0Tf5FWUc=\ndep\tgithub.com/rivo/uniseg\tv0.4.7\th1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=\ndep\tgithub.com/xo/terminfo\tv0.0.0-20220910002029-abceb7e1c41e\th1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=\ndep\tgolang.org/x/sys\tv0.36.0\th1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=\nbuild\t-buildmode=exe\nbuild\t-compiler=gc\nbuild\tCGO_ENABLED=0\nbuild\tGOARCH=arm64\nbuild\tGOOS=darwin\nbuild\tGOARM64=v8.0\nbuild\tvcs=git\nbuild\tvcs.revision=c06aa1a15e4093410a686ff0ce4f579fba59dec1\nbuild\tvcs.time=2026-07-13T13:17:18Z\nbuild\tvcs.modified=true\n\xf92C1\x86\x18 r\x00\x82B\x10A\x16\xd8\xf2"
+EOF
+mkdir -p $WORK/b001/exe/
+cd .
+GOROOT='/Users/iv/.goenv/versions/1.25.5' /Users/iv/.goenv/versions/1.25.5/pkg/tool/darwin_arm64/link -o $WORK/b001/exe/a.out -importcfg $WORK/b001/importcfg.link -buildmode=pie -buildid=iM8tjKiMOVPiZGOwTvEu/KQpu8XJ3bb9pf2gHafV8/bFEi85Ho6NVaFREFvwiZ/iM8tjKiMOVPiZGOwTvEu -extld=cc $WORK/b001/_pkg_.a
+go tool buildid -w $WORK/b001/exe/a.out # internal
+# github.com/relux-works/curator/cmd/curator
+loadinternal: cannot find runtime/cgo
+ld: warning: no platform load command found in '/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/go-link-3696807101/go.o', assuming: macOS
+mkdir -p /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-poa3ze-review/
+mv $WORK/b001/exe/a.out /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-poa3ze-review/extlink-probe-curator
+rm -rf $WORK/b001/

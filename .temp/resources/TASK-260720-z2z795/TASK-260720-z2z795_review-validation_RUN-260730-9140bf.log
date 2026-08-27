@@ -1,0 +1,184 @@
+TASK-260720-z2z795 INDEPENDENT REVIEW VALIDATION
+run: RUN-260730-9140bf
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+HEAD: 5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+verdict: accepted
+
+TOOL READINESS
+
+task-board version 0.23.0 (commit beec6e9, built 2026-07-27T23:36:53Z)
+git version 2.50.1 (Apple Git-155)
+ripgrep 15.2.0
+Python 3.11.14
+pytest 8.3.4
+mypy 2.3.0 (compiled: yes)
+ruff 0.16.0
+build 1.2.2.post1
+
+CURRENT REWORK BOUNDARIES
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_windows_nested_missing_identity_is_recanonicalized_after_creation
+  tests/test_locking.py::test_each_lock_class_recanonicalizes_the_home_before_process_reservation
+  tests/test_locking.py::test_windows_case_sensitive_first_use_keeps_distinct_lock_classes_concurrent
+  tests/test_transactions.py::test_home_lock_witness_is_bound_to_the_engine_home_before_state_access
+  tests/test_transactions.py::test_entry_target_commit_replaces_the_link_without_mutating_referents
+  tests/test_transactions.py::test_entry_kind_digests_the_link_destination_while_bytes_remain_strict
+  tests/test_transactions.py::test_entry_target_removal_unlinks_only_the_owned_entry
+  tests/test_transactions.py::test_entry_target_rollback_restores_the_exact_link
+  tests/test_transactions.py::test_entry_target_recovery_finishes_an_interrupted_link_commit
+  tests/test_transactions.py::test_entry_target_stale_preimage_preserves_a_repointed_link_and_referents
+  tests/test_transactions.py::test_entry_target_and_its_referent_are_independent_transaction_namespaces
+  tests/test_transactions.py::test_recovery_preserves_cleanup_tomb_reappearing_after_removed_state
+exit: 0
+result: 19 passed, 3 skipped in 6.89s
+
+PRESCRIBED PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  Exact 14-node selection from TASK-260720-z2z795_current-rework-validation.log
+  covering stable legacy migration, stale-breaker serialization, canonical
+  home/project/build lock namespace rejection, held-witness preservation,
+  physical aliases, corrupt-journal lock redirection, and witness loss.
+exit: 0
+result: 14 passed in 5.64s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  Exact 13-node selection covering canonical lock ordering, lock-order
+  failures, durable journal ordering and consumer-last commit, cross-project
+  recovery, reverse rollback, concurrent consumers, stale-preimage defense,
+  and generation changes.
+exit: 0
+result: 13 passed in 15.47s
+
+FOCUSED PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: 124 passed, 4 skipped in 61.60s
+
+FULL PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+exit: 0
+result: 694 passed, 23 skipped in 150.92s
+
+STRICT MYPY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+result: Success: no issues found in 57 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: 4 files already formatted
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+  --outdir
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-z2z795/review-RUN-260730-9140bf/build
+exit: 0
+result:
+  Successfully built
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730.tar.gz
+  cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730-py3-none-any.whl
+
+build SHA-256:
+  538fdc7ebdcc8bd2ea1aae44f18ad44f4f9811b7a1ff62b75364e9a1a671d5c9
+    cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730.tar.gz
+  bf56481055afe57cf27c7e4c1d71267be2d30b5a700830e36a754d96b3105a4c
+    cocoaskills-0.12.6.dev2+g5f8bfbbd6.d20260730-py3-none-any.whl
+
+DIFF CHECK
+
+command: git diff --check
+exit: 0
+result: empty
+
+ADDITIONAL ADVERSARIAL PROBE
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src /opt/homebrew/bin/python3.11 -
+  (temporary-directory canonical removed-sidecar reappearance at a durable
+  journal tomb; no repository writes)
+exit: 0
+result:
+  canonical_removed_sidecar_preserved=True
+  journal_tomb_preserved=True
+  committed_live_preserved=True
+
+PROVENANCE
+
+accepted base:
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12
+
+git merge-base --is-ancestor accepted-base HEAD:
+  exit 0
+
+git rev-parse HEAD:
+  5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+
+git rev-parse origin/task/TASK-260720-z2z795-transaction-engine:
+  5f8bfbbd6e0c3a00dd0a3de0295e74f05990a0ec
+
+canonical main:
+  ## main...origin/main
+  HEAD: 495ad021847529ce5a544dba415ca2fe19949539
+  origin/main: 495ad021847529ce5a544dba415ca2fe19949539
+
+task worktree status:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/locking.py
+   M src/csk/transactions.py
+   M tests/test_locking.py
+   M tests/test_transactions.py
+
+source SHA-256:
+  88a1d0db58c8eb6834cd460b6067371fce222c010d0b1c2b67cae69670015932
+    src/csk/locking.py
+  f479fe784a4dd485d355e41c5344717ad26fbb4eecb10fd52ca9f87d7558b34a
+    src/csk/transactions.py
+  a10530435846d48c3eda01d034c3e717bbbc9763857d658970e313c155e0cca2
+    tests/test_locking.py
+  3d1a03d559b20de0113a434db56b3c184727b390993d894f9b4811875c1223a8
+    tests/test_transactions.py
+
+PLATFORM AND REVIEWER BOUNDARY
+
+The run executed on macOS. One existing real-Windows durability test and three
+current real-Windows per-directory case-sensitive contention cases were
+collected but skipped. Pure Windows routing/recanonicalization cases ran; no
+current-byte real-Windows result is claimed.
+
+The reviewer changed no product or test source, staged or committed nothing,
+performed no fetch/reset/rebase/push/tag/release/SSH operation, and supplied no
+commit_ack. The standalone logbook executable is unavailable (exit 1);
+important evidence is persisted in the task-scoped verdict, validation
+resource, and board note.

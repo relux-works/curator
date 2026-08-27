@@ -1,0 +1,45 @@
+{
+  "id": "RUN-260824-6ac619",
+  "task_id": "TASK-260825-1lausy",
+  "created_at": "2026-08-24T23:03:01.574211Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "claude-fable-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-fable-5"
+    },
+    "resolved": {
+      "model": "claude-fable-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "claude",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-03-03-01_-reviewer--reviewer--claude-_TASK-260825-1lausy.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "40m0s",
+  "log_resource_name": "TASK-260825-1lausy_spawn-log_-reviewer--reviewer--claude-_RUN-260824-6ac619.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260825-1lausy_results.md",
+    "TASK-260825-1lausy_spawn-log_-implementer--developer--codex-_RUN-260824-6a9f60.log",
+    "TASK-260825-1lausy_spawn-log_-reviewer--reviewer--claude-_RUN-260824-50980d.log"
+  ]
+}

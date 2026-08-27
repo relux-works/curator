@@ -1,0 +1,567 @@
+﻿2026-07-31T09:39:43.8879870Z Current runner version: '2.336.0'
+2026-07-31T09:39:43.8912238Z ##[group]Runner Image Provisioner
+2026-07-31T09:39:43.8913327Z Hosted Compute Agent
+2026-07-31T09:39:43.8914192Z Version: 20260707.563
+2026-07-31T09:39:43.8915036Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+2026-07-31T09:39:43.8916005Z Build Date: 2026-07-07T19:33:50Z
+2026-07-31T09:39:43.8916948Z Worker ID: {d748b449-8a72-47bf-b10e-77352524a2d7}
+2026-07-31T09:39:43.8917907Z Azure Region: westus
+2026-07-31T09:39:43.8918639Z ##[endgroup]
+2026-07-31T09:39:43.8920202Z ##[group]Operating System
+2026-07-31T09:39:43.8921125Z Microsoft Windows Server 2025
+2026-07-31T09:39:43.8922542Z 10.0.26100
+2026-07-31T09:39:43.8923350Z Datacenter
+2026-07-31T09:39:43.8924107Z ##[endgroup]
+2026-07-31T09:39:43.8924966Z ##[group]Runner Image
+2026-07-31T09:39:43.8925871Z Image: windows-2025-vs2026
+2026-07-31T09:39:43.8926803Z Version: 20260714.173.1
+2026-07-31T09:39:43.8928808Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260714.173/images/windows/Windows2025-VS2026-Readme.md
+2026-07-31T09:39:43.8931732Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260714.173
+2026-07-31T09:39:43.8933626Z ##[endgroup]
+2026-07-31T09:39:43.8935771Z ##[group]GITHUB_TOKEN Permissions
+2026-07-31T09:39:43.8938419Z Contents: read
+2026-07-31T09:39:43.8939578Z Metadata: read
+2026-07-31T09:39:43.8940745Z ##[endgroup]
+2026-07-31T09:39:43.8943877Z Secret source: Actions
+2026-07-31T09:39:43.8945864Z Prepare workflow directory
+2026-07-31T09:39:43.9340828Z Prepare all required actions
+2026-07-31T09:39:43.9390982Z Getting action download info
+2026-07-31T09:39:44.3004913Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-07-31T09:39:45.6772591Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+2026-07-31T09:39:46.1196486Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-07-31T09:39:50.0749530Z Complete job name: Test (windows-latest)
+2026-07-31T09:39:51.4328775Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-31T09:39:51.4337404Z ##[group]Run actions/checkout@v4
+2026-07-31T09:39:51.4337942Z with:
+2026-07-31T09:39:51.4338203Z   submodules: true
+2026-07-31T09:39:51.4338531Z   repository: relux-works/curator
+2026-07-31T09:39:51.4340995Z   token: ***
+2026-07-31T09:39:51.4341275Z   ssh-strict: true
+2026-07-31T09:39:51.4341571Z   ssh-user: git
+2026-07-31T09:39:51.4341855Z   persist-credentials: true
+2026-07-31T09:39:51.4342161Z   clean: true
+2026-07-31T09:39:51.4342448Z   sparse-checkout-cone-mode: true
+2026-07-31T09:39:51.4342761Z   fetch-depth: 1
+2026-07-31T09:39:51.4343459Z   fetch-tags: false
+2026-07-31T09:39:51.4343753Z   show-progress: true
+2026-07-31T09:39:51.4344144Z   lfs: false
+2026-07-31T09:39:51.4344411Z   set-safe-directory: true
+2026-07-31T09:39:51.4344722Z   allow-unsafe-pr-checkout: false
+2026-07-31T09:39:51.4345314Z env:
+2026-07-31T09:39:51.4345626Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:39:51.4346011Z   GOTOOLCHAIN: local
+2026-07-31T09:39:51.4346277Z   GOENV: off
+2026-07-31T09:39:51.4346599Z ##[endgroup]
+2026-07-31T09:39:51.6008387Z Syncing repository: relux-works/curator
+2026-07-31T09:39:51.6009663Z ##[group]Getting Git version info
+2026-07-31T09:39:51.6009976Z Working directory is 'D:\a\curator\curator'
+2026-07-31T09:39:51.6965726Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-07-31T09:39:51.9002510Z git version 2.55.0.windows.2
+2026-07-31T09:39:51.9057030Z ##[endgroup]
+2026-07-31T09:39:51.9075759Z Temporarily overriding HOME='D:\a\_temp\9f6de250-b656-4cdf-b0a1-d93a36ddab02' before making global git config changes
+2026-07-31T09:39:51.9079940Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-31T09:39:51.9093838Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+2026-07-31T09:39:51.9413624Z Deleting the contents of 'D:\a\curator\curator'
+2026-07-31T09:39:51.9419421Z ##[group]Initializing the repository
+2026-07-31T09:39:51.9427855Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator
+2026-07-31T09:39:52.0066741Z Initialized empty Git repository in D:/a/curator/curator/.git/
+2026-07-31T09:39:52.0114076Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator
+2026-07-31T09:39:52.0451379Z ##[endgroup]
+2026-07-31T09:39:52.0451821Z ##[group]Disabling automatic garbage collection
+2026-07-31T09:39:52.0467833Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-07-31T09:39:52.0800413Z ##[endgroup]
+2026-07-31T09:39:52.0800824Z ##[group]Setting up auth
+2026-07-31T09:39:52.0813670Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-07-31T09:39:52.1150965Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-07-31T09:39:53.2676008Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-31T09:39:53.2976652Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-07-31T09:39:53.8744059Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-31T09:39:53.9063065Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-07-31T09:39:54.4412594Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-07-31T09:39:54.4723435Z ##[endgroup]
+2026-07-31T09:39:54.4723970Z ##[group]Fetching the repository
+2026-07-31T09:39:54.4737206Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9b00cd9ba135e5156cbff2b21038eed10aa15e64:refs/remotes/pull/10/merge
+2026-07-31T09:39:55.5237106Z From https://github.com/relux-works/curator
+2026-07-31T09:39:55.5238177Z  * [new ref]         9b00cd9ba135e5156cbff2b21038eed10aa15e64 -> pull/10/merge
+2026-07-31T09:39:55.5283082Z ##[endgroup]
+2026-07-31T09:39:55.5284613Z ##[group]Determining the checkout info
+2026-07-31T09:39:55.5286602Z ##[endgroup]
+2026-07-31T09:39:55.5296784Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-07-31T09:39:55.5635932Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-07-31T09:39:55.5959312Z ##[group]Checking out the ref
+2026-07-31T09:39:55.5960248Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force refs/remotes/pull/10/merge
+2026-07-31T09:39:55.7363986Z Note: switching to 'refs/remotes/pull/10/merge'.
+2026-07-31T09:39:55.7364404Z 
+2026-07-31T09:39:55.7364647Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-07-31T09:39:55.7365217Z changes and commit them, and you can discard any commits you make in this
+2026-07-31T09:39:55.7366562Z state without impacting any branches by switching back to a branch.
+2026-07-31T09:39:55.7367017Z 
+2026-07-31T09:39:55.7367361Z If you want to create a new branch to retain commits you create, you may
+2026-07-31T09:39:55.7368173Z do so (now or later) by using -c with the switch command. Example:
+2026-07-31T09:39:55.7368628Z 
+2026-07-31T09:39:55.7370096Z   git switch -c <new-branch-name>
+2026-07-31T09:39:55.7370461Z 
+2026-07-31T09:39:55.7370668Z Or undo this operation with:
+2026-07-31T09:39:55.7370988Z 
+2026-07-31T09:39:55.7371131Z   git switch -
+2026-07-31T09:39:55.7371353Z 
+2026-07-31T09:39:55.7371733Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-07-31T09:39:55.7372314Z 
+2026-07-31T09:39:55.7373039Z HEAD is now at 9b00cd9 Merge 8a686920fc05c92b7e5b8d8bfd9d3de39d6e5a98 into cfffd7cd7be33aba9ca44d26993ce5ab19b5fa4d
+2026-07-31T09:39:55.7427958Z ##[endgroup]
+2026-07-31T09:39:55.7428585Z ##[group]Setting up auth for fetching submodules
+2026-07-31T09:39:55.7440854Z [command]"C:\Program Files\Git\bin\git.exe" config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-07-31T09:39:55.7764812Z [command]"C:\Program Files\Git\bin\git.exe" config --global --unset-all url.https://github.com/.insteadOf
+2026-07-31T09:39:55.8069654Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf git@github.com:
+2026-07-31T09:39:55.8381592Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf org-261817730@github.com:
+2026-07-31T09:39:55.8681630Z ##[endgroup]
+2026-07-31T09:39:55.8681976Z ##[group]Fetching submodules
+2026-07-31T09:39:55.8691611Z [command]"C:\Program Files\Git\bin\git.exe" submodule sync
+2026-07-31T09:39:56.4076334Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 submodule update --init --force --depth=1
+2026-07-31T09:39:56.9214144Z Submodule 'agents/skills/skill-go-testing-tools' (https://github.com/relux-works/skill-go-testing-tools.git) registered for path 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:39:56.9465731Z Cloning into 'D:/a/curator/curator/agents/skills/skill-go-testing-tools'...
+2026-07-31T09:39:58.8721440Z From https://github.com/relux-works/skill-go-testing-tools
+2026-07-31T09:39:58.8722094Z  * branch            21585d0e937cae47e54a788d8ae36b1780eae47f -> FETCH_HEAD
+2026-07-31T09:39:58.9576503Z Submodule path 'agents/skills/skill-go-testing-tools': checked out '21585d0e937cae47e54a788d8ae36b1780eae47f'
+2026-07-31T09:39:58.9676185Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local gc.auto 0"
+2026-07-31T09:39:59.5087411Z Entering 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:39:59.5538278Z ##[endgroup]
+2026-07-31T09:39:59.5538901Z ##[group]Persisting credentials for submodules
+2026-07-31T09:39:59.5550392Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :\""
+2026-07-31T09:40:00.0934104Z Entering 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:40:00.1908106Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "sh -c \"git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url\""
+2026-07-31T09:40:00.7141652Z Entering 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:40:00.7954856Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+2026-07-31T09:40:00.8081118Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'"
+2026-07-31T09:40:01.3282652Z Entering 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:40:01.3734611Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'org-261817730@github.com:'"
+2026-07-31T09:40:01.8838772Z Entering 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:40:01.9299309Z ##[endgroup]
+2026-07-31T09:40:01.9625803Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-07-31T09:40:01.9901565Z 9b00cd9ba135e5156cbff2b21038eed10aa15e64
+2026-07-31T09:40:02.0391313Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-31T09:40:02.0393933Z ##[group]Run actions/checkout@v4
+2026-07-31T09:40:02.0394252Z with:
+2026-07-31T09:40:02.0394511Z   repository: relux-works/curator-spec
+2026-07-31T09:40:02.0394904Z   ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:40:02.0395290Z   path: protocol-spec
+2026-07-31T09:40:02.0398879Z   token: ***
+2026-07-31T09:40:02.0399124Z   ssh-strict: true
+2026-07-31T09:40:02.0399375Z   ssh-user: git
+2026-07-31T09:40:02.0399637Z   persist-credentials: true
+2026-07-31T09:40:02.0399933Z   clean: true
+2026-07-31T09:40:02.0400195Z   sparse-checkout-cone-mode: true
+2026-07-31T09:40:02.0400525Z   fetch-depth: 1
+2026-07-31T09:40:02.0400833Z   fetch-tags: false
+2026-07-31T09:40:02.0401087Z   show-progress: true
+2026-07-31T09:40:02.0401345Z   lfs: false
+2026-07-31T09:40:02.0401628Z   submodules: false
+2026-07-31T09:40:02.0401887Z   set-safe-directory: true
+2026-07-31T09:40:02.0402195Z   allow-unsafe-pr-checkout: false
+2026-07-31T09:40:02.0402507Z env:
+2026-07-31T09:40:02.0402781Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:40:02.0403175Z   GOTOOLCHAIN: local
+2026-07-31T09:40:02.0403430Z   GOENV: off
+2026-07-31T09:40:02.0403652Z ##[endgroup]
+2026-07-31T09:40:02.1559105Z Syncing repository: relux-works/curator-spec
+2026-07-31T09:40:02.1567846Z ##[group]Getting Git version info
+2026-07-31T09:40:02.1568341Z Working directory is 'D:\a\curator\curator\protocol-spec'
+2026-07-31T09:40:02.2421468Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-07-31T09:40:02.2699338Z git version 2.55.0.windows.2
+2026-07-31T09:40:02.2748921Z ##[endgroup]
+2026-07-31T09:40:02.2766910Z Temporarily overriding HOME='D:\a\_temp\860b5d63-74e0-406d-8765-45232872fd90' before making global git config changes
+2026-07-31T09:40:02.2768682Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-31T09:40:02.2778263Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+2026-07-31T09:40:02.3091816Z ##[group]Initializing the repository
+2026-07-31T09:40:02.3101844Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator\protocol-spec
+2026-07-31T09:40:02.3455956Z Initialized empty Git repository in D:/a/curator/curator/protocol-spec/.git/
+2026-07-31T09:40:02.3500099Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator-spec
+2026-07-31T09:40:02.3799366Z ##[endgroup]
+2026-07-31T09:40:02.3799757Z ##[group]Disabling automatic garbage collection
+2026-07-31T09:40:02.3809799Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-07-31T09:40:02.4097260Z ##[endgroup]
+2026-07-31T09:40:02.4097642Z ##[group]Setting up auth
+2026-07-31T09:40:02.4110388Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-07-31T09:40:02.4426746Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-07-31T09:40:02.9725293Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-31T09:40:03.0042834Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-07-31T09:40:03.5463600Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-31T09:40:03.5767095Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-07-31T09:40:04.0989944Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-07-31T09:40:04.1304451Z ##[endgroup]
+2026-07-31T09:40:04.1305043Z ##[group]Fetching the repository
+2026-07-31T09:40:04.1318137Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:40:04.6140765Z From https://github.com/relux-works/curator-spec
+2026-07-31T09:40:04.6141305Z  * branch            00b1688a9b2457ca397a0bb550acf47cad8ee967 -> FETCH_HEAD
+2026-07-31T09:40:04.6180240Z ##[endgroup]
+2026-07-31T09:40:04.6180951Z ##[group]Determining the checkout info
+2026-07-31T09:40:04.6183356Z ##[endgroup]
+2026-07-31T09:40:04.6192445Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-07-31T09:40:04.6519326Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-07-31T09:40:04.6803479Z ##[group]Checking out the ref
+2026-07-31T09:40:04.6813201Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:40:04.7609069Z Note: switching to '00b1688a9b2457ca397a0bb550acf47cad8ee967'.
+2026-07-31T09:40:04.7609585Z 
+2026-07-31T09:40:04.7609946Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-07-31T09:40:04.7610787Z changes and commit them, and you can discard any commits you make in this
+2026-07-31T09:40:04.7611616Z state without impacting any branches by switching back to a branch.
+2026-07-31T09:40:04.7612103Z 
+2026-07-31T09:40:04.7612433Z If you want to create a new branch to retain commits you create, you may
+2026-07-31T09:40:04.7613198Z do so (now or later) by using -c with the switch command. Example:
+2026-07-31T09:40:04.7613702Z 
+2026-07-31T09:40:04.7613883Z   git switch -c <new-branch-name>
+2026-07-31T09:40:04.7614176Z 
+2026-07-31T09:40:04.7614333Z Or undo this operation with:
+2026-07-31T09:40:04.7614601Z 
+2026-07-31T09:40:04.7614727Z   git switch -
+2026-07-31T09:40:04.7614924Z 
+2026-07-31T09:40:04.7615280Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-07-31T09:40:04.7615813Z 
+2026-07-31T09:40:04.7616167Z HEAD is now at 00b1688 Adopt agent-skill.json as the canonical manifest (#11)
+2026-07-31T09:40:04.7670124Z ##[endgroup]
+2026-07-31T09:40:04.7985413Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-07-31T09:40:04.8250107Z 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:40:04.8623361Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-31T09:40:04.8624732Z ##[group]Run actions/setup-go@v5
+2026-07-31T09:40:04.8624955Z with:
+2026-07-31T09:40:04.8625127Z   go-version-file: go.mod
+2026-07-31T09:40:04.8625332Z   check-latest: false
+2026-07-31T09:40:04.8627621Z   token: ***
+2026-07-31T09:40:04.8627790Z   cache: true
+2026-07-31T09:40:04.8627943Z env:
+2026-07-31T09:40:04.8628142Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:40:04.8628413Z   GOTOOLCHAIN: local
+2026-07-31T09:40:04.8628585Z   GOENV: off
+2026-07-31T09:40:04.8628738Z ##[endgroup]
+2026-07-31T09:40:05.0247917Z Setup go version spec 1.25.5
+2026-07-31T09:40:05.0263494Z Attempting to download 1.25.5...
+2026-07-31T09:40:05.0466489Z (node:7000) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-31T09:40:05.0467199Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-31T09:40:05.6408743Z matching 1.25.5...
+2026-07-31T09:40:05.6456134Z Acquiring 1.25.5 from https://github.com/actions/go-versions/releases/download/1.25.5-19880500865/go-1.25.5-win32-x64.zip
+2026-07-31T09:40:06.2991436Z Extracting Go...
+2026-07-31T09:40:06.3943783Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command "$ErrorActionPreference = 'Stop' ; try { Add-Type -AssemblyName System.IO.Compression.ZipFile } catch { } ; try { [System.IO.Compression.ZipFile]::ExtractToDirectory('D:\a\_temp\go-1.25.5-win32-x64.zip', 'D:\a\_temp\298e3b81-7b66-4285-80cf-6c5fafde61b9', $true) } catch { if (($_.Exception.GetType().FullName -eq 'System.Management.Automation.MethodException') -or ($_.Exception.GetType().FullName -eq 'System.Management.Automation.RuntimeException') ){ Expand-Archive -LiteralPath 'D:\a\_temp\go-1.25.5-win32-x64.zip' -DestinationPath 'D:\a\_temp\298e3b81-7b66-4285-80cf-6c5fafde61b9' -Force } else { throw $_ } } ;"
+2026-07-31T09:40:11.3194001Z Successfully extracted go to D:\a\_temp\298e3b81-7b66-4285-80cf-6c5fafde61b9
+2026-07-31T09:40:11.3194525Z Adding to the cache ...
+2026-07-31T09:40:22.6569829Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64 => D:\hostedtoolcache\windows\go\1.25.5\x64
+2026-07-31T09:40:22.6575196Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64.complete => D:\hostedtoolcache\windows\go\1.25.5\x64.complete
+2026-07-31T09:40:22.6576421Z Successfully cached go to C:\hostedtoolcache\windows\go\1.25.5\x64
+2026-07-31T09:40:22.6583983Z Added go to the path
+2026-07-31T09:40:22.6587112Z Successfully set up Go version 1.25.5
+2026-07-31T09:40:23.1256319Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOCACHE
+2026-07-31T09:40:23.1303732Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOMODCACHE
+2026-07-31T09:40:23.1615105Z C:\Users\runneradmin\AppData\Local\go-build
+2026-07-31T09:40:23.1621556Z C:\Users\runneradmin\go\pkg\mod
+2026-07-31T09:40:23.5647080Z Cache is not found
+2026-07-31T09:40:23.5664433Z go version go1.25.5 windows/amd64
+2026-07-31T09:40:23.5664640Z 
+2026-07-31T09:40:23.5664913Z ##[group]go env
+2026-07-31T09:40:26.6238797Z set AR=ar
+2026-07-31T09:40:26.6239139Z set CC=gcc
+2026-07-31T09:40:26.6239480Z set CGO_CFLAGS=-O2 -g
+2026-07-31T09:40:26.6239911Z set CGO_CPPFLAGS=
+2026-07-31T09:40:26.6240233Z set CGO_CXXFLAGS=-O2 -g
+2026-07-31T09:40:26.6240587Z set CGO_ENABLED=1
+2026-07-31T09:40:26.6240899Z set CGO_FFLAGS=-O2 -g
+2026-07-31T09:40:26.6241221Z set CGO_LDFLAGS=-O2 -g
+2026-07-31T09:40:26.6241554Z set CXX=g++
+2026-07-31T09:40:26.6241857Z set GCCGO=gccgo
+2026-07-31T09:40:26.6242163Z set GO111MODULE=
+2026-07-31T09:40:26.6242434Z set GOAMD64=v1
+2026-07-31T09:40:26.6244913Z set GOARCH=amd64
+2026-07-31T09:40:26.6245286Z set GOAUTH=netrc
+2026-07-31T09:40:26.6245566Z set GOBIN=
+2026-07-31T09:40:26.6245937Z set GOCACHE=C:\Users\runneradmin\AppData\Local\go-build
+2026-07-31T09:40:26.6246450Z set GOCACHEPROG=
+2026-07-31T09:40:26.6246741Z set GODEBUG=
+2026-07-31T09:40:26.6247034Z set GOENV=
+2026-07-31T09:40:26.6247309Z set GOEXE=.exe
+2026-07-31T09:40:26.6247598Z set GOEXPERIMENT=
+2026-07-31T09:40:26.6247907Z set GOFIPS140=off
+2026-07-31T09:40:26.6248208Z set GOFLAGS=
+2026-07-31T09:40:26.6249390Z set GOGCCFLAGS=-m64 -mthreads -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=C:\Users\RUNNER~1\AppData\Local\Temp\go-build523310982=/tmp/go-build -gno-record-gcc-switches
+2026-07-31T09:40:26.6251001Z set GOHOSTARCH=amd64
+2026-07-31T09:40:26.6251310Z set GOHOSTOS=windows
+2026-07-31T09:40:26.6251619Z set GOINSECURE=
+2026-07-31T09:40:26.6251934Z set GOMOD=D:\a\curator\curator\go.mod
+2026-07-31T09:40:26.6252395Z set GOMODCACHE=C:\Users\runneradmin\go\pkg\mod
+2026-07-31T09:40:26.6252846Z set GONOPROXY=
+2026-07-31T09:40:26.6253121Z set GONOSUMDB=
+2026-07-31T09:40:26.6253377Z set GOOS=windows
+2026-07-31T09:40:26.6253681Z set GOPATH=C:\Users\runneradmin\go
+2026-07-31T09:40:26.6254106Z set GOPRIVATE=
+2026-07-31T09:40:26.6254495Z set GOPROXY=https://proxy.golang.org,direct
+2026-07-31T09:40:26.6255282Z set GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+2026-07-31T09:40:26.6255759Z set GOSUMDB=sum.golang.org
+2026-07-31T09:40:26.6256096Z set GOTELEMETRY=local
+2026-07-31T09:40:26.6256586Z set GOTELEMETRYDIR=C:\Users\runneradmin\AppData\Roaming\go\telemetry
+2026-07-31T09:40:26.6257144Z set GOTMPDIR=
+2026-07-31T09:40:26.6257423Z set GOTOOLCHAIN=local
+2026-07-31T09:40:26.6257952Z set GOTOOLDIR=C:\hostedtoolcache\windows\go\1.25.5\x64\pkg\tool\windows_amd64
+2026-07-31T09:40:26.6258556Z set GOVCS=
+2026-07-31T09:40:26.6258822Z set GOVERSION=go1.25.5
+2026-07-31T09:40:26.6259113Z set GOWORK=
+2026-07-31T09:40:26.6259390Z set PKG_CONFIG=pkg-config
+2026-07-31T09:40:26.6259610Z 
+2026-07-31T09:40:26.6260653Z ##[endgroup]
+2026-07-31T09:40:26.6557906Z ##[group]Run bash .github/ci/toolchain-identity.sh
+2026-07-31T09:40:26.6558392Z [36;1mbash .github/ci/toolchain-identity.sh[0m
+2026-07-31T09:40:26.6580183Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-07-31T09:40:26.6580612Z env:
+2026-07-31T09:40:26.6580832Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:40:26.6581117Z   GOTOOLCHAIN: local
+2026-07-31T09:40:26.6581296Z   GOENV: off
+2026-07-31T09:40:26.6581458Z ##[endgroup]
+2026-07-31T09:40:26.9502459Z toolchain: go version go1.25.5 windows/amd64
+2026-07-31T09:40:26.9979192Z toolchain: GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+2026-07-31T09:40:27.0796072Z toolchain: GOTOOLCHAIN=local
+2026-07-31T09:40:27.1223467Z toolchain: GOENV=<none>
+2026-07-31T09:40:27.1224418Z ci-toolchain-identity: ok
+2026-07-31T09:40:27.1453037Z ##[group]Run go vet ./...
+2026-07-31T09:40:27.1453349Z [36;1mgo vet ./...[0m
+2026-07-31T09:40:27.1599587Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-07-31T09:40:27.1600003Z env:
+2026-07-31T09:40:27.1600226Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:40:27.1600518Z   GOTOOLCHAIN: local
+2026-07-31T09:40:27.1600706Z   GOENV: off
+2026-07-31T09:40:27.1600893Z ##[endgroup]
+2026-07-31T09:40:27.7004434Z go: downloading github.com/charmbracelet/bubbletea v1.3.10
+2026-07-31T09:40:27.7082427Z go: downloading golang.org/x/sys v0.36.0
+2026-07-31T09:40:27.7430770Z go: downloading golang.org/x/text v0.3.8
+2026-07-31T09:40:27.9876591Z go: downloading github.com/BurntSushi/toml v1.6.0
+2026-07-31T09:40:28.4569966Z go: downloading github.com/charmbracelet/lipgloss v1.1.0
+2026-07-31T09:40:29.1424012Z go: downloading github.com/charmbracelet/x/ansi v0.10.1
+2026-07-31T09:40:29.2606904Z go: downloading github.com/charmbracelet/x/term v0.2.1
+2026-07-31T09:40:29.2892754Z go: downloading github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f
+2026-07-31T09:40:29.3259262Z go: downloading github.com/mattn/go-localereader v0.0.1
+2026-07-31T09:40:29.3523024Z go: downloading github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
+2026-07-31T09:40:29.3549289Z go: downloading github.com/muesli/cancelreader v0.2.2
+2026-07-31T09:40:29.4299108Z go: downloading github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd
+2026-07-31T09:40:29.4301857Z go: downloading github.com/muesli/termenv v0.16.0
+2026-07-31T09:40:29.4327153Z go: downloading github.com/rivo/uniseg v0.4.7
+2026-07-31T09:40:29.4833528Z go: downloading github.com/lucasb-eyer/go-colorful v1.2.0
+2026-07-31T09:40:29.4862183Z go: downloading github.com/mattn/go-runewidth v0.0.16
+2026-07-31T09:40:29.5814693Z go: downloading github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc
+2026-07-31T09:40:29.5837359Z go: downloading github.com/aymanbagabas/go-osc52/v2 v2.0.1
+2026-07-31T09:40:29.5844179Z go: downloading github.com/mattn/go-isatty v0.0.20
+2026-07-31T09:40:29.6573704Z go: downloading github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
+2026-07-31T09:41:00.6154760Z ##[group]Run bash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger
+2026-07-31T09:41:00.6155393Z [36;1mbash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger[0m
+2026-07-31T09:41:00.6173242Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-07-31T09:41:00.6173640Z env:
+2026-07-31T09:41:00.6174080Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:41:00.6174636Z   GOTOOLCHAIN: local
+2026-07-31T09:41:00.6174819Z   GOENV: off
+2026-07-31T09:41:00.6174987Z ##[endgroup]
+2026-07-31T09:41:14.0157488Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix [must=windows skip=-]
+2026-07-31T09:41:14.0158545Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix/* [must=- skip=windows]
+2026-07-31T09:41:14.0159568Z ok    internal/buildcache :: TestValidateWindowsSecurityPolicy [must=windows skip=-]
+2026-07-31T09:41:14.0160852Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry [must=windows skip=windows]
+2026-07-31T09:41:14.0162443Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot [must=windows skip=windows]
+2026-07-31T09:41:14.0163263Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+2026-07-31T09:41:14.0165045Z ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+2026-07-31T09:41:14.0167770Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0169945Z ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0171437Z ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+2026-07-31T09:41:14.0172881Z ok    internal/buildcache :: TestUnixProtectedStateMatrix [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0174519Z ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0175950Z ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0177155Z ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0178449Z ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0179558Z ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0180417Z ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0183010Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0184596Z ok    internal/buildsource :: TestRejectsSpecialFile [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0186664Z ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin skip=windows]
+2026-07-31T09:41:14.0188328Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0189431Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation/* [must=- skip=linux,darwin,windows]
+2026-07-31T09:41:14.0191306Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0193665Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0194912Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/* [must=- skip=linux,darwin,windows]
+2026-07-31T09:41:14.0195623Z ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0196243Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0199699Z excl  internal/godriver :: TestResourceLimitsStayInsideManagerBounds (package excluded on linux by the supplied root)
+2026-07-31T09:41:14.0200675Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds [must=darwin,windows skip=-]
+2026-07-31T09:41:14.0201724Z excl  internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly (package excluded on linux by the supplied root)
+2026-07-31T09:41:14.0203155Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly [must=darwin,windows skip=-]
+2026-07-31T09:41:14.0204964Z excl  internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (package excluded on linux by the supplied root)
+2026-07-31T09:41:14.0206372Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes [must=darwin,windows skip=-]
+2026-07-31T09:41:14.0207206Z excl  internal/godriver :: TestPerFileSizeLimitIsReallyApplied (package excluded on linux by the supplied root)
+2026-07-31T09:41:14.0208238Z ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied [must=darwin skip=windows]
+2026-07-31T09:41:14.0209635Z excl  internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart (package excluded on linux by the supplied root)
+2026-07-31T09:41:14.0211008Z ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart [must=windows skip=darwin]
+2026-07-31T09:41:14.0212456Z excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation (package excluded on linux by the supplied root)
+2026-07-31T09:41:14.0213981Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation [must=darwin,windows skip=-]
+2026-07-31T09:41:14.0215283Z ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+2026-07-31T09:41:14.0216632Z ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+2026-07-31T09:41:14.0217810Z ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+2026-07-31T09:41:14.0219032Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0220170Z ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0221347Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0223474Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths [must=linux,darwin,windows skip=linux,darwin,windows]
+2026-07-31T09:41:14.0225545Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves [must=linux,darwin,windows skip=linux,darwin,windows]
+2026-07-31T09:41:14.0227578Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped [must=linux,darwin,windows skip=linux,darwin,windows]
+2026-07-31T09:41:14.0229505Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0231283Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0233151Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly [must=linux,darwin,windows skip=linux,darwin,windows]
+2026-07-31T09:41:14.0234012Z ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0234683Z excl  internal/godriver :: TestCandidateGoV1SourceAwareContract (package excluded on linux by the supplied root)
+2026-07-31T09:41:14.0235443Z ok    internal/godriver :: TestCandidateGoV1SourceAwareContract [must=darwin,windows skip=darwin,windows]
+2026-07-31T09:41:14.0236213Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker [must=linux,darwin,windows skip=-]
+2026-07-31T09:41:14.0236872Z ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+2026-07-31T09:41:14.0237179Z 
+2026-07-31T09:41:14.0238074Z ledger-consistency: 49 rows checked across linux darwin windows
+2026-07-31T09:41:14.0238470Z ledger-consistency: ok
+2026-07-31T09:41:14.0405597Z ##[group]Run bash .github/ci/test-gate.sh .temp/ci-evidence/test
+2026-07-31T09:41:14.0406776Z [36;1mbash .github/ci/test-gate.sh .temp/ci-evidence/test[0m
+2026-07-31T09:41:14.0422693Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-07-31T09:41:14.0423082Z env:
+2026-07-31T09:41:14.0423299Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:41:14.0423588Z   GOTOOLCHAIN: local
+2026-07-31T09:41:14.0423767Z   GOENV: off
+2026-07-31T09:41:14.0424109Z   CURATOR_CONFORMANCE_ROOT: D:\a\curator\curator/protocol-spec/conformance/v1
+2026-07-31T09:41:14.0424478Z ##[endgroup]
+2026-07-31T09:41:14.1866430Z test-gate: flags=<none> timeout=30m
+2026-07-31T09:41:14.1867213Z test-gate: conformance root=D:\a\curator\curator/protocol-spec/conformance/v1
+2026-07-31T09:41:14.1867749Z 
+2026-07-31T09:41:33.9846930Z suite-plan: GOOS=windows
+2026-07-31T09:41:33.9848316Z suite-plan: root=D:\a\curator\curator/protocol-spec/conformance/v1
+2026-07-31T09:41:33.9851891Z suite-plan: the root publishes no vectors/conformance-claim-v3-qualification.json; the recorded default_excluded_on applies
+2026-07-31T09:41:33.9853169Z 
+2026-07-31T09:41:33.9853732Z defer internal/buildcache
+2026-07-31T09:41:33.9856363Z       the supplied root publishes none of: vectors/build-drivers.json
+2026-07-31T09:41:33.9857471Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+2026-07-31T09:41:33.9858216Z defer internal/buildsource
+2026-07-31T09:41:33.9858927Z       the supplied root publishes none of: vectors/build-drivers.json
+2026-07-31T09:41:33.9860077Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+2026-07-31T09:41:33.9861091Z defer internal/install
+2026-07-31T09:41:33.9862129Z       the supplied root publishes none of: vectors/build-drivers.json
+2026-07-31T09:41:33.9863773Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+2026-07-31T09:41:33.9864625Z defer internal/marker
+2026-07-31T09:41:33.9865671Z       the supplied root publishes none of: schema-cases/install-marker-v2 expected/build-driver/marker.json
+2026-07-31T09:41:33.9866528Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+2026-07-31T09:41:33.9867044Z defer internal/scopes
+2026-07-31T09:41:33.9867563Z       the supplied root publishes none of: vectors/external-repository-lifecycle.json
+2026-07-31T09:41:33.9868674Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+2026-07-31T09:41:33.9869230Z defer internal/skillspec
+2026-07-31T09:41:33.9869829Z       the supplied root publishes none of: schema-cases/agent-skill-v6 fixtures/go-build-skill
+2026-07-31T09:41:33.9870542Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+2026-07-31T09:41:33.9871022Z defer internal/whitelist
+2026-07-31T09:41:33.9871633Z       the supplied root publishes none of: fixtures/go-build-skill expected/build-driver/context_files.json
+2026-07-31T09:41:33.9872405Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+2026-07-31T09:41:33.9872799Z 
+2026-07-31T09:41:33.9872963Z suite-plan: served=33 deferred=7 excluded=0
+2026-07-31T09:41:33.9888706Z suite-plan: ok
+2026-07-31T09:43:56.4409089Z test-gate: stage served exit=1 (stream: .temp/ci-evidence/test/go-test-served.json)
+2026-07-31T09:44:33.7701794Z test-gate: stage deferred exit=1 (stream: .temp/ci-evidence/test/go-test-deferred.json)
+2026-07-31T09:44:33.7704393Z 
+2026-07-31T09:44:33.7705342Z test-gate: go test overall exit=1 (merged stream: .temp/ci-evidence/test/go-test.json)
+2026-07-31T09:44:33.7706396Z 
+2026-07-31T09:44:34.5820996Z platform-case gate: GOOS=windows
+2026-07-31T09:44:34.5822174Z platform-case gate: ledger=.github/ci/platform-cases.tsv
+2026-07-31T09:44:34.5831204Z platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+2026-07-31T09:44:34.5832875Z 
+2026-07-31T09:44:34.5833594Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix
+2026-07-31T09:44:34.5837897Z ok    internal/buildcache :: TestValidateWindowsSecurityPolicy
+2026-07-31T09:44:34.5839515Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry
+2026-07-31T09:44:34.5840593Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot
+2026-07-31T09:44:34.5843249Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes
+2026-07-31T09:44:34.5845128Z FAIL  required case failed: internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode
+2026-07-31T09:44:34.5846962Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+2026-07-31T09:44:34.5859382Z ok    internal/runtimestore :: TestRuntimeCommandPath
+2026-07-31T09:44:34.5870282Z ok    internal/config :: TestBootstrapAndAddProject
+2026-07-31T09:44:34.5871664Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+2026-07-31T09:44:34.5872773Z FAIL  required case failed: internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+2026-07-31T09:44:34.5873998Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+2026-07-31T09:44:34.5874976Z ok    internal/install :: TestDryRunTouchesNothing
+2026-07-31T09:44:34.5875785Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+2026-07-31T09:44:34.5876715Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+2026-07-31T09:44:34.5877697Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+2026-07-31T09:44:34.5878827Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+2026-07-31T09:44:34.5879987Z ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart
+2026-07-31T09:44:34.5881089Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+2026-07-31T09:44:34.5882684Z ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt
+2026-07-31T09:44:34.5883615Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+2026-07-31T09:44:34.5884509Z FAIL  required case failed: internal/install :: TestEndToEndInstall
+2026-07-31T09:44:34.5885446Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+2026-07-31T09:44:34.5886635Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+2026-07-31T09:44:34.5888024Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+2026-07-31T09:44:34.5889587Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+2026-07-31T09:44:34.5891268Z FAIL  required case failed: internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+2026-07-31T09:44:34.5894272Z FAIL  required case failed: internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+2026-07-31T09:44:34.5896847Z FAIL  required case failed: internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+2026-07-31T09:44:34.5898222Z ok    internal/interop :: TestGoldenContextCopy
+2026-07-31T09:44:34.5904350Z tol   internal/godriver :: TestCandidateGoV1SourceAwareContract (tolerated skip: root-content)
+2026-07-31T09:44:34.5907508Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+2026-07-31T09:44:34.5908282Z 
+2026-07-31T09:44:34.5908834Z platform-case gate: 63 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+2026-07-31T09:44:34.5909704Z platform-case gate: FAILED
+2026-07-31T09:44:34.5910300Z 
+2026-07-31T09:44:34.5912122Z test-gate: go test exit=1, platform-case gate exit=1
+2026-07-31T09:44:34.5928913Z ##[error]Process completed with exit code 1.
+2026-07-31T09:44:34.6192239Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-31T09:44:34.6194031Z ##[group]Run actions/upload-artifact@v4
+2026-07-31T09:44:34.6194286Z with:
+2026-07-31T09:44:34.6194472Z   name: test-evidence-windows-latest
+2026-07-31T09:44:34.6194731Z   path: .temp/ci-evidence/
+2026-07-31T09:44:34.6194947Z   if-no-files-found: warn
+2026-07-31T09:44:34.6195155Z   compression-level: 6
+2026-07-31T09:44:34.6195346Z   overwrite: false
+2026-07-31T09:44:34.6195536Z   include-hidden-files: false
+2026-07-31T09:44:34.6195778Z env:
+2026-07-31T09:44:34.6195980Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+2026-07-31T09:44:34.6196256Z   GOTOOLCHAIN: local
+2026-07-31T09:44:34.6196431Z   GOENV: off
+2026-07-31T09:44:34.6196630Z ##[endgroup]
+2026-07-31T09:44:34.8421975Z (node:6232) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-31T09:44:34.8423120Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-31T09:44:34.8580878Z With the provided path, there will be 23 files uploaded
+2026-07-31T09:44:34.8587986Z Artifact name is valid!
+2026-07-31T09:44:34.8589611Z Root directory input is valid!
+2026-07-31T09:44:35.2100363Z Beginning upload of artifact content to blob storage
+2026-07-31T09:44:35.3283383Z (node:6232) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-31T09:44:35.9862648Z Uploaded bytes 292602
+2026-07-31T09:44:36.0673907Z Finished uploading artifact content to blob storage!
+2026-07-31T09:44:36.0675191Z SHA256 digest of uploaded artifact zip is 5258e67b147a3eb680634dd42e7c930e23041bc20977bd91c25796481b456569
+2026-07-31T09:44:36.0677587Z Finalizing artifact upload
+2026-07-31T09:44:36.2878688Z Artifact test-evidence-windows-latest.zip successfully finalized. Artifact ID 8789366268
+2026-07-31T09:44:36.2880138Z Artifact test-evidence-windows-latest has been successfully uploaded! Final size is 292602 bytes. Artifact ID is 8789366268
+2026-07-31T09:44:36.2891096Z Artifact download URL: https://github.com/relux-works/curator/actions/runs/30620739038/artifacts/8789366268
+2026-07-31T09:44:36.3336742Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-31T09:44:36.3338097Z Post job cleanup.
+2026-07-31T09:44:36.5705710Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-07-31T09:44:36.6026666Z git version 2.55.0.windows.2
+2026-07-31T09:44:36.6103987Z Temporarily overriding HOME='D:\a\_temp\87069601-7763-4121-b424-8651f44a0449' before making global git config changes
+2026-07-31T09:44:36.6105335Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-31T09:44:36.6117025Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+2026-07-31T09:44:36.6455004Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-07-31T09:44:36.6792971Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-07-31T09:44:37.2398517Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-31T09:44:37.2671275Z http.https://github.com/.extraheader
+2026-07-31T09:44:37.2716993Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-07-31T09:44:37.3039654Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-07-31T09:44:37.9090469Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-31T09:44:37.9455182Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-07-31T09:44:38.5703294Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-31T09:44:38.5704631Z Post job cleanup.
+2026-07-31T09:44:38.7743938Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-07-31T09:44:38.8050561Z git version 2.55.0.windows.2
+2026-07-31T09:44:38.8133489Z Temporarily overriding HOME='D:\a\_temp\d59bc0a8-4eec-4e67-86f5-71b1042a40af' before making global git config changes
+2026-07-31T09:44:38.8134739Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-31T09:44:38.8145892Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+2026-07-31T09:44:38.8485275Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-07-31T09:44:38.8799642Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-07-31T09:44:39.4850197Z Entering 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:44:39.5936831Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-31T09:44:39.6211790Z http.https://github.com/.extraheader
+2026-07-31T09:44:39.6257479Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+2026-07-31T09:44:39.6575438Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-07-31T09:44:40.6251752Z Entering 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:44:40.7002992Z http.https://github.com/.extraheader
+2026-07-31T09:44:40.7620034Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-31T09:44:40.7960710Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-07-31T09:44:41.3763150Z Entering 'agents/skills/skill-go-testing-tools'
+2026-07-31T09:44:41.4137368Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+2026-07-31T09:44:41.4412632Z [command]"C:\Program Files\Git\bin\git.exe" config --file D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-31T09:44:41.4927037Z Cleaning up orphan processes
+2026-07-31T09:44:41.5142113Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

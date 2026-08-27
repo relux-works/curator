@@ -1,0 +1,53 @@
+{
+  "id": "RUN-260730-644c1c",
+  "task_id": "TASK-260720-3t8nr3",
+  "created_at": "2026-07-30T20:20:48.57199Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260731-00-20-48_-implementer--developer--claude-_TASK-260720-3t8nr3.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "budget": 8,
+  "log_resource_name": "TASK-260720-3t8nr3_spawn-log_-implementer--developer--claude-_RUN-260730-644c1c.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-3t8nr3_results.md",
+    "TASK-260720-3t8nr3_review-verdict.md",
+    "TASK-260720-3t8nr3_spawn-log_-implementer--developer--codex-_RUN-260730-41c0aa.log",
+    "TASK-260720-3t8nr3_spawn-log_-implementer--developer--codex-_RUN-260730-41e013.log",
+    "TASK-260720-3t8nr3_spawn-log_-reviewer--reviewer--claude-_RUN-260730-c38a81.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-3t8nr3_results.md": "3f67102fb97f83df21544c561f145b81d11b6dd60f8209ea0e8c2fe3ce4d16a4",
+    "TASK-260720-3t8nr3_review-verdict.md": "071e51912143814f112c27c90ed1cad4bac68c092d1c8036fdf11c1362f7e4e3"
+  },
+  "require_outcome_artifact": true
+}

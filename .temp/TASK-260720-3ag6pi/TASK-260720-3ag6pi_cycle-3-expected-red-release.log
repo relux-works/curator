@@ -1,0 +1,120 @@
+EEEEEEEEEEEE
+======================================================================
+ERROR: test_accepts_claim_for_current_rc5_suite (test_release_gate.ProtocolRC5ReleaseGateTests.test_accepts_claim_for_current_rc5_suite)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 415, in test_accepts_claim_for_current_rc5_suite
+    self._write_json(path, self._valid_claim())
+                           ~~~~~~~~~~~~~~~~~^^
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 324, in _valid_claim
+    claim["suite_sha256"] = release_gate.current_suite_sha256()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'current_suite_sha256'
+
+======================================================================
+ERROR: test_accepts_complete_rc5_artifact_set (test_release_gate.ProtocolRC5ReleaseGateTests.test_accepts_complete_rc5_artifact_set)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 328, in test_accepts_complete_rc5_artifact_set
+    release_gate.validate_protocol_artifacts(self.VERSION)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'validate_protocol_artifacts'
+
+======================================================================
+ERROR: test_rejects_claim_v3_transition_mismatch (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_claim_v3_transition_mismatch)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 411, in test_rejects_claim_v3_transition_mismatch
+    release_gate.validate_protocol_artifacts(self.VERSION)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'validate_protocol_artifacts'
+
+======================================================================
+ERROR: test_rejects_duplicate_suite_hash_in_rc5_claim (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_duplicate_suite_hash_in_rc5_claim)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 429, in test_rejects_duplicate_suite_hash_in_rc5_claim
+    claim = self._valid_claim()
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 324, in _valid_claim
+    claim["suite_sha256"] = release_gate.current_suite_sha256()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'current_suite_sha256'
+
+======================================================================
+ERROR: test_rejects_each_missing_required_artifact (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_each_missing_required_artifact)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 331, in test_rejects_each_missing_required_artifact
+    for relative in sorted(release_gate.RC5_REQUIRED_FILES):
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'RC5_REQUIRED_FILES'
+
+======================================================================
+ERROR: test_rejects_missing_required_manifest_entry (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_missing_required_manifest_entry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 361, in test_rejects_missing_required_manifest_entry
+    release_gate.validate_protocol_artifacts(self.VERSION)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'validate_protocol_artifacts'
+
+======================================================================
+ERROR: test_rejects_redefined_claim_v1_and_v2_history (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_redefined_claim_v1_and_v2_history) (schema='conformance-claim-v1.schema.json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 401, in test_rejects_redefined_claim_v1_and_v2_history
+    release_gate.validate_protocol_artifacts(self.VERSION)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'validate_protocol_artifacts'
+
+======================================================================
+ERROR: test_rejects_redefined_claim_v1_and_v2_history (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_redefined_claim_v1_and_v2_history) (schema='conformance-claim-v2.schema.json')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 401, in test_rejects_redefined_claim_v1_and_v2_history
+    release_gate.validate_protocol_artifacts(self.VERSION)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'validate_protocol_artifacts'
+
+======================================================================
+ERROR: test_rejects_removed_lifecycle_case_with_updated_manifest_hash (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_removed_lifecycle_case_with_updated_manifest_hash)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 369, in test_rejects_removed_lifecycle_case_with_updated_manifest_hash
+    for case in vector["recovery_cases"]
+                ~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'recovery_cases'
+
+======================================================================
+ERROR: test_rejects_renamed_v6_schema (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_renamed_v6_schema)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 349, in test_rejects_renamed_v6_schema
+    release_gate.validate_protocol_artifacts(self.VERSION)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'validate_protocol_artifacts'
+
+======================================================================
+ERROR: test_rejects_stale_compiled_fixture_with_updated_manifest_hash (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_stale_compiled_fixture_with_updated_manifest_hash)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 382, in test_rejects_stale_compiled_fixture_with_updated_manifest_hash
+    vector["compiled_build_fixture"]["execution_policy"] = "hardened-worker-v1"
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'compiled_build_fixture'
+
+======================================================================
+ERROR: test_rejects_stale_suite_hash_as_rc5_evidence (test_release_gate.ProtocolRC5ReleaseGateTests.test_rejects_stale_suite_hash_as_rc5_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 419, in test_rejects_stale_suite_hash_as_rc5_evidence
+    claim = self._valid_claim()
+  File "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3/tools/test_release_gate.py", line 324, in _valid_claim
+    claim["suite_sha256"] = release_gate.current_suite_sha256()
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'release_gate' has no attribute 'current_suite_sha256'
+
+----------------------------------------------------------------------
+Ran 11 tests in 2.519s
+
+FAILED (errors=12)

@@ -1,0 +1,54 @@
+TASK-260720-3j8pp5 independent reviewer validation
+
+PROVENANCE
+HEAD=dd76b570f88339fd1d659c02950e68b17f6ba834
+main=dd76b570f88339fd1d659c02950e68b17f6ba834
+origin/main=dd76b570f88339fd1d659c02950e68b17f6ba834
+scope:
+  src/csk/builds/toolchain.py
+  tests/test_builds_toolchain.py
+
+HASHES
+a2284025742cfbfe53b914924c3c7289172a52b8c190ef6c0b577e7975851077  src/csk/builds/toolchain.py
+1c8c0faa5fb826d7b34c87bb6093c54cf57b8e18b1aabb10cc0b851ec2ea4d8f  tests/test_builds_toolchain.py
+
+COMMAND
+/Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest tests/test_builds_toolchain.py -q
+EXIT
+0
+OUTPUT
+...........................................................              [100%]
+59 passed in 0.21s
+
+COMMAND
+/Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m mypy
+EXIT
+0
+OUTPUT
+Success: no issues found in 57 source files
+
+COMMAND
+/Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest -q
+EXIT
+0
+OUTPUT
+633 passed, 19 skipped in 93.88s (0:01:33)
+
+COMMAND
+awk task-file 119-column/trailing-whitespace gate
+EXIT
+0
+OUTPUT
+<none>
+
+REAL GO SMOKE
+EXIT
+0
+executable=/opt/homebrew/Cellar/go/1.25.5/libexec/bin/go
+go_version=go version go1.25.5 darwin/arm64
+target=darwin/arm64
+tuning={'GOARM64': 'v8.0'}
+identity=sha256:69f6b3484a10b288561c7fc66be60945e48b7628978c7baafbaa2ca5c823da0b
+operation_root_exists_after_close=False
+private_children_after_close=[]
+

@@ -1,0 +1,47 @@
+/Users/iv/.local/bin/task-board
+Manage a file-based task board with epics, stories, tasks, and bugs.
+
+Usage:
+  task-board [command]
+
+Available Commands:
+  admin            Server administration (users, tokens, access)
+  boards           List boards accessible to the current user (remote mode)
+  claude           Launch Claude through the Task-board Session Manager
+  codex            Attach Codex to the Task-board Session Manager
+  completion       Generate the autocompletion script for the specified shell
+  export           Export current board into a tar.gz archive
+  goal             Read and align the board-scoped parent primary goal
+  grep             Full-text search across board files
+  handoff          Verify role handoff evidence and move to the role end status
+  help             Help about any command
+  import           Import a tar.gz archive into the current board
+  login            Store a token for the current remote
+  logout           Remove active user's token for current remote
+  m                Execute a mutation (write operation)
+  migrate-keychain Import legacy remote credentials into macOS Keychain
+  plan             Show execution plan with phases and critical path
+  q                Query the board with a mini DSL
+  repair-links     List or remove unsupported container dependency links
+  resource         Upload, update, download, and delete board resources
+  self-update      Update task-board to the latest version
+  session          Inspect and stop Task-board Session Manager sessions
+  spawn            Queue an agent spawn run for a board task
+  switch-user      Switch active user for current remote
+  tree             Show board as hierarchical tree
+  tui              Launch interactive TUI
+  validate         Validate board structure
+  whoami           Show current remote and active user
+
+Flags:
+      --board-dir string         Path to the board directory (overrides TASK_BOARD_DIR and config local.board_dir) (default ".task-board")
+      --context-profile string   Agent context profile override: full or lite
+  -h, --help                     help for task-board
+      --insecure                 Skip TLS certificate verification (for self-signed certs)
+      --json                     Output in JSON format
+      --no-update-check          Disable automatic update check
+      --remote string            Remote board server URL (overrides TASK_BOARD_REMOTE)
+      --remote-board string      Remote board ID (overrides TASK_BOARD_ID)
+  -v, --version                  version for task-board
+
+Use "task-board [command] --help" for more information about a command.

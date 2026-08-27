@@ -1,0 +1,72 @@
+{
+  "id": "RUN-260825-1b209e",
+  "task_id": "TASK-260825-2fy132",
+  "created_at": "2026-08-25T00:49:42.045985Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-terra",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "codex",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "service_tier": "default",
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-04-49-42_-implementer--developer--codex-_TASK-260825-2fy132.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "control_root": "/Users/iv/Developer/ReluxWorks/curator",
+  "execution_root": "/Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260825-39h6vz/worktree",
+  "story_id": "STORY-260825-39h6vz",
+  "workspace": {
+    "workspace_id": "WS-30c4b651e0b4",
+    "story_id": "STORY-260825-39h6vz",
+    "branch_ref": "refs/heads/task-board/story/STORY-260825-39h6vz",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260825-39h6vz/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "timeout": "45m0s",
+  "supervision": {
+    "check_every_minutes": 5,
+    "idle_deadline_minutes": 0,
+    "max_runtime_minutes": 0,
+    "on_deadline": "park"
+  },
+  "log_resource_name": "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-1b209e.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260825-2fy132_results.md",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-6e408e.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260825-2fy132_results.md": "8e73083126e3086501eca2a9f81c330aba342d42d83c38f32d7eadace0ae03e0"
+  },
+  "require_outcome_artifact": true,
+  "recovery_root_run_id": "RUN-260825-1b209e"
+}

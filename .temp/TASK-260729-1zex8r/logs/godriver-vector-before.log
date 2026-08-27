@@ -1,0 +1,80 @@
+=== RUN   TestPortableExecutionPolicyMatchesTheAcceptedVector
+    build_conformance_test.go:172: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+--- SKIP: TestPortableExecutionPolicyMatchesTheAcceptedVector (0.00s)
+=== RUN   TestMandatoryControlsMatchTheAcceptedVector
+    build_conformance_test.go:207: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+--- SKIP: TestMandatoryControlsMatchTheAcceptedVector (0.00s)
+=== RUN   TestNativeControlInventoryMatchesTheAcceptedVector
+    build_conformance_test.go:221: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+--- SKIP: TestNativeControlInventoryMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCapabilityEvidenceRecordMatchesTheAcceptedVector
+    build_conformance_test.go:260: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+--- SKIP: TestCapabilityEvidenceRecordMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector
+    build_conformance_test.go:307: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+--- SKIP: TestCapabilityEvidenceCasesMatchTheAcceptedVector (0.00s)
+=== RUN   TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector
+    build_conformance_test.go:363: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+--- SKIP: TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector (0.00s)
+=== RUN   TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector
+    build_conformance_test.go:405: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+--- SKIP: TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector (0.00s)
+=== RUN   TestCacheIdentityMatchesTheAcceptedVector
+    build_conformance_test.go:430: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 is a pre-revision root and publishes no portable execution-policy vector
+--- SKIP: TestCacheIdentityMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCandidateGoV1SourceAwareContract
+    build_conformance_test.go:466: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 publishes no build-drivers vector
+--- SKIP: TestCandidateGoV1SourceAwareContract (0.00s)
+=== RUN   TestToolchainFramingMatchesRC4Vector
+--- PASS: TestToolchainFramingMatchesRC4Vector (0.00s)
+=== RUN   TestCandidateRC4ToolchainArtifacts
+    fingerprint_test.go:86: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1 publishes no expected/build-driver artifacts
+--- SKIP: TestCandidateRC4ToolchainArtifacts (0.00s)
+=== RUN   TestFingerprintImplementationMatchesRC4ToolchainVector
+--- PASS: TestFingerprintImplementationMatchesRC4ToolchainVector (0.01s)
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/package_pattern
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/extra_flag
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/short_vector
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/relative_output
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/other_command
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/output_outside_private_staging
+--- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector (0.64s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/package_pattern (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/extra_flag (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/short_vector (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/relative_output (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/other_command (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/output_outside_private_staging (0.00s)
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/zero_length
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/oversize_length
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/truncated_payload
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/unknown_field
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/unknown_kind
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/trailing_data
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/not_an_object
+--- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/zero_length (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/oversize_length (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/truncated_payload (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/unknown_field (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/unknown_kind (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/trailing_data (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/not_an_object (0.00s)
+=== RUN   TestBuildPermitIsBoundToTheSessionAndVector
+--- PASS: TestBuildPermitIsBoundToTheSessionAndVector (0.00s)
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/relative_CURATOR_GO
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/wrapper
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/repository_toolchain
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/missing_GOROOT
+--- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/relative_CURATOR_GO (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/wrapper (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/repository_toolchain (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/missing_GOROOT (0.00s)
+=== RUN   TestCandidateLinkOutsideDerivedGOROOTFails
+--- PASS: TestCandidateLinkOutsideDerivedGOROOTFails (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	1.006s

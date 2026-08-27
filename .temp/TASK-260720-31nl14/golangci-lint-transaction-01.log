@@ -1,0 +1,69 @@
+internal/transaction/digest.go:91:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/transaction/durability_unix.go:17:18: Error return value of `unix.Close` is not checked (errcheck)
+	defer unix.Close(fd)
+	                ^
+internal/transaction/files.go:80:19: Error return value of `input.Close` is not checked (errcheck)
+	defer input.Close()
+	                 ^
+internal/transaction/digest.go:92:71: G115: integer overflow conversion int64 -> uint64 (gosec)
+	if err := writeDigestEntry(hash, 'f', rel, info.Mode().Perm(), uint64(info.Size())); err != nil {
+	                                                                     ^
+internal/transaction/engine.go:475:18: G304: Potential file inclusion via variable (gosec)
+	payload, err := os.ReadFile(path)
+	                ^
+internal/transaction/engine.go:22:1: exported: exported function New should have comment or be unexported (revive)
+func New(home string, options ...Option) (*Engine, error) {
+^
+internal/transaction/types.go:16:2: exported: exported const DigestAbsent should have comment (or a comment on this block) or be unexported (revive)
+	DigestAbsent  = "absent"
+	^
+internal/transaction/types.go:20:2: exported: exported var ErrImplementationCorruption should have comment or be unexported (revive)
+	ErrImplementationCorruption = errors.New("transaction implementation-corruption")
+	^
+internal/transaction/types.go:31:6: exported: exported type Phase should have comment or be unexported (revive)
+type Phase string
+     ^
+internal/transaction/types.go:34:2: exported: exported const PhasePreparing should have comment (or a comment on this block) or be unexported (revive)
+	PhasePreparing       Phase = "preparing"
+	^
+internal/transaction/types.go:42:6: exported: exported type CommitState should have comment or be unexported (revive)
+type CommitState string
+     ^
+internal/transaction/types.go:45:2: exported: exported const StatePending should have comment (or a comment on this block) or be unexported (revive)
+	StatePending    CommitState = "pending"
+	^
+internal/transaction/types.go:66:6: exported: exported type Plan should have comment or be unexported (revive)
+type Plan struct {
+     ^
+internal/transaction/types.go:84:6: exported: exported type TargetRecord should have comment or be unexported (revive)
+type TargetRecord struct {
+     ^
+internal/transaction/types.go:99:6: exported: exported type Point should have comment or be unexported (revive)
+type Point string
+     ^
+internal/transaction/types.go:102:2: exported: exported const PointPrepared should have comment (or a comment on this block) or be unexported (revive)
+	PointPrepared         Point = "prepared"
+	^
+internal/transaction/types.go:113:6: exported: exported type Event should have comment or be unexported (revive)
+type Event struct {
+     ^
+internal/transaction/types.go:128:6: exported: exported type Option should have comment or be unexported (revive)
+type Option func(*Engine)
+     ^
+internal/transaction/types.go:130:1: exported: exported function WithHooks should have comment or be unexported (revive)
+func WithHooks(hooks Hooks) Option {
+^
+internal/transaction/engine_test.go:163:43: QF1001: could apply De Morgan's law (staticcheck)
+		if event.Point != PointBeforeInstall && !(event.Point == PointBeforeBackup && event.TargetIndex == 1) {
+		                                        ^
+internal/transaction/journal.go:263:6: QF1001: could apply De Morgan's law (staticcheck)
+		if !(value >= '0' && value <= '9') && !(value >= 'a' && value <= 'f') {
+		   ^
+21 issues:
+* errcheck: 3
+* gosec: 2
+* revive: 14
+* staticcheck: 2
+exit status 1

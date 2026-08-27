@@ -1,0 +1,74 @@
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestWindowsProtectedStateMatrix
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestWindowsProtectedStateMatrix/*
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestValidateWindowsSecurityPolicy
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot
+FAIL  required on windows but not compiled into that build: internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes
+      a rename, a moved build tag or a deleted test looks exactly like this.
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+FAIL  required on windows but not compiled into that build: internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode
+      a rename, a moved build tag or a deleted test looks exactly like this.
+ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+FAIL  required on linux but not compiled into that build: internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+      a rename, a moved build tag or a deleted test looks exactly like this.
+FAIL  required on darwin but not compiled into that build: internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+      a rename, a moved build tag or a deleted test looks exactly like this.
+ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestUnixProtectedStateMatrix
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+FAIL  ledger row names a package that is not in the module: internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+FAIL  required on linux but not compiled into that build: internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+      a rename, a moved build tag or a deleted test looks exactly like this.
+FAIL  required on darwin but not compiled into that build: internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+      a rename, a moved build tag or a deleted test looks exactly like this.
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+FAIL  ledger row names a package that is not in the module: internal/buildsource :: TestRejectsSpecialFile
+ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin skip=windows]
+FAIL  ledger row names a package that is not in the module: internal/buildsource :: TestFrozenTokenRejectsMutation
+FAIL  ledger row names a package that is not in the module: internal/buildsource :: TestFrozenTokenRejectsMutation/*
+FAIL  ledger row names a package that is not in the module: internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+FAIL  ledger row names a package that is not in the module: internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+FAIL  ledger row names a package that is not in the module: internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/*
+ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+FAIL  ledger row names a package that is not in the module: internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+FAIL  ledger row names a package that is not in the module: internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+FAIL  ledger row names a package that is not in the module: internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+FAIL  ledger row names a package that is not in the module: internal/godriver :: TestPerFileSizeLimitIsReallyApplied
+FAIL  ledger row names a package that is not in the module: internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart
+FAIL  ledger row names a package that is not in the module: internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+FAIL  required on linux but not compiled into that build: internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+      a rename, a moved build tag or a deleted test looks exactly like this.
+FAIL  required on darwin but not compiled into that build: internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+      a rename, a moved build tag or a deleted test looks exactly like this.
+ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+FAIL  required on linux but not compiled into that build: internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+      a rename, a moved build tag or a deleted test looks exactly like this.
+FAIL  required on darwin but not compiled into that build: internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+      a rename, a moved build tag or a deleted test looks exactly like this.
+FAIL  required on windows but not compiled into that build: internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+      a rename, a moved build tag or a deleted test looks exactly like this.
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+FAIL  ledger row names a package that is not in the module: internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+FAIL  ledger row names a package that is not in the module: internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+FAIL  ledger row names a package that is not in the module: internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+FAIL  ledger row names a package that is not in the module: internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+FAIL  ledger row names a package that is not in the module: internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+FAIL  ledger row names a package that is not in the module: internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+FAIL  ledger row names a package that is not in the module: internal/godriver :: TestCandidateGoV1SourceAwareContract
+FAIL  ledger row names a package that is not in the module: internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+
+ledger-consistency: 49 rows checked across linux darwin windows
+ledger-consistency: FAILED

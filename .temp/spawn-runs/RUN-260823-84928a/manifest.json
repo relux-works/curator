@@ -1,0 +1,80 @@
+{
+  "id": "RUN-260823-84928a",
+  "task_id": "TASK-260822-c0rxj7",
+  "created_at": "2026-08-23T18:42:40.116936Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "claude",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260823-22-42-40_-implementer--developer--claude-_TASK-260822-c0rxj7.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "55m0s",
+  "log_resource_name": "TASK-260822-c0rxj7_spawn-log_-implementer--developer--claude-_RUN-260823-84928a.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260822-c0rxj7_candidate-suite-identity-e66cb72.txt",
+    "TASK-260822-c0rxj7_candidate-suite-identity.txt",
+    "TASK-260822-c0rxj7_candidate-ubuntu.log",
+    "TASK-260822-c0rxj7_candidate-windows.log",
+    "TASK-260822-c0rxj7_e66cb72-green-matrix.md",
+    "TASK-260822-c0rxj7_rc9-rerun-32638424105.md",
+    "TASK-260822-c0rxj7_regeneration-pass1-e66cb72.sha256",
+    "TASK-260822-c0rxj7_regeneration-pass1.sha256",
+    "TASK-260822-c0rxj7_regeneration-pass2-e66cb72.sha256",
+    "TASK-260822-c0rxj7_regeneration-pass2.sha256",
+    "TASK-260822-c0rxj7_results.md",
+    "TASK-260822-c0rxj7_review-cycle2-regen-pass1.sha256",
+    "TASK-260822-c0rxj7_review-cycle2-regen-pass2.sha256",
+    "TASK-260822-c0rxj7_review-verdict-cycle2.md",
+    "TASK-260822-c0rxj7_review-verdict.md",
+    "TASK-260822-c0rxj7_spawn-log_-implementer--developer--claude-_RUN-260823-c4cb4f.log",
+    "TASK-260822-c0rxj7_spawn-log_-implementer--developer--codex-_RUN-260823-320616.log",
+    "TASK-260822-c0rxj7_spawn-log_-reviewer--reviewer--claude-_RUN-260823-129cf5.log",
+    "TASK-260822-c0rxj7_spawn-log_-reviewer--reviewer--claude-_RUN-260823-ae8cf4.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260822-c0rxj7_candidate-suite-identity-e66cb72.txt": "689bb31ab9009eed3fc03920581907d3b7dbb407010438aedde967e53b91944d",
+    "TASK-260822-c0rxj7_candidate-suite-identity.txt": "85328ab3d5f64dbf2eba941a8a50c3bdf629c125e801066654cb4f96658a3160",
+    "TASK-260822-c0rxj7_candidate-ubuntu.log": "230b21d067f3e4c07c2244a719a1f0a84cbfa9f08593a56c9feb86e4d5219079",
+    "TASK-260822-c0rxj7_candidate-windows.log": "09c7d631f29d8c0c763e6c52799c2687ec0783a6abe6435cdeb0b1d40c39d198",
+    "TASK-260822-c0rxj7_e66cb72-green-matrix.md": "4f373cc7b695519ddc6969c5472112658c3e819a4bfbc7c65d2e2dc2524de221",
+    "TASK-260822-c0rxj7_rc9-rerun-32638424105.md": "4c92b12d623311b999df1ce0ad4e9fc6f71cc1ad8569adb8afd487ee77ef7768",
+    "TASK-260822-c0rxj7_regeneration-pass1-e66cb72.sha256": "54d8e7e149e9b3acb9f42f90420b59772bbbc15eb056db46c2a761d27cf025df",
+    "TASK-260822-c0rxj7_regeneration-pass1.sha256": "662a0a2d671ef7ff51765b7594721150acc5880af37f3a7b5a0a4794814da7a9",
+    "TASK-260822-c0rxj7_regeneration-pass2-e66cb72.sha256": "54d8e7e149e9b3acb9f42f90420b59772bbbc15eb056db46c2a761d27cf025df",
+    "TASK-260822-c0rxj7_regeneration-pass2.sha256": "662a0a2d671ef7ff51765b7594721150acc5880af37f3a7b5a0a4794814da7a9",
+    "TASK-260822-c0rxj7_results.md": "30aad68aff654c63f7b62a38e8225abd6985f345836aa8819e3e3396df0c8881",
+    "TASK-260822-c0rxj7_review-cycle2-regen-pass1.sha256": "f76a2894595b2299f036a2a1d15362a5feb7a7d78017270abfd9224a7c3ff9a5",
+    "TASK-260822-c0rxj7_review-cycle2-regen-pass2.sha256": "f76a2894595b2299f036a2a1d15362a5feb7a7d78017270abfd9224a7c3ff9a5",
+    "TASK-260822-c0rxj7_review-verdict-cycle2.md": "4d7c0d26cc05fc938e74dd92b5c721cac899619b3760fb569bd8996ecee84b70",
+    "TASK-260822-c0rxj7_review-verdict.md": "fe8b927c4dc5f65c91f4dad91804909297d409bf40ccd2c091ef9f2c120980ba"
+  },
+  "require_outcome_artifact": true
+}

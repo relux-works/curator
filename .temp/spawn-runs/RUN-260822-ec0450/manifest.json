@@ -1,0 +1,62 @@
+{
+  "id": "RUN-260822-ec0450",
+  "task_id": "TASK-260822-1yz9ug",
+  "created_at": "2026-08-22T17:03:49.83928Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] doc-writer (claude)",
+  "role": "doc-writer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260822-21-03-49_-implementer--doc-writer--claude-_TASK-260822-1yz9ug.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "30m0s",
+  "log_resource_name": "TASK-260822-1yz9ug_spawn-log_-implementer--doc-writer--claude-_RUN-260822-ec0450.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260822-1yz9ug_amendment-results.md",
+    "TASK-260822-1yz9ug_decision-0009-amended.md",
+    "TASK-260822-1yz9ug_decision-0009.md",
+    "TASK-260822-1yz9ug_results.md",
+    "TASK-260822-1yz9ug_review-verdict-2.md",
+    "TASK-260822-1yz9ug_review-verdict.md",
+    "TASK-260822-1yz9ug_spawn-log_-implementer--doc-writer--claude-_RUN-260822-2bf138.log",
+    "TASK-260822-1yz9ug_spawn-log_-implementer--doc-writer--claude-_RUN-260822-69969d.log",
+    "TASK-260822-1yz9ug_spawn-log_-reviewer--reviewer--claude-_RUN-260822-5f6beb.log",
+    "TASK-260822-1yz9ug_spawn-log_-reviewer--reviewer--claude-_RUN-260822-c8550c.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260822-1yz9ug_amendment-results.md": "7b64f1bb408d86bc35184b7e11d3549b677d16f81b1d7683ba8ad0a40d1e9455",
+    "TASK-260822-1yz9ug_decision-0009-amended.md": "226fe68db54d31941ab0e9d6371a3a63653381907ce7a6083c3b4c78f8718ae8",
+    "TASK-260822-1yz9ug_decision-0009.md": "b69e3aa2ee535a34d5977a1965e1d6ac6b8825b5ceb5f98859c43dfe76402f4e",
+    "TASK-260822-1yz9ug_results.md": "bbf740d64fec13ac5aa9a419bc301b5449e3076dbf2793e39ac83da1b4a42ecb",
+    "TASK-260822-1yz9ug_review-verdict-2.md": "c23c16cba61b96372f4257db6ee41d734f65dc767a89175cef9c4f44552b67f9",
+    "TASK-260822-1yz9ug_review-verdict.md": "95b83eb7a4e534aa2f2b0dc80a63680427ac1d9c1c2be780333019ec8db8954a"
+  },
+  "require_outcome_artifact": true
+}

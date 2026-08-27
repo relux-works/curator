@@ -1,0 +1,57 @@
+{
+  "id": "RUN-260824-6f6eb7",
+  "task_id": "TASK-260825-3kb532",
+  "agent_name": "[implementer] developer (codex)",
+  "agent_type": "codex",
+  "status": "failed",
+  "phase": "finalizing",
+  "summary": "run exceeded --timeout 50m0s and was terminated by the launcher",
+  "created_at": "2026-08-24T23:33:30.856485Z",
+  "started_at": "2026-08-24T23:33:31.362651Z",
+  "completed_at": "2026-08-25T00:23:31.847984Z",
+  "last_heartbeat_at": "2026-08-25T00:23:31.847984Z",
+  "last_progress_at": "2026-08-25T00:23:31.847984Z",
+  "completion_reason": "failure",
+  "last_event_seq": 1513,
+  "exit_code": 124,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-03-33-30_-implementer--developer--codex-_TASK-260825-3kb532.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/TASK-260825-3kb532/-implementer--developer--codex-_RUN-260824-6f6eb7.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260824-6f6eb7/runner.log",
+  "error": "run exceeded --timeout 50m0s and was terminated by the launcher",
+  "max_parallel": 20,
+  "story_id": "STORY-260825-32bopo",
+  "workspace": {
+    "workspace_id": "WS-8ab97c9b53ba",
+    "story_id": "STORY-260825-32bopo",
+    "branch_ref": "refs/heads/task-board/story/STORY-260825-32bopo",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260825-32bopo/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "provider": "codex",
+    "producer_version": "v1.6.1",
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "recovery_root_run_id": "RUN-260824-6f6eb7",
+  "element_routing_message": "spawn run RUN-260824-6f6eb7 failed; operator action required; failure: run exceeded --timeout 50m0s and was terminated by the launcher",
+  "element_routing_note_recorded": true,
+  "element_routing_last_attempt_at": "2026-08-25T00:23:31.853418Z",
+  "element_routed_at": "2026-08-25T00:23:31.853418Z",
+  "provider_attempts": [
+    {
+      "attempt": 1,
+      "provider": "codex",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "medium",
+      "group": "codex-plan",
+      "started_at": "2026-08-24T23:33:31.477566Z",
+      "completed_at": "2026-08-25T00:23:31.722301Z",
+      "exit_code": 124,
+      "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/TASK-260825-3kb532/-implementer--developer--codex-_RUN-260824-6f6eb7.log"
+    }
+  ]
+}

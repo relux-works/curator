@@ -1,0 +1,84 @@
+TASK-260728-1jafds rework cycle 2 - validation evidence
+worktree: /Users/iv/Developer/ReluxWorks/.temp/TASK-260728-1jafds/curator-spec-worktree
+python: /Users/iv/Developer/ReluxWorks/.temp/TASK-260728-1jafds/curator-spec-worktree/.venv/bin/python3 (task venv; system python3 lacks jsonschema)
+
+=== A. Reviewer probe R2-1, BEFORE the rework (candidate as reviewed) ===
+platform/backend mismatch receipt errors = 0
+darwin target with linux TCB receipt errors = 0
+uncryptographic trusted component receipt errors = 0
+manager parent identity present in TCB = False
+host OS/hypervisor identity present in TCB = False
+backend version present in TCB = False
+macos TCB with windows backend claim errors = 0
+
+=== B. Same probe, AFTER the rework (this candidate) ===
+platform/backend mismatch receipt errors = 1
+darwin target with linux TCB receipt errors = 1
+uncryptographic trusted component receipt errors = 1
+manager parent identity present in TCB = True
+host OS/hypervisor identity present in TCB = True
+backend version present in TCB = True
+macos TCB with windows backend claim errors = 1
+
+=== C. Gate exit codes, each command run standalone, real status ===
+GREEN in the task worktree:
+  make validate                                        exit 0
+  python3 tools/validate.py                            exit 0   (42 portable schemas, 422 vector files)
+  python3 tools/validate_hardened.py                   exit 0   (6 hardened schemas, 79 hardened suite files)
+  python3 -B -m unittest discover -s tools              exit 0   (113 tests, was 87 at cycle 1)
+  go test -count=1 ./tools/...                         exit 0
+  gofmt -l tools                                       exit 0   (empty)
+  go vet ./tools/...                                   exit 0
+  git diff --check                                     exit 0
+
+EXPECTED-RED in the task worktree, reported truthfully:
+  make regenerate-check                                exit 2
+  make regenerate-hardened-check                       exit 2
+  python3 tools/release_gate.py --version 1.0.0-rc.5   exit 1   ("release gate requires a clean candidate checkout")
+  Cause is structural: these gates run 'git diff --exit-code' or require a clean
+  checkout, and the whole rc.5+hardened candidate is uncommitted against 57c1f56.
+  The directive forbids staging or committing, so they are resolved in a clean probe.
+
+RESOLVED in an ephemeral clean probe (tar of the worktree, fresh git repo,
+signing disabled inside the probe only, deleted afterwards; byte-identical
+to the worktree by diff -r):
+  make validate                                        exit 0
+  make regenerate-check                                exit 0
+  make regenerate-hardened-check                       exit 0
+  python3 tools/release_gate.py --version 1.0.0-rc.5   exit 0
+  -> the added hardened material does not alter rc.5 qualification.
+
+=== D. Portable rc.5 byte parity vs the accepted predecessor TASK-260728-2kp3tv ===
+  diff -r conformance/v1   exit 0 (identical)
+  diff -r schemas/v1       exit 0 (identical)
+  cmp release/1.0.0-rc.5.json exit 0 (identical)
+  conformance/v1/manifest.json sha256 = 9ba9b8ecf6f06cafda1425aed3539dee8d12af43dabd36f803f4f420dbb1dacf
+  = the manifest_sha256 pinned by release/1.0.0-rc.5.json
+  Both comparisons were made after regenerating with tools/generate-vectors.
+
+=== E. Hardened suite ===
+  hardened suite files: 79 (was 48)
+  hardened schema cases: 75 total, 7 valid, 68 invalid (was 33/6/27)
+  TCB rotation cases: 13; TCB completeness adversarial cases: 21
+  hardened manifest sha256 = release/hardened-1.0.0-rc.1.json pin =
+    sha256:abc0974b641c852806cfc88ea217b91b9d31c2e4ec8a3d7c6ea18b8a044cf3ce
+  hardened suite regeneration is byte stable (generated twice, manifests identical)
+  claims_emitted = []   qualified_platforms = []
+  linux/macos/windows all unqualified, native_evidence absent
+
+=== F. Full make validate output ===
+=== make validate ===
+python3 tools/validate.py
+validated 42 schemas and 422 vector files
+python3 tools/validate_hardened.py
+validated 6 hardened schemas and 79 hardened suite files
+python3 -B -m unittest discover -s tools -p 'test_*.py'
+.................................................................................................................
+----------------------------------------------------------------------
+Ran 113 tests in 24.947s
+
+OK
+validated 6 hardened schemas and 79 hardened suite files
+go test ./tools/...
+ok  	github.com/relux-works/curator-spec/tools/generate-hardened	0.874s
+ok  	github.com/relux-works/curator-spec/tools/generate-vectors	0.451s

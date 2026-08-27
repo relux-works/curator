@@ -1,0 +1,518 @@
+--- /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-37ei85/worktree/tools/generate-vectors/main.go	2026-07-21 00:09:17
++++ /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1s1vr6/worktree/tools/generate-vectors/main.go	2026-07-21 00:56:42
+@@ -6,6 +6,7 @@
+ 	"crypto/ed25519"
+ 	"crypto/sha256"
+ 	"encoding/base64"
++	"encoding/binary"
+ 	"encoding/hex"
+ 	"encoding/json"
+ 	"flag"
+@@ -136,6 +137,7 @@
+ 	writeSkillManifestResolutionVectors(vectors)
+ 	writeManagerConfigVectors(vectors, pinned)
+ 	writeManagerLifecycleVectors(vectors)
++	writeBuildDriverVectors(vectors, filepath.Join(suite, "fixtures", "go-build-skill"), filepath.Join(expected, "build-driver"), marker)
+ 	writeSchemaCases(suite, marker, ledger, audited, snapshot, entries[0], bundle, pinned)
+ 	writeManifest(suite)
+ }
+@@ -958,8 +960,470 @@
+ 		level = next
+ 	}
+ 	return hex.EncodeToString(level[0])
++}
++
++type buildSourceRecord struct {
++	path    string
++	content []byte
++}
++
++type toolchainRecord struct {
++	path    string
++	kind    byte
++	payload []byte
++}
++
++func writeBuildDriverVectors(dir, fixture, expected string, markerV1 map[string]any) {
++	fixtureFiles := regularFiles(fixture)
++	contextFiles := selectedContextFiles(fixture)
++	contextHash := contentHash(fixture, contextFiles)
++	fixtureRecords := buildSourceRecords(fixture, fixtureFiles)
++	fixtureBuildSourceBytes := frameBuildSource(fixtureRecords)
++	fixtureBuildSourceHash := sha256Identity(fixtureBuildSourceBytes)
++
++	writeJSON(filepath.Join(expected, "context_files.json"), contextFiles)
++	writeText(filepath.Join(expected, "context_sha256.txt"), contextHash+"\n")
++	writeBytes(filepath.Join(expected, "build-source.preimage.bin"), fixtureBuildSourceBytes)
++	writeText(filepath.Join(expected, "build-source-sha256.txt"), fixtureBuildSourceHash+"\n")
++
++	buildInput := validGoBuildInputV1()
++	buildInputBytes := canonicalBytes(buildInput)
++	cacheKey := sha256Identity(buildInputBytes)
++	receipt := validBuildReceiptV1()
++	receipt["cache_key"] = cacheKey
++	receiptBytes := canonicalBytes(receipt)
++	receiptHash := sha256Identity(receiptBytes)
++	marker := validInstallMarkerV2(markerV1)
++	buildRecord := marker["builds"].(map[string]any)["golden-tool"].(map[string]any)
++	buildRecord["cache_key"] = cacheKey
++	buildRecord["receipt_sha256"] = receiptHash
++
++	writeBytes(filepath.Join(expected, "build-input.ccj.json"), buildInputBytes)
++	writeText(filepath.Join(expected, "cache-key.txt"), cacheKey+"\n")
++	writeBytes(filepath.Join(expected, "receipt.ccj.json"), receiptBytes)
++	writeText(filepath.Join(expected, "receipt-sha256.txt"), receiptHash+"\n")
++	writeJSON(filepath.Join(expected, "marker.json"), marker)
++
++	toolchainEntries := []toolchainRecord{
++		{path: "pkg/tool-link", kind: 'L', payload: []byte("../bin/go")},
++		{path: "bin/go", kind: 'F', payload: []byte("GO")},
++		{path: "pkg", kind: 'D'},
++		{path: "bin", kind: 'D'},
++	}
++	versionLF := []byte("go version go1.25.5 darwin/arm64\n")
++	normalizedVersion, err := normalizeGoVersion(versionLF)
++	must(err)
++	toolchainBytes := frameToolchain(toolchainEntries, normalizedVersion)
++	toolchainHash := sha256Identity(toolchainBytes)
++	writeBytes(filepath.Join(expected, "toolchain.preimage.bin"), toolchainBytes)
++	writeText(filepath.Join(expected, "toolchain-sha256.txt"), toolchainHash+"\n")
++
++	var excludedContext []any
++	for _, name := range fixtureFiles {
++		if underRoot(name, []string{"assets/build-tool", "scripts"}) {
++			excludedContext = append(excludedContext, name)
++		}
++	}
++
++	buildSourceCases := buildSourceVectorCases(fixtureRecords, fixtureBuildSourceBytes, fixtureBuildSourceHash)
++	toolchainCases := toolchainVectorCases(toolchainEntries, versionLF, normalizedVersion, toolchainBytes, toolchainHash)
++	argv := fixedGoArgv()
++	writeJSON(filepath.Join(dir, "build-drivers.json"), map[string]any{
++		"schema_version": 1,
++		"driver":         "go-v1",
++		"fixture": map[string]any{
++			"root":                   "fixtures/go-build-skill",
++			"snapshot_files":         stringsToAny(fixtureFiles),
++			"expected_context_files": stringsToAny(contextFiles),
++			"excluded_context_files": excludedContext,
++			"context_sha256":         contextHash,
++			"build_source": map[string]any{
++				"algorithm": "curator-build-source-v1", "content_sha256": fixtureBuildSourceHash,
++				"preimage_base64": base64.StdEncoding.EncodeToString(fixtureBuildSourceBytes),
++			},
++			"expected_artifacts": map[string]any{
++				"context_files": "expected/build-driver/context_files.json", "context_sha256": "expected/build-driver/context_sha256.txt",
++				"build_source_preimage": "expected/build-driver/build-source.preimage.bin", "build_source_sha256": "expected/build-driver/build-source-sha256.txt",
++			},
++		},
++		"fixed_environment": fixedGoEnvironment(),
++		"argv":              argv,
++		"portable_identity": map[string]any{
++			"build_input":             buildInput,
++			"build_input_ccj_utf8":    string(buildInputBytes),
++			"build_input_ccj_base64":  base64.StdEncoding.EncodeToString(buildInputBytes),
++			"cache_key":               cacheKey,
++			"stored_receipt":          receipt,
++			"stored_receipt_ccj_utf8": string(receiptBytes),
++			"stored_receipt_base64":   base64.StdEncoding.EncodeToString(receiptBytes),
++			"receipt_sha256":          receiptHash,
++			"artifact":                receipt["artifact"],
++			"marker":                  marker,
++			"expected_artifacts": map[string]any{
++				"build_input": "expected/build-driver/build-input.ccj.json", "cache_key": "expected/build-driver/cache-key.txt",
++				"receipt": "expected/build-driver/receipt.ccj.json", "receipt_sha256": "expected/build-driver/receipt-sha256.txt",
++				"marker": "expected/build-driver/marker.json",
++			},
++		},
++		"positive_cases":     positiveBuildDriverCases(contextFiles, excludedContext, argv, cacheKey, receiptHash),
++		"rejection_cases":    buildDriverRejectionCases(),
++		"build_source_cases": buildSourceCases,
++		"toolchain_cases":    toolchainCases,
++	})
++}
++
++func positiveBuildDriverCases(contextFiles []string, excludedContext []any, argv []any, cacheKey, receiptHash string) []any {
++	return []any{
++		map[string]any{
++			"name": "schema-6-mixed-script-and-build-commands", "result": "accepted",
++			"manifest": map[string]any{
++				"schema_version": 6, "runtime_roots": []any{"scripts"}, "build_roots": []any{"assets/build-tool"},
++				"commands": map[string]any{
++					"golden-tool":  map[string]any{"type": "build", "driver": "go-v1", "source_dir": "assets/build-tool/cmd/golden-tool"},
++					"skill-helper": map[string]any{"type": "script", "unix_path": "scripts/skill-helper", "win_path": "scripts/skill-helper.cmd"},
++				},
++			},
++		},
++		map[string]any{
++			"name": "build-root-excluded-from-agent-context", "result": "accepted",
++			"expected_context_files": stringsToAny(contextFiles), "expected_excluded_files": excludedContext,
++			"cache_hit_source_aware_go_commands": []any{}, "dry_run_source_aware_go_commands": []any{},
++		},
++		map[string]any{
++			"name": "valid-standard-library-only-main", "result": "accepted", "package": map[string]any{
++				"name": "main", "main_packages": 1, "dependencies": []any{"standard-library"}, "vendor_required": false,
++			},
++		},
++		map[string]any{
++			"name": "valid-vendor-only-main-with-transitive-embed", "result": "accepted", "package": map[string]any{
++				"name": "main", "main_packages": 1, "module_root": "assets/build-tool", "vendor_mode": "vendor",
++				"vendored_package": "example.com/curator/vendored/decorate", "transitive_package": "internal/render",
++				"embedded_inputs": []any{"assets/build-tool/internal/render/template.txt", "assets/build-tool/internal/render/empty.txt"},
++			},
++		},
++		map[string]any{
++			"name": "fixed-environment-and-five-direct-argv-forms", "result": "accepted", "argv": argv,
++			"shell_used": false, "artifact_executed": false,
++		},
++		map[string]any{
++			"name": "protected-cache-hit", "result": "cache-hit", "cache_key": cacheKey, "receipt_sha256": receiptHash,
++			"protected_boundary_verified": true, "source_aware_go_commands": []any{}, "artifact_executed": false,
++		},
++		map[string]any{
++			"name": "compiler-free-dry-run-miss", "result": "would-preflight-and-build", "cache_key": cacheKey,
++			"package_independent_go_commands": []any{"telemetry-off", "version", "env"}, "source_aware_go_commands": []any{},
++			"persistent_effects": []any{},
++		},
++	}
++}
++
++func rejection(name, boundary, expectedError string, input map[string]any) any {
++	return map[string]any{
++		"name": name, "boundary": boundary, "input": input,
++		"expected": map[string]any{"result": "reject", "error": expectedError, "reuse": false, "artifact_executed": false},
++	}
++}
++
++func buildDriverRejectionCases() []any {
++	type rejectSpec struct{ name, boundary, outcome, condition string }
++	specs := []rejectSpec{
++		{"schema-5-build-command", "manifest", "build_requires_schema_6", "type=build under schema_version=5"},
++		{"unknown-driver", "manifest", "unsupported_build_driver", "driver is not go-v1"},
++		{"forbidden-args", "manifest", "manifest_invalid", "build command declares args"},
++		{"forbidden-env", "manifest", "manifest_invalid", "build command declares env"},
++		{"forbidden-output", "manifest", "manifest_invalid", "build command declares output"},
++		{"forbidden-toolchain", "manifest", "manifest_invalid", "build command declares toolchain"},
++		{"forbidden-hooks", "manifest", "manifest_invalid", "build command declares hooks"},
++		{"mixed-script-build-shape", "manifest", "manifest_invalid", "one command combines build and script fields"},
++		{"missing-build-roots", "filesystem", "build_roots_required", "build command has no build_roots"},
++		{"missing-build-root-directory", "filesystem", "build_root_missing", "declared build root does not exist"},
++		{"unused-build-root", "filesystem", "build_root_unused", "declared build root contains no command"},
++		{"overlapping-build-roots", "filesystem", "build_roots_overlap", "one build root contains another"},
++		{"runtime-overlapping-build-root", "filesystem", "build_runtime_roots_overlap", "build root overlaps runtime root"},
++		{"root-build-root", "filesystem", "build_root_invalid", "build_root is dot"},
++		{"build-root-symlink", "filesystem", "build_root_link", "build root is a symbolic link"},
++		{"build-root-special-file", "filesystem", "build_root_special_file", "build root is a special file"},
++		{"root-source-dir", "filesystem", "build_source_outside_build_root", "source_dir is dot"},
++		{"escaped-source-dir", "filesystem", "build_source_path_escape", "source_dir contains parent traversal"},
++		{"source-outside-root", "filesystem", "build_source_outside_build_root", "source_dir is outside every build root"},
++		{"source-link", "filesystem", "build_source_link", "source_dir crosses a symbolic link"},
++		{"source-special-file", "filesystem", "build_source_special_file", "source_dir is a special file"},
++		{"source-not-directory", "filesystem", "build_source_not_directory", "source_dir is a regular file"},
++		{"missing-root-go-mod", "module", "build_module_missing", "build root lacks direct go.mod"},
++		{"nested-module", "module", "nested_build_module", "nearest go.mod intervenes below build root"},
++		{"non-main-package", "dependency-graph", "build_package_not_main", "selected package is a library"},
++		{"multiple-packages", "dependency-graph", "build_package_ambiguous", "selection yields multiple main packages"},
++		{"missing-vendored-dependency", "dependency-graph", "vendor_dependency_missing", "required module is absent from vendor"},
++		{"inconsistent-vendor-modules", "dependency-graph", "vendor_metadata_inconsistent", "vendor/modules.txt disagrees with go.mod"},
++		{"workspace-only-dependency", "dependency-graph", "workspace_dependency_forbidden", "dependency resolves only through go.work"},
++		{"toolchain-switch-request", "toolchain", "toolchain_switch_forbidden", "go.mod requests another toolchain"},
++		{"unsupported-go-pre-1-23", "toolchain", "unsupported_go_family", "selected release is older than Go 1.23"},
++		{"unsupported-go-future-family", "toolchain", "unsupported_go_family", "selected release family is not allowlisted"},
++		{"cgo-only-package", "dependency-graph", "cgo_required", "package has no buildable files with CGO_ENABLED=0"},
++		{"native-c-input", "dependency-graph", "go_native_input_forbidden", "non-standard package has CFiles"},
++		{"native-cxx-input", "dependency-graph", "go_native_input_forbidden", "non-standard package has CXXFiles"},
++		{"native-swig-input", "dependency-graph", "go_native_input_forbidden", "non-standard package has SwigFiles"},
++		{"root-syso", "dependency-graph", "go_syso_forbidden", "root package has SysoFiles"},
++		{"transitive-syso", "dependency-graph", "go_syso_forbidden", "transitive package has SysoFiles"},
++		{"root-assembly-absolute-include", "dependency-graph", "go_assembly_forbidden", "root SFiles includes an absolute path"},
++		{"transitive-assembly-escaping-include", "dependency-graph", "go_assembly_forbidden", "transitive SFiles escapes the build root"},
++		{"escaped-embed-input", "dependency-graph", "go_embed_input_escape", "EmbedFiles resolves outside the build root"},
++		{"cgo-import-dynamic", "compiler-directive", "go_forbidden_compiler_directive", "active GoFiles contains //go:cgo_import_dynamic"},
++		{"attempted-go-generate", "compiler-directive", "go_generator_forbidden", "package requires go generate output"},
++		{"default-pgo", "compiler-directive", "go_pgo_forbidden", "package attempts default.pgo input"},
++		{"poisoned-path", "process", "process_environment_poisoned", "host PATH contains compiler tools"},
++		{"inherited-goflags-toolexec", "process", "process_environment_poisoned", "host GOFLAGS requests toolexec"},
++		{"inherited-goenv", "process", "process_environment_poisoned", "host GOENV selects a file"},
++		{"inherited-gowork", "process", "process_environment_poisoned", "host GOWORK selects a workspace"},
++		{"vcs-metadata", "process", "ambient_vcs_input_forbidden", "repository VCS metadata would affect output"},
++		{"repository-local-fake-go", "process", "untrusted_go_executable", "repository supplies a fake go executable"},
++		{"telemetry-command-failure", "process", "telemetry_initialization_failed", "go telemetry off exits unsuccessfully"},
++		{"telemetry-private-dir-escape", "process", "telemetry_directory_untrusted", "GOTELEMETRYDIR escapes operation root"},
++		{"external-link-required", "process", "external_link_forbidden", "target requires external linking"},
++		{"libgcc-fallback-attempt", "process", "libgcc_fallback_forbidden", "linker attempts host compiler lookup"},
++		{"child-outside-goroot-tools", "process", "unexpected_child_process", "child executable is outside GOROOT/pkg/tool/host"},
++		{"wrong-go-executable-path", "toolchain", "toolchain_executable_mismatch", "selected executable is not GOROOT/bin/go"},
++		{"toolchain-digest-mismatch", "toolchain", "toolchain_digest_mismatch", "tree digest changes before child exit"},
++		{"cache-key-mismatch", "cache", "cache_key_mismatch", "receipt input derives another key"},
++		{"cache-wrong-target", "cache", "cache_input_mismatch", "receipt target differs"},
++		{"cache-wrong-toolchain", "cache", "cache_input_mismatch", "receipt toolchain differs"},
++		{"cache-wrong-policy", "cache", "cache_input_mismatch", "receipt policy differs"},
++		{"cache-wrong-build-source", "cache", "cache_input_mismatch", "receipt build source differs"},
++		{"receipt-hash-mismatch", "cache", "receipt_hash_mismatch", "stored receipt hash differs"},
++		{"artifact-hash-mismatch", "cache", "artifact_hash_mismatch", "artifact bytes differ"},
++		{"artifact-size-mismatch", "cache", "artifact_size_mismatch", "artifact length differs"},
++		{"artifact-path-mismatch", "cache", "artifact_path_mismatch", "artifact path is not manager-derived"},
++		{"noncanonical-receipt-whitespace", "cache", "receipt_not_canonical", "stored receipt is pretty-printed"},
++		{"noncanonical-receipt-trailing-lf", "cache", "receipt_not_canonical", "stored receipt has terminal LF"},
++		{"partial-cache-entry", "cache", "cache_entry_incomplete", "receipt or artifact is absent"},
++		{"artifact-link", "cache", "artifact_link", "artifact is a symbolic link"},
++		{"artifact-special-file", "cache", "artifact_special_file", "artifact is not regular"},
++		{"concurrent-publisher-different-bytes", "cache", "cache_publication_conflict", "winner differs for the same key"},
++		{"self-consistent-forged-receipt-outside-protected-state", "cache", "untrusted_provenance", "all hashes pass outside manager-protected state"},
++		{"marker-embed-build-source-regression", "context", "build_source_outside_build_root", "root module embeds .csk-install.json variants"},
++		{"build-root-content-in-context", "context", "build_root_visible_in_context", "context selector exposes build-root input"},
++	}
++	result := make([]any, 0, len(specs))
++	for _, spec := range specs {
++		if spec.name == "self-consistent-forged-receipt-outside-protected-state" {
++			result = append(result, selfConsistentForgedReceiptVector())
++			continue
++		}
++		if spec.name == "marker-embed-build-source-regression" {
++			result = append(result, markerEmbedRegressionVector())
++			continue
++		}
++		result = append(result, rejection(spec.name, spec.boundary, spec.outcome, map[string]any{"condition": spec.condition}))
++	}
++	return result
+ }
+ 
++func selfConsistentForgedReceiptVector() any {
++	artifact := []byte("attacker-chosen-artifact")
++	receipt := map[string]any{
++		"schema_version": 1,
++		"cache_key":      "sha256:3fcd714a40e8918eb67dbd35d435875dcce6c9047da811a1fa26626e5e57be48",
++		"input":          validGoBuildInputV1(),
++		"artifact": map[string]any{
++			"path": "bin/golden-tool", "sha256": sha256Identity(artifact), "size": len(artifact),
++		},
++	}
++	return map[string]any{
++		"name": "self-consistent-forged-receipt-outside-protected-state", "boundary": "cache",
++		"cache_boundary": map[string]any{
++			"manager_created": false, "owner_matches_manager_principal": false,
++			"other_principals_can_write": true, "all_components_link_safe": true,
++		},
++		"candidate": map[string]any{
++			"artifact_bytes_base64": base64.StdEncoding.EncodeToString(artifact), "artifact_is_regular_executable": true,
++			"receipt": receipt, "receipt_sha256": sha256Identity(canonicalBytes(receipt)),
++			"internal_checks": map[string]any{
++				"cache_key_matches": true, "input_matches": true, "artifact_hash_matches": true,
++				"artifact_size_matches": true, "receipt_hash_matches": true,
++			},
++		},
++		"expected": map[string]any{
++			"result": "reject", "error": "untrusted_provenance", "reuse": false, "marker_current": false,
++			"real_operation": "rebuild-from-validated-snapshot-into-protected-state", "dry_run": "would-rebuild-untrusted-cache",
++			"artifact_executed": false,
++		},
++	}
++}
++
++func markerEmbedRegressionVector() any {
++	return map[string]any{
++		"name": "marker-embed-build-source-regression", "boundary": "context",
++		"input": map[string]any{
++			"candidate_command":     map[string]any{"type": "build", "driver": "go-v1", "source_dir": "."},
++			"directive":             "//go:embed .csk-install.json",
++			"legacy_content_sha256": "sha256:829a040a1455fdf96e2731aa5c089e7e42dbcec2a51b1db3222a610f0ffb5b35",
++			"variants": []any{
++				map[string]any{"marker_content_base64": "eyJ2YXJpYW50IjoiQSJ9Cg==", "build_source": map[string]any{"algorithm": "curator-build-source-v1", "content_sha256": "sha256:0017492cfbcd822237a7e72239d45b59f0923b54f2ac2e0a59ecd9202cc48ad0"}},
++				map[string]any{"marker_content_base64": "eyJ2YXJpYW50IjoiQiJ9Cg==", "build_source": map[string]any{"algorithm": "curator-build-source-v1", "content_sha256": "sha256:60fe9b764163b7d6bc38bc0cac63675398eb7167ad692fd189e221c3fc096266"}},
++			},
++		},
++		"expected": map[string]any{
++			"result": "reject", "error": "build_source_outside_build_root", "reuse": false,
++			"legacy_content_hashes_equal": true, "build_source_hashes_equal": false,
++			"cache_keys_created": false, "go_commands": []any{}, "artifact_executed": false,
++		},
++	}
++}
++
++func buildSourceVectorCases(fixtureRecords []buildSourceRecord, fixtureBytes []byte, fixtureHash string) []any {
++	edgeRecords := []buildSourceRecord{
++		{path: "z-binary.bin", content: []byte{0, 0xff, 1}},
++		{path: "empty", content: []byte{}},
++		{path: ".csk-install.json", content: []byte("{\"variant\":\"fixture\"}\n")},
++		{path: "é.txt", content: []byte("utf8\n")},
++	}
++	edgeBytes := frameBuildSource(edgeRecords)
++	one := []buildSourceRecord{{path: "a", content: []byte{'x', 0, 'b', 0, 'y'}}}
++	two := []buildSourceRecord{{path: "a", content: []byte("x")}, {path: "b", content: []byte("y")}}
++	legacy := []byte{'a', 0, 'x', 0, 'b', 0, 'y'}
++	markerA := []buildSourceRecord{{path: ".csk-install.json", content: []byte("{\"variant\":\"A\"}\n")}, {path: "go.mod", content: []byte("module example\n")}}
++	markerB := []buildSourceRecord{{path: ".csk-install.json", content: []byte("{\"variant\":\"B\"}\n")}, {path: "go.mod", content: []byte("module example\n")}}
++	return []any{
++		map[string]any{"name": "fixture-exact-build-source", "result": "accepted", "records": buildSourceRecordsJSON(fixtureRecords), "preimage_base64": base64.StdEncoding.EncodeToString(fixtureBytes), "content_sha256": fixtureHash},
++		map[string]any{"name": "domain-prefix-ordering-framing-empty-binary-and-root-marker", "result": "accepted", "input_order": buildSourceRecordsJSON(edgeRecords), "sorted_paths": []any{".csk-install.json", "empty", "z-binary.bin", "é.txt"}, "domain_prefix_base64": base64.StdEncoding.EncodeToString([]byte("curator-build-source-v1\x00")), "preimage_base64": base64.StdEncoding.EncodeToString(edgeBytes), "content_sha256": sha256Identity(edgeBytes)},
++		map[string]any{"name": "mode-and-timestamp-are-non-inputs", "result": "accepted", "variants": []any{map[string]any{"mode": "0644", "mtime": "2000-01-01T00:00:00Z"}, map[string]any{"mode": "0755", "mtime": "2030-01-01T00:00:00Z"}}, "content_sha256": sha256Identity(edgeBytes)},
++		rejection("invalid-unicode-build-source-path", "build-source", "invalid_unicode", map[string]any{"path_bytes_base64": "/w=="}),
++		rejection("duplicate-build-source-path", "build-source", "duplicate_path", map[string]any{"paths": []any{"same", "same"}}),
++		rejection("build-source-symbolic-link", "build-source", "link_forbidden", map[string]any{"path": "link", "type": "symlink"}),
++		rejection("build-source-special-file", "build-source", "special_file_forbidden", map[string]any{"path": "pipe", "type": "fifo"}),
++		rejection("build-source-mutation-during-use", "build-source", "snapshot_mutated", map[string]any{"phase": "before-last-build-child-exit"}),
++		map[string]any{"name": "legacy-nul-stream-structural-collision", "result": "regression-proved", "legacy_stream_base64": base64.StdEncoding.EncodeToString(legacy), "one_file": buildSourceRecordsJSON(one), "two_files": buildSourceRecordsJSON(two), "legacy_streams_equal": true, "framed_content_sha256": []any{sha256Identity(frameBuildSource(one)), sha256Identity(frameBuildSource(two))}, "framed_hashes_equal": false},
++		map[string]any{"name": "root-marker-bytes-are-build-input", "result": "regression-proved", "legacy_installed_tree_hashes_equal": true, "variants": []any{map[string]any{"name": "A", "content_sha256": sha256Identity(frameBuildSource(markerA))}, map[string]any{"name": "B", "content_sha256": sha256Identity(frameBuildSource(markerB))}}, "build_source_hashes_equal": false},
++	}
++}
++
++func toolchainVectorCases(entries []toolchainRecord, versionLF, normalized, preimage []byte, digest string) []any {
++	versionCRLF := []byte("go version go1.25.5 darwin/arm64\r\n")
++	normalizedCRLF, err := normalizeGoVersion(versionCRLF)
++	must(err)
++	return []any{
++		map[string]any{"name": "unsorted-directories-files-and-internal-link", "result": "accepted", "entries": toolchainRecordsJSON(entries), "go_version_stdout_base64": base64.StdEncoding.EncodeToString(versionLF), "normalized_go_version": string(normalized), "preimage_base64": base64.StdEncoding.EncodeToString(preimage), "content_sha256": digest},
++		map[string]any{"name": "crlf-version-normalizes-to-lf-identity", "result": "accepted", "go_version_stdout_base64": base64.StdEncoding.EncodeToString(versionCRLF), "normalized_go_version": string(normalizedCRLF), "content_sha256": sha256Identity(frameToolchain(entries, normalizedCRLF))},
++		map[string]any{"name": "toolchain-mode-and-timestamp-are-non-inputs", "result": "accepted", "variants": []any{map[string]any{"mode": "0755", "mtime": "2000-01-01T00:00:00Z"}, map[string]any{"mode": "0555", "mtime": "2030-01-01T00:00:00Z"}}, "content_sha256": digest},
++		rejection("toolchain-version-missing-terminal-lf", "toolchain", "malformed_go_version", map[string]any{"stdout_base64": base64.StdEncoding.EncodeToString([]byte("go version go1.25.5 darwin/arm64"))}),
++		rejection("toolchain-version-multiple-terminal-newlines", "toolchain", "malformed_go_version", map[string]any{"stdout_base64": base64.StdEncoding.EncodeToString([]byte("go version go1.25.5 darwin/arm64\n\n"))}),
++		rejection("invalid-unicode-toolchain-path", "toolchain", "invalid_unicode", map[string]any{"path_bytes_base64": "/w=="}),
++		rejection("duplicate-toolchain-path", "toolchain", "duplicate_path", map[string]any{"paths": []any{"bin/go", "bin/go"}}),
++		rejection("escaping-toolchain-link", "toolchain", "toolchain_link_escape", map[string]any{"path": "pkg/escape", "target": "../../outside"}),
++		rejection("absolute-toolchain-link", "toolchain", "toolchain_link_absolute", map[string]any{"path": "pkg/absolute", "target": "/outside"}),
++		rejection("dangling-toolchain-link", "toolchain", "toolchain_link_dangling", map[string]any{"path": "pkg/missing", "target": "missing"}),
++		rejection("selected-go-outside-goroot", "toolchain", "toolchain_executable_mismatch", map[string]any{"selected": "/tmp/go", "required": "<goroot>/bin/go"}),
++		rejection("toolchain-tree-mutation-during-use", "toolchain", "toolchain_mutated", map[string]any{"phase": "before-last-child-exit"}),
++	}
++}
++
++func buildSourceRecords(root string, files []string) []buildSourceRecord {
++	records := make([]buildSourceRecord, 0, len(files))
++	for _, name := range files {
++		payload, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
++		must(err)
++		records = append(records, buildSourceRecord{path: name, content: payload})
++	}
++	return records
++}
++
++func frameBuildSource(records []buildSourceRecord) []byte {
++	sorted := append([]buildSourceRecord(nil), records...)
++	sort.Slice(sorted, func(left, right int) bool { return sorted[left].path < sorted[right].path })
++	result := append([]byte{}, []byte("curator-build-source-v1\x00")...)
++	for _, record := range sorted {
++		result = append(result, 'F')
++		result = binary.BigEndian.AppendUint64(result, uint64(len([]byte(record.path))))
++		result = append(result, []byte(record.path)...)
++		result = binary.BigEndian.AppendUint64(result, uint64(len(record.content)))
++		result = append(result, record.content...)
++	}
++	return result
++}
++
++func frameToolchain(records []toolchainRecord, version []byte) []byte {
++	sorted := append([]toolchainRecord(nil), records...)
++	sort.Slice(sorted, func(left, right int) bool { return sorted[left].path < sorted[right].path })
++	result := append([]byte{}, []byte("curator-go-toolchain-v1\x00")...)
++	for _, record := range sorted {
++		result = appendFramedRecord(result, record.kind, []byte(record.path), record.payload)
++	}
++	return appendFramedRecord(result, 'V', nil, version)
++}
++
++func appendFramedRecord(result []byte, kind byte, path, payload []byte) []byte {
++	result = append(result, kind)
++	result = binary.BigEndian.AppendUint64(result, uint64(len(path)))
++	result = append(result, path...)
++	result = binary.BigEndian.AppendUint64(result, uint64(len(payload)))
++	return append(result, payload...)
++}
++
++func normalizeGoVersion(stdout []byte) ([]byte, error) {
++	if len(stdout) == 0 || stdout[len(stdout)-1] != '\n' || strings.Count(string(stdout), "\n") != 1 || strings.ContainsRune(string(stdout), 0) {
++		return nil, fmt.Errorf("malformed go version output")
++	}
++	value := stdout[:len(stdout)-1]
++	if len(value) > 0 && value[len(value)-1] == '\r' {
++		value = value[:len(value)-1]
++	}
++	if len(value) == 0 || strings.ContainsRune(string(value), '\r') || !utf8.Valid(value) {
++		return nil, fmt.Errorf("malformed go version output")
++	}
++	return append([]byte(nil), value...), nil
++}
++
++func sha256Identity(payload []byte) string {
++	digest := sha256.Sum256(payload)
++	return "sha256:" + hex.EncodeToString(digest[:])
++}
++
++func buildSourceRecordsJSON(records []buildSourceRecord) []any {
++	result := make([]any, 0, len(records))
++	for _, record := range records {
++		result = append(result, map[string]any{"path": record.path, "content_base64": base64.StdEncoding.EncodeToString(record.content)})
++	}
++	return result
++}
++
++func toolchainRecordsJSON(records []toolchainRecord) []any {
++	kinds := map[byte]string{'D': "directory", 'F': "file", 'L': "symlink"}
++	result := make([]any, 0, len(records))
++	for _, record := range records {
++		item := map[string]any{"path": record.path, "type": kinds[record.kind]}
++		if record.kind == 'F' {
++			item["content_base64"] = base64.StdEncoding.EncodeToString(record.payload)
++		} else if record.kind == 'L' {
++			item["target"] = string(record.payload)
++		}
++		result = append(result, item)
++	}
++	return result
++}
++
++func fixedGoEnvironment() map[string]any {
++	return map[string]any{
++		"GO111MODULE": "on", "GOENV": "off", "GOFLAGS": "", "GOPATH": "<operation-private>/gopath",
++		"GOMODCACHE": "<operation-private>/gomodcache", "GOCACHE": "<operation-private>/gocache", "GOTMPDIR": "<operation-private>/gotmp",
++		"GOPROXY": "off", "GOSUMDB": "off", "GOPRIVATE": "", "GONOPROXY": "none", "GONOSUMDB": "none", "GOVCS": "*:off",
++		"GOWORK": "off", "GOTOOLCHAIN": "local", "CGO_ENABLED": "0", "GO_EXTLINK_ENABLED": "0", "GOEXPERIMENT": "",
++		"GOROOT": "<resolved-trusted-goroot>", "GOOS": "darwin", "GOARCH": "arm64", "GOARM64": "v8.0",
++		"HOME": "<operation-private>/home", "XDG_CONFIG_HOME": "<operation-private>/config", "PATH": "<operation-private>/empty-path",
++		"TMPDIR": "<operation-private>/tmp", "LC_ALL": "C", "LANG": "C",
++	}
++}
++
++func fixedGoArgv() []any {
++	goTool := "/absolute/trusted/goroot/bin/go"
++	return []any{
++		map[string]any{"name": "telemetry-off", "cwd": "<operation-private>/empty", "source_aware": false, "argv": []any{goTool, "telemetry", "off"}},
++		map[string]any{"name": "version", "cwd": "<operation-private>/empty", "source_aware": false, "argv": []any{goTool, "version"}},
++		map[string]any{"name": "env", "cwd": "<operation-private>/empty", "source_aware": false, "argv": []any{goTool, "env", "-json", "GOROOT", "GOHOSTOS", "GOHOSTARCH", "GOOS", "GOARCH", "GO386", "GOAMD64", "GOARM", "GOARM64", "GOMIPS", "GOMIPS64", "GOPPC64", "GORISCV64", "GOWASM", "GOTELEMETRY", "GOTELEMETRYDIR"}},
++		map[string]any{"name": "list", "cwd": "<validated-source-dir>", "source_aware": true, "argv": []any{goTool, "list", "-mod=vendor", "-deps", "-json", "-buildvcs=false", "-compiler=gc", "-pgo=off", "."}},
++		map[string]any{"name": "build", "cwd": "<validated-source-dir>", "source_aware": true, "argv": []any{goTool, "build", "-mod=vendor", "-trimpath", "-buildvcs=false", "-buildmode=exe", "-compiler=gc", "-pgo=off", "-ldflags=-linkmode=internal -libgcc=none", "-o", "<operation-staging>/bin/golden-tool", "."}},
++	}
++}
++
+ func regularFiles(root string) []string {
+ 	var files []string
+ 	must(filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+@@ -982,6 +1446,7 @@
+ func selectedContextFiles(root string) []string {
+ 	var manifest struct {
+ 		RuntimeRoots []string       `json:"runtime_roots"`
++		BuildRoots   []string       `json:"build_roots"`
+ 		Commands     map[string]any `json:"commands"`
+ 	}
+ 	payload, err := os.ReadFile(filepath.Join(root, "agent-skill.json"))
+@@ -993,7 +1458,7 @@
+ 		if !includeRoots[parts[0]] && !(parts[0] == "scripts" && len(manifest.Commands) == 0) {
+ 			continue
+ 		}
+-		if excluded(parts) || underRoot(rel, manifest.RuntimeRoots) {
++		if excluded(parts) || underRoot(rel, manifest.RuntimeRoots) || underRoot(rel, manifest.BuildRoots) {
+ 			continue
+ 		}
+ 		files = append(files, rel)
+@@ -1233,6 +1698,11 @@
+ 	must(os.MkdirAll(filepath.Dir(path), 0o755))
+ 	must(os.WriteFile(path, []byte(text), 0o644))
+ }
++
++func writeBytes(path string, payload []byte) {
++	must(os.MkdirAll(filepath.Dir(path), 0o755))
++	must(os.WriteFile(path, payload, 0o644))
++}
+ func must(err error) {
+ 	if err != nil {
+ 		panic(fmt.Sprintf("generate conformance vectors: %v", err))

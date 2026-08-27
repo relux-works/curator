@@ -1,0 +1,559 @@
+=== RUN   TestGCPrunesDeadConsumersUnderTheHomeLock
+curator: warning: build cache sweep skipped: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestGCPrunesDeadConsumersUnderTheHomeLock1744753642\001\manager home DACL is not protected from inheritance; no entry was traversed or removed
+removed runtime skill-x/3333333333333333333333333333333333333333
+gc: 1 runtime entry removed, 0 build entries removed
+--- PASS: TestGCPrunesDeadConsumersUnderTheHomeLock (0.03s)
+=== RUN   TestGCWaitsForTheHomeLock
+curator: warning: build cache sweep skipped: untrusted cache provenance: C:\Users\admin\AppData\Local\Temp\TestGCWaitsForTheHomeLock1393004487\001\manager home DACL is not protected from inheritance; no entry was traversed or removed
+gc: 0 runtime entries removed, 0 build entries removed
+--- PASS: TestGCWaitsForTheHomeLock (0.27s)
+=== RUN   TestGCRunsSerializedAcrossConcurrentInvocations
+--- PASS: TestGCRunsSerializedAcrossConcurrentInvocations (0.08s)
+=== RUN   TestUsageEnumeratesDocumentedCommands
+--- PASS: TestUsageEnumeratesDocumentedCommands (0.00s)
+=== RUN   TestRunVersionExitsZero
+curator dev
+--- PASS: TestRunVersionExitsZero (0.00s)
+=== RUN   TestRunNoArgsPrintsUsage
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestRunNoArgsPrintsUsage (0.00s)
+=== RUN   TestRunUnknownCommand
+curator: unknown command "frobnicate"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestRunUnknownCommand (0.00s)
+=== RUN   TestShellInitPrintsHooks
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in
+  declare\ -a*)
+    _curator_prompt_present=0
+    for _curator_prompt_entry in "${PROMPT_COMMAND[@]}"; do
+      if [ "$_curator_prompt_entry" = "_curator_auto_env" ]; then
+        _curator_prompt_present=1
+        break
+      fi
+    done
+    if [ "$_curator_prompt_present" = "0" ]; then
+      PROMPT_COMMAND=("_curator_auto_env" "${PROMPT_COMMAND[@]}")
+    fi
+    unset _curator_prompt_present
+    unset _curator_prompt_entry
+    ;;
+  *)
+    case ";${PROMPT_COMMAND:-};" in
+      *";_curator_auto_env;"*) ;;
+      *) PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+    esac
+    ;;
+esac
+_curator_auto_env
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+curator: unsupported shell: fish
+curator: unsupported shell: fish
+--- PASS: TestShellInitPrintsHooks (0.00s)
+=== RUN   TestShellInitInstallCachesHookWithoutConfig
+wrote C:\Users\admin\AppData\Local\Temp\TestShellInitInstallCachesHookWithoutConfig3989023712\001\manager home\hooks\curator.bash
+optional shell profile line: . 'C:/Users/admin/AppData/Local/Temp/TestShellInitInstallCachesHookWithoutConfig3989023712/001/manager home/hooks/curator.bash'
+--- PASS: TestShellInitInstallCachesHookWithoutConfig (0.02s)
+=== RUN   TestSkillCheckOnTempDir
+error: skill.missing_skill_md (SKILL.md): required SKILL.md not found
+[
+  {
+    "severity": "error",
+    "code": "skill.missing_skill_md",
+    "path": "SKILL.md",
+    "message": "required SKILL.md not found"
+  }
+]
+--- PASS: TestSkillCheckOnTempDir (0.00s)
+=== RUN   TestInstallFlagsAcceptTrailingOptions
+--- PASS: TestInstallFlagsAcceptTrailingOptions (0.00s)
+=== RUN   TestInstallAuditFlagAcceptsOptionalMode
+--- PASS: TestInstallAuditFlagAcceptsOptionalMode (0.00s)
+=== RUN   TestSelectProjectTargetsUsesAliasesAndStableAllOrder
+--- PASS: TestSelectProjectTargetsUsesAliasesAndStableAllOrder (0.00s)
+=== RUN   TestStatusDriftDetectsContentTampering
+--- PASS: TestStatusDriftDetectsContentTampering (0.03s)
+=== RUN   TestBootstrapAndProjectCommands
+wrote C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3313267607\001\config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+added project app: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3313267607\003
+alias: app
+path: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3313267607\003
+skillfile: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3313267607\003\Skillfile.json
+skills: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3313267607\003\.agents\skills
+bin: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3313267607\003\.agents\bin
+--- PASS: TestBootstrapAndProjectCommands (0.03s)
+=== RUN   TestBootstrapIfMissingKeepsExistingConfigWithoutParsing
+kept existing config: C:\Users\admin\AppData\Local\Temp\TestBootstrapIfMissingKeepsExistingConfigWithoutParsing1145740948\001\config.json
+--- PASS: TestBootstrapIfMissingKeepsExistingConfigWithoutParsing (0.01s)
+=== RUN   TestBootstrapIfMissingCreatesAbsentConfig
+wrote C:\Users\admin\AppData\Local\Temp\TestBootstrapIfMissingCreatesAbsentConfig515908236\001\home\config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+--- PASS: TestBootstrapIfMissingCreatesAbsentConfig (0.01s)
+=== RUN   TestBootstrapIfMissingRejectsForce
+curator: bootstrap --if-missing and --force are mutually exclusive
+--- PASS: TestBootstrapIfMissingRejectsForce (0.00s)
+=== RUN   TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot
+app: generated paths are not ignored by git; missing entries: .agents/, .codex/skills/; skipped
+--- PASS: TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot (0.04s)
+=== RUN   TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot
+initialized C:\Users\admin\AppData\Local\Temp\TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot1184564916\001\home\global\Skillfile.json
+global: dry-run; no files modified
+--- PASS: TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot (0.02s)
+=== RUN   TestCLIEndToEndInstallStatusAndTamperCheck
+    main_test.go:296: git [init -q -b main]: exec: "git": executable file not found in %PATH%
+--- FAIL: TestCLIEndToEndInstallStatusAndTamperCheck (0.01s)
+=== RUN   TestHiddenWorkerModeIsNotAUserVisibleCommand
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestHiddenWorkerModeIsNotAUserVisibleCommand (0.00s)
+FAIL

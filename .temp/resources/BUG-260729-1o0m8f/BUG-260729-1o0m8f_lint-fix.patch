@@ -1,0 +1,283 @@
+--- a/internal/protocoljson/ccj.go
++++ b/internal/protocoljson/ccj.go
+@@ -207,9 +207,13 @@
+ 			buffer.WriteString(`\t`)
+ 		default:
+ 			if character < 0x20 {
++				// Ranging a string never yields a negative rune, so a control
++				// character here is one of 0x00..0x1f. Both nibbles therefore
++				// index the sixteen-entry table directly, and no narrowing
++				// conversion stands between the rune and the escape digits.
+ 				buffer.WriteString(`\u00`)
+-				buffer.WriteByte(hexadecimal[byte(character)>>4])
+-				buffer.WriteByte(hexadecimal[byte(character)&0x0f])
++				buffer.WriteByte(hexadecimal[character>>4])
++				buffer.WriteByte(hexadecimal[character&0x0f])
+ 			} else {
+ 				buffer.WriteRune(character)
+ 			}
+--- a/internal/protocoljson/ccj_test.go
++++ b/internal/protocoljson/ccj_test.go
+@@ -0,0 +1,79 @@
++package protocoljson
++
++import (
++	"fmt"
++	"testing"
++)
++
++// TestMarshalCanonicalEscapesEveryControlCharacter pins the exact bytes CCJ-1
++// emits for the whole C0 range. The escape digits are produced by indexing a
++// hexadecimal table with the rune itself, so this fixes the contract the
++// encoder has to keep: the five named escapes stay named, every other control
++// character becomes a lower-case \u00xx pair, and the first printable
++// character above the range is still written through untouched.
++func TestMarshalCanonicalEscapesEveryControlCharacter(t *testing.T) {
++	named := map[rune]string{
++		'\b': `\b`,
++		'\t': `\t`,
++		'\n': `\n`,
++		'\f': `\f`,
++		'\r': `\r`,
++	}
++	for character := rune(0); character < 0x20; character++ {
++		escape, ok := named[character]
++		if !ok {
++			escape = fmt.Sprintf(`\u%04x`, character)
++		}
++		want := `{"s":"` + escape + `"}`
++		got, err := MarshalCanonical(map[string]any{"s": string(character)})
++		if err != nil {
++			t.Fatalf("MarshalCanonical(U+%04X): %v", character, err)
++		}
++		if string(got) != want {
++			t.Fatalf("U+%04X encoded as %s, CCJ-1 requires %s", character, got, want)
++		}
++	}
++	// The guard is exclusive: a space is the first character the encoder must
++	// write literally, and the two structural characters keep their own
++	// escapes rather than falling into the \u00xx form.
++	for _, testCase := range []struct {
++		value string
++		want  string
++	}{
++		{value: " ", want: `{"s":" "}`},
++		{value: `"`, want: `{"s":"\""}`},
++		{value: `\`, want: `{"s":"\\"}`},
++		{value: "\x7f", want: "{\"s\":\"\x7f\"}"},
++		{value: "é", want: `{"s":"é"}`},
++	} {
++		got, err := MarshalCanonical(map[string]any{"s": testCase.value})
++		if err != nil {
++			t.Fatalf("MarshalCanonical(%q): %v", testCase.value, err)
++		}
++		if string(got) != testCase.want {
++			t.Fatalf("%q encoded as %s, CCJ-1 requires %s", testCase.value, got, testCase.want)
++		}
++	}
++}
++
++// TestRequireCanonicalAcceptsEveryControlCharacterEscape closes the loop: the
++// bytes the encoder produces for the C0 range must be exactly the bytes the
++// canonical-form check accepts, and re-encoding them must be a fixed point.
++func TestRequireCanonicalAcceptsEveryControlCharacterEscape(t *testing.T) {
++	for character := rune(0); character < 0x20; character++ {
++		payload, err := MarshalCanonical(map[string]any{"s": string(character)})
++		if err != nil {
++			t.Fatalf("MarshalCanonical(U+%04X): %v", character, err)
++		}
++		if err := RequireCanonical(payload); err != nil {
++			t.Fatalf("U+%04X encoding %s is not canonical: %v", character, payload, err)
++		}
++		var decoded map[string]any
++		if err := UnmarshalCanonical(payload, &decoded); err != nil {
++			t.Fatalf("U+%04X encoding %s did not round-trip: %v", character, payload, err)
++		}
++		if decoded["s"] != string(character) {
++			t.Fatalf("U+%04X round-tripped to %q", character, decoded["s"])
++		}
++	}
++}
+--- a/internal/transaction/journal.go
++++ b/internal/transaction/journal.go
+@@ -394,8 +394,12 @@
+ 		return fmt.Errorf("root entry is missing")
+ 	}
+ 	byPath := make(map[string]RemovalEntry, len(entries))
++	// Carrying the preceding path forward keeps the strict-order check on a
++	// value the loop has already validated, rather than reaching backwards
++	// into the slice under a guard that only the reader can see is safe.
++	previousPath := ""
+ 	for index, entry := range entries {
+-		if !validText(entry.RelativePath) || (index > 0 && bytes.Compare([]byte(entries[index-1].RelativePath), []byte(entry.RelativePath)) >= 0) {
++		if !validText(entry.RelativePath) || (index > 0 && bytes.Compare([]byte(previousPath), []byte(entry.RelativePath)) >= 0) {
+ 			return fmt.Errorf("entry paths are not in strict unsigned-byte order")
+ 		}
+ 		if entry.RelativePath != "" {
+@@ -435,6 +439,7 @@
+ 			return fmt.Errorf("entry %q kind %q is invalid", entry.RelativePath, entry.Kind)
+ 		}
+ 		byPath[entry.RelativePath] = entry
++		previousPath = entry.RelativePath
+ 	}
+ 	for _, entry := range entries[1:] {
+ 		parent := pathpkg.Dir(entry.RelativePath)
+--- a/internal/transaction/journal_order_test.go
++++ b/internal/transaction/journal_order_test.go
+@@ -0,0 +1,143 @@
++package transaction
++
++import (
++	"strings"
++	"testing"
++)
++
++func orderingRoot() RemovalEntry {
++	return RemovalEntry{Kind: "directory", Mode: 0o755}
++}
++
++func orderingFile(path string) RemovalEntry {
++	return RemovalEntry{
++		RelativePath: path,
++		Kind:         "file",
++		Mode:         0o644,
++		Digest:       "sha256:" + strings.Repeat("ab", 32),
++	}
++}
++
++// TestValidateRemovalEntriesOrdersByUnsignedBytes pins the ordering contract of
++// a removal manifest. The check walks the manifest forward carrying the
++// preceding path, so this fixes what that walk has to reject: any pair that is
++// equal or descending in unsigned-byte order, including the pair where a
++// signed-byte reading would disagree.
++func TestValidateRemovalEntriesOrdersByUnsignedBytes(t *testing.T) {
++	for _, testCase := range []struct {
++		name    string
++		entries []RemovalEntry
++		accept  bool
++	}{
++		{
++			name:    "root alone",
++			entries: []RemovalEntry{orderingRoot()},
++			accept:  true,
++		},
++		{
++			name:    "strictly ascending",
++			entries: []RemovalEntry{orderingRoot(), orderingFile("a"), orderingFile("b"), orderingFile("c")},
++			accept:  true,
++		},
++		{
++			// "~" is 0x7e and "é" opens with 0xc3. Unsigned-byte order puts
++			// the tilde first; a signed reading would put it last, so this
++			// pair separates the two orderings.
++			name:    "high byte sorts after ascii",
++			entries: []RemovalEntry{orderingRoot(), orderingFile("~"), orderingFile("é")},
++			accept:  true,
++		},
++		{
++			name:    "high byte before ascii is descending",
++			entries: []RemovalEntry{orderingRoot(), orderingFile("é"), orderingFile("~")},
++			accept:  false,
++		},
++		{
++			name:    "duplicate path",
++			entries: []RemovalEntry{orderingRoot(), orderingFile("a"), orderingFile("a")},
++			accept:  false,
++		},
++		{
++			name:    "descending pair",
++			entries: []RemovalEntry{orderingRoot(), orderingFile("b"), orderingFile("a")},
++			accept:  false,
++		},
++		{
++			name:    "descending at the tail",
++			entries: []RemovalEntry{orderingRoot(), orderingFile("a"), orderingFile("c"), orderingFile("b")},
++			accept:  false,
++		},
++		{
++			// A prefix is strictly shorter and therefore strictly smaller;
++			// the reverse pairing is the descending one.
++			name:    "prefix before extension",
++			entries: []RemovalEntry{orderingRoot(), orderingFile("a"), orderingFile("ab")},
++			accept:  true,
++		},
++		{
++			name:    "extension before prefix",
++			entries: []RemovalEntry{orderingRoot(), orderingFile("ab"), orderingFile("a")},
++			accept:  false,
++		},
++		{
++			name:    "root repeated",
++			entries: []RemovalEntry{orderingRoot(), orderingRoot()},
++			accept:  false,
++		},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			err := validateRemovalEntries(testCase.entries)
++			if testCase.accept && err != nil {
++				t.Fatalf("canonical manifest was rejected: %v", err)
++			}
++			if !testCase.accept {
++				if err == nil {
++					t.Fatal("a manifest out of strict unsigned-byte order was accepted")
++				}
++				if !strings.Contains(err.Error(), "strict unsigned-byte order") {
++					t.Fatalf("rejection names the wrong defect: %v", err)
++				}
++			}
++		})
++	}
++}
++
++// TestValidateRemovalEntriesStaysFailClosedWithoutARoot keeps the degenerate
++// inputs on the rejecting side and, because the ordering walk no longer reads
++// the slice behind the current index, proves they cannot fault.
++func TestValidateRemovalEntriesStaysFailClosedWithoutARoot(t *testing.T) {
++	for _, testCase := range []struct {
++		name    string
++		entries []RemovalEntry
++	}{
++		{name: "nil manifest", entries: nil},
++		{name: "empty manifest", entries: []RemovalEntry{}},
++		{name: "first entry is not the root", entries: []RemovalEntry{orderingFile("a")}},
++		{name: "root is not first", entries: []RemovalEntry{orderingFile("a"), orderingRoot()}},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			defer func() {
++				if recovered := recover(); recovered != nil {
++					t.Fatalf("validation faulted instead of rejecting: %v", recovered)
++				}
++			}()
++			if err := validateRemovalEntries(testCase.entries); err == nil {
++				t.Fatal("a manifest without a leading root entry was accepted")
++			}
++		})
++	}
++}
++
++// TestValidateRemovalEntriesRejectsUnorderedTextDefects keeps the two halves of
++// the ordering condition independent: a path that is not valid text is refused
++// even when the manifest is otherwise ascending.
++func TestValidateRemovalEntriesRejectsUnorderedTextDefects(t *testing.T) {
++	entries := []RemovalEntry{orderingRoot(), orderingFile("a"), orderingFile("b\x00c")}
++	if err := validateRemovalEntries(entries); err == nil {
++		t.Fatal("a manifest carrying a NUL in a path was accepted")
++	}
++	entries = []RemovalEntry{orderingRoot(), orderingFile("a"), orderingFile("b" + string([]byte{0xff}))}
++	if err := validateRemovalEntries(entries); err == nil {
++		t.Fatal("a manifest carrying invalid UTF-8 in a path was accepted")
++	}
++}
+--- a/internal/godriver/builddriver_positive_conformance_test.go
++++ b/internal/godriver/builddriver_positive_conformance_test.go
+@@ -172,10 +172,6 @@
+ 	t.Run("fixed environment", func(t *testing.T) {
+ 		if len(vectors.FixedEnvironment) == 0 {
+ 			t.Skip("this conformance root publishes no fixed environment")
+-		}
+-		environment := indispensableEnvironment()
+-		if environment == nil {
+-			environment = map[string]string{}
+ 		}
+ 		fixture := newSnapshotFixture(t)
+ 		fixture.start(stubScript{ListStdout: string(encodePackages(t, fixture.rootPackage())), Artifact: "artifact"})

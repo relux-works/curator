@@ -1,0 +1,11 @@
+test-gate: flags=<none> timeout=30m
+test-gate: conformance root=/Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260731-3a5q1p/spec-rc6/conformance/v1
+
+suite-plan: GOOS=darwin
+suite-plan: root=/Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260731-3a5q1p/spec-rc6/conformance/v1
+suite-plan: platform qualification read from the root's own vectors/conformance-claim-v3-qualification.json
+
+
+suite-plan: served=40 deferred=0 excluded=0
+suite-plan: CI_REQUIRE_FULL_ROOT=1 -- every package must be served by this root
+suite-plan: ok

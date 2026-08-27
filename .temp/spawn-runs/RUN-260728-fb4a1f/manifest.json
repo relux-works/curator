@@ -1,0 +1,61 @@
+{
+  "id": "RUN-260728-fb4a1f",
+  "task_id": "TASK-260728-1jafds",
+  "created_at": "2026-07-28T20:35:59.543373Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-00-35-59_-implementer--developer--claude-_TASK-260728-1jafds.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260728-1jafds_spawn-log_-implementer--developer--claude-_RUN-260728-fb4a1f.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260728-1jafds_results.md",
+    "TASK-260728-1jafds_review-verdict-cycle-1.md",
+    "TASK-260728-1jafds_review-verdict-cycle-2.md",
+    "TASK-260728-1jafds_rework-cycle-1-results.md",
+    "TASK-260728-1jafds_rework-cycle-1-validation.log",
+    "TASK-260728-1jafds_spawn-log_-implementer--developer--claude-_RUN-260728-b2f0dc.log",
+    "TASK-260728-1jafds_spawn-log_-implementer--developer--claude-_RUN-260728-fa9b1c.log",
+    "TASK-260728-1jafds_spawn-log_-reviewer--reviewer--codex-_RUN-260728-39001c.log",
+    "TASK-260728-1jafds_spawn-log_-reviewer--reviewer--codex-_RUN-260728-a70334.log",
+    "TASK-260728-1jafds_validate.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260728-1jafds_results.md": "e4a5a9d2f6884c0e3bc4b5882cbe32e2009e5b65638f5e3f6441f7ad20028430",
+    "TASK-260728-1jafds_review-verdict-cycle-1.md": "4047669e570fbdc4d9d2bf3aa0705384a7052b002c5e8f6f68b1b4c4390e02c1",
+    "TASK-260728-1jafds_review-verdict-cycle-2.md": "600c20593cebebd56d7d3c9285f03ab2f335626dd30eb12bc7470eea5686419c",
+    "TASK-260728-1jafds_rework-cycle-1-results.md": "2df749b0e352941798cebc47a8cf788354bd84e655e26e67493a427fe9d3d3e2",
+    "TASK-260728-1jafds_rework-cycle-1-validation.log": "54bd4987cf8f34c5564f138cc9b339f2be940aa87f6f8fd649711337c61af518",
+    "TASK-260728-1jafds_validate.log": "08aaf435dedd57dddc4bcb229478b312f1d88fef4dfdc0a253efc8b865bc3305"
+  },
+  "require_outcome_artifact": true
+}

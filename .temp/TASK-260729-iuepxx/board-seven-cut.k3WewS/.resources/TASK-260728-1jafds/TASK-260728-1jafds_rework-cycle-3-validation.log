@@ -1,0 +1,108 @@
+=== rework cycle 3 validation, 2026-07-29T00:04:12Z ===
+worktree: /Users/iv/Developer/ReluxWorks/.temp/TASK-260728-1jafds/curator-spec-worktree
+
+--- reviewer probes, before ---
+recorded in rework-cycle-3/probe-r3.py; original output was:
+  backend-below-minimum: schema errors = 0; check_claim_qualification ACCEPTED
+  host-platform-contradiction: schema errors = 0; check_claim_qualification ACCEPTED
+  curator-hardened-component-{file,tree}-v1: named at protocol/hardened-execution.md:167,197,198; never constructed
+
+--- reviewer probes, after ---
+backend-below-minimum: schema errors = 4; check_claim_qualification rejected: backend-below-minimum: observed backend version '0' is outside the hardened-backend-version-v1 grammar, so it cannot be compared with a minimum
+host-platform-contradiction: schema errors = 2; check_claim_qualification rejected: host-platform-contradiction: platform linux observed the kernel identity 'windows', which another platform declares
+well-formed-below-minimum: schema errors = 0; check_claim_qualification rejected: well-formed-below-minimum declares minimum version 'cgroup2-6.99' that its own trusted computing base does not satisfy: it observed 'cgroup2-6.0'
+below-minimum-not-lexical: schema errors = 0; check_claim_qualification rejected: below-minimum-not-lexical declares minimum version 'cgroup2-6.10' that its own trusted computing base does not satisfy: it observed 'cgroup2-6.9'
+curator-hardened-component-file-v1: normative construction at protocol/hardened-execution.md:[254]; mentions = [173, 203, 254, 260, 342]
+curator-hardened-component-tree-v1: normative construction at protocol/hardened-execution.md:[270]; mentions = [167, 204, 270, 295, 341]
+fixture capability-probe-suite: reproduced sha256:92f9047451c3a6e5057d13d7eb9cc3f6a42c00f136313c5a8b31ccc4b9e2ee18
+fixture capability-probe-suite-extra-member: reproduced sha256:953518bb9434e77e0ac7ef4a69841fb1b5e3c044bbaa4170cb0038ae15cb41b3
+fixture capability-probe-suite-retyped-entry: reproduced sha256:d485f1ed8d3e6cf2bb7f1e711db36068b054a0fa30598e88cb9e291339511be3
+fixture capability-probe-suite-link-substituted: reproduced sha256:29fe88749d9e5c6b288c2538c3c2357346a1692ab16d98d7758545877552c69b
+fixture capability-probe-single-file: reproduced sha256:242f7f080210efa0b0486e10c6773e8fef3a155ea80c9488038e3129a8070cfe
+fixture enforcement-backend-adapter: reproduced sha256:a5313564d5288332fa5d42fc2b29dbcdc9ce619dbe434834df9c04db347532c0
+fixture enforcement-backend-adapter-updated: reproduced sha256:586cd2fced16f7d6cb51e52f753a40e4c026f6d08b79a0cda5bb03b27ed40b25
+fixture supervisor-launcher-interpreter: reproduced sha256:f1ecb55973ca1d2fdef5390218e43a3df493fae813f7e9cd27d3fb999d75b79f
+fixture empty-file-component: reproduced sha256:a8bb342fcd6fe9e978b77ea1063009dac0c899b9824ba5f1f6bbcdfc79b09df5
+fixture empty-tree-component: reproduced sha256:c046e05be6f10b3f73342d4223d427b98967df4cb28eeda35e15b067fb8bb000
+distinct fixture digests: 10/10
+probe-r3 exit=0
+
+--- schema mutation probe: neuter each new rule, require a distinct failure ---
+host-identity-to-platform: detected — the hardened schemas accept a receipt whose macos trusted base observed the linux kernel identity
+backend-version-series-to-backend: detected — the hardened schemas accept a receipt whose macos-sandbox-v1 reports a cgroup2 version
+component-algorithm-to-kind: detected — the hardened schemas accept a receipt digesting an interpreter as a tree
+host-kind-narrowing: detected — the hardened host kind is not the single operating-system value this revision admits
+host-identity-value-set: detected — the hardened host identity value set is not exactly the declared canonical kernels
+backend-version-grammar: detected — the hardened schemas accept a receipt whose backend version is 'sandbox-02.0'
+claim-minimum-version-series: detected — the hardened schemas accept a claim whose minimum version is in the sandbox series
+
+detected 7/7; distinct messages = 7
+mutation-probe exit=0
+
+--- conformance-validator rule probe ---
+claim-backend-version-at-least-minimum: rejected — claim-backend-version-at-least-minimum declares minimum version 'cgroup2-99.0' that its own trusted computing base does not satisfy: it observed 'cgroup2-6.12'
+claim-backend-version-lexical-trap: rejected — claim-backend-version-lexical-trap declares minimum version 'cgroup2-6.10' that its own trusted computing base does not satisfy: it observed 'cgroup2-6.9'
+claim-minimum-version-incomparable-series: rejected — claim-minimum-version-incomparable-series declares minimum version 'sandbox-2.0' that cannot be compared with the observed 'cgroup2-6.12': one is malformed or they are different series
+tcb-host-identity-platform-mismatch: rejected — tcb-host-identity-platform-mismatch: platform linux observed the kernel identity 'windows-nt', which another platform declares
+tcb-backend-version-wrong-series: rejected — tcb-backend-version-wrong-series: backend linux-namespace-seccomp-v1 reports a version in the 'sandbox' series, which another backend declares
+tcb-component-algorithm-kind-mismatch: rejected — tcb-component-algorithm-kind-mismatch: trusted component of kind script carries a curator-hardened-component-tree-v1 digest, which that kind does not admit
+shipped-claim: qualifies
+
+rejected 6/6; distinct messages = 6
+validator-mutation-probe exit=0
+
+=== mechanical gates, task worktree, real exit codes ===
+make validate exit=0
+python3 tools/validate_hardened.py
+validated 6 hardened schemas and 92 hardened suite files
+python3 -B -m unittest discover -s tools -p 'test_*.py'
+.......................................................................................................................................................
+----------------------------------------------------------------------
+Ran 151 tests in 33.672s
+
+OK
+validated 6 hardened schemas and 92 hardened suite files
+go test ./tools/...
+ok  	github.com/relux-works/curator-spec/tools/generate-hardened	(cached)
+ok  	github.com/relux-works/curator-spec/tools/generate-vectors	0.619s
+tools/validate.py exit=0
+tools/validate_hardened.py exit=0
+unittest exit=0
+Ran 151 tests in 31.880s
+OK
+go test exit=0
+go vet exit=0
+gofmt -l tools: []
+git diff --check exit=0
+make regenerate-check exit=2 (EXPECTED-RED: compares against committed 57c1f56 while the whole candidate is uncommitted)
+make regenerate-hardened-check exit=2 (EXPECTED-RED: same reason)
+release_gate.py rc.5 exit=1 (EXPECTED-RED: requires a clean checkout)
+
+=== byte stability and rc.5 parity ===
+hardened suite regeneration diff exit=0 (0 = byte stable)
+hardened release regeneration cmp exit=0
+conformance/v1 vs accepted predecessor exit=0
+schemas/v1 vs accepted predecessor exit=0
+release/1.0.0-rc.5.json vs predecessor exit=0
+portable manifest sha256: 9ba9b8ecf6f06cafda1425aed3539dee8d12af43dabd36f803f4f420dbb1dacf
+rc.5 pin in release/1.0.0-rc.5.json: sha256:9ba9b8ecf6f06cafda1425aed3539dee8d12af43dabd36f803f4f420dbb1dacf
+
+=== nothing is claimed qualified ===
+release qualified_platforms: []
+release claim_v4: {"claims_emitted": [], "linux_status": "unqualified-pending-native-evidence", "macos_status": "unqualified-pending-native-evidence", "windows_status": "unqualified-pending-native-evidence"}
+  linux: unqualified, native_evidence=absent
+  macos: unqualified, native_evidence=absent
+  windows: unqualified, native_evidence=absent
+adversarial evidence_status: pending-native-validation qualified_platforms: []
+
+=== git state: nothing staged, committed, or published ===
+HEAD: 57c1f56846d221ecc55786bd3c2467ec32f11730
+staged files: 0
+
+=== clean probe: the three structural gates resolved without staging or committing curator-spec ===
+probe is byte-identical to the task worktree: diff exit=0
+throwaway probe commit a7acf57
+make validate exit=0
+make regenerate-check exit=0 (RESOLVED)
+make regenerate-hardened-check exit=0 (RESOLVED)
+release_gate.py rc.5 exit=0 (RESOLVED: hardened CI gates do not alter rc.5 qualification)

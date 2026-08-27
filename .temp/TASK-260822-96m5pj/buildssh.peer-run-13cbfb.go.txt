@@ -1,0 +1,264 @@
+package config
+
+import (
+	"regexp"
+	"sort"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/identity"
+	"github.com/relux-works/curator/internal/verr"
+)
+
+// build_ssh selects the operator SSH credentials used to reach an external
+// build repository. Credentials are operator-owned: no manifest, descriptor,
+// repository, substitution, or marker may select them (Spec §12.2). The
+// operator names a scope, the scope is matched against the canonical
+// `host/path` repository identity of Spec §6.3, and the longest matching
+// scope wins.
+//
+// A scope is a lowercase host, optionally followed by `/`-separated path
+// segments. Matching is segment-aware exactly like the source allowlist of
+// Spec §6.1: scope `h/portals` covers `h/portals/app` and never
+// `h/portals-evil`.
+//
+// An entry names an agent socket, an identity file, or both, which are the
+// three authentication shapes the SSH invocation admits: an identity alone,
+// an agent alone, and an agent pinned to one named identity. The socket is
+// always explicit, because no ambient agent socket is admitted.
+
+// MaxBuildSSHScopeLength bounds a scope by the canonical identity it selects.
+const MaxBuildSSHScopeLength = 4096
+
+// maxCredentialPathLength bounds an operator credential path.
+const maxCredentialPathLength = 4096
+
+// maxScopeHostLength bounds the host label of a scope.
+const maxScopeHostLength = 253
+
+// BuildSSHScopeRule is the human-readable scope rule, phrased once for reuse.
+const BuildSSHScopeRule = "must be a lowercase DNS host optionally followed by '/'-separated path segments of letters, digits, dots, underscores, or hyphens"
+
+// BuildSSHPathRule is the human-readable rule for an operator credential path.
+const BuildSSHPathRule = "must be an absolute path or start with '~/' and contain no control characters"
+
+var (
+	scopeHostRE    = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$`)
+	scopeSegmentRE = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+	// Recognised without consulting the running platform, so one config file
+	// yields the same verdict wherever it is read.
+	windowsAbsoluteRE = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\\\\)`)
+)
+
+// buildSSHFields are the only fields a scope entry may carry.
+var buildSSHFields = map[string]bool{"agent": true, "identity": true, "known_hosts": true}
+
+// BuildSSHCredential is one operator credential selection. Paths keep the
+// operator's spelling; Expanded resolves a leading `~/`.
+type BuildSSHCredential struct {
+	// Scope is the map key this credential was configured under.
+	Scope string
+	// Agent is the SSH agent socket offered to the destination.
+	Agent string
+	// Identity is the identity file. Together with Agent it pins the single
+	// key the agent may offer.
+	Identity string
+	// KnownHosts overrides the operator known-hosts file for this scope.
+	KnownHosts string
+}
+
+// Empty reports a selection that names no credential at all.
+func (b BuildSSHCredential) Empty() bool { return b.Agent == "" && b.Identity == "" }
+
+// Expanded returns the credential with every `~/` path resolved against the
+// operator's home directory.
+func (b BuildSSHCredential) Expanded() BuildSSHCredential {
+	b.Agent = expandHome(b.Agent)
+	b.Identity = expandHome(b.Identity)
+	b.KnownHosts = expandHome(b.KnownHosts)
+	return b
+}
+
+// ValidBuildSSHScope reports whether value is a well-formed credential scope.
+func ValidBuildSSHScope(value string) bool {
+	if value == "" || utf8.RuneCountInString(value) > MaxBuildSSHScopeLength {
+		return false
+	}
+	host, path, hasPath := strings.Cut(value, "/")
+	if len(host) > maxScopeHostLength || !scopeHostRE.MatchString(host) {
+		return false
+	}
+	if !hasPath {
+		return true
+	}
+	for _, segment := range strings.Split(path, "/") {
+		// A canonical identity never carries an empty, "." or ".." path
+		// component, so a scope spelled with one could never match.
+		if segment == "." || segment == ".." || !scopeSegmentRE.MatchString(segment) {
+			return false
+		}
+	}
+	return true
+}
+
+// ValidateBuildSSH checks one credential against the scope grammar, the path
+// rule, and the requirement that a scope select something.
+func ValidateBuildSSH(credential BuildSSHCredential) error {
+	if !ValidBuildSSHScope(credential.Scope) {
+		return verr.New("build_ssh", "scope %q %s", credential.Scope, BuildSSHScopeRule)
+	}
+	label := "build_ssh." + credential.Scope
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"agent", credential.Agent},
+		{"identity", credential.Identity},
+		{"known_hosts", credential.KnownHosts},
+	} {
+		if field.value != "" && !validCredentialPath(field.value) {
+			return verr.New(label+"."+field.name, "%s", BuildSSHPathRule)
+		}
+	}
+	if credential.Empty() {
+		return verr.New(label, "requires 'agent', 'identity', or both")
+	}
+	return nil
+}
+
+// BuildSSHFor returns the credential whose scope is the longest segment-aware
+// prefix of a canonical repository identity (Spec §6.3). A value that is not
+// a canonical `host/path` identity, and an identity no scope covers, select
+// no credential: the caller must then fail closed rather than fall back to
+// ambient SSH state.
+func (c *Config) BuildSSHFor(canonical string) (BuildSSHCredential, bool) {
+	if !identity.ValidCanonical(canonical) {
+		return BuildSSHCredential{}, false
+	}
+	best := ""
+	for scope := range c.BuildSSH {
+		if len(scope) > len(best) && identity.MatchesPrefix(canonical, scope) {
+			best = scope
+		}
+	}
+	if best == "" {
+		return BuildSSHCredential{}, false
+	}
+	return c.BuildSSH[best], true
+}
+
+// BuildSSHScopes returns the configured scopes in sorted order.
+func (c *Config) BuildSSHScopes() []string {
+	scopes := make([]string, 0, len(c.BuildSSH))
+	for scope := range c.BuildSSH {
+		scopes = append(scopes, scope)
+	}
+	sort.Strings(scopes)
+	return scopes
+}
+
+// BuildSSHObject renders credentials back into the config JSON shape. Unset
+// fields are omitted, and the result parses back to the same credentials.
+func BuildSSHObject(credentials map[string]BuildSSHCredential) map[string]any {
+	if len(credentials) == 0 {
+		return nil
+	}
+	object := make(map[string]any, len(credentials))
+	for scope, credential := range credentials {
+		entry := map[string]any{}
+		for field, value := range map[string]string{
+			"agent": credential.Agent, "identity": credential.Identity,
+			"known_hosts": credential.KnownHosts,
+		} {
+			if value != "" {
+				entry[field] = value
+			}
+		}
+		object[scope] = entry
+	}
+	return object
+}
+
+// parseBuildSSH validates the build_ssh field. Anything the grammar does not
+// spell out is rejected rather than ignored: a credential that silently fails
+// to apply is worse than a config that refuses to load.
+func parseBuildSSH(raw any) (map[string]BuildSSHCredential, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	object, ok := raw.(map[string]any)
+	if !ok {
+		return nil, verr.New("build_ssh", "must be an object")
+	}
+	scopes := make([]string, 0, len(object))
+	for scope := range object {
+		scopes = append(scopes, scope)
+	}
+	// Sorted so a config with several faults always reports the same one.
+	sort.Strings(scopes)
+
+	credentials := map[string]BuildSSHCredential{}
+	for _, scope := range scopes {
+		if !ValidBuildSSHScope(scope) {
+			return nil, verr.New("build_ssh", "scope %q %s", scope, BuildSSHScopeRule)
+		}
+		label := "build_ssh." + scope
+		entry, ok := object[scope].(map[string]any)
+		if !ok {
+			return nil, verr.New(label, "must be an object")
+		}
+		var unknown []string
+		for key := range entry {
+			if !buildSSHFields[key] {
+				unknown = append(unknown, key)
+			}
+		}
+		if len(unknown) > 0 {
+			sort.Strings(unknown)
+			return nil, verr.New(label, "has unsupported field(s): %s", strings.Join(unknown, ", "))
+		}
+		credential := BuildSSHCredential{Scope: scope}
+		for field, target := range map[string]*string{
+			"agent": &credential.Agent, "identity": &credential.Identity,
+			"known_hosts": &credential.KnownHosts,
+		} {
+			raw, present := entry[field]
+			if !present {
+				continue
+			}
+			value, ok := raw.(string)
+			// An explicit empty string is a fault, not an absent field:
+			// silently dropping it would hand the repository the ambient
+			// SSH state the operator meant to replace.
+			if !ok || value == "" {
+				return nil, verr.New(label+"."+field, "%s", BuildSSHPathRule)
+			}
+			*target = value
+		}
+		if err := ValidateBuildSSH(credential); err != nil {
+			return nil, err
+		}
+		credentials[scope] = credential
+	}
+	return credentials, nil
+}
+
+// validCredentialPath reports whether value is a rooted, control-free path an
+// operator can hand to the SSH client unchanged. A relative path is refused
+// because a machine-global config has no stable directory to resolve it
+// against.
+func validCredentialPath(value string) bool {
+	if value == "" || utf8.RuneCountInString(value) > maxCredentialPathLength {
+		return false
+	}
+	for _, character := range value {
+		if unicode.IsControl(character) {
+			return false
+		}
+	}
+	if strings.HasPrefix(value, "~/") {
+		return true
+	}
+	return strings.HasPrefix(value, "/") || windowsAbsoluteRE.MatchString(value)
+}

@@ -1,0 +1,28 @@
+--- /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-rfrdfo/worktree/internal/install/atomicity/fixture_test.go	2026-07-28 16:53:34
++++ /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2afulh/worktree/internal/install/atomicity/fixture_test.go	2026-07-29 19:24:09
+@@ -72,6 +72,17 @@
+ }
+ 
+ // skill creates a tagged skill repository with one exported script command.
++//
++// The context tree is deliberately the minimum this suite asserts on. It used
++// to carry a whitelisted references/info.md as well, which nothing here ever
++// read: every rollback assertion compares whole-state digests that are computed
++// from whatever is on disk, so an extra unasserted file adds no coverage and
++// only lengthens the staged manifest. Dropping it removes two staging entries
++// (the references directory and the file) and one copied chunk from every
++// context target this suite stages, and every one of those entries costs
++// saveJournal calls on a journal the whole sweep rewrites repeatedly. Anything
++// that genuinely needs a multi-directory context tree belongs in a test that
++// asserts on it — internal/whitelist and internal/interop already do.
+ func (e *env) skill(name string) {
+ 	e.t.Helper()
+ 	dir := filepath.Join(e.skillsRoot, name)
+@@ -80,7 +91,6 @@
+ 	}
+ 	e.git(dir, "init", "-q", "-b", "main")
+ 	e.write(dir, "SKILL.md", "---\nname: "+name+"\ndescription: d\n---\n# "+name+"\n")
+-	e.write(dir, "references/info.md", "ref")
+ 	e.write(dir, "scripts/"+name+"-tool", "#!/bin/sh\necho "+name+"\n")
+ 	spec := map[string]any{
+ 		"schema_version": 4,

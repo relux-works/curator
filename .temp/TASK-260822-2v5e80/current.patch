@@ -1,0 +1,384 @@
+diff --git a/cmd/curator/toolchain_remedy_test.go b/cmd/curator/toolchain_remedy_test.go
+new file mode 100644
+index 0000000..07dc735
+--- /dev/null
++++ b/cmd/curator/toolchain_remedy_test.go
+@@ -0,0 +1,63 @@
++package main
++
++import (
++	"go/build"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/godriver"
++)
++
++// TestInstallPrintsTheRemedyAVersionManagerSelectionEarns drives the whole
++// chain an operator with a version-manager toolchain takes: the driver refuses
++// the selection at its trust boundary, the install boundary renders that
++// refusal through its bounded, path-redacting rendering, and the command prints
++// it. A remedy is only worth attaching if it survives all three, so the
++// assertion is on what stderr actually says.
++func TestInstallPrintsTheRemedyAVersionManagerSelectionEarns(t *testing.T) {
++	compiledProject(t)
++
++	realRoot := build.Default.GOROOT
++	if realRoot == "" {
++		t.Skip("this host reports no GOROOT to select a real launcher from")
++	}
++	launcher := "go"
++	if runtime.GOOS == "windows" {
++		launcher = "go.exe"
++	}
++	// A version-manager layout in the small: the selected launcher sits in a
++	// bin directory of its own and resolves to the real launcher under another
++	// root, which is what a goenv, asdf, or mise wrapper looks like here.
++	wrapperRoot := t.TempDir()
++	if err := os.MkdirAll(filepath.Join(wrapperRoot, "bin"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	wrapper := filepath.Join(wrapperRoot, "bin", launcher)
++	if err := os.Symlink(filepath.Join(realRoot, "bin", launcher), wrapper); err != nil {
++		t.Skipf("this host cannot create the symbolic link the case needs: %v", err)
++	}
++	t.Setenv(godriver.SelectionCuratorGo, wrapper)
++
++	code, _, stderr := capture(t, "install", "app")
++	if code != exitFail {
++		t.Fatalf("install with a version-manager selection = %d, want %d\n%s", code, exitFail, stderr)
++	}
++
++	// The protocol string and the remedy reach the operator on one line, the
++	// remedy behind the string a reader matches on.
++	const want = "go-v1 toolchain_executable_mismatch: " +
++		"selected Go executable is not the regular executable under the derived GOROOT" +
++		`; put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
++	if !strings.Contains(stderr, want) {
++		t.Fatalf("install did not print the remedied diagnostic:\nwant to contain: %s\ngot:\n%s", want, stderr)
++	}
++	// The remedy is advice about the operator's own shell, so it must not cost
++	// the operator the rule that says the manager never reads that shell to
++	// choose a toolchain.
++	if !strings.Contains(stderr, "Curator never searches PATH and never downloads a toolchain") {
++		t.Fatalf("the remedy displaced the closed selection rule:\n%s", stderr)
++	}
++}
+diff --git a/internal/godriver/errors.go b/internal/godriver/errors.go
+index bb214d9..b64f94d 100644
+--- a/internal/godriver/errors.go
++++ b/internal/godriver/errors.go
+@@ -10,14 +10,28 @@ import (
+ type Diagnostic struct {
+ 	Code   string
+ 	Detail string
++	// Remedy is the operator action that resolves this boundary, and is empty
++	// for every boundary an operator cannot act on from their own host.
++	//
++	// It is kept out of Detail on purpose. Detail is the protocol string a
++	// reader matches on — a conformance vector, an operator grepping a log —
++	// and advice folded into it would move that string every time the advice
++	// was reworded. Error renders the remedy behind Detail instead, so the
++	// protocol string stays byte for byte what it was while the operator still
++	// reads what to do about it.
++	Remedy string
+ 	Err    error
+ }
+ 
+ func (err *Diagnostic) Error() string {
+-	if err.Detail == "" {
+-		return "go-v1 " + err.Code
++	message := "go-v1 " + err.Code
++	if err.Detail != "" {
++		message += ": " + err.Detail
+ 	}
+-	return fmt.Sprintf("go-v1 %s: %s", err.Code, err.Detail)
++	if err.Remedy != "" {
++		message += "; " + err.Remedy
++	}
++	return message
+ }
+ 
+ func (err *Diagnostic) Unwrap() error { return err.Err }
+@@ -30,6 +44,18 @@ func diagnosticErr(code string, err error, format string, args ...any) error {
+ 	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...), Err: err}
+ }
+ 
++// diagnosticRemedy is diagnostic for a boundary that carries an operator
++// remedy alongside its protocol detail.
++func diagnosticRemedy(code, remedy, format string, args ...any) error {
++	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...), Remedy: remedy}
++}
++
++// diagnosticErrRemedy is diagnosticRemedy for a boundary that also has a cause
++// to unwrap.
++func diagnosticErrRemedy(code, remedy string, err error, format string, args ...any) error {
++	return &Diagnostic{Code: code, Detail: fmt.Sprintf(format, args...), Remedy: remedy, Err: err}
++}
++
+ // DiagnosticCode returns the stable go-v1 code carried by err, or an empty
+ // string when err did not originate at a driver trust boundary.
+ func DiagnosticCode(err error) string {
+diff --git a/internal/godriver/session.go b/internal/godriver/session.go
+index 459b8f5..953e001 100644
+--- a/internal/godriver/session.go
++++ b/internal/godriver/session.go
+@@ -58,6 +58,24 @@ const (
+ 	SelectionGOROOT = "GOROOT"
+ )
+ 
++// toolchainSelectionRemedy is the operator remedy every
++// toolchain_executable_mismatch carries. It answers the one host condition that
++// produces the code in practice: a version-manager launcher was selected — a
++// goenv, asdf, or mise wrapper that lives outside a real GOROOT/bin, or one
++// that answers go env with a root other than the one selected. The verdict
++// alone does not tell an operator that, and the fix is a single host fact, so
++// the diagnostic names it.
++//
++// It is advice about the operator's own shell, which is where the trusted
++// selection variables are derived from. The driver itself still never searches
++// PATH and never downloads a toolchain, and the CLI guidance that the code
++// earns still says exactly that.
++//
++// The text is short deliberately: the install boundary bounds a rendered
++// diagnostic, and a longer remedy would be truncated away precisely where an
++// operator reads it.
++const toolchainSelectionRemedy = `put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
++
+ // TestedFamilies lists the Go release families this manager has tested against
+ // the go-v1 conformance vectors, in ascending order. A release outside the list
+ // is rejected rather than downloaded or approximated, so operator-facing
+@@ -500,7 +518,8 @@ func selectToolchain(config Config, runtimeRoot string) (string, string, fs.File
+ 	}
+ 	expected := filepath.Join(resolvedRoot, "bin", platformGoName)
+ 	if resolvedCandidate != expected {
+-		return "", "", nil, diagnostic("toolchain_executable_mismatch", "selected Go executable is not the regular executable under the derived GOROOT")
++		return "", "", nil, diagnosticRemedy("toolchain_executable_mismatch", toolchainSelectionRemedy,
++			"selected Go executable is not the regular executable under the derived GOROOT")
+ 	}
+ 	for _, forbidden := range config.ForbiddenRoots {
+ 		forbiddenAbs, resolveErr := absolutePhysical(forbidden)
+@@ -647,7 +666,8 @@ func decodeProbeEnvironment(payload []byte) (map[string]string, error) {
+ func validateProbe(values map[string]string, goroot, versionOS, versionArch string, host hostFacts, configRoot string) error {
+ 	probedRoot, err := absolutePhysical(values["GOROOT"])
+ 	if err != nil || probedRoot != goroot {
+-		return diagnosticErr("toolchain_executable_mismatch", err, "go env GOROOT does not match the selected toolchain")
++		return diagnosticErrRemedy("toolchain_executable_mismatch", toolchainSelectionRemedy, err,
++			"go env GOROOT does not match the selected toolchain")
+ 	}
+ 	if values["GOHOSTOS"] != host.goos || values["GOOS"] != host.goos || versionOS != host.goos ||
+ 		values["GOHOSTARCH"] != host.goarch || values["GOARCH"] != host.goarch || versionArch != host.goarch {
+diff --git a/internal/godriver/toolchain_remedy_test.go b/internal/godriver/toolchain_remedy_test.go
+new file mode 100644
+index 0000000..0991384
+--- /dev/null
++++ b/internal/godriver/toolchain_remedy_test.go
+@@ -0,0 +1,125 @@
++package godriver
++
++import (
++	"context"
++	"errors"
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++)
++
++// The exact operator-facing halves of both toolchain_executable_mismatch sites.
++// They are spelled out here rather than composed from the constants the driver
++// renders them from, so that changing either half of either string has to be
++// done twice, deliberately: the protocol detail is what a reader matches on and
++// may not drift, and the remedy is what an operator acts on.
++const (
++	mismatchSelectionDetail = "selected Go executable is not the regular executable under the derived GOROOT"
++	mismatchProbeDetail     = "go env GOROOT does not match the selected toolchain"
++	mismatchRemedy          = `put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
++)
++
++// TestToolchainExecutableMismatchCarriesTheOperatorRemedy pins both halves of
++// the diagnostic a version-manager selection produces: the protocol detail the
++// boundary has always reported, byte for byte and with the remedy kept out of
++// it, and the remedy that names the one host fact an operator can act on.
++//
++// Both sites that raise the code are covered, because they are the two ways the
++// same wrapper is seen — a launcher that resolves outside the derived
++// GOROOT/bin, and a launcher that answers go env with a different root than the
++// one selected — and an operator who reached either has the same thing to fix.
++func TestToolchainExecutableMismatchCarriesTheOperatorRemedy(t *testing.T) {
++	// A version-manager layout in the small: the selected launcher sits under
++	// one root and resolves to the real launcher under another, which is what a
++	// goenv, asdf, or mise tree looks like to the boundary.
++	t.Run("selection resolves outside the derived GOROOT", func(t *testing.T) {
++		inside, outside := t.TempDir(), testToolchain(t)
++		if err := os.MkdirAll(filepath.Join(inside, "bin"), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(filepath.Join(outside, "bin", platformGoName), filepath.Join(inside, "bin", platformGoName)); err != nil {
++			t.Skipf("this host cannot create the symbolic link the case needs: %v", err)
++		}
++
++		_, _, _, err := selectToolchain(Config{CuratorGo: filepath.Join(inside, "bin", platformGoName)}, outside)
++		assertMismatchDiagnostic(t, err, mismatchSelectionDetail)
++	})
++
++	t.Run("go env reports another root", func(t *testing.T) {
++		root, otherRoot := testToolchain(t), testToolchain(t)
++		host := hostFacts{runtimeGOROOT: root, goos: runtime.GOOS, goarch: runtime.GOARCH}
++		valid := validProbeExecutor(t, root, host)
++		executor := &recordingExecutor{run: func(index int, process Process) (Output, error) {
++			output, err := valid.run(index, process)
++			if err != nil || index != 2 {
++				return output, err
++			}
++			output.Stdout = mutateJSON(t, output.Stdout, "GOROOT", otherRoot)
++			return output, nil
++		}}
++
++		_, err := establish(context.Background(), Config{
++			PrivateBase: t.TempDir(),
++			CuratorGo:   filepath.Join(root, "bin", platformGoName),
++			Executor:    executor,
++		}, host)
++		assertMismatchDiagnostic(t, err, mismatchProbeDetail)
++	})
++}
++
++// assertMismatchDiagnostic reads the boundary verdict out of err and checks all
++// three of its published forms: the code a caller branches on, the protocol
++// detail a reader matches on, and the one line an operator reads. It reads the
++// diagnostic rather than err.Error() so the assertion stays about what the
++// boundary reported, not about whatever cleanup error a caller may have joined
++// to it on the way out.
++func assertMismatchDiagnostic(t *testing.T, err error, wantDetail string) {
++	t.Helper()
++	var failure *Diagnostic
++	if !errors.As(err, &failure) {
++		t.Fatalf("error = %v, want a go-v1 diagnostic", err)
++	}
++	if failure.Code != "toolchain_executable_mismatch" {
++		t.Fatalf("code = %q, want %q", failure.Code, "toolchain_executable_mismatch")
++	}
++	if failure.Detail != wantDetail {
++		t.Fatalf("protocol detail = %q, want %q", failure.Detail, wantDetail)
++	}
++	if failure.Remedy != mismatchRemedy {
++		t.Fatalf("remedy = %q, want %q", failure.Remedy, mismatchRemedy)
++	}
++	want := "go-v1 toolchain_executable_mismatch: " + wantDetail + "; " + mismatchRemedy
++	if failure.Error() != want {
++		t.Fatalf("diagnostic = %q, want %q", failure.Error(), want)
++	}
++}
++
++// TestDiagnosticRenderingIsUnchangedWithoutARemedy pins the rest of the
++// vocabulary: a boundary that carries no remedy renders exactly what it
++// rendered before there was a remedy to carry, with and without a detail.
++func TestDiagnosticRenderingIsUnchangedWithoutARemedy(t *testing.T) {
++	for name, testCase := range map[string]struct {
++		failure Diagnostic
++		want    string
++	}{
++		"code and detail": {
++			failure: Diagnostic{Code: "toolchain_mutated", Detail: "toolchain file changed while opening"},
++			want:    "go-v1 toolchain_mutated: toolchain file changed while opening",
++		},
++		"code only": {
++			failure: Diagnostic{Code: "toolchain_mutated"},
++			want:    "go-v1 toolchain_mutated",
++		},
++		"remedy without a detail": {
++			failure: Diagnostic{Code: "toolchain_executable_mismatch", Remedy: mismatchRemedy},
++			want:    "go-v1 toolchain_executable_mismatch; " + mismatchRemedy,
++		},
++	} {
++		t.Run(name, func(t *testing.T) {
++			if got := testCase.failure.Error(); got != testCase.want {
++				t.Fatalf("Error() = %q, want %q", got, testCase.want)
++			}
++		})
++	}
++}
+diff --git a/internal/install/diagnostics_test.go b/internal/install/diagnostics_test.go
+index a2a7a0b..2e57584 100644
+--- a/internal/install/diagnostics_test.go
++++ b/internal/install/diagnostics_test.go
+@@ -1,10 +1,16 @@
+ package install
+ 
+ import (
++	"context"
+ 	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
+ 	"strings"
+ 	"testing"
+ 	"unicode/utf8"
++
++	"github.com/relux-works/curator/internal/godriver"
+ )
+ 
+ func TestRedactDiagnosticReplacesEveryAbsoluteLocation(t *testing.T) {
+@@ -158,3 +164,58 @@ func TestBuildFailuresAreRedactedInTheResult(t *testing.T) {
+ 			utf8.RuneCountInString(bounded.Errors[0]), maxDiagnosticRunes)
+ 	}
+ }
++
++// TestGoToolchainRemedyReachesTheOperatorIntact proves the half of the
++// version-manager remedy this package owns: the go-v1 boundary renders it
++// behind the protocol detail of a toolchain_executable_mismatch, and the
++// failure surface an operator reads goes through RedactDiagnostic, whose job is
++// to remove locations. The remedy names a shell assignment rather than a
++// location, so it must survive that rendering verbatim — a remedy that reaches
++// the operator as `<path>` or as a truncated fragment is not a remedy.
++//
++// The diagnostic is taken from the driver rather than written out here, so the
++// case fails if either side of the boundary changes without the other.
++func TestGoToolchainRemedyReachesTheOperatorIntact(t *testing.T) {
++	t.Parallel()
++	const remedy = `; put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
++
++	launcher := "go"
++	if runtime.GOOS == "windows" {
++		launcher = "go.exe"
++	}
++	// The shape of a version-manager selection: the launcher named by the
++	// trusted selection variable resolves to a real launcher under a different
++	// root, so the boundary refuses it and says what to do about it.
++	wrapperRoot, realRoot := t.TempDir(), t.TempDir()
++	for _, dir := range []string{wrapperRoot, realRoot} {
++		if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if err := os.WriteFile(filepath.Join(realRoot, "bin", launcher), []byte("binary"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Symlink(filepath.Join(realRoot, "bin", launcher), filepath.Join(wrapperRoot, "bin", launcher)); err != nil {
++		t.Skipf("this host cannot create the symbolic link the case needs: %v", err)
++	}
++
++	_, err := godriver.Probe(context.Background(), godriver.Config{
++		PrivateBase: t.TempDir(),
++		CuratorGo:   filepath.Join(wrapperRoot, "bin", launcher),
++	})
++	if code := godriver.DiagnosticCode(err); code != "toolchain_executable_mismatch" {
++		t.Fatalf("error = %v, code = %q, want %q", err, code, "toolchain_executable_mismatch")
++	}
++	if !strings.Contains(err.Error(), remedy) {
++		t.Fatalf("driver diagnostic carries no operator remedy: %q", err)
++	}
++
++	var result Result
++	result.failBuild(err)
++	if len(result.Errors) != 1 {
++		t.Fatalf("result = %+v", result)
++	}
++	if !strings.Contains(result.Errors[0], remedy) {
++		t.Fatalf("rendered failure lost the operator remedy: %q", result.Errors[0])
++	}
++}

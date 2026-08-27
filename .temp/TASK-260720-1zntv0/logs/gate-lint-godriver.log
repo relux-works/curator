@@ -1,0 +1,71 @@
+internal/godriver/build.go:489:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/godriver/build_test.go:466:19: Error return value of `token.Close` is not checked (errcheck)
+	defer token.Close()
+	                 ^
+internal/godriver/fingerprint.go:40:18: Error return value of `root.Close` is not checked (errcheck)
+	defer root.Close()
+	                ^
+internal/godriver/graph.go:269:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/godriver/identity.go:69:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/godriver/session_test.go:40:21: Error return value of `session.Close` is not checked (errcheck)
+	defer session.Close()
+	                   ^
+internal/godriver/session_test.go:129:21: Error return value of `session.Close` is not checked (errcheck)
+	defer session.Close()
+	                   ^
+internal/godriver/session_test.go:167:23: Error return value of `session.Close` is not checked (errcheck)
+			defer session.Close()
+			                   ^
+internal/godriver/fingerprint.go:136:30: G115: integer overflow conversion int64 -> uint64 (gosec)
+			writeLength(digest, uint64(opened.Size()))
+			                          ^
+internal/godriver/build.go:422:50: unused-parameter: parameter 'entry' seems to be unused, consider removing or renaming it as _ (revive)
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+	                                                ^
+internal/godriver/executor.go:44:1: exported: exported method OSExecutor.Run should have comment or be unexported (revive)
+func (OSExecutor) Run(ctx context.Context, process Process) (Output, error) {
+^
+internal/godriver/executor_test.go:59:32: unused-parameter: parameter 't' seems to be unused, consider removing or renaming it as _ (revive)
+func TestGodriverHelperProcess(t *testing.T) {
+                               ^
+internal/godriver/fingerprint.go:44:53: unused-parameter: parameter 'entry' seems to be unused, consider removing or renaming it as _ (revive)
+	err = fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, walkErr error) error {
+	                                                   ^
+internal/godriver/session.go:269:1: exported: exported method Session.Executable should have comment or be unexported (revive)
+func (session *Session) Executable() string             { return session.executable }
+^
+internal/godriver/session.go:270:1: exported: exported method Session.GOROOT should have comment or be unexported (revive)
+func (session *Session) GOROOT() string                 { return session.goroot }
+^
+internal/godriver/session.go:271:1: exported: exported method Session.Target should have comment or be unexported (revive)
+func (session *Session) Target() buildmeta.Target       { return copyTarget(session.target) }
+^
+internal/godriver/session.go:272:1: exported: exported method Session.Toolchain should have comment or be unexported (revive)
+func (session *Session) Toolchain() buildmeta.Toolchain { return session.toolchain }
+^
+internal/godriver/session.go:273:1: exported: exported method Session.Environment should have comment or be unexported (revive)
+func (session *Session) Environment() []string          { return append([]string(nil), session.environment...) }
+^
+internal/godriver/build_test.go:469:35: SA1019: runtime.GOROOT has been deprecated since Go 1.24: The root used during the Go build will not be meaningful if the binary is copied to another machine. Use the system path to locate the “go” binary, and use “go env GOROOT” to find its GOROOT. (staticcheck)
+	config.CuratorGo = filepath.Join(runtime.GOROOT(), "bin", platformGoName)
+	                                 ^
+internal/godriver/session.go:110:57: SA1019: runtime.GOROOT has been deprecated since Go 1.24: The root used during the Go build will not be meaningful if the binary is copied to another machine. Use the system path to locate the “go” binary, and use “go env GOROOT” to find its GOROOT. (staticcheck)
+	return establish(ctx, config, hostFacts{runtimeGOROOT: runtime.GOROOT(), goos: runtime.GOOS, goarch: runtime.GOARCH})
+	                                                       ^
+internal/godriver/session.go:116:53: SA1019: runtime.GOROOT has been deprecated since Go 1.24: The root used during the Go build will not be meaningful if the binary is copied to another machine. Use the system path to locate the “go” binary, and use “go env GOROOT” to find its GOROOT. (staticcheck)
+	return probe(ctx, config, hostFacts{runtimeGOROOT: runtime.GOROOT(), goos: runtime.GOOS, goarch: runtime.GOARCH})
+	                                                   ^
+internal/godriver/session.go:328:2: QF1003: could use tagged switch on goos (staticcheck)
+	if goos == "darwin" {
+	^
+22 issues:
+* errcheck: 8
+* gosec: 1
+* revive: 9
+* staticcheck: 4

@@ -1,0 +1,61 @@
+{
+  "id": "RUN-260728-571491",
+  "task_id": "TASK-260728-168smo",
+  "created_at": "2026-07-28T23:27:24.615301Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] solution-architect (claude)",
+  "role": "solution-architect",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-03-27-24_-analyst--solution-architect--claude-_TASK-260728-168smo.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260728-168smo_spawn-log_-analyst--solution-architect--claude-_RUN-260728-571491.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260728-168smo_command-evidence.log",
+    "TASK-260728-168smo_decision-0010-kotlin-native-driver-pair.md",
+    "TASK-260728-168smo_gate-log.txt",
+    "TASK-260728-168smo_kotlin-native-build-drivers-reference.md",
+    "TASK-260728-168smo_probe.tar.gz",
+    "TASK-260728-168smo_results.md",
+    "TASK-260728-168smo_review-verdict-cycle-1.md",
+    "TASK-260728-168smo_spawn-log_-implementer--developer--claude-_RUN-260728-338c0b.log",
+    "TASK-260728-168smo_spawn-log_-reviewer--reviewer--codex-_RUN-260728-49361f.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260728-168smo_command-evidence.log": "0bf0a9cbf75c0c38382d170bb1e7f8a522406a2b2033d4e0ed6b39ee0261c2b6",
+    "TASK-260728-168smo_decision-0010-kotlin-native-driver-pair.md": "5ed82e77943f5370f9333d5f1806c25412af51222a85d3605a708bb4b1f7ccb4",
+    "TASK-260728-168smo_gate-log.txt": "6ad6933b506edbac1d3c1d468b6cc5f4d0b63ff779be160d31337fc270986cff",
+    "TASK-260728-168smo_kotlin-native-build-drivers-reference.md": "f1fc7db448d974b0133de09941d85259dc9dcc5231b6363a7a9c7e2dd006d278",
+    "TASK-260728-168smo_probe.tar.gz": "57b7b3e8a32dcf41ac3b4ab08cd723727870b92298d50778692b3c55a5e5374b",
+    "TASK-260728-168smo_results.md": "174f407eca347fb6f5bad0b457957031def90ffa8b4f0a01efe831c32cb2e95b",
+    "TASK-260728-168smo_review-verdict-cycle-1.md": "3347c681e210fa3ecb24336c639a5a05e630b08f8f0475856dc653e36fa2681c"
+  },
+  "require_outcome_artifact": true
+}

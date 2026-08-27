@@ -1,0 +1,14 @@
+TASK-260720-29hi1h verification summary
+base: 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+predecessor: TASK-260720-11pfex accepted product diff
+go test ./...: pass
+go test -race ./internal/runtimestore ./internal/globalbins: pass
+go test -count=10 ./internal/runtimestore ./internal/globalbins: pass
+go vet ./...: pass
+go build ./...: pass
+candidate focused tests: pass
+Linux amd64 full test compile/build: pass
+Windows amd64 full test compile/build: pass
+Windows runtime execution: not run; no Windows runtime or VM on host
+gofmt: clean
+git diff --check: pass

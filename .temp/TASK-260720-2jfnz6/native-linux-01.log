@@ -1,0 +1,28 @@
+TASK-260720-2jfnz6 native Linux validation
+Date: 2026-07-30
+
+Environment
+- Hypervisor: QEMU 10.1.3 with Apple HVF
+- Guest: Alpine Linux 3.24.1 aarch64
+- Kernel: Linux 6.18.35-0-virt
+- Python: 3.14.5
+- ISO: alpine-virt-3.24.1-aarch64.iso
+- ISO SHA-256 verification: exit code 0
+
+Current source SHA-256
+- src/csk/builds/cache_posix.py:
+  f80f16750ccd31a769df7f5540c306c1dc3e48f5cf0bdfa84c28e5e05b762479
+- tests/test_build_cache_posix.py:
+  d8fd87f569fe7a8ccc22c493ddb34cfc671a013e414e94d099796f1597b92e89
+
+Gate
+PYTHONPATH=src python3 -m pytest -q tests/test_build_cache_posix.py
+exit code: 0
+40 passed in 0.33s
+
+Linux descriptor-restoration probe
+PYTHONPATH=src python3 -m pytest -q tests/test_build_cache_posix.py::test_linux_opath_unlock_restores_0000_when_regular_reopen_fails
+exit code: 0
+1 passed in 0.03s
+
+The guest was powered off cleanly after both commands.

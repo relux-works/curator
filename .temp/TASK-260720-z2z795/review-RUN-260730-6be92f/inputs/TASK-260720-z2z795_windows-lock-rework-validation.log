@@ -1,0 +1,307 @@
+TASK-260720-z2z795 WINDOWS STABLE-LOCK REWORK VALIDATION
+run: RUN-260730-bcc707
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+HEAD: 108ae51e549566b0b7e1ff4a8a2424e8cb4fcc77
+
+TOOL READINESS
+
+command: task-board --version
+exit: 0
+output: task-board version 0.23.0 (commit beec6e9, built 2026-07-27T23:36:53Z)
+
+command: git --version
+exit: 0
+output: git version 2.50.1 (Apple Git-155)
+
+command: rg --version
+exit: 0
+output: ripgrep 15.2.0
+
+command: /opt/homebrew/bin/python3.11 --version
+exit: 0
+output: Python 3.11.14
+
+command: python3 --version
+exit: 0
+output: Python 3.14.4
+
+command: PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest --version
+exit: 0
+output: pytest 8.3.4
+
+command: PYTHONDONTWRITEBYTECODE=1 python3 -m pytest --version
+exit: 1
+output: No module named pytest
+rationale: the unqualified Python 3.14 installation has no pytest package.
+The qualified uvx route below was used instead.
+
+command: uvx --python 3.14 pytest --version
+exit: 0
+output: pytest 9.1.1
+
+command:
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --version
+exit: 0
+output: mypy 2.3.0 (compiled: yes)
+
+command: uvx ruff --version
+exit: 0
+output: ruff 0.16.0
+
+command: PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build --version
+exit: 0
+output: build 1.2.2.post1
+
+INPUT CI DIAGNOSIS
+
+GitHub Actions API read:
+  repository: ivanopcode/cocoaskills
+  run: 30515699781
+  input commit: 108ae51e549566b0b7e1ff4a8a2424e8cb4fcc77
+result:
+  macOS Python 3.11/3.12/3.13/3.14: success
+  Ubuntu Python 3.11/3.12/3.13/3.14: success
+  Windows Python 3.11/3.12/3.13/3.14: failure
+  strict mypy: success
+
+supplied job log:
+  /tmp/csk-job-90784893156.log
+  job: Tests / Python 3.14 on windows-latest
+  job id: 90784893156
+  result: 787 passed, 42 skipped, 150 failed
+  dominant failure:
+    lock publication witness was lost at src/csk/locking.py:344
+  independent Windows behavior:
+    Path.rename on the live stable lock failed with WinError 32 while its
+    handle was open.
+
+root cause:
+  os.open omitted O_BINARY. Windows CRT translated LF to CRLF on write and
+  CRLF back to LF on read. fstat reported physical bytes while os.read
+  returned translated logical bytes, so the size-bounded witness reader
+  reached EOF with one byte remaining and returned None.
+
+references:
+  https://docs.python.org/3/library/os.html#os.open
+  https://learn.microsoft.com/en-us/cpp/c-runtime-library/translation-mode-constants?view=msvc-170
+  https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex
+
+EXPECTED-RED REGRESSION
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_stable_lock_descriptor_uses_binary_mode
+exit: 1
+output: 1 failed in 1.63s
+rationale: expected pre-fix failure proving stable descriptors omitted the
+required Windows binary-mode flag.
+
+FIXED BINARY-MODE REGRESSION
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_stable_lock_descriptor_uses_binary_mode
+exit: 0
+output: 1 passed in 0.30s
+
+WINDOWS-SEMANTICS SELECTION — PYTHON 3.11
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_stable_lock_descriptor_uses_binary_mode
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_acquire_rechecks_canonical_witness_after_publication
+  tests/test_transactions.py::test_recovery_rejects_journal_filename_id_mismatch_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+output: 21 passed in 6.63s
+
+WINDOWS-SEMANTICS SELECTION — PYTHON 3.14
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 uvx --python 3.14 pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_stable_lock_descriptor_uses_binary_mode
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_acquire_rechecks_canonical_witness_after_publication
+  tests/test_transactions.py::test_recovery_rejects_journal_filename_id_mismatch_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+output: 21 passed in 5.94s
+
+PRESCRIBED PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_requires_offline_migration
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_crashed_owner_and_barrier_contenders_share_one_stable_lock
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+output: 14 passed in 5.07s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_project_locks_are_canonicalized_deduplicated_and_byte_sorted
+  tests/test_locking.py::test_home_lock_is_forbidden_while_build_lock_is_held_by_another_thread
+  tests/test_locking.py::test_pending_home_lock_blocks_project_and_build_acquisition
+  tests/test_transactions.py::test_journal_records_complete_ordered_recovery_state_and_consumer_commits_last
+  tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project
+  tests/test_transactions.py::test_commit_failure_rolls_back_in_exact_reverse_commit_order
+  tests/test_transactions.py::test_concurrent_project_transactions_preserve_both_consumers
+  tests/test_transactions.py::test_failed_second_project_restores_ledger_preimage_containing_first_success
+  tests/test_transactions.py::test_stale_preimage_is_rejected_without_overwriting_newer_state
+  tests/test_transactions.py::test_generation_change_is_rejected_at_commit
+exit: 0
+output: 13 passed in 13.22s
+
+FOCUSED PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 125 passed, 4 skipped in 67.38s
+skip boundary:
+  one existing real-Windows durability case plus three Windows
+  per-directory-case-sensitive first-use contention cases.
+
+STRICT MYPY
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+output: Success: no issues found in 62 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+output: 4 files already formatted
+
+FULL PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+exit: 0
+output: 804 passed, 58 skipped in 164.85s
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m build
+  --outdir .temp/TASK-260720-z2z795/windows-lock-fix/build-RUN-260730-bcc707
+exit: 0
+output:
+  Successfully built
+  cocoaskills-0.12.6.dev8+g108ae51e5.d20260730.tar.gz and
+  cocoaskills-0.12.6.dev8+g108ae51e5.d20260730-py3-none-any.whl
+
+DIFF CHECK
+
+command: git diff --check
+exit: 0
+output: empty
+
+PROVENANCE
+
+command:
+  git merge-base --is-ancestor
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12 HEAD
+exit: 0
+output: empty
+
+command: git rev-parse HEAD
+exit: 0
+output: 108ae51e549566b0b7e1ff4a8a2424e8cb4fcc77
+
+command:
+  git rev-parse origin/task/TASK-260720-z2z795-transaction-engine
+exit: 0
+output: 108ae51e549566b0b7e1ff4a8a2424e8cb4fcc77
+
+command: git diff --name-only
+exit: 0
+output:
+  src/csk/locking.py
+  tests/test_locking.py
+  tests/test_transactions.py
+
+command: git status --short --branch
+exit: 0
+output:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/locking.py
+   M tests/test_locking.py
+   M tests/test_transactions.py
+
+SOURCE SHA-256
+
+6ca6f7b792fba0abd5e25109975e1928b403e5ceb818a45cf48545fc6c5a6aa6  src/csk/locking.py
+f479fe784a4dd485d355e41c5344717ad26fbb4eecb10fd52ca9f87d7558b34a  src/csk/transactions.py
+5b8e7a1a91a3e442e905c3be0037ecdb5747c1b1d2cffd464246af75df80d582  tests/test_locking.py
+3f4edc3fadff19974c0194a9b9ad3535c5b4032308158626f76339170ac937af  tests/test_transactions.py
+
+BUILD SHA-256
+
+3df87bf909d665dfde03902ad7f2ab0089972ea56215df19992b181394d43ffc  cocoaskills-0.12.6.dev8+g108ae51e5.d20260730-py3-none-any.whl
+ecf82b7c0c5dd23d1c04b8c85db506cf568d4227522fc1c82955c095ee134a79  cocoaskills-0.12.6.dev8+g108ae51e5.d20260730.tar.gz
+
+LOGBOOK AVAILABILITY
+
+command: command -v logbook
+exit: 1
+output: empty
+rationale: no standalone logbook executable is installed. The finding is
+persisted in this task-scoped validation artifact, the outcome, and task notes.
+
+CURRENT-BYTE WINDOWS MATRIX BOUNDARY
+
+The task explicitly prohibits stage, commit, and push from this developer run.
+GitHub Actions can only execute repository bytes, so the current three-file
+unstaged patch was not rerun on Windows and no green current-byte Windows claim
+is made. The commit-owning mover must publish the reviewed bytes and rerun the
+Windows Python 3.11/3.12/3.13/3.14 matrix.

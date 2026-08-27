@@ -1,0 +1,69 @@
+{
+  "id": "RUN-260729-a702af",
+  "task_id": "TASK-260720-z2z795",
+  "created_at": "2026-07-29T22:53:11.296267Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-02-53-11_-implementer--developer--codex-_TASK-260720-z2z795.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-z2z795_spawn-log_-implementer--developer--codex-_RUN-260729-a702af.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-z2z795_atomic-rework-results.md",
+    "TASK-260720-z2z795_atomic-rework-validation.log",
+    "TASK-260720-z2z795_csk-build-lifecycle.puml",
+    "TASK-260720-z2z795_csk-build-lifecycle.svg",
+    "TASK-260720-z2z795_results.md",
+    "TASK-260720-z2z795_review-verdict.md",
+    "TASK-260720-z2z795_spawn-log_-implementer--developer--claude-_RUN-260729-64841b.log",
+    "TASK-260720-z2z795_spawn-log_-implementer--developer--codex-_RUN-260729-4ad5fe.log",
+    "TASK-260720-z2z795_spawn-log_-implementer--developer--codex-_RUN-260729-97b285.log",
+    "TASK-260720-z2z795_spawn-log_-implementer--developer--codex-_RUN-260729-c98ce0.log",
+    "TASK-260720-z2z795_spawn-log_-reviewer--reviewer--codex-_RUN-260729-2ed7a8.log",
+    "TASK-260720-z2z795_spawn-log_-reviewer--reviewer--codex-_RUN-260729-5be9e5.log",
+    "TASK-260720-z2z795_windows-durability-review-verdict.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-z2z795_atomic-rework-results.md": "13a27db2854bfd5a36ff9ce91abbc16a8f823ed19dda706d53e6e9286448ea64",
+    "TASK-260720-z2z795_atomic-rework-validation.log": "01c2bef430bd0587ca0c611f4856b7b0e87f1e8543f26fc91941c9c56098e47e",
+    "TASK-260720-z2z795_csk-build-lifecycle.puml": "893a3b1d6db2c5cac1ddc9414fea0df8504d1d088cd794efcaba45cb67653aa9",
+    "TASK-260720-z2z795_csk-build-lifecycle.svg": "35e055f72ba28226d7a5166e3ab81260cb1238be77ded489bc3cb3355440ffcf",
+    "TASK-260720-z2z795_results.md": "3dfca2ad0a719c31a7e0f875efaf6e958fd0051f287c5c7795582ac46bf3568e",
+    "TASK-260720-z2z795_review-verdict.md": "adcddfe9f70e7a1268eda8c72da81af6c73d84b785903e6605d14f554a753ef5",
+    "TASK-260720-z2z795_windows-durability-review-verdict.md": "a1db0f5da242f2cece113bf4628d80f710574aa9b7c889f6e2f2e3b744842537"
+  },
+  "require_outcome_artifact": true
+}

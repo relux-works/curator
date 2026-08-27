@@ -1,0 +1,649 @@
+Candidate suite (macos-latest)	Set up job	﻿2026-08-23T18:47:30.3081540Z Current runner version: '2.336.0'
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3097280Z ##[group]Runner Image Provisioner
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3097790Z Hosted Compute Agent
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3098150Z Version: 20260707.563
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3098540Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3099130Z Build Date: 2026-07-07T19:33:50Z
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3099640Z Worker ID: {c8c283e1-a8c8-43d7-a72a-b14129a77d63}
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3100130Z Azure Region: westus
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3100480Z ##[endgroup]
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3101290Z ##[group]Operating System
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3101680Z macOS
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3101990Z 26.5.2
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3102300Z 25F84
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3102630Z ##[endgroup]
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3102960Z ##[group]Runner Image
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3103330Z Image: macos-26-arm64
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3103680Z Version: 20260728.0273.1
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3104400Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20260728.0273/images/macos/macos-26-arm64-Readme.md
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3105540Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20260728.0273
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3106190Z ##[endgroup]
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3106880Z ##[group]GITHUB_TOKEN Permissions
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3107840Z Contents: read
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3108250Z Metadata: read
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3108630Z ##[endgroup]
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3109960Z Secret source: Actions
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3110600Z Prepare workflow directory
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3362530Z Prepare all required actions
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.3396780Z Getting action download info
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.4652150Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:30.6079230Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:31.5283470Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Candidate suite (macos-latest)	Set up job	2026-08-23T18:47:31.7116910Z Complete job name: Candidate suite (macos-latest)
+Candidate suite (macos-latest)	Run actions/checkout@v4	﻿2026-08-23T18:47:31.7582330Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7589510Z ##[group]Run actions/checkout@v4
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7590040Z with:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7590390Z   submodules: true
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7590770Z   repository: relux-works/curator
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7593680Z   token: ***
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7594030Z   ssh-strict: true
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7594400Z   ssh-user: git
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7594760Z   persist-credentials: true
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7595150Z   clean: true
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7595500Z   sparse-checkout-cone-mode: true
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7595930Z   fetch-depth: 1
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7596280Z   fetch-tags: false
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7596710Z   show-progress: true
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7597130Z   lfs: false
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7597550Z   set-safe-directory: true
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7597970Z   allow-unsafe-pr-checkout: false
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7598500Z env:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7598900Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7599370Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7599730Z   GOENV: off
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:31.7600070Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1237900Z Syncing repository: relux-works/curator
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1239720Z ##[group]Getting Git version info
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1240410Z Working directory is '/Users/runner/work/curator/curator'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1241460Z [command]/opt/homebrew/bin/git version
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1456080Z git version 2.55.0
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1468600Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1475660Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/93475041-5eff-4d8c-a0b9-6052404ab7a3/.gitconfig'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1480760Z Temporarily overriding HOME='/Users/runner/work/_temp/93475041-5eff-4d8c-a0b9-6052404ab7a3' before making global git config changes
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1483450Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1485090Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/curator/curator
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1573670Z Deleting the contents of '/Users/runner/work/curator/curator'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1576510Z ##[group]Initializing the repository
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1579310Z [command]/opt/homebrew/bin/git init /Users/runner/work/curator/curator
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1757770Z hint: Using 'master' as the name for the initial branch. This default branch name
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1759720Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1761690Z hint: to use in all of your new repositories, which will suppress this warning,
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1763110Z hint: call:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1763780Z hint:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1764720Z hint: 	git config --global init.defaultBranch <name>
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1765920Z hint:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1766930Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1768620Z hint: 'development'. The just-created branch can be renamed via this command:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1770130Z hint:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1770810Z hint: 	git branch -m <name>
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1771630Z hint:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1772740Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1774520Z Initialized empty Git repository in /Users/runner/work/curator/curator/.git/
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1777480Z [command]/opt/homebrew/bin/git remote add origin https://github.com/relux-works/curator
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1835950Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1837380Z ##[group]Disabling automatic garbage collection
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1838710Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1895900Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1897430Z ##[group]Setting up auth
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1899460Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.1957290Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.2725100Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.2797350Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.3421340Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.3478060Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.4188570Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.4253190Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.4254440Z ##[group]Fetching the repository
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:32.4257510Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +e17b0f1d2b08f6daaed653827eb9ff0559b54d40:refs/remotes/origin/main
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.3900540Z From https://github.com/relux-works/curator
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.3901630Z  * [new ref]         e17b0f1d2b08f6daaed653827eb9ff0559b54d40 -> origin/main
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.3903200Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.3903580Z ##[group]Determining the checkout info
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.3904000Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.3907130Z [command]/opt/homebrew/bin/git sparse-checkout disable
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.3975470Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4031080Z ##[group]Checking out the ref
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4034200Z [command]/opt/homebrew/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4868570Z Switched to a new branch 'main'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4870950Z branch 'main' set up to track 'origin/main'.
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4875370Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4875770Z ##[group]Setting up auth for fetching submodules
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4879170Z [command]/opt/homebrew/bin/git config --global http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4941390Z [command]/opt/homebrew/bin/git config --global --unset-all url.https://github.com/.insteadOf
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.4993520Z [command]/opt/homebrew/bin/git config --global --add url.https://github.com/.insteadOf git@github.com:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.5049170Z [command]/opt/homebrew/bin/git config --global --add url.https://github.com/.insteadOf org-261817730@github.com:
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.5101330Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.5101760Z ##[group]Fetching submodules
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.5104200Z [command]/opt/homebrew/bin/git submodule sync
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.5751790Z [command]/opt/homebrew/bin/git -c protocol.version=2 submodule update --init --force --depth=1
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.6445560Z Submodule 'agents/skills/skill-go-testing-tools' (https://github.com/relux-works/skill-go-testing-tools.git) registered for path 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:33.6550020Z Cloning into '/Users/runner/work/curator/curator/agents/skills/skill-go-testing-tools'...
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:35.9851470Z From https://github.com/relux-works/skill-go-testing-tools
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:35.9853500Z  * branch            21585d0e937cae47e54a788d8ae36b1780eae47f -> FETCH_HEAD
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.0209660Z Submodule path 'agents/skills/skill-go-testing-tools': checked out '21585d0e937cae47e54a788d8ae36b1780eae47f'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.0223760Z [command]/opt/homebrew/bin/git submodule foreach git config --local gc.auto 0
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.0870890Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.0960830Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.0961820Z ##[group]Persisting credentials for submodules
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.0965060Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :"
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.1611440Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.1779840Z [command]/opt/homebrew/bin/git submodule foreach sh -c "git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.2414340Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.2573980Z file:/Users/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.2591910Z [command]/opt/homebrew/bin/git submodule foreach git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.3221890Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.3311080Z [command]/opt/homebrew/bin/git submodule foreach git config --local --add 'url.https://github.com/.insteadOf' 'org-261817730@github.com:'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.3926890Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.4014840Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.4089190Z [command]/opt/homebrew/bin/git log -1 --format=%H
+Candidate suite (macos-latest)	Run actions/checkout@v4	2026-08-23T18:47:36.4145800Z e17b0f1d2b08f6daaed653827eb9ff0559b54d40
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	﻿2026-08-23T18:47:36.4296020Z ##[group]Run bash .github/ci/candidate-suite.sh verify-inputs "$CANDIDATE_REF" "$CANDIDATE_ROOT_INPUT"
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4296590Z ^[[36;1mbash .github/ci/candidate-suite.sh verify-inputs "$CANDIDATE_REF" "$CANDIDATE_ROOT_INPUT"^[[0m
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4332190Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4332450Z env:
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4332660Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4333160Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4333350Z   GOENV: off
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4333560Z   CANDIDATE_REF: 6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4333810Z   CANDIDATE_ROOT_INPUT: 
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4333970Z ##[endgroup]
+Candidate suite (macos-latest)	Reject ambiguous candidate inputs	2026-08-23T18:47:36.4590850Z candidate-suite: candidate input accepted (exactly one revision or root)
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	﻿2026-08-23T18:47:36.4631390Z ##[group]Run bash .github/ci/candidate-suite.sh verify-ref "$CANDIDATE_REF"
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4631830Z ^[[36;1mbash .github/ci/candidate-suite.sh verify-ref "$CANDIDATE_REF"^[[0m
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4659680Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4659950Z env:
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4660130Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4660380Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4660540Z   GOENV: off
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4660740Z   CANDIDATE_REF: 6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4661010Z ##[endgroup]
+Candidate suite (macos-latest)	Reject a non-immutable candidate revision	2026-08-23T18:47:36.4915430Z candidate-suite: revision accepted (immutable, full 40-hex): 6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Check out the candidate suite	﻿2026-08-23T18:47:36.4987190Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4988410Z ##[group]Run actions/checkout@v4
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4988600Z with:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4988760Z   repository: relux-works/curator-spec
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4988990Z   ref: 6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4989210Z   path: candidate-spec
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4990980Z   token: ***
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4991140Z   ssh-strict: true
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4991280Z   ssh-user: git
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4991450Z   persist-credentials: true
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4991620Z   clean: true
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4991810Z   sparse-checkout-cone-mode: true
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4992000Z   fetch-depth: 1
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4992150Z   fetch-tags: false
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4992340Z   show-progress: true
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4992510Z   lfs: false
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4992640Z   submodules: false
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4992820Z   set-safe-directory: true
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4993010Z   allow-unsafe-pr-checkout: false
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4993210Z env:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4993390Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4993670Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4993850Z   GOENV: off
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.4994030Z ##[endgroup]
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5772800Z Syncing repository: relux-works/curator-spec
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5773730Z ##[group]Getting Git version info
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5774320Z Working directory is '/Users/runner/work/curator/curator/candidate-spec'
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5796120Z [command]/opt/homebrew/bin/git version
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5855660Z git version 2.55.0
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5865890Z ##[endgroup]
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5871060Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/31ce26d9-a5ce-47fb-b913-5bccf474f4b1/.gitconfig'
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5876990Z Temporarily overriding HOME='/Users/runner/work/_temp/31ce26d9-a5ce-47fb-b913-5bccf474f4b1' before making global git config changes
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5878030Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5882500Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/curator/curator/candidate-spec
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5944420Z ##[group]Initializing the repository
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.5948110Z [command]/opt/homebrew/bin/git init /Users/runner/work/curator/curator/candidate-spec
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6048460Z hint: Using 'master' as the name for the initial branch. This default branch name
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6051370Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6053310Z hint: to use in all of your new repositories, which will suppress this warning,
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6053780Z hint: call:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6054020Z hint:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6054350Z hint: 	git config --global init.defaultBranch <name>
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6054660Z hint:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6054920Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6055420Z hint: 'development'. The just-created branch can be renamed via this command:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6055820Z hint:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6056050Z hint: 	git branch -m <name>
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6056330Z hint:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6057750Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6058330Z Initialized empty Git repository in /Users/runner/work/curator/curator/candidate-spec/.git/
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6059520Z [command]/opt/homebrew/bin/git remote add origin https://github.com/relux-works/curator-spec
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6113140Z ##[endgroup]
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6113590Z ##[group]Disabling automatic garbage collection
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6116030Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6183180Z ##[endgroup]
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6189250Z ##[group]Setting up auth
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6189720Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6234310Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6920710Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.6973960Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.7761780Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.7819060Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.8729190Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.8833950Z ##[endgroup]
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.8925860Z ##[group]Fetching the repository
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:36.8958920Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6603350Z From https://github.com/relux-works/curator-spec
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6603850Z  * branch            6001dc33281b94a4ec7442ab15278550dd0f51d9 -> FETCH_HEAD
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6606340Z ##[endgroup]
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6606630Z ##[group]Determining the checkout info
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6607500Z ##[endgroup]
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6611620Z [command]/opt/homebrew/bin/git sparse-checkout disable
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6680890Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6734930Z ##[group]Checking out the ref
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.6737710Z [command]/opt/homebrew/bin/git checkout --progress --force 6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.7477420Z HEAD is now at 6001dc3 Band the external repository manager profile on marker v4
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.7484530Z ##[endgroup]
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.7555980Z [command]/opt/homebrew/bin/git log -1 --format=%H
+Candidate suite (macos-latest)	Check out the candidate suite	2026-08-23T18:47:37.7613080Z 6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	﻿2026-08-23T18:47:37.7721030Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7722160Z ##[group]Run actions/checkout@v4
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7722350Z with:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7722490Z   repository: relux-works/curator-spec
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7722700Z   ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7722910Z   path: protocol-spec
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7724560Z   token: ***
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7724680Z   ssh-strict: true
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7724810Z   ssh-user: git
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7724950Z   persist-credentials: true
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7725110Z   clean: true
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7725250Z   sparse-checkout-cone-mode: true
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7725430Z   fetch-depth: 1
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7725560Z   fetch-tags: false
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7725710Z   show-progress: true
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7725850Z   lfs: false
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7725970Z   submodules: false
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7726110Z   set-safe-directory: true
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7726280Z   allow-unsafe-pr-checkout: false
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7726450Z env:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7726600Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7726810Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7726940Z   GOENV: off
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.7727050Z ##[endgroup]
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8528640Z Syncing repository: relux-works/curator-spec
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8531530Z ##[group]Getting Git version info
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8531880Z Working directory is '/Users/runner/work/curator/curator/protocol-spec'
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8553050Z [command]/opt/homebrew/bin/git version
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8610940Z git version 2.55.0
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8620900Z ##[endgroup]
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8638020Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/55bb98f8-126f-4880-8469-fdcffa75bed0/.gitconfig'
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8638910Z Temporarily overriding HOME='/Users/runner/work/_temp/55bb98f8-126f-4880-8469-fdcffa75bed0' before making global git config changes
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8639530Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8640140Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/curator/curator/protocol-spec
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8694100Z ##[group]Initializing the repository
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8697360Z [command]/opt/homebrew/bin/git init /Users/runner/work/curator/curator/protocol-spec
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8794130Z hint: Using 'master' as the name for the initial branch. This default branch name
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8794760Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8795230Z hint: to use in all of your new repositories, which will suppress this warning,
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8795540Z hint: call:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8795680Z hint:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8795950Z hint: 	git config --global init.defaultBranch <name>
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8796210Z hint:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8796440Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8796830Z hint: 'development'. The just-created branch can be renamed via this command:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8797150Z hint:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8797280Z hint: 	git branch -m <name>
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8797470Z hint:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8797720Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8798180Z Initialized empty Git repository in /Users/runner/work/curator/curator/protocol-spec/.git/
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8800510Z [command]/opt/homebrew/bin/git remote add origin https://github.com/relux-works/curator-spec
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8858380Z ##[endgroup]
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8859050Z ##[group]Disabling automatic garbage collection
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8861420Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8913030Z ##[endgroup]
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8913840Z ##[group]Setting up auth
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8917900Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.8979650Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.9636550Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:37.9689080Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.0315930Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.0374450Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.1660090Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.1735520Z ##[endgroup]
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.1745000Z ##[group]Fetching the repository
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.1745640Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8607370Z From https://github.com/relux-works/curator-spec
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8609260Z  * branch            00b1688a9b2457ca397a0bb550acf47cad8ee967 -> FETCH_HEAD
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8611150Z ##[endgroup]
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8611630Z ##[group]Determining the checkout info
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8612490Z ##[endgroup]
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8616810Z [command]/opt/homebrew/bin/git sparse-checkout disable
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8696130Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8758790Z ##[group]Checking out the ref
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8761630Z [command]/opt/homebrew/bin/git checkout --progress --force 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.8984840Z HEAD is now at 00b1688 Adopt agent-skill.json as the canonical manifest (#11)
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.9005750Z ##[endgroup]
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.9067830Z [command]/opt/homebrew/bin/git log -1 --format=%H
+Candidate suite (macos-latest)	Checkout the committed released pin for comparison	2026-08-23T18:47:38.9124650Z 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Run actions/setup-go@v5	﻿2026-08-23T18:47:38.9209920Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9210870Z ##[group]Run actions/setup-go@v5
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9211050Z with:
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9211180Z   go-version-file: go.mod
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9211350Z   check-latest: false
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9213130Z   token: ***
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9213270Z   cache: true
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9213390Z env:
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9213550Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9213770Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9213910Z   GOENV: off
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:38.9214040Z ##[endgroup]
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:39.0274140Z Setup go version spec 1.25.5
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:39.0285120Z Attempting to download 1.25.5...
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:39.0425950Z (node:1704) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:39.0428350Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:40.1641070Z matching 1.25.5...
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:40.1698290Z Acquiring 1.25.5 from https://github.com/actions/go-versions/releases/download/1.25.5-19880500865/go-1.25.5-darwin-arm64.tar.gz
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:40.7996660Z Extracting Go...
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:40.8127120Z [command]/usr/bin/tar xz -C /Users/runner/work/_temp/537f3d85-d826-45e3-b751-9247e9d36f02 -f /Users/runner/work/_temp/10973f23-90f2-469f-a9d4-a5ba198618a0
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:43.0184910Z Successfully extracted go to /Users/runner/work/_temp/537f3d85-d826-45e3-b751-9247e9d36f02
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:43.0185730Z Adding to the cache ...
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:48.8772920Z Successfully cached go to /Users/runner/hostedtoolcache/go/1.25.5/arm64
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:48.8774290Z Added go to the path
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:48.8776310Z Successfully set up Go version 1.25.5
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:48.9515980Z [command]/Users/runner/hostedtoolcache/go/1.25.5/arm64/bin/go env GOMODCACHE
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:48.9523540Z [command]/Users/runner/hostedtoolcache/go/1.25.5/arm64/bin/go env GOCACHE
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:48.9582090Z /Users/runner/go/pkg/mod
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:48.9582380Z /Users/runner/Library/Caches/go-build
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:49.0057840Z Cache hit for: setup-go-macOS-arm64-go-1.25.5-4ce59a23addd1e381562aa006c7fdb29d2b75285eeb8d306f3eb0f731d5ae710
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:49.0119070Z (node:1704) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:49.5325030Z Received 77490039 of 77490039 (100.0%), 162.1 MBs/sec
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:49.5404650Z Cache Size: ~74 MB (77490039 B)
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:49.5433740Z [command]/opt/homebrew/bin/gtar -xf /Users/runner/work/_temp/c7ec81d1-fcb8-4a03-a5f2-f36d877437ae/cache.tzst -P -C /Users/runner/work/curator/curator --delay-directory-restore --use-compress-program unzstd
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:50.5264060Z Cache restored successfully
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:50.5297420Z Cache restored from key: setup-go-macOS-arm64-go-1.25.5-4ce59a23addd1e381562aa006c7fdb29d2b75285eeb8d306f3eb0f731d5ae710
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:50.5346200Z go version go1.25.5 darwin/arm64
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:50.5346400Z 
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:50.5346740Z ##[group]go env
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7593730Z AR='ar'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7594410Z CC='clang'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7595500Z CGO_CFLAGS='-O2 -g'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7597040Z CGO_CPPFLAGS=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7597890Z CGO_CXXFLAGS='-O2 -g'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7600780Z CGO_ENABLED='1'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7601230Z CGO_FFLAGS='-O2 -g'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7602570Z CGO_LDFLAGS='-O2 -g'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7603060Z CXX='clang++'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7603410Z GCCGO='gccgo'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7604020Z GO111MODULE=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7604750Z GOARCH='arm64'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7605240Z GOARM64='v8.0'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7609920Z GOAUTH='netrc'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7610470Z GOBIN=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7610900Z GOCACHE='/Users/runner/Library/Caches/go-build'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7611620Z GOCACHEPROG=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7612400Z GODEBUG=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7612710Z GOENV=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7613060Z GOEXE=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7613370Z GOEXPERIMENT=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7613670Z GOFIPS140='off'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7614150Z GOFLAGS=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7615140Z GOGCCFLAGS='-fPIC -arch arm64 -pthread -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -ffile-prefix-map=/var/folders/df/djsxfhc17x95674wsm_g8s980000gn/T/go-build820701574=/tmp/go-build -gno-record-gcc-switches -fno-common'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7616160Z GOHOSTARCH='arm64'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7616530Z GOHOSTOS='darwin'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7616780Z GOINSECURE=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7617120Z GOMOD='/Users/runner/work/curator/curator/go.mod'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7617530Z GOMODCACHE='/Users/runner/go/pkg/mod'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7617750Z GONOPROXY=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7617920Z GONOSUMDB=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7618080Z GOOS='darwin'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7618240Z GOPATH='/Users/runner/go'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7618420Z GOPRIVATE=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7618610Z GOPROXY='https://proxy.golang.org,direct'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7618900Z GOROOT='/Users/runner/hostedtoolcache/go/1.25.5/arm64'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7619260Z GOSUMDB='sum.golang.org'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7619460Z GOTELEMETRY='local'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7619810Z GOTELEMETRYDIR='/Users/runner/Library/Application Support/go/telemetry'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7620170Z GOTMPDIR=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7620340Z GOTOOLCHAIN='local'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7620730Z GOTOOLDIR='/Users/runner/hostedtoolcache/go/1.25.5/arm64/pkg/tool/darwin_arm64'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7621140Z GOVCS=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7621320Z GOVERSION='go1.25.5'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7623440Z GOWORK=''
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7623670Z PKG_CONFIG='pkg-config'
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7623820Z 
+Candidate suite (macos-latest)	Run actions/setup-go@v5	2026-08-23T18:47:51.7624260Z ##[endgroup]
+Candidate suite (macos-latest)	Verify Go toolchain identity	﻿2026-08-23T18:47:51.7736760Z ##[group]Run bash .github/ci/toolchain-identity.sh
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.7737200Z ^[[36;1mbash .github/ci/toolchain-identity.sh^[[0m
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.7769660Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.7769970Z env:
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.7770230Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.7770500Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.7770710Z   GOENV: off
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.7770870Z ##[endgroup]
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.8175220Z toolchain: go version go1.25.5 darwin/arm64
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.8233600Z toolchain: GOROOT=/Users/runner/hostedtoolcache/go/1.25.5/arm64
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.8339700Z toolchain: GOTOOLCHAIN=local
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.8399520Z toolchain: GOENV=<none>
+Candidate suite (macos-latest)	Verify Go toolchain identity	2026-08-23T18:47:51.8400050Z ci-toolchain-identity: ok
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	﻿2026-08-23T18:47:51.8429980Z ##[group]Run set -u
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8430170Z ^[[36;1mset -u^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8430360Z ^[[36;1mif [ -n "$CANDIDATE_ROOT_INPUT" ]; then^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8430680Z ^[[36;1m  root="$CANDIDATE_ROOT_INPUT"^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8430920Z ^[[36;1melse^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8431150Z ^[[36;1m  root="$GITHUB_WORKSPACE/candidate-spec/conformance/v1"^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8431520Z ^[[36;1mfi^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8431700Z ^[[36;1mecho "root=$root" >>"$GITHUB_OUTPUT"^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8431970Z ^[[36;1m^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8432290Z ^[[36;1mpin_manifest="$GITHUB_WORKSPACE/protocol-spec/conformance/v1/manifest.json"^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8432780Z ^[[36;1mif command -v shasum >/dev/null 2>&1; then^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8433190Z ^[[36;1m  PIN_MANIFEST_SHA256="$(shasum -a 256 <"$pin_manifest" | awk '{print $1}')"^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8433490Z ^[[36;1melse^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8433760Z ^[[36;1m  PIN_MANIFEST_SHA256="$(sha256sum <"$pin_manifest" | awk '{print $1}')"^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8434070Z ^[[36;1mfi^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8434370Z ^[[36;1mexport PIN_MANIFEST_SHA256^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8434720Z ^[[36;1mbash .github/ci/candidate-suite.sh record "$root" .temp/ci-evidence/candidate^[[0m
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8475320Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8475630Z env:
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8475810Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8476050Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8476200Z   GOENV: off
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8476450Z   CANDIDATE_REF: 6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8476720Z   CANDIDATE_ROOT_INPUT: 
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8477080Z   CANDIDATE_EXPECTED_MANIFEST_SHA256: sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:47:51.8477460Z ##[endgroup]
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8187260Z candidate-suite: manifest digest matches the supplied expectation
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8346910Z # CANDIDATE PROTOCOL SUITE EVIDENCE -- NOT A RELEASE
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8347430Z #
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8347940Z # This file records the identity of an explicitly supplied, non-default
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8348510Z # candidate protocol suite. It is NOT a published release, NOT a release
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8349040Z # claim and NOT a conformance claim, and it must not be cited as any of
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8349550Z # them. The committed default pin is unchanged by this run; promoting it
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8350100Z # is owned by TASK-260720-38l1sy after TASK-260720-25d05o qualifies the
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8350640Z # release.
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8350840Z #
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8351090Z candidate_revision      6001dc33281b94a4ec7442ab15278550dd0f51d9
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8351770Z candidate_root          /Users/runner/work/curator/curator/candidate-spec/conformance/v1
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8352200Z protocol_version        1.0.0-rc.9
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8352760Z manifest_sha256         sha256:803918bf8672f76cf990985e51db213b826674cd5bb54fbf47731b8404b44403
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8353450Z tree_sha256             sha256:176dc52bdb73bc57ae394e2a063e9bb80dc3cd8f4c51f75b74c4144a8c942f02
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8354200Z file_count              692
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8354490Z committed_released_pin  00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8354800Z runner_goos             darwin
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8355020Z runner_goarch           arm64
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8355230Z evidence_class          candidate-only
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8355470Z release_claim           none
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8355690Z conformance_claim       none
+Candidate suite (macos-latest)	Resolve and record the candidate suite identity	2026-08-23T18:48:03.8356110Z candidate-suite: identity recorded at .temp/ci-evidence/candidate/candidate-suite-identity.txt
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	﻿2026-08-23T18:48:03.8402460Z ##[group]Run bash .github/ci/test-gate.sh .temp/ci-evidence/test
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8402830Z ^[[36;1mbash .github/ci/test-gate.sh .temp/ci-evidence/test^[[0m
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8431650Z shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8431950Z env:
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8432230Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8432490Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8432660Z   GOENV: off
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8432950Z   CURATOR_CONFORMANCE_ROOT: /Users/runner/work/curator/curator/candidate-spec/conformance/v1
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8433370Z   CI_REQUIRE_FULL_ROOT: 1
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8433550Z   GO_TEST_TIMEOUT: 30m
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8433700Z ##[endgroup]
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8793140Z test-gate: flags=<none> timeout=30m
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8794010Z test-gate: conformance root=/Users/runner/work/curator/curator/candidate-spec/conformance/v1
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:03.8794400Z 
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:05.0790760Z suite-plan: GOOS=darwin
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:05.0791310Z suite-plan: root=/Users/runner/work/curator/curator/candidate-spec/conformance/v1
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:05.0792080Z suite-plan: platform qualification read from the root's own vectors/conformance-claim-v3-qualification.json
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:05.0792460Z 
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:05.0792540Z 
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:05.0792650Z suite-plan: served=41 deferred=0 excluded=0
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:05.0793410Z suite-plan: CI_REQUIRE_FULL_ROOT=1 -- every package must be served by this root
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:48:05.0793850Z suite-plan: ok
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:10.8794610Z test-gate: stage served exit=0 (stream: .temp/ci-evidence/test/go-test-served.json)
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:10.8795210Z 
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:10.8795900Z test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/test/go-test.json)
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:10.8796360Z 
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8873780Z platform-case gate: GOOS=darwin
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8874550Z platform-case gate: ledger=.github/ci/platform-cases.tsv
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8874830Z 
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8875090Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8875710Z ok    internal/runtimestore :: TestRuntimeCommandPath
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8876320Z ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8876930Z ok    internal/buildcache :: TestUnixProtectedStateMatrix
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8877730Z ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8878240Z ok    internal/config :: TestBootstrapAndAddProject
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8878840Z ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8879490Z ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8880160Z ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8880910Z ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8881730Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8882280Z ok    internal/buildsource :: TestRejectsSpecialFile
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8882780Z ok    internal/gitops :: TestArchiveRejectsLinks
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8883350Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8883930Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8993790Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8994470Z ok    internal/install :: TestDryRunTouchesNothing
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8994970Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8995510Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8996130Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8996830Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8997330Z ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8998930Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.8999450Z ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9000080Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9000790Z ok    internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9001440Z ok    internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9002120Z ok    internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9002770Z ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9003380Z ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9003950Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9004460Z ok    internal/install :: TestEndToEndInstall
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9004870Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9005510Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9006200Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9007000Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9007710Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9008340Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9009040Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9009620Z ok    internal/transaction :: TestCommitAndRollbackRestoreALinkExactly
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9010230Z ok    internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9010840Z ok    internal/transaction :: TestEntryRemovalRestoresTheExactLink
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9011400Z ok    internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9012060Z ok    internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9012540Z ok    internal/interop :: TestGoldenContextCopy
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9013210Z ok    internal/godriver :: TestCandidateGoV1SourceAwareContract
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9013830Z ok    internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9014540Z ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9015260Z ok    cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9015920Z ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9016580Z ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9017240Z ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9017870Z ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9018600Z ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9019740Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9020080Z 
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9020310Z platform-case gate: 10 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9020830Z platform-case gate: ok
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9021060Z 
+Candidate suite (macos-latest)	Candidate suite + platform-case gate	2026-08-23T18:54:11.9021230Z test-gate: go test exit=0, platform-case gate exit=0
+Candidate suite (macos-latest)	Upload candidate evidence	﻿2026-08-23T18:54:11.9184450Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9185950Z ##[group]Run actions/upload-artifact@v4
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9186310Z with:
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9186530Z   name: candidate-evidence-macos-latest
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9186870Z   path: .temp/ci-evidence/
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9187180Z   if-no-files-found: warn
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9187430Z   compression-level: 6
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9187720Z   overwrite: false
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9188050Z   include-hidden-files: false
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9188280Z env:
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9188570Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9188870Z   GOTOOLCHAIN: local
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9189150Z   GOENV: off
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:11.9189360Z ##[endgroup]
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.3394110Z (node:19473) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.3395050Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.3459130Z With the provided path, there will be 17 files uploaded
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.3459940Z Artifact name is valid!
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.3460370Z Root directory input is valid!
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.5424100Z Beginning upload of artifact content to blob storage
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.6144000Z (node:19473) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.6922150Z Uploaded bytes 379032
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.7089360Z Finished uploading artifact content to blob storage!
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.7090020Z SHA256 digest of uploaded artifact zip is 94dec7db1e129516d5bb46528bb83c598d9b528877581c38107ba0eab6936f14
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.7090560Z Finalizing artifact upload
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.8993980Z Artifact candidate-evidence-macos-latest.zip successfully finalized. Artifact ID 9498346144
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.8995190Z Artifact candidate-evidence-macos-latest has been successfully uploaded! Final size is 379032 bytes. Artifact ID is 9498346144
+Candidate suite (macos-latest)	Upload candidate evidence	2026-08-23T18:54:12.9104380Z Artifact download URL: https://github.com/relux-works/curator/actions/runs/32659157687/artifacts/9498346144
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	﻿2026-08-23T18:54:12.9336690Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	2026-08-23T18:54:12.9337790Z Post job cleanup.
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	2026-08-23T18:54:13.0487640Z (node:19475) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	2026-08-23T18:54:13.0488350Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	2026-08-23T18:54:13.0525110Z [command]/Users/runner/hostedtoolcache/go/1.25.5/arm64/bin/go env GOCACHE
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	2026-08-23T18:54:13.0553060Z [command]/Users/runner/hostedtoolcache/go/1.25.5/arm64/bin/go env GOMODCACHE
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	2026-08-23T18:54:13.0612800Z /Users/runner/go/pkg/mod
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	2026-08-23T18:54:13.0613800Z /Users/runner/Library/Caches/go-build
+Candidate suite (macos-latest)	Post Run actions/setup-go@v5	2026-08-23T18:54:13.0624540Z Cache hit occurred on the primary key setup-go-macOS-arm64-go-1.25.5-4ce59a23addd1e381562aa006c7fdb29d2b75285eeb8d306f3eb0f731d5ae710, not saving cache.
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	﻿2026-08-23T18:54:13.0720450Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.0721550Z Post job cleanup.
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.1634110Z [command]/opt/homebrew/bin/git version
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.1695950Z git version 2.55.0
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.1712970Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/d8c2d04d-0c9e-4ecd-997d-ef819998a63d/.gitconfig'
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.1719130Z Temporarily overriding HOME='/Users/runner/work/_temp/d8c2d04d-0c9e-4ecd-997d-ef819998a63d' before making global git config changes
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.1720030Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.1723280Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/curator/curator/protocol-spec
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.1795670Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.1858270Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.2702550Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.2759230Z http.https://github.com/.extraheader
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.2766850Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.2835090Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.3645800Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (macos-latest)	Post Checkout the committed released pin for comparison	2026-08-23T18:54:13.3710190Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Candidate suite (macos-latest)	Post Check out the candidate suite	﻿2026-08-23T18:54:13.4573490Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.4574550Z Post job cleanup.
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.5435430Z [command]/opt/homebrew/bin/git version
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.5499160Z git version 2.55.0
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.5516200Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/292e7a08-c2a4-46a3-b546-da0af2045d9e/.gitconfig'
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.5522350Z Temporarily overriding HOME='/Users/runner/work/_temp/292e7a08-c2a4-46a3-b546-da0af2045d9e' before making global git config changes
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.5523420Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.5526240Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/curator/curator/candidate-spec
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.5601960Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.5666950Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.6473050Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.6528900Z http.https://github.com/.extraheader
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.6535740Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.6599020Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.7386570Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (macos-latest)	Post Check out the candidate suite	2026-08-23T18:54:13.7451080Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	﻿2026-08-23T18:54:13.8329600Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.8330640Z Post job cleanup.
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.9196800Z [command]/opt/homebrew/bin/git version
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.9261100Z git version 2.55.0
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.9278430Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/9003cc47-83a2-4fef-897b-de7b2ba4bb8a/.gitconfig'
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.9284440Z Temporarily overriding HOME='/Users/runner/work/_temp/9003cc47-83a2-4fef-897b-de7b2ba4bb8a' before making global git config changes
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.9285340Z Adding repository directory to the temporary git global config as a safe directory
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.9288270Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/curator/curator
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.9362060Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:13.9433160Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.0210350Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.0437950Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.0496080Z http.https://github.com/.extraheader
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.0503400Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.0573240Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.1331310Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.1475180Z http.https://github.com/.extraheader
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.1630650Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.1683030Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.2454870Z Entering 'agents/skills/skill-go-testing-tools'
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.2555420Z file:/Users/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Candidate suite (macos-latest)	Post Run actions/checkout@v4	2026-08-23T18:54:14.2633280Z [command]/opt/homebrew/bin/git config --file /Users/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config --name-only --get-regexp ^includeIf\.gitdir:
+Candidate suite (macos-latest)	Complete job	﻿2026-08-23T18:54:14.2787100Z Cleaning up orphan processes
+Candidate suite (macos-latest)	Complete job	2026-08-23T18:54:15.9091340Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

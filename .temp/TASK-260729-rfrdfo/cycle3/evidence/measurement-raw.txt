@@ -1,0 +1,25 @@
+# TASK-260729-2afulh measured A/B staging cost
+
+before = accepted TASK-260729-rfrdfo state (13 files, references/info.md present)
+after  = same tree plus the single 14th-file trim
+measurement-only test file: internal/install/atomicity/zz_measure_test.go (scratch trees only, NOT in the 14-file patch)
+
+## raw before
+MEASURE scenario=project phase=baseline txns=1 staged_targets=12 entries=24 dirs=8 files=14 links=2 other=0 ref_entries=4 chunk_syncs=14 copy_points=14 derived_staging_saves=100
+MEASURE scenario=project phase=upgrade txns=1 staged_targets=18 entries=34 dirs=10 files=19 links=5 other=0 ref_entries=6 chunk_syncs=19 copy_points=19 derived_staging_saves=140
+MANIFEST scenario=project entries=directory:,directory:references,file:.csk-install.json,file:SKILL.md,file:references/info.md
+MEASURE scenario=global phase=baseline txns=1 staged_targets=14 entries=26 dirs=8 files=16 links=2 other=0 ref_entries=4 chunk_syncs=16 copy_points=16 derived_staging_saves=110
+MEASURE scenario=global phase=upgrade txns=1 staged_targets=15 entries=25 dirs=6 files=16 links=3 other=0 ref_entries=4 chunk_syncs=16 copy_points=16 derived_staging_saves=107
+MANIFEST scenario=global entries=directory:,directory:references,file:.csk-install.json,file:SKILL.md,file:references/info.md
+--- PASS: TestMeasureStagingCost (60.48s)
+ok  	github.com/relux-works/curator/internal/install/atomicity	61.271s
+
+## raw after
+MEASURE scenario=project phase=baseline txns=1 staged_targets=12 entries=20 dirs=6 files=12 links=2 other=0 ref_entries=0 chunk_syncs=12 copy_points=12 derived_staging_saves=84
+MEASURE scenario=project phase=upgrade txns=1 staged_targets=18 entries=28 dirs=7 files=16 links=5 other=0 ref_entries=0 chunk_syncs=16 copy_points=16 derived_staging_saves=116
+MANIFEST scenario=project entries=directory:,file:.csk-install.json,file:SKILL.md
+MEASURE scenario=global phase=baseline txns=1 staged_targets=14 entries=22 dirs=6 files=14 links=2 other=0 ref_entries=0 chunk_syncs=14 copy_points=14 derived_staging_saves=94
+MEASURE scenario=global phase=upgrade txns=1 staged_targets=15 entries=21 dirs=4 files=14 links=3 other=0 ref_entries=0 chunk_syncs=14 copy_points=14 derived_staging_saves=91
+MANIFEST scenario=global entries=directory:,file:.csk-install.json,file:SKILL.md
+--- PASS: TestMeasureStagingCost (53.97s)
+ok  	github.com/relux-works/curator/internal/install/atomicity	54.448s

@@ -1,0 +1,92 @@
+TASK-260728-168smo — gate transcript, rework cycle 4
+=====================================================
+date 2026-07-29 · gate host macOS 26.5 arm64
+
+Every gate was run standalone this cycle and its real exit code is recorded.
+Nothing is carried forward from cycle 3 on assertion. Two gates are expected-red
+and both are re-attributed below from this cycle's own output.
+
+This cycle changed two Markdown documents and no executable input, so no
+qualification measurement was re-run and no host other than the gate host was
+touched.
+
+curator-spec (worktree .temp/TASK-260728-168smo/curator-spec-worktree, base 57c1f56)
+------------------------------------------------------------------------------------
+  jsonschema is absent from the system interpreter, so validate.py runs from the
+  throwaway venv built from the repo requirements-dev.txt (jsonschema 4.25.1),
+  as in cycles 2 and 3.
+
+  /tmp/specvenv/bin/python tools/validate.py   (baseline 57c1f56, clean checkout
+                                                .temp/TASK-260728-168smo/spec-baseline)
+                                                              exit 0
+      validated 30 schemas and 93 vector files
+
+  /tmp/specvenv/bin/python tools/validate.py   (task worktree)
+                                                              exit 1   EXPECTED-RED
+      validation failed: docs/external-build-repositories.md:
+        broken local link: ../release/1.0.0-rc.5.json
+      ATTRIBUTION: docs/external-build-repositories.md is an untracked in-flight
+      sibling document copied into this worktree by another task; line 146 links
+      to a release file that does not exist on this base. This task authored 0
+      of the broken links. The same command exits 0 on the clean baseline
+      checkout above, which is what isolates the failure to the copied-in file.
+      Count is 1, unchanged from cycle 3.
+
+  scoped link sweep over the two documents this task authored
+    python3 .temp/TASK-260728-168smo/linkcheck.py curator-spec-worktree \
+      decisions/0010-kotlin-native-driver-pair.md \
+      docs/kotlin-native-build-drivers.md
+                                                              exit 0
+      local links checked: 6, broken: 0
+
+  /tmp/specvenv/bin/python -m unittest discover -s tools -p 'test_*.py'
+                                                              exit 0   Ran 8 tests, OK
+  go test ./tools/...                                         exit 0
+      ok github.com/relux-works/curator-spec/tools/generate-vectors
+
+curator (repository root)
+-------------------------
+  go build ./...                                              exit 0
+  go vet ./...                                                exit 0
+  gofmt -l ./cmd ./internal                                   exit 0   0 files
+  go test ./...                                               exit 0   31 packages ok
+  make check                                                  exit 2   EXPECTED-RED
+      go vet and go test inside make check both pass; the gofmt stage fails.
+      ATTRIBUTION, computed from this cycle's output: 754 unformatted Go files
+      are listed, and 0 of them are outside another task's .temp/ scratch tree:
+          747  .temp/TASK-260728-2jaw7h/...   (a vendored Go toolchain source tree)
+            4  .temp/TASK-260720-1zntv0/...
+            2  .temp/TASK-260729-1t1z2l/...   (generated _testmain.go)
+            1  .temp/TASK-260729-3jmqgl/...
+        ----
+          754  total, 0 in the product tree
+      gofmt -l ./cmd ./internal — the product tree — lists 0 files. This task
+      authored 0 Go files, 0 schemas, 0 vectors and 0 release files.
+      The count differs from cycle 3's 1,528 because another task's scratch tree
+      shrank between runs; the attribution is identical and was recomputed, not
+      copied.
+
+  golangci-lint                                               NOT RUN
+      not installed on this host.
+
+Qualification host
+-------------------
+  NOT RUN THIS CYCLE, and correctly so: no finding of review cycle 3 disputed a
+  measurement. The retained windows/amd64 evidence is unchanged and lives in
+  TASK-260728-168smo_command-evidence-cycle3.log records W1-W17 and in the raw
+  host logs inside TASK-260728-168smo_probe-cycle3.tar.gz.
+
+  Correction to cycle 3's gate log: that transcript titled this section's summary
+  "the A1-A9 acceptance test". It is the A1-A7 host-side transcript. A8 and A9
+  are discharged by the conformance corpus and no run has produced them, which is
+  precisely the second blocker of review cycle 3. The exit codes it lists were
+  and are correct; only the label was wrong.
+
+Scope of change
+----------------
+  Two Markdown documents were edited, both to revision 4:
+    decisions/0010-kotlin-native-driver-pair.md
+    docs/kotlin-native-build-drivers.md
+  0 Go files, 0 schemas, 0 vectors, 0 release files.
+  No staging, commit, publication, pin, toolchain install, board mutation, or
+  platform-claim widening.

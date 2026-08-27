@@ -1,0 +1,16 @@
+# Native Windows verification (DESKTOP-3PBO632, go1.25.5 windows/amd64)
+# curator @ origin/main 351db49 ; CURATOR_CONFORMANCE_ROOT = candidate edd0721 conformance/v1
+
+$ go test ./internal/godriver -run '^TestToolchainIdentityVectors$' -count=1 -v
+--- FAIL: TestToolchainIdentityVectors (2.01s)
+    --- FAIL: TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link (0.00s)
+        builddriver_positive_conformance_test.go:267: materialized link target = "..\\bin\\go", <nil>; want exact protocol target "../bin/go"
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	2.828s
+FAIL
+
+$ go test ./internal/godriver -run '^TestFixedEnvironmentAndFiveDirectArgvFormsVector$' -count=1
+ok  	github.com/relux-works/curator/internal/godriver	2.781s
+
+$ go run linkprobe.go   # os.Symlink/os.Readlink round-trip
+READLINK="..\\bin\\go" err=<nil> want="../bin/go" match=false

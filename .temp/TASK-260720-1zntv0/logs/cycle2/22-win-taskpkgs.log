@@ -1,0 +1,1230 @@
+=== RUN   TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+=== RUN   TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/availability-probe
+=== RUN   TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/domain-preparation
+=== RUN   TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/domain-installation
+--- PASS: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (4.95s)
+    --- PASS: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/availability-probe (2.71s)
+    --- PASS: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/domain-preparation (0.93s)
+    --- PASS: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/domain-installation (1.31s)
+=== RUN   TestControlSeamFailureNeverDriftsIntoAHardenedClaim
+--- PASS: TestControlSeamFailureNeverDriftsIntoAHardenedClaim (1.21s)
+=== RUN   TestControlDomainInstallsBeforeTheWorkerIsReleased
+--- PASS: TestControlDomainInstallsBeforeTheWorkerIsReleased (0.03s)
+=== RUN   TestParentRejectsAWorkerRecordThatDiffersFromWhatWasInstalled
+--- PASS: TestParentRejectsAWorkerRecordThatDiffersFromWhatWasInstalled (0.00s)
+=== RUN   TestParentClassifiesAChildStartFailureWithoutBuildContinuation
+=== RUN   TestParentClassifiesAChildStartFailureWithoutBuildContinuation/list
+=== RUN   TestParentClassifiesAChildStartFailureWithoutBuildContinuation/build
+--- PASS: TestParentClassifiesAChildStartFailureWithoutBuildContinuation (0.00s)
+    --- PASS: TestParentClassifiesAChildStartFailureWithoutBuildContinuation/list (0.00s)
+    --- PASS: TestParentClassifiesAChildStartFailureWithoutBuildContinuation/build (0.00s)
+=== RUN   TestBuildFailsClosedWhenTheGoChildCannotStart
+--- PASS: TestBuildFailsClosedWhenTheGoChildCannotStart (1.70s)
+=== RUN   TestWorkerDomainTeardownSurvivesARefusedChild
+--- PASS: TestWorkerDomainTeardownSurvivesARefusedChild (0.95s)
+=== RUN   TestPortableExecutionPolicyMatchesTheAcceptedVector
+--- PASS: TestPortableExecutionPolicyMatchesTheAcceptedVector (0.00s)
+=== RUN   TestMandatoryControlsMatchTheAcceptedVector
+--- PASS: TestMandatoryControlsMatchTheAcceptedVector (0.00s)
+=== RUN   TestNativeControlInventoryMatchesTheAcceptedVector
+--- PASS: TestNativeControlInventoryMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCapabilityEvidenceRecordMatchesTheAcceptedVector
+--- PASS: TestCapabilityEvidenceRecordMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/available-native-control-is-applied
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/unavailable-native-control-does-not-reject
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/capability-evidence-is-not-cache-input
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/unavailable-control-cannot-be-reported-as-applied
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/available-control-cannot-be-reported-as-unavailable
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/unknown-native-control-is-rejected
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/missing-native-control-entry-is-rejected
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/duplicate-native-control-entry-is-rejected
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/unknown-evidence-record-version-is-rejected
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/hardened-guarantee-claimed-under-portable-policy
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/hardened-execution-policy-in-evidence-record
+--- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/available-native-control-is-applied (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/unavailable-native-control-does-not-reject (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/capability-evidence-is-not-cache-input (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/unavailable-control-cannot-be-reported-as-applied (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/available-control-cannot-be-reported-as-unavailable (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/unknown-native-control-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/missing-native-control-entry-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/duplicate-native-control-entry-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/unknown-evidence-record-version-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/hardened-guarantee-claimed-under-portable-policy (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/hardened-execution-policy-in-evidence-record (0.00s)
+=== RUN   TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector
+--- PASS: TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector (0.00s)
+=== RUN   TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector
+--- PASS: TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector (0.00s)
+=== RUN   TestCacheIdentityMatchesTheAcceptedVector
+--- PASS: TestCacheIdentityMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCandidateGoV1SourceAwareContract
+    build_conformance_test.go:466: C:\curator-ci\rc5\conformance\v1 publishes no build-drivers vector
+--- SKIP: TestCandidateGoV1SourceAwareContract (0.00s)
+=== RUN   TestBuildRunsExactlyOneFixedListAndBuildInsideTheWorker
+--- PASS: TestBuildRunsExactlyOneFixedListAndBuildInsideTheWorker (1.15s)
+=== RUN   TestBuildEmitsExactlyOneClosedCapabilityEvidenceRecord
+--- PASS: TestBuildEmitsExactlyOneClosedCapabilityEvidenceRecord (1.15s)
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/non_main
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/incomplete
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/package_error
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/dependency_error
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/test_package
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/cgo
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/native
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/assembly
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/syso
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/escaped_source
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/escaped_embed
+=== RUN   TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/replaced_module
+--- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass (12.37s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/non_main (1.03s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/incomplete (1.02s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/package_error (1.02s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/dependency_error (1.02s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/test_package (1.03s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/cgo (1.03s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/native (1.05s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/assembly (1.03s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/syso (1.02s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/escaped_source (1.08s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/escaped_embed (1.03s)
+    --- PASS: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/replaced_module (1.03s)
+=== RUN   TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild
+=== RUN   TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/cgo_import_dynamic
+=== RUN   TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/generator
+=== RUN   TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/pgo
+=== RUN   TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/multiple_roots
+--- PASS: TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild (4.19s)
+    --- PASS: TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/cgo_import_dynamic (1.04s)
+    --- PASS: TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/generator (1.05s)
+    --- PASS: TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/pgo (1.05s)
+    --- PASS: TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/multiple_roots (1.05s)
+=== RUN   TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs
+=== RUN   TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/symlink
+=== RUN   TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/oversize
+=== RUN   TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/extra_output
+=== RUN   TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/missing_output
+--- PASS: TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs (4.50s)
+    --- PASS: TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/symlink (1.16s)
+    --- PASS: TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/oversize (1.10s)
+    --- PASS: TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/extra_output (1.12s)
+    --- PASS: TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/missing_output (1.12s)
+=== RUN   TestBuildRejectsHardLinkedArtifact
+--- PASS: TestBuildRejectsHardLinkedArtifact (1.07s)
+=== RUN   TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit
+=== RUN   TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit/combined_output
+=== RUN   TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit/deadline
+=== RUN   TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit/nonzero_exit
+--- PASS: TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit (4.12s)
+    --- PASS: TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit/combined_output (1.02s)
+    --- PASS: TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit/deadline (2.07s)
+    --- PASS: TestBuildEnforcesOutputDeadlineDiskAndNonzeroExit/nonzero_exit (1.04s)
+=== RUN   TestBuildRejectsOversizedPrivateState
+--- PASS: TestBuildRejectsOversizedPrivateState (1.11s)
+=== RUN   TestBuildClassifiesOfflineVendorAndToolchainFailures
+=== RUN   TestBuildClassifiesOfflineVendorAndToolchainFailures/missing_vendor
+=== RUN   TestBuildClassifiesOfflineVendorAndToolchainFailures/inconsistent_vendor
+=== RUN   TestBuildClassifiesOfflineVendorAndToolchainFailures/toolchain
+--- PASS: TestBuildClassifiesOfflineVendorAndToolchainFailures (3.07s)
+    --- PASS: TestBuildClassifiesOfflineVendorAndToolchainFailures/missing_vendor (1.02s)
+    --- PASS: TestBuildClassifiesOfflineVendorAndToolchainFailures/inconsistent_vendor (1.03s)
+    --- PASS: TestBuildClassifiesOfflineVendorAndToolchainFailures/toolchain (1.01s)
+=== RUN   TestBuildRejectsWorkspaceAndPackageSelectedToolchainBeforeGo
+=== RUN   TestBuildRejectsWorkspaceAndPackageSelectedToolchainBeforeGo/workspace
+=== RUN   TestBuildRejectsWorkspaceAndPackageSelectedToolchainBeforeGo/toolchain
+--- PASS: TestBuildRejectsWorkspaceAndPackageSelectedToolchainBeforeGo (1.79s)
+    --- PASS: TestBuildRejectsWorkspaceAndPackageSelectedToolchainBeforeGo/workspace (0.90s)
+    --- PASS: TestBuildRejectsWorkspaceAndPackageSelectedToolchainBeforeGo/toolchain (0.89s)
+=== RUN   TestBuildDetectsSourceMutationThroughTheLastChild
+--- PASS: TestBuildDetectsSourceMutationThroughTheLastChild (1.03s)
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface/executable
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface/args
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface/env
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface/output
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface/flags
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface/hooks
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface/plugins
+=== RUN   TestBuildRejectsEveryPackageInfluenceSurface/generate
+--- PASS: TestBuildRejectsEveryPackageInfluenceSurface (6.74s)
+    --- PASS: TestBuildRejectsEveryPackageInfluenceSurface/executable (0.85s)
+    --- PASS: TestBuildRejectsEveryPackageInfluenceSurface/args (0.84s)
+    --- PASS: TestBuildRejectsEveryPackageInfluenceSurface/env (0.84s)
+    --- PASS: TestBuildRejectsEveryPackageInfluenceSurface/output (0.84s)
+    --- PASS: TestBuildRejectsEveryPackageInfluenceSurface/flags (0.84s)
+    --- PASS: TestBuildRejectsEveryPackageInfluenceSurface/hooks (0.85s)
+    --- PASS: TestBuildRejectsEveryPackageInfluenceSurface/plugins (0.84s)
+    --- PASS: TestBuildRejectsEveryPackageInfluenceSurface/generate (0.84s)
+=== RUN   TestBuildRequiresThePackageCommandSurface
+--- PASS: TestBuildRequiresThePackageCommandSurface (0.83s)
+=== RUN   TestBuildTerminatesTheCompleteWorkerDomain
+--- PASS: TestBuildTerminatesTheCompleteWorkerDomain (1.70s)
+=== RUN   TestPerFileSizeLimitIsReallyApplied
+    build_test.go:434: per-file-size-limit is available only on macOS in rc5-native-control-inventory-v1
+--- SKIP: TestPerFileSizeLimitIsReallyApplied (0.00s)
+=== RUN   TestRealGoV1VendoredBuildIsBoundedAndNotLaunched
+--- PASS: TestRealGoV1VendoredBuildIsBoundedAndNotLaunched (44.84s)
+=== RUN   TestNativeControlInventoryIsExhaustiveAndClosed
+--- PASS: TestNativeControlInventoryIsExhaustiveAndClosed (0.00s)
+=== RUN   TestMandatoryControlSetIsExactAndCarriesNoHardenedClaim
+--- PASS: TestMandatoryControlSetIsExactAndCarriesNoHardenedClaim (0.00s)
+=== RUN   TestDeferredHardenedGuaranteesNeverAppearAndNeverReject
+--- PASS: TestDeferredHardenedGuaranteesNeverAppearAndNeverReject (0.00s)
+=== RUN   TestCapabilityEvidenceConsistencyRules
+=== RUN   TestCapabilityEvidenceConsistencyRules/available-native-control-is-applied
+=== RUN   TestCapabilityEvidenceConsistencyRules/unavailable-native-control-does-not-reject
+=== RUN   TestCapabilityEvidenceConsistencyRules/unavailable-control-cannot-be-reported-as-applied
+=== RUN   TestCapabilityEvidenceConsistencyRules/available-control-cannot-be-reported-as-unavailable
+=== RUN   TestCapabilityEvidenceConsistencyRules/unknown-native-control-is-rejected
+=== RUN   TestCapabilityEvidenceConsistencyRules/missing-native-control-entry-is-rejected
+=== RUN   TestCapabilityEvidenceConsistencyRules/duplicate-native-control-entry-is-rejected
+=== RUN   TestCapabilityEvidenceConsistencyRules/unknown-evidence-record-version-is-rejected
+=== RUN   TestCapabilityEvidenceConsistencyRules/unprobed-availability-is-rejected
+=== RUN   TestCapabilityEvidenceConsistencyRules/unknown-probe-timing-is-rejected
+=== RUN   TestCapabilityEvidenceConsistencyRules/foreign-platform-is-rejected
+=== RUN   TestCapabilityEvidenceConsistencyRules/hardened-guarantee-claimed-under-portable-policy
+=== RUN   TestCapabilityEvidenceConsistencyRules/hardened-execution-policy-in-evidence-record
+--- PASS: TestCapabilityEvidenceConsistencyRules (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/available-native-control-is-applied (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/unavailable-native-control-does-not-reject (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/unavailable-control-cannot-be-reported-as-applied (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/available-control-cannot-be-reported-as-unavailable (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/unknown-native-control-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/missing-native-control-entry-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/duplicate-native-control-entry-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/unknown-evidence-record-version-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/unprobed-availability-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/unknown-probe-timing-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/foreign-platform-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/hardened-guarantee-claimed-under-portable-policy (0.00s)
+    --- PASS: TestCapabilityEvidenceConsistencyRules/hardened-execution-policy-in-evidence-record (0.00s)
+=== RUN   TestCapabilityEvidenceIsNotACacheOrReceiptInput
+--- PASS: TestCapabilityEvidenceIsNotACacheOrReceiptInput (0.00s)
+=== RUN   TestPortableExecutionPolicyIsABindingCacheInput
+--- PASS: TestPortableExecutionPolicyIsABindingCacheInput (0.00s)
+=== RUN   TestOSExecutorClosesStdinAndCapturesBoundedOutput
+--- PASS: TestOSExecutorClosesStdinAndCapturesBoundedOutput (0.02s)
+=== RUN   TestOSExecutorEnforcesOutputAndTimeBounds
+=== RUN   TestOSExecutorEnforcesOutputAndTimeBounds/output
+=== RUN   TestOSExecutorEnforcesOutputAndTimeBounds/combined_output
+=== RUN   TestOSExecutorEnforcesOutputAndTimeBounds/timeout
+--- PASS: TestOSExecutorEnforcesOutputAndTimeBounds (0.06s)
+    --- PASS: TestOSExecutorEnforcesOutputAndTimeBounds/output (0.02s)
+    --- PASS: TestOSExecutorEnforcesOutputAndTimeBounds/combined_output (0.02s)
+    --- PASS: TestOSExecutorEnforcesOutputAndTimeBounds/timeout (0.02s)
+=== RUN   TestGodriverHelperProcess
+--- PASS: TestGodriverHelperProcess (0.00s)
+=== RUN   TestToolchainFramingMatchesRC4Vector
+--- PASS: TestToolchainFramingMatchesRC4Vector (0.00s)
+=== RUN   TestGoVersionLFAndCRLFNormalizeToSameIdentity
+--- PASS: TestGoVersionLFAndCRLFNormalizeToSameIdentity (0.00s)
+=== RUN   TestCandidateRC4ToolchainArtifacts
+    fingerprint_test.go:86: C:\curator-ci\rc5\conformance\v1 publishes no expected/build-driver artifacts
+--- SKIP: TestCandidateRC4ToolchainArtifacts (0.00s)
+=== RUN   TestFingerprintRejectsDuplicateEncodedClaim
+--- PASS: TestFingerprintRejectsDuplicateEncodedClaim (0.00s)
+=== RUN   TestFingerprintRejectsEscapingAndAbsoluteLinks
+=== RUN   TestFingerprintRejectsEscapingAndAbsoluteLinks/escape
+=== RUN   TestFingerprintRejectsEscapingAndAbsoluteLinks/absolute
+--- PASS: TestFingerprintRejectsEscapingAndAbsoluteLinks (0.00s)
+    --- PASS: TestFingerprintRejectsEscapingAndAbsoluteLinks/escape (0.00s)
+    --- PASS: TestFingerprintRejectsEscapingAndAbsoluteLinks/absolute (0.00s)
+=== RUN   TestFingerprintRejectsDanglingLink
+--- PASS: TestFingerprintRejectsDanglingLink (0.00s)
+=== RUN   TestDirectiveScanFindsExactTokenAcrossReadBoundary
+--- PASS: TestDirectiveScanFindsExactTokenAcrossReadBoundary (0.01s)
+=== RUN   TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs
+=== RUN   TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/standard_escape
+=== RUN   TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/transitive_syso
+=== RUN   TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/transitive_native
+=== RUN   TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/transitive_assembly
+=== RUN   TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/transitive_embed_escape
+--- PASS: TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs (0.03s)
+    --- PASS: TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/standard_escape (0.00s)
+    --- PASS: TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/transitive_syso (0.00s)
+    --- PASS: TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/transitive_native (0.00s)
+    --- PASS: TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/transitive_assembly (0.00s)
+    --- PASS: TestPackageGraphValidatesStandardMainModuleAndVendoredTransitiveInputs/transitive_embed_escape (0.00s)
+=== RUN   TestPackageGraphRejectsMalformedMissingAndDuplicateResults
+=== RUN   TestPackageGraphRejectsMalformedMissingAndDuplicateResults/empty
+=== RUN   TestPackageGraphRejectsMalformedMissingAndDuplicateResults/malformed
+=== RUN   TestPackageGraphRejectsMalformedMissingAndDuplicateResults/duplicate
+--- PASS: TestPackageGraphRejectsMalformedMissingAndDuplicateResults (0.00s)
+    --- PASS: TestPackageGraphRejectsMalformedMissingAndDuplicateResults/empty (0.00s)
+    --- PASS: TestPackageGraphRejectsMalformedMissingAndDuplicateResults/malformed (0.00s)
+    --- PASS: TestPackageGraphRejectsMalformedMissingAndDuplicateResults/duplicate (0.00s)
+=== RUN   TestVerifyArtifactRejectsHardLinks
+--- PASS: TestVerifyArtifactRejectsHardLinks (0.00s)
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/network_proxy
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/checksum_database
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/version_control
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/workspace
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/cgo
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/external_link
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/toolchain_switch
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/go_flags
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/go_env_file
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/host_compiler
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/credential_helper
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/proxy_variable
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/tool_directory
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/output_binary_directory
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/non_protocol_variable
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/shared_cache
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/shared_home
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/missing_target
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/foreign_GOROOT
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/malformed_entry
+=== RUN   TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/duplicate_entry
+--- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment (0.84s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/network_proxy (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/checksum_database (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/version_control (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/workspace (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/cgo (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/external_link (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/toolchain_switch (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/go_flags (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/go_env_file (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/host_compiler (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/credential_helper (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/proxy_variable (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/tool_directory (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/output_binary_directory (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/non_protocol_variable (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/shared_cache (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/shared_home (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/missing_target (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/foreign_GOROOT (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/malformed_entry (0.00s)
+    --- PASS: TestWorkerEnvironmentGuardAcceptsOnlyTheClosedOfflineEnvironment/duplicate_entry (0.00s)
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/package_pattern
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/extra_flag
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/short_vector
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/relative_output
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/other_command
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/output_outside_private_staging
+--- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector (0.84s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/package_pattern (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/extra_flag (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/short_vector (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/relative_output (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/other_command (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/output_outside_private_staging (0.00s)
+=== RUN   TestProbeSetGuardMatchesTheInventoryExactly
+--- PASS: TestProbeSetGuardMatchesTheInventoryExactly (0.00s)
+=== RUN   TestAppliedControlReportMustAgreeWithItsEvidence
+--- PASS: TestAppliedControlReportMustAgreeWithItsEvidence (0.00s)
+=== RUN   TestResourceLimitsStayInsideManagerBounds
+--- PASS: TestResourceLimitsStayInsideManagerBounds (0.00s)
+=== RUN   TestExecutableIdentityRejectsSubstitutionAndMutation
+--- PASS: TestExecutableIdentityRejectsSubstitutionAndMutation (0.01s)
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/zero_length
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/oversize_length
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/truncated_payload
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/unknown_field
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/unknown_kind
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/trailing_data
+=== RUN   TestSessionFramingRejectsMalformedAndOversizeFrames/not_an_object
+--- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/zero_length (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/oversize_length (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/truncated_payload (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/unknown_field (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/unknown_kind (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/trailing_data (0.00s)
+    --- PASS: TestSessionFramingRejectsMalformedAndOversizeFrames/not_an_object (0.00s)
+=== RUN   TestBuildPermitIsBoundToTheSessionAndVector
+--- PASS: TestBuildPermitIsBoundToTheSessionAndVector (0.00s)
+=== RUN   TestPackageCommandSurfaceIsClosed
+=== RUN   TestPackageCommandSurfaceIsClosed/wrong_type
+=== RUN   TestPackageCommandSurfaceIsClosed/wrong_driver
+=== RUN   TestPackageCommandSurfaceIsClosed/mismatched_source_dir
+=== RUN   TestPackageCommandSurfaceIsClosed/unknown_field
+--- PASS: TestPackageCommandSurfaceIsClosed (0.00s)
+    --- PASS: TestPackageCommandSurfaceIsClosed/wrong_type (0.00s)
+    --- PASS: TestPackageCommandSurfaceIsClosed/wrong_driver (0.00s)
+    --- PASS: TestPackageCommandSurfaceIsClosed/mismatched_source_dir (0.00s)
+    --- PASS: TestPackageCommandSurfaceIsClosed/unknown_field (0.00s)
+=== RUN   TestEstablishUsesExactPrivateProbeAndFrozenEnvironment
+--- PASS: TestEstablishUsesExactPrivateProbeAndFrozenEnvironment (0.02s)
+=== RUN   TestSelectionPriorityAndNoPathLookup
+--- PASS: TestSelectionPriorityAndNoPathLookup (0.02s)
+=== RUN   TestConfigFromEnvironmentAdmitsOnlyTrustedSelectors
+--- PASS: TestConfigFromEnvironmentAdmitsOnlyTrustedSelectors (0.00s)
+=== RUN   TestSelectionFallsBackOnlyWhenHigherPriorityIsMissing
+=== RUN   TestSelectionFallsBackOnlyWhenHigherPriorityIsMissing/GOROOT
+=== RUN   TestSelectionFallsBackOnlyWhenHigherPriorityIsMissing/runtime
+--- PASS: TestSelectionFallsBackOnlyWhenHigherPriorityIsMissing (0.03s)
+    --- PASS: TestSelectionFallsBackOnlyWhenHigherPriorityIsMissing/GOROOT (0.02s)
+    --- PASS: TestSelectionFallsBackOnlyWhenHigherPriorityIsMissing/runtime (0.01s)
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/relative_CURATOR_GO
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/wrapper
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/repository_toolchain
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/missing_GOROOT
+--- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution (0.02s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/relative_CURATOR_GO (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/wrapper (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/repository_toolchain (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/missing_GOROOT (0.00s)
+=== RUN   TestCandidateLinkOutsideDerivedGOROOTFails
+--- PASS: TestCandidateLinkOutsideDerivedGOROOTFails (0.01s)
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/telemetry_failure
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/probe_timeout
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/invalid_version
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/future_family
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/target_mismatch
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/GOROOT_mismatch
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/telemetry_remains_local
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/invalid_env_JSON
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/telemetry_escape
+=== RUN   TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/bounded_output
+--- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics (0.10s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/telemetry_failure (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/probe_timeout (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/invalid_version (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/future_family (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/target_mismatch (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/GOROOT_mismatch (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/telemetry_remains_local (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/invalid_env_JSON (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/telemetry_escape (0.01s)
+    --- PASS: TestProbeFailuresCleanPrivateStateAndHaveStableDiagnostics/bounded_output (0.01s)
+=== RUN   TestMalformedVersionAndEnvironmentInputs
+--- PASS: TestMalformedVersionAndEnvironmentInputs (0.00s)
+=== RUN   TestProbeRemovesStateAndNeverMemoizes
+--- PASS: TestProbeRemovesStateAndNeverMemoizes (0.03s)
+=== RUN   TestToolchainMutationFailsRecheck
+--- PASS: TestToolchainMutationFailsRecheck (0.02s)
+=== RUN   TestRealTrustedGoProbe
+    session_test.go:383: set CURATOR_REAL_GO_TEST=1 for the bounded native toolchain probe
+--- SKIP: TestRealTrustedGoProbe (0.00s)
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/executable_digest_mismatch
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/executable_path_substitution
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/executable_size_mismatch
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/unexpected_program_below_the_worker
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/tool_directory_outside_GOROOT
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/mutated_list_vector
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/mutated_build_vector
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/output_outside_private_staging
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/poisoned_environment
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/widened_environment
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/working_directory_outside_the_snapshot
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/private_root_overlapping_the_snapshot
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/unsupported_protocol_version
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/probe_claims_an_unavailable_control
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/probe_set_outside_the_inventory
+=== RUN   TestWorkerRejectsEveryIdentityAndRequestMutation/platform_other_than_this_host
+--- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation (14.44s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/executable_digest_mismatch (0.92s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/executable_path_substitution (0.90s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/executable_size_mismatch (0.90s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/unexpected_program_below_the_worker (0.90s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/tool_directory_outside_GOROOT (0.90s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/mutated_list_vector (0.90s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/mutated_build_vector (0.91s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/output_outside_private_staging (0.92s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/poisoned_environment (0.93s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/widened_environment (0.89s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/working_directory_outside_the_snapshot (0.90s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/private_root_overlapping_the_snapshot (0.89s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/unsupported_protocol_version (0.88s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/probe_claims_an_unavailable_control (0.90s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/probe_set_outside_the_inventory (0.93s)
+    --- PASS: TestWorkerRejectsEveryIdentityAndRequestMutation/platform_other_than_this_host (0.89s)
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/build_permit_before_list_validation
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/replayed_session_nonce
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/out_of_order_message
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/unknown_message_kind
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/oversize_frame
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/unauthenticated_build_permit
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/permit_bound_to_another_vector
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/second_build_request_in_one_session
+=== RUN   TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/second_list_in_one_session
+--- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler (8.21s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/build_permit_before_list_validation (0.90s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/replayed_session_nonce (0.89s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/out_of_order_message (0.89s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/unknown_message_kind (0.89s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/oversize_frame (0.92s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/unauthenticated_build_permit (0.91s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/permit_bound_to_another_vector (0.94s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/second_build_request_in_one_session (0.93s)
+    --- PASS: TestWorkerRejectsEveryProtocolDeviationBeforeTheCompiler/second_list_in_one_session (0.92s)
+=== RUN   TestWorkerRunsTheCompleteHappySession
+--- PASS: TestWorkerRunsTheCompleteHappySession (0.92s)
+=== RUN   TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+--- PASS: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker (0.00s)
+=== RUN   TestWorkerModeIsNotReachableThroughPackageData
+--- PASS: TestWorkerModeIsNotReachableThroughPackageData (0.83s)
+=== RUN   TestWorkerRejectsAProbeThatDropsAPlatformAvailableControl
+--- PASS: TestWorkerRejectsAProbeThatDropsAPlatformAvailableControl (0.89s)
+=== RUN   TestWorkerReturnsABoundedResultWhenTheGoChildCannotStart
+--- PASS: TestWorkerReturnsABoundedResultWhenTheGoChildCannotStart (0.91s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	127.886s
+=== RUN   TestGoV1GoldenInputKeyReceiptAndHash
+--- PASS: TestGoV1GoldenInputKeyReceiptAndHash (0.00s)
+=== RUN   TestCandidateBuildMetadataArtifacts
+    buildmeta_test.go:109: C:\curator-ci\rc5\conformance\v1 publishes no expected/build-driver artifacts
+--- SKIP: TestCandidateBuildMetadataArtifacts (0.00s)
+=== RUN   TestCandidateBuildReceiptSchemaCase
+--- PASS: TestCandidateBuildReceiptSchemaCase (0.00s)
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_terminal_newline
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_byte_order_mark
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_duplicate_key
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_noninteger_size
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_unknown_field
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_unsupported_version
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_missing_artifact
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_pretty_printed
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_missing_policy
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_missing_false_policy_field
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_absolute_build_root
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_unknown_field
+=== RUN   TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_unsupported_version
+--- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_terminal_newline (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_byte_order_mark (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_duplicate_key (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_noninteger_size (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_unknown_field (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_unsupported_version (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_missing_artifact (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/receipt_pretty_printed (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_missing_policy (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_missing_false_policy_field (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_absolute_build_root (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_unknown_field (0.00s)
+    --- PASS: TestStrictReadersRejectNoncanonicalOrIncompleteMetadata/input_unsupported_version (0.00s)
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.schema_version
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.driver
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.build_source
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.build_root
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.command
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.source_dir
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.target
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.toolchain
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_.policy
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_build_source.algorithm
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_build_source.content_sha256
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_target.goos
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_target.goarch
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_target.tuning
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_toolchain.algorithm
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_toolchain.go_relpath
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_toolchain.go_version
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_toolchain.content_sha256
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.module_mode
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.network
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.workspace
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.cgo
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.compiler_directives
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.target_mode
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.link_mode
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.libgcc
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.package_assembly
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.host_objects
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.telemetry
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/unknown_build_source
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/unknown_target
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/unknown_toolchain
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/unknown_policy
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_artifact.path
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_artifact.sha256
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_artifact.size
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_.schema_version
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_.cache_key
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_.input
+=== RUN   TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_.artifact
+--- PASS: TestStrictReadersRejectEveryMissingOrUnknownField (0.01s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.schema_version (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.driver (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.build_source (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.build_root (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.command (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.source_dir (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.target (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.toolchain (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_.policy (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_build_source.algorithm (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_build_source.content_sha256 (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_target.goos (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_target.goarch (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_target.tuning (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_toolchain.algorithm (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_toolchain.go_relpath (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_toolchain.go_version (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_toolchain.content_sha256 (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.module_mode (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.network (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.workspace (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.cgo (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.compiler_directives (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.target_mode (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.link_mode (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.libgcc (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.package_assembly (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.host_objects (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/missing_policy.telemetry (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/unknown_build_source (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/unknown_target (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/unknown_toolchain (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/unknown_policy (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_artifact.path (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_artifact.sha256 (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_artifact.size (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_.schema_version (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_.cache_key (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_.input (0.00s)
+    --- PASS: TestStrictReadersRejectEveryMissingOrUnknownField/receipt_missing_.artifact (0.00s)
+=== RUN   TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches
+=== RUN   TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/cache_key
+=== RUN   TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/artifact_path
+=== RUN   TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/artifact_hash
+=== RUN   TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/artifact_size
+=== RUN   TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/build_source_algorithm
+=== RUN   TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/toolchain_algorithm
+=== RUN   TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/target_tuning
+--- PASS: TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches (0.00s)
+    --- PASS: TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/cache_key (0.00s)
+    --- PASS: TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/artifact_path (0.00s)
+    --- PASS: TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/artifact_hash (0.00s)
+    --- PASS: TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/artifact_size (0.00s)
+    --- PASS: TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/build_source_algorithm (0.00s)
+    --- PASS: TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/toolchain_algorithm (0.00s)
+    --- PASS: TestReceiptReaderRejectsDerivedIdentityAndArtifactMismatches/target_tuning (0.00s)
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent/target_tuning
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent/toolchain_version
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent/toolchain_identity
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent/command
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent/build_root
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent/source_dir
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent/source_identity
+=== RUN   TestExpectedInputComparisonCoversEveryLogicalComponent/target
+--- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent (0.01s)
+    --- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent/target_tuning (0.00s)
+    --- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent/toolchain_version (0.00s)
+    --- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent/toolchain_identity (0.00s)
+    --- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent/command (0.00s)
+    --- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent/build_root (0.00s)
+    --- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent/source_dir (0.00s)
+    --- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent/source_identity (0.00s)
+    --- PASS: TestExpectedInputComparisonCoversEveryLogicalComponent/target (0.00s)
+=== RUN   TestArtifactConstraintsArePlatformDerived
+=== RUN   TestArtifactConstraintsArePlatformDerived/darwin
+=== RUN   TestArtifactConstraintsArePlatformDerived/linux
+=== RUN   TestArtifactConstraintsArePlatformDerived/windows
+=== RUN   TestArtifactConstraintsArePlatformDerived/bad_hash
+=== RUN   TestArtifactConstraintsArePlatformDerived/wrong_path
+=== RUN   TestArtifactConstraintsArePlatformDerived/absolute_path
+=== RUN   TestArtifactConstraintsArePlatformDerived/negative_size
+=== RUN   TestArtifactConstraintsArePlatformDerived/unsafe_size
+--- PASS: TestArtifactConstraintsArePlatformDerived (0.00s)
+    --- PASS: TestArtifactConstraintsArePlatformDerived/darwin (0.00s)
+    --- PASS: TestArtifactConstraintsArePlatformDerived/linux (0.00s)
+    --- PASS: TestArtifactConstraintsArePlatformDerived/windows (0.00s)
+    --- PASS: TestArtifactConstraintsArePlatformDerived/bad_hash (0.00s)
+    --- PASS: TestArtifactConstraintsArePlatformDerived/wrong_path (0.00s)
+    --- PASS: TestArtifactConstraintsArePlatformDerived/absolute_path (0.00s)
+    --- PASS: TestArtifactConstraintsArePlatformDerived/negative_size (0.00s)
+    --- PASS: TestArtifactConstraintsArePlatformDerived/unsafe_size (0.00s)
+=== RUN   TestTargetTuningIsArchitectureDerived
+=== RUN   TestTargetTuningIsArchitectureDerived/riscv64
+=== RUN   TestTargetTuningIsArchitectureDerived/mips
+=== RUN   TestTargetTuningIsArchitectureDerived/mips64
+=== RUN   TestTargetTuningIsArchitectureDerived/mips64le
+=== RUN   TestTargetTuningIsArchitectureDerived/ppc64
+=== RUN   TestTargetTuningIsArchitectureDerived/ppc64le
+=== RUN   TestTargetTuningIsArchitectureDerived/wasm
+=== RUN   TestTargetTuningIsArchitectureDerived/386
+=== RUN   TestTargetTuningIsArchitectureDerived/amd64
+=== RUN   TestTargetTuningIsArchitectureDerived/arm
+=== RUN   TestTargetTuningIsArchitectureDerived/arm64
+=== RUN   TestTargetTuningIsArchitectureDerived/mipsle
+--- PASS: TestTargetTuningIsArchitectureDerived (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/riscv64 (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/mips (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/mips64 (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/mips64le (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/ppc64 (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/ppc64le (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/wasm (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/386 (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/amd64 (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/arm (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/arm64 (0.00s)
+    --- PASS: TestTargetTuningIsArchitectureDerived/mipsle (0.00s)
+=== RUN   TestInputAndToolchainValidationRejectMalformedModels
+--- PASS: TestInputAndToolchainValidationRejectMalformedModels (0.00s)
+=== RUN   TestReadersRejectWrongJSONTypes
+--- PASS: TestReadersRejectWrongJSONTypes (0.00s)
+=== RUN   TestReceiptHashIsConsistencyMetadata
+--- PASS: TestReceiptHashIsConsistencyMetadata (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/buildmeta	0.953s
+=== RUN   TestUsageEnumeratesDocumentedCommands
+--- PASS: TestUsageEnumeratesDocumentedCommands (0.00s)
+=== RUN   TestRunVersionExitsZero
+curator dev
+--- PASS: TestRunVersionExitsZero (0.00s)
+=== RUN   TestRunNoArgsPrintsUsage
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestRunNoArgsPrintsUsage (0.00s)
+=== RUN   TestRunUnknownCommand
+curator: unknown command "frobnicate"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestRunUnknownCommand (0.00s)
+=== RUN   TestShellInitPrintsHooks
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in
+  declare\ -a*)
+    _curator_prompt_present=0
+    for _curator_prompt_entry in "${PROMPT_COMMAND[@]}"; do
+      if [ "$_curator_prompt_entry" = "_curator_auto_env" ]; then
+        _curator_prompt_present=1
+        break
+      fi
+    done
+    if [ "$_curator_prompt_present" = "0" ]; then
+      PROMPT_COMMAND=("_curator_auto_env" "${PROMPT_COMMAND[@]}")
+    fi
+    unset _curator_prompt_present
+    unset _curator_prompt_entry
+    ;;
+  *)
+    case ";${PROMPT_COMMAND:-};" in
+      *";_curator_auto_env;"*) ;;
+      *) PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+    esac
+    ;;
+esac
+_curator_auto_env
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+curator: unsupported shell: fish
+curator: unsupported shell: fish
+--- PASS: TestShellInitPrintsHooks (0.00s)
+=== RUN   TestShellInitInstallCachesHookWithoutConfig
+wrote C:\Users\admin\AppData\Local\Temp\TestShellInitInstallCachesHookWithoutConfig3600194673\001\manager home\hooks\curator.bash
+optional shell profile line: . 'C:/Users/admin/AppData/Local/Temp/TestShellInitInstallCachesHookWithoutConfig3600194673/001/manager home/hooks/curator.bash'
+--- PASS: TestShellInitInstallCachesHookWithoutConfig (0.01s)
+=== RUN   TestSkillCheckOnTempDir
+error: skill.missing_skill_md (SKILL.md): required SKILL.md not found
+[
+  {
+    "severity": "error",
+    "code": "skill.missing_skill_md",
+    "path": "SKILL.md",
+    "message": "required SKILL.md not found"
+  }
+]
+--- PASS: TestSkillCheckOnTempDir (0.00s)
+=== RUN   TestInstallFlagsAcceptTrailingOptions
+--- PASS: TestInstallFlagsAcceptTrailingOptions (0.00s)
+=== RUN   TestInstallAuditFlagAcceptsOptionalMode
+--- PASS: TestInstallAuditFlagAcceptsOptionalMode (0.00s)
+=== RUN   TestSelectProjectTargetsUsesAliasesAndStableAllOrder
+--- PASS: TestSelectProjectTargetsUsesAliasesAndStableAllOrder (0.00s)
+=== RUN   TestStatusDriftDetectsContentTampering
+--- PASS: TestStatusDriftDetectsContentTampering (0.02s)
+=== RUN   TestBootstrapAndProjectCommands
+wrote C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3112597705\001\config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+added project app: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3112597705\003
+alias: app
+path: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3112597705\003
+skillfile: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3112597705\003\Skillfile.json
+skills: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3112597705\003\.agents\skills
+bin: C:\Users\admin\AppData\Local\Temp\TestBootstrapAndProjectCommands3112597705\003\.agents\bin
+--- PASS: TestBootstrapAndProjectCommands (0.03s)
+=== RUN   TestBootstrapIfMissingKeepsExistingConfigWithoutParsing
+kept existing config: C:\Users\admin\AppData\Local\Temp\TestBootstrapIfMissingKeepsExistingConfigWithoutParsing2557536349\001\config.json
+--- PASS: TestBootstrapIfMissingKeepsExistingConfigWithoutParsing (0.00s)
+=== RUN   TestBootstrapIfMissingCreatesAbsentConfig
+wrote C:\Users\admin\AppData\Local\Temp\TestBootstrapIfMissingCreatesAbsentConfig3252790623\001\home\config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+--- PASS: TestBootstrapIfMissingCreatesAbsentConfig (0.01s)
+=== RUN   TestBootstrapIfMissingRejectsForce
+curator: bootstrap --if-missing and --force are mutually exclusive
+--- PASS: TestBootstrapIfMissingRejectsForce (0.00s)
+=== RUN   TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot
+app: generated paths are not ignored by git; missing entries: .agents/, .codex/skills/; skipped
+--- PASS: TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot (0.13s)
+=== RUN   TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot
+initialized C:\Users\admin\AppData\Local\Temp\TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot788653848\001\home\global\Skillfile.json
+global: dry-run; no files modified
+--- PASS: TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot (0.02s)
+=== RUN   TestCLIEndToEndInstallStatusAndTamperCheck
+app: skill-a tag v1 2b244f2 context=yes commands=[] via=<project> installed
+app: skill-a up-to-date
+app: skill-a content-drift
+--- PASS: TestCLIEndToEndInstallStatusAndTamperCheck (1.08s)
+=== RUN   TestHiddenWorkerModeIsNotAUserVisibleCommand
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestHiddenWorkerModeIsNotAUserVisibleCommand (0.00s)
+PASS
+ok  	github.com/relux-works/curator/cmd/curator	3.166s

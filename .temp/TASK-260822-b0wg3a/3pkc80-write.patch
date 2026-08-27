@@ -1,0 +1,227 @@
+diff --git a/internal/config/write.go b/internal/config/write.go
+index f9211d2..2e1cc77 100644
+--- a/internal/config/write.go
++++ b/internal/config/write.go
+@@ -5,6 +5,8 @@ import (
+ 	"fmt"
+ 	"os"
+ 	"path/filepath"
++
++	"github.com/relux-works/curator/internal/verr"
+ )
+ 
+ // Bootstrap writes a minimal schema 1 user configuration. Existing files are
+@@ -110,3 +112,72 @@ func toFloatJSON(value any) map[string]any {
+ 	_ = json.Unmarshal(payload, &object)
+ 	return object
+ }
++
++// SetBuildSSH records one operator credential scope in the user
++// configuration, replacing whatever was recorded under the same scope, and
++// reports whether an existing entry was replaced. Unrelated user fields and
++// other scopes are left untouched.
++func SetBuildSSH(path string, credential BuildSSHCredential) (bool, error) {
++	if err := ValidateBuildSSH(credential); err != nil {
++		return false, err
++	}
++	object, err := readObject(path)
++	if err != nil {
++		return false, err
++	}
++	entries, err := buildSSHEntries(object)
++	if err != nil {
++		return false, err
++	}
++	_, replaced := entries[credential.Scope]
++	rendered := BuildSSHObject(map[string]BuildSSHCredential{credential.Scope: credential})
++	entries[credential.Scope] = rendered[credential.Scope]
++	object["build_ssh"] = entries
++	if _, err := Parse(object, path); err != nil {
++		return false, err
++	}
++	return replaced, writeObjectAtomic(path, object)
++}
++
++// RemoveBuildSSH drops one credential scope from the user configuration.
++// Removing a scope that is not recorded is an error: reporting success would
++// read as "that credential no longer applies" while it still does.
++func RemoveBuildSSH(path, scope string) error {
++	object, err := readObject(path)
++	if err != nil {
++		return err
++	}
++	entries, err := buildSSHEntries(object)
++	if err != nil {
++		return err
++	}
++	if _, present := entries[scope]; !present {
++		return fmt.Errorf("build_ssh scope %q is not configured in %s", scope, path)
++	}
++	delete(entries, scope)
++	// The last scope takes the whole field with it, so a config that selects
++	// no credential says so by omission rather than by an empty object.
++	if len(entries) == 0 {
++		delete(object, "build_ssh")
++	} else {
++		object["build_ssh"] = entries
++	}
++	if _, err := Parse(object, path); err != nil {
++		return err
++	}
++	return writeObjectAtomic(path, object)
++}
++
++// buildSSHEntries returns the raw build_ssh object, treating an absent field
++// as an empty one.
++func buildSSHEntries(object map[string]any) (map[string]any, error) {
++	raw, present := object["build_ssh"]
++	if !present || raw == nil {
++		return map[string]any{}, nil
++	}
++	entries, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("build_ssh", "must be an object")
++	}
++	return entries, nil
++}
+diff --git a/internal/config/write_test.go b/internal/config/write_test.go
+index 765607b..b8e2cac 100644
+--- a/internal/config/write_test.go
++++ b/internal/config/write_test.go
+@@ -1,8 +1,10 @@
+ package config
+ 
+ import (
++	"encoding/json"
+ 	"os"
+ 	"path/filepath"
++	"reflect"
+ 	"runtime"
+ 	"testing"
+ )
+@@ -34,3 +36,125 @@ func TestBootstrapAndAddProject(t *testing.T) {
+ 		t.Fatalf("config mode = %o, want private", info.Mode().Perm())
+ 	}
+ }
++
++func TestSetBuildSSHRecordsReplacesAndPreservesOtherFields(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "home", "config.json")
++	if err := Bootstrap(path, filepath.Join(t.TempDir(), "skills"), "ru", []string{"codex_cli"}, false); err != nil {
++		t.Fatal(err)
++	}
++	project := t.TempDir()
++	if err := AddProject(path, "app", project, []string{"codex_cli"}); err != nil {
++		t.Fatal(err)
++	}
++	replaced, err := SetBuildSSH(path, BuildSSHCredential{
++		Scope: "git.example.com", Agent: true, AgentSocket: "/run/agent.sock",
++	})
++	if err != nil || replaced {
++		t.Fatalf("first set: replaced=%v err=%v", replaced, err)
++	}
++	if replaced, err = SetBuildSSH(path, BuildSSHCredential{
++		Scope: "git.example.com/portals", Identity: "~/.ssh/portals", KnownHosts: "~/.ssh/known_hosts",
++	}); err != nil || replaced {
++		t.Fatalf("second set: replaced=%v err=%v", replaced, err)
++	}
++	// A replacement is a whole entry: a leftover agent selection from the
++	// previous spelling would still authenticate.
++	if replaced, err = SetBuildSSH(path, BuildSSHCredential{
++		Scope: "git.example.com", Identity: "/keys/org",
++	}); err != nil || !replaced {
++		t.Fatalf("replacement: replaced=%v err=%v", replaced, err)
++	}
++	cfg, err := Load(path, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	want := map[string]BuildSSHCredential{
++		"git.example.com": {Scope: "git.example.com", Identity: "/keys/org"},
++		"git.example.com/portals": {
++			Scope: "git.example.com/portals", Identity: "~/.ssh/portals",
++			KnownHosts: "~/.ssh/known_hosts",
++		},
++	}
++	if !reflect.DeepEqual(cfg.BuildSSH, want) {
++		t.Fatalf("build_ssh = %+v, want %+v", cfg.BuildSSH, want)
++	}
++	if cfg.PreferredLocale != "ru" || cfg.Projects["app"].Path != project {
++		t.Fatalf("unrelated fields disturbed: %+v", cfg)
++	}
++}
++
++func TestSetBuildSSHRejectsInvalidCredentialsWithoutWriting(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "home", "config.json")
++	if err := Bootstrap(path, filepath.Join(t.TempDir(), "skills"), "", nil, false); err != nil {
++		t.Fatal(err)
++	}
++	before, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for name, credential := range map[string]BuildSSHCredential{
++		"malformed scope":  {Scope: "Git.Example.com", Agent: true},
++		"selects nothing":  {Scope: "git.example.com"},
++		"known hosts only": {Scope: "git.example.com", KnownHosts: "/etc/known_hosts"},
++		"relative path":    {Scope: "git.example.com", Identity: "keys/org"},
++		"socket no agent":  {Scope: "git.example.com", AgentSocket: "/run/agent.sock", Identity: "/keys/org"},
++	} {
++		if _, err := SetBuildSSH(path, credential); err == nil {
++			t.Fatalf("%s: SetBuildSSH accepted %+v", name, credential)
++		}
++	}
++	after, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if string(after) != string(before) {
++		t.Fatalf("a rejected credential rewrote the config:\n%s", after)
++	}
++}
++
++func TestRemoveBuildSSHDropsScopesAndReportsMissingOnes(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "home", "config.json")
++	if err := Bootstrap(path, filepath.Join(t.TempDir(), "skills"), "", nil, false); err != nil {
++		t.Fatal(err)
++	}
++	if err := RemoveBuildSSH(path, "git.example.com"); err == nil {
++		t.Fatal("removing from a config with no build_ssh must fail")
++	}
++	for _, scope := range []string{"git.example.com", "git.example.com/portals"} {
++		if _, err := SetBuildSSH(path, BuildSSHCredential{Scope: scope, Agent: true}); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if err := RemoveBuildSSH(path, "git.example.com/other"); err == nil {
++		t.Fatal("removing an unconfigured scope must fail")
++	}
++	if err := RemoveBuildSSH(path, "git.example.com"); err != nil {
++		t.Fatal(err)
++	}
++	cfg, err := Load(path, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(cfg.BuildSSH) != 1 || !cfg.BuildSSH["git.example.com/portals"].Agent {
++		t.Fatalf("build_ssh = %+v", cfg.BuildSSH)
++	}
++	// The last scope takes the field with it, so nothing reads as "an empty
++	// credential set was configured on purpose".
++	if err := RemoveBuildSSH(path, "git.example.com/portals"); err != nil {
++		t.Fatal(err)
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var object map[string]any
++	if err := json.Unmarshal(payload, &object); err != nil {
++		t.Fatal(err)
++	}
++	if _, present := object["build_ssh"]; present {
++		t.Fatalf("build_ssh survived its last scope: %s", payload)
++	}
++	if err := RemoveBuildSSH(path, "git.example.com/portals"); err == nil {
++		t.Fatal("a second removal must fail")
++	}
++}

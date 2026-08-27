@@ -1,0 +1,51 @@
+{
+  "id": "RUN-260731-a087ac",
+  "task_id": "BUG-260731-lepevi",
+  "created_at": "2026-07-31T09:47:04.730495Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260731-13-47-04_-reviewer--reviewer--claude-_BUG-260731-lepevi.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "45m0s",
+  "log_resource_name": "BUG-260731-lepevi_spawn-log_-reviewer--reviewer--claude-_RUN-260731-a087ac.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "BUG-260731-lepevi_ci-evidence.tar.gz",
+    "BUG-260731-lepevi_linux-lane-outcome.md",
+    "BUG-260731-lepevi_spawn-log_-implementer--developer--claude-_RUN-260731-118c78.log",
+    "BUG-260731-lepevi_spawn-log_-implementer--developer--claude-_RUN-260731-35d0f2.log",
+    "BUG-260731-lepevi_spawn-log_-implementer--developer--claude-_RUN-260731-4655a2.log",
+    "BUG-260731-lepevi_spawn-log_-implementer--developer--claude-_RUN-260731-7722a0.log",
+    "BUG-260731-lepevi_spawn-log_-implementer--developer--claude-_RUN-260731-7dca5f.log",
+    "BUG-260731-lepevi_spawn-log_-implementer--developer--claude-_RUN-260731-922dc9.log",
+    "BUG-260731-lepevi_spawn-log_-implementer--developer--claude-_RUN-260731-a0ad63.log"
+  ]
+}

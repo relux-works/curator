@@ -1,0 +1,8 @@
+--- FAIL: TestMarshalCanonicalEscapesEveryControlCharacter (0.00s)
+    ccj_test.go:33: U+001F encoded as {"s":""}, CCJ-1 requires {"s":"\u001f"}
+--- FAIL: TestRequireCanonicalAcceptsEveryControlCharacterEscape (0.00s)
+    ccj_test.go:69: U+001F encoding {"s":""} is not canonical: invalid CCJ-1: malformed protocol JSON: invalid character '\x1f' in string literal
+FAIL
+FAIL	github.com/relux-works/curator/internal/protocoljson	0.352s
+ok  	github.com/relux-works/curator/internal/transaction	0.550s
+FAIL

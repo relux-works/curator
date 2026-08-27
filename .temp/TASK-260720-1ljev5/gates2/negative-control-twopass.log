@@ -1,0 +1,19 @@
+--- FAIL: TestCollectStaysFailSafeAcrossConsecutivePasses (0.01s)
+    --- FAIL: TestCollectStaysFailSafeAcrossConsecutivePasses/corrupt_consumer_registry (0.00s)
+        gc_conservative_test.go:88: an untrusted registry was rewritten as "{\n  \"consumers\": [],\n  \"schema_version\": 1\n}\n"
+    --- FAIL: TestCollectStaysFailSafeAcrossConsecutivePasses/registry_of_an_unknown_schema (0.00s)
+        gc_conservative_test.go:106: an untrusted registry was rewritten as "{\n  \"consumers\": [],\n  \"schema_version\": 1\n}\n"
+    --- FAIL: TestCollectStaysFailSafeAcrossConsecutivePasses/project_with_only_an_invalid_marker (0.00s)
+        gc_conservative_test.go:178: an uncertain consumer was dropped from the registry: []
+    --- FAIL: TestCollectStaysFailSafeAcrossConsecutivePasses/unreadable_installed_skill_directory (0.00s)
+        gc_conservative_test.go:178: an uncertain consumer was dropped from the registry: []
+    --- FAIL: TestCollectStaysFailSafeAcrossConsecutivePasses/skill_root_replaced_by_a_file (0.00s)
+        gc_conservative_test.go:178: an uncertain consumer was dropped from the registry: []
+--- FAIL: TestCollectStaysFailSafeOnRedirectedUnixScopes (0.01s)
+    --- FAIL: TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_project_skill_root (0.00s)
+        gc_conservative_unix_test.go:82: an uncertain consumer was dropped from the registry: []
+    --- FAIL: TestCollectStaysFailSafeOnRedirectedUnixScopes/redirected_installed_skill (0.00s)
+        gc_conservative_unix_test.go:82: an uncertain consumer was dropped from the registry: []
+FAIL
+FAIL	github.com/relux-works/curator/internal/scopes	0.430s
+FAIL

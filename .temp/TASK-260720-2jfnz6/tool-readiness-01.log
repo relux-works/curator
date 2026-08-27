@@ -1,0 +1,51 @@
+2026-07-30 tool readiness
+
+task-board --version
+exit code: 0
+task-board version 0.23.0 (commit beec6e9, built 2026-07-27T23:36:53Z)
+
+git --version
+exit code: 0
+git version 2.50.1 (Apple Git-155)
+
+python3 --version
+exit code: 0
+Python 3.14.4
+
+python3 -m pytest --version
+exit code: 1
+/opt/homebrew/opt/python@3.14/bin/python3.14: No module named pytest
+
+python3 -m mypy --version
+exit code: 1
+/opt/homebrew/opt/python@3.14/bin/python3.14: No module named mypy
+
+rg --version
+exit code: 0
+ripgrep 15.2.0 (rev e89fff89ac)
+features:+pcre2
+simd(compile):+NEON
+simd(runtime):+NEON
+PCRE2 10.45 is available (JIT is available)
+
+The system Python lacks the project test/type-check dependencies. Project
+inspection must identify and verify the repository-supported environment before
+pytest or mypy is used for validation.
+
+Task virtual environment:
+
+/Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-2jfnz6/venv/bin/python -m pytest --version
+exit code: 0
+pytest 9.1.1
+
+/Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-2jfnz6/venv/bin/python -m mypy --version
+exit code: 0
+mypy 2.3.0 (compiled: yes)
+
+Expected-red regression:
+
+/Users/iv/Developer/Wildberries/cocoaskills/.temp/TASK-260720-2jfnz6/venv/bin/python -m pytest -q tests/test_build_cache_posix.py::test_quarantine_fails_closed_before_reserving_when_safe_unlock_is_unavailable
+exit code: 1
+Expected failure: the old implementation leaked a raw ValueError from the
+unsupported Linux no-follow chmod combination before it could return the
+required controlled cache error.

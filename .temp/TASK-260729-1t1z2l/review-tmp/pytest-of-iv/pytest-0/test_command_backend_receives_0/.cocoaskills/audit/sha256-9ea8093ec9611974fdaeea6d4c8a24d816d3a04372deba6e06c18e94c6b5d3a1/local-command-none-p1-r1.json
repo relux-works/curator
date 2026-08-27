@@ -1,0 +1,40 @@
+{
+  "backend": "local-command",
+  "canary_passed": true,
+  "cloud": false,
+  "commit": "eaf5af47a47f819bcb8bd7715bab738c9e6b0408",
+  "content_sha256": "sha256:9ea8093ec9611974fdaeea6d4c8a24d816d3a04372deba6e06c18e94c6b5d3a1",
+  "decision": "warn",
+  "findings": [
+    {
+      "capability_violation": null,
+      "category": "semantic-risk",
+      "confidence": "high",
+      "detector": "fixture",
+      "evidence": "fixture finding",
+      "id": "fixture.prompt.note",
+      "location": {
+        "file": "SKILL.md",
+        "span": [
+          1,
+          1
+        ]
+      },
+      "severity": "medium",
+      "surface": "prompt",
+      "verifiable": true
+    }
+  ],
+  "model": null,
+  "prompt_version": 1,
+  "ran_at": "2026-07-29T00:20:03.695324+00:00",
+  "ruleset_version": 1,
+  "schema_version": 1,
+  "skill": "skill-a",
+  "source": "skill-a",
+  "trust": {
+    "pinned": false,
+    "pinned_by": null,
+    "reason": null
+  }
+}

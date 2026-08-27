@@ -1,0 +1,93 @@
+{
+  "id": "RUN-260825-09390b",
+  "task_id": "TASK-260825-2fy132",
+  "created_at": "2026-08-25T02:19:23.296972Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-sonnet-5",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-sonnet-5",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "claude-sonnet-5",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "claude",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-06-19-23_-implementer--developer--claude-_TASK-260825-2fy132.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "control_root": "/Users/iv/Developer/ReluxWorks/curator",
+  "execution_root": "/Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260825-39h6vz/worktree",
+  "story_id": "STORY-260825-39h6vz",
+  "workspace": {
+    "workspace_id": "WS-30c4b651e0b4",
+    "story_id": "STORY-260825-39h6vz",
+    "branch_ref": "refs/heads/task-board/story/STORY-260825-39h6vz",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260825-39h6vz/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "25m0s",
+  "supervision": {
+    "check_every_minutes": 5,
+    "idle_deadline_minutes": 0,
+    "max_runtime_minutes": 0,
+    "on_deadline": "park"
+  },
+  "log_resource_name": "TASK-260825-2fy132_spawn-log_-implementer--developer--claude-_RUN-260825-09390b.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260825-2fy132_blocker.md",
+    "TASK-260825-2fy132_change-request_rev1.patch",
+    "TASK-260825-2fy132_change-request_rev2.patch",
+    "TASK-260825-2fy132_change-request_rev3.patch",
+    "TASK-260825-2fy132_results.md",
+    "TASK-260825-2fy132_review-verdict-rev2.md",
+    "TASK-260825-2fy132_review-verdict-rev3.md",
+    "TASK-260825-2fy132_review-verdict.md",
+    "TASK-260825-2fy132_rework-rev2.md",
+    "TASK-260825-2fy132_rework-v3.md",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-1b209e.log",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-325ae9.log",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-6e408e.log",
+    "TASK-260825-2fy132_spawn-log_-implementer--developer--codex-_RUN-260825-bebe93.log",
+    "TASK-260825-2fy132_spawn-log_-reviewer--reviewer--claude-_RUN-260825-53327c.log",
+    "TASK-260825-2fy132_spawn-log_-reviewer--reviewer--claude-_RUN-260825-a57cd2.log",
+    "TASK-260825-2fy132_spawn-log_-reviewer--reviewer--claude-_RUN-260825-e65a13.log",
+    "TASK-260825-2fy132_verification.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260825-2fy132_blocker.md": "4b96615ecbba81189b8a69e315fceade50a487627635cba7c9eea843b3a3e3b4",
+    "TASK-260825-2fy132_results.md": "8e73083126e3086501eca2a9f81c330aba342d42d83c38f32d7eadace0ae03e0",
+    "TASK-260825-2fy132_review-verdict-rev2.md": "a4f6feed9af45818d558d8c3786c41672568484ae77235dbf22cb5879f683962",
+    "TASK-260825-2fy132_review-verdict-rev3.md": "1e03358cf631ab29ab752df7fb2c747e103c778aba20ef4032050e5b308c8180",
+    "TASK-260825-2fy132_review-verdict.md": "97f120ae866853139465903fffae5c18482e4d4093ebaf89724c11d8bf225d78",
+    "TASK-260825-2fy132_rework-rev2.md": "fd2430a8ac3510b6202684a45a86d9d3f0caacb8561b558ee68aef71ed3dbb28",
+    "TASK-260825-2fy132_rework-v3.md": "8b82e71574250db09e9834d7cd3bc1c627261bb64c6e1b1ff1e93549f41e8d6f",
+    "TASK-260825-2fy132_verification.md": "b1bdfbd38ff551c7907256a565b5907d555bc9c72b2ff61ef061070e7baaffd3"
+  },
+  "require_outcome_artifact": true,
+  "recovery_root_run_id": "RUN-260825-09390b"
+}

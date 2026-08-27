@@ -1,0 +1,71 @@
+{
+  "id": "RUN-260729-4aec88",
+  "task_id": "TASK-260729-365r5r",
+  "created_at": "2026-07-29T16:38:06.563241Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-20-38-06_-implementer--developer--claude-_TASK-260729-365r5r.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "30m0s",
+  "log_resource_name": "TASK-260729-365r5r_spawn-log_-implementer--developer--claude-_RUN-260729-4aec88.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260729-365r5r_excluded-artifacts.md",
+    "TASK-260729-365r5r_gate-evidence.tgz",
+    "TASK-260729-365r5r_lint-gate.md",
+    "TASK-260729-365r5r_prototype.patch",
+    "TASK-260729-365r5r_results.md",
+    "TASK-260729-365r5r_review-verdict-cycle2.md",
+    "TASK-260729-365r5r_review-verdict.md",
+    "TASK-260729-365r5r_rework-lint.md",
+    "TASK-260729-365r5r_spawn-log_-implementer--developer--claude-_RUN-260729-313095.log",
+    "TASK-260729-365r5r_spawn-log_-implementer--developer--claude-_RUN-260729-3819ca.log",
+    "TASK-260729-365r5r_spawn-log_-implementer--developer--claude-_RUN-260729-38def3.log",
+    "TASK-260729-365r5r_spawn-log_-implementer--developer--claude-_RUN-260729-b9f281.log",
+    "TASK-260729-365r5r_spawn-log_-implementer--developer--claude-_RUN-260729-bd5fd3.log",
+    "TASK-260729-365r5r_spawn-log_-implementer--developer--claude-_RUN-260729-d36102.log",
+    "TASK-260729-365r5r_spawn-log_-implementer--developer--claude-_RUN-260729-fa5b3e.log",
+    "TASK-260729-365r5r_spawn-log_-reviewer--reviewer--codex-_RUN-260729-1048ed.log",
+    "TASK-260729-365r5r_spawn-log_-reviewer--reviewer--codex-_RUN-260729-f79ddb.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260729-365r5r_excluded-artifacts.md": "ac9a563572cc30ede11e909d8d1b5f6dcbae24722f6d6552b4e1930d4396bb26",
+    "TASK-260729-365r5r_gate-evidence.tgz": "f50a8ffabcbe3eb5ee013f03a1601c935dfb70b38a9d37f8391416ee83d229c2",
+    "TASK-260729-365r5r_lint-gate.md": "ab9025953c81e174b550c242d925b4cecec19c9cad5618356f4fb7a52b9523ad",
+    "TASK-260729-365r5r_prototype.patch": "3dbbbfbd06d586442bd08166142934763b217efae42f85506d9c6a258c4c50d2",
+    "TASK-260729-365r5r_results.md": "b09ebfc0a08150d1eac3d2c7f7d3a28adadb26a063c066dc72e2b3ee0054b329",
+    "TASK-260729-365r5r_review-verdict-cycle2.md": "fbd6b8b4f74023b42fa3c4a36a19947f7142e91a1341f912f52ce1c8e98f971f",
+    "TASK-260729-365r5r_review-verdict.md": "32d0a1fa579198432e309a9946270e83c517d501cbbc8e21311ea7c618f02bc2",
+    "TASK-260729-365r5r_rework-lint.md": "c7d5362443fac48619c9707c7dc07601b83523e804f11ec6ba71db331a842fe5"
+  },
+  "require_outcome_artifact": true
+}

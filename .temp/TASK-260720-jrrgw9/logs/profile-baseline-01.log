@@ -1,0 +1,770 @@
+=== RUN   TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode
+--- PASS: TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode (0.00s)
+=== RUN   TestUnusableToolchainRowsCarryTheDriverBoundaryCode
+--- PASS: TestUnusableToolchainRowsCarryTheDriverBoundaryCode (0.00s)
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/logical_key_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/receipt_identity_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/artifact_hash_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/artifact_path_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/unsupported_driver_in_the_marker
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/unsupported_driver_in_the_plan
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/marker_without_a_build_source
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/snapshot_identity_moved
+--- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/logical_key_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/receipt_identity_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/artifact_hash_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/artifact_path_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/unsupported_driver_in_the_marker (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/unsupported_driver_in_the_plan (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/marker_without_a_build_source (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/snapshot_identity_moved (0.00s)
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_operating_system
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_architecture
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_tuning
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/toolchain_release
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/toolchain_content
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/build_root
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/source_directory
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/another_manager_version_recorded_the_key
+--- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_operating_system (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_architecture (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_tuning (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/toolchain_release (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/toolchain_content (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/build_root (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/source_directory (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/another_manager_version_recorded_the_key (0.00s)
+=== RUN   TestInputCausesAreDistinctAndDocumented
+--- PASS: TestInputCausesAreDistinctAndDocumented (0.00s)
+=== RUN   TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation
+--- PASS: TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation (0.00s)
+=== RUN   TestClassifySkillBuildsWithoutCompiledStateStaysSilent
+--- PASS: TestClassifySkillBuildsWithoutCompiledStateStaysSilent (0.00s)
+=== RUN   TestClassifySkillBuildsDetectsContextExposure
+=== RUN   TestClassifySkillBuildsDetectsContextExposure/recorded_context_file_inside_a_build_root
+=== RUN   TestClassifySkillBuildsDetectsContextExposure/build_root_materialized_in_agent-facing_context
+--- PASS: TestClassifySkillBuildsDetectsContextExposure (0.00s)
+    --- PASS: TestClassifySkillBuildsDetectsContextExposure/recorded_context_file_inside_a_build_root (0.00s)
+    --- PASS: TestClassifySkillBuildsDetectsContextExposure/build_root_materialized_in_agent-facing_context (0.00s)
+=== RUN   TestClassifySkillBuildsDetectsCommandDriftInBothDirections
+=== RUN   TestClassifySkillBuildsDetectsCommandDriftInBothDirections/closure_activates_a_command_the_marker_does_not_record
+=== RUN   TestClassifySkillBuildsDetectsCommandDriftInBothDirections/marker_records_a_command_the_closure_no_longer_activates
+--- PASS: TestClassifySkillBuildsDetectsCommandDriftInBothDirections (0.00s)
+    --- PASS: TestClassifySkillBuildsDetectsCommandDriftInBothDirections/closure_activates_a_command_the_marker_does_not_record (0.00s)
+    --- PASS: TestClassifySkillBuildsDetectsCommandDriftInBothDirections/marker_records_a_command_the_closure_no_longer_activates (0.00s)
+=== RUN   TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild
+--- PASS: TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild (0.00s)
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/readable_schema_that_is_still_not_a_valid_marker
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/no_marker_at_all
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/not_a_JSON_document
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/no_schema_version
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/schema_from_a_newer_manager
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/schema_below_the_oldest_readable
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/build_driver_outside_the_closed_set
+--- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/readable_schema_that_is_still_not_a_valid_marker (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/no_marker_at_all (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/not_a_JSON_document (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/no_schema_version (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/schema_from_a_newer_manager (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/schema_below_the_oldest_readable (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/build_driver_outside_the_closed_set (0.00s)
+=== RUN   TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass
+--- PASS: TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass (0.00s)
+=== RUN   TestEveryCurrentnessCodeIsDocumented
+--- PASS: TestEveryCurrentnessCodeIsDocumented (0.00s)
+=== RUN   TestCheckFailsForEveryNonCurrentCode
+--- PASS: TestCheckFailsForEveryNonCurrentCode (0.00s)
+=== RUN   TestBuildReportsNeverPublishAnAbsolutePath
+--- PASS: TestBuildReportsNeverPublishAnAbsolutePath (0.00s)
+=== RUN   TestBuildReportDetailIsBounded
+--- PASS: TestBuildReportDetailIsBounded (0.00s)
+=== RUN   TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies
+--- PASS: TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies (0.00s)
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/an_unusable_toolchain_is_refused
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/untrusted_state_was_rebuilt
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/untrusted_state_was_not_repaired
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/corrupt_state_was_rebuilt
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/corrupt_state_was_not_repaired
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/a_rebuilt_entry_could_not_be_withdrawn
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/an_unprotectable_host_is_refused
+--- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/an_unusable_toolchain_is_refused (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/untrusted_state_was_rebuilt (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/untrusted_state_was_not_repaired (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/corrupt_state_was_rebuilt (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/corrupt_state_was_not_repaired (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/a_rebuilt_entry_could_not_be_withdrawn (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/an_unprotectable_host_is_refused (0.00s)
+=== RUN   TestMarkerDigestsDetectAConcurrentInstallMarkerChange
+--- PASS: TestMarkerDigestsDetectAConcurrentInstallMarkerChange (0.00s)
+=== RUN   TestStatusReportMarksCompiledStateThatMovedDuringTheCheck
+--- PASS: TestStatusReportMarksCompiledStateThatMovedDuringTheCheck (0.00s)
+=== RUN   TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill
+--- PASS: TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill (0.00s)
+=== RUN   TestGCPrunesDeadConsumersUnderTheHomeLock
+removed runtime skill-x/3333333333333333333333333333333333333333
+gc: 1 runtime entry removed, 0 build entries removed
+--- PASS: TestGCPrunesDeadConsumersUnderTheHomeLock (0.00s)
+=== RUN   TestGCWaitsForTheHomeLock
+gc: 0 runtime entries removed, 0 build entries removed
+--- PASS: TestGCWaitsForTheHomeLock (0.26s)
+=== RUN   TestGCRunsSerializedAcrossConcurrentInvocations
+--- PASS: TestGCRunsSerializedAcrossConcurrentInvocations (0.04s)
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/recorded_build-source_identity_no_longer_matches_the_frozen_snapshot
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/logical_key_recorded_by_the_marker_was_derived_from_another_build_input
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/marker_records_no_build_for_the_command_the_closure_activates
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/protected_cache_entry_cannot_be_interpreted
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/protected_cache_holds_no_entry_for_the_recorded_key
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/build_root_reached_agent-facing_context
+=== RUN   TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/trusted_go_toolchain_cannot_be_resolved
+--- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck (28.51s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/recorded_build-source_identity_no_longer_matches_the_frozen_snapshot (2.49s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/logical_key_recorded_by_the_marker_was_derived_from_another_build_input (0.03s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/marker_records_no_build_for_the_command_the_closure_activates (0.03s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/protected_cache_entry_cannot_be_interpreted (2.34s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/protected_cache_holds_no_entry_for_the_recorded_key (2.45s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/build_root_reached_agent-facing_context (2.53s)
+    --- PASS: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck/trusted_go_toolchain_cannot_be_resolved (0.10s)
+=== RUN   TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+--- PASS: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand (16.36s)
+=== RUN   TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands
+--- PASS: TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands (1.40s)
+=== RUN   TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent
+--- PASS: TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent (0.00s)
+=== RUN   TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved
+--- PASS: TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved (0.00s)
+=== RUN   TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven
+--- PASS: TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven (1.37s)
+=== RUN   TestGlobalStatusRejectsPositionalArguments
+--- PASS: TestGlobalStatusRejectsPositionalArguments (0.13s)
+=== RUN   TestAuthoritativeBootstrapCasesAreExecutable
+=== RUN   TestAuthoritativeBootstrapCasesAreExecutable/missing-config-if-missing
+=== RUN   TestAuthoritativeBootstrapCasesAreExecutable/existing-config-if-missing
+=== RUN   TestAuthoritativeBootstrapCasesAreExecutable/if-missing-with-force
+--- PASS: TestAuthoritativeBootstrapCasesAreExecutable (0.00s)
+    --- PASS: TestAuthoritativeBootstrapCasesAreExecutable/missing-config-if-missing (0.00s)
+    --- PASS: TestAuthoritativeBootstrapCasesAreExecutable/existing-config-if-missing (0.00s)
+    --- PASS: TestAuthoritativeBootstrapCasesAreExecutable/if-missing-with-force (0.00s)
+=== RUN   TestAuthoritativeUpgradeCasesAreExecutable
+=== RUN   TestAuthoritativeUpgradeCasesAreExecutable/selected-project-closure
+=== RUN   TestAuthoritativeUpgradeCasesAreExecutable/all-projects-deduplicate
+=== RUN   TestAuthoritativeUpgradeCasesAreExecutable/global-closure
+--- PASS: TestAuthoritativeUpgradeCasesAreExecutable (13.89s)
+    --- PASS: TestAuthoritativeUpgradeCasesAreExecutable/selected-project-closure (4.23s)
+    --- PASS: TestAuthoritativeUpgradeCasesAreExecutable/all-projects-deduplicate (6.18s)
+    --- PASS: TestAuthoritativeUpgradeCasesAreExecutable/global-closure (3.47s)
+=== RUN   TestUsageEnumeratesDocumentedCommands
+--- PASS: TestUsageEnumeratesDocumentedCommands (0.00s)
+=== RUN   TestRunVersionExitsZero
+curator dev
+--- PASS: TestRunVersionExitsZero (0.00s)
+=== RUN   TestRunNoArgsPrintsUsage
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestRunNoArgsPrintsUsage (0.00s)
+=== RUN   TestRunUnknownCommand
+curator: unknown command "frobnicate"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestRunUnknownCommand (0.00s)
+=== RUN   TestShellInitPrintsHooks
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+case "$(declare -p PROMPT_COMMAND 2>/dev/null)" in
+  declare\ -a*)
+    _curator_prompt_present=0
+    for _curator_prompt_entry in "${PROMPT_COMMAND[@]}"; do
+      if [ "$_curator_prompt_entry" = "_curator_auto_env" ]; then
+        _curator_prompt_present=1
+        break
+      fi
+    done
+    if [ "$_curator_prompt_present" = "0" ]; then
+      PROMPT_COMMAND=("_curator_auto_env" "${PROMPT_COMMAND[@]}")
+    fi
+    unset _curator_prompt_present
+    unset _curator_prompt_entry
+    ;;
+  *)
+    case ";${PROMPT_COMMAND:-};" in
+      *";_curator_auto_env;"*) ;;
+      *) PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+    esac
+    ;;
+esac
+_curator_auto_env
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  if ($env:CURATOR_AUTO_ENV -eq "0") {
+    if ($env:CURATOR_ACTIVE_ENV) {
+      $env:PATH = $env:CURATOR_OLD_PATH
+      Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+      Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+    }
+    return
+  }
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    $env:CURATOR_ACTIVE_ENV = $envFile
+    . $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  case "$cfg" in
+    [A-Za-z]:\\*|[A-Za-z]:/*|\\\\*) cfg="${cfg//\\//}" ;;
+  esac
+  home_dir="${cfg%/*}"
+  if [ "$home_dir" = "$cfg" ]; then
+    home_dir="."
+  elif [ -z "$home_dir" ]; then
+    home_dir="/"
+  fi
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "${CURATOR_ACTIVE_GLOBAL_ENV:-}" != "$global_env" ]; then
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+    . "$global_env"
+  fi
+}
+
+_curator_find_env() {
+  local dir="${PWD:-}"
+  case "$dir" in
+    /*) ;;
+    *) return 1 ;;
+  esac
+  while :; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+    dir="${dir%/*}"
+    if [ -z "$dir" ]; then
+      dir="/"
+    fi
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  local env_file
+  _curator_source_global_env
+  if [ "${CURATOR_AUTO_ENV:-1}" = "0" ]; then
+    if [ -n "${CURATOR_ACTIVE_ENV:-}" ]; then
+      PATH="${CURATOR_OLD_PATH:-$PATH}"
+      export PATH
+      unset CURATOR_ACTIVE_ENV
+      unset CURATOR_OLD_PATH
+    fi
+    return 0
+  fi
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "${CURATOR_ACTIVE_ENV:-}" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="${CURATOR_OLD_PATH:-$PATH}"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "${CURATOR_ACTIVE_ENV:-}" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    # Mark the environment before sourcing. zsh can run chpwd hooks for a cd
+    # used by env.sh while it resolves the project root.
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+    . "$env_file"
+  fi
+}
+
+autoload -Uz add-zsh-hook 2>/dev/null || true
+add-zsh-hook -d precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook -d chpwd _curator_auto_env 2>/dev/null || true
+add-zsh-hook precmd _curator_auto_env 2>/dev/null || true
+add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true
+_curator_auto_env
+curator: unsupported shell: fish
+curator: unsupported shell: fish
+--- PASS: TestShellInitPrintsHooks (0.00s)
+=== RUN   TestShellInitInstallCachesHookWithoutConfig
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestShellInitInstallCachesHookWithoutConfig4228910144/001/manager home/hooks/curator.bash
+optional shell profile line: . '/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestShellInitInstallCachesHookWithoutConfig4228910144/001/manager home/hooks/curator.bash'
+--- PASS: TestShellInitInstallCachesHookWithoutConfig (0.01s)
+=== RUN   TestSkillCheckOnTempDir
+error: skill.missing_skill_md (SKILL.md): required SKILL.md not found
+[
+  {
+    "severity": "error",
+    "code": "skill.missing_skill_md",
+    "path": "SKILL.md",
+    "message": "required SKILL.md not found"
+  }
+]
+--- PASS: TestSkillCheckOnTempDir (0.00s)
+=== RUN   TestInstallFlagsAcceptTrailingOptions
+--- PASS: TestInstallFlagsAcceptTrailingOptions (0.00s)
+=== RUN   TestInstallAuditFlagAcceptsOptionalMode
+--- PASS: TestInstallAuditFlagAcceptsOptionalMode (0.00s)
+=== RUN   TestSelectProjectTargetsUsesAliasesAndStableAllOrder
+--- PASS: TestSelectProjectTargetsUsesAliasesAndStableAllOrder (0.00s)
+=== RUN   TestStatusDriftDetectsContentTampering
+--- PASS: TestStatusDriftDetectsContentTampering (0.00s)
+=== RUN   TestBootstrapAndProjectCommands
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1575942782/001/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+added project app: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1575942782/003
+alias: app
+path: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1575942782/003
+skillfile: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1575942782/003/Skillfile.json
+skills: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1575942782/003/.agents/skills
+bin: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1575942782/003/.agents/bin
+--- PASS: TestBootstrapAndProjectCommands (0.00s)
+=== RUN   TestBootstrapIfMissingKeepsExistingConfigWithoutParsing
+kept existing config: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapIfMissingKeepsExistingConfigWithoutParsing4147171079/001/config.json
+--- PASS: TestBootstrapIfMissingKeepsExistingConfigWithoutParsing (0.00s)
+=== RUN   TestBootstrapIfMissingCreatesAbsentConfig
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapIfMissingCreatesAbsentConfig3181930122/001/home/config.json
+shell profile changes are not required: agent skills can invoke project and global command shims directly
+optional bare commands for interactive use: curator shell-init --install
+--- PASS: TestBootstrapIfMissingCreatesAbsentConfig (0.00s)
+=== RUN   TestBootstrapIfMissingRejectsForce
+curator: bootstrap --if-missing and --force are mutually exclusive
+--- PASS: TestBootstrapIfMissingRejectsForce (0.00s)
+=== RUN   TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot
+app: generated paths are not ignored by git; missing entries: .agents/, .codex/skills/; skipped
+--- PASS: TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot (0.03s)
+=== RUN   TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot
+initialized /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot2166904372/001/home/global/Skillfile.json
+global: dry-run; no files modified
+--- PASS: TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot (0.00s)
+=== RUN   TestCLIEndToEndInstallStatusAndTamperCheck
+app: skill-a tag v1 92fb22d context=yes commands=[] via=<project> installed
+app: skill-a up-to-date
+app: skill-a content-drift
+--- PASS: TestCLIEndToEndInstallStatusAndTamperCheck (1.44s)
+=== RUN   TestHiddenWorkerModeIsNotAUserVisibleCommand
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+curator: unknown command "__curator-go-worker-v1"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config show              print the effective configuration
+  --version                print the curator version
+--- PASS: TestHiddenWorkerModeIsNotAUserVisibleCommand (0.00s)
+=== RUN   TestStatusReportsCompiledCurrentnessAndFailsCheck
+=== RUN   TestStatusReportsCompiledCurrentnessAndFailsCheck/receipt_recorded_by_the_marker_no_longer_matches_the_entry
+=== RUN   TestStatusReportsCompiledCurrentnessAndFailsCheck/logical_key_was_derived_under_a_build_root_the_marker_does_not_record
+=== RUN   TestStatusReportsCompiledCurrentnessAndFailsCheck/recorded_artifact_is_not_the_one_this_target_derives

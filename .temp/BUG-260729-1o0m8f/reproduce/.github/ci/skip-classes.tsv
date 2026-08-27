@@ -1,0 +1,86 @@
+# The complete vocabulary of legitimate skip reasons, and what each one means.
+#
+# `.github/ci/platform-case-gate.sh` matches the reason text a skipped test
+# actually printed against these patterns. A skip whose reason matches NOTHING
+# here is fatal: that is how a newly-introduced skip is caught the first time it
+# runs, instead of quietly shrinking the suite.
+#
+# Every skip -- tolerated or not -- is written to `skips-observed.tsv` with its
+# package, case name, class and verbatim reason, so "no case silently skipped"
+# is a property of the evidence and not of a promise.
+#
+# policy:
+#   allow          legitimate under any root
+#   deferred-only  legitimate only for a package `suite-plan.sh` deferred
+#                  because the supplied root does not publish its artefacts.
+#                  In a lane that requires a fully-serving root there are no
+#                  deferred packages, so this class becomes fatal there --
+#                  which is exactly what stops a candidate run from passing
+#                  while a package ran without its vectors.
+#
+# class meanings:
+#   platform-control  a control or fixture the protocol/runtime defines for
+#                     another platform only. This is the acceptance criteria's
+#                     "protocol-defined unsupported platform controls" carve-out
+#                     and the ONLY class that may hide a whole platform's
+#                     behaviour.
+#   host-capability   the runner cannot create the artefact the case needs
+#                     (symlink, hard link, reparse point, FIFO, named pipe,
+#                     non-UTF-8 name, case sensitivity, mode-000 semantics).
+#   root-content      the supplied conformance root publishes no such vector
+#                     group. Recorded against the root's identity in the
+#                     candidate evidence.
+#   root-unset        the package ran with CURATOR_CONFORMANCE_ROOT unset.
+#   opt-in            an explicit developer environment variable or a probe
+#                     that hashes the host toolchain.
+#   helper-process    the `go test` helper-process re-exec pattern.
+#
+# Columns are TAB separated. `regex` is an extended regular expression matched
+# against the reason text, anchored nowhere -- it may match anywhere in it.
+#
+# class	regex	policy	note
+
+# --- the conformance root ---------------------------------------------------
+root-unset	CURATOR_CONFORMANCE_ROOT is not set	deferred-only	the package was deferred by suite-plan.sh
+root-content	publishes no 	allow	the supplied root does not publish this vector group
+root-content	is a pre-revision root	allow	the supplied root predates this artefact
+
+# --- protocol / platform-defined controls -----------------------------------
+platform-control	available only on (Windows|macOS) in rc5-native-control-inventory-v1	allow	the inventory defines this control for one platform only
+platform-control	(is|are) exercised (on|by) 	allow	the behaviour is asserted on its own platform's runner
+platform-control	is covered by PowerShell on Windows	allow	the behaviour is asserted on the Windows runner
+platform-control	executes (a )?POSIX (launcher|skill commands)	allow	a POSIX launcher fixture, asserted on the unix runners
+platform-control	POSIX post-install launch fixture	allow	a POSIX post-install fixture, asserted on the unix runners
+platform-control	shell sentinel is Unix-only	allow	the sentinel exists on unix only
+
+# --- host capability --------------------------------------------------------
+host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
+host-capability	filesystem does not support (hard|symbolic) links	allow	the runner filesystem provides no such link
+host-capability	this host cannot create	allow	the runner cannot create the artefact the vector needs
+host-capability	creating Windows symlink requires host support	allow	the Windows runner forbids unprivileged symlink creation
+host-capability	no ln on this platform	allow	the `ln` tool is absent from this runner's PATH
+host-capability	no bash	allow	no POSIX shell on this runner
+host-capability	(bash|zsh|PowerShell) is unavailable	allow	that interpreter is absent from this runner
+host-capability	filesystem rejects invalid UTF-8 names	allow	the runner filesystem enforces UTF-8 names
+host-capability	this host folds the alias	allow	the runner filesystem folds the alias into one member
+host-capability	hard links across the staging filesystem are unavailable	allow	no hard links across the staging filesystem
+host-capability	mode did not produce a link on this filesystem	allow	the runner filesystem produced no link for this mode
+host-capability	(is unsupported|cannot publish a protected cache entry) 	allow	the platform provides no persistent protection primitive
+host-capability	persistent protection is unsupported on this platform	allow	the platform provides no persistent protection primitive
+host-capability	this environment can (inspect|read) a mode-000 directory	allow	the runner ignores mode-000 directory permissions
+host-capability	root ignores directory permissions	allow	the runner ignores directory permissions
+host-capability	this process can write through a read-only directory	allow	the runner ignores read-only directory permissions
+host-capability	(per-directory )?case sensitivity	allow	the runner filesystem case semantics differ
+host-capability	test filesystem (is case-sensitive|distinguishes canonical Unicode spellings)	allow	the runner filesystem case/normalisation semantics differ
+host-capability	temporary directory uses case-sensitive Windows path semantics	allow	the runner temporary directory case semantics differ
+host-capability	no trusted Go toolchain is resolvable here	allow	no trusted toolchain is resolvable on this runner
+host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
+
+# --- opt-in probes ----------------------------------------------------------
+opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable
+opt-in	cross-check env not set	allow	enabled by an explicit developer environment variable
+opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
+
+# --- go test plumbing -------------------------------------------------------
+helper-process	helper process	allow	the go test helper-process re-exec pattern
+helper-process	is not reachable from this test binary	allow	the go test helper-process re-exec pattern

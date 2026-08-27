@@ -1,0 +1,73 @@
+commit be7861cfdf10761071f252a19f6e5ab84583e5db
+Author: Ivan <98310998+ivanopcode@users.noreply.github.com>
+Date:   Sat Aug 22 21:19:00 2026 +0400
+
+    Correct three factual sentences in decision 0009 (#26)
+    
+    Review cycle 2 found three prose statements in
+    decisions/0009-first-party-module-roots.md that verifiable state falsifies.
+    The Decision section's rules are untouched; no revert of b92b105 or 3dc9ca6.
+    
+    Status: the previous amendment claimed the Decision section was unchanged.
+    git diff b92b105 3dc9ca6 has a hunk at @@ -111,9 +136,11 @@, inside
+    ## Decision, point 5 -- and it is the load-bearing edit, replacing the false
+    laundering claim with the clause bounding it. The rules did not move; the
+    sentence bounding what point 5 delivers did. Say so.
+    
+    Context: "there the repository carries no replace directive at all" is
+    over-broad at ca5c4fd3. pkg/board/go.mod there replaces
+    skill-agent-facing-api/agentquery with ../../../skill-agent-facing-api/agentquery,
+    outside the repository. Both build roots carry zero, which is the narrower
+    and stronger claim, since it is the build root's go.mod the manager reads.
+    
+    Consequences: the first-consumer bullet said main lacks the replace
+    directives. It has four across its build roots -- board-cli three,
+    board-tui one -- as the Context states two screens above. What main lacks is
+    the vendor trees.
+
+diff --git a/decisions/0009-first-party-module-roots.md b/decisions/0009-first-party-module-roots.md
+index 62d078f..172a15c 100644
+--- a/decisions/0009-first-party-module-roots.md
++++ b/decisions/0009-first-party-module-roots.md
+@@ -4,9 +4,11 @@
+ 
+ Accepted 2026-08-22. Amended 2026-08-22 after review of the original text:
+ the description of the first consumer was factually wrong, and point 5's
+-security claim overstated what its predicate delivers. The Decision section
+-is unchanged. Context, Rejected alternatives, Compatibility impact, Security
+-impact, Consequences, and a seventh open question carry the corrections.
++security claim overstated what its predicate delivers. The Decision section's
++rules are unchanged; point 5 gains the bound that its scoping does not reach
++packages presenting no replacement. Context, Rejected alternatives,
++Compatibility impact, Security impact, Consequences, and a seventh open
++question carry the corrections.
+ 
+ ## Context
+ 
+@@ -38,8 +40,8 @@ ground that Go auto-enables `-mod=vendor` whenever `vendor/modules.txt`
+ exists, so a stale vendor tree fails every build instead of falling back.
+ 
+ The revision consumers actually install, `ca5c4fd3`, is a different shape,
+-and it is the one this decision has to reckon with. There the repository
+-carries no `replace` directive at all. `tools/board-cli/go.mod` requires
++and it is the one this decision has to reckon with. There neither build root
++carries a `replace` directive. `tools/board-cli/go.mod` requires
+ `pkg/board v0.0.0` and `pkg/remoteconfig v0.0.0` as ordinary requirements,
+ `vendor/modules.txt` lists both as ordinary explicit modules with no `=>`
+ line, and their sources sit under
+@@ -289,10 +291,11 @@ manager should reconcile them is open question 1.
+   replacements, and Windows path collisions among declared directories.
+ - Implementations: Curator (Go) and cocoaskills (Python) implement the same
+   wire contract from the shared vectors, proven by cross-implementation CI.
+-- First consumer: `skill-project-management` restores the `replace`
+-  directives and vendor trees its `main` branch currently lacks and declares
+-  its module roots, replacing the unreplaced pre-vendored shape it ships at
+-  `ca5c4fd3`. No repository restructuring is required either way.
++- First consumer: `skill-project-management` restores the vendor trees its
++  `main` branch currently lacks, keeps the `replace` directives it already
++  has, and declares its module roots, replacing the unreplaced pre-vendored
++  shape it ships at `ca5c4fd3`. No repository restructuring is required
++  either way.
+ 
+ ## Open questions deferred to the normative change
+ 

@@ -1,0 +1,41 @@
+=== SUITE A start ===
+--- step 1: baseline ---
+L0 files=27867
+D0 digest=63d96ff7c488e713dedbf7029237cfc6cd030ae4c1caf11c8ba2274395badae3 files=27867
+--- step 2: compile with WRITABLE bundle data dir (S1) ---
+ARGV[s1] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\s1 C:\kn168\src\main.kt
+EXIT[s1]=0 elapsed_s=18.1
+  produced \s1.exe 570368
+L1 files=27868
+  => /konan-data/dependencies/cache/.lock 0
+--- step 3: restore curated state, verify digest returns to D0 ---
+  removed /konan-data/dependencies/cache/.lock
+D0' digest=63d96ff7c488e713dedbf7029237cfc6cd030ae4c1caf11c8ba2274395badae3 files=27867
+RESTORED_TO_BASELINE=True
+--- step 4: make bundle read-only to the running account ---
+icacls deny elapsed_s=0
+  | WORKGROUP\admin: Сопоставление между именами пользователей и идентификаторами безопасности не было произведено.
+  | Успешно обработано 0 файлов; не удалось обработать 1 файлов
+  WRITE-PROBE: SUCCEEDED (bundle NOT read-only)
+--- step 5: compile with READ-ONLY bundle data dir (S2) ---
+ARGV[s2] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\s2 C:\kn168\src\main.kt
+EXIT[s2]=0 elapsed_s=18.2
+--- step 6: build operation-private overlay, compile (S3) ---
+overlay mechanism=junction
+  ov cache Directory, ReparsePoint
+  ov libffi-3.3-windows-x64-1 Directory, ReparsePoint
+  ov lldb-2-windows Directory, ReparsePoint
+  ov llvm-21-x86_64-windows-essentials-150 Directory, ReparsePoint
+  ov msys2-mingw-w64-x86_64-2 Directory, ReparsePoint
+  ov .extracted Archive
+ARGV[s3] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\s3 C:\kn168\src\main.kt
+EXIT[s3]=0 elapsed_s=18.2
+  produced \s1.exe 570368
+  produced \s2.exe 570368
+  produced \s3.exe 570368
+--- overlay writes ---
+  ovfile \dependencies\.extracted 103
+--- step 7: bundle byte-identity after overlay compile ---
+D2 digest=9c28a7fd744709f092e96eeed9b2f65beea8d7ace538ce100b49c1a9fe0affd7 files=27868
+BUNDLE_UNCHANGED_BY_OVERLAY_COMPILE=False
+=== SUITE A done rc1=ARGV[s1] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\s1 C:\kn168\src\main.kt EXIT[s1]=0 elapsed_s=18.1 0 rc2=ARGV[s2] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\s2 C:\kn168\src\main.kt EXIT[s2]=0 elapsed_s=18.2 0 rc3=ARGV[s3] C:\kn168\b\jdk\bin\java.exe -ea -Xmx3G -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US -Dkonan.home=C:\kn168\b\kotlin-native -cp C:\kn168\b\kotlin-native\konan\lib\kotlin-native-compiler-embeddable.jar org.jetbrains.kotlin.cli.utilities.MainKt konanc -Xoverride-konan-properties=airplaneMode=true -produce program -target mingw_x64 -o C:\kn168\out\s3 C:\kn168\src\main.kt EXIT[s3]=0 elapsed_s=18.2 0 ===

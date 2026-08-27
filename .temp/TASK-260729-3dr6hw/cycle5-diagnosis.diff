@@ -1,0 +1,243 @@
+--- .task-board/.resources/TASK-260729-3dr6hw/TASK-260729-3dr6hw_install-race-timeout-diagnosis.md	2026-07-29 18:16:21
++++ .research/260729_install-race-timeouts.md	2026-07-29 18:36:10
+@@ -2,7 +2,7 @@
+ 
+ Date: 2026-07-29
+ Role: researcher
+-Revision: **cycle 4** (addresses reviewer verdict cycle 3)
++Revision: **cycle 5** (addresses reviewer verdict cycle 4)
+ Verdict: **test-only rework is viable**; the smallest patch is specified below.
+ 
+ Method: read-only static inventory, the verifier-3 evidence, and prior first-hand gate logs already
+@@ -24,7 +24,31 @@
+ | 1 — §3.5 claims to list "every" large completed package but omits `internal/runtimestore` | Fixed. §3.5 now states a **mechanical** selection rule — completed on both sides, `max(non-race, race) ≥ 10s` — which yields exactly **five** packages, and all five are listed: `cmd/curator` ×1.45, `internal/godriver` ×1.39, `internal/transaction` ×1.25, `internal/runtimestore` **×0.98**, `internal/managerlock` **×2.90**. The word "every" is withdrawn from the ×1.25–1.45 claim, which was **false**: the completed-package factors under that rule span ×0.98–×2.90. |
+ | 2 — §3.5 attributes `internal/transaction`'s low factor to `git` / `go build` subprocesses; static source contradicts this | Fixed. The subprocess mechanism claim is **withdrawn entirely**. Verified against source: `internal/transaction` has 50 tests, ~33 `Prepare` call sites, exactly **2** `exec.Command` sites — both re-executing the test binary (`os.Args[0] -test.run=^TestTransactionCrashHelper$`, `subprocess_test.go:56,459`) — and **zero** `"git"` or `go build` invocations. It is an in-process package at ×1.25, which directly refutes cycle 3's "in-process ⇒ large inflation" framing. §3.5 is now explicitly **descriptive**; the workload-shape discussion the reviewer permitted (journal target count `P`) is labelled a hypothesis consistent with the captured stacks and static source, **not** a measured attribution. |
+ | — (consistency, cycle 4) | The same withdrawn claim appeared in two other places and is repaired there too: §2.2's closing clause and §3.3's closing clause both said atomicity inflates more because `internal/install` spends its time in `git` subprocesses "which `-race` does not slow". Both now state the target-count difference without the unmeasured subprocess attribution. §3.1's status table row for the mechanism is downgraded from **measured** to **hypothesis**. |
+-| — (new, found in cycle 4) | `internal/install/atomicity`'s raw same-run ratio is `603.701 / 441.122 =` **×1.37**, which is *lower* than `cmd/curator`'s ×1.45. That ratio is **censored** by the alarm and carries no information; §3.5 now says so instead of leaving a reader to infer that atomicity inflates less than `cmd/curator`. Atomicity's in-gate factor comes from §3.4's phase-level solve, not from this table. |
++| — (new, found in cycle 4) | `internal/install/atomicity`'s raw same-run ratio is `603.701 / 441.122 =` **×1.3686**, which is *lower* than `cmd/curator`'s ×1.45. That ratio is **censored** by the alarm; §3.5 now says so instead of leaving a reader to infer that atomicity inflates less than `cmd/curator`. Atomicity's in-gate factor comes from §3.4's phase-level solve, not from this table. **Cycle 5 corrects how cycle 4 characterised it** — see the cycle-5 table below. |
++
++## What changed in cycle 5
++
++Cycle 5 does two things, and keeps them strictly separate.
++
++1. **The bounded evidence repair the verdict ordered** — the characterisation of the censored
++   atomicity ratio, in the three places it appears. **Nothing else is modified**: §1, §2, §4 through
++   §9, both allowlists, the assertion/invariant tradeoff, the focused validation commands, the
++   candidate-integrity checks, and every timing band are byte-unchanged apart from the two §3.5
++   bullets and the §3.5 closing paragraph named below.
++2. **A new, purely additive §10** recording evidence that did not exist when cycles 1–4 were written:
++   a sibling producer task has since **applied this plan's Patch A + Patch B and measured it**, and
++   §9 risk 4 has fired. §10 retracts nothing and modifies nothing; it is separable and can be deleted
++   without touching the ordered repair. It is included because withholding a measured result that
++   contradicts §4.2's projected band would fail this task's fact-checking acceptance criterion.
++
++| Reviewer item (cycle 4) | Resolution |
++| --- | --- |
++| R4-1 — the censored atomicity ratio is mischaracterised as carrying **no information**, while the analogous censored `internal/install` ratio is treated as a genuine floor; the two readings are internally inconsistent | Fixed. Both censored ratios are now stated as the **same kind of object**: a one-sided (right-censored) lower bound on the completed factor. Atomicity is `> ×1.3685`; `internal/install` is `> ×1.7670`. The phrase "carries no information" is withdrawn everywhere. What is now said instead: the atomicity bound is **too weak to support cross-package comparison or to estimate the completed factor**, because the censoring is severe — the binding sweep chain was unfinished and three post-sweep tests had not started. |
++| R4-1, required item 2 — remove or qualify "its position below `cmd/curator` is *purely* due to truncation" | Fixed. "Purely" is withdrawn. The corrected statement: the *observed* value is low **because the numerator is truncated**, and the *completed* factor is not derivable from this row at all — it comes from the separate phase-level solve in §3.4 (×3.33 sweep, ×4.14 activation prefix). No claim is made about where the completed factor would sit relative to `cmd/curator`. |
++| R4-1, required item 3 — apply the same correction to the cycle-4 rework record and all current-summary passages | Done. The cycle-4 rework record (`TASK-260729-3dr6hw_cycle4-rework-record.md`) §2 item 1 is corrected in place with an explicit cycle-5 amendment note, and the cycle-4 change-table row above is corrected. Those are the only three occurrences; see the cycle-5 verification table in the rework record. |
++| — (new, found in cycle 5 while applying the fix) | **Both rounded bounds were stated in the direction that makes them invalid.** `603.701 / 441.122 = 1.368557…` and `603.306 / 341.415 = 1.767075…`. Rounded to two decimals these are ×1.37 and ×1.77 — but both roundings go **up**, so neither "> ×1.37" nor "> ×1.77" is a strictly true floor. The document now carries the truncated values **> ×1.3685** and **> ×1.7670**, which are strictly true, and states the 2-dp figures as roundings rather than as bounds. The verdict's own shorthand ">×1.37" is honoured in substance and tightened in form. |
++| — (new, additive, cycle 5) | **§10 added.** TASK-260729-rfrdfo applied Patch A + Patch B to a prototype worktree and ran the §7 gates. Atomicity under race: **exit 0** at **591.280s** and **560.828s** — clearing the unchanged 600s alarm by 8.72s / 39.17s, but **missing §7's 480s pass bar** by 111.3s / 80.8s and landing 22–29% above §4.2's projected 340–460s band. The `internal/install` race gates have not run. §9 risk 4's ladder (§4.3, then §6) is the sanctioned response. Also yields the first **uncensored** atomicity race factor: ×2.07 / ×1.97, well below the ×3.33–4.27 §3.4 assumed. |
++| — (new, found in cycle 5) | §3.5's `internal/install` bullet said the package "was cut off with **35** of 107 tests unstarted". The alarm shows test **73** in flight, so 72 finished, 1 in flight, **34** never started. Corrected in the bullet being rewritten. §3.2's `(107/72) × 600` is **unaffected** — it partitions 107 into 72 *finished* and 35 *unfinished*, which is correct under its own definition and is left byte-unchanged. |
+ 
+ ## What changed in cycle 3
+ 
+@@ -449,7 +473,7 @@
+ 15–33% higher, which is the reason §4 keeps the partition at **one class per scenario** rather than a
+ gentler two-class split.
+ 
+-### 3.5 Same-run race-factor observation (descriptive; corrected in cycle 4)
++### 3.5 Same-run race-factor observation (descriptive; corrected in cycle 4, censoring re-stated in cycle 5)
+ 
+ Every projection above imports a race factor from *another* run. The failing gate itself supplies a
+ set of same-run ratios that import nothing. **Cycle 3 over-read them.** This section is rebuilt to
+@@ -476,18 +500,40 @@
+ that is why the rule exists, not a reason to present the surviving five as homogeneous. **There is no
+ single race factor for this host and run.**
+ 
+-**What the two timed-out packages contribute here.**
++**What the two timed-out packages contribute here (corrected in cycle 5).**
+ 
+-- `internal/install`: `603.306 / 341.415 =` **×1.77** is a genuine same-run **floor** on the exact
+-  candidate — the package was cut off with 35 of 107 tests unstarted, so the true factor is strictly
+-  higher. This is the one imported-assumption-free datum in the section, and ×1.77 already exceeds
+-  four of the five completed packages above.
+-- `internal/install/atomicity`: `603.701 / 441.122 =` **×1.37** is **censored and carries no
+-  information**. It is *lower* than `cmd/curator`'s ×1.45 purely because the alarm truncated the
+-  numerator; the package had not finished its binding sweep chain and had not started three
+-  post-sweep tests at all. Atomicity's in-gate factor is solved from phase costs in §3.4 (×3.33
+-  sweep / ×4.14 activation), not from this table. Do not read this row as evidence about atomicity.
++Both timed-out rows are the **same kind of object** and cycle 4 wrongly treated them as two different
++kinds. Each package's race side is **right-censored**: the alarm stopped the clock before the package
++finished, so the recorded race second-count is a strict *under*-estimate of what a completed race run
++would have cost, while the non-race side is a completed measurement. Each ratio is therefore a
++**one-sided lower bound** on the completed factor — never a point estimate, and never information-free.
++What separates them is only *how severe* the censoring is, and therefore how useful the bound is.
++
++- `internal/install`: completed non-race **341.415s**; race **FAIL at 603.306s** with test 73 of 107
++  in flight — 72 finished, 1 in flight, **34** never started. The completed race duration is strictly
++  greater than 603.306s, so the completed factor is strictly greater than
++  `603.306 / 341.415 = 1.767075… ⇒` **> ×1.7670**. Censoring here is **moderate**: about two thirds of
++  the package's tests had finished, so the bound is already informative — it exceeds four of the five
++  completed packages in the table above, on the exact candidate, with no imported factor. It remains a
++  bound, not the factor.
++- `internal/install/atomicity`: completed non-race **441.122s**; race **FAIL at 603.701s** with the
++  binding sweep chain unfinished and **three** post-sweep tests never started (§1.3, §3.4). The
++  completed race duration is strictly greater than 603.701s, so the completed factor is strictly
++  greater than `603.701 / 441.122 = 1.368557… ⇒` **> ×1.3685**. Censoring here is **severe**: the
++  numerator is missing the tail of the most expensive test in the package *plus* three whole tests, so
++  the bound is **too weak to compare against `cmd/curator`'s completed ×1.45, against the other
++  completed packages, or to estimate the completed factor**. That is the correct statement — not that
++  the row carries no information. Its *observed* value is low because the numerator is truncated; how
++  far above ×1.3685 the completed factor actually sits is **not derivable from this row**, and this
++  document makes no claim either way from it. Atomicity's in-gate factor is solved independently from
++  phase costs in §3.4 (**×3.33** sweep, **×4.14** activation prefix), and that solve — not this row —
++  is what §3.4's band rests on.
+ 
++**Rounding convention (cycle 5).** `1.767075…` and `1.368557…` round *up* to ×1.77 and ×1.37 at two
++decimals, so those two-decimal figures are **not** themselves valid strict floors. Wherever a bound is
++asserted, this document uses the truncated values **> ×1.7670** and **> ×1.3685**; ×1.77 and ×1.37
++appear only as roundings of the quotient, never as the bound.
++
+ **This section corroborates no mechanism.** Cycle 3 attributed the low factors of `cmd/curator`,
+ `internal/godriver` and `internal/transaction` to time spent in `git` and `go build` subprocesses.
+ Static source refutes that for `internal/transaction`, and the claim is withdrawn for all three:
+@@ -516,11 +562,14 @@
+ reading of the ×1.25 row without asserting anything about subprocesses. It is still a hypothesis: it
+ predicts a direction, not a magnitude, and it is unmeasured.
+ 
+-**What §3.5 is for, after the correction.** One observation on the exact candidate, in the exact
+-failing gate: `internal/install`'s floor of ×1.77 is a real same-run measurement, and the completed
+-packages in the same run span ×0.98–×2.90, so a single imported factor cannot be assumed. That is
+-descriptive context for §3.2 and §3.4 — it neither raises nor lowers their bands, and the patch is
+-still sized against Estimate B (1000s) and the §3.4 atomicity band (1284–1494s).
++**What §3.5 is for, after the correction.** Two observations on the exact candidate, in the exact
++failing gate. First, `internal/install`'s censored lower bound of **> ×1.7670** is a real same-run
++measurement — moderately censored, therefore usable as a floor. Second, the completed packages in the
++same run span ×0.98–×2.90, so a single imported factor cannot be assumed. Atomicity's own row
++(**> ×1.3685**) is a valid bound of the same kind but is too severely censored to add anything here,
++which is why §3.4 solves atomicity's factor from phase costs instead. All of this is descriptive
++context for §3.2 and §3.4 — it neither raises nor lowers their bands, and the patch is still sized
++against Estimate B (1000s) and the §3.4 atomicity band (1284–1494s).
+ 
+ ---
+ 
+@@ -1335,3 +1384,118 @@
+    `cmd/curator` under `./...`. Patch B raises atomicity's total CPU by ~125%, which slightly
+    lengthens the whole-suite wall clock even as it shortens atomicity's own. The verifier's `./...`
+    wall time should be expected to move, and should be reported rather than treated as noise.
++
++---
++
++## 10. Cycle-5 addendum — the plan is now partly *executed*, and risk 4 has fired
++
++**This section is additive. It changes no number, command, allowlist, or recommendation in §1–§9.**
++It exists because evidence that did not exist when cycles 1–4 were written now does, and a diagnosis
++that omitted it would be dishonest. Everything the cycle-4 verdict required to be preserved is
++preserved.
++
++### 10.1 What happened
++
++A sibling producer task, **TASK-260729-rfrdfo**, applied this diagnosis's Patch A + Patch B to a
++prototype worktree (`.temp/TASK-260729-rfrdfo/worktree`) and is running the §7 gate list right now.
++Its driver (`.temp/TASK-260729-rfrdfo/bin/run-gates.sh`) implements §7 faithfully: exact
++`CURATOR_CONFORMANCE_ROOT`, task-owned `GOTMPDIR`, **no** `-timeout` token, **no** `./...`, one gate
++at a time behind a two-scan process barrier, each gate a standalone process with its real exit code
++written last.
++
++The patch touches **exactly the 13 files** of the §4.0 allowlist — 11 in `internal/install`,
++`atomicity/activation_test.go` and `atomicity/commit_atomicity_test.go` — with `aba_test.go` and
++`atomicity/fixture_test.go` untouched, as §4.0 requires.
++
++### 10.2 Results available at the time of writing (2026-07-29T18:33 local)
++
++| Gate | Real exit | Log line | Wall |
++| --- | ---: | --- | ---: |
++| `gate-gofmt` | 0 | empty | 0s |
++| `gate-vet` (`go vet ./internal/install/...`) | 0 | empty | 0s |
++| `gate-atomicity-structure` (`-count=1 -v`, **non-race**) | 0 | `ok … internal/install/atomicity 285.434s` | 286s |
++| `gate-race-atomicity-1` (`-count=1 -race`) | **0** | `ok … internal/install/atomicity` **591.280s** | 593s |
++| `gate-race-atomicity-2` (`-count=1 -race`) | **0** | `ok … internal/install/atomicity` **560.828s** | 561s |
++| `gate-race-atomicity-3` | — | **in flight** (`.log` empty, no `.exit`) | — |
++| `gate-race-install-1..3` | — | **not started** | — |
++
++No `internal/install` race gate has run yet, so the Patch A half of the plan is **unmeasured**.
++
++### 10.3 The honest reading
++
++**Patch B works, and it is not enough.**
++
++- It clears the unchanged **600s alarm**: exit 0 twice, margins of **8.72s** and **39.17s**.
++- It **misses §7's own 480s pass condition** by **111.3s** and **80.8s**.
++- It lands **21.9%–28.5% above the top** of §4.2's projected 340–460s realistic landing zone.
++- And these are **focused, single-package** numbers on an otherwise idle machine. §3.2, §7 and §9
++  risk 3 all state that focused numbers read *optimistically* relative to the `./...` gate, where
++  `cmd/curator` (557.779s under race) overlaps for nearly the whole run. An 8.72s margin does not
++  survive that. **On this evidence the patched atomicity package should be expected to time out
++  again under `go test -count=1 -race ./...`.**
++
++This is precisely **§9 risk 4**, which reads: *"Atomicity's margin is the tighter of the two … If the
++focused run lands above 480s, the next lever is the `references/info.md` fixture reduction (§4.3)
++with a measurement attached, then the production-side fix in §6 — **not** a timeout override."*
++That contingency is now live and should be followed as written.
++
++### 10.4 Two projection errors this exposes, and which direction each went
++
++The completed patched pair is the **first uncensored same-package race factor** ever measured for
++this package, and it corrects §3.4 in the *favourable* direction while §4.2 was wrong in the
++*unfavourable* one.
++
++| Quantity | §3.4 / §4.2 assumed | rfrdfo measured | Direction |
++| --- | --- | --- | --- |
++| atomicity race factor | ×3.33–4.27 (imported / phase-solved) | `591.280 / 285.434 =` **×2.07**; `560.828 / 285.434 =` **×1.97** | assumption was **too pessimistic** |
++| patched non-race package wall | modelled from a 78.02s longest chain | **285.434s** (from 441.122s, **−35.3%**) | model was **far too optimistic** |
++| patched race package wall | 320–410s chain bound / 274–351s CPU floor ⇒ **340–460s** | **560.8–591.3s** | projection **missed low** |
++
++**Why the wall model missed.** §4.2 priced one class chain at its *isolated* §2.4 cost (project
++`40.74s + 37.28s = 78.02s`). Patch B gives each class its own `env`, so twelve chains plus seven
++other tests want 19 slots on **12 performance cores**, and each chain pays a full baseline rebuild
++under that self-contention. The verbose structure log shows it directly: the twelve per-class outer
++subtests span **196.25s–247.78s** wall with inner injections of **68.50s–133.91s**, against the
++modelled 37.28s injection and 40.74s baseline+final. That is roughly **×3 self-contention inflation
++per chain**, and the package wall is bound by the longest chain (**247.78s**), not by the modelled
++78.02s. Effective concurrency across the twelve outer subtests is `2732.07 / 285.434 ≈` **×9.6** —
++good parallelism, but spent on **+125% more total CPU** (§4.2 predicted that CPU rise correctly; it
++simply under-priced what the rise does to each individual chain).
++
++The net: the two errors partly cancel (a gentler race factor against a heavier non-race baseline),
++which is why the result clears 600s at all rather than by the projected 140–260s.
++
++### 10.5 What this does *not* change
++
++- **No section of §1–§9 is retracted.** §1 and §2 are evidence; §4's patch is the same patch that was
++  in fact applied and does in fact run green; §5's assertion matrix, §7's commands, §8's integrity
++  gates and both allowlists are all confirmed workable by the fact that a producer executed them
++  end-to-end without hitting a contradiction.
++- **The 480s bar in §7 stays.** It was set exactly to absorb the focused-versus-`./...` gap, and it
++  is doing its job: it is refusing a result that would probably fail the real gate.
++- **No `-timeout` override, skip, or assertion weakening becomes acceptable** because the margin is
++  thin. §9 risk 4's ladder is the sanctioned response.
++
++### 10.6 Recommended next step for the downstream producer
++
++1. Let `gate-race-atomicity-3` and the three `gate-race-install-*` gates finish; report all six real
++   exit codes and package seconds. Patch A is still unmeasured and may well clear 480s comfortably —
++   its lever (88 tests going parallel) is much larger than Patch B's.
++2. If atomicity's three race runs land in the 560–600s band as the first two did, apply **§4.3**
++   (the `references/info.md` fixture reduction) *with a before/after measurement attached*, and
++   re-run the three atomicity race gates. §4.3 is explicitly not counted in any margin above, so any
++   saving it produces is additional.
++3. If §4.3 is insufficient, escalate to §6 — the production-side `saveJournal` / O(P²) namespace
++   revalidation fix — as a separate story. Do **not** hand back a test-only patch whose focused
++   margin is 8.72s and call the race gate solved.
++
++### 10.7 Evidence-honesty statement for this section
++
++**No Go command, build, vet, or test was executed by this task in any cycle, including cycle 5.**
++Every number in §10 is read verbatim from files that TASK-260729-rfrdfo wrote:
++`gates/gate-*.log`, `gates/gate-*.exit`, `gates/gate-*.seconds`, and `bin/run-gates.sh`. The two
++derived quantities (×2.07 / ×1.97, and the ×9.6 effective concurrency) are arithmetic on those
++quoted values and state their inputs. `gate-race-atomicity-3` is reported as **in flight**, not as
++passing or failing — it has no `.exit` file, and under that driver's protocol a missing `.exit`
++means "killed or still running", never "passed". A live `pgrep` at 18:33 confirmed three Go
++processes active, which is a second reason nothing was run from this task.

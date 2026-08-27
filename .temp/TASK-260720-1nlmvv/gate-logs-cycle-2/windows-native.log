@@ -1,0 +1,156 @@
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+### install.test.exe redaction suite
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/embedded_windows_path_after_a_key
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/embedded_unc_path_after_a_key
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/uri_form
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/windows_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/a_bare_separator_is_not_a_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/embedded_after_a_key
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/several_embedded_locations_in_one_detail
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/a_bracketed_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/a_trailing_sentence_stop_is_not_part_of_the_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/protocol-relative_values_embedded_after_a_key_survive
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/unix_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/unc_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/quoted_path
+=== RUN   TestRedactDiagnosticReplacesEveryAbsoluteLocation/relative_declaration_paths_survive
+--- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/embedded_windows_path_after_a_key (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/embedded_unc_path_after_a_key (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/uri_form (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/windows_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/a_bare_separator_is_not_a_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/embedded_after_a_key (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/several_embedded_locations_in_one_detail (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/a_bracketed_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/a_trailing_sentence_stop_is_not_part_of_the_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/protocol-relative_values_embedded_after_a_key_survive (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/unix_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/unc_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/quoted_path (0.00s)
+    --- PASS: TestRedactDiagnosticReplacesEveryAbsoluteLocation/relative_declaration_paths_survive (0.00s)
+=== RUN   TestRedactDiagnosticCannotDriveATerminal
+--- PASS: TestRedactDiagnosticCannotDriveATerminal (0.00s)
+=== RUN   TestRedactDiagnosticIsBounded
+--- PASS: TestRedactDiagnosticIsBounded (0.00s)
+=== RUN   TestRedactDiagnosticKeepsInvalidUTF8Out
+--- PASS: TestRedactDiagnosticKeepsInvalidUTF8Out (0.00s)
+=== RUN   TestPlanLinesRedactAnUntrustedReason
+--- PASS: TestPlanLinesRedactAnUntrustedReason (0.00s)
+=== RUN   TestBuildFailuresAreRedactedInTheResult
+--- PASS: TestBuildFailuresAreRedactedInTheResult (0.00s)
+PASS
+install_exit=0
+### curator.test.exe platform-neutral classification suite
+=== RUN   TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode
+--- PASS: TestClassifyBuildCommandMapsEveryCacheOutcomeToADistinctCode (0.00s)
+=== RUN   TestUnusableToolchainRowsCarryTheDriverBoundaryCode
+--- PASS: TestUnusableToolchainRowsCarryTheDriverBoundaryCode (0.00s)
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/marker_without_a_build_source
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/snapshot_identity_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/logical_key_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/receipt_identity_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/artifact_hash_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/artifact_path_moved
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/unsupported_driver_in_the_marker
+=== RUN   TestClassifyBuildCommandDetectsRecordedIdentityDrift/unsupported_driver_in_the_plan
+--- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/marker_without_a_build_source (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/snapshot_identity_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/logical_key_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/receipt_identity_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/artifact_hash_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/artifact_path_moved (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/unsupported_driver_in_the_marker (0.00s)
+    --- PASS: TestClassifyBuildCommandDetectsRecordedIdentityDrift/unsupported_driver_in_the_plan (0.00s)
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_architecture
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_tuning
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/toolchain_release
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/toolchain_content
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/build_root
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/source_directory
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_operating_system
+=== RUN   TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/another_manager_version_recorded_the_key
+--- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_architecture (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_tuning (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/toolchain_release (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/toolchain_content (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/build_root (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/source_directory (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/target_operating_system (0.00s)
+    --- PASS: TestBuildInputDriftIsAttributedOnlyAsFarAsTheMarkerProves/another_manager_version_recorded_the_key (0.00s)
+=== RUN   TestInputCausesAreDistinctAndDocumented
+    builds_test.go:371: ..\..\README.md is not reachable from this test binary
+--- SKIP: TestInputCausesAreDistinctAndDocumented (0.00s)
+=== RUN   TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation
+--- PASS: TestClassifySkillBuildsAcceptsOnlyAnExactlyCurrentInstallation (0.00s)
+=== RUN   TestClassifySkillBuildsWithoutCompiledStateStaysSilent
+--- PASS: TestClassifySkillBuildsWithoutCompiledStateStaysSilent (0.00s)
+=== RUN   TestClassifySkillBuildsDetectsContextExposure
+=== RUN   TestClassifySkillBuildsDetectsContextExposure/recorded_context_file_inside_a_build_root
+=== RUN   TestClassifySkillBuildsDetectsContextExposure/build_root_materialized_in_agent-facing_context
+--- PASS: TestClassifySkillBuildsDetectsContextExposure (0.00s)
+    --- PASS: TestClassifySkillBuildsDetectsContextExposure/recorded_context_file_inside_a_build_root (0.00s)
+    --- PASS: TestClassifySkillBuildsDetectsContextExposure/build_root_materialized_in_agent-facing_context (0.00s)
+=== RUN   TestClassifySkillBuildsDetectsCommandDriftInBothDirections
+=== RUN   TestClassifySkillBuildsDetectsCommandDriftInBothDirections/closure_activates_a_command_the_marker_does_not_record
+=== RUN   TestClassifySkillBuildsDetectsCommandDriftInBothDirections/marker_records_a_command_the_closure_no_longer_activates
+--- PASS: TestClassifySkillBuildsDetectsCommandDriftInBothDirections (0.00s)
+    --- PASS: TestClassifySkillBuildsDetectsCommandDriftInBothDirections/closure_activates_a_command_the_marker_does_not_record (0.00s)
+    --- PASS: TestClassifySkillBuildsDetectsCommandDriftInBothDirections/marker_records_a_command_the_closure_no_longer_activates (0.00s)
+=== RUN   TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild
+--- PASS: TestClassifySkillBuildsRefusesAMarkerThatCannotDescribeABuild (0.00s)
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/build_driver_outside_the_closed_set
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/readable_schema_that_is_still_not_a_valid_marker
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/no_marker_at_all
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/not_a_JSON_document
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/no_schema_version
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/schema_from_a_newer_manager
+=== RUN   TestMarkerRefusalSeparatesUnsupportedFromInvalid/schema_below_the_oldest_readable
+--- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid (0.02s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/build_driver_outside_the_closed_set (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/readable_schema_that_is_still_not_a_valid_marker (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/no_marker_at_all (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/not_a_JSON_document (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/no_schema_version (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/schema_from_a_newer_manager (0.00s)
+    --- PASS: TestMarkerRefusalSeparatesUnsupportedFromInvalid/schema_below_the_oldest_readable (0.00s)
+=== RUN   TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass
+--- PASS: TestCurrentnessCodesAreDistinctAndOnlyExactStatesPass (0.00s)
+=== RUN   TestCheckFailsForEveryNonCurrentCode
+--- PASS: TestCheckFailsForEveryNonCurrentCode (0.00s)
+=== RUN   TestBuildReportsNeverPublishAnAbsolutePath
+--- PASS: TestBuildReportsNeverPublishAnAbsolutePath (0.00s)
+=== RUN   TestBuildReportDetailIsBounded
+--- PASS: TestBuildReportDetailIsBounded (0.00s)
+=== RUN   TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies
+--- PASS: TestGoToolchainGuidanceNamesTheAcceptedSelectionAndTestedFamilies (0.00s)
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/untrusted_state_was_rebuilt
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/untrusted_state_was_not_repaired
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/corrupt_state_was_rebuilt
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/corrupt_state_was_not_repaired
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/an_unprotectable_host_is_refused
+=== RUN   TestRepairNoticesDistinguishRepairFromAPreservedInstallation/an_unusable_toolchain_is_refused
+--- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/untrusted_state_was_rebuilt (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/untrusted_state_was_not_repaired (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/corrupt_state_was_rebuilt (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/corrupt_state_was_not_repaired (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/an_unprotectable_host_is_refused (0.00s)
+    --- PASS: TestRepairNoticesDistinguishRepairFromAPreservedInstallation/an_unusable_toolchain_is_refused (0.00s)
+=== RUN   TestMarkerDigestsDetectAConcurrentInstallMarkerChange
+--- PASS: TestMarkerDigestsDetectAConcurrentInstallMarkerChange (0.01s)
+=== RUN   TestStatusReportMarksCompiledStateThatMovedDuringTheCheck
+--- PASS: TestStatusReportMarksCompiledStateThatMovedDuringTheCheck (0.01s)
+=== RUN   TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill
+--- PASS: TestStatusReportReportsCompiledCommandsOfAnUninstalledSkill (0.00s)
+PASS
+curator_exit=0

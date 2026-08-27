@@ -1,0 +1,2 @@
+go run ./tools/generate-vectors -root .
+git diff --exit-code -- conformance/v1 conformance/next release/1.0.0-rc.5.json

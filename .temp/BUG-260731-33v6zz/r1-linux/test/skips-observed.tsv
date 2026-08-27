@@ -1,0 +1,35 @@
+package	test	class	verdict	reason
+cmd/curator	TestHostGoToolchainIsSelectableOnAnInventoryPlatform	platform-control	allowed-platform-control	the go-v1 compiled-command boundary is exercised on the rc5-native-control-inventory-v1 runners
+internal/buildcache	TestCacheRejectionClustersMapToStableCuratorOutcomes	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildcache	TestCandidateCacheOutcomeVocabulary	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildcache	TestCompilerFreeDryRunMissVector	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildcache	TestProtectedCacheHitVector	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildmeta	TestCandidateBuildMetadataArtifacts	root-content	allowed-root-content	/home/runner/work/curator/curator/protocol-spec/conformance/v1 publishes no expected/build-driver artifacts
+internal/buildmeta	TestCandidateBuildReceiptSchemaCase	root-content	allowed-root-content	/home/runner/work/curator/curator/protocol-spec/conformance/v1 publishes no build-receipt-v1 schema case
+internal/buildmeta	TestPortableExecutionPolicyIsTheOnlyAdmittedBuildInput	root-content	allowed-root-content	/home/runner/work/curator/curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/buildsource	TestBuildSourceConformanceVectors	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/buildsource	TestBuildSourceIdentityVectors	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/closure	TestBuildCommandOrderingConformanceVector	root-content	allowed-root-content	this conformance root publishes no build_order_cases group
+internal/hashing	TestCrossCheckTree	opt-in	tolerated-by-ledger	cross-check env not set
+internal/install	TestAuthoritativeCacheOutcomesDriveInstallation	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/install	TestAuthoritativeCacheRejectionsAreRebuiltNeverAdopted	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/install	TestAuthoritativeDryRunCasesMutateNothingPersistent	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/install	TestInstallHelperProcess	helper-process	allowed-helper-process	helper process
+internal/interop	TestManagerCompiledCacheMissDryRunVector	root-content	allowed-root-content	this conformance root publishes no compiled-cache-miss-is-read-only dry-run case
+internal/marker	TestAuthoritativeCompiledMarkerRoundTripsThroughWriter	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/marker	TestReadAuthoritativeMarkerV2SchemaCases	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/scopes	TestAuthoritativeGarbageCollectionRootsAreRetained	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/shell	TestPosixHookDoesNotReenterWhileSourcingGlobalEnv/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookEntersNestedSwitchesAndLeavesProjects/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookRejectsNonAbsolutePWDWithoutHanging/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPosixHookSupportsNounsetProfiles/zsh	host-capability	allowed-host-capability	zsh is unavailable
+internal/shell	TestPowerShellHookRunsOnEveryPrompt	platform-control	tolerated-by-ledger	PowerShell prompt integration is exercised on Windows
+internal/shell	TestZshHookIsIdempotentAndDoesNotReenter	host-capability	allowed-host-capability	zsh is unavailable
+internal/skillcheck	TestBuildRootContentInContextVector	root-content	allowed-root-content	/home/runner/work/curator/curator/protocol-spec/conformance/v1 publishes no build-drivers vector
+internal/skillspec	TestManifestAndFilesystemRejectionVectors	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/skillspec	TestPortablePathConformanceVectors	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/skillspec	TestSchemaSixMixedScriptAndBuildCommandsVector	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/skillspec	TestSchemaV6ConformanceCases	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/skillspec	TestSchemaV6FixtureParsingDoesNotExecuteGo	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/whitelist	TestBuildRootContextExclusionConformanceFixture	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set
+internal/whitelist	TestBuildRootExcludedFromAgentContextVector	root-unset	allowed-root-unset	CURATOR_CONFORMANCE_ROOT is not set

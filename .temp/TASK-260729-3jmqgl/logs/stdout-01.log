@@ -1,0 +1,105 @@
+{
+  "record_version": "hardened-capability-evidence-v1",
+  "hardened_profile": "hardened-profile-v1",
+  "execution_policy": "hardened-worker-v1",
+  "platform": "macos",
+  "enforcement_backend": "macos-sandbox-v1",
+  "qualification_status": "unqualified",
+  "outcome": "rejected",
+  "rejected_before": "capability-probe",
+  "diagnostic": "hardened_capability_unavailable",
+  "capabilities": [
+    {
+      "name": "domain-membership-enforcement",
+      "availability": "unavailable",
+      "status": "not-applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "domain-atomic-termination",
+      "availability": "unavailable",
+      "status": "not-applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "network-syscall-denial",
+      "availability": "available",
+      "status": "applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "preexisting-endpoint-revocation",
+      "availability": "unavailable",
+      "status": "not-applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "read-only-source-view",
+      "availability": "available",
+      "status": "applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "read-only-toolchain-view",
+      "availability": "available",
+      "status": "applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "write-path-confinement",
+      "availability": "available",
+      "status": "applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "filesystem-view-restriction",
+      "availability": "unavailable",
+      "status": "not-applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "exec-path-allowlist",
+      "availability": "available",
+      "status": "applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "aggregate-resource-bounds",
+      "availability": "unavailable",
+      "status": "not-applied",
+      "probed_at": "pre-domain-entry"
+    },
+    {
+      "name": "active-capability-probe",
+      "availability": "available",
+      "status": "applied",
+      "probed_at": "pre-domain-entry"
+    }
+  ],
+  "guarantees": [
+    {
+      "name": "total-network-denial",
+      "established": false
+    },
+    {
+      "name": "read-only-source-and-toolchain",
+      "established": false
+    },
+    {
+      "name": "private-build-root-only-writes",
+      "established": false
+    },
+    {
+      "name": "hard-aggregate-descendant-resource-bounds",
+      "established": false
+    },
+    {
+      "name": "exact-executable-allowlisting",
+      "established": false
+    },
+    {
+      "name": "fail-closed-capability-preflight",
+      "established": true
+    }
+  ]
+}

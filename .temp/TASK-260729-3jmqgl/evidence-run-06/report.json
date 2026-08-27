@@ -1,0 +1,1419 @@
+{
+  "report_version": "macos-hardened-probe-report-v1",
+  "spec_revision": "hardened-1.0.0-rc.1",
+  "platform": "macos",
+  "enforcement_backend": "macos-sandbox-v1",
+  "host": {
+    "product_name": "macOS",
+    "product_version": "26.5",
+    "build_version": "25F71",
+    "kernel_version": "Darwin Kernel Version 25.5.0: Mon Apr 27 20:39:42 PDT 2026; root:xnu-12377.121.6~2/RELEASE_ARM64_T6031",
+    "arch": "arm64",
+    "go_version": "go1.25.5",
+    "sip_status": "System Integrity Protection status: enabled.",
+    "uid": 502
+  },
+  "classes": [
+    {
+      "class": "domain-membership-enforcement",
+      "verdict": "unavailable",
+      "mechanism": "process group and session; seatbelt policy inheritance",
+      "reasons": [
+        "detached-descendant-membership (adversarial): membership-renounced"
+      ],
+      "checks": [
+        {
+          "name": "detached-descendant-membership",
+          "kind": "adversarial",
+          "expectation": "a descendant that calls setsid remains a domain member",
+          "observed": "membership-renounced",
+          "pass": false,
+          "detail": "domain session 89776; detached descendant session 95921"
+        },
+        {
+          "name": "attached-descendant-membership",
+          "kind": "negative-control",
+          "expectation": "a descendant that does not detach is reached by the domain-directed kill, proving the measurement works",
+          "observed": "no-survivor",
+          "pass": true,
+          "detail": "attached descendant pid 95922"
+        },
+        {
+          "name": "sandbox-policy-inheritance",
+          "kind": "positive",
+          "expectation": "the seatbelt policy itself is inherited and cannot be renounced by a descendant",
+          "observed": "policy-inherited",
+          "pass": true,
+          "detail": "policy inheritance is real on this backend, but it binds access rules only, not accounting or termination membership"
+        }
+      ],
+      "applied": false,
+      "duration_ms": 0
+    },
+    {
+      "class": "domain-atomic-termination",
+      "verdict": "unavailable",
+      "mechanism": "process-group signal; macOS exposes no job object or cgroup kill",
+      "reasons": [
+        "detached-descendant-survives (adversarial): survivor"
+      ],
+      "checks": [
+        {
+          "name": "domain-teardown-was-issued",
+          "kind": "positive",
+          "expectation": "the supervisor holds a handle that destroys the domain and the destruction is actually issued",
+          "observed": "teardown-issued",
+          "pass": true,
+          "detail": "SIGKILL delivered to process group 95920, the only domain-wide teardown handle macOS offers a plain supervisor"
+        },
+        {
+          "name": "detached-descendant-survives",
+          "kind": "adversarial",
+          "expectation": "no domain member survives destruction of the domain",
+          "observed": "survivor",
+          "pass": false,
+          "detail": "detached descendant pid 95921 after a process-group SIGKILL"
+        },
+        {
+          "name": "attached-descendant-terminated",
+          "kind": "negative-control",
+          "expectation": "a non-detached descendant is destroyed, proving the teardown signal really lands",
+          "observed": "no-survivor",
+          "pass": true,
+          "detail": "attached descendant pid 95922"
+        }
+      ],
+      "applied": false,
+      "duration_ms": 0
+    },
+    {
+      "class": "network-syscall-denial",
+      "verdict": "available",
+      "mechanism": "seatbelt (deny default) with no network allowance",
+      "checks": [
+        {
+          "name": "connect-loopback-tcp",
+          "kind": "positive",
+          "expectation": "loopback TCP connect is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: dial tcp 127.0.0.1:63895: connect: operation not permitted"
+        },
+        {
+          "name": "connect-offhost-tcp",
+          "kind": "positive",
+          "expectation": "outbound TCP connect is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: dial tcp 192.0.2.1:80: connect: operation not permitted"
+        },
+        {
+          "name": "connect-offhost-udp",
+          "kind": "positive",
+          "expectation": "outbound UDP send is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: dial udp 192.0.2.1:53: connect: operation not permitted"
+        },
+        {
+          "name": "connect-unix",
+          "kind": "positive",
+          "expectation": "unix-domain connect leaving the domain is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: dial unix /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/hp226254506/p.sock: connect: operation not permitted"
+        },
+        {
+          "name": "listen-loopback-tcp",
+          "kind": "positive",
+          "expectation": "inbound bind and listen is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: listen tcp 127.0.0.1:0: bind: operation not permitted"
+        },
+        {
+          "name": "socket-inet-stream",
+          "kind": "adversarial",
+          "expectation": "socket creation on this address family gains no usable endpoint",
+          "observed": "allowed",
+          "pass": true,
+          "detail": "socket descriptor created; the connect and bind checks above carry the denial"
+        },
+        {
+          "name": "socket-inet6-stream",
+          "kind": "adversarial",
+          "expectation": "socket creation on this address family gains no usable endpoint",
+          "observed": "allowed",
+          "pass": true,
+          "detail": "socket descriptor created; the connect and bind checks above carry the denial"
+        },
+        {
+          "name": "socket-inet-dgram",
+          "kind": "adversarial",
+          "expectation": "socket creation on this address family gains no usable endpoint",
+          "observed": "allowed",
+          "pass": true,
+          "detail": "socket descriptor created; the connect and bind checks above carry the denial"
+        },
+        {
+          "name": "connect-loopback-tcp",
+          "kind": "negative-control",
+          "expectation": "with network allowed, the loopback connect succeeds",
+          "observed": "allowed",
+          "pass": true
+        }
+      ],
+      "applied": true,
+      "duration_ms": 774
+    },
+    {
+      "class": "preexisting-endpoint-revocation",
+      "verdict": "unavailable",
+      "mechanism": "seatbelt profile applied at exec; inherited descriptors are not re-evaluated",
+      "reasons": [
+        "write-inherited-endpoint (positive): allowed"
+      ],
+      "checks": [
+        {
+          "name": "write-inherited-endpoint",
+          "kind": "positive",
+          "expectation": "an inherited connected endpoint is unusable inside the domain",
+          "observed": "allowed",
+          "pass": false
+        },
+        {
+          "name": "write-unpassed-descriptor",
+          "kind": "negative-control",
+          "expectation": "a descriptor that was never passed fails, proving the agent observes write failures",
+          "observed": "inconclusive",
+          "pass": true,
+          "detail": "EBADF: write never-passed: bad file descriptor"
+        }
+      ],
+      "applied": false,
+      "duration_ms": 12
+    },
+    {
+      "class": "read-only-source-view",
+      "verdict": "available",
+      "mechanism": "seatbelt file-read* allowance with no file-write* allowance",
+      "checks": [
+        {
+          "name": "source:read-dir",
+          "kind": "positive",
+          "expectation": "the view is readable",
+          "observed": "allowed",
+          "pass": true
+        },
+        {
+          "name": "source:open-write-existing",
+          "kind": "positive",
+          "expectation": "opening an existing file for writing is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod: operation not permitted"
+        },
+        {
+          "name": "source:open-truncate-existing",
+          "kind": "positive",
+          "expectation": "truncating an existing file is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod: operation not permitted"
+        },
+        {
+          "name": "source:chmod-existing",
+          "kind": "positive",
+          "expectation": "changing permissions is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: chmod /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod: operation not permitted"
+        },
+        {
+          "name": "source:chown-existing",
+          "kind": "positive",
+          "expectation": "changing ownership is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: chown /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod: operation not permitted"
+        },
+        {
+          "name": "source:setxattr-existing",
+          "kind": "positive",
+          "expectation": "setting an extended attribute is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: operation not permitted"
+        },
+        {
+          "name": "source:rename-existing",
+          "kind": "positive",
+          "expectation": "renaming is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: rename /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod.renamed: operation not permitted"
+        },
+        {
+          "name": "source:unlink-existing",
+          "kind": "positive",
+          "expectation": "unlinking is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: remove /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod: operation not permitted"
+        },
+        {
+          "name": "source:create-file",
+          "kind": "positive",
+          "expectation": "creating a new file in the view is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/probe-created: operation not permitted"
+        },
+        {
+          "name": "source:mkdir",
+          "kind": "positive",
+          "expectation": "creating a directory in the view is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: mkdir /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/probe-created-dir: operation not permitted"
+        },
+        {
+          "name": "source:hardlink-existing",
+          "kind": "adversarial",
+          "expectation": "a second name for a file in the view cannot be created",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: link /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/go.mod.link: operation not permitted"
+        },
+        {
+          "name": "source:symlink",
+          "kind": "adversarial",
+          "expectation": "a symbolic link cannot be planted in the view",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: symlink /etc/hosts /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/source/probe-symlink: operation not permitted"
+        },
+        {
+          "name": "source:create-file",
+          "kind": "negative-control",
+          "expectation": "with the view writable, creating a file succeeds",
+          "observed": "allowed",
+          "pass": true
+        }
+      ],
+      "applied": true,
+      "duration_ms": 24
+    },
+    {
+      "class": "read-only-toolchain-view",
+      "verdict": "available",
+      "mechanism": "seatbelt file-read* allowance with no file-write* allowance",
+      "checks": [
+        {
+          "name": "toolchain:read-dir",
+          "kind": "positive",
+          "expectation": "the view is readable",
+          "observed": "allowed",
+          "pass": true
+        },
+        {
+          "name": "toolchain:open-write-existing",
+          "kind": "positive",
+          "expectation": "opening an existing file for writing is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION: operation not permitted"
+        },
+        {
+          "name": "toolchain:open-truncate-existing",
+          "kind": "positive",
+          "expectation": "truncating an existing file is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION: operation not permitted"
+        },
+        {
+          "name": "toolchain:chmod-existing",
+          "kind": "positive",
+          "expectation": "changing permissions is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: chmod /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION: operation not permitted"
+        },
+        {
+          "name": "toolchain:chown-existing",
+          "kind": "positive",
+          "expectation": "changing ownership is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: chown /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION: operation not permitted"
+        },
+        {
+          "name": "toolchain:setxattr-existing",
+          "kind": "positive",
+          "expectation": "setting an extended attribute is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: operation not permitted"
+        },
+        {
+          "name": "toolchain:rename-existing",
+          "kind": "positive",
+          "expectation": "renaming is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: rename /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION.renamed: operation not permitted"
+        },
+        {
+          "name": "toolchain:unlink-existing",
+          "kind": "positive",
+          "expectation": "unlinking is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: remove /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION: operation not permitted"
+        },
+        {
+          "name": "toolchain:create-file",
+          "kind": "positive",
+          "expectation": "creating a new file in the view is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/probe-created: operation not permitted"
+        },
+        {
+          "name": "toolchain:mkdir",
+          "kind": "positive",
+          "expectation": "creating a directory in the view is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: mkdir /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/probe-created-dir: operation not permitted"
+        },
+        {
+          "name": "toolchain:hardlink-existing",
+          "kind": "adversarial",
+          "expectation": "a second name for a file in the view cannot be created",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: link /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/VERSION.link: operation not permitted"
+        },
+        {
+          "name": "toolchain:symlink",
+          "kind": "adversarial",
+          "expectation": "a symbolic link cannot be planted in the view",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: symlink /etc/hosts /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/goroot/probe-symlink: operation not permitted"
+        },
+        {
+          "name": "toolchain:create-file",
+          "kind": "negative-control",
+          "expectation": "with the view writable, creating a file succeeds",
+          "observed": "allowed",
+          "pass": true
+        }
+      ],
+      "applied": true,
+      "duration_ms": 25
+    },
+    {
+      "class": "write-path-confinement",
+      "verdict": "available",
+      "mechanism": "seatbelt file-write* allowance restricted to the private build root",
+      "checks": [
+        {
+          "name": "write-inside-build-root",
+          "kind": "negative-control",
+          "expectation": "the private build root is writable",
+          "observed": "allowed",
+          "pass": true
+        },
+        {
+          "name": "write-absolute-outside",
+          "kind": "positive",
+          "expectation": "a write outside the build root by absolute path is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/outside/escape-absolute: operation not permitted"
+        },
+        {
+          "name": "write-home",
+          "kind": "positive",
+          "expectation": "a write into the home directory is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/.probe-escape: operation not permitted"
+        },
+        {
+          "name": "write-tmp",
+          "kind": "adversarial",
+          "expectation": "a write into /tmp is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /tmp/probe-escape: operation not permitted"
+        },
+        {
+          "name": "write-private-tmp",
+          "kind": "adversarial",
+          "expectation": "a write into /private/tmp is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /private/tmp/probe-escape: operation not permitted"
+        },
+        {
+          "name": "write-build-root-parent",
+          "kind": "adversarial",
+          "expectation": "a write into the build root's parent is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/escape-parent: operation not permitted"
+        },
+        {
+          "name": "write-relative-traversal",
+          "kind": "adversarial",
+          "expectation": "a write reached by relative traversal out of the build root is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/escape-traversal: operation not permitted"
+        },
+        {
+          "name": "write-tmpdir-env",
+          "kind": "adversarial",
+          "expectation": "a write into the inherited TMPDIR is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/probe-escape: operation not permitted"
+        },
+        {
+          "name": "write-through-symlink",
+          "kind": "adversarial",
+          "expectation": "a write through a symbolic link that leaves the build root is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/buildroot/escape-symlink: operation not permitted"
+        },
+        {
+          "name": "create-escape-hardlink",
+          "kind": "adversarial",
+          "expectation": "hard-linking an outside file into the build root is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: link /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/outside/outside-target /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/buildroot/escape-hardlink: operation not permitted"
+        },
+        {
+          "name": "no-escape-artifact:/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/outside/escape-absolute",
+          "kind": "positive",
+          "expectation": "no file was created outside the private build root",
+          "observed": "absent",
+          "pass": true,
+          "detail": "lstat /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/outside/escape-absolute: no such file or directory"
+        },
+        {
+          "name": "no-escape-artifact:/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/outside/escape-through-symlink",
+          "kind": "positive",
+          "expectation": "no file was created outside the private build root",
+          "observed": "absent",
+          "pass": true,
+          "detail": "lstat /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/outside/escape-through-symlink: no such file or directory"
+        },
+        {
+          "name": "no-escape-artifact:/Users/iv/.probe-escape",
+          "kind": "positive",
+          "expectation": "no file was created outside the private build root",
+          "observed": "absent",
+          "pass": true,
+          "detail": "lstat /Users/iv/.probe-escape: no such file or directory"
+        },
+        {
+          "name": "no-escape-artifact:/tmp/probe-escape",
+          "kind": "positive",
+          "expectation": "no file was created outside the private build root",
+          "observed": "absent",
+          "pass": true,
+          "detail": "lstat /tmp/probe-escape: no such file or directory"
+        },
+        {
+          "name": "no-escape-artifact:/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/escape-parent",
+          "kind": "positive",
+          "expectation": "no file was created outside the private build root",
+          "observed": "absent",
+          "pass": true,
+          "detail": "lstat /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/escape-parent: no such file or directory"
+        },
+        {
+          "name": "no-escape-artifact:/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/escape-traversal",
+          "kind": "positive",
+          "expectation": "no file was created outside the private build root",
+          "observed": "absent",
+          "pass": true,
+          "detail": "lstat /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/escape-traversal: no such file or directory"
+        }
+      ],
+      "applied": true,
+      "duration_ms": 11
+    },
+    {
+      "class": "filesystem-view-restriction",
+      "verdict": "unavailable",
+      "mechanism": "seatbelt path-based access denial; macOS has no per-operation mount namespace",
+      "reasons": [
+        "readdir-root (adversarial): allowed"
+      ],
+      "checks": [
+        {
+          "name": "read-etc-passwd",
+          "kind": "positive",
+          "expectation": "reading /etc/passwd is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: stat /etc/passwd: operation not permitted"
+        },
+        {
+          "name": "read-etc-hosts",
+          "kind": "positive",
+          "expectation": "reading /etc/hosts is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: stat /etc/hosts: operation not permitted"
+        },
+        {
+          "name": "readdir-users",
+          "kind": "positive",
+          "expectation": "listing /Users is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: stat /Users: operation not permitted"
+        },
+        {
+          "name": "readdir-home",
+          "kind": "positive",
+          "expectation": "listing the home directory is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: stat /Users/iv: operation not permitted"
+        },
+        {
+          "name": "readdir-applications",
+          "kind": "positive",
+          "expectation": "listing /Applications is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: stat /Applications: operation not permitted"
+        },
+        {
+          "name": "read-ssh-dir",
+          "kind": "positive",
+          "expectation": "reading the ssh directory is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: stat /Users/iv/.ssh: operation not permitted"
+        },
+        {
+          "name": "stat-home",
+          "kind": "positive",
+          "expectation": "reaching the home directory is denied",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: stat /Users/iv: operation not permitted"
+        },
+        {
+          "name": "readdir-root",
+          "kind": "adversarial",
+          "expectation": "the domain cannot enumerate the root namespace",
+          "observed": "allowed",
+          "pass": false,
+          "detail": "the dynamic loader requires file-read* on the literal \"/\"; denying it aborts every dynamically linked program at startup, so root enumeration cannot be closed on this backend"
+        },
+        {
+          "name": "uncontained:read-etc-passwd",
+          "kind": "negative-control",
+          "expectation": "outside a probe domain this read succeeds, so the contained denial came from the profile",
+          "observed": "allowed",
+          "pass": true
+        },
+        {
+          "name": "uncontained:read-etc-hosts",
+          "kind": "negative-control",
+          "expectation": "outside a probe domain this read succeeds, so the contained denial came from the profile",
+          "observed": "allowed",
+          "pass": true
+        },
+        {
+          "name": "uncontained:readdir-users",
+          "kind": "negative-control",
+          "expectation": "outside a probe domain this read succeeds, so the contained denial came from the profile",
+          "observed": "allowed",
+          "pass": true
+        },
+        {
+          "name": "uncontained:readdir-home",
+          "kind": "negative-control",
+          "expectation": "outside a probe domain this read succeeds, so the contained denial came from the profile",
+          "observed": "allowed",
+          "pass": true
+        }
+      ],
+      "applied": false,
+      "duration_ms": 17
+    },
+    {
+      "class": "exec-path-allowlist",
+      "verdict": "available",
+      "mechanism": "seatbelt (deny default) process-exec* with literal allowances and bounded file-map-executable",
+      "checks": [
+        {
+          "name": "write-program-into-build-root",
+          "kind": "negative-control",
+          "expectation": "the domain can write a program into its private build root, so the execution attempt below is real",
+          "observed": "allowed",
+          "pass": true
+        },
+        {
+          "name": "exec-shell",
+          "kind": "positive",
+          "expectation": "a shell cannot start",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: fork/exec /bin/sh: operation not permitted"
+        },
+        {
+          "name": "exec-bash",
+          "kind": "positive",
+          "expectation": "bash cannot start",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: fork/exec /bin/bash: operation not permitted"
+        },
+        {
+          "name": "exec-zsh",
+          "kind": "positive",
+          "expectation": "zsh cannot start",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: fork/exec /bin/zsh: operation not permitted"
+        },
+        {
+          "name": "exec-interpreter",
+          "kind": "positive",
+          "expectation": "an interpreter cannot start",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: fork/exec /usr/bin/python3: operation not permitted"
+        },
+        {
+          "name": "exec-host-binary",
+          "kind": "positive",
+          "expectation": "an arbitrary host binary cannot start",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: fork/exec /bin/ls: operation not permitted"
+        },
+        {
+          "name": "exec-perl",
+          "kind": "adversarial",
+          "expectation": "perl cannot start",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: fork/exec /usr/bin/perl: operation not permitted"
+        },
+        {
+          "name": "exec-dyld-as-program",
+          "kind": "adversarial",
+          "expectation": "the dynamic loader cannot be invoked as a program",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: fork/exec /usr/lib/dyld: operation not permitted"
+        },
+        {
+          "name": "exec-self-written-copy",
+          "kind": "positive",
+          "expectation": "a file the domain just wrote cannot be executed",
+          "observed": "denied",
+          "pass": true,
+          "detail": "EPERM: fork/exec /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/work-measure/buildroot/written-program: operation not permitted"
+        },
+        {
+          "name": "mmap-exec-self-written",
+          "kind": "adversarial",
+          "expectation": "a file the domain just wrote cannot be mapped executable",
+          "observed": "denied",
+          "pass": true,
+          "detail": "denied by the platform W^X policy (PROT_EXEC requires a JIT entitlement on Apple Silicon), not by the seatbelt allowlist; not attributable to this profile"
+        },
+        {
+          "name": "exec-symlink-to-allowlisted",
+          "kind": "adversarial",
+          "expectation": "a symbolic link is not a way around the allowlist",
+          "observed": "allowed",
+          "pass": true,
+          "detail": "allowed: the kernel resolved the link to the allowlisted path before checking it, so no unlisted program started"
+        },
+        {
+          "name": "exec-allowlisted-self",
+          "kind": "negative-control",
+          "expectation": "the allowlisted program starts, so the sweep of denials is not vacuous",
+          "observed": "allowed",
+          "pass": true
+        }
+      ],
+      "applied": true,
+      "duration_ms": 276
+    },
+    {
+      "class": "aggregate-resource-bounds",
+      "verdict": "unavailable",
+      "mechanism": "POSIX RLIMIT_* (per process) and a supervisor deadline; macOS exposes no job object, cgroup or per-directory byte cap",
+      "reasons": [
+        "descriptors:descendant-shares-the-declared-budget (adversarial): per-process-only",
+        "disk-bytes:write-past-declared-byte-budget (adversarial): per-process-only",
+        "cpu-milliseconds:descendant-shares-the-declared-budget (adversarial): per-process-only",
+        "cpu-milliseconds:member-cannot-raise-its-own-bound (adversarial): member-restored-its-budget",
+        "address-space-bytes:bound-can-be-declared (positive): install-refused",
+        "data-segment-bytes:bound-can-be-declared (positive): install-refused",
+        "process-count:declared-budget-is-available-to-the-domain (adversarial): budget-consumed-outside-the-domain",
+        "process-count:descendant-shares-the-declared-budget (adversarial): not-evaluable",
+        "process-count:member-cannot-raise-its-own-bound (adversarial): member-restored-its-budget",
+        "wall-clock:deadline-reaches-the-attached-descendant (adversarial): survivor",
+        "wall-clock:deadline-reaches-the-detached-descendant (adversarial): survivor",
+        "wall-clock:deadline-cancellation-leaves-no-descendant (positive): 1 survivors",
+        "supervisor-side-accounting-is-unescapable (positive): escapable"
+      ],
+      "checks": [
+        {
+          "name": "descriptors:per-process-bound-binds",
+          "kind": "negative-control",
+          "expectation": "the declared descriptor bound binds the process that set it, so the aggregate result below is a real measurement",
+          "observed": "bound-binds",
+          "pass": true,
+          "detail": "declared soft limit 64; the domain root opened 61 descriptors before the kernel refused"
+        },
+        {
+          "name": "descriptors:descendant-shares-the-declared-budget",
+          "kind": "adversarial",
+          "expectation": "a descriptor bound is accounted over the domain, so a parent and a child share one budget",
+          "observed": "per-process-only",
+          "pass": false,
+          "detail": "soft limit 64; the domain root opened 61 and its child opened 61, aggregate 122"
+        },
+        {
+          "name": "disk-bytes:write-past-declared-byte-budget",
+          "kind": "adversarial",
+          "expectation": "writing past the declared aggregate byte budget below the build root is refused",
+          "observed": "per-process-only",
+          "pass": false,
+          "detail": "declared budget 4194304 bytes; the domain wrote 8388608 bytes with no refusal"
+        },
+        {
+          "name": "cpu-milliseconds:bound-can-be-declared",
+          "kind": "positive",
+          "expectation": "a bound at the declared build budget can be installed on a domain member",
+          "observed": "bound-installed",
+          "pass": true,
+          "detail": "RLIMIT_CPU declared at 1000 CPU-milliseconds"
+        },
+        {
+          "name": "cpu-milliseconds:bound-binds-the-process-that-set-it",
+          "kind": "positive",
+          "expectation": "the process that installed the bound is refused when it tries to pass it",
+          "observed": "refused-at-the-bound",
+          "pass": true,
+          "detail": "reached 1002 CPU-milliseconds against a declared budget of 1000 before SIGXCPU: the kernel signalled the CPU-time soft limit"
+        },
+        {
+          "name": "cpu-milliseconds:unbounded-control-exceeds-the-declared-budget",
+          "kind": "negative-control",
+          "expectation": "with no bound installed the same attempt passes the declared budget, so a refusal above is attributable to the bound",
+          "observed": "exceeded-the-declared-budget",
+          "pass": true,
+          "detail": "the unbounded control reached 1600 CPU-milliseconds against a declared budget of 1000: burned 1600 CPU-milliseconds with no refusal and stopped at the ceiling"
+        },
+        {
+          "name": "cpu-milliseconds:declared-budget-is-available-to-the-domain",
+          "kind": "adversarial",
+          "expectation": "the domain can actually use the budget that was declared for it, so the bound is scoped to the domain rather than shared with processes outside it",
+          "observed": "domain-received-its-budget",
+          "pass": true,
+          "detail": "the domain reached 1002 CPU-milliseconds of its declared 1000 before the bound refused"
+        },
+        {
+          "name": "cpu-milliseconds:descendant-shares-the-declared-budget",
+          "kind": "adversarial",
+          "expectation": "a descendant that inherits the bound draws on the same budget, so the domain total cannot pass the declared bound",
+          "observed": "per-process-only",
+          "pass": false,
+          "detail": "the domain root reached 1002 and its descendant a fresh 1003 CPU-milliseconds, aggregate 2005 against a declared 1000"
+        },
+        {
+          "name": "cpu-milliseconds:member-cannot-raise-its-own-bound",
+          "kind": "adversarial",
+          "expectation": "a domain member cannot restore the budget the supervisor took away from it",
+          "observed": "member-restored-its-budget",
+          "pass": false,
+          "detail": "with the hard limit left as inherited, raising the soft limit back to it was \"raised\""
+        },
+        {
+          "name": "cpu-milliseconds:lowered-hard-limit-refuses-the-raise",
+          "kind": "negative-control",
+          "expectation": "with the hard limit lowered too, the same raise is refused, so the result above is attributable to the hard limit",
+          "observed": "refused",
+          "pass": true,
+          "detail": "with the hard limit lowered to the declared value, raising the soft limit was \"refused:EPERM\""
+        },
+        {
+          "name": "address-space-bytes:bound-can-be-declared",
+          "kind": "positive",
+          "expectation": "a bound at the declared build budget can be installed on a domain member",
+          "observed": "install-refused",
+          "pass": false,
+          "detail": "RLIMIT_AS refused the declared value 268435456 bytes with EINVAL"
+        },
+        {
+          "name": "address-space-bytes:some-bound-is-accepted-by-the-kernel",
+          "kind": "negative-control",
+          "expectation": "the kernel accepts some value for this resource, so the refusal above is attributable to the declared value rather than to a broken call",
+          "observed": "a-larger-bound-is-accepted",
+          "pass": true,
+          "detail": "the lowest soft limit this kernel accepted for RLIMIT_AS was 421707907058 bytes, which is 1570 times the declared build budget of 268435456"
+        },
+        {
+          "name": "address-space-bytes:unbounded-control-exceeds-the-declared-budget",
+          "kind": "negative-control",
+          "expectation": "with no bound installed the same attempt passes the declared budget, so a refusal above is attributable to the bound",
+          "observed": "exceeded-the-declared-budget",
+          "pass": true,
+          "detail": "the unbounded control reached 536870912 bytes against a declared budget of 268435456: mapped and touched 536870912 bytes with no refusal and stopped at the ceiling"
+        },
+        {
+          "name": "data-segment-bytes:bound-can-be-declared",
+          "kind": "positive",
+          "expectation": "a bound at the declared build budget can be installed on a domain member",
+          "observed": "install-refused",
+          "pass": false,
+          "detail": "RLIMIT_DATA refused the declared value 268435456 bytes with EINVAL"
+        },
+        {
+          "name": "data-segment-bytes:some-bound-is-accepted-by-the-kernel",
+          "kind": "negative-control",
+          "expectation": "the kernel accepts some value for this resource, so the refusal above is attributable to the declared value rather than to a broken call",
+          "observed": "a-larger-bound-is-accepted",
+          "pass": true,
+          "detail": "the lowest soft limit this kernel accepted for RLIMIT_DATA was 421707907058 bytes, which is 1570 times the declared build budget of 268435456"
+        },
+        {
+          "name": "data-segment-bytes:unbounded-control-exceeds-the-declared-budget",
+          "kind": "negative-control",
+          "expectation": "with no bound installed the same attempt passes the declared budget, so a refusal above is attributable to the bound",
+          "observed": "exceeded-the-declared-budget",
+          "pass": true,
+          "detail": "the unbounded control reached 536870912 bytes against a declared budget of 268435456: mapped and touched 536870912 bytes with no refusal and stopped at the ceiling"
+        },
+        {
+          "name": "process-count:bound-can-be-declared",
+          "kind": "positive",
+          "expectation": "a bound at the declared build budget can be installed on a domain member",
+          "observed": "bound-installed",
+          "pass": true,
+          "detail": "RLIMIT_NPROC declared at 4 processes"
+        },
+        {
+          "name": "process-count:bound-binds-the-process-that-set-it",
+          "kind": "positive",
+          "expectation": "the process that installed the bound is refused when it tries to pass it",
+          "observed": "refused-at-the-bound",
+          "pass": true,
+          "detail": "reached 0 processes against a declared budget of 4 before EAGAIN: the kernel refused descendant 1: fork/exec /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/hardened-probe: resource temporarily unavailable"
+        },
+        {
+          "name": "process-count:unbounded-control-exceeds-the-declared-budget",
+          "kind": "negative-control",
+          "expectation": "with no bound installed the same attempt passes the declared budget, so a refusal above is attributable to the bound",
+          "observed": "exceeded-the-declared-budget",
+          "pass": true,
+          "detail": "the unbounded control reached 6 processes against a declared budget of 4: started 6 descendants with no refusal and stopped at the ceiling"
+        },
+        {
+          "name": "process-count:declared-budget-is-available-to-the-domain",
+          "kind": "adversarial",
+          "expectation": "the domain can actually use the budget that was declared for it, so the bound is scoped to the domain rather than shared with processes outside it",
+          "observed": "budget-consumed-outside-the-domain",
+          "pass": false,
+          "detail": "the domain reached 0 processes of its declared 4 before the bound refused"
+        },
+        {
+          "name": "process-count:descendant-shares-the-declared-budget",
+          "kind": "adversarial",
+          "expectation": "a descendant that inherits the bound draws on the same budget, so the domain total cannot pass the declared bound",
+          "observed": "not-evaluable",
+          "pass": false,
+          "detail": "the descendant produced no measurement (fork/exec /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-3jmqgl/evidence-run-06/hardened-probe: resource temporarily unavailable), so whether it would have drawn on the same budget was not established"
+        },
+        {
+          "name": "process-count:member-cannot-raise-its-own-bound",
+          "kind": "adversarial",
+          "expectation": "a domain member cannot restore the budget the supervisor took away from it",
+          "observed": "member-restored-its-budget",
+          "pass": false,
+          "detail": "with the hard limit left as inherited, raising the soft limit back to it was \"raised\""
+        },
+        {
+          "name": "process-count:lowered-hard-limit-refuses-the-raise",
+          "kind": "negative-control",
+          "expectation": "with the hard limit lowered too, the same raise is refused, so the result above is attributable to the hard limit",
+          "observed": "refused",
+          "pass": true,
+          "detail": "with the hard limit lowered to the declared value, raising the soft limit was \"refused:EPERM\""
+        },
+        {
+          "name": "wall-clock:deadline-terminates-the-domain-root",
+          "kind": "positive",
+          "expectation": "the declared wall-clock bound ends the process the supervisor started, while it still had work to do",
+          "observed": "no-survivor",
+          "pass": true,
+          "detail": "declared 3s; the domain root ran 3.002s and the deadline fired"
+        },
+        {
+          "name": "wall-clock:control-exits-before-the-deadline",
+          "kind": "negative-control",
+          "expectation": "a domain whose work fits inside the deadline exits on its own, so the termination above is attributable to the deadline",
+          "observed": "control-exited-in-time",
+          "pass": true,
+          "detail": "the control domain exited with status 0 after 36ms, inside the declared 3s"
+        },
+        {
+          "name": "wall-clock:deadline-reaches-the-attached-descendant",
+          "kind": "adversarial",
+          "expectation": "cancelling the supervised process at the deadline also ends the descendants it created",
+          "observed": "survivor",
+          "pass": false,
+          "detail": "attached descendant pid 95927 after the deadline cancelled the domain root; cancelling a supervised process signals that process alone, not the tree below it"
+        },
+        {
+          "name": "wall-clock:deadline-reaches-the-detached-descendant",
+          "kind": "adversarial",
+          "expectation": "a descendant that left the supervisor's process group is still ended by the deadline",
+          "observed": "survivor",
+          "pass": false,
+          "detail": "detached descendant pid 95926 after the deadline cancelled the domain root"
+        },
+        {
+          "name": "wall-clock:group-teardown-reaches-the-attached-descendant",
+          "kind": "negative-control",
+          "expectation": "the strongest teardown a macOS supervisor can issue does end a descendant that stayed in the group, proving the teardown lands",
+          "observed": "no-survivor",
+          "pass": true,
+          "detail": "SIGKILL delivered to process group 95925; attached descendant pid 95927, detached descendant pid 95926"
+        },
+        {
+          "name": "wall-clock:deadline-cancellation-leaves-no-descendant",
+          "kind": "positive",
+          "expectation": "once the declared wall-clock bound has been enforced by every means the supervisor has, no domain member is left running",
+          "observed": "1 survivors",
+          "pass": false,
+          "detail": "still running after the deadline and the process-group teardown: [95926]"
+        },
+        {
+          "name": "wall-clock:harness-leaves-no-descendant-behind",
+          "kind": "negative-control",
+          "expectation": "the probe itself leaves nothing running on the host, whatever the platform failed to do",
+          "observed": "no-survivor",
+          "pass": true,
+          "detail": "the harness signals every descendant it recorded by pid; a production implementation cannot rely on this, because it only works for descendants the supervisor already knew about"
+        },
+        {
+          "name": "supervisor-side-accounting-is-unescapable",
+          "kind": "positive",
+          "expectation": "supervisor-side accounting is equivalent to host accounting only when no domain member can evade or survive it",
+          "observed": "escapable",
+          "pass": false,
+          "detail": "derived from this run: domain session 89776, detached descendant session 95921 (membership renounced); teardown teardown-issued on process group 95920; survivors after teardown: detached=true attached=false"
+        }
+      ],
+      "applied": false,
+      "duration_ms": 2714
+    },
+    {
+      "class": "active-capability-probe",
+      "verdict": "available",
+      "mechanism": "in-process probe domains created by /usr/bin/sandbox-exec",
+      "checks": [
+        {
+          "name": "probe-domain-can-be-created",
+          "kind": "positive",
+          "expectation": "a probe domain can be established on this host, so the other classes can be observed at all",
+          "observed": "yes",
+          "pass": true,
+          "detail": "a probe domain contains no package byte, runs no Go process and produces no artifact"
+        },
+        {
+          "name": "every-class-observed-this-run",
+          "kind": "positive",
+          "expectation": "every class of the exhaustive inventory produced an actual observation in this operation",
+          "observed": "10/10 observed",
+          "pass": true,
+          "detail": "unobserved: []"
+        },
+        {
+          "name": "unobserved-class-is-detected",
+          "kind": "negative-control",
+          "expectation": "the completeness check notices a class this run did not observe",
+          "observed": "detector-fires",
+          "pass": true,
+          "detail": "\"domain-membership-enforcement\" was dropped from a copy of this run's results and the same reduction was re-run"
+        },
+        {
+          "name": "unprobed-class-cannot-be-claimed",
+          "kind": "adversarial",
+          "expectation": "a record built without an observation for a class reports it unprobed and rejects, rather than defaulting to available",
+          "observed": "unprobed-class-rejected",
+          "pass": true,
+          "detail": "a record built from this run's observations minus \"domain-membership-enforcement\" came out \"rejected\""
+        },
+        {
+          "name": "no-cached-or-declared-availability",
+          "kind": "positive",
+          "expectation": "no availability value comes from a host label, a build-time constant, or an earlier operation",
+          "observed": "all-from-this-run",
+          "pass": true,
+          "detail": "every availability in the evidence record is reduced from checks recorded in this report; the probe reads no cache and no configuration"
+        }
+      ],
+      "applied": true,
+      "duration_ms": 0
+    }
+  ],
+  "mechanisms": [
+    {
+      "name": "/usr/bin/sandbox-exec",
+      "status": "deprecated",
+      "classes": [
+        "network-syscall-denial",
+        "read-only-source-view",
+        "read-only-toolchain-view",
+        "write-path-confinement",
+        "filesystem-view-restriction",
+        "exec-path-allowlist"
+      ],
+      "note": "shipped and functional on this host, but it is a thin wrapper over sandbox_init, which \u003csandbox.h\u003e declares deprecated. Apple publishes no replacement for applying a dynamic profile to an arbitrary already-built binary.",
+      "exercised": true,
+      "observation": "probe-domain-can-be-created=yes (expectation held)"
+    },
+    {
+      "name": "sandbox_init / sandbox_init_with_parameters (libsystem_sandbox)",
+      "status": "deprecated",
+      "classes": [
+        "network-syscall-denial",
+        "write-path-confinement",
+        "exec-path-allowlist"
+      ],
+      "note": "declared deprecated in the public SDK header. The named built-in profiles it accepts are coarse; a per-operation profile requires the profile language below.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "seatbelt profile language (version 1 S-expressions)",
+      "status": "private",
+      "classes": [
+        "network-syscall-denial",
+        "read-only-source-view",
+        "read-only-toolchain-view",
+        "write-path-confinement",
+        "filesystem-view-restriction",
+        "exec-path-allowlist"
+      ],
+      "note": "not a published, versioned interface. Operation names and filter semantics are discovered from the shipped profiles under /usr/share/sandbox and can change between releases without notice.",
+      "exercised": true,
+      "observation": "connect-offhost-tcp=denied (expectation held); write-absolute-outside=denied (expectation held); exec-shell=denied (expectation held); readdir-root=allowed (expectation did not hold)"
+    },
+    {
+      "name": "App Sandbox (com.apple.security.app-sandbox entitlement)",
+      "status": "conditional",
+      "classes": [
+        "network-syscall-denial",
+        "write-path-confinement",
+        "filesystem-view-restriction"
+      ],
+      "note": "supported and non-deprecated, but it applies to a signed, entitled bundle. It cannot be imposed on an arbitrary toolchain binary the manager did not build and sign, and its container model does not express an exact executable allowlist.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "Endpoint Security framework",
+      "status": "private",
+      "classes": [
+        "exec-path-allowlist",
+        "domain-membership-enforcement"
+      ],
+      "note": "an authorization client could veto exec system-wide, but it requires the com.apple.developer.endpoint-security.client entitlement, which Apple grants case by case, plus a system extension and full disk access. It is also a global authorizer, not a per-operation domain.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "POSIX process group and session",
+      "status": "supported",
+      "classes": [
+        "domain-membership-enforcement",
+        "domain-atomic-termination"
+      ],
+      "note": "the only grouping a plain macOS supervisor can create. A descendant leaves it with setsid, so it is not an unescapable domain.",
+      "exercised": true,
+      "observation": "detached-descendant-membership=membership-renounced (expectation did not hold); detached-descendant-survives=survivor (expectation did not hold); attached-descendant-terminated=no-survivor (expectation held)"
+    },
+    {
+      "name": "Supervisor deadline (context cancellation plus a process-group signal)",
+      "status": "supported",
+      "classes": [
+        "aggregate-resource-bounds",
+        "domain-atomic-termination"
+      ],
+      "note": "the only way to bound wall-clock time, because no resource limit expresses it. Cancelling a supervised process signals that process alone; the descendants it created need a separate group-directed signal, and a descendant that left the group needs its pid to have been recorded in advance.",
+      "exercised": true,
+      "observation": "wall-clock:deadline-terminates-the-domain-root=no-survivor (expectation held); wall-clock:deadline-reaches-the-attached-descendant=survivor (expectation did not hold); wall-clock:deadline-reaches-the-detached-descendant=survivor (expectation did not hold); wall-clock:deadline-cancellation-leaves-no-descendant=1 survivors (expectation did not hold)"
+    },
+    {
+      "name": "setrlimit RLIMIT_NOFILE",
+      "status": "supported",
+      "classes": [
+        "aggregate-resource-bounds"
+      ],
+      "note": "per process. A child inherits the same soft limit as a fresh budget, so a parent and a child together pass it. The soft limit can be lowered without the hard limit, in which case a domain member can raise it back; lowering the hard limit closes that route but is irreversible for the process that does it.",
+      "exercised": true,
+      "observation": "descriptors:per-process-bound-binds=bound-binds (expectation held); descriptors:descendant-shares-the-declared-budget=per-process-only (expectation did not hold)"
+    },
+    {
+      "name": "setrlimit RLIMIT_CPU",
+      "status": "supported",
+      "classes": [
+        "aggregate-resource-bounds"
+      ],
+      "note": "per process, in whole seconds, delivered as SIGXCPU at the soft limit and SIGKILL at the hard limit. Each descendant receives its own fresh CPU budget under the same declared bound.",
+      "exercised": true,
+      "observation": "cpu-milliseconds:bound-can-be-declared=bound-installed (expectation held); cpu-milliseconds:bound-binds-the-process-that-set-it=refused-at-the-bound (expectation held); cpu-milliseconds:descendant-shares-the-declared-budget=per-process-only (expectation did not hold); cpu-milliseconds:member-cannot-raise-its-own-bound=member-restored-its-budget (expectation did not hold)"
+    },
+    {
+      "name": "setrlimit RLIMIT_AS (RLIMIT_RSS on Darwin)",
+      "status": "conditional",
+      "classes": [
+        "aggregate-resource-bounds"
+      ],
+      "note": "the interface exists and the resource number is defined, but this kernel refuses any soft limit below the address space the calling process has already reserved. A Go process reserves far more than a build budget, so no usable address-space bound can be installed from inside one.",
+      "exercised": true,
+      "observation": "address-space-bytes:bound-can-be-declared=install-refused (expectation did not hold); address-space-bytes:some-bound-is-accepted-by-the-kernel=a-larger-bound-is-accepted (expectation held)"
+    },
+    {
+      "name": "setrlimit RLIMIT_DATA",
+      "status": "conditional",
+      "classes": [
+        "aggregate-resource-bounds"
+      ],
+      "note": "same refusal as RLIMIT_AS on this kernel, and it bounds the data segment rather than mapped memory, so it would not bound an mmap-based allocator even if it installed.",
+      "exercised": true,
+      "observation": "data-segment-bytes:bound-can-be-declared=install-refused (expectation did not hold); data-segment-bytes:some-bound-is-accepted-by-the-kernel=a-larger-bound-is-accepted (expectation held)"
+    },
+    {
+      "name": "setrlimit RLIMIT_NPROC",
+      "status": "conditional",
+      "classes": [
+        "aggregate-resource-bounds"
+      ],
+      "note": "accounted per real user id, not per operation. The budget is shared with every other process the user already has, so a bound sized for a build domain refuses the domain's first process.",
+      "exercised": true,
+      "observation": "process-count:bound-can-be-declared=bound-installed (expectation held); process-count:bound-binds-the-process-that-set-it=refused-at-the-bound (expectation held); process-count:declared-budget-is-available-to-the-domain=budget-consumed-outside-the-domain (expectation did not hold)"
+    },
+    {
+      "name": "Mach task ports and task_policy_set",
+      "status": "private",
+      "classes": [
+        "aggregate-resource-bounds"
+      ],
+      "note": "task_for_pid on another process requires elevated privilege and is blocked by SIP for protected processes. The policy interfaces set scheduling and QoS bands, not hard aggregate bounds.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "Linux cgroup v2 equivalent",
+      "status": "unavailable",
+      "classes": [
+        "aggregate-resource-bounds",
+        "domain-membership-enforcement",
+        "domain-atomic-termination"
+      ],
+      "note": "macOS has no cgroup-style controller. There is no pids.max, memory.max or cgroup.kill analogue exposed to third-party code.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "Windows Job Object equivalent",
+      "status": "unavailable",
+      "classes": [
+        "domain-membership-enforcement",
+        "domain-atomic-termination",
+        "aggregate-resource-bounds"
+      ],
+      "note": "macOS exposes nothing with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE semantics: no kernel object that a descendant cannot leave and whose destruction destroys every member.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "Filesystem quotas (edquota, quotacheck)",
+      "status": "conditional",
+      "classes": [
+        "aggregate-resource-bounds"
+      ],
+      "note": "per user or group on a whole volume, requires root, and is not enabled on a default APFS install. It cannot bound the bytes one operation writes below one private directory.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "Disk image (hdiutil) as a size-bounded private volume",
+      "status": "supported",
+      "classes": [
+        "aggregate-resource-bounds"
+      ],
+      "note": "a fixed-size attached image does bound bytes written below the build root, which is the one aggregate quantity macOS can enforce without private interfaces. It costs an attach and detach per operation and still does not bound memory, processes, CPU or time.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "Virtualization.framework guest",
+      "status": "supported",
+      "classes": [
+        "domain-membership-enforcement",
+        "domain-atomic-termination",
+        "aggregate-resource-bounds",
+        "network-syscall-denial"
+      ],
+      "note": "a guest is an unescapable domain with aggregate memory and CPU bounds and atomic destruction. It is the only public macOS mechanism that satisfies the three blocking classes, at the cost of a guest image in the trusted computing base and a much larger per-operation setup.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "chroot",
+      "status": "conditional",
+      "classes": [
+        "filesystem-view-restriction"
+      ],
+      "note": "requires root and is not a security boundary on macOS. It does not remove the global path namespace for a process that can create a new root, and it does not bound anything else.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    },
+    {
+      "name": "posix_spawn POSIX_SPAWN_START_SUSPENDED plus a pre-exec sandbox call",
+      "status": "deprecated",
+      "classes": [
+        "network-syscall-denial",
+        "write-path-confinement"
+      ],
+      "note": "the usual way to apply a profile without sandbox-exec still calls the deprecated sandbox_init in the child. It changes who calls the interface, not whether the interface is deprecated.",
+      "exercised": false,
+      "observation": "not exercised by this run; the status above is a reading of the published interface, not a measurement"
+    }
+  ],
+  "fail_closed_controls": null,
+  "started_at": "2026-07-29T13:00:21Z",
+  "duration_ms": 8584,
+  "evidence_record": {
+    "record_version": "hardened-capability-evidence-v1",
+    "hardened_profile": "hardened-profile-v1",
+    "execution_policy": "hardened-worker-v1",
+    "platform": "macos",
+    "enforcement_backend": "macos-sandbox-v1",
+    "qualification_status": "unqualified",
+    "outcome": "rejected",
+    "rejected_before": "capability-probe",
+    "diagnostic": "hardened_capability_unavailable",
+    "capabilities": [
+      {
+        "name": "domain-membership-enforcement",
+        "availability": "unavailable",
+        "status": "not-applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "domain-atomic-termination",
+        "availability": "unavailable",
+        "status": "not-applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "network-syscall-denial",
+        "availability": "available",
+        "status": "applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "preexisting-endpoint-revocation",
+        "availability": "unavailable",
+        "status": "not-applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "read-only-source-view",
+        "availability": "available",
+        "status": "applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "read-only-toolchain-view",
+        "availability": "available",
+        "status": "applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "write-path-confinement",
+        "availability": "available",
+        "status": "applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "filesystem-view-restriction",
+        "availability": "unavailable",
+        "status": "not-applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "exec-path-allowlist",
+        "availability": "available",
+        "status": "applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "aggregate-resource-bounds",
+        "availability": "unavailable",
+        "status": "not-applied",
+        "probed_at": "pre-domain-entry"
+      },
+      {
+        "name": "active-capability-probe",
+        "availability": "available",
+        "status": "applied",
+        "probed_at": "pre-domain-entry"
+      }
+    ],
+    "guarantees": [
+      {
+        "name": "total-network-denial",
+        "established": false
+      },
+      {
+        "name": "read-only-source-and-toolchain",
+        "established": false
+      },
+      {
+        "name": "private-build-root-only-writes",
+        "established": false
+      },
+      {
+        "name": "hard-aggregate-descendant-resource-bounds",
+        "established": false
+      },
+      {
+        "name": "exact-executable-allowlisting",
+        "established": false
+      },
+      {
+        "name": "fail-closed-capability-preflight",
+        "established": true
+      }
+    ]
+  },
+  "exit_code": 1
+}

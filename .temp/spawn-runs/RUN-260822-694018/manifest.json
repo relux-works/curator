@@ -1,0 +1,47 @@
+{
+  "id": "RUN-260822-694018",
+  "task_id": "TASK-260822-5wfdfx",
+  "created_at": "2026-08-22T16:59:51.559098Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "opus",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "opus"
+    },
+    "resolved": {
+      "model": "opus"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260822-20-59-51_-reviewer--reviewer--claude-_TASK-260822-5wfdfx.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "30m0s",
+  "log_resource_name": "TASK-260822-5wfdfx_spawn-log_-reviewer--reviewer--claude-_RUN-260822-694018.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260822-5wfdfx_manifest-fallback-fail-loud.md",
+    "TASK-260822-5wfdfx_mutant-2-stat-presence.log",
+    "TASK-260822-5wfdfx_results.md",
+    "TASK-260822-5wfdfx_spawn-log_-implementer--developer--claude-_RUN-260822-b89c6b.log",
+    "TASK-260822-5wfdfx_spawn-log_-implementer--developer--claude-_RUN-260822-c1807e.log"
+  ]
+}

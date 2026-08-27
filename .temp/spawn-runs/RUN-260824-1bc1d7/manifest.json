@@ -1,0 +1,68 @@
+{
+  "id": "RUN-260824-1bc1d7",
+  "task_id": "TASK-260825-1lausy",
+  "created_at": "2026-08-24T23:27:19.768752Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[reviewer] reviewer (claude)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "claude-fable-5",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-fable-5",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "claude-fable-5",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "agent": "claude",
+    "producer": {
+      "version": "v1.6.1",
+      "commit": "e5a5a5d"
+    },
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-03-27-19_-reviewer--reviewer--claude-_TASK-260825-1lausy.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "control_root": "/Users/iv/Developer/ReluxWorks/curator",
+  "execution_root": "/Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260825-37cz7x/worktree",
+  "story_id": "STORY-260825-37cz7x",
+  "workspace": {
+    "workspace_id": "WS-7379bb890361",
+    "story_id": "STORY-260825-37cz7x",
+    "branch_ref": "refs/heads/task-board/story/STORY-260825-37cz7x",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260825-37cz7x/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "25m0s",
+  "supervision": {
+    "check_every_minutes": 5,
+    "idle_deadline_minutes": 0,
+    "max_runtime_minutes": 0,
+    "on_deadline": "park"
+  },
+  "log_resource_name": "TASK-260825-1lausy_spawn-log_-reviewer--reviewer--claude-_RUN-260824-1bc1d7.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260825-1lausy_orchestrator-full-suite.log",
+    "TASK-260825-1lausy_results.md",
+    "TASK-260825-1lausy_spawn-log_-implementer--developer--codex-_RUN-260824-6a9f60.log",
+    "TASK-260825-1lausy_spawn-log_-reviewer--reviewer--claude-_RUN-260824-50980d.log",
+    "TASK-260825-1lausy_spawn-log_-reviewer--reviewer--claude-_RUN-260824-6ac619.log"
+  ],
+  "recovery_root_run_id": "RUN-260824-1bc1d7"
+}

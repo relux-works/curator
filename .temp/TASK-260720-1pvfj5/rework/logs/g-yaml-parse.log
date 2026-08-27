@@ -1,0 +1,8 @@
+Ignoring ffi-1.15.0 because its extensions are not built. Try: gem pristine ffi --version 1.15.0
+jobs: test race lint gate-selftest interop naming-gate candidate-conformance
+SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+GOENV: "off" GOTOOLCHAIN: "local"
+race matrix: ubuntu-latest,macos-latest
+test matrix: ubuntu-latest,macos-latest,windows-latest
+candidate matrix: ubuntu-latest,macos-latest,windows-latest
+candidate if: github.event_name == 'workflow_dispatch' && (inputs.candidate_ref != '' || inputs.candidate_root != '')

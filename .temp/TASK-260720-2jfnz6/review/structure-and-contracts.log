@@ -1,0 +1,387 @@
+src/csk/builds/cache.py:22:_SHA256_IDENTITY = re.compile(r"sha256:[0-9a-f]{64}\Z")
+src/csk/builds/cache.py:25:class BuildCacheError(RuntimeError):
+src/csk/builds/cache.py:28:    def __init__(self, code: str, detail: str):
+src/csk/builds/cache.py:34:class CacheConflictError(BuildCacheError):
+src/csk/builds/cache.py:37:    def __init__(self, cache_key: str):
+src/csk/builds/cache.py:45:class CacheEntryStatus(str, Enum):
+src/csk/builds/cache.py:55:class CachePublicationStatus(str, Enum):
+src/csk/builds/cache.py:63:class CacheExpectation:
+src/csk/builds/cache.py:69:    def __post_init__(self) -> None:
+src/csk/builds/cache.py:77:class CacheInspection:
+src/csk/builds/cache.py:92:    @property
+src/csk/builds/cache.py:93:    def dry_run_outcome(self) -> str:
+src/csk/builds/cache.py:106:    @property
+src/csk/builds/cache.py:107:    def reusable(self) -> bool:
+src/csk/builds/cache.py:112:class CachePublication:
+src/csk/builds/cache.py:119:    def __post_init__(self) -> None:
+src/csk/builds/cache.py:128:class CachePublicationResult:
+src/csk/builds/cache.py:135:    def __post_init__(self) -> None:
+src/csk/builds/cache.py:140:class CacheMutationGuard(Protocol):
+src/csk/builds/cache.py:143:    def assert_held(self) -> None:
+src/csk/builds/cache.py:148:class BuildCacheBackend(Protocol):
+src/csk/builds/cache.py:151:    @property
+src/csk/builds/cache.py:152:    def manager_home(self) -> Path:
+src/csk/builds/cache.py:155:    def inspect(self, expectation: CacheExpectation) -> CacheInspection:
+src/csk/builds/cache.py:158:    def publish(
+src/csk/builds/cache.py:166:    def quarantine(
+src/csk/builds/cache.py:175:def cache_for_manager_home(manager_home: str | os.PathLike[str]) -> BuildCacheBackend:
+src/csk/builds/cache.py:188:def _require_sha256(value: str, label: str) -> None:
+src/csk/builds/cache_posix.py:63:class _MissingState(Exception):
+src/csk/builds/cache_posix.py:67:class _UntrustedState(Exception):
+src/csk/builds/cache_posix.py:71:class _CorruptState(Exception):
+src/csk/builds/cache_posix.py:76:class _VerifiedEntry:
+src/csk/builds/cache_posix.py:84:class PosixBuildCache:
+src/csk/builds/cache_posix.py:87:    def __init__(self, manager_home: str | os.PathLike[str]):
+src/csk/builds/cache_posix.py:109:    @property
+src/csk/builds/cache_posix.py:110:    def manager_home(self) -> Path:
+src/csk/builds/cache_posix.py:113:    def inspect(self, expectation: CacheExpectation) -> CacheInspection:
+src/csk/builds/cache_posix.py:173:    def publish(
+src/csk/builds/cache_posix.py:182:    def _publish_locked(
+src/csk/builds/cache_posix.py:447:    def quarantine(
+src/csk/builds/cache_posix.py:502:    def _artifact_path(self, key: str, build_input: _metadata.GoBuildInput) -> Path:
+src/csk/builds/cache_posix.py:512:def _protection_supported() -> bool:
+src/csk/builds/cache_posix.py:537:def _rename_noreplace_available() -> bool:
+src/csk/builds/cache_posix.py:546:def _effective_uid() -> int:
+src/csk/builds/cache_posix.py:555:def _artifact_name(build_input: _metadata.GoBuildInput) -> str:
+src/csk/builds/cache_posix.py:564:def _key_component(cache_key: str) -> str:
+src/csk/builds/cache_posix.py:578:def _require_guard(guard: CacheMutationGuard) -> None:
+src/csk/builds/cache_posix.py:593:def _directory_flags() -> int:
+src/csk/builds/cache_posix.py:602:def _file_flags() -> int:
+src/csk/builds/cache_posix.py:613:def _open_manager_home(path: Path) -> Iterator[int]:
+src/csk/builds/cache_posix.py:630:def _open_private_directory_at(
+src/csk/builds/cache_posix.py:661:def _open_protected_file_at(
+src/csk/builds/cache_posix.py:704:def _validate_manager_home(descriptor: int) -> None:
+src/csk/builds/cache_posix.py:719:def _validate_directory(descriptor: int, label: str, expected_mode: int) -> None:
+src/csk/builds/cache_posix.py:734:def _validate_regular_file(
+src/csk/builds/cache_posix.py:757:def _inspect_entry_at(
+src/csk/builds/cache_posix.py:837:def _directory_names(descriptor: int, label: str) -> list[str]:
+src/csk/builds/cache_posix.py:844:def _read_bounded_file(
+src/csk/builds/cache_posix.py:869:def _hash_file(
+src/csk/builds/cache_posix.py:896:def _publication_error(detail: str) -> BuildCacheError:
+src/csk/builds/cache_posix.py:900:def _stable_file_state(
+src/csk/builds/cache_posix.py:926:def _open_publication_source(path: Path) -> Iterator[tuple[int, os.stat_result]]:
+src/csk/builds/cache_posix.py:978:def _validate_publication_source_state(
+src/csk/builds/cache_posix.py:991:def _open_or_replace_auxiliary_root(
+src/csk/builds/cache_posix.py:1005:def _open_live_driver_for_publish(
+src/csk/builds/cache_posix.py:1031:def _open_or_create_private_directory(
+src/csk/builds/cache_posix.py:1088:def _create_stage_name(staging_fd: int) -> str:
+src/csk/builds/cache_posix.py:1103:def _write_staged_entry(
+src/csk/builds/cache_posix.py:1176:def _create_file_at(parent_fd: int, name: str, mode: int) -> int:
+src/csk/builds/cache_posix.py:1187:def _write_all(descriptor: int, raw: bytes) -> None:
+src/csk/builds/cache_posix.py:1196:def _seal_published_entry(driver_fd: int, entry_name: str) -> None:
+src/csk/builds/cache_posix.py:1209:def _move_aside(
+src/csk/builds/cache_posix.py:1298:def _unlock_owned_directory_for_move(
+src/csk/builds/cache_posix.py:1362:def _open_inaccessible_owned_directory_for_move(
+src/csk/builds/cache_posix.py:1389:def _open_linux_directory_for_move(
+src/csk/builds/cache_posix.py:1454:def _open_darwin_directory_for_move(
+src/csk/builds/cache_posix.py:1518:def _same_directory_identity(
+src/csk/builds/cache_posix.py:1530:def _directory_reference_flags_linux() -> int:
+src/csk/builds/cache_posix.py:1545:def _fchmod_opath_linux(descriptor: int, mode: int) -> None:
+src/csk/builds/cache_posix.py:1580:def _restore_moved_directory_mode(
+src/csk/builds/cache_posix.py:1594:def _reserve_move_destination(
+src/csk/builds/cache_posix.py:1624:def _remove_move_reservation(
+src/csk/builds/cache_posix.py:1639:def _remove_stage(staging_fd: int, stage_name: str) -> None:
+src/csk/builds/cache_posix.py:1669:def _artifact_files_equal(
+src/csk/builds/cache_posix.py:1708:def _open_artifact_at(
+src/csk/builds/cache_posix.py:1736:def _rename_noreplace(
+src/csk/builds/cache_posix.py:5:    <manager-home>/builds/go-v1/<64-hex-key>/
+src/csk/builds/cache_posix.py:11:Publication staging and quarantine live in separate manager-home namespaces so
+src/csk/builds/cache_posix.py:12:an entry appears below ``builds`` only as one complete atomic directory.
+src/csk/builds/cache_posix.py:39:    CacheMutationGuard,
+src/csk/builds/cache_posix.py:45:LIVE_ROOT_NAME: Final = "builds"
+src/csk/builds/cache_posix.py:46:STAGING_ROOT_NAME: Final = ".builds-staging"
+src/csk/builds/cache_posix.py:47:QUARANTINE_ROOT_NAME: Final = ".builds-quarantine"
+src/csk/builds/cache_posix.py:85:    """Protected immutable cache rooted below one trusted manager home."""
+src/csk/builds/cache_posix.py:87:    def __init__(self, manager_home: str | os.PathLike[str]):
+src/csk/builds/cache_posix.py:88:        raw = os.fspath(manager_home)
+src/csk/builds/cache_posix.py:90:            raise BuildCacheError("cache_home_invalid", "manager home is empty")
+src/csk/builds/cache_posix.py:94:                "manager home must be an absolute path",
+src/csk/builds/cache_posix.py:99:                "manager home must be a clean absolute path",
+src/csk/builds/cache_posix.py:101:        self._manager_home = Path(raw)
+src/csk/builds/cache_posix.py:103:        # The caller-held manager-home lock is the cross-process authority.
+src/csk/builds/cache_posix.py:110:    def manager_home(self) -> Path:
+src/csk/builds/cache_posix.py:111:        return self._manager_home
+src/csk/builds/cache_posix.py:124:            with _open_manager_home(self._manager_home) as home_fd:  # noqa: SIM117
+src/csk/builds/cache_posix.py:130:                ) as builds_fd:
+src/csk/builds/cache_posix.py:132:                        builds_fd,
+src/csk/builds/cache_posix.py:177:        guard: CacheMutationGuard,
+src/csk/builds/cache_posix.py:186:        guard: CacheMutationGuard,
+src/csk/builds/cache_posix.py:238:                with _open_manager_home(self._manager_home) as home_fd:  # noqa: SIM117
+src/csk/builds/cache_posix.py:451:        guard: CacheMutationGuard,
+src/csk/builds/cache_posix.py:453:        """Atomically move a live entry outside ``builds`` without traversing it."""
+src/csk/builds/cache_posix.py:463:            with _open_manager_home(self._manager_home) as home_fd:  # noqa: SIM117
+src/csk/builds/cache_posix.py:474:                        ) as builds_fd, _open_private_directory_at(
+src/csk/builds/cache_posix.py:475:                            builds_fd,
+src/csk/builds/cache_posix.py:494:            return self._manager_home / QUARANTINE_ROOT_NAME / moved
+src/csk/builds/cache_posix.py:504:            self._manager_home
+src/csk/builds/cache_posix.py:578:def _require_guard(guard: CacheMutationGuard) -> None:
+src/csk/builds/cache_posix.py:582:            "caller-held manager-home mutation lock is required",
+src/csk/builds/cache_posix.py:585:        guard.assert_held()
+src/csk/builds/cache_posix.py:589:            f"manager-home mutation lock is not held: {exc}",
+src/csk/builds/cache_posix.py:613:def _open_manager_home(path: Path) -> Iterator[int]:
+src/csk/builds/cache_posix.py:617:        raise _MissingState("manager home is absent") from exc
+src/csk/builds/cache_posix.py:620:            f"cannot open manager home without following links: {exc}"
+src/csk/builds/cache_posix.py:623:        _validate_manager_home(descriptor)
+src/csk/builds/cache_posix.py:704:def _validate_manager_home(descriptor: int) -> None:
+src/csk/builds/cache_posix.py:707:        raise _UntrustedState("manager home is not a directory")
+src/csk/builds/cache_posix.py:710:            "manager home owner does not match the effective user"
+src/csk/builds/cache_posix.py:714:        raise _UntrustedState("manager home is writable by group or other")
+src/csk/builds/cache_posix.py:716:        raise _UntrustedState("manager home does not grant owner control")
+src/csk/builds/cache_posix.py:1007:    guard: CacheMutationGuard,
+src/csk/builds/cache_posix.py:1018:            replacement_prefix="boundary-builds",
+src/csk/builds/cache_posix.py:1019:        ) as builds_fd:
+src/csk/builds/cache_posix.py:1022:                builds_fd,
+src/csk/builds/cache_posix.py:1171:        # caller still holds the manager-home mutation lock.
+tests/test_build_source.py:13:from csk.builds import _windows, source
+tests/test_build_metadata.py:14:from csk.builds import (
+tests/test_build_metadata.py:25:from csk.builds.toolchain import NativeTarget
+tests/test_build_metadata.py:457:    assert tuple(marker.builds) == ("golden-tool",)
+tests/test_build_metadata.py:458:    build = marker.builds["golden-tool"]
+tests/test_build_metadata.py:471:    payload = _json("schema-cases/install-marker-v2/valid-multiple-builds.json")
+tests/test_build_metadata.py:478:    payload["builds"] = dict(reversed(list(payload["builds"].items())))
+tests/test_build_metadata.py:492:    assert list(canonical["builds"]) == ["alpha-tool", "golden-tool"]
+tests/test_build_metadata.py:496:    payload = _json("schema-cases/install-marker-v2/valid-empty-builds.json")
+tests/test_build_metadata.py:532:    payload = _json("schema-cases/install-marker-v2/valid-empty-builds.json")
+tests/test_build_metadata.py:562:    payload = _json("schema-cases/install-marker-v2/valid-empty-builds.json")
+tests/test_build_metadata.py:570:    payload["builds"]["golden-tool"]["artifact_path"] = "bin/another-tool"
+src/csk/install_marker.py:4:receipt, lock, quarantine, and manager-home paths are deliberately absent from
+src/csk/install_marker.py:18:from .builds.metadata import GO_V1_DRIVER, derived_artifact_path
+src/csk/install_marker.py:19:from .builds.source import BuildSourceIdentity
+src/csk/install_marker.py:72:    {"build_roots", "builds"}
+src/csk/install_marker.py:360:    builds: Mapping[str, InstallMarkerBuild]
+src/csk/install_marker.py:380:        object.__setattr__(self, "builds", _freeze_builds(self.builds))
+src/csk/install_marker.py:382:        has_builds = bool(self.builds)
+src/csk/install_marker.py:383:        if has_builds != (self.build_source is not None):
+src/csk/install_marker.py:384:            requirement = "present" if has_builds else "absent"
+src/csk/install_marker.py:387:                f"build_source must be {requirement} exactly when builds is non-empty",
+src/csk/install_marker.py:391:        if has_builds:
+src/csk/install_marker.py:395:                    "non-empty marker-v2 builds require skill_schema_version 6",
+src/csk/install_marker.py:400:                    "non-empty marker-v2 builds require at least one build root",
+src/csk/install_marker.py:402:            for name, build in self.builds.items():
+src/csk/install_marker.py:413:        result["builds"] = {
+src/csk/install_marker.py:414:            name: build.to_json() for name, build in self.builds.items()
+src/csk/install_marker.py:463:        builds=_parse_builds(body["builds"]),
+src/csk/install_marker.py:552:def _parse_builds(value: Any) -> Mapping[str, InstallMarkerBuild]:
+src/csk/install_marker.py:553:    body = _require_object(value, "builds")
+src/csk/install_marker.py:557:        record = _require_object(raw, f"builds.{name}")
+src/csk/install_marker.py:562:            f"builds.{name}",
+src/csk/install_marker.py:612:def _freeze_builds(value: Any) -> Mapping[str, InstallMarkerBuild]:
+src/csk/install_marker.py:616:            f"builds must be an object, got {type(value).__name__}",
+src/csk/install_marker.py:624:                f"builds.{name} must be an InstallMarkerBuild",
+src/csk/builds/cache.py:4:portable build protocol. Physical manager-home layout and protection checks
+src/csk/builds/cache.py:140:class CacheMutationGuard(Protocol):
+src/csk/builds/cache.py:141:    """Caller-owned witness for the exclusive manager-home mutation lock."""
+src/csk/builds/cache.py:143:    def assert_held(self) -> None:
+src/csk/builds/cache.py:144:        """Raise if the exclusive manager-home lock is no longer held."""
+src/csk/builds/cache.py:152:    def manager_home(self) -> Path:
+src/csk/builds/cache.py:153:        """Return the clean absolute manager home without mutating it."""
+src/csk/builds/cache.py:162:        guard: CacheMutationGuard,
+src/csk/builds/cache.py:170:        guard: CacheMutationGuard,
+src/csk/builds/cache.py:175:def cache_for_manager_home(manager_home: str | os.PathLike[str]) -> BuildCacheBackend:
+src/csk/builds/cache.py:181:        return PosixBuildCache(manager_home)
+src/csk/builds/cache.py:200:    "CacheMutationGuard",
+src/csk/builds/cache.py:204:    "cache_for_manager_home",
+tests/test_skillspec.py:526:def test_schema_v6_without_builds_keeps_empty_build_domain(tmp_path):
+src/csk/skillspec.py:10:from .builds import GO_V1_DRIVER
+tests/test_builds_toolchain.py:12:from csk.builds import toolchain
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm[simple]>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cocoaskills"
+dynamic = ["version"]
+description = "Local skill manager for AI agent skills with reproducible per-project installs"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+  { name = "Ivan Oparin", email = "oparin@me.com" }
+]
+keywords = [
+  "skills",
+  "ai-agents",
+  "claude-code",
+  "cursor",
+  "codex",
+  "gemini",
+  "dependency-manager",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development",
+  "Topic :: Software Development :: Build Tools",
+  "Topic :: System :: Software Distribution",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9",
+  "build>=1.2",
+  "twine>=5",
+  "mypy>=1.14",
+  "cryptography>=44",
+]
+
+[project.scripts]
+csk = "csk.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ivanopcode/cocoaskills"
+Source = "https://github.com/ivanopcode/cocoaskills"
+Issues = "https://github.com/ivanopcode/cocoaskills/issues"
+Changelog = "https://github.com/ivanopcode/cocoaskills/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/ivanopcode/cocoaskills/blob/main/docs/mvp-design.md"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"csk.audit" = ["prompts/*.md", "prompts/*.json"]
+
+[tool.setuptools_scm]
+version_file = "src/csk/_version.py"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["src/csk"]
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests / Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout Curator Protocol conformance suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: f5d7673039226ab81de2f4f87e2155ae995c4df3
+          path: protocol-spec
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
+      - name: Configure git (POSIX)
+        if: runner.os != 'Windows'
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+          git config --global init.defaultBranch main
+
+      - name: Configure git (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+          git config --global init.defaultBranch main
+          git config --global core.autocrlf false
+          git config --global core.symlinks false
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run tests
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+        run: python -m pytest -v
+
+  typecheck:
+    name: Type check / mypy strict
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run mypy
+        run: python -m mypy
+
+  build:
+    name: Build artifacts
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Verify metadata
+        run: twine check dist/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error

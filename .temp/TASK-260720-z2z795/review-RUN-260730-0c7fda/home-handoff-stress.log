@@ -1,0 +1,62 @@
+iteration=1
+.                                                                        [100%]
+1 passed in 7.76s
+iteration=2
+.                                                                        [100%]
+1 passed in 8.38s
+iteration=3
+.                                                                        [100%]
+1 passed in 8.25s
+iteration=4
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_repeated_concurrent_home_consumers_survive_release_handoffs _______
+
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-124/test_repeated_concurrent_home_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107457790>
+
+    def test_repeated_concurrent_home_consumers_survive_release_handoffs(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        home = tmp_path / "home"
+        worker_count = 12
+        barrier = threading.Barrier(worker_count)
+        acquired: list[int] = []
+        errors: list[Exception] = []
+        real_record_released = ManagerHomeLock._record_released
+    
+        def delayed_record_released(lock: ManagerHomeLock) -> None:
+            time.sleep(0.002)
+            real_record_released(lock)
+    
+        monkeypatch.setattr(
+            ManagerHomeLock,
+            "_record_released",
+            delayed_record_released,
+        )
+    
+        def consume(index: int) -> None:
+            try:
+                barrier.wait(timeout=2)
+                with ManagerHomeLock(home, timeout=5):
+                    acquired.append(index)
+            except Exception as exc:  # noqa: BLE001 - surface worker failures in the parent test
+                errors.append(exc)
+    
+        threads = [
+            threading.Thread(target=consume, args=(index,)) for index in range(worker_count)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=7)
+    
+>       assert not any(thread.is_alive() for thread in threads)
+E       assert not True
+E        +  where True = any(<generator object test_repeated_concurrent_home_consumers_survive_release_handoffs.<locals>.<genexpr> at 0x106ae4c70>)
+
+tests/test_locking.py:1308: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_locking.py::test_repeated_concurrent_home_consumers_survive_release_handoffs
+1 failed in 8.21s

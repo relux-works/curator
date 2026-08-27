@@ -1,0 +1,12 @@
+--- /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2284br/negative-control-r5/generation.go.orig	2026-07-28 19:45:43
++++ internal/install/generation.go	2026-07-28 19:46:45
+@@ -92,7 +92,8 @@
+ 	if err != nil {
+ 		return document{}, err
+ 	}
+-	return document{payload: payload, exists: true, generation: digestDeclaration(payload)}, nil
++	separate, _ := os.ReadFile(path)
++	return document{payload: payload, exists: true, generation: digestDeclaration(separate)}, nil
+ }
+ 
+ // documentGeneration re-reads one declaration document and reports the

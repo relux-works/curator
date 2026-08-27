@@ -1,0 +1,46 @@
+ok  	github.com/relux-works/curator/cmd/curator	2.684s
+ok  	github.com/relux-works/curator/internal/adapters	1.263s
+ok  	github.com/relux-works/curator/internal/audit	1.905s
+ok  	github.com/relux-works/curator/internal/buildcache	3.140s
+ok  	github.com/relux-works/curator/internal/buildmeta	0.907s
+ok  	github.com/relux-works/curator/internal/buildsource	2.232s
+ok  	github.com/relux-works/curator/internal/capabilities	5.235s
+ok  	github.com/relux-works/curator/internal/closure	7.012s
+ok  	github.com/relux-works/curator/internal/config	2.963s
+ok  	github.com/relux-works/curator/internal/devsub	3.561s
+ok  	github.com/relux-works/curator/internal/envfiles	1.588s
+ok  	github.com/relux-works/curator/internal/gitignore	4.052s
+ok  	github.com/relux-works/curator/internal/gitops	4.967s
+ok  	github.com/relux-works/curator/internal/globalbins	4.927s
+--- FAIL: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (30.96s)
+    --- FAIL: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/availability-probe (15.32s)
+        boundary_test.go:66: go-v1 process_timeout: Go probe exceeded its deadline
+--- FAIL: TestWorkerRejectsEveryIdentityAndRequestMutation (28.18s)
+    --- FAIL: TestWorkerRejectsEveryIdentityAndRequestMutation/executable_digest_mismatch (15.03s)
+        worker_test.go:289: go-v1 process_timeout: Go probe exceeded its deadline
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	89.008s
+ok  	github.com/relux-works/curator/internal/hashing	4.527s
+ok  	github.com/relux-works/curator/internal/identifiers	4.907s
+ok  	github.com/relux-works/curator/internal/identity	4.881s
+ok  	github.com/relux-works/curator/internal/interop	4.829s
+ok  	github.com/relux-works/curator/internal/locale	4.933s
+ok  	github.com/relux-works/curator/internal/managerlock	5.835s
+ok  	github.com/relux-works/curator/internal/manifest	4.753s
+ok  	github.com/relux-works/curator/internal/marker	4.903s
+ok  	github.com/relux-works/curator/internal/mcp	5.027s
+ok  	github.com/relux-works/curator/internal/protocoljson	4.938s
+ok  	github.com/relux-works/curator/internal/registry	6.135s
+ok  	github.com/relux-works/curator/internal/runtimestore	36.787s
+ok  	github.com/relux-works/curator/internal/scopes	4.599s
+ok  	github.com/relux-works/curator/internal/shell	5.052s
+ok  	github.com/relux-works/curator/internal/skillcheck	4.967s
+ok  	github.com/relux-works/curator/internal/skillspec	26.793s
+ok  	github.com/relux-works/curator/internal/snapshot	28.171s
+ok  	github.com/relux-works/curator/internal/staging	26.701s
+ok  	github.com/relux-works/curator/internal/transaction	52.458s
+ok  	github.com/relux-works/curator/internal/ui	26.918s
+ok  	github.com/relux-works/curator/internal/verr	26.692s
+ok  	github.com/relux-works/curator/internal/version	26.638s
+ok  	github.com/relux-works/curator/internal/whitelist	26.820s
+FAIL

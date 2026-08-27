@@ -1,0 +1,45 @@
+{
+  "id": "RUN-260728-b72cf7",
+  "task_id": "TASK-260729-1kq1rd",
+  "created_at": "2026-07-28T23:37:08.013388Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[analyst] researcher (codex)",
+  "role": "researcher",
+  "role_archetype": "analyst",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-03-37-08_-analyst--researcher--codex-_TASK-260729-1kq1rd.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260729-1kq1rd_spawn-log_-analyst--researcher--codex-_RUN-260728-b72cf7.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "require_outcome_artifact": true
+}

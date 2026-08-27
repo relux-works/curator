@@ -1,0 +1,13 @@
+package	test	class	verdict	reason
+internal/buildcache	TestCandidateCacheOutcomeVocabulary/shared_publication_vocabulary	root-content	allowed-root-content	this conformance root publishes no cache_publication_cases group
+internal/buildsource	TestBuildSourceIdentityVectors/duplicate-build-source-path	host-capability	allowed-host-capability	this host folds the alias into one directory member, so no duplicate encoded path is reachable
+internal/buildsource	TestBuildSourceIdentityVectors/invalid-unicode-build-source-path	host-capability	allowed-host-capability	this host cannot create a non-UTF-8 filename: open /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBuildSourceIdentityVectorsinvalid-unicode-build-source-path1353774800/001/ufffd: illegal byte sequence
+internal/closure	TestBuildCommandOrderingConformanceVector	root-content	allowed-root-content	this conformance root publishes no build_order_cases group
+internal/godriver	TestBuildFailsClosedWhenTheGoChildCannotStart	platform-control	tolerated-by-ledger	active-process-count-limit is available only on Windows in rc5-native-control-inventory-v1
+internal/godriver	TestFingerprintRejectsInvalidUnicodePath	host-capability	allowed-host-capability	filesystem rejects invalid UTF-8 names: open /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestFingerprintRejectsInvalidUnicodePath2553793907/001/ufffd: illegal byte sequence
+internal/godriver	TestRealGoV1VendoredBuildIsBoundedAndNotLaunched	opt-in	allowed-opt-in	set CURATOR_REAL_GO_BUILD_TEST=1 for the bounded native go-v1 integration
+internal/godriver	TestRealTrustedGoProbe	opt-in	allowed-opt-in	set CURATOR_REAL_GO_TEST=1 for the bounded native toolchain probe
+internal/godriver	TestToolchainIdentityVectors/invalid-unicode-toolchain-path	host-capability	allowed-host-capability	this host cannot create a non-UTF-8 filename: open /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestToolchainIdentityVectorsinvalid-unicode-toolchain-path1829259097/001/bin/ufffd: illegal byte sequence
+internal/hashing	TestCrossCheckTree	opt-in	tolerated-by-ledger	cross-check env not set
+internal/install	TestInstallHelperProcess	helper-process	allowed-helper-process	helper process
+internal/shell	TestPowerShellHookRunsOnEveryPrompt	platform-control	tolerated-by-ledger	PowerShell prompt integration is exercised on Windows

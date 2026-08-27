@@ -1,0 +1,266 @@
+TASK-260720-z2z795 INDEPENDENT REVIEW VALIDATION
+run: RUN-260730-fd059d
+date: 2026-07-30
+worktree: /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/worktree
+branch: task/TASK-260720-z2z795-transaction-engine
+HEAD: d0d91788bc01c6590dec49a0dd296a78e95fd44b
+upstream: d0d91788bc01c6590dec49a0dd296a78e95fd44b
+verdict: accepted
+
+RUN CONTROL
+
+command: task-board spawn goal "$TASK_BOARD_RUN_ID"
+exit: 0
+result: Active Goal: none (run is not goal-bound)
+
+command: task-board spawn directives "$TASK_BOARD_RUN_ID"
+exit: 0
+result: No directives recorded for RUN-260730-fd059d
+
+TOOL READINESS
+
+task-board version 0.23.0 (commit beec6e9, built 2026-07-27T23:36:53Z)
+git version 2.50.1 (Apple Git-155)
+ripgrep 15.2.0
+Python 3.11.14
+pytest 8.3.4
+Python 3.14.4
+pytest 9.0.3
+mypy 2.1.0 (compiled: yes)
+mypy 2.3.0 (compiled: yes)
+ruff 0.16.0
+build 1.5.0
+
+WINDOWS CI CLUSTER SELECTION — PYTHON 3.11
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_transactions.py::test_windows_staging_mode_identity_uses_only_the_settable_read_only_bit
+  tests/test_transactions.py::test_windows_cleanup_mode_identity_detects_read_only_attribute_changes
+  tests/test_transactions.py::test_read_only_targets_stage_commit_and_cleanup
+  tests/test_transactions.py::test_read_only_directory_rollback_restores_mode_and_cleans_sidecars
+  tests/test_transactions.py::test_recovery_discards_crash_during_read_only_mode_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_finishes_crash_during_read_only_committed_cleanup
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+exit: 0
+result: 15 passed in 6.12s
+
+WINDOWS CI CLUSTER SELECTION — PYTHON 3.14
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+  tests/test_transactions.py::test_windows_staging_mode_identity_uses_only_the_settable_read_only_bit
+  tests/test_transactions.py::test_windows_cleanup_mode_identity_detects_read_only_attribute_changes
+  tests/test_transactions.py::test_read_only_targets_stage_commit_and_cleanup
+  tests/test_transactions.py::test_read_only_directory_rollback_restores_mode_and_cleans_sidecars
+  tests/test_transactions.py::test_recovery_discards_crash_during_read_only_mode_finalization
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_staging_finalization
+  tests/test_transactions.py::test_recovery_finishes_crash_during_read_only_committed_cleanup
+  tests/test_transactions.py::test_recovery_rejects_foreign_mode_during_read_only_cleanup
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+exit: 0
+result: 15 passed in 5.54s
+
+PRESCRIBED PRIOR LOCK-INTEGRITY REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_legacy_dead_lock_record_requires_offline_migration
+  tests/test_locking.py::test_released_lock_file_remains_and_can_be_reacquired
+  tests/test_locking.py::test_crashed_owner_and_barrier_contenders_share_one_stable_lock
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/projects/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds]
+  tests/test_transactions.py::test_prepare_rejects_manager_lock_namespaces_before_mutation[locks/builds/arbitrary.lock]
+  tests/test_transactions.py::test_prepare_rejects_held_project_lock_and_preserves_both_witnesses
+  tests/test_transactions.py::test_build_plan_rejects_held_build_lock_and_preserves_outer_witnesses
+  tests/test_transactions.py::test_prepare_rejects_physical_alias_of_project_lock_namespace
+  tests/test_transactions.py::test_corrupt_journal_cannot_redirect_live_target_into_home_lock
+  tests/test_transactions.py::test_commit_reports_home_lock_witness_loss_at_mutation_boundary
+exit: 0
+result: 14 passed in 5.35s
+
+CONTRACT-TARGETED REGRESSIONS
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q
+  tests/test_locking.py::test_project_locks_are_canonicalized_deduplicated_and_byte_sorted
+  tests/test_locking.py::test_home_lock_is_forbidden_while_build_lock_is_held_by_another_thread
+  tests/test_locking.py::test_pending_home_lock_blocks_project_and_build_acquisition
+  tests/test_transactions.py::test_journal_records_complete_ordered_recovery_state_and_consumer_commits_last
+  tests/test_transactions.py::test_recovery_completes_interrupted_commit_for_any_initiating_project
+  tests/test_transactions.py::test_commit_failure_rolls_back_in_exact_reverse_commit_order
+  tests/test_transactions.py::test_concurrent_project_transactions_preserve_both_consumers
+  tests/test_transactions.py::test_failed_second_project_restores_ledger_preimage_containing_first_success
+  tests/test_transactions.py::test_stale_preimage_is_rejected_without_overwriting_newer_state
+  tests/test_transactions.py::test_generation_change_is_rejected_at_commit
+exit: 0
+result: 13 passed in 13.50s
+
+FOCUSED LOCKING AND TRANSACTION PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 /opt/homebrew/bin/python3.11 -m pytest
+  -p no:cacheprovider -q tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: 129 passed, 4 skipped in 65.92s
+skip boundary:
+  Existing real-Windows durability and per-directory-case-sensitive first-use
+  cases remain platform-gated.
+
+STRICT MYPY — CANONICAL 2.1
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+result: Success: no issues found in 62 source files
+
+STRICT MYPY — COMPATIBILITY 2.3
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/ReluxWorks/cocoaskills-production/.temp/TASK-260720-z2z795/mypy-venv/bin/python
+  -m mypy --no-incremental
+exit: 0
+result: Success: no issues found in 62 source files
+
+RUFF LINT
+
+command:
+  uvx ruff check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: All checks passed!
+
+RUFF FORMAT
+
+command:
+  uvx ruff format --check src/csk/locking.py src/csk/transactions.py
+  tests/test_locking.py tests/test_transactions.py
+exit: 0
+result: 4 files already formatted
+
+FULL PYTHON 3.14 PYTEST
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest
+  -p no:cacheprovider -q
+exit: 0
+result: 808 passed, 58 skipped in 148.51s
+
+PACKAGE BUILD
+
+command:
+  PYTHONDONTWRITEBYTECODE=1
+  /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m build
+  --outdir
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-z2z795/reviewer/build
+exit: 0
+result:
+  Successfully built
+  cocoaskills-0.12.6.dev9+gd0d91788b.d20260730.tar.gz
+  cocoaskills-0.12.6.dev9+gd0d91788b.d20260730-py3-none-any.whl
+
+build SHA-256:
+  543b4e9906bd8665780177fbb823e53090f667aa92488d5cdb3b0a32bb6a21af
+    cocoaskills-0.12.6.dev9+gd0d91788b.d20260730-py3-none-any.whl
+  7a17016b5bac0dbdf531cd4e4a8a5b10f9ca8ec88925177ff5593779ec7992cc
+    cocoaskills-0.12.6.dev9+gd0d91788b.d20260730.tar.gz
+
+built wheel csk/transactions.py SHA-256:
+  6f5712bf7d0cf8cafdabc7fe5811e918b20ed7c564eb27b23591880dcf5cb6b2
+
+ADVERSARIAL PERMISSION-IDENTITY PROBE
+
+command:
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src
+  /opt/homebrew/bin/python3.11 -
+exit: 0
+result:
+  Windows 0666 versus 0644 accepted as the same writable identity.
+  Windows 0777 versus 0755 accepted as the same writable identity.
+  Windows read-only to writable and writable to read-only changes rejected.
+  POSIX group-write and execute-bit changes rejected.
+
+DIFF AND PROVENANCE
+
+command: git diff --check
+exit: 0
+result: empty
+
+command:
+  git merge-base --is-ancestor
+  6fc2fd97dbdf40f5b0e46f846eaa0d78a1b33d12 HEAD
+exit: 0
+result: empty
+
+command: git verify-commit HEAD
+exit: 0
+result:
+  Good "git" signature for oparin@me.com with ECDSA key
+  SHA256:V6JiKG7J29mjsvikcLoSVp0bLa77VTsFy12gnLO81cM
+
+command: git rev-parse HEAD
+exit: 0
+result: d0d91788bc01c6590dec49a0dd296a78e95fd44b
+
+command: git rev-parse '@{upstream}'
+exit: 0
+result: d0d91788bc01c6590dec49a0dd296a78e95fd44b
+
+command: git diff --name-only
+exit: 0
+result:
+  src/csk/transactions.py
+  tests/test_transactions.py
+
+command: git status --short --branch
+exit: 0
+result:
+  ## task/TASK-260720-z2z795-transaction-engine...origin/task/TASK-260720-z2z795-transaction-engine
+   M src/csk/transactions.py
+   M tests/test_transactions.py
+
+source SHA-256:
+  6ca6f7b792fba0abd5e25109975e1928b403e5ceb818a45cf48545fc6c5a6aa6
+    src/csk/locking.py
+  6f5712bf7d0cf8cafdabc7fe5811e918b20ed7c564eb27b23591880dcf5cb6b2
+    src/csk/transactions.py
+  5b8e7a1a91a3e442e905c3be0037ecdb5747c1b1d2cffd464246af75df80d582
+    tests/test_locking.py
+  1d21d2513b2ef06f435c905eda8a0bf8f3e74c156bd07bea67557119420028a6
+    tests/test_transactions.py
+
+OFFICIAL PLATFORM CONTRACT
+
+Python os.chmod:
+  https://docs.python.org/3/library/os.html#os.chmod
+  On Windows only the read-only flag is settable through stat.S_IWRITE and
+  stat.S_IREAD; all other permission bits are ignored.
+
+PLATFORM AND REVIEWER BOUNDARY
+
+The run executed on macOS. The current two-file patch is unstaged and
+uncommitted, so no current-byte real-Windows CI result is claimed. The
+commit-owning mover should commit the accepted hashes and rerun the Windows
+Python 3.11/3.12/3.13/3.14 matrix before publication.
+
+The reviewer changed no product or test source, staged or committed nothing,
+performed no fetch/reset/rebase/push/tag/release/SSH operation, and supplied no
+commit_ack.

@@ -1,0 +1,26 @@
+--- /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1zntv0/worktree/internal/install/install.go	2026-07-28 18:15:09
++++ /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-2284br/reviewer/aba-overlay/install.go	2026-07-28 19:22:23
+@@ -36,6 +36,9 @@
+ 	"github.com/relux-works/curator/internal/skillspec"
+ )
+ 
++var reviewerAfterProjectManifestObserve func()
++var reviewerAfterProjectManifestLoad func()
++
+ // Options control one installation run.
+ type Options struct {
+ 	DryRun       bool
+@@ -175,7 +178,13 @@
+ 	// holding no operation lock, so it can gain, lose, or retarget a
+ 	// declaration at any point during this run.
+ 	observed.observe(projectManifestKey, manifest.PathIn(projectRoot))
++	if reviewerAfterProjectManifestObserve != nil {
++		reviewerAfterProjectManifestObserve()
++	}
+ 	projectManifest, err := manifest.Load(projectRoot)
++	if reviewerAfterProjectManifestLoad != nil {
++		reviewerAfterProjectManifestLoad()
++	}
+ 	if err != nil {
+ 		result.failf("%v", err)
+ 		return result, nil

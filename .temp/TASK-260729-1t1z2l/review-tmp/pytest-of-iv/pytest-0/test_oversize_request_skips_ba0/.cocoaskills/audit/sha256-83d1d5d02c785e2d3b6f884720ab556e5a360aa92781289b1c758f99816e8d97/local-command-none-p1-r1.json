@@ -1,0 +1,34 @@
+{
+  "backend": "local-command",
+  "canary_passed": true,
+  "cloud": false,
+  "commit": "403169103245cc6ba3f4a180a2a383e0e6105be9",
+  "content_sha256": "sha256:83d1d5d02c785e2d3b6f884720ab556e5a360aa92781289b1c758f99816e8d97",
+  "decision": "block",
+  "findings": [
+    {
+      "capability_violation": null,
+      "category": "audit-incomplete",
+      "confidence": "high",
+      "detector": "audit.request",
+      "evidence": "Audit request is 886 bytes, limit is 1 bytes",
+      "id": "audit.request.too-large",
+      "location": null,
+      "severity": "high",
+      "surface": "manifest",
+      "verifiable": true
+    }
+  ],
+  "model": null,
+  "prompt_version": 1,
+  "ran_at": "2026-07-29T00:20:06.287894+00:00",
+  "ruleset_version": 1,
+  "schema_version": 1,
+  "skill": "skill-a",
+  "source": "skill-a",
+  "trust": {
+    "pinned": false,
+    "pinned_by": null,
+    "reason": null
+  }
+}

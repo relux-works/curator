@@ -1,0 +1,91 @@
+=== RUN   TestRejectsSpecialFile
+--- PASS: TestRejectsSpecialFile (0.00s)
+=== RUN   TestAuthoritativeFramingVectors
+=== RUN   TestAuthoritativeFramingVectors/empty
+=== RUN   TestAuthoritativeFramingVectors/binary_ordering_marker_and_framing
+=== RUN   TestAuthoritativeFramingVectors/legacy_structural_collision_is_separated
+--- PASS: TestAuthoritativeFramingVectors (0.00s)
+    --- PASS: TestAuthoritativeFramingVectors/empty (0.00s)
+    --- PASS: TestAuthoritativeFramingVectors/binary_ordering_marker_and_framing (0.00s)
+    --- PASS: TestAuthoritativeFramingVectors/legacy_structural_collision_is_separated (0.00s)
+=== RUN   TestMarkerChangesBuildSourceButNotLegacyHash
+--- PASS: TestMarkerChangesBuildSourceButNotLegacyHash (0.00s)
+=== RUN   TestModesAndTimestampsAreNotFrozenInputs
+--- PASS: TestModesAndTimestampsAreNotFrozenInputs (0.00s)
+=== RUN   TestRejectsInvalidPathsLinksAndCollisions
+=== RUN   TestRejectsInvalidPathsLinksAndCollisions/invalid_protocol_path
+=== RUN   TestRejectsInvalidPathsLinksAndCollisions/symbolic_link
+=== RUN   TestRejectsInvalidPathsLinksAndCollisions/symbolic_link_root
+=== RUN   TestRejectsInvalidPathsLinksAndCollisions/duplicate_encoded_path
+=== RUN   TestRejectsInvalidPathsLinksAndCollisions/invalid_UTF-8
+=== RUN   TestRejectsInvalidPathsLinksAndCollisions/case-insensitive_platform_collision
+=== RUN   TestRejectsInvalidPathsLinksAndCollisions/normalizing_platform_collision
+--- PASS: TestRejectsInvalidPathsLinksAndCollisions (0.00s)
+    --- PASS: TestRejectsInvalidPathsLinksAndCollisions/invalid_protocol_path (0.00s)
+    --- PASS: TestRejectsInvalidPathsLinksAndCollisions/symbolic_link (0.00s)
+    --- PASS: TestRejectsInvalidPathsLinksAndCollisions/symbolic_link_root (0.00s)
+    --- PASS: TestRejectsInvalidPathsLinksAndCollisions/duplicate_encoded_path (0.00s)
+    --- PASS: TestRejectsInvalidPathsLinksAndCollisions/invalid_UTF-8 (0.00s)
+    --- PASS: TestRejectsInvalidPathsLinksAndCollisions/case-insensitive_platform_collision (0.00s)
+    --- PASS: TestRejectsInvalidPathsLinksAndCollisions/normalizing_platform_collision (0.00s)
+=== RUN   TestFrozenTokenRejectsMutation
+=== RUN   TestFrozenTokenRejectsMutation/file_bytes
+=== RUN   TestFrozenTokenRejectsMutation/tree
+=== RUN   TestFrozenTokenRejectsMutation/file_type
+--- PASS: TestFrozenTokenRejectsMutation (0.00s)
+    --- PASS: TestFrozenTokenRejectsMutation/file_bytes (0.00s)
+    --- PASS: TestFrozenTokenRejectsMutation/tree (0.00s)
+    --- PASS: TestFrozenTokenRejectsMutation/file_type (0.00s)
+=== RUN   TestFrozenTokenRejectsRootReplacement
+--- PASS: TestFrozenTokenRejectsRootReplacement (0.00s)
+=== RUN   TestWithValidatedOrdersCallbackAndRejectsMutation
+--- PASS: TestWithValidatedOrdersCallbackAndRejectsMutation (0.00s)
+=== RUN   TestBuildSourceConformanceVectors
+=== RUN   TestBuildSourceConformanceVectors/fixture-exact-build-source
+=== RUN   TestBuildSourceConformanceVectors/domain-prefix-ordering-framing-empty-binary-and-root-marker
+--- PASS: TestBuildSourceConformanceVectors (0.01s)
+    --- PASS: TestBuildSourceConformanceVectors/fixture-exact-build-source (0.01s)
+    --- PASS: TestBuildSourceConformanceVectors/domain-prefix-ordering-framing-empty-binary-and-root-marker (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/buildsource	0.453s
+=== RUN   TestGetCachesValidatedCommitTree
+--- PASS: TestGetCachesValidatedCommitTree (0.12s)
+=== RUN   TestGetRepairsTamperedOrIncompleteCache
+=== RUN   TestGetRepairsTamperedOrIncompleteCache/changed_file
+=== RUN   TestGetRepairsTamperedOrIncompleteCache/changed_root_marker
+=== RUN   TestGetRepairsTamperedOrIncompleteCache/missing_file
+=== RUN   TestGetRepairsTamperedOrIncompleteCache/extra_file
+=== RUN   TestGetRepairsTamperedOrIncompleteCache/link
+--- PASS: TestGetRepairsTamperedOrIncompleteCache (0.30s)
+    --- PASS: TestGetRepairsTamperedOrIncompleteCache/changed_file (0.05s)
+    --- PASS: TestGetRepairsTamperedOrIncompleteCache/changed_root_marker (0.04s)
+    --- PASS: TestGetRepairsTamperedOrIncompleteCache/missing_file (0.04s)
+    --- PASS: TestGetRepairsTamperedOrIncompleteCache/extra_file (0.04s)
+    --- PASS: TestGetRepairsTamperedOrIncompleteCache/link (0.04s)
+=== RUN   TestGetValidatesRepositoryBeforeReusingCache
+--- PASS: TestGetValidatesRepositoryBeforeReusingCache (0.18s)
+=== RUN   TestConcurrentGetPublishesOneValidSnapshot
+--- PASS: TestConcurrentGetPublishesOneValidSnapshot (0.12s)
+=== RUN   TestConcurrentGetRepairsPresentTamperedSnapshotAtomically
+--- PASS: TestConcurrentGetRepairsPresentTamperedSnapshotAtomically (0.25s)
+=== RUN   TestGetRepairsTamperedSelectionAndGenerationTypes
+--- PASS: TestGetRepairsTamperedSelectionAndGenerationTypes (0.15s)
+=== RUN   TestSnapshotLockSerializesCallers
+--- PASS: TestSnapshotLockSerializesCallers (0.05s)
+PASS
+ok  	github.com/relux-works/curator/internal/snapshot	1.966s
+=== RUN   TestCrossCheckTree
+    crosscheck_test.go:15: cross-check env not set
+--- SKIP: TestCrossCheckTree (0.00s)
+=== RUN   TestByteLayout
+--- PASS: TestByteLayout (0.00s)
+=== RUN   TestMarkerExcluded
+--- PASS: TestMarkerExcluded (0.00s)
+=== RUN   TestEmptyTree
+--- PASS: TestEmptyTree (0.00s)
+=== RUN   TestOrderIndependence
+--- PASS: TestOrderIndependence (0.00s)
+=== RUN   TestNormalize
+--- PASS: TestNormalize (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/hashing	1.136s

@@ -1,0 +1,5 @@
+Command harness failure before go test execution:
+zsh:1: no such file or directory: .temp/TASK-260823-37vckg/go-readiness-01.log
+zsh:6: read-only variable: status
+
+Cause: paths were relative to the detached reviewer worktree and `status` is reserved by zsh.

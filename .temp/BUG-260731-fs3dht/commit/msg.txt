@@ -1,0 +1,59 @@
+Resolve the trusted GOROOT the way the host resolves it
+
+On windows-latest the go-v1 boundary refuses the runner's own Go installation:
+`go_toolchain_missing: trusted GOROOT is not a real directory`. The native
+artifact from run 30623699047 names the host fact behind it. actions/setup-go
+leaves `C:\hostedtoolcache\windows\go\1.25.5\x64` carrying attributes 0x410 and
+reparse tag 0xa0000003 -- FILE_ATTRIBUTE_DIRECTORY plus a directory junction,
+IO_REPARSE_TAG_MOUNT_POINT -- while `bin\go.exe` under it stats normally and
+every build in the same job runs through it.
+
+A junction is a name surrogate, so since Go 1.23 os.Lstat suppresses ModeDir
+for it and, as its tag is neither symlink, socket, nor dedup, adds
+ModeIrregular: `mode=?rw-rw-rw-`, size 0. filepath.EvalSymlinks follows a
+component only where that lstat reports ModeSymlink, so it hands the junction
+straight back, unresolved and err=nil, which is what the artifact records. The
+selection then asks whether that redirection is a real directory and is
+correctly told no -- about a directory that opens, lists and traverses fine.
+Behind that first rejection sat a second: walkSymlinks answers ENOTDIR for a
+non-symlink non-directory intermediate component, so resolving the derived
+`<junction>\bin\go.exe` would have failed too.
+
+So the defect is not the directory check. It is that filepath.EvalSymlinks is
+not the host's path resolver on Windows, and the boundary was reading the
+answer of the wrong one. This adds a platform physicalPath hook and routes the
+package's canonicalization through it: EvalSymlinks on POSIX, where a symbolic
+link is the only redirection a component can carry, and on Windows
+GetFinalPathNameByHandle over a handle opened without
+FILE_FLAG_OPEN_REPARSE_POINT -- the kernel already resolved every reparse point
+to open it, so the final name is where the handle landed. That result is passed
+through EvalSymlinks afterwards rather than instead, so the spelling compared
+here is normalized by the same function on both platforms.
+
+Nothing is relaxed by this. The trusted root is still required to lstat as a
+plain directory that is not a symlink, its identity is still frozen and
+re-proved with os.SameFile, the launcher is still derived from the root and
+never searched for on PATH, no toolchain is downloaded, and no case is skipped
+on any platform. What changes is which location those checks are about: the
+physical directory instead of the junction naming it. That is strictly stronger
+-- a junction re-aimed after selection cannot alter a root that was never held
+by its name -- and it is what EvalSymlinks already gave the boundary on POSIX.
+
+The launcher re-proof inside the worker moves with it, since parent and worker
+must decide canonicality by one rule, and so does the manager executable, which
+would refuse to resolve at all under an installation reached through a junction.
+
+Coverage: internal/godriver builds a real IO_REPARSE_TAG_MOUNT_POINT junction
+and proves selection through it -- by GOROOT, by CURATOR_GO, and through the
+runtime fallback with the private probe base junctioned as well -- lands on the
+physical root, keeps that root's own identity, and satisfies the worker's
+launcher re-proof; the extended-length spellings are covered including the
+volume-GUID form, which is refused rather than returned as a silently relative
+path. A GOROOT naming a regular file is refused, so a relaxed directory check
+fails a case rather than passing one. The host-toolchain case in cmd/curator
+now also asserts the selected root is a plain directory holding the selected
+launcher, which a relaxed check would fail.
+
+internal/godriver/controls_other.go drops an unreachable destroy: it is called
+only after a launch that succeeded, which cannot happen on a platform outside
+the native control inventory, and `unused` reported it on the Lint lane.

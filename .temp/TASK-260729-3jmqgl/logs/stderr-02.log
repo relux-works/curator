@@ -1,0 +1,42 @@
+
+platform            macOS / 26.5 (arm64)
+backend             macos-sandbox-v1 (unqualified)
+outcome             rejected
+rejected before     capability-probe
+diagnostic          hardened_capability_unavailable
+
+capability classes
+  domain-membership-enforcement      unavailable  not-applied  detached-descendant-membership (adversarial): membership-renounced
+  domain-atomic-termination          unavailable  not-applied  detached-descendant-survives (adversarial): survivor
+  network-syscall-denial             available    applied
+  preexisting-endpoint-revocation    unavailable  not-applied  write-inherited-endpoint (positive): allowed
+  read-only-source-view              available    applied
+  read-only-toolchain-view           available    applied
+  write-path-confinement             available    applied
+  filesystem-view-restriction        unavailable  not-applied  readdir-root (adversarial): allowed
+  exec-path-allowlist                available    applied
+  aggregate-resource-bounds          unavailable  not-applied  descriptor-budget-is-per-process (adversarial): per-process-only
+  active-capability-probe            available    applied
+
+guarantees
+  total-network-denial                         not established
+  read-only-source-and-toolchain               not established
+  private-build-root-only-writes               not established
+  hard-aggregate-descendant-resource-bounds    not established
+  exact-executable-allowlisting                not established
+  fail-closed-capability-preflight             established
+
+fail-closed sweep
+  domain-membership-enforcement      ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  domain-atomic-termination          ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  network-syscall-denial             ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  preexisting-endpoint-revocation    ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  read-only-source-view              ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  read-only-toolchain-view           ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  write-path-confinement             ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  filesystem-view-restriction        ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  exec-path-allowlist                ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  aggregate-resource-bounds          ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+  active-capability-probe            ok   rejected before capability-probe with hardened_capability_unavailable (exit 1)
+
+This is a capability observation, not an enforcement claim. macos remains unqualified.

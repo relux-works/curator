@@ -1,0 +1,47 @@
+@startuml
+!theme plain
+!pragma layout smetana
+
+title Protocol schema v6 — task and artifact ownership
+top to bottom direction
+skinparam componentStyle rectangle
+
+package "Normative contract" #LightBlue {
+  [TASK-260720-1nvomm\nCore, security, ADR] as Core
+  [TASK-260720-17llva\nManager profile] as Manager
+}
+
+package "Wire schemas" #LightGreen {
+  [TASK-260720-wajgn8\nManifest v6 pair] as Manifest
+  [TASK-260720-12iigs\nReceipt v1 + marker v2] as Artifacts
+  [TASK-260720-2zc6k1\nClaim v2 + rc.4 suite identity] as Claim
+  [TASK-260720-37ei85\nLegacy compatibility guards] as Legacy
+}
+
+package "Generated conformance" #LightYellow {
+  [TASK-260720-1s1vr6\nBuild-driver fixture + vectors] as BuildVectors
+  [TASK-260720-cw39jh\nManager lifecycle vectors] as LifecycleVectors
+}
+
+package "Publication gates" #LightPink {
+  [TASK-260720-1u7hes\nValidation + release gates] as Gates
+  [TASK-260720-3lo9jc\nSchema, conformance, CLI docs] as Docs
+  [TASK-260720-q5oy3o\nrc.4 release metadata] as Release
+  [TASK-260720-3ag6pi\nIntegrated verification] as Verify
+}
+
+Core -down-> Manager : operational semantics
+Core -down-> Manifest : structural surface
+Manager -down-> Artifacts : lifecycle metadata
+Manifest -down-> Artifacts : shared definitions
+Artifacts -down-> Claim : release identity
+Claim -down-> Legacy : claim transition
+Legacy -down-> BuildVectors : compatibility baseline
+BuildVectors -down-> LifecycleVectors : logical identities
+LifecycleVectors -down-> Gates : executable evidence
+LifecycleVectors -down-> Docs : stable docs surface
+Gates -down-> Release
+Docs -down-> Release
+Release -down-> Verify
+
+@enduml

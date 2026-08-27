@@ -1,0 +1,4 @@
+uname 
+dirname /opt/homebrew/Cellar/kotlin/2.4.10/libexec/bin/kotlinc
+java -version
+java -Xmx512M -Xms128M -noverify -cp //lib/kotlin-preloader.jar org.jetbrains.kotlin.preloading.Preloader -cp //lib/kotlin-compiler.jar org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -d out /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/argprobe/main.kt

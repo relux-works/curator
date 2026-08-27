@@ -1,0 +1,261 @@
+Test (windows-latest)	go vet	﻿2026-07-31T08:18:13.3122167Z ##[group]Run go vet ./...
+Test (windows-latest)	go vet	2026-07-31T08:18:13.3122450Z [36;1mgo vet ./...[0m
+Test (windows-latest)	go vet	2026-07-31T08:18:13.4845314Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+Test (windows-latest)	go vet	2026-07-31T08:18:13.4845630Z env:
+Test (windows-latest)	go vet	2026-07-31T08:18:13.4846070Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	go vet	2026-07-31T08:18:13.4846299Z   GOTOOLCHAIN: local
+Test (windows-latest)	go vet	2026-07-31T08:18:13.4846454Z   GOENV: off
+Test (windows-latest)	go vet	2026-07-31T08:18:13.4846625Z ##[endgroup]
+Test (windows-latest)	go vet	2026-07-31T08:18:14.0094882Z go: downloading github.com/charmbracelet/bubbletea v1.3.10
+Test (windows-latest)	go vet	2026-07-31T08:18:14.0221456Z go: downloading golang.org/x/sys v0.36.0
+Test (windows-latest)	go vet	2026-07-31T08:18:14.0340326Z go: downloading golang.org/x/text v0.3.8
+Test (windows-latest)	go vet	2026-07-31T08:18:14.3216825Z go: downloading github.com/BurntSushi/toml v1.6.0
+Test (windows-latest)	go vet	2026-07-31T08:18:16.0614545Z go: downloading github.com/charmbracelet/lipgloss v1.1.0
+Test (windows-latest)	go vet	2026-07-31T08:18:16.9916882Z go: downloading github.com/charmbracelet/x/ansi v0.10.1
+Test (windows-latest)	go vet	2026-07-31T08:18:16.9917501Z go: downloading github.com/charmbracelet/x/term v0.2.1
+Test (windows-latest)	go vet	2026-07-31T08:18:16.9928811Z go: downloading github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f
+Test (windows-latest)	go vet	2026-07-31T08:18:17.0842225Z go: downloading github.com/mattn/go-localereader v0.0.1
+Test (windows-latest)	go vet	2026-07-31T08:18:17.1033377Z go: downloading github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
+Test (windows-latest)	go vet	2026-07-31T08:18:17.1943513Z go: downloading github.com/muesli/cancelreader v0.2.2
+Test (windows-latest)	go vet	2026-07-31T08:18:17.4741475Z go: downloading github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd
+Test (windows-latest)	go vet	2026-07-31T08:18:17.4761689Z go: downloading github.com/muesli/termenv v0.16.0
+Test (windows-latest)	go vet	2026-07-31T08:18:17.4769359Z go: downloading github.com/rivo/uniseg v0.4.7
+Test (windows-latest)	go vet	2026-07-31T08:18:19.6401501Z go: downloading github.com/lucasb-eyer/go-colorful v1.2.0
+Test (windows-latest)	go vet	2026-07-31T08:18:19.6948585Z go: downloading github.com/mattn/go-runewidth v0.0.16
+Test (windows-latest)	go vet	2026-07-31T08:18:22.6432027Z go: downloading github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc
+Test (windows-latest)	go vet	2026-07-31T08:18:22.7696131Z go: downloading github.com/aymanbagabas/go-osc52/v2 v2.0.1
+Test (windows-latest)	go vet	2026-07-31T08:18:22.7972160Z go: downloading github.com/mattn/go-isatty v0.0.20
+Test (windows-latest)	go vet	2026-07-31T08:18:23.7667554Z go: downloading github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e
+Test (windows-latest)	go vet	2026-07-31T08:18:46.5924795Z # github.com/relux-works/curator/internal/runtimestore
+Test (windows-latest)	go vet	2026-07-31T08:18:46.5928495Z # [github.com/relux-works/curator/internal/runtimestore]
+Test (windows-latest)	go vet	2026-07-31T08:18:46.5952997Z ##[error]vet.exe: internal\runtimestore\targets_windows_test.go:97:14: undefined: decodeHelperOutput
+Test (windows-latest)	go vet	2026-07-31T08:18:47.3582423Z ##[error]Process completed with exit code 1.
+Test (ubuntu-latest)	go test + platform-case gate	﻿2026-07-31T08:17:54.0141820Z ##[group]Run bash .github/ci/test-gate.sh .temp/ci-evidence/test
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0142299Z [36;1mbash .github/ci/test-gate.sh .temp/ci-evidence/test[0m
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0186354Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0186698Z env:
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0186925Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0187219Z   GOTOOLCHAIN: local
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0187417Z   GOENV: off
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0187768Z   CURATOR_CONFORMANCE_ROOT: /home/runner/work/curator/curator/protocol-spec/conformance/v1
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0188424Z ##[endgroup]
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0313872Z test-gate: flags=<none> timeout=30m
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0314741Z test-gate: conformance root=/home/runner/work/curator/curator/protocol-spec/conformance/v1
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.0315143Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7951642Z suite-plan: GOOS=linux
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7952556Z suite-plan: root=/home/runner/work/curator/curator/protocol-spec/conformance/v1
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7954033Z suite-plan: the root publishes no vectors/conformance-claim-v3-qualification.json; the recorded default_excluded_on applies
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7955095Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7955503Z defer internal/buildcache
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7956320Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7957541Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7958901Z defer internal/buildsource
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7959663Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7960809Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7961584Z excl  internal/godriver
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7962817Z       excluded on linux by default_excluded_on (this root publishes no vectors/conformance-claim-v3-qualification.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7964717Z       the exclusion is asserted by TestProbeRejectsAnUncoveredPlatformBeforeTheWorker, which still runs and must pass
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7965785Z defer internal/install
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7966581Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7967390Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7967833Z defer internal/marker
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7969136Z       the supplied root publishes none of: schema-cases/install-marker-v2 expected/build-driver/marker.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7970100Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7970536Z defer internal/scopes
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7971035Z       the supplied root publishes none of: vectors/external-repository-lifecycle.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7971737Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7972234Z defer internal/skillspec
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7972957Z       the supplied root publishes none of: schema-cases/agent-skill-v6 fixtures/go-build-skill
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7973753Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7974183Z defer internal/whitelist
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7974778Z       the supplied root publishes none of: fixtures/go-build-skill expected/build-driver/context_files.json
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7975527Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7975851Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7975984Z suite-plan: served=32 deferred=7 excluded=1
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:17:54.7976266Z suite-plan: ok
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:39.9441789Z test-gate: stage served exit=1 (stream: .temp/ci-evidence/test/go-test-served.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:56.8473282Z test-gate: stage deferred exit=0 (stream: .temp/ci-evidence/test/go-test-deferred.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:57.7459980Z test-gate: stage assert-godriver exit=0 (stream: .temp/ci-evidence/test/go-test-assert-godriver.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:57.7465073Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:57.7467649Z test-gate: go test overall exit=1 (merged stream: .temp/ci-evidence/test/go-test.json)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:57.7468096Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0389422Z platform-case gate: GOOS=linux
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0390137Z platform-case gate: ledger=.github/ci/platform-cases.tsv
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0391654Z platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0393237Z platform-case gate: excluded packages (not run here): internal/godriver 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0393742Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0394090Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0394776Z ok    internal/runtimestore :: TestRuntimeCommandPath
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0395523Z ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0396246Z ok    internal/buildcache :: TestUnixProtectedStateMatrix
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0397084Z ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0397838Z ok    internal/config :: TestBootstrapAndAddProject
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0398876Z ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0401526Z ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0402126Z ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0402707Z ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0403276Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0403719Z ok    internal/buildsource :: TestRejectsSpecialFile
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0404077Z ok    internal/gitops :: TestArchiveRejectsLinks
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0404454Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0404891Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0405423Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0405890Z ok    internal/install :: TestDryRunTouchesNothing
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0406294Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0406766Z ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0407291Z ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0407788Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0408154Z ok    internal/install :: TestEndToEndInstall
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0408882Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0409479Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0410149Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0410809Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0411501Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0412172Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0412789Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0413258Z ok    internal/interop :: TestGoldenContextCopy
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0413830Z excl  internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker (package not executed on linux)
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0414280Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0414526Z platform-case gate: 33 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0414936Z platform-case gate: ok
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0415079Z 
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0415217Z test-gate: go test exit=1, platform-case gate exit=0
+Test (ubuntu-latest)	go test + platform-case gate	2026-07-31T08:18:58.0424416Z ##[error]Process completed with exit code 1.
+Race (ubuntu-latest)	go test -race + platform-case gate	﻿2026-07-31T08:17:26.3846640Z ##[group]Run bash .github/ci/test-gate.sh .temp/ci-evidence/race
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3847086Z [36;1mbash .github/ci/test-gate.sh .temp/ci-evidence/race[0m
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3874509Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3874837Z env:
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3875062Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3875345Z   GOTOOLCHAIN: local
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3875541Z   GOENV: off
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3875886Z   CURATOR_CONFORMANCE_ROOT: /home/runner/work/curator/curator/protocol-spec/conformance/v1
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3876306Z   GO_TEST_FLAGS: -race
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3876507Z ##[endgroup]
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3976136Z test-gate: flags=-race timeout=30m
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3976796Z test-gate: conformance root=/home/runner/work/curator/curator/protocol-spec/conformance/v1
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:26.3977158Z 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2105826Z suite-plan: GOOS=linux
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2106465Z suite-plan: root=/home/runner/work/curator/curator/protocol-spec/conformance/v1
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2107667Z suite-plan: the root publishes no vectors/conformance-claim-v3-qualification.json; the recorded default_excluded_on applies
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2108451Z 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2108626Z defer internal/buildcache
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2109371Z       the supplied root publishes none of: vectors/build-drivers.json
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2111114Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2111791Z defer internal/buildsource
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2112423Z       the supplied root publishes none of: vectors/build-drivers.json
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2113014Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2113429Z excl  internal/godriver
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2114038Z       excluded on linux by default_excluded_on (this root publishes no vectors/conformance-claim-v3-qualification.json)
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2114932Z       the exclusion is asserted by TestProbeRejectsAnUncoveredPlatformBeforeTheWorker, which still runs and must pass
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2115452Z defer internal/install
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2115835Z       the supplied root publishes none of: vectors/build-drivers.json
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2116395Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2116787Z defer internal/marker
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2117322Z       the supplied root publishes none of: schema-cases/install-marker-v2 expected/build-driver/marker.json
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2118007Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2118406Z defer internal/scopes
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2118858Z       the supplied root publishes none of: vectors/external-repository-lifecycle.json
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2119678Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2120612Z defer internal/skillspec
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2121423Z       the supplied root publishes none of: schema-cases/agent-skill-v6 fixtures/go-build-skill
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2122648Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2123335Z defer internal/whitelist
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2124258Z       the supplied root publishes none of: fixtures/go-build-skill expected/build-driver/context_files.json
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2125244Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2125555Z 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2125673Z suite-plan: served=32 deferred=7 excluded=1
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:17:28.2125947Z suite-plan: ok
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:19:29.3817996Z test-gate: stage served exit=1 (stream: .temp/ci-evidence/race/go-test-served.json)
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:03.2600772Z test-gate: stage deferred exit=0 (stream: .temp/ci-evidence/race/go-test-deferred.json)
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:05.8631742Z test-gate: stage assert-godriver exit=0 (stream: .temp/ci-evidence/race/go-test-assert-godriver.json)
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:05.8634591Z 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:05.8635086Z test-gate: go test overall exit=1 (merged stream: .temp/ci-evidence/race/go-test.json)
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:05.8635604Z 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1358311Z platform-case gate: GOOS=linux
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1358824Z platform-case gate: ledger=.github/ci/platform-cases.tsv
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1360226Z platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1361647Z platform-case gate: excluded packages (not run here): internal/godriver 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1362151Z 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1362541Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1363238Z ok    internal/runtimestore :: TestRuntimeCommandPath
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1364179Z ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1365233Z ok    internal/buildcache :: TestUnixProtectedStateMatrix
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1365762Z ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1366170Z ok    internal/config :: TestBootstrapAndAddProject
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1366558Z ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1367009Z ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1367497Z ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1368022Z ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1368525Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1368934Z ok    internal/buildsource :: TestRejectsSpecialFile
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1369262Z ok    internal/gitops :: TestArchiveRejectsLinks
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1369613Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1370315Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1370807Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1371235Z ok    internal/install :: TestDryRunTouchesNothing
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1371610Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1372047Z ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1372526Z ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1372976Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1373323Z ok    internal/install :: TestEndToEndInstall
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1373692Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1374465Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1375103Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1375736Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1376397Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1377041Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1377638Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1379963Z ok    internal/interop :: TestGoldenContextCopy
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1380835Z excl  internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker (package not executed on linux)
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1381489Z 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1381898Z platform-case gate: 33 skips recorded in .temp/ci-evidence/race/skips-observed.tsv
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1382532Z platform-case gate: ok
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1382732Z 
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1382953Z test-gate: go test exit=1, platform-case gate exit=0
+Race (ubuntu-latest)	go test -race + platform-case gate	2026-07-31T08:20:06.1393943Z ##[error]Process completed with exit code 1.
+Lint	Run golangci/golangci-lint-action@v7	﻿2026-07-31T08:17:31.8834440Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8835406Z ##[group]Run golangci/golangci-lint-action@v7
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8835635Z with:
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8835790Z   version: v2.12.2
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8835959Z   install-mode: binary
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838095Z   github-token: ***
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838317Z   verify: true
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838484Z   only-new-issues: false
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838669Z   skip-cache: false
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838835Z   skip-save-cache: false
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839014Z   problem-matchers: false
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839212Z   cache-invalidation-interval: 7
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839406Z env:
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839585Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839859Z   GOTOOLCHAIN: local
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8840028Z   GOENV: off
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8840181Z ##[endgroup]
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.9872120Z ##[group]prepare environment
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.9874909Z Checking for go.mod: go.mod
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.9879389Z (node:2501) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.9880135Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0918918Z Cache not found for input keys: golangci-lint.cache-Linux-2952-8519b13fa584c7e05466568513eadf49618073e2, golangci-lint.cache-Linux-2952-
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0920058Z Finding needed golangci-lint version...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0922766Z Installation mode: binary
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0923273Z Installing golangci-lint binary v2.12.2...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0924039Z Downloading binary https://github.com/golangci/golangci-lint/releases/download/v2.12.2/golangci-lint-2.12.2-linux-amd64.tar.gz ...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.2382925Z [command]/usr/bin/tar xz --overwrite --warning=no-unknown-keyword --overwrite -C /home/runner -f /home/runner/work/_temp/8049ef25-cdc4-4eb0-a7cc-15b89e0e14d2
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4759946Z Installed golangci-lint into /home/runner/golangci-lint-2.12.2-linux-amd64/golangci-lint in 383ms
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4761227Z Prepared env in 489ms
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4762151Z ##[endgroup]
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4763956Z ##[group]run golangci-lint
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4768356Z Running [/home/runner/golangci-lint-2.12.2-linux-amd64/golangci-lint config path] in [/home/runner/work/curator/curator] ...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.5364801Z Running [/home/runner/golangci-lint-2.12.2-linux-amd64/golangci-lint config verify] in [/home/runner/work/curator/curator] ...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.6063627Z Running [/home/runner/golangci-lint-2.12.2-linux-amd64/golangci-lint run] in [/home/runner/work/curator/curator] ...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1265438Z ##[error]internal/godriver/controls_other.go:35:30: func (*controlDomain).destroy is unused (unused)
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1271380Z func (domain *controlDomain) destroy(_ *exec.Cmd) {}
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1271778Z                              ^
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1272682Z ##[error]internal/transaction/namespace.go:310:6: func existingNamespaceAncestor is unused (unused)
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1273655Z func existingNamespaceAncestor(path string) (string, error) {
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1273966Z      ^
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1274136Z 2 issues:
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1274306Z * unused: 2
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1274401Z 
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1282610Z ##[error]issues found
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1283368Z Ran golangci-lint in 20517ms
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1283816Z ##[endgroup]

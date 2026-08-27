@@ -1,0 +1,15 @@
+FOCUS EXIT=0
+--- PASS: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (1.69s)
+    --- PASS: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/availability-probe (0.74s)
+    --- PASS: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/domain-preparation (0.47s)
+    --- PASS: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/domain-installation (0.48s)
+--- PASS: TestControlSeamFailureNeverDriftsIntoAHardenedClaim (0.67s)
+--- PASS: TestControlDomainInstallsBeforeTheWorkerIsReleased (0.01s)
+--- PASS: TestParentClassifiesAChildStartFailureWithoutBuildContinuation (0.00s)
+    --- PASS: TestParentClassifiesAChildStartFailureWithoutBuildContinuation/list (0.00s)
+    --- PASS: TestParentClassifiesAChildStartFailureWithoutBuildContinuation/build (0.00s)
+--- PASS: TestWorkerDomainTeardownSurvivesARefusedChild (0.43s)
+--- PASS: TestBuildTerminatesTheCompleteWorkerDomain (1.17s)
+--- PASS: TestPerFileSizeLimitIsReallyApplied (0.58s)
+--- PASS: TestWorkerReturnsABoundedResultWhenTheGoChildCannotStart (0.45s)
+ok  	github.com/relux-works/curator/internal/godriver	5.345s

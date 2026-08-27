@@ -1,0 +1,1149 @@
+{
+ "fixture_version": "rust-boundary-fixture-v1",
+ "task": "TASK-260728-12pnm1",
+ "host": {
+  "operating_system": "macos",
+  "architecture": "arm64",
+  "probe_go_version": "go1.25.5"
+ },
+ "toolchain": {
+  "root": "",
+  "available": false,
+  "reason": "no toolchains directory under /tmp/no-such-rustup"
+ },
+ "cases": [
+  {
+   "case": {
+    "id": "accept.two-component",
+    "literal": "\"1.85\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.three-component",
+    "literal": "\"1.85.0\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.bare-major-edition-2015",
+    "literal": "\"1\"",
+    "edition": "2015",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true,
+    "note": "grammar-representable; edition 2015 has the lowest floor"
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.edition-2018-at-floor",
+    "literal": "\"1.31\"",
+    "edition": "2018",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.edition-2024-at-floor",
+    "literal": "\"1.85\"",
+    "edition": "2024",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "accept.above-host",
+    "literal": "\"1.99\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 4,
+    "compared": true,
+    "note": "isolation witness: representable and above the resolved toolchain, so a command that reports it cannot be applying the host gate"
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "document.float",
+    "literal": "1.85",
+    "edition": "2021",
+    "toml_type_phrase": "floating point `1.85`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "document.integer",
+    "literal": "1",
+    "edition": "2021",
+    "toml_type_phrase": "integer `1`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "document.boolean",
+    "literal": "true",
+    "edition": "2021",
+    "toml_type_phrase": "boolean `true`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.prerelease",
+    "literal": "\"1.85.0-beta\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.nonnumeric",
+    "literal": "\"not-a-version\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.build-metadata",
+    "literal": "\"1.85.0+build\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.four-components",
+    "literal": "\"1.85.0.1\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.track-token",
+    "literal": "\"stable\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "grammar.empty",
+    "literal": "\"\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "edition.bare-major-2018",
+    "literal": "\"1\"",
+    "edition": "2018",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false,
+    "note": "independence witness: the grammar layer accepts this value, the edition floor does not"
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "edition.below-2021",
+    "literal": "\"1.31\"",
+    "edition": "2021",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  },
+  {
+   "case": {
+    "id": "edition.below-2024",
+    "literal": "\"1.56\"",
+    "edition": "2024",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  }
+ ],
+ "host_gate_cases": [
+  {
+   "case": {
+    "id": "hostgate.above-resolved",
+    "literal": "\"1.99\"",
+    "edition": "2021",
+    "expect_layer": "host-gate",
+    "curator_class": 4,
+    "compared": true,
+    "note": "same value as accept.above-host; the isolated command reports it, the corroborating command gates on it"
+   },
+   "status": "not_run",
+   "reason": "no toolchains directory under /tmp/no-such-rustup",
+   "predicted": {
+    "caret_line": "",
+    "edition_floor": ""
+   },
+   "isolated": {
+    "layer": "",
+    "recognised": false
+   },
+   "corroborating": {
+    "layer": "",
+    "recognised": false
+   },
+   "agreed": false,
+   "matched_expectation": false,
+   "runs": null
+  }
+ ],
+ "alignment": {
+  "security_partition_empty": false,
+  "p1_no_widening": false,
+  "p2_no_narrowing": false
+ },
+ "closure": null,
+ "controls": null,
+ "structural": null,
+ "vectors": [
+  {
+   "id": "N0/embedded-sample",
+   "group": "normalization",
+   "title": "the embedded measured stream reproduces the recorded digests",
+   "expected": "payload=191 sha=7d8e08339e557ede5a9e565773c4cf17f83dea27f7d0c6591869f184bd1b81b5 record=208 sha=7fc35c11acae420849418f9c9f9b5681651beedc6d68f00bf1e4db022cd5f06b",
+   "observed": "payload=191 sha=7d8e08339e557ede5a9e565773c4cf17f83dea27f7d0c6591869f184bd1b81b5 record=208 sha=7fc35c11acae420849418f9c9f9b5681651beedc6d68f00bf1e4db022cd5f06b",
+   "verdict": "match"
+  },
+  {
+   "id": "N0/embedded-cargo",
+   "group": "normalization",
+   "title": "the embedded cargo --version stream reproduces the recorded digests",
+   "expected": "payload=35 sha=8d712854de14f22840767bc824c5ac08098f35ddaa44437256e31b53cb546165 record=52 sha=d677e668d65108419fd197d147f31f2dda30a1364233440f3b0138d5185c2f78",
+   "observed": "payload=35 sha=8d712854de14f22840767bc824c5ac08098f35ddaa44437256e31b53cb546165 record=52 sha=d677e668d65108419fd197d147f31f2dda30a1364233440f3b0138d5185c2f78",
+   "verdict": "match"
+  },
+  {
+   "id": "N1/live-stream",
+   "group": "normalization",
+   "title": "live rustc -vV stdout normalizes and frames deterministically",
+   "expected": "not run",
+   "observed": "not run",
+   "verdict": "match",
+   "detail": "host-dependent by construction"
+  },
+  {
+   "id": "N2/crlf-folds",
+   "group": "normalization",
+   "title": "CRLF line endings fold to the same payload",
+   "expected": "same digest",
+   "observed": "same digest",
+   "verdict": "match"
+  },
+  {
+   "id": "N3/line-removed",
+   "group": "normalization",
+   "title": "one interior line removed",
+   "expected": "different digest",
+   "observed": "different digest",
+   "verdict": "match"
+  },
+  {
+   "id": "N4/byte-changed",
+   "group": "normalization",
+   "title": "one payload byte changed",
+   "expected": "different digest",
+   "observed": "different digest",
+   "verdict": "match"
+  },
+  {
+   "id": "N5/lines-transposed",
+   "group": "normalization",
+   "title": "two whole lines transposed",
+   "expected": "different digest",
+   "observed": "different digest",
+   "verdict": "match"
+  },
+  {
+   "id": "N6/bare-cr",
+   "group": "normalization",
+   "title": "a bare CR inserted",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "contains a bare CR"
+  },
+  {
+   "id": "N7/no-terminal-lf",
+   "group": "normalization",
+   "title": "no terminal LF",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "does not end with LF"
+  },
+  {
+   "id": "N8/two-terminal-lf",
+   "group": "normalization",
+   "title": "two terminal LFs",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "ends with more than one LF"
+  },
+  {
+   "id": "N9/nul",
+   "group": "normalization",
+   "title": "a NUL inserted",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "contains NUL"
+  },
+  {
+   "id": "N10/invalid-utf8",
+   "group": "normalization",
+   "title": "invalid UTF-8 inserted",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "not valid UTF-8"
+  },
+  {
+   "id": "N11/empty",
+   "group": "normalization",
+   "title": "empty stdout",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "shorter than two bytes"
+  },
+  {
+   "id": "N12/too-long",
+   "group": "normalization",
+   "title": "4097 bytes",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "over 4096 bytes"
+  },
+  {
+   "id": "N13/c-record-multiline",
+   "group": "normalization",
+   "title": "a C payload carrying an interior LF",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "single-line record carries an interior LF"
+  },
+  {
+   "id": "P1/plain",
+   "group": "prewalk",
+   "title": "lexical path grammar: P1/plain",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P2/nested",
+   "group": "prewalk",
+   "title": "lexical path grammar: P2/nested",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P3/vendored",
+   "group": "prewalk",
+   "title": "lexical path grammar: P3/vendored",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P4/non-ascii",
+   "group": "prewalk",
+   "title": "lexical path grammar: P4/non-ascii",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P5/parent",
+   "group": "prewalk",
+   "title": "lexical path grammar: P5/parent",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 6: dot component"
+  },
+  {
+   "id": "P6/parent-deep",
+   "group": "prewalk",
+   "title": "lexical path grammar: P6/parent-deep",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 6: dot component"
+  },
+  {
+   "id": "P7/absolute",
+   "group": "prewalk",
+   "title": "lexical path grammar: P7/absolute",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 4: absolute"
+  },
+  {
+   "id": "P8/drive",
+   "group": "prewalk",
+   "title": "lexical path grammar: P8/drive",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 5: drive prefix"
+  },
+  {
+   "id": "P9/drive-lower",
+   "group": "prewalk",
+   "title": "lexical path grammar: P9/drive-lower",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 5: drive prefix"
+  },
+  {
+   "id": "P10/unc",
+   "group": "prewalk",
+   "title": "lexical path grammar: P10/unc",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 5: UNC prefix"
+  },
+  {
+   "id": "P11/backslash",
+   "group": "prewalk",
+   "title": "lexical path grammar: P11/backslash",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: backslash"
+  },
+  {
+   "id": "P12/backslash-inner",
+   "group": "prewalk",
+   "title": "lexical path grammar: P12/backslash-inner",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: backslash"
+  },
+  {
+   "id": "P13/empty-component",
+   "group": "prewalk",
+   "title": "lexical path grammar: P13/empty-component",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 6: empty component"
+  },
+  {
+   "id": "P14/dot-component",
+   "group": "prewalk",
+   "title": "lexical path grammar: P14/dot-component",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 6: dot component"
+  },
+  {
+   "id": "P15/trailing-dot",
+   "group": "prewalk",
+   "title": "lexical path grammar: P15/trailing-dot",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 7: trailing dot or space"
+  },
+  {
+   "id": "P16/trailing-space",
+   "group": "prewalk",
+   "title": "lexical path grammar: P16/trailing-space",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 7: trailing dot or space"
+  },
+  {
+   "id": "P17/reserved-con",
+   "group": "prewalk",
+   "title": "lexical path grammar: P17/reserved-con",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 7: reserved device name"
+  },
+  {
+   "id": "P18/reserved-com1-ext",
+   "group": "prewalk",
+   "title": "lexical path grammar: P18/reserved-com1-ext",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 7: reserved device name"
+  },
+  {
+   "id": "P19/control-char",
+   "group": "prewalk",
+   "title": "lexical path grammar: P19/control-char",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: control character"
+  },
+  {
+   "id": "P20/nul",
+   "group": "prewalk",
+   "title": "lexical path grammar: P20/nul",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: NUL"
+  },
+  {
+   "id": "P21/home",
+   "group": "prewalk",
+   "title": "lexical path grammar: P21/home",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 5: home prefix"
+  },
+  {
+   "id": "P22/empty",
+   "group": "prewalk",
+   "title": "lexical path grammar: P22/empty",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 1: empty"
+  },
+  {
+   "id": "P23/too-long",
+   "group": "prewalk",
+   "title": "lexical path grammar: P23/too-long",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 1: over 1024 bytes"
+  },
+  {
+   "id": "P24/symlink-component",
+   "group": "prewalk",
+   "title": "a lexically clean path traversing a symlink",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match"
+  },
+  {
+   "id": "P25/physical-ok",
+   "group": "prewalk",
+   "title": "a real directory with a manifest",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P26/missing-dependency",
+   "group": "prewalk",
+   "title": "a dependency path that does not exist",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "missing component: absent"
+  },
+  {
+   "id": "P27/missing-target",
+   "group": "prewalk",
+   "title": "a target path that does not exist",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match",
+   "detail": "a vendored crate may declare a target whose sources were not vendored"
+  },
+  {
+   "id": "P28/ancestor-clean",
+   "group": "prewalk",
+   "title": "no ancestor Cargo.toml or .cargo",
+   "expected": "clean",
+   "observed": "clean",
+   "verdict": "match"
+  },
+  {
+   "id": "P29/ancestor-manifest",
+   "group": "prewalk",
+   "title": "an ancestor Cargo.toml is detected",
+   "expected": "offending ancestor manifest found",
+   "observed": "offending ancestor manifest found",
+   "verdict": "match",
+   "detail": "/tmp/rustprobe-anc-949467329/parent/Cargo.toml"
+  },
+  {
+   "id": "P30/ancestor-cargo-dir",
+   "group": "prewalk",
+   "title": "an ancestor .cargo directory is detected",
+   "expected": "offending ancestor config directory found",
+   "observed": "offending ancestor config directory found",
+   "verdict": "match",
+   "detail": "/tmp/rustprobe-anc-949467329/parent/.cargo"
+  },
+  {
+   "id": "S1/ascii",
+   "group": "config",
+   "title": "directory serialization: S1/ascii",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S1/ascii/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S2/space",
+   "group": "config",
+   "title": "directory serialization: S2/space",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S2/space/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S3/non-ascii",
+   "group": "config",
+   "title": "directory serialization: S3/non-ascii",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S3/non-ascii/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S4/double-quote",
+   "group": "config",
+   "title": "directory serialization: S4/double-quote",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S4/double-quote/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S5/backslash-unix",
+   "group": "config",
+   "title": "directory serialization: S5/backslash-unix",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S5/backslash-unix/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S6/apostrophe",
+   "group": "config",
+   "title": "directory serialization: S6/apostrophe",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 4: apostrophe"
+  },
+  {
+   "id": "S7/newline",
+   "group": "config",
+   "title": "directory serialization: S7/newline",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: control character"
+  },
+  {
+   "id": "S8/tab",
+   "group": "config",
+   "title": "directory serialization: S8/tab",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: control character"
+  },
+  {
+   "id": "S9/del",
+   "group": "config",
+   "title": "directory serialization: S9/del",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: control character"
+  },
+  {
+   "id": "S10/nul",
+   "group": "config",
+   "title": "directory serialization: S10/nul",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: NUL"
+  },
+  {
+   "id": "S11/relative",
+   "group": "config",
+   "title": "directory serialization: S11/relative",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: not absolute"
+  },
+  {
+   "id": "S12/empty",
+   "group": "config",
+   "title": "directory serialization: S12/empty",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 1: empty"
+  },
+  {
+   "id": "S13/unc",
+   "group": "config",
+   "title": "directory serialization: S13/unc",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: not absolute"
+  },
+  {
+   "id": "S14/verbatim",
+   "group": "config",
+   "title": "directory serialization: S14/verbatim",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: not absolute"
+  },
+  {
+   "id": "S15/template-length",
+   "group": "config",
+   "title": "the constant part of the template is 150 bytes",
+   "expected": "prefix=89 suffix=61 total=183",
+   "observed": "prefix=89 suffix=61 total=183",
+   "verdict": "match"
+  },
+  {
+   "id": "S16/template-digest",
+   "group": "config",
+   "title": "the sample document reproduces its recorded digest",
+   "expected": "41aaeac44f7f26e747bbd29fafddd0715b813e5b06edbad967755ac3f87b60f2",
+   "observed": "41aaeac44f7f26e747bbd29fafddd0715b813e5b06edbad967755ac3f87b60f2",
+   "verdict": "match"
+  },
+  {
+   "id": "S17/table-count",
+   "group": "config",
+   "title": "the intended document has exactly four table headers",
+   "expected": "4",
+   "observed": "4",
+   "verdict": "match",
+   "detail": "[source.crates-io] [source.curator-vendor] [net] [term]"
+  },
+  {
+   "id": "S18/no-crlf",
+   "group": "config",
+   "title": "the template carries no CR and exactly one terminal LF",
+   "expected": "true",
+   "observed": "true",
+   "verdict": "match"
+  }
+ ],
+ "summary": {
+  "cases": 19,
+  "matched": 0,
+  "divergences": 0,
+  "not_run": 19,
+  "closure_checks": 0,
+  "closure_failures": 0,
+  "controls_total": 0,
+  "controls_failing_as_required": 0,
+  "structural_total": 0,
+  "structural_divergences": 0,
+  "vectors_total": 68,
+  "vector_divergences": 0,
+  "green": false
+ }
+}

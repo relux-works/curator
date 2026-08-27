@@ -1,0 +1,93 @@
+{
+  "id": "RUN-260729-1faee0",
+  "task_id": "TASK-260720-jrrgw9",
+  "created_at": "2026-07-29T11:01:17.067314Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[tester] tester (codex)",
+  "role": "tester",
+  "role_archetype": "tester",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-15-01-17_-tester--tester--codex-_TASK-260720-jrrgw9.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-jrrgw9_spawn-log_-tester--tester--codex-_RUN-260729-1faee0.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-jrrgw9_cmd-timeout-rework.md",
+    "TASK-260720-jrrgw9_cmd-timing-diagnosis-results.md",
+    "TASK-260720-jrrgw9_cmd-timing-diagnosis.md",
+    "TASK-260720-jrrgw9_focused-new-tests.log",
+    "TASK-260720-jrrgw9_full-verifier-results.md",
+    "TASK-260720-jrrgw9_full-verifier.md",
+    "TASK-260720-jrrgw9_go-test-all-failed.log",
+    "TASK-260720-jrrgw9_go-vet-scoped.log",
+    "TASK-260720-jrrgw9_narrow-test-allowlist.md",
+    "TASK-260720-jrrgw9_rc5-conformance-matrix.md",
+    "TASK-260720-jrrgw9_rc5-conformance-rework.md",
+    "TASK-260720-jrrgw9_spawn-log_-implementer--developer--claude-_RUN-260729-2692b2.log",
+    "TASK-260720-jrrgw9_spawn-log_-implementer--developer--claude-_RUN-260729-28943e.log",
+    "TASK-260720-jrrgw9_spawn-log_-implementer--developer--claude-_RUN-260729-84f437.log",
+    "TASK-260720-jrrgw9_spawn-log_-implementer--developer--claude-_RUN-260729-9cf10f.log",
+    "TASK-260720-jrrgw9_spawn-log_-implementer--developer--claude-_RUN-260729-addee5.log",
+    "TASK-260720-jrrgw9_spawn-log_-implementer--developer--claude-_RUN-260729-b17328.log",
+    "TASK-260720-jrrgw9_spawn-log_-tester--tester--codex-_RUN-260729-4765e8.log",
+    "TASK-260720-jrrgw9_spawn-log_-tester--tester--codex-_RUN-260729-561d31.log",
+    "TASK-260720-jrrgw9_spawn-log_-tester--tester--codex-_RUN-260729-d56908.log",
+    "TASK-260720-jrrgw9_spawn-log_-tester--tester--codex-_RUN-260729-dd8b99.log",
+    "TASK-260720-jrrgw9_status-timing-assertion-matrix.md",
+    "TASK-260720-jrrgw9_status-timing-gates.log",
+    "TASK-260720-jrrgw9_status-timing-patch-results.md",
+    "TASK-260720-jrrgw9_status-timing-patch.diff",
+    "TASK-260720-jrrgw9_status-timing-patch.md",
+    "TASK-260720-jrrgw9_tester-audit.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-jrrgw9_cmd-timeout-rework.md": "be90651eb63b06984dbd77c2dae58b82ad6e30d9ea8c30cb3442613200a6050f",
+    "TASK-260720-jrrgw9_cmd-timing-diagnosis-results.md": "06a0da86ab9c2d3c7110aebce3600ab522fbcc3f267f25bccc73a787bbf7f62e",
+    "TASK-260720-jrrgw9_cmd-timing-diagnosis.md": "d65638675314da43156d79ace4c5aa2c85f3f44505cabef5d33bc876e8b9d55c",
+    "TASK-260720-jrrgw9_focused-new-tests.log": "f82cd003b3136ea1646a9bd3a88cad50ab157ff30d59cc7c8cce93cb038d97ab",
+    "TASK-260720-jrrgw9_full-verifier-results.md": "5590b17319f2dba0605f43a1e61f091b4c15d09d69a65d671b4ff284b71c20d7",
+    "TASK-260720-jrrgw9_full-verifier.md": "f52442cba31a38619c9e1f67ae62fe6cd04e9a52e2a727936c899c98e87cc019",
+    "TASK-260720-jrrgw9_go-test-all-failed.log": "25af3516ca076c95777b8c01ca5f89a85c42df7e13ec5b804c6a28f7ca2c2385",
+    "TASK-260720-jrrgw9_go-vet-scoped.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "TASK-260720-jrrgw9_narrow-test-allowlist.md": "44babafdbc89ed3f47a61d47e01dc0ab3d15c71a047d7004a62c5e4482ca1df3",
+    "TASK-260720-jrrgw9_rc5-conformance-matrix.md": "3e4e2ee020841a9f45ce11c788f7617b8dd7ec2a64dfcace9fc968c8dbe7e9f2",
+    "TASK-260720-jrrgw9_rc5-conformance-rework.md": "b7bb67bf96b8bf3e8de5da5c704b1f1aa41a401aa2b79019c3744008b9c7ad52",
+    "TASK-260720-jrrgw9_status-timing-assertion-matrix.md": "2597f7f9a8f9231be7bcd24d1afc20052c60ce1a8e4694ad232e53e1271e8e8d",
+    "TASK-260720-jrrgw9_status-timing-gates.log": "442ff49951f57fbd5776e3aa4b97c6e6e6c5242369c555be1f5255c6ec824921",
+    "TASK-260720-jrrgw9_status-timing-patch-results.md": "fb6a22f606fd6dcbb7e5c5b7db8d614676b09f4e72b5d2d2e0385754f99483c8",
+    "TASK-260720-jrrgw9_status-timing-patch.diff": "03c637da916ea5526298ec6ac41d0f234ccda4bfce098acc63f9e3dc29984acd",
+    "TASK-260720-jrrgw9_status-timing-patch.md": "908d1abf3fb89b90b784129107aef6b78cea9070d94b7765f81a010b4525beae",
+    "TASK-260720-jrrgw9_tester-audit.md": "97491a54a4ba776af17a3b2d386a0f3497bcdd6f32934df18f070d8c7f21922c"
+  },
+  "require_outcome_artifact": true
+}

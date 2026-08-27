@@ -1,0 +1,31 @@
+--- FAIL: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (37.99s)
+    --- FAIL: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/availability-probe (15.31s)
+        boundary_test.go:66: go-v1 process_timeout: Go probe exceeded its deadline
+    --- FAIL: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes/domain-installation (15.02s)
+        boundary_test.go:66: go-v1 process_timeout: Go probe exceeded its deadline
+--- FAIL: TestWorkerDomainTeardownSurvivesARefusedChild (15.02s)
+    boundary_test.go:287: go-v1 process_timeout: Go probe exceeded its deadline
+--- FAIL: TestBuildEmitsExactlyOneClosedCapabilityEvidenceRecord (15.02s)
+    build_test.go:77: go-v1 process_timeout: Go probe exceeded its deadline
+--- FAIL: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass (91.91s)
+    --- FAIL: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/package_error (15.02s)
+        build_test.go:137: go-v1 process_timeout: Go probe exceeded its deadline
+    --- FAIL: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/native (15.05s)
+        build_test.go:137: go-v1 process_timeout: Go probe exceeded its deadline
+    --- FAIL: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/escaped_source (15.02s)
+        build_test.go:137: go-v1 process_timeout: Go probe exceeded its deadline
+    --- FAIL: TestBuildStopsBeforeBuildForEveryPreflightRejectionClass/replaced_module (15.03s)
+        build_test.go:137: go-v1 process_timeout: Go probe exceeded its deadline
+--- FAIL: TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild (32.59s)
+    --- FAIL: TestBuildRejectsDirectivesPGOAndMultipleRootsBeforeBuild/pgo (15.02s)
+        build_test.go:172: go-v1 process_timeout: Go probe exceeded its deadline
+--- FAIL: TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs (46.82s)
+    --- FAIL: TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/symlink (15.05s)
+        build_test.go:209: go-v1 process_timeout: Go probe exceeded its deadline
+    --- FAIL: TestBuildRejectsArtifactLinksOversizeAndUnexpectedOutputs/extra_output (15.36s)
+        build_test.go:209: go-v1 process_timeout: Go probe exceeded its deadline
+--- FAIL: TestBuildRejectsHardLinkedArtifact (15.02s)
+    build_test.go:226: go-v1 process_timeout: Go probe exceeded its deadline
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	303.774s
+FAIL

@@ -1,0 +1,15 @@
+internal/godriver/builddriver_positive_conformance_test.go:178:4: ineffectual assignment to environment (ineffassign)
+			environment = map[string]string{}
+			^
+internal/transaction/namespace_pass_test.go:119:16: unused-parameter: parameter 't' seems to be unused, consider removing or renaming it as _ (revive)
+			build: func(t *testing.T, root string) ([]TargetRecord, []targetNamespacePath) {
+			            ^
+internal/transaction/namespace_pass_test.go:127:16: unused-parameter: parameter 't' seems to be unused, consider removing or renaming it as _ (revive)
+			build: func(t *testing.T, root string) ([]TargetRecord, []targetNamespacePath) {
+			            ^
+internal/transaction/namespace_pass_test.go:136:16: unused-parameter: parameter 't' seems to be unused, consider removing or renaming it as _ (revive)
+			build: func(t *testing.T, root string) ([]TargetRecord, []targetNamespacePath) {
+			            ^
+4 issues:
+* ineffassign: 1
+* revive: 3

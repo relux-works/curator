@@ -1,0 +1,38 @@
+Align the Linux lane with the native control inventory
+
+Two failures surface on the Linux lane once the toolchain-identity gate
+stops failing first, and neither has anything to do with a protocol
+vector.
+
+golangci-lint reports two `unused` findings that exist only in the linux
+build. Both are genuinely dead there, so both are removed rather than
+suppressed. `(*controlDomain).destroy` on the non-macOS, non-Windows
+build had no caller: the two platform domains each call their own from
+inside their own `launch`, and the shared worker client never does.
+`existingNamespaceAncestor` had exactly one consumer,
+`namespace_case_darwin.go`, so it moves there -- Windows answers the case
+and normalization questions from the platform contract and the remaining
+unix builds from the POSIX one, so neither ever needs an ancestor to ask
+about.
+
+Six `cmd/curator` cases need a completed compilation, which the go-v1
+driver refuses on a host `rc5-native-control-inventory-v1` defines no
+record for. They are carved out by
+`requireNativeControlInventoryPlatform`, which reads
+`godriver.InventoryPlatform` rather than a GOOS list, so the guard cannot
+drift from the inventory it stands for and stops skipping on its own if
+the inventory gains a record.
+
+The carve-out is asserted, not merely obeyed, exactly as
+`internal/godriver`'s whole-package exclusion already is.
+`TestCompiledInstallFollowsTheNativeControlInventoryExactly` runs on
+every runner and proves the boundary from whichever side that runner is
+on: a covered host installs and publishes exactly one protected cache
+entry; an uncovered host is refused with
+`build_execution_control_unavailable` naming the inventory and the host,
+publishes nothing at all, and leaves `status --check` non-zero rather
+than reporting a compiled command as current.
+
+The ledger records all seven cases, so a future silent skip on macOS or
+Windows is fatal by name, and the skip class is narrow: it matches the
+inventory's own "defines no record for host" wording.

@@ -1,0 +1,12 @@
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.01s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest (0.01s)
+        fingerprint_equivalence_test.go:519: error = go-v1 toolchain_mutated: toolchain file "z" changed while reading, want nil or toolchain_timeout
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.00s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest (0.00s)
+        fingerprint_equivalence_test.go:519: error = go-v1 toolchain_mutated: toolchain file "a/b/c/d/leaf" changed while reading, want nil or toolchain_timeout
+--- FAIL: TestFingerprintCancellationStaysFailClosed (0.00s)
+    --- FAIL: TestFingerprintCancellationStaysFailClosed/cancelled_between_the_walk_and_the_digest (0.00s)
+        fingerprint_equivalence_test.go:519: error = go-v1 toolchain_mutated: toolchain file "a/other" changed while reading, want nil or toolchain_timeout
+FAIL
+FAIL	github.com/relux-works/curator/internal/godriver	11.842s
+FAIL

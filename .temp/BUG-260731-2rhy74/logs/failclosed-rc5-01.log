@@ -1,0 +1,36 @@
+.F...................................................................... [ 67%]
+...................................                                      [100%]
+=================================== FAILURES ===================================
+_________________ test_shared_fixture_context_hash_and_marker __________________
+
+tmp_path = PosixPath('/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/pytest-of-iv/pytest-312/test_shared_fixture_context_ha0')
+
+    def test_shared_fixture_context_hash_and_marker(tmp_path: Path) -> None:
+        fixture = _root() / "fixtures" / "skill"
+        expected_files = _json("expected/context_files.json")
+        expected_hash = (_root() / "expected" / "context_sha256.txt").read_text(encoding="utf-8").strip()
+        # Writers emit marker schema 2 for skill schemas 1 through 6, so the writer
+        # golden is the separately published marker-v2 fixture. A root without it
+        # fails here rather than silently comparing schema-2 output to the frozen
+        # schema-1 legacy-read evidence.
+>       expected_marker_bytes = _golden_bytes("expected/marker-v2.json")
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_protocol_conformance.py:77: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+relative = 'expected/marker-v2.json'
+
+    def _golden_bytes(relative: str) -> bytes:
+        """Read one golden as bytes, failing closed when the suite omits it."""
+        path = _root() / relative
+>       assert path.is_file(), f"conformance root {_root()} publishes no {relative}"
+E       AssertionError: conformance root /Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260731-2rhy74/pin-rc5/conformance/v1 publishes no expected/marker-v2.json
+E       assert False
+E        +  where False = is_file()
+E        +    where is_file = PosixPath('/Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260731-2rhy74/pin-rc5/conformance/v1/expected/marker-v2.json').is_file
+
+tests/test_protocol_conformance.py:51: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_protocol_conformance.py::test_shared_fixture_context_hash_and_marker
+1 failed, 106 passed in 0.23s

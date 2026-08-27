@@ -1,0 +1,14 @@
+=== RUN   TestMeasureStagingCost
+=== RUN   TestMeasureStagingCost/project
+MEASURE scenario=project phase=baseline txns=1 staged_targets=12 entries=24 dirs=8 files=14 links=2 other=0 ref_entries=4 chunk_syncs=14 copy_points=14 derived_staging_saves=100
+MEASURE scenario=project phase=upgrade txns=1 staged_targets=18 entries=34 dirs=10 files=19 links=5 other=0 ref_entries=6 chunk_syncs=19 copy_points=19 derived_staging_saves=140
+MANIFEST scenario=project entries=directory:,directory:references,file:.csk-install.json,file:SKILL.md,file:references/info.md
+=== RUN   TestMeasureStagingCost/global
+MEASURE scenario=global phase=baseline txns=1 staged_targets=14 entries=26 dirs=8 files=16 links=2 other=0 ref_entries=4 chunk_syncs=16 copy_points=16 derived_staging_saves=110
+MEASURE scenario=global phase=upgrade txns=1 staged_targets=15 entries=25 dirs=6 files=16 links=3 other=0 ref_entries=4 chunk_syncs=16 copy_points=16 derived_staging_saves=107
+MANIFEST scenario=global entries=directory:,directory:references,file:.csk-install.json,file:SKILL.md,file:references/info.md
+--- PASS: TestMeasureStagingCost (60.48s)
+    --- PASS: TestMeasureStagingCost/project (32.72s)
+    --- PASS: TestMeasureStagingCost/global (27.76s)
+PASS
+ok  	github.com/relux-works/curator/internal/install/atomicity	61.271s

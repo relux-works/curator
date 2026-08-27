@@ -1,0 +1,11 @@
+$ gofmt -l tools
+gofmt_changed_files=0
+gofmt_exit_code=0
+$ go vet ./tools/...
+go_vet_exit_code=0
+$ go test -count=1 ./tools/...
+ok  	github.com/relux-works/curator-spec/tools/generate-vectors	0.383s
+uncached_go_test_exit_code=0
+$ git diff --check
+git_diff_check_exit_code=0
+worktree_status_bytes=0

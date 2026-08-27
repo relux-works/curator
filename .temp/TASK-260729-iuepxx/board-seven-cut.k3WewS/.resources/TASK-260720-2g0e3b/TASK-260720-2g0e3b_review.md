@@ -1,0 +1,9 @@
+# Reviewer verdict: accepted
+
+Implementation matches the schema v6 parser acceptance criteria and fits the existing skillspec architecture. The task worktree is based at 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8, and dry-run checksum comparison against accepted TASK-260720-3pwg2w is identical outside internal/skillspec, excluding task-board.config.json.
+
+Verified: canonical and legacy mixed v6 manifests; explicit BuildRoots, Driver, and SourceDir; closed build command shape; schema 1-5 and runtime fallback version gating; deterministic field-scoped negative diagnostics; Lstat-based link-free roots, source directories, and go.mod; root uniqueness, disjointness, use, runtime separation, containment, and nearest-module rules; no os/exec or exec.Command in internal/skillspec.
+
+Independent gates: focused internal/skillspec test with CURATOR_CONFORMANCE_ROOT passed all 34 v6 schema cases and fake-Go sentinel; authoritative skill-manifest-resolution vectors passed; make check passed; go test -race ./... passed; go build ./... passed; internal/skillspec coverage 89.9 percent; golangci-lint 2.12.2 reported 0 issues for ./internal/skillspec/...; Windows amd64 and Linux amd64 parser test binaries compiled; git diff --check passed; candidate manifest SHA-256 is 70cd274150d629f16ca04f2073a8eae5a0f3fff4584f905d807775040af21eae.
+
+Non-blocking upstream anomalies: a full golangci-lint latest run reports 27 findings only in accepted predecessor code outside internal/skillspec. A full repository run with the rc.4 candidate conformance root fails only internal/interop TestManagerLifecycleVectors on the new compiled-cache-miss dry-run vector; baseline full tests and parser-owned rc.4 consumers pass. This mismatch belongs to downstream lifecycle implementation, not parser rework.

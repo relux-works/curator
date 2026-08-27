@@ -1,0 +1,46 @@
+platform-case gate: GOOS=windows
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix
+ok    internal/buildcache :: TestValidateWindowsSecurityPolicy
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes
+ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+FAIL  required case failed: internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+FAIL  required case failed: internal/install :: TestEndToEndInstall
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+FAIL  required case failed: internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+FAIL  required case failed: internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+FAIL  required case failed: internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+ok    internal/interop :: TestGoldenContextCopy
+tol   internal/godriver :: TestCandidateGoV1SourceAwareContract (tolerated skip: root-content)
+ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly
+ok    cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery
+ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand
+ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand
+ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState
+ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+
+platform-case gate: 64 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+platform-case gate: FAILED

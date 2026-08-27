@@ -1,0 +1,9 @@
+internal/gitignore/gitignore.go:60:21: G304: Potential file inclusion via variable (gosec)
+	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- project .gitignore
+	                   ^
+internal/scopes/hybrid.go:134:21: G304: Potential file inclusion via variable (gosec)
+	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- machine home
+	                   ^
+2 issues:
+* gosec: 2
+EXIT=1

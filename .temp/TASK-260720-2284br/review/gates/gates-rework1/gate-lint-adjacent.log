@@ -1,0 +1,68 @@
+internal/scopes/hybrid.go:134:21: G304: Potential file inclusion via variable (gosec)
+	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- machine home
+	                   ^
+internal/runtimestore/targets.go:24:2: exported: exported const ScriptRuntime should have comment (or a comment on this block) or be unexported (revive)
+	ScriptRuntime TargetKind = "script-runtime"
+	^
+internal/runtimestore/targets.go:45:1: exported: exported method ScriptTarget.Kind should have comment or be unexported (revive)
+func (target ScriptTarget) Kind() TargetKind       { return ScriptRuntime }
+^
+internal/runtimestore/targets.go:46:1: exported: exported method ScriptTarget.ExecutablePath should have comment or be unexported (revive)
+func (target ScriptTarget) ExecutablePath() string { return target.executable }
+^
+internal/runtimestore/targets.go:47:1: exported: exported method ScriptTarget.RuntimeDir should have comment or be unexported (revive)
+func (target ScriptTarget) RuntimeDir() string     { return target.runtimeDir }
+^
+internal/runtimestore/targets.go:58:1: exported: exported method CompiledTarget.Kind should have comment or be unexported (revive)
+func (target CompiledTarget) Kind() TargetKind                   { return BuildArtifact }
+^
+internal/runtimestore/targets.go:59:1: exported: exported method CompiledTarget.ExecutablePath should have comment or be unexported (revive)
+func (target CompiledTarget) ExecutablePath() string             { return target.artifactPath }
+^
+internal/runtimestore/targets.go:60:1: exported: exported method CompiledTarget.CacheKey should have comment or be unexported (revive)
+func (target CompiledTarget) CacheKey() buildmeta.CacheKey       { return target.cacheKey }
+^
+internal/runtimestore/targets.go:61:1: exported: exported method CompiledTarget.ReceiptHash should have comment or be unexported (revive)
+func (target CompiledTarget) ReceiptHash() buildmeta.ReceiptHash { return target.receiptHash }
+^
+internal/runtimestore/targets.go:137:2: exported: exported const ProjectShim should have comment (or a comment on this block) or be unexported (revive)
+	ProjectShim         ShimRole = "project"
+	^
+internal/runtimestore/targets.go:153:1: exported: exported function NewManagedShim should have comment or be unexported (revive)
+func NewManagedShim(role ShimRole, binDir, command, platform string) (ManagedShim, error) {
+^
+internal/runtimestore/targets.go:174:1: exported: exported method ManagedShim.Role should have comment or be unexported (revive)
+func (shim ManagedShim) Role() ShimRole   { return shim.role }
+^
+internal/runtimestore/targets.go:175:1: exported: exported method ManagedShim.BinDir should have comment or be unexported (revive)
+func (shim ManagedShim) BinDir() string   { return shim.binDir }
+^
+internal/runtimestore/targets.go:176:1: exported: exported method ManagedShim.Command should have comment or be unexported (revive)
+func (shim ManagedShim) Command() string  { return shim.command }
+^
+internal/runtimestore/targets.go:177:1: exported: exported method ManagedShim.Platform should have comment or be unexported (revive)
+func (shim ManagedShim) Platform() string { return shim.platform }
+^
+internal/runtimestore/targets.go:178:1: exported: exported method ManagedShim.Path should have comment or be unexported (revive)
+func (shim ManagedShim) Path() string     { return shim.path }
+^
+internal/runtimestore/targets.go:229:2: exported: exported const RuntimeTreeTarget should have comment (or a comment on this block) or be unexported (revive)
+	RuntimeTreeTarget ManagedTargetKind = "runtime-tree"
+	^
+internal/runtimestore/targets.go:94:28: ST1005: error strings should not be capitalized (staticcheck)
+		return CompiledTarget{}, fmt.Errorf("Windows compiled artifact must have an .exe suffix")
+		                         ^
+internal/runtimestore/targets.go:329:11: ST1005: error strings should not be capitalized (staticcheck)
+			return fmt.Errorf("Unix PATH entry contains a separator")
+			       ^
+internal/runtimestore/targets.go:332:11: ST1005: error strings should not be capitalized (staticcheck)
+			return fmt.Errorf("Windows PATH entry contains a separator")
+			       ^
+internal/runtimestore/targets_test.go:393:6: func decodeHelperOutput is unused (unused)
+func decodeHelperOutput(t *testing.T, payload []byte) map[string]any {
+     ^
+21 issues:
+* gosec: 1
+* revive: 16
+* staticcheck: 3
+* unused: 1

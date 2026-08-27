@@ -1,0 +1,15 @@
+ok  	github.com/relux-works/curator/internal/protocoljson	0.208s
+--- FAIL: TestValidateRemovalEntriesOrdersByUnsignedBytes (0.00s)
+    --- FAIL: TestValidateRemovalEntriesOrdersByUnsignedBytes/high_byte_before_ascii_is_descending (0.00s)
+        journal_order_test.go:95: a manifest out of strict unsigned-byte order was accepted
+    --- FAIL: TestValidateRemovalEntriesOrdersByUnsignedBytes/duplicate_path (0.00s)
+        journal_order_test.go:95: a manifest out of strict unsigned-byte order was accepted
+    --- FAIL: TestValidateRemovalEntriesOrdersByUnsignedBytes/descending_pair (0.00s)
+        journal_order_test.go:95: a manifest out of strict unsigned-byte order was accepted
+    --- FAIL: TestValidateRemovalEntriesOrdersByUnsignedBytes/descending_at_the_tail (0.00s)
+        journal_order_test.go:95: a manifest out of strict unsigned-byte order was accepted
+    --- FAIL: TestValidateRemovalEntriesOrdersByUnsignedBytes/extension_before_prefix (0.00s)
+        journal_order_test.go:95: a manifest out of strict unsigned-byte order was accepted
+FAIL
+FAIL	github.com/relux-works/curator/internal/transaction	0.333s
+FAIL

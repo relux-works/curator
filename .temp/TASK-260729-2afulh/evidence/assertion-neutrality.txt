@@ -1,0 +1,16 @@
+# TASK-260729-2afulh assertion-neutrality checks (internal/install/atomicity)
+
+BASELINE  t.Fatal(=17 t.Fatalf(=44 t.Error(=0 t.Errorf(=3 t.Skip=1 t.Parallel()=10 t.TempDir()=5 t.Setenv(=1 funcTest=8 t.Run(=4 timeout_tokens=0 e.write(=8
+FINAL     t.Fatal(=17 t.Fatalf(=44 t.Error(=0 t.Errorf(=3 t.Skip=1 t.Parallel()=10 t.TempDir()=5 t.Setenv(=1 funcTest=8 t.Run(=4 timeout_tokens=0 e.write(=7
+
+## every non-comment occurrence of references/info.md left in the package
+  none outside comments
+
+## Patch A package fixture is byte-identical (internal/install/install_test.go)
+  IDENTICAL; its own references/info.md line is retained:
+73:	e.write(dir, "references/info.md", "ref")
+
+## scenario isolation surface is byte-identical
+  IDENTICAL commit_atomicity_test.go
+  IDENTICAL activation_test.go
+  IDENTICAL doc.go

@@ -1,0 +1,63 @@
+{
+  "id": "RUN-260728-ed8ee4",
+  "task_id": "TASK-260729-rhjxtx",
+  "created_at": "2026-07-28T21:21:48.057403Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-01-21-48_-implementer--developer--claude-_TASK-260729-rhjxtx.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260729-rhjxtx_spawn-log_-implementer--developer--claude-_RUN-260728-ed8ee4.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260729-rhjxtx_command-evidence.log",
+    "TASK-260729-rhjxtx_fixture-macos.json",
+    "TASK-260729-rhjxtx_fixture-windows.json",
+    "TASK-260729-rhjxtx_gate-log.txt",
+    "TASK-260729-rhjxtx_probe.tar.gz",
+    "TASK-260729-rhjxtx_results.md",
+    "TASK-260729-rhjxtx_review-verdict-cycle-1.md",
+    "TASK-260729-rhjxtx_spawn-log_-implementer--developer--claude-_RUN-260728-bc90af.log",
+    "TASK-260729-rhjxtx_spawn-log_-reviewer--reviewer--codex-_RUN-260728-42e1e8.log",
+    "TASK-260729-rhjxtx_windows-inventory.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260729-rhjxtx_command-evidence.log": "2689ed974a407d4443a130f27058334de87d49399500a6dc210da162324a8782",
+    "TASK-260729-rhjxtx_fixture-macos.json": "0c29f9ffbed9be9911adda4fe86ea85290fef24eb31dfd058e28101347dd311a",
+    "TASK-260729-rhjxtx_fixture-windows.json": "503812317eaff83742d44835a2ea845b6ecc1503a1b94a05edd03361159acee1",
+    "TASK-260729-rhjxtx_gate-log.txt": "311ff30fe3da12f2e40af96957873ffd0f66d87050b87549c92944547ddc2b3d",
+    "TASK-260729-rhjxtx_probe.tar.gz": "0674becf4aa815f7ba7a68f373c96b83db37ed31ef2fc01d7cd8db6e01730aec",
+    "TASK-260729-rhjxtx_results.md": "4395a983d706cbd6c79e7169d571f95b302542b3fc101634a8b66b6615d61b9d",
+    "TASK-260729-rhjxtx_review-verdict-cycle-1.md": "92d434a22e4f9c7f401daa231c5603baeec9433242c8182c6f9ce87d0c648873",
+    "TASK-260729-rhjxtx_windows-inventory.log": "51a0bfd6dd48f2da1eeee975247c38578505570ec893bb6aea2687a04a3a4d8f"
+  },
+  "require_outcome_artifact": true
+}

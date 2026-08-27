@@ -1,0 +1,297 @@
+TASK-260720-3itlly rework cycle 4 verification
+worktree: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1zntv0/worktree
+base HEAD: 17804ceae42d3bb62abf6e8a9d9cbef6dd5370b8
+go: go version go1.25.5 darwin/arm64
+
+=================================================================
+$ gofmt -l internal cmd
+--- exit=0
+
+=================================================================
+$ go build ./...
+--- exit=0
+
+=================================================================
+$ go vet ./...
+--- exit=0
+
+=================================================================
+$ git diff --check
+--- exit=0
+
+=================================================================
+$ go test -count=1 ./internal/install/
+ok  	github.com/relux-works/curator/internal/install	17.570s
+--- exit=0
+
+=================================================================
+$ go test -count=1 ./internal/godriver/
+ok  	github.com/relux-works/curator/internal/godriver	24.896s
+--- exit=0
+
+=================================================================
+$ go test -count=1 ./...
+ok  	github.com/relux-works/curator/cmd/curator	3.450s
+ok  	github.com/relux-works/curator/internal/adapters	1.170s
+ok  	github.com/relux-works/curator/internal/audit	0.838s
+ok  	github.com/relux-works/curator/internal/buildcache	4.561s
+ok  	github.com/relux-works/curator/internal/buildmeta	3.460s
+ok  	github.com/relux-works/curator/internal/buildsource	2.424s
+ok  	github.com/relux-works/curator/internal/capabilities	0.298s
+ok  	github.com/relux-works/curator/internal/closure	5.280s
+ok  	github.com/relux-works/curator/internal/config	1.391s
+ok  	github.com/relux-works/curator/internal/devsub	2.749s
+ok  	github.com/relux-works/curator/internal/envfiles	2.099s
+ok  	github.com/relux-works/curator/internal/gitignore	3.948s
+ok  	github.com/relux-works/curator/internal/gitops	1.139s
+ok  	github.com/relux-works/curator/internal/globalbins	1.877s
+ok  	github.com/relux-works/curator/internal/godriver	40.167s
+ok  	github.com/relux-works/curator/internal/hashing	4.746s
+ok  	github.com/relux-works/curator/internal/identifiers	4.770s
+ok  	github.com/relux-works/curator/internal/identity	4.557s
+ok  	github.com/relux-works/curator/internal/install	30.501s
+ok  	github.com/relux-works/curator/internal/interop	4.865s
+ok  	github.com/relux-works/curator/internal/locale	5.080s
+ok  	github.com/relux-works/curator/internal/manifest	4.943s
+ok  	github.com/relux-works/curator/internal/marker	5.060s
+ok  	github.com/relux-works/curator/internal/mcp	5.065s
+ok  	github.com/relux-works/curator/internal/protocoljson	5.072s
+ok  	github.com/relux-works/curator/internal/registry	6.110s
+ok  	github.com/relux-works/curator/internal/runtimestore	15.389s
+ok  	github.com/relux-works/curator/internal/scopes	4.975s
+ok  	github.com/relux-works/curator/internal/shell	4.871s
+ok  	github.com/relux-works/curator/internal/skillcheck	5.159s
+ok  	github.com/relux-works/curator/internal/skillspec	5.243s
+ok  	github.com/relux-works/curator/internal/snapshot	6.452s
+ok  	github.com/relux-works/curator/internal/ui	5.499s
+ok  	github.com/relux-works/curator/internal/verr	5.143s
+ok  	github.com/relux-works/curator/internal/version	5.131s
+ok  	github.com/relux-works/curator/internal/whitelist	5.532s
+--- exit=0
+
+=================================================================
+$ go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6 run ./internal/install/...
+0 issues.
+--- exit=0
+
+EXPECTED-RED: the repo-wide lint fails on pre-existing issues outside this task's scope.
+=================================================================
+$ go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6 run ./...
+internal/buildcache/protection_unix.go:163:18: Error return value of `unix.Close` is not checked (errcheck)
+	defer unix.Close(rootFD)
+	                ^
+internal/buildcache/protection_unix.go:247:18: Error return value of `unix.Close` is not checked (errcheck)
+	defer unix.Close(fd)
+	                ^
+internal/buildcache/protection_unix_test.go:357:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/buildcache/protection_unix_test.go:365:17: Error return value of `dir.Close` is not checked (errcheck)
+	defer dir.Close()
+	               ^
+internal/buildcache/publish.go:87:20: Error return value of `source.Close` is not checked (errcheck)
+	defer source.Close()
+	                  ^
+internal/buildsource/buildsource.go:115:19: Error return value of `token.Close` is not checked (errcheck)
+	defer token.Close()
+	                 ^
+internal/buildsource/buildsource.go:257:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/snapshot/snapshot.go:30:23: Error return value of `validated.Close` is not checked (errcheck)
+	defer validated.Close()
+	                     ^
+internal/snapshot/snapshot.go:49:20: Error return value of `os.RemoveAll` is not checked (errcheck)
+	defer os.RemoveAll(tmp)
+	                  ^
+internal/snapshot/snapshot.go:68:18: Error return value of `lock.Close` is not checked (errcheck)
+	defer lock.Close()
+	                ^
+internal/snapshot/snapshot.go:105:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/snapshot/snapshot.go:176:17: Error return value of `os.Remove` is not checked (errcheck)
+	defer os.Remove(tmpPath)
+	               ^
+internal/snapshot/snapshot_test.go:86:23: Error return value of `validated.Close` is not checked (errcheck)
+	defer validated.Close()
+	                     ^
+internal/snapshot/snapshot_test.go:245:19: Error return value of `token.Close` is not checked (errcheck)
+	defer token.Close()
+	                 ^
+internal/snapshot/snapshot_test.go:308:22: Error return value of `token.Close` is not checked (errcheck)
+				defer token.Close()
+				                 ^
+internal/snapshot/snapshot_test.go:391:23: Error return value of `validated.Close` is not checked (errcheck)
+	defer validated.Close()
+	                     ^
+internal/buildcache/protection_unix.go:200:12: G302: Expect file permissions to be 0600 or less (gosec)
+	if err := os.Chmod(path, 0o700); err != nil {
+	          ^
+internal/buildcache/protection_unix.go:211:9: G302: Expect file permissions to be 0600 or less (gosec)
+	return os.Chmod(path, 0o700)
+	       ^
+internal/buildsource/buildsource.go:266:28: G115: integer overflow conversion int64 -> uint64 (gosec)
+	writeUint64(digest, uint64(openedInfo.Size()))
+	                          ^
+internal/gitignore/gitignore.go:60:21: G304: Potential file inclusion via variable (gosec)
+	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- project .gitignore
+	                   ^
+internal/scopes/hybrid.go:134:21: G304: Potential file inclusion via variable (gosec)
+	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- machine home
+	                   ^
+internal/buildcache/cache.go:32:2: exported: exported const Hit should have comment (or a comment on this block) or be unexported (revive)
+	Hit                 Status = "hit"
+	^
+internal/buildcache/cache_test.go:408:50: unused-parameter: parameter 'entry' seems to be unused, consider removing or renaming it as _ (revive)
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+	                                                ^
+internal/buildcache/publish.go:36:2: exported: exported const Published should have comment (or a comment on this block) or be unexported (revive)
+	Published    PublicationStatus = "published"
+	^
+internal/buildsource/buildsource.go:191:54: unused-parameter: parameter 'entry' seems to be unused, consider removing or renaming it as _ (revive)
+	err := fs.WalkDir(root.FS(), ".", func(path string, entry fs.DirEntry, walkErr error) error {
+	                                                    ^
+internal/runtimestore/targets.go:24:2: exported: exported const ScriptRuntime should have comment (or a comment on this block) or be unexported (revive)
+	ScriptRuntime TargetKind = "script-runtime"
+	^
+internal/runtimestore/targets.go:42:1: exported: exported method ScriptTarget.Kind should have comment or be unexported (revive)
+func (target ScriptTarget) Kind() TargetKind       { return ScriptRuntime }
+^
+internal/runtimestore/targets.go:43:1: exported: exported method ScriptTarget.ExecutablePath should have comment or be unexported (revive)
+func (target ScriptTarget) ExecutablePath() string { return target.executable }
+^
+internal/runtimestore/targets.go:44:1: exported: exported method ScriptTarget.RuntimeDir should have comment or be unexported (revive)
+func (target ScriptTarget) RuntimeDir() string     { return target.runtimeDir }
+^
+internal/runtimestore/targets.go:55:1: exported: exported method CompiledTarget.Kind should have comment or be unexported (revive)
+func (target CompiledTarget) Kind() TargetKind                   { return BuildArtifact }
+^
+internal/runtimestore/targets.go:56:1: exported: exported method CompiledTarget.ExecutablePath should have comment or be unexported (revive)
+func (target CompiledTarget) ExecutablePath() string             { return target.artifactPath }
+^
+internal/runtimestore/targets.go:57:1: exported: exported method CompiledTarget.CacheKey should have comment or be unexported (revive)
+func (target CompiledTarget) CacheKey() buildmeta.CacheKey       { return target.cacheKey }
+^
+internal/runtimestore/targets.go:58:1: exported: exported method CompiledTarget.ReceiptHash should have comment or be unexported (revive)
+func (target CompiledTarget) ReceiptHash() buildmeta.ReceiptHash { return target.receiptHash }
+^
+internal/runtimestore/targets.go:107:2: exported: exported const ProjectShim should have comment (or a comment on this block) or be unexported (revive)
+	ProjectShim         ShimRole = "project"
+	^
+internal/runtimestore/targets.go:123:1: exported: exported function NewManagedShim should have comment or be unexported (revive)
+func NewManagedShim(role ShimRole, binDir, command, platform string) (ManagedShim, error) {
+^
+internal/runtimestore/targets.go:144:1: exported: exported method ManagedShim.Role should have comment or be unexported (revive)
+func (shim ManagedShim) Role() ShimRole   { return shim.role }
+^
+internal/runtimestore/targets.go:145:1: exported: exported method ManagedShim.BinDir should have comment or be unexported (revive)
+func (shim ManagedShim) BinDir() string   { return shim.binDir }
+^
+internal/runtimestore/targets.go:146:1: exported: exported method ManagedShim.Command should have comment or be unexported (revive)
+func (shim ManagedShim) Command() string  { return shim.command }
+^
+internal/runtimestore/targets.go:147:1: exported: exported method ManagedShim.Platform should have comment or be unexported (revive)
+func (shim ManagedShim) Platform() string { return shim.platform }
+^
+internal/runtimestore/targets.go:148:1: exported: exported method ManagedShim.Path should have comment or be unexported (revive)
+func (shim ManagedShim) Path() string     { return shim.path }
+^
+internal/runtimestore/targets.go:162:2: exported: exported const RuntimeTreeTarget should have comment (or a comment on this block) or be unexported (revive)
+	RuntimeTreeTarget ManagedTargetKind = "runtime-tree"
+	^
+internal/runtimestore/targets.go:91:28: ST1005: error strings should not be capitalized (staticcheck)
+		return CompiledTarget{}, fmt.Errorf("Windows compiled artifact must have an .exe suffix")
+		                         ^
+internal/runtimestore/targets.go:262:11: ST1005: error strings should not be capitalized (staticcheck)
+			return fmt.Errorf("Unix PATH entry contains a separator")
+			       ^
+internal/runtimestore/targets.go:265:11: ST1005: error strings should not be capitalized (staticcheck)
+			return fmt.Errorf("Windows PATH entry contains a separator")
+			       ^
+internal/runtimestore/targets_test.go:393:6: func decodeHelperOutput is unused (unused)
+func decodeHelperOutput(t *testing.T, payload []byte) map[string]any {
+     ^
+45 issues:
+* errcheck: 16
+* gosec: 5
+* revive: 20
+* staticcheck: 3
+* unused: 1
+exit status 1
+--- exit=1
+
+=================================================================
+REVERT-TO-PROVE R1: restore the separate curator-dry-run-* /
+curator-global-dry-run-* closure scratch workspace; the new
+regressions must fail with the reviewer's exact finding.
+$ go test -count=1 -run DryRunKeepsEveryEphemeralPath ./internal/install/
+--- FAIL: TestProjectDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot (0.22s)
+    private_test.go:150: temporary roots during the dry run = [curator-dry-run-354281039], want exactly one curator-install-private-* root
+--- FAIL: TestGlobalDryRunKeepsEveryEphemeralPathInOneOperationPrivateRoot (0.19s)
+    private_test.go:192: temporary roots during the global dry run = [curator-global-dry-run-726500250], want exactly one curator-install-private-* root
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	0.775s
+FAIL
+--- exit=1 (expected 1)
+
+=================================================================
+REVERT-TO-PROVE R2: remove the global MCP and registry gates and
+the marker evidence; the new regressions must fail showing that a
+failing gate still probed, inspected, compiled, staged and installed.
+$ go test -count=1 -run 'TestGlobalMcpFailure|TestGlobalRegistryFailure|TestGlobalMarkersCarry' ./internal/install/
+--- FAIL: TestGlobalMcpFailureBlocksToolchainCacheAndBuild (0.16s)
+    private_test.go:297: global status = "ok", want failed: {Alias:global Path:/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestGlobalMcpFailureBlocksToolchainCacheAndBuild2753721301/002/global Status:ok Messages:[global: build-skill: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (project .agents/bin lookup, manager global/bin fallback, validated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional global: build-skill.alpha build source=curator-build-source-v1:sha256:03ebe6c35ffb1a58a3d2c8d40055a3ff7c7bd380060d3c375cf28ce9009ea424 root=src dir=src/cmd/alpha target=linux/amd64+GOAMD64=v1 key=sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 outcome=would-preflight-and-build global: build-skill.alpha staged key=sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 sha256=sha256:e1454fecc66fad3e206852fae91305077516350cff4428247e4dbe961bfa2ea0 global: build-skill tag v1 2dab7de context=yes commands=[alpha] via=<project> installed] Errors:[] Builds:[{skill:build-skill command:alpha commandObject:map[driver:go-v1 source_dir:src/cmd/alpha type:build] buildRoot:src sourceDir:src/cmd/alpha source:{Algorithm:curator-build-source-v1 ContentSHA256:sha256:03ebe6c35ffb1a58a3d2c8d40055a3ff7c7bd380060d3c375cf28ce9009ea424} target:{GOOS:linux GOARCH:amd64 Tuning:map[GOAMD64:v1]} input:{SchemaVersion:1 Driver:go-v1 BuildSource:{Algorithm:curator-build-source-v1 ContentSHA256:sha256:03ebe6c35ffb1a58a3d2c8d40055a3ff7c7bd380060d3c375cf28ce9009ea424} BuildRoot:src Command:alpha SourceDir:src/cmd/alpha Target:{GOOS:linux GOARCH:amd64 Tuning:map[GOAMD64:v1]} Toolchain:{Algorithm:curator-go-toolchain-v1 GoRelpath:bin/go GoVersion:1.25.0 ContentSHA256:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} Policy:{ModuleMode:vendor Network:none Workspace:false CGO:false CompilerDirectives:reject-nonstandard-cgo-import-dynamic-v1 ExecutionPolicy:manager-worker-v1 TargetMode:native LinkMode:internal Libgcc:none PackageAssembly:false HostObjects:false Telemetry:off-private}} key:sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 outcome:would-preflight-and-build reason:cache entry is absent artifactPath:}] Staged:[{skill:build-skill command:alpha key:sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 path:/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestGlobalMcpFailureBlocksToolchainCacheAndBuild2753721301/005/bin/alpha receipt:{SchemaVersion:1 CacheKey:sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 Input:{SchemaVersion:1 Driver:go-v1 BuildSource:{Algorithm:curator-build-source-v1 ContentSHA256:sha256:03ebe6c35ffb1a58a3d2c8d40055a3ff7c7bd380060d3c375cf28ce9009ea424} BuildRoot:src Command:alpha SourceDir:src/cmd/alpha Target:{GOOS:linux GOARCH:amd64 Tuning:map[GOAMD64:v1]} Toolchain:{Algorithm:curator-go-toolchain-v1 GoRelpath:bin/go GoVersion:1.25.0 ContentSHA256:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} Policy:{ModuleMode:vendor Network:none Workspace:false CGO:false CompilerDirectives:reject-nonstandard-cgo-import-dynamic-v1 ExecutionPolicy:manager-worker-v1 TargetMode:native LinkMode:internal Libgcc:none PackageAssembly:false HostObjects:false Telemetry:off-private}} Artifact:{Path:bin/alpha SHA256:sha256:e1454fecc66fad3e206852fae91305077516350cff4428247e4dbe961bfa2ea0 Size:14}} artifact:{Path:bin/alpha SHA256:sha256:e1454fecc66fad3e206852fae91305077516350cff4428247e4dbe961bfa2ea0 Size:14}}]}
+--- FAIL: TestGlobalRegistryFailureBlocksToolchainCacheAndBuild (0.16s)
+    private_test.go:321: global status = "ok", want failed: {Alias:global Path:/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestGlobalRegistryFailureBlocksToolchainCacheAndBuild3688443333/002/global Status:ok Messages:[global: build-skill: warning: skill.command_resolution_contract_missing (SKILL.md): prompt-visible instructions export managed runtime commands but do not document a shell-neutral resolver (project .agents/bin lookup, manager global/bin fallback, validated POSIX and PowerShell bare-command fallbacks, Windows .cmd shim suffix). Agents must resolve project shims first, then global shims, then a validated bare command; shell profile activation is optional global: build-skill.alpha build source=curator-build-source-v1:sha256:03ebe6c35ffb1a58a3d2c8d40055a3ff7c7bd380060d3c375cf28ce9009ea424 root=src dir=src/cmd/alpha target=linux/amd64+GOAMD64=v1 key=sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 outcome=would-preflight-and-build global: build-skill.alpha staged key=sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 sha256=sha256:e1454fecc66fad3e206852fae91305077516350cff4428247e4dbe961bfa2ea0 global: build-skill tag v1 2dab7de context=yes commands=[alpha] via=<project> installed] Errors:[] Builds:[{skill:build-skill command:alpha commandObject:map[driver:go-v1 source_dir:src/cmd/alpha type:build] buildRoot:src sourceDir:src/cmd/alpha source:{Algorithm:curator-build-source-v1 ContentSHA256:sha256:03ebe6c35ffb1a58a3d2c8d40055a3ff7c7bd380060d3c375cf28ce9009ea424} target:{GOOS:linux GOARCH:amd64 Tuning:map[GOAMD64:v1]} input:{SchemaVersion:1 Driver:go-v1 BuildSource:{Algorithm:curator-build-source-v1 ContentSHA256:sha256:03ebe6c35ffb1a58a3d2c8d40055a3ff7c7bd380060d3c375cf28ce9009ea424} BuildRoot:src Command:alpha SourceDir:src/cmd/alpha Target:{GOOS:linux GOARCH:amd64 Tuning:map[GOAMD64:v1]} Toolchain:{Algorithm:curator-go-toolchain-v1 GoRelpath:bin/go GoVersion:1.25.0 ContentSHA256:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} Policy:{ModuleMode:vendor Network:none Workspace:false CGO:false CompilerDirectives:reject-nonstandard-cgo-import-dynamic-v1 ExecutionPolicy:manager-worker-v1 TargetMode:native LinkMode:internal Libgcc:none PackageAssembly:false HostObjects:false Telemetry:off-private}} key:sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 outcome:would-preflight-and-build reason:cache entry is absent artifactPath:}] Staged:[{skill:build-skill command:alpha key:sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 path:/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestGlobalRegistryFailureBlocksToolchainCacheAndBuild3688443333/005/bin/alpha receipt:{SchemaVersion:1 CacheKey:sha256:ee0532c9ca2d605eb6d671a6b29c0891ce9eafef02d18e3d429991c6767a1011 Input:{SchemaVersion:1 Driver:go-v1 BuildSource:{Algorithm:curator-build-source-v1 ContentSHA256:sha256:03ebe6c35ffb1a58a3d2c8d40055a3ff7c7bd380060d3c375cf28ce9009ea424} BuildRoot:src Command:alpha SourceDir:src/cmd/alpha Target:{GOOS:linux GOARCH:amd64 Tuning:map[GOAMD64:v1]} Toolchain:{Algorithm:curator-go-toolchain-v1 GoRelpath:bin/go GoVersion:1.25.0 ContentSHA256:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa} Policy:{ModuleMode:vendor Network:none Workspace:false CGO:false CompilerDirectives:reject-nonstandard-cgo-import-dynamic-v1 ExecutionPolicy:manager-worker-v1 TargetMode:native LinkMode:internal Libgcc:none PackageAssembly:false HostObjects:false Telemetry:off-private}} Artifact:{Path:bin/alpha SHA256:sha256:e1454fecc66fad3e206852fae91305077516350cff4428247e4dbe961bfa2ea0 Size:14}} artifact:{Path:bin/alpha SHA256:sha256:e1454fecc66fad3e206852fae91305077516350cff4428247e4dbe961bfa2ea0 Size:14}}]}
+--- FAIL: TestGlobalMarkersCarryMcpAndAttestationEvidence (0.15s)
+    private_test.go:394: global marker mcp_servers = map[], want the verified finding
+FAIL
+FAIL	github.com/relux-works/curator/internal/install	0.759s
+FAIL
+--- exit=1 (expected 1)
+
+=================================================================
+POST-RESTORE RECHECK: both fixes back in place.
+$ gofmt -l internal cmd
+--- exit=0
+$ go build ./...
+--- exit=0
+$ go test -count=1 ./...
+ok  	github.com/relux-works/curator/cmd/curator	2.823s
+ok  	github.com/relux-works/curator/internal/adapters	0.966s
+ok  	github.com/relux-works/curator/internal/audit	1.521s
+ok  	github.com/relux-works/curator/internal/buildcache	3.749s
+ok  	github.com/relux-works/curator/internal/buildmeta	3.924s
+ok  	github.com/relux-works/curator/internal/buildsource	3.738s
+ok  	github.com/relux-works/curator/internal/capabilities	3.036s
+ok  	github.com/relux-works/curator/internal/closure	4.029s
+ok  	github.com/relux-works/curator/internal/config	2.196s
+ok  	github.com/relux-works/curator/internal/devsub	1.170s
+ok  	github.com/relux-works/curator/internal/envfiles	1.856s
+ok  	github.com/relux-works/curator/internal/gitignore	3.730s
+ok  	github.com/relux-works/curator/internal/gitops	1.336s
+ok  	github.com/relux-works/curator/internal/globalbins	4.269s
+ok  	github.com/relux-works/curator/internal/godriver	37.687s
+ok  	github.com/relux-works/curator/internal/hashing	4.495s
+ok  	github.com/relux-works/curator/internal/identifiers	3.708s
+ok  	github.com/relux-works/curator/internal/identity	3.708s
+ok  	github.com/relux-works/curator/internal/install	27.834s
+ok  	github.com/relux-works/curator/internal/interop	3.795s
+ok  	github.com/relux-works/curator/internal/locale	3.748s
+ok  	github.com/relux-works/curator/internal/manifest	3.633s
+ok  	github.com/relux-works/curator/internal/marker	3.215s
+ok  	github.com/relux-works/curator/internal/mcp	3.419s
+ok  	github.com/relux-works/curator/internal/protocoljson	2.959s
+ok  	github.com/relux-works/curator/internal/registry	4.502s
+ok  	github.com/relux-works/curator/internal/runtimestore	12.809s
+ok  	github.com/relux-works/curator/internal/scopes	3.478s
+ok  	github.com/relux-works/curator/internal/shell	3.858s
+ok  	github.com/relux-works/curator/internal/skillcheck	3.662s
+ok  	github.com/relux-works/curator/internal/skillspec	3.776s
+ok  	github.com/relux-works/curator/internal/snapshot	4.785s
+ok  	github.com/relux-works/curator/internal/ui	3.779s
+ok  	github.com/relux-works/curator/internal/verr	3.516s
+ok  	github.com/relux-works/curator/internal/version	3.626s
+ok  	github.com/relux-works/curator/internal/whitelist	3.607s
+--- exit=0

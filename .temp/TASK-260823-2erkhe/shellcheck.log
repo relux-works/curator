@@ -1,0 +1,13 @@
+
+In .github/ci/gate-selftest.sh line 174:
+run_gate() {
+^-- SC2329 (info): This function is never invoked. Check usage (or ignored if invoked indirectly).
+
+
+In .github/ci/gate-selftest.sh line 350:
+	skip 'suite-plan and ledger-consistency cases' 'no usable `go list` on this runner; these gates need the module graph'
+                                                       ^-- SC2016 (info): Expressions don't expand in single quotes, use double quotes for that.
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2016 -- Expressions don't expand in singl...
+  https://www.shellcheck.net/wiki/SC2329 -- This function is never invoked. C...

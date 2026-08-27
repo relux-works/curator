@@ -1,0 +1,34 @@
+internal/buildcache/protection_windows.go:509:18: Error return value of `root.Close` is not checked (errcheck)
+	defer root.Close()
+	                ^
+internal/buildrepo/protection_windows.go:331:18: Error return value of `file.Close` is not checked (errcheck)
+	defer file.Close()
+	                ^
+internal/managerlock/identity_windows.go:96:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+	defer windows.CloseHandle(handle)
+	                         ^
+internal/managerlock/identity_windows_test.go:269:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+	defer windows.CloseHandle(handle)
+	                         ^
+internal/transaction/durability_windows.go:49:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+	defer windows.CloseHandle(handle)
+	                         ^
+internal/buildcache/protection_windows.go:298:25: G103: Use of unsafe calls should be audited (gosec)
+		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
+		                      ^
+internal/buildrepo/protection_windows.go:333:40: G115: integer overflow conversion int64 -> uint64 (gosec)
+	if err != nil || initial.size > uint64(max) {
+	                                      ^
+internal/godriver/controls_windows.go:62:11: G103: Use of unsafe calls should be audited (gosec)
+		uintptr(unsafe.Pointer(&information)), uint32(unsafe.Sizeof(information))); err != nil {
+		        ^
+internal/managerlock/identity_windows.go:102:11: G103: Use of unsafe calls should be audited (gosec)
+		(*byte)(unsafe.Pointer(&flags)),
+		        ^
+internal/buildrepo/protection_windows.go:321:43: redefines-builtin-id: redefinition of the built-in function max (revive)
+func readNativeProtectedFile(name string, max int64, hook func(string)) ([]byte, error) {
+                                          ^
+10 issues:
+* errcheck: 5
+* gosec: 4
+* revive: 1

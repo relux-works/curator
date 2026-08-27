@@ -1,0 +1,36 @@
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/root_alone
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/strictly_ascending
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/high_byte_sorts_after_ascii
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/high_byte_before_ascii_is_descending
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/duplicate_path
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/descending_pair
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/descending_at_the_tail
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/prefix_before_extension
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/extension_before_prefix
+=== RUN   TestValidateRemovalEntriesOrdersByUnsignedBytes/root_repeated
+--- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/root_alone (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/strictly_ascending (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/high_byte_sorts_after_ascii (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/high_byte_before_ascii_is_descending (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/duplicate_path (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/descending_pair (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/descending_at_the_tail (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/prefix_before_extension (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/extension_before_prefix (0.00s)
+    --- PASS: TestValidateRemovalEntriesOrdersByUnsignedBytes/root_repeated (0.00s)
+=== RUN   TestValidateRemovalEntriesStaysFailClosedWithoutARoot
+=== RUN   TestValidateRemovalEntriesStaysFailClosedWithoutARoot/nil_manifest
+=== RUN   TestValidateRemovalEntriesStaysFailClosedWithoutARoot/empty_manifest
+=== RUN   TestValidateRemovalEntriesStaysFailClosedWithoutARoot/first_entry_is_not_the_root
+=== RUN   TestValidateRemovalEntriesStaysFailClosedWithoutARoot/root_is_not_first
+--- PASS: TestValidateRemovalEntriesStaysFailClosedWithoutARoot (0.00s)
+    --- PASS: TestValidateRemovalEntriesStaysFailClosedWithoutARoot/nil_manifest (0.00s)
+    --- PASS: TestValidateRemovalEntriesStaysFailClosedWithoutARoot/empty_manifest (0.00s)
+    --- PASS: TestValidateRemovalEntriesStaysFailClosedWithoutARoot/first_entry_is_not_the_root (0.00s)
+    --- PASS: TestValidateRemovalEntriesStaysFailClosedWithoutARoot/root_is_not_first (0.00s)
+=== RUN   TestValidateRemovalEntriesRejectsUnorderedTextDefects
+--- PASS: TestValidateRemovalEntriesRejectsUnorderedTextDefects (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/transaction	0.457s

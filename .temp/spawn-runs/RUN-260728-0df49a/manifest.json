@@ -1,0 +1,71 @@
+{
+  "id": "RUN-260728-0df49a",
+  "task_id": "TASK-260728-12pnm1",
+  "created_at": "2026-07-28T23:55:54.614978Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] solution-architect (claude)",
+  "role": "solution-architect",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-03-55-54_-analyst--solution-architect--claude-_TASK-260728-12pnm1.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "log_resource_name": "TASK-260728-12pnm1_spawn-log_-analyst--solution-architect--claude-_RUN-260728-0df49a.log",
+  "start_status": "analysis",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260728-12pnm1_command-evidence.log",
+    "TASK-260728-12pnm1_decision-0009-rust-driver-pair.md",
+    "TASK-260728-12pnm1_fixture-absent.json",
+    "TASK-260728-12pnm1_fixture-macos.json",
+    "TASK-260728-12pnm1_gate-log.txt",
+    "TASK-260728-12pnm1_probe.tar.gz",
+    "TASK-260728-12pnm1_results.md",
+    "TASK-260728-12pnm1_review-verdict-cycle-1.md",
+    "TASK-260728-12pnm1_review-verdict-cycle-2.md",
+    "TASK-260728-12pnm1_rework-cycle-2-measurements.md",
+    "TASK-260728-12pnm1_rust-build-drivers-reference.md",
+    "TASK-260728-12pnm1_spawn-log_-analyst--solution-architect--claude-_RUN-260728-2e7daa.log",
+    "TASK-260728-12pnm1_spawn-log_-implementer--developer--claude-_RUN-260728-52b118.log",
+    "TASK-260728-12pnm1_spawn-log_-reviewer--reviewer--codex-_RUN-260728-de06b1.log",
+    "TASK-260728-12pnm1_spawn-log_-reviewer--reviewer--codex-_RUN-260728-efa5bc.log"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260728-12pnm1_command-evidence.log": "bdd88715043b54ab2158e01cfa352c44b02d1cf9f1238f4e162002c622a8870c",
+    "TASK-260728-12pnm1_decision-0009-rust-driver-pair.md": "c4b82ad362b17e393f7a63fd370cf7e744a6fbed0c3808e79733a1240b51cf73",
+    "TASK-260728-12pnm1_fixture-absent.json": "d8b8a5da3c34dc7111600bae97ae392cd11379f30937e08fc658e797b46fb3c0",
+    "TASK-260728-12pnm1_fixture-macos.json": "a2d36a45619ad28f81a183c3e4d7752f4ecec530885530a3b363e0fa1d84cab9",
+    "TASK-260728-12pnm1_gate-log.txt": "a44c1a7376dc4f32019e7abf95c2e8f9242e528145bffd19392ecaf005363e33",
+    "TASK-260728-12pnm1_probe.tar.gz": "0719faa4feb1615346cf43385168cc9cfd627aacf156b86a10e4f12f34558e0a",
+    "TASK-260728-12pnm1_results.md": "b4cf08461fd37aca80d466c81e974afc1d931b25a8dc0347d38bdfb781d9f0b9",
+    "TASK-260728-12pnm1_review-verdict-cycle-1.md": "fc41d123a83f7d00d4dd13b4265e3bd63eb1434291bd922a38484cc5e414335f",
+    "TASK-260728-12pnm1_review-verdict-cycle-2.md": "3f66e7a2a025be4d303c3a8134c7a5ebcb867ad11022ac1954d7c6dfeb0e557d",
+    "TASK-260728-12pnm1_rework-cycle-2-measurements.md": "3444502569c906753ab976f7c4f1bee284debed5553fd728e19ac31685b8001d",
+    "TASK-260728-12pnm1_rust-build-drivers-reference.md": "edc77e54b2e116e99a0c0426ecbfc76a8fd3274e686be6e27e88d0be3fbd3544"
+  },
+  "require_outcome_artifact": true
+}

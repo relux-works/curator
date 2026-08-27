@@ -1,0 +1,611 @@
+Test (windows-latest)	Set up job	﻿2026-08-23T13:02:41.7522580Z Current runner version: '2.336.0'
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7578780Z ##[group]Runner Image Provisioner
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7579596Z Hosted Compute Agent
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7580225Z Version: 20260729.566
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7580869Z Commit: cf7153fe6e25b664e8693c24944bf2b00355d109
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7581566Z Build Date: 2026-07-29T19:17:02Z
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7582217Z Worker ID: {65738474-101d-49a4-bdcc-e694c0d0887a}
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7583194Z Azure Region: eastus
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7583732Z ##[endgroup]
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7585211Z ##[group]Operating System
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7585840Z Microsoft Windows Server 2025
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7586403Z 10.0.26100
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7586907Z Datacenter
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7587425Z ##[endgroup]
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7588301Z ##[group]Runner Image
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7588881Z Image: windows-2025-vs2026
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7589436Z Version: 20260818.207.1
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7590553Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260818.207/images/windows/Windows2025-VS2026-Readme.md
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7592670Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260818.207
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7593872Z ##[endgroup]
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7595256Z ##[group]GITHUB_TOKEN Permissions
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7597159Z Contents: read
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7597771Z Metadata: read
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7598311Z ##[endgroup]
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7600378Z Secret source: Actions
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.7601406Z Prepare workflow directory
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.8005609Z Prepare all required actions
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.8054902Z Getting action download info
+Test (windows-latest)	Set up job	2026-08-23T13:02:41.9473174Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Test (windows-latest)	Set up job	2026-08-23T13:02:42.0847188Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+Test (windows-latest)	Set up job	2026-08-23T13:02:42.3383951Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Test (windows-latest)	Set up job	2026-08-23T13:02:42.6990821Z Complete job name: Test (windows-latest)
+Test (windows-latest)	Run actions/checkout@v4	﻿2026-08-23T13:02:42.8489946Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8501656Z ##[group]Run actions/checkout@v4
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8502507Z with:
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8503013Z   submodules: true
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8503586Z   repository: relux-works/curator
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8507654Z   token: ***
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8508180Z   ssh-strict: true
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8508799Z   ssh-user: git
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8509495Z   persist-credentials: true
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8510050Z   clean: true
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8510542Z   sparse-checkout-cone-mode: true
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8511147Z   fetch-depth: 1
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8511669Z   fetch-tags: false
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8512362Z   show-progress: true
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8512918Z   lfs: false
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8513471Z   set-safe-directory: true
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8514069Z   allow-unsafe-pr-checkout: false
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8514979Z env:
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8515603Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8516260Z   GOTOOLCHAIN: local
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8516728Z   GOENV: off
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:42.8517496Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.0034377Z Syncing repository: relux-works/curator
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.0036429Z ##[group]Getting Git version info
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.0037083Z Working directory is 'D:\a\curator\curator'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.0933303Z [command]"C:\Program Files\Git\bin\git.exe" version
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.2585315Z git version 2.55.0.windows.4
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.2629306Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.2648864Z Temporarily overriding HOME='D:\a\_temp\fe64797e-4d20-4a3f-8c0d-a794793f0ea9' before making global git config changes
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.2652738Z Adding repository directory to the temporary git global config as a safe directory
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.2659749Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.2977970Z Deleting the contents of 'D:\a\curator\curator'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.2985403Z ##[group]Initializing the repository
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.2994248Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.3491916Z Initialized empty Git repository in D:/a/curator/curator/.git/
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.3537466Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.3872390Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.3873297Z ##[group]Disabling automatic garbage collection
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.3881705Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.4196276Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.4197667Z ##[group]Setting up auth
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.4208970Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:43.4527805Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:44.6365208Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:44.6663839Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:45.2315704Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:45.2650794Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:45.8078525Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:45.8402667Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:45.8403303Z ##[group]Fetching the repository
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:45.8415361Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +5d7380d377b6f4a0fdf0bd1184bd203a79654d67:refs/remotes/pull/25/merge
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6029965Z From https://github.com/relux-works/curator
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6031630Z  * [new ref]         5d7380d377b6f4a0fdf0bd1184bd203a79654d67 -> pull/25/merge
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6088446Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6090180Z ##[group]Determining the checkout info
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6092632Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6103124Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6480878Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6793883Z ##[group]Checking out the ref
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.6803188Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force refs/remotes/pull/25/merge
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8477784Z Note: switching to 'refs/remotes/pull/25/merge'.
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8478382Z 
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8478780Z You are in 'detached HEAD' state. You can look around, make experimental
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8479658Z changes and commit them, and you can discard any commits you make in this
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8480209Z state without impacting any branches by switching back to a branch.
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8480669Z 
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8480853Z If you want to create a new branch to retain commits you create, you may
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8481296Z do so (now or later) by using -c with the switch command. Example:
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8481562Z 
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8482703Z   git switch -c <new-branch-name>
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8482901Z 
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8483015Z Or undo this operation with:
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8483243Z 
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8483345Z   git switch -
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8483462Z 
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8483685Z Turn off this advice by setting config variable advice.detachedHead to false
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8484060Z 
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8484458Z HEAD is now at 5d7380d Merge 465467009c59990b62d493c4a2bef1f9585b1b33 into 95ca5ae837462463e84d27289c9ed6141f27c43d
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8549609Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8550040Z ##[group]Setting up auth for fetching submodules
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8560603Z [command]"C:\Program Files\Git\bin\git.exe" config --global http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.8894855Z [command]"C:\Program Files\Git\bin\git.exe" config --global --unset-all url.https://github.com/.insteadOf
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.9217201Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf git@github.com:
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.9542350Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add url.https://github.com/.insteadOf org-261817730@github.com:
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.9871054Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.9871669Z ##[group]Fetching submodules
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:46.9882954Z [command]"C:\Program Files\Git\bin\git.exe" submodule sync
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:47.5767855Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 submodule update --init --force --depth=1
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:48.1142567Z Submodule 'agents/skills/skill-go-testing-tools' (https://github.com/relux-works/skill-go-testing-tools.git) registered for path 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:48.1610373Z Cloning into 'D:/a/curator/curator/agents/skills/skill-go-testing-tools'...
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:49.3026696Z From https://github.com/relux-works/skill-go-testing-tools
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:49.3027456Z  * branch            21585d0e937cae47e54a788d8ae36b1780eae47f -> FETCH_HEAD
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:49.3927636Z Submodule path 'agents/skills/skill-go-testing-tools': checked out '21585d0e937cae47e54a788d8ae36b1780eae47f'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:49.4011892Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local gc.auto 0"
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:49.9282731Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:49.9787649Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:49.9788073Z ##[group]Persisting credentials for submodules
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:49.9789103Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :\""
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:50.5156404Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:50.6082001Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "sh -c \"git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url\""
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:51.1277236Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:51.2070706Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:51.2197849Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'"
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:51.7525455Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:51.7995100Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach "git config --local --add 'url.https://github.com/.insteadOf' 'org-261817730@github.com:'"
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:52.3454971Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:52.3960201Z ##[endgroup]
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:52.4326682Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+Test (windows-latest)	Run actions/checkout@v4	2026-08-23T13:02:52.4607886Z 5d7380d377b6f4a0fdf0bd1184bd203a79654d67
+Test (windows-latest)	Checkout authoritative protocol suite	﻿2026-08-23T13:02:52.5110293Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5112693Z ##[group]Run actions/checkout@v4
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5112933Z with:
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5113139Z   repository: relux-works/curator-spec
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5113427Z   ref: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5113699Z   path: protocol-spec
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5116164Z   token: ***
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5116344Z   ssh-strict: true
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5116522Z   ssh-user: git
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5116708Z   persist-credentials: true
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5116932Z   clean: true
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5117123Z   sparse-checkout-cone-mode: true
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5117359Z   fetch-depth: 1
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5117552Z   fetch-tags: false
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5117776Z   show-progress: true
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5117958Z   lfs: false
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5118123Z   submodules: false
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5118309Z   set-safe-directory: true
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5118527Z   allow-unsafe-pr-checkout: false
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5118744Z env:
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5118940Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5119215Z   GOTOOLCHAIN: local
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5119387Z   GOENV: off
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.5119547Z ##[endgroup]
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.6243608Z Syncing repository: relux-works/curator-spec
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.6252565Z ##[group]Getting Git version info
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.6253079Z Working directory is 'D:\a\curator\curator\protocol-spec'
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.7092999Z [command]"C:\Program Files\Git\bin\git.exe" version
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.7376271Z git version 2.55.0.windows.4
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.7421379Z ##[endgroup]
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.7440829Z Temporarily overriding HOME='D:\a\_temp\d4bdbd2f-28bd-4640-9f1f-cec2be8d4540' before making global git config changes
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.7441623Z Adding repository directory to the temporary git global config as a safe directory
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.7452280Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.7765901Z ##[group]Initializing the repository
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.7777051Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\curator\curator\protocol-spec
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.8145823Z Initialized empty Git repository in D:/a/curator/curator/protocol-spec/.git/
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.8190394Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/relux-works/curator-spec
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.8509255Z ##[endgroup]
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.8509670Z ##[group]Disabling automatic garbage collection
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.8519825Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.8830720Z ##[endgroup]
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.8831133Z ##[group]Setting up auth
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.8843866Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:52.9171963Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:53.5025273Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:53.5341707Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.0958417Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.1271690Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.6503417Z [command]"C:\Program Files\Git\bin\git.exe" config --local http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.6842181Z ##[endgroup]
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.6843035Z ##[group]Fetching the repository
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.6855257Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.9520980Z From https://github.com/relux-works/curator-spec
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.9521581Z  * branch            00b1688a9b2457ca397a0bb550acf47cad8ee967 -> FETCH_HEAD
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.9561927Z ##[endgroup]
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.9562410Z ##[group]Determining the checkout info
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.9564692Z ##[endgroup]
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.9574116Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:54.9936879Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.0245842Z ##[group]Checking out the ref
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.0255414Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1075021Z Note: switching to '00b1688a9b2457ca397a0bb550acf47cad8ee967'.
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1075753Z 
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1076256Z You are in 'detached HEAD' state. You can look around, make experimental
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1077265Z changes and commit them, and you can discard any commits you make in this
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1078041Z state without impacting any branches by switching back to a branch.
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1078502Z 
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1078785Z If you want to create a new branch to retain commits you create, you may
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1079495Z do so (now or later) by using -c with the switch command. Example:
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1079944Z 
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1080111Z   git switch -c <new-branch-name>
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1080378Z 
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1080519Z Or undo this operation with:
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1080759Z 
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1080875Z   git switch -
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1081047Z 
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1081379Z Turn off this advice by setting config variable advice.detachedHead to false
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1081890Z 
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1082209Z HEAD is now at 00b1688 Adopt agent-skill.json as the canonical manifest (#11)
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1153526Z ##[endgroup]
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1542408Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+Test (windows-latest)	Checkout authoritative protocol suite	2026-08-23T13:02:55.1829881Z 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Run actions/setup-go@v5	﻿2026-08-23T13:02:55.2232727Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2234147Z ##[group]Run actions/setup-go@v5
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2234377Z with:
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2234554Z   go-version-file: go.mod
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2234766Z   check-latest: false
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2237231Z   token: ***
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2237404Z   cache: true
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2237567Z env:
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2237765Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2238046Z   GOTOOLCHAIN: local
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2238224Z   GOENV: off
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.2238386Z ##[endgroup]
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.3808775Z Setup go version spec 1.25.5
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.3822127Z Attempting to download 1.25.5...
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.4008801Z (node:4540) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.4010130Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.7715735Z matching 1.25.5...
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:55.7802925Z Acquiring 1.25.5 from https://github.com/actions/go-versions/releases/download/1.25.5-19880500865/go-1.25.5-win32-x64.zip
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:56.3113072Z Extracting Go...
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:02:56.3940506Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command "$ErrorActionPreference = 'Stop' ; try { Add-Type -AssemblyName System.IO.Compression.ZipFile } catch { } ; try { [System.IO.Compression.ZipFile]::ExtractToDirectory('D:\a\_temp\go-1.25.5-win32-x64.zip', 'D:\a\_temp\f76727fc-fa99-437e-af86-56ed2f8666a4', $true) } catch { if (($_.Exception.GetType().FullName -eq 'System.Management.Automation.MethodException') -or ($_.Exception.GetType().FullName -eq 'System.Management.Automation.RuntimeException') ){ Expand-Archive -LiteralPath 'D:\a\_temp\go-1.25.5-win32-x64.zip' -DestinationPath 'D:\a\_temp\f76727fc-fa99-437e-af86-56ed2f8666a4' -Force } else { throw $_ } } ;"
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:01.3611690Z Successfully extracted go to D:\a\_temp\f76727fc-fa99-437e-af86-56ed2f8666a4
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:01.3612222Z Adding to the cache ...
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:12.4768369Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64 => D:\hostedtoolcache\windows\go\1.25.5\x64
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:12.4774089Z Created link C:\hostedtoolcache\windows\go\1.25.5\x64.complete => D:\hostedtoolcache\windows\go\1.25.5\x64.complete
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:12.4775572Z Successfully cached go to C:\hostedtoolcache\windows\go\1.25.5\x64
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:12.4783303Z Added go to the path
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:12.4786595Z Successfully set up Go version 1.25.5
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:12.9651738Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOMODCACHE
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:12.9707779Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOCACHE
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:13.0070165Z C:\Users\runneradmin\go\pkg\mod
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:13.0070807Z C:\Users\runneradmin\AppData\Local\go-build
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:13.2327430Z Cache hit for: setup-go-Windows-x64-go-1.25.5-a83679499ba324054710aba827b097460d875f30e10d8aab956eabc0616f4046
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:13.2468315Z (node:4540) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:13.7448587Z Received 65971802 of 65971802 (100.0%), 134.7 MBs/sec
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:13.7450689Z Cache Size: ~63 MB (65971802 B)
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:13.7478638Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/f472fecc-79f2-47b2-af45-51971d57a0f6/cache.tzst -P -C D:/a/curator/curator --force-local --use-compress-program "zstd -d"
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.5013472Z Cache restored successfully
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.5084049Z Cache restored from key: setup-go-Windows-x64-go-1.25.5-a83679499ba324054710aba827b097460d875f30e10d8aab956eabc0616f4046
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.5106983Z go version go1.25.5 windows/amd64
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.5107313Z 
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.5107766Z ##[group]go env
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7851538Z set AR=ar
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7851961Z set CC=gcc
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7852350Z set CGO_CFLAGS=-O2 -g
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7852717Z set CGO_CPPFLAGS=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7853001Z set CGO_CXXFLAGS=-O2 -g
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7853221Z set CGO_ENABLED=1
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7853415Z set CGO_FFLAGS=-O2 -g
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7853622Z set CGO_LDFLAGS=-O2 -g
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7853813Z set CXX=g++
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7853985Z set GCCGO=gccgo
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7854165Z set GO111MODULE=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7854345Z set GOAMD64=v1
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7854522Z set GOARCH=amd64
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7854707Z set GOAUTH=netrc
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7854879Z set GOBIN=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7855122Z set GOCACHE=C:\Users\runneradmin\AppData\Local\go-build
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7909947Z set GOCACHEPROG=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7910384Z set GODEBUG=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7910693Z set GOENV=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7910976Z set GOEXE=.exe
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7911508Z set GOEXPERIMENT=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7912407Z set GOFIPS140=off
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7912730Z set GOFLAGS=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7913952Z set GOGCCFLAGS=-m64 -mthreads -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=C:\Users\RUNNER~1\AppData\Local\Temp\go-build2088482969=/tmp/go-build -gno-record-gcc-switches
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7915479Z set GOHOSTARCH=amd64
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7915825Z set GOHOSTOS=windows
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7916095Z set GOINSECURE=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7916325Z set GOMOD=D:\a\curator\curator\go.mod
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7916624Z set GOMODCACHE=C:\Users\runneradmin\go\pkg\mod
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7916905Z set GONOPROXY=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7917100Z set GONOSUMDB=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7939712Z set GOOS=windows
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7940120Z set GOPATH=C:\Users\runneradmin\go
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7940987Z set GOPRIVATE=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7941449Z set GOPROXY=https://proxy.golang.org,direct
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7942004Z set GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7942514Z set GOSUMDB=sum.golang.org
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7942884Z set GOTELEMETRY=local
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7943395Z set GOTELEMETRYDIR=C:\Users\runneradmin\AppData\Roaming\go\telemetry
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7944004Z set GOTMPDIR=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7944301Z set GOTOOLCHAIN=local
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7944861Z set GOTOOLDIR=C:\hostedtoolcache\windows\go\1.25.5\x64\pkg\tool\windows_amd64
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7945500Z set GOVCS=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7945789Z set GOVERSION=go1.25.5
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7946113Z set GOWORK=
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7946416Z set PKG_CONFIG=pkg-config
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7946656Z 
+Test (windows-latest)	Run actions/setup-go@v5	2026-08-23T13:03:21.7947122Z ##[endgroup]
+Test (windows-latest)	Verify Go toolchain identity	﻿2026-08-23T13:03:21.8396800Z ##[group]Run bash .github/ci/toolchain-identity.sh
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:21.8397287Z ^[[36;1mbash .github/ci/toolchain-identity.sh^[[0m
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:21.8418934Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:21.8419344Z env:
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:21.8419571Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:21.8419881Z   GOTOOLCHAIN: local
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:21.8420067Z   GOENV: off
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:21.8420240Z ##[endgroup]
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:22.1438055Z toolchain: go version go1.25.5 windows/amd64
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:22.1905686Z toolchain: GOROOT=C:\hostedtoolcache\windows\go\1.25.5\x64
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:22.2845467Z toolchain: GOTOOLCHAIN=local
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:22.3327686Z toolchain: GOENV=<none>
+Test (windows-latest)	Verify Go toolchain identity	2026-08-23T13:03:22.3328929Z ci-toolchain-identity: ok
+Test (windows-latest)	go vet	﻿2026-08-23T13:03:22.3537653Z ##[group]Run go vet ./...
+Test (windows-latest)	go vet	2026-08-23T13:03:22.3537979Z ^[[36;1mgo vet ./...^[[0m
+Test (windows-latest)	go vet	2026-08-23T13:03:22.4066493Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+Test (windows-latest)	go vet	2026-08-23T13:03:22.4066873Z env:
+Test (windows-latest)	go vet	2026-08-23T13:03:22.4067093Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	go vet	2026-08-23T13:03:22.4067378Z   GOTOOLCHAIN: local
+Test (windows-latest)	go vet	2026-08-23T13:03:22.4067850Z   GOENV: off
+Test (windows-latest)	go vet	2026-08-23T13:03:22.4068026Z ##[endgroup]
+Test (windows-latest)	Ledger consistency	﻿2026-08-23T13:03:27.2186224Z ##[group]Run bash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:27.2186888Z ^[[36;1mbash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger^[[0m
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:27.2202675Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:27.2203074Z env:
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:27.2203298Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:27.2203585Z   GOTOOLCHAIN: local
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:27.2203767Z   GOENV: off
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:27.2203938Z ##[endgroup]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4879707Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix [must=windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4881932Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix/* [must=- skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4882967Z ok    internal/buildcache :: TestValidateWindowsSecurityPolicy [must=windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4884360Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry [must=windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4885641Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot [must=windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4887262Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4890100Z ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4891752Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4892975Z ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4894449Z ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4896404Z ok    internal/buildcache :: TestUnixProtectedStateMatrix [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4898134Z ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4900566Z ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4901741Z ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4903909Z ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4906108Z ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4908348Z ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4910656Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4912312Z ok    internal/buildsource :: TestRejectsSpecialFile [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4913169Z ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4914844Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4916062Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation/* [must=- skip=linux,darwin,windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4917063Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4917847Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4918676Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/* [must=- skip=linux,darwin,windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4919366Z ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4919981Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4920760Z excl  internal/godriver :: TestResourceLimitsStayInsideManagerBounds (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4924834Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds [must=darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4926140Z excl  internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4927521Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly [must=darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4929026Z excl  internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4930341Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes [must=darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4931177Z excl  internal/godriver :: TestPerFileSizeLimitIsReallyApplied (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4931902Z ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied [must=darwin skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4933258Z excl  internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4934469Z ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart [must=windows skip=darwin]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4935311Z excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4936195Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation [must=darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4937027Z excl  internal/godriver :: TestExecutableIdentityResolvesALauncherLink (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4937838Z ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink [must=darwin,windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4938530Z ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink/* [must=- skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4939372Z excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4940545Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink [must=darwin,windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4941434Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink/* [must=- skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4942734Z excl  internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4944426Z ok    internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch [must=darwin,windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4946168Z excl  internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4948448Z ok    internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink [must=darwin,windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4950216Z excl  internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4951940Z ok    internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink [must=darwin,windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4953539Z ok    internal/godriver :: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction [must=windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4955144Z ok    internal/godriver :: TestExecutableIdentityStillRejectsSubstitutionBehindAJunction [must=windows skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4956559Z ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4957448Z ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4958164Z ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4959608Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4960248Z ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4960873Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4961786Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4962877Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4964484Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4965546Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4967184Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4968193Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly [must=linux,darwin,windows skip=linux,darwin,windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4969132Z ok    internal/transaction :: TestCommitAndRollbackRestoreALinkExactly [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4969919Z ok    internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4970654Z ok    internal/transaction :: TestEntryRemovalRestoresTheExactLink [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4971384Z ok    internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4972196Z ok    internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4973066Z ok    internal/transaction :: TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken [must=windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4973700Z ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4974361Z excl  internal/godriver :: TestCandidateGoV1SourceAwareContract (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4975138Z ok    internal/godriver :: TestCandidateGoV1SourceAwareContract [must=darwin,windows skip=darwin,windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4975985Z excl  internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically (package excluded on linux by the supplied root)
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4976846Z ok    internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically [must=darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4977653Z ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4978427Z ok    cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery [must=darwin,windows skip=linux]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4979175Z ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand [must=darwin,windows skip=linux]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4979944Z ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand [must=darwin,windows skip=linux]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4980683Z ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState [must=darwin,windows skip=linux]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4981422Z ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck [must=darwin,windows skip=linux]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4982221Z ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand [must=darwin,windows skip=linux]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4983037Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker [must=linux,darwin,windows skip=-]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4983694Z ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4984109Z 
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4984643Z ledger-consistency: 72 rows checked across linux darwin windows
+Test (windows-latest)	Ledger consistency	2026-08-23T13:03:42.4985026Z ledger-consistency: ok
+Test (windows-latest)	go test + platform-case gate	﻿2026-08-23T13:03:42.5174055Z ##[group]Run bash .github/ci/test-gate.sh .temp/ci-evidence/test
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.5174596Z ^[[36;1mbash .github/ci/test-gate.sh .temp/ci-evidence/test^[[0m
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.5192480Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.5192880Z env:
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.5193110Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.5193395Z   GOTOOLCHAIN: local
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.5193587Z   GOENV: off
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.5193890Z   CURATOR_CONFORMANCE_ROOT: D:\a\curator\curator/protocol-spec/conformance/v1
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.5194278Z ##[endgroup]
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.6636114Z test-gate: flags=<none> timeout=30m
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.6636976Z test-gate: conformance root=D:\a\curator\curator/protocol-spec/conformance/v1
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:03:42.6637918Z 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6816615Z suite-plan: GOOS=windows
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6817397Z suite-plan: root=D:\a\curator\curator/protocol-spec/conformance/v1
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6818574Z suite-plan: the root publishes no vectors/conformance-claim-v3-qualification.json; the recorded default_excluded_on applies
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6819525Z 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6819699Z defer internal/buildcache
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6820421Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6821552Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6822301Z defer internal/buildsource
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6822957Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6824364Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6825945Z defer internal/install
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6826608Z       the supplied root publishes none of: vectors/build-drivers.json
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6827705Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6828466Z defer internal/marker
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6829452Z       the supplied root publishes none of: schema-cases/install-marker-v2 expected/build-driver/marker.json
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6830674Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6831117Z defer internal/scopes
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6831811Z       the supplied root publishes none of: vectors/external-repository-lifecycle.json
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6833524Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6834348Z defer internal/skillspec
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6835288Z       the supplied root publishes none of: schema-cases/agent-skill-v6 fixtures/go-build-skill
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6836454Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6837189Z defer internal/whitelist
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6838112Z       the supplied root publishes none of: fixtures/go-build-skill expected/build-driver/context_files.json
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6839358Z       it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6839935Z 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6840131Z suite-plan: served=34 deferred=7 excluded=0
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:04:02.6840565Z suite-plan: ok
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:28:46.5911101Z test-gate: stage served exit=0 (stream: .temp/ci-evidence/test/go-test-served.json)
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:03.7627889Z test-gate: stage deferred exit=0 (stream: .temp/ci-evidence/test/go-test-deferred.json)
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:03.7630301Z 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:03.7631155Z test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/test/go-test.json)
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:03.7632156Z 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6246845Z platform-case gate: GOOS=windows
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6249217Z platform-case gate: ledger=.github/ci/platform-cases.tsv
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6253217Z platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6260405Z 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6260926Z ok    internal/buildcache :: TestWindowsProtectedStateMatrix
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6262267Z ok    internal/buildcache :: TestValidateWindowsSecurityPolicy
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6263493Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6264513Z ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6265582Z ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6266890Z ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6270060Z ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6270991Z ok    internal/runtimestore :: TestRuntimeCommandPath
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6274710Z ok    internal/config :: TestBootstrapAndAddProject
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6275690Z ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6276662Z ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6277746Z ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6279448Z ok    internal/install :: TestDryRunTouchesNothing
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6284565Z ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6286462Z ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6287508Z ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6335720Z ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6337024Z ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6337963Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6338849Z ok    internal/godriver :: TestExecutableIdentityResolvesALauncherLink
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6339831Z ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionThroughALauncherLink
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6340881Z ok    internal/godriver :: TestExecutableIdentityResolvesARealSymlinkedProcessLaunch
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6341880Z ok    internal/godriver :: TestBuildAcceptsAManagerStartedThroughALauncherLink
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6343039Z ok    internal/godriver :: TestWorkerProvesTheInstalledIdentityWhenLaunchedThroughALink
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6344288Z ok    internal/godriver :: TestExecutableIdentityResolvesALauncherReachedThroughADirectoryJunction
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6345604Z ok    internal/godriver :: TestExecutableIdentityStillRejectsSubstitutionBehindAJunction
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6346879Z ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6347429Z ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6347880Z ok    internal/install :: TestEndToEndInstall
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6348459Z ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6349227Z ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6350010Z ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6350740Z ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6351458Z ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6352212Z ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6352900Z ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6353516Z ok    internal/transaction :: TestCommitAndRollbackRestoreALinkExactly
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6354085Z ok    internal/transaction :: TestRecoveryFinishesAPreparedLinkTransaction
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6354665Z ok    internal/transaction :: TestEntryRemovalRestoresTheExactLink
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6356270Z ok    internal/transaction :: TestEntryTargetsDoNotAliasTheirDestination
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6356906Z ok    internal/transaction :: TestNamespaceIdentityIsReadOnceWithinOneValidationPass
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6357569Z ok    internal/transaction :: TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6358132Z ok    internal/interop :: TestGoldenContextCopy
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6358701Z tol   internal/godriver :: TestCandidateGoV1SourceAwareContract (tolerated skip: root-content)
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6359385Z ok    internal/godriver :: TestFingerprintReportsUnreadableDirectoryIdentically
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6359984Z ok    cmd/curator :: TestCompiledInstallFollowsTheNativeControlInventoryExactly
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6360740Z ok    cmd/curator :: TestCompiledProjectStatusRepairRollbackRecovery
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6361295Z ok    cmd/curator :: TestStatusReportsATransitivelyResolvedCompiledCommand
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6361862Z ok    cmd/curator :: TestStatusReportsAnUnusableToolchainPerCompiledCommand
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6362433Z ok    cmd/curator :: TestGCRetainsAndReportsReferencedCompiledState
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6362969Z ok    cmd/curator :: TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6363544Z ok    cmd/curator :: TestGlobalStatusReportsATransitivelyResolvedCompiledCommand
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6364166Z ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6364531Z 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6364830Z platform-case gate: 80 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6365330Z platform-case gate: ok
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6365611Z 
+Test (windows-latest)	go test + platform-case gate	2026-08-23T13:36:04.6365792Z test-gate: go test exit=0, platform-case gate exit=0
+Test (windows-latest)	Upload gate evidence	﻿2026-08-23T13:36:04.6601608Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6603214Z ##[group]Run actions/upload-artifact@v4
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6603555Z with:
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6603820Z   name: test-evidence-windows-latest
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6604156Z   path: .temp/ci-evidence/
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6604454Z   if-no-files-found: warn
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6604789Z   compression-level: 6
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6605032Z   overwrite: false
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6605318Z   include-hidden-files: false
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6605608Z env:
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6605918Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6606656Z   GOTOOLCHAIN: local
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6607036Z   GOENV: off
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.6607378Z ##[endgroup]
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.9112366Z (node:5216) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.9114473Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.9286023Z With the provided path, there will be 23 files uploaded
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.9293439Z Artifact name is valid!
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:04.9295455Z Root directory input is valid!
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.1587252Z Beginning upload of artifact content to blob storage
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.2965650Z (node:5216) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.3566209Z Uploaded bytes 317631
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.3730419Z Finished uploading artifact content to blob storage!
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.3732643Z SHA256 digest of uploaded artifact zip is 687e444b4877448fcc34ff51e65bdf4adfa7ea1720807e8270ca1347d07ffae1
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.3734787Z Finalizing artifact upload
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.5547023Z Artifact test-evidence-windows-latest.zip successfully finalized. Artifact ID 9494064136
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.5548784Z Artifact test-evidence-windows-latest has been successfully uploaded! Final size is 317631 bytes. Artifact ID is 9494064136
+Test (windows-latest)	Upload gate evidence	2026-08-23T13:36:05.5563508Z Artifact download URL: https://github.com/relux-works/curator/actions/runs/32641151707/artifacts/9494064136
+Test (windows-latest)	Post Run actions/setup-go@v5	﻿2026-08-23T13:36:05.5990006Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	Post Run actions/setup-go@v5	2026-08-23T13:36:05.5992443Z Post job cleanup.
+Test (windows-latest)	Post Run actions/setup-go@v5	2026-08-23T13:36:05.7843495Z (node:7276) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Test (windows-latest)	Post Run actions/setup-go@v5	2026-08-23T13:36:05.7846076Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Test (windows-latest)	Post Run actions/setup-go@v5	2026-08-23T13:36:05.9357725Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOMODCACHE
+Test (windows-latest)	Post Run actions/setup-go@v5	2026-08-23T13:36:05.9440395Z [command]C:\hostedtoolcache\windows\go\1.25.5\x64\bin\go.exe env GOCACHE
+Test (windows-latest)	Post Run actions/setup-go@v5	2026-08-23T13:36:05.9846499Z C:\Users\runneradmin\AppData\Local\go-build
+Test (windows-latest)	Post Run actions/setup-go@v5	2026-08-23T13:36:05.9863681Z C:\Users\runneradmin\go\pkg\mod
+Test (windows-latest)	Post Run actions/setup-go@v5	2026-08-23T13:36:05.9888872Z Cache hit occurred on the primary key setup-go-Windows-x64-go-1.25.5-a83679499ba324054710aba827b097460d875f30e10d8aab956eabc0616f4046, not saving cache.
+Test (windows-latest)	Post Checkout authoritative protocol suite	﻿2026-08-23T13:36:06.0262179Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:06.0263718Z Post job cleanup.
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:06.2622323Z [command]"C:\Program Files\Git\bin\git.exe" version
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:06.3049007Z git version 2.55.0.windows.4
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:06.3124831Z Temporarily overriding HOME='D:\a\_temp\a20769a8-f364-49d6-9e71-e58a12527cfd' before making global git config changes
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:06.3126241Z Adding repository directory to the temporary git global config as a safe directory
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:06.3139571Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator\protocol-spec
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:06.3503210Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:06.3907861Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:07.0335113Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:07.0627339Z http.https://github.com/.extraheader
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:07.0677604Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:07.1024072Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:07.6830861Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	Post Checkout authoritative protocol suite	2026-08-23T13:36:07.7182265Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (windows-latest)	Post Run actions/checkout@v4	﻿2026-08-23T13:36:08.3655327Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:08.3657616Z Post job cleanup.
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:08.5788569Z [command]"C:\Program Files\Git\bin\git.exe" version
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:08.6100295Z git version 2.55.0.windows.4
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:08.6197337Z Temporarily overriding HOME='D:\a\_temp\b19f4826-3e0b-4494-a313-0b8863c201f5' before making global git config changes
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:08.6198545Z Adding repository directory to the temporary git global config as a safe directory
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:08.6210119Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\curator\curator
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:08.6567290Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:08.6917695Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:09.2789844Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:09.3881681Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:09.4186139Z http.https://github.com/.extraheader
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:09.4242221Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all http.https://github.com/.extraheader
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:09.4609614Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:10.0574482Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:10.1312754Z http.https://github.com/.extraheader
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:10.1923515Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:10.2262723Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:10.8010955Z Entering 'agents/skills/skill-go-testing-tools'
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:10.8401164Z file:D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Test (windows-latest)	Post Run actions/checkout@v4	2026-08-23T13:36:10.8688167Z [command]"C:\Program Files\Git\bin\git.exe" config --file D:/a/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config --name-only --get-regexp ^includeIf\.gitdir:
+Test (windows-latest)	Complete job	﻿2026-08-23T13:36:10.9228206Z Cleaning up orphan processes
+Test (windows-latest)	Complete job	2026-08-23T13:36:10.9676793Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

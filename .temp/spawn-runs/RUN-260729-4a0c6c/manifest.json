@@ -1,0 +1,64 @@
+{
+  "id": "RUN-260729-4a0c6c",
+  "task_id": "TASK-260728-12pnm1",
+  "created_at": "2026-07-29T00:31:10.018749Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260729-04-31-09_-reviewer--reviewer--codex-_TASK-260728-12pnm1.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260728-12pnm1_spawn-log_-reviewer--reviewer--codex-_RUN-260729-4a0c6c.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260728-12pnm1_command-evidence.log",
+    "TASK-260728-12pnm1_cycle3-raw-measurements.log",
+    "TASK-260728-12pnm1_decision-0009-rust-driver-pair.md",
+    "TASK-260728-12pnm1_fixture-absent.json",
+    "TASK-260728-12pnm1_fixture-controls.json",
+    "TASK-260728-12pnm1_fixture-macos.json",
+    "TASK-260728-12pnm1_gate-log.txt",
+    "TASK-260728-12pnm1_probe.tar.gz",
+    "TASK-260728-12pnm1_results.md",
+    "TASK-260728-12pnm1_review-verdict-cycle-1.md",
+    "TASK-260728-12pnm1_review-verdict-cycle-2.md",
+    "TASK-260728-12pnm1_rework-cycle-2-measurements.md",
+    "TASK-260728-12pnm1_rework-cycle-3-measurements.md",
+    "TASK-260728-12pnm1_rust-build-drivers-reference.md",
+    "TASK-260728-12pnm1_spawn-log_-analyst--solution-architect--claude-_RUN-260728-0df49a.log",
+    "TASK-260728-12pnm1_spawn-log_-analyst--solution-architect--claude-_RUN-260728-2e7daa.log",
+    "TASK-260728-12pnm1_spawn-log_-implementer--developer--claude-_RUN-260728-52b118.log",
+    "TASK-260728-12pnm1_spawn-log_-reviewer--reviewer--codex-_RUN-260728-de06b1.log",
+    "TASK-260728-12pnm1_spawn-log_-reviewer--reviewer--codex-_RUN-260728-efa5bc.log"
+  ]
+}

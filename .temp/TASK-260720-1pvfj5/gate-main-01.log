@@ -1,0 +1,20 @@
+test-gate: GOOS=darwin module=github.com/relux-works/curator packages=./...
+test-gate: conformance root=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1
+test-gate: go test exit=1 (stream: .temp/ci-evidence/test/go-test.json)
+platform-case gate: GOOS=darwin
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/adapters :: TestSymlinkModeUsesRelativeLinks
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+
+platform-case gate: ok
+test-gate: platform-case gate exit=0 (report: .temp/ci-evidence/test/platform-cases.txt)
+test-gate: go test exit=1, platform-case gate exit=0
+GATE_EXIT=1

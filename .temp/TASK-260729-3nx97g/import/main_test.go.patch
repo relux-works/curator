@@ -1,0 +1,364 @@
+--- /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-37ei85/worktree/tools/generate-vectors/main_test.go	2026-07-21 00:32:45
++++ /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1s1vr6/worktree/tools/generate-vectors/main_test.go	2026-07-21 00:57:12
+@@ -1,6 +1,7 @@
+ package main
+ 
+ import (
++	"bytes"
+ 	"crypto/ed25519"
+ 	"crypto/sha256"
+ 	"encoding/base64"
+@@ -20,6 +21,9 @@
+ 	conformanceClaimV1SchemaSHA256  = "c9f49460618ccc8b1d7d2dfaf760fc6ad3a53a870a6685a685ddc148d3c87b3f"
+ 	conformanceClaimV1ValidSHA256   = "799682489be118331135d91798db90b8d020cbb703207331824ab113f037693c"
+ 	conformanceClaimV1InvalidSHA256 = "de9568757a2bb89c87702e47f6d9c162df24f5ee964f1ef49b9e191ed94b7017"
++	buildDriverCacheKey             = "sha256:3fcd714a40e8918eb67dbd35d435875dcce6c9047da811a1fa26626e5e57be48"
++	buildDriverReceiptSHA256        = "sha256:750f5f7557ffe1dac1ec06b7d47cb5976e390a7dc7d57ea616c9edda91013c11"
++	buildDriverToolchainSHA256      = "sha256:baf7c5f3b9c3f1fae3da4c356381bf74442aa7f8f0b6fb2304c9c10833d6032e"
+ )
+ 
+ func TestConformanceClaimV2SchemaAndGeneratedCases(t *testing.T) {
+@@ -613,9 +617,297 @@
+ 	audit := readObject(t, filepath.Join(root, "schemas", "v1", "audit-record-v1.schema.json"))
+ 	if got, want := audit["required"], []any{"name", "source_identity", "commit", "content_sha256", "status", "sig"}; !reflect.DeepEqual(got, want) {
+ 		t.Fatalf("audit record no longer attests the frozen source identity: required = %#v, want %#v", got, want)
++	}
++}
++
++func TestGeneratedGoBuildFixtureContextAndIdentity(t *testing.T) {
++	root := repositoryRoot(t)
++	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "build-drivers.json"))
++	fixture := vector["fixture"].(map[string]any)
++	if fixture["root"] != "fixtures/go-build-skill" {
++		t.Fatalf("build fixture root = %v", fixture["root"])
++	}
++	wantContext := []any{"SKILL.md", "assets/prompt.md"}
++	if got := fixture["expected_context_files"]; !reflect.DeepEqual(got, wantContext) {
++		t.Fatalf("build fixture context = %#v, want %#v", got, wantContext)
++	}
++	excluded := fixture["excluded_context_files"].([]any)
++	for _, required := range []any{
++		"assets/build-tool/go.mod",
++		"assets/build-tool/internal/render/empty.txt",
++		"assets/build-tool/internal/render/template.txt",
++		"assets/build-tool/vendor/example.com/curator/vendored/decorate/decorate.go",
++		"scripts/skill-helper",
++	} {
++		if !containsValue(excluded, required) {
++			t.Fatalf("build fixture exclusion misses %s", required)
++		}
++	}
++
++	fixtureRoot := filepath.Join(root, "conformance", "v1", "fixtures", "go-build-skill")
++	manifest := readObject(t, filepath.Join(fixtureRoot, "agent-skill.json"))
++	if manifest["schema_version"] != json.Number("6") || !reflect.DeepEqual(manifest["build_roots"], []any{"assets/build-tool"}) {
++		t.Fatalf("fixture manifest does not declare the exact schema-6 build root: %#v", manifest)
++	}
++	commands := manifest["commands"].(map[string]any)
++	if commands["golden-tool"].(map[string]any)["driver"] != "go-v1" || commands["skill-helper"].(map[string]any)["type"] != "script" {
++		t.Fatalf("fixture commands do not mix the closed build and script shapes: %#v", commands)
++	}
++	renderSource, err := os.ReadFile(filepath.Join(fixtureRoot, "assets", "build-tool", "internal", "render", "render.go"))
++	if err != nil {
++		t.Fatal(err)
+ 	}
++	if !bytes.Contains(renderSource, []byte("//go:embed template.txt")) || !bytes.Contains(renderSource, []byte("//go:embed empty.txt")) || !bytes.Contains(renderSource, []byte("example.com/curator/vendored/decorate")) {
++		t.Fatal("fixture does not contain the transitive embed and vendored dependency")
++	}
++
++	preimage, err := os.ReadFile(filepath.Join(root, "conformance", "v1", "expected", "build-driver", "build-source.preimage.bin"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.HasPrefix(preimage, []byte("curator-build-source-v1\x00")) {
++		t.Fatal("build-source preimage lacks its domain prefix")
++	}
++	identity := fixture["build_source"].(map[string]any)
++	if got := sha256Identity(preimage); got != identity["content_sha256"] {
++		t.Fatalf("fixture build-source digest = %s, vector = %v", got, identity["content_sha256"])
++	}
++	if !bytes.Contains(preimage, []byte(".csk-install.json")) {
++		t.Fatal("fixture build-source preimage omits the root marker")
++	}
+ }
+ 
++func TestBuildDriverPortableIdentityIsByteExact(t *testing.T) {
++	root := repositoryRoot(t)
++	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "build-drivers.json"))
++	identity := vector["portable_identity"].(map[string]any)
++	if identity["cache_key"] != buildDriverCacheKey {
++		t.Fatalf("cache key = %v, want %s", identity["cache_key"], buildDriverCacheKey)
++	}
++	if identity["receipt_sha256"] != buildDriverReceiptSHA256 {
++		t.Fatalf("receipt hash = %v, want %s", identity["receipt_sha256"], buildDriverReceiptSHA256)
++	}
++	inputBytes := canonicalBytes(identity["build_input"])
++	if got := string(inputBytes); got != identity["build_input_ccj_utf8"] {
++		t.Fatalf("build input CCJ-1 bytes differ: %q != %q", got, identity["build_input_ccj_utf8"])
++	}
++	if got := sha256Identity(inputBytes); got != buildDriverCacheKey {
++		t.Fatalf("build input digest = %s, want %s", got, buildDriverCacheKey)
++	}
++	receiptBytes := canonicalBytes(identity["stored_receipt"])
++	if got := string(receiptBytes); got != identity["stored_receipt_ccj_utf8"] {
++		t.Fatalf("stored receipt bytes differ: %q != %q", got, identity["stored_receipt_ccj_utf8"])
++	}
++	if bytes.HasSuffix(receiptBytes, []byte("\n")) || sha256Identity(receiptBytes) != buildDriverReceiptSHA256 {
++		t.Fatal("stored receipt is not exact canonical JSON without a terminal newline")
++	}
++	for name, want := range map[string][]byte{
++		"build-input.ccj.json": inputBytes,
++		"receipt.ccj.json":     receiptBytes,
++	} {
++		payload, err := os.ReadFile(filepath.Join(root, "conformance", "v1", "expected", "build-driver", name))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if !bytes.Equal(payload, want) {
++			t.Fatalf("expected artifact %s does not carry exact CCJ-1 bytes", name)
++		}
++	}
++	artifact := identity["artifact"].(map[string]any)
++	if artifact["path"] != "bin/golden-tool" || artifact["sha256"] != "sha256:"+strings.Repeat("d", 64) || artifact["size"] != json.Number("1234567") {
++		t.Fatalf("artifact identity changed: %#v", artifact)
++	}
++	marker := identity["marker"].(map[string]any)
++	build := marker["builds"].(map[string]any)["golden-tool"].(map[string]any)
++	if build["cache_key"] != buildDriverCacheKey || build["receipt_sha256"] != buildDriverReceiptSHA256 || build["artifact_sha256"] != artifact["sha256"] {
++		t.Fatalf("marker build identity is inconsistent: %#v", build)
++	}
++}
++
++func TestBuildDriverPositiveProcessCacheAndDryRunCoverage(t *testing.T) {
++	root := repositoryRoot(t)
++	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "build-drivers.json"))
++	positive := namedObjects(t, vector["positive_cases"])
++	wantPositive := []string{
++		"schema-6-mixed-script-and-build-commands",
++		"build-root-excluded-from-agent-context",
++		"valid-standard-library-only-main",
++		"valid-vendor-only-main-with-transitive-embed",
++		"fixed-environment-and-five-direct-argv-forms",
++		"protected-cache-hit",
++		"compiler-free-dry-run-miss",
++	}
++	assertNamedSet(t, positive, wantPositive)
++
++	argv := vector["argv"].([]any)
++	if len(argv) != 5 {
++		t.Fatalf("go-v1 argv forms = %d, want 5", len(argv))
++	}
++	wantArgvNames := []string{"telemetry-off", "version", "env", "list", "build"}
++	for index, name := range wantArgvNames {
++		item := argv[index].(map[string]any)
++		if item["name"] != name || len(item["argv"].([]any)) == 0 || item["argv"].([]any)[0] != "/absolute/trusted/goroot/bin/go" {
++			t.Fatalf("argv form %d = %#v", index, item)
++		}
++	}
++	buildArgv := argv[4].(map[string]any)["argv"].([]any)
++	for _, fixed := range []any{"-mod=vendor", "-trimpath", "-pgo=off", "-ldflags=-linkmode=internal -libgcc=none", "."} {
++		if !containsValue(buildArgv, fixed) {
++			t.Fatalf("build argv misses %q: %#v", fixed, buildArgv)
++		}
++	}
++	environment := vector["fixed_environment"].(map[string]any)
++	for key, value := range map[string]any{
++		"GOENV": "off", "GOPROXY": "off", "GOWORK": "off", "GOTOOLCHAIN": "local",
++		"CGO_ENABLED": "0", "GO_EXTLINK_ENABLED": "0", "GOARM64": "v8.0", "PATH": "<operation-private>/empty-path",
++	} {
++		if environment[key] != value {
++			t.Fatalf("fixed environment %s = %v, want %v", key, environment[key], value)
++		}
++	}
++	for _, forbidden := range []string{"CC", "CXX", "PKG_CONFIG", "AR", "GCCGO", "GOAUTH", "GOTELEMETRY"} {
++		if _, ok := environment[forbidden]; ok {
++			t.Fatalf("fixed environment inherits forbidden variable %s", forbidden)
++		}
++	}
++	for _, name := range []string{"protected-cache-hit", "compiler-free-dry-run-miss"} {
++		commands := positive[name]["source_aware_go_commands"].([]any)
++		if len(commands) != 0 {
++			t.Fatalf("%s executes source-aware Go commands: %#v", name, commands)
++		}
++	}
++}
++
++func TestBuildDriverRejectionCoverageAndNamedOutcomes(t *testing.T) {
++	root := repositoryRoot(t)
++	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "build-drivers.json"))
++	cases := namedObjects(t, vector["rejection_cases"])
++	want := []string{
++		"schema-5-build-command", "unknown-driver", "forbidden-args", "forbidden-env", "forbidden-output", "forbidden-toolchain", "forbidden-hooks", "mixed-script-build-shape",
++		"missing-build-roots", "missing-build-root-directory", "unused-build-root", "overlapping-build-roots", "runtime-overlapping-build-root", "root-build-root", "build-root-symlink", "build-root-special-file",
++		"root-source-dir", "escaped-source-dir", "source-outside-root", "source-link", "source-special-file", "source-not-directory", "missing-root-go-mod", "nested-module", "non-main-package", "multiple-packages",
++		"missing-vendored-dependency", "inconsistent-vendor-modules", "workspace-only-dependency", "toolchain-switch-request", "unsupported-go-pre-1-23", "unsupported-go-future-family", "cgo-only-package",
++		"native-c-input", "native-cxx-input", "native-swig-input", "root-syso", "transitive-syso", "root-assembly-absolute-include", "transitive-assembly-escaping-include", "escaped-embed-input",
++		"cgo-import-dynamic", "attempted-go-generate", "default-pgo", "poisoned-path", "inherited-goflags-toolexec", "inherited-goenv", "inherited-gowork", "vcs-metadata", "repository-local-fake-go",
++		"telemetry-command-failure", "telemetry-private-dir-escape", "external-link-required", "libgcc-fallback-attempt", "child-outside-goroot-tools", "wrong-go-executable-path", "toolchain-digest-mismatch",
++		"cache-key-mismatch", "cache-wrong-target", "cache-wrong-toolchain", "cache-wrong-policy", "cache-wrong-build-source", "receipt-hash-mismatch", "artifact-hash-mismatch", "artifact-size-mismatch", "artifact-path-mismatch",
++		"noncanonical-receipt-whitespace", "noncanonical-receipt-trailing-lf", "partial-cache-entry", "artifact-link", "artifact-special-file", "concurrent-publisher-different-bytes",
++		"self-consistent-forged-receipt-outside-protected-state", "marker-embed-build-source-regression", "build-root-content-in-context",
++	}
++	assertNamedSet(t, cases, want)
++	for name, item := range cases {
++		expected, ok := item["expected"].(map[string]any)
++		if !ok || expected["result"] != "reject" || expected["error"] == nil || expected["error"] == "" || expected["artifact_executed"] != false {
++			t.Fatalf("rejection %s lacks a named non-executing outcome: %#v", name, item)
++		}
++	}
++	forged := cases["self-consistent-forged-receipt-outside-protected-state"]
++	candidate := forged["candidate"].(map[string]any)
++	receipt := candidate["receipt"].(map[string]any)
++	if sha256Identity(canonicalBytes(receipt)) != "sha256:9a23f5b77e6173b0f10e7ed43cd2b21aa3b99f3a34945ec432fbb31338a6186d" || candidate["receipt_sha256"] != "sha256:9a23f5b77e6173b0f10e7ed43cd2b21aa3b99f3a34945ec432fbb31338a6186d" {
++		t.Fatalf("forged receipt is not the exact self-consistent regression candidate: %#v", candidate)
++	}
++	marker := cases["marker-embed-build-source-regression"]
++	markerInput := marker["input"].(map[string]any)
++	variants := markerInput["variants"].([]any)
++	if markerInput["legacy_content_sha256"] != "sha256:829a040a1455fdf96e2731aa5c089e7e42dbcec2a51b1db3222a610f0ffb5b35" || variants[0].(map[string]any)["build_source"].(map[string]any)["content_sha256"] == variants[1].(map[string]any)["build_source"].(map[string]any)["content_sha256"] {
++		t.Fatalf("marker-embed regression identities are incomplete: %#v", marker)
++	}
++}
++
++func TestBuildSourceAndToolchainByteVectors(t *testing.T) {
++	root := repositoryRoot(t)
++	vector := readObject(t, filepath.Join(root, "conformance", "v1", "vectors", "build-drivers.json"))
++	buildCases := namedObjects(t, vector["build_source_cases"])
++	assertNamedSet(t, buildCases, []string{
++		"fixture-exact-build-source", "domain-prefix-ordering-framing-empty-binary-and-root-marker", "mode-and-timestamp-are-non-inputs",
++		"invalid-unicode-build-source-path", "duplicate-build-source-path", "build-source-symbolic-link", "build-source-special-file",
++		"build-source-mutation-during-use", "legacy-nul-stream-structural-collision", "root-marker-bytes-are-build-input",
++	})
++	edge := buildCases["domain-prefix-ordering-framing-empty-binary-and-root-marker"]
++	if edge["content_sha256"] != "sha256:68008c9a1131c1295d78f4f7d184c3df5f7382a88d8d40333be7cf02b2ee4de9" {
++		t.Fatalf("build-source edge digest changed: %v", edge["content_sha256"])
++	}
++	collision := buildCases["legacy-nul-stream-structural-collision"]
++	framed := collision["framed_content_sha256"].([]any)
++	if collision["legacy_streams_equal"] != true || collision["framed_hashes_equal"] != false || framed[0] == framed[1] {
++		t.Fatalf("legacy NUL collision regression is incomplete: %#v", collision)
++	}
++
++	toolchainCases := namedObjects(t, vector["toolchain_cases"])
++	assertNamedSet(t, toolchainCases, []string{
++		"unsorted-directories-files-and-internal-link", "crlf-version-normalizes-to-lf-identity", "toolchain-mode-and-timestamp-are-non-inputs",
++		"toolchain-version-missing-terminal-lf", "toolchain-version-multiple-terminal-newlines", "invalid-unicode-toolchain-path", "duplicate-toolchain-path",
++		"escaping-toolchain-link", "absolute-toolchain-link", "dangling-toolchain-link", "selected-go-outside-goroot", "toolchain-tree-mutation-during-use",
++	})
++	exact := toolchainCases["unsorted-directories-files-and-internal-link"]
++	if exact["content_sha256"] != buildDriverToolchainSHA256 || exact["normalized_go_version"] != "go version go1.25.5 darwin/arm64" {
++		t.Fatalf("toolchain exact vector changed: %#v", exact)
++	}
++	if toolchainCases["crlf-version-normalizes-to-lf-identity"]["content_sha256"] != buildDriverToolchainSHA256 {
++		t.Fatal("CRLF go version did not normalize to the LF toolchain identity")
++	}
++}
++
++func TestBuildDriverGenerationIsDeterministic(t *testing.T) {
++	root := repositoryRoot(t)
++	fixture := filepath.Join(root, "conformance", "v1", "fixtures", "go-build-skill")
++	marker := readObject(t, filepath.Join(root, "conformance", "v1", "expected", "marker.json"))
++	one := t.TempDir()
++	two := t.TempDir()
++	writeBuildDriverVectors(filepath.Join(one, "vectors"), fixture, filepath.Join(one, "expected"), marker)
++	writeBuildDriverVectors(filepath.Join(two, "vectors"), fixture, filepath.Join(two, "expected"), marker)
++	oneFiles := regularFiles(one)
++	twoFiles := regularFiles(two)
++	if !reflect.DeepEqual(oneFiles, twoFiles) {
++		t.Fatalf("deterministic generation inventory differs: %#v != %#v", oneFiles, twoFiles)
++	}
++	for _, name := range oneFiles {
++		left, err := os.ReadFile(filepath.Join(one, filepath.FromSlash(name)))
++		if err != nil {
++			t.Fatal(err)
++		}
++		right, err := os.ReadFile(filepath.Join(two, filepath.FromSlash(name)))
++		if err != nil {
++			t.Fatal(err)
++		}
++		if !bytes.Equal(left, right) {
++			t.Fatalf("deterministic generation differs for %s", name)
++		}
++	}
++}
++
++func TestBuildDriverGenerationPreservesScriptFixtureAndRegistryGoldens(t *testing.T) {
++	root := repositoryRoot(t)
++	want := map[string]string{
++		"conformance/v1/fixtures/skill/.skill_triggers/en.md":       "ba431f8ce1d9c6cb079b381caae9c71a470e26d4dbbdc2e6badbd392e753c679",
++		"conformance/v1/fixtures/skill/README.md":                   "1a9d7c9c5b8df5b83f485f43c1a536a3c078796b8d1ef3642ced6cc2e4d7f1a6",
++		"conformance/v1/fixtures/skill/SKILL.md":                    "998b2482cc522a3b0091e377bce1aeda049bf8504ac32164ab345214569c8575",
++		"conformance/v1/fixtures/skill/agent-skill.json":            "4e8adc18905769d60511a795fca139dbb9ee7e7f0316d9a7279a8c5ca376c075",
++		"conformance/v1/fixtures/skill/locales/metadata.json":       "fcf376ac8bd03713871a55a0b2f5d9e207c4536eec9e1698036fc9e61f4cfdd3",
++		"conformance/v1/fixtures/skill/references/notes.md":         "eb30e8c7ba3b1c16870dd28b828e45e3f3b290dea3da1b703f872763fb64b1c0",
++		"conformance/v1/fixtures/skill/scripts/golden-tool":         "823c5909efd8d73239bdcd64fce67ff79f43c7b36de8d921194b7e4e3cf0fb04",
++		"conformance/v1/expected/registry/bundle.json":              "b51676030624be7427b7276ec5a2f98f6a0fcd9b86f99bce2e1e12708b991a07",
++		"conformance/v1/expected/registry/log.json":                 "894a905bc2652e906b857e771c1f82477e31fb3b7c0a10b8cb0cef8096058f4e",
++		"conformance/v1/expected/registry/pinned_key.txt":           "bd4a0eb75144aea935dfb3a8a69c12826d49ed54c49db6e30bfdfe2cac7c36c4",
++		"conformance/v1/expected/registry/record_audited.json":      "994220de5f8f40861b3bdd1bd4f3cc0c1716c2cf79540f7499dafe50d3dc1d0a",
++		"conformance/v1/expected/registry/record_forged.json":       "3721c1b0b6bd6ecdce261272901e45f66306653ac4d2d008aec10a340efb84df",
++		"conformance/v1/expected/registry/record_revoked.json":      "fc4fa99f6ceb732dd018e1d4b30c41ccbd92e96b0ec7e85c6d5304c19d75602d",
++		"conformance/v1/expected/registry/record_wrong_key_id.json": "cb3bb9b8a2c79f93088f725b2bfc7fe19d14864c280eaa5c141d936d0c0e54bd",
++		"conformance/v1/expected/registry/snapshot.json":            "6ffc2378a139f1c16ca8d3a0e4609563e6a48a16a7fb86493b801101ee7b1f3c",
++	}
++	for name, digest := range want {
++		payload, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got := sha256.Sum256(payload)
++		if hex.EncodeToString(got[:]) != digest {
++			t.Fatalf("frozen script/registry golden changed: %s", name)
++		}
++	}
++}
++
+ func TestCCJ1RemovesOnlyOuterSignature(t *testing.T) {
+ 	value := map[string]any{
+ 		"z": "заметка",
+@@ -752,6 +1044,45 @@
+ 	return false
+ }
+ 
++func namedObjects(t *testing.T, value any) map[string]map[string]any {
++	t.Helper()
++	items, ok := value.([]any)
++	if !ok {
++		t.Fatalf("named cases are not an array: %#v", value)
++	}
++	result := make(map[string]map[string]any, len(items))
++	for _, raw := range items {
++		item, ok := raw.(map[string]any)
++		if !ok {
++			t.Fatalf("named case is not an object: %#v", raw)
++		}
++		name, ok := item["name"].(string)
++		if !ok || name == "" {
++			t.Fatalf("named case has no name: %#v", item)
++		}
++		if _, duplicate := result[name]; duplicate {
++			t.Fatalf("duplicate named case %q", name)
++		}
++		result[name] = item
++	}
++	return result
++}
++
++func assertNamedSet(t *testing.T, got map[string]map[string]any, want []string) {
++	t.Helper()
++	wantSet := make(map[string]bool, len(want))
++	for _, name := range want {
++		wantSet[name] = true
++	}
++	gotSet := make(map[string]bool, len(got))
++	for name := range got {
++		gotSet[name] = true
++	}
++	if !reflect.DeepEqual(gotSet, wantSet) {
++		t.Fatalf("named case coverage = %#v, want %#v", gotSet, wantSet)
++	}
++}
++
+ func indexedSchemaCases(index []map[string]any, schema string) map[string]bool {
+ 	prefix := strings.TrimSuffix(schema, ".schema.json") + "/"
+ 	result := map[string]bool{}

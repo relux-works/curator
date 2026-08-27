@@ -1,0 +1,439 @@
+curator dev
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           update, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init <shell>       print the shell hook (zsh, bash, powershell; --no-global)
+  ui                       terminal view over installed state
+  config <subcommand>      show | build-ssh (see config build-ssh -h)
+  --version                print the curator version
+curator: unknown command "frobnicate"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           update, then install
+  status [path] [flags]    manifest vs installed state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init <shell>       print the shell hook (zsh, bash, powershell; --no-global)
+  ui                       terminal view over installed state
+  config <subcommand>      show | build-ssh (see config build-ssh -h)
+  --version                print the curator version
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  home_dir="$(dirname "$cfg")"
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "$CURATOR_ACTIVE_GLOBAL_ENV" != "$global_env" ]; then
+    . "$global_env"
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+  fi
+}
+
+_curator_find_env() {
+  local dir="$PWD"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  _curator_source_global_env
+  local env_file
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "$CURATOR_ACTIVE_ENV" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="$CURATOR_OLD_PATH"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    . "$env_file"
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+  fi
+}
+
+case "$SHELL" in
+  *zsh*) autoload -Uz add-zsh-hook 2>/dev/null || true; add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true ;;
+esac
+PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+_curator_auto_env
+# Curator shell hook
+
+_curator_global_env_file() {
+  local cfg="${CURATOR_CONFIG:-$HOME/.curator/config.json}"
+  local home_dir
+  home_dir="$(dirname "$cfg")"
+  if [ -f "$home_dir/global/env.sh" ]; then
+    printf '%s/global/env.sh\n' "$home_dir"
+  fi
+}
+
+_curator_source_global_env() {
+  local global_env
+  global_env="$(_curator_global_env_file 2>/dev/null || true)"
+  if [ -n "$global_env" ] && [ "$CURATOR_ACTIVE_GLOBAL_ENV" != "$global_env" ]; then
+    . "$global_env"
+    CURATOR_ACTIVE_GLOBAL_ENV="$global_env"
+    export CURATOR_ACTIVE_GLOBAL_ENV
+  fi
+}
+
+_curator_find_env() {
+  local dir="$PWD"
+  while [ "$dir" != "/" ]; do
+    if [ -f "$dir/.agents/env.sh" ]; then
+      printf '%s/.agents/env.sh\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+_curator_auto_env() {
+  _curator_source_global_env
+  local env_file
+  env_file="$(_curator_find_env 2>/dev/null || true)"
+  if [ -n "$CURATOR_ACTIVE_ENV" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    PATH="$CURATOR_OLD_PATH"
+    export PATH
+    unset CURATOR_ACTIVE_ENV
+    unset CURATOR_OLD_PATH
+  fi
+  if [ -n "$env_file" ] && [ "$CURATOR_ACTIVE_ENV" != "$env_file" ]; then
+    CURATOR_OLD_PATH="$PATH"
+    export CURATOR_OLD_PATH
+    . "$env_file"
+    CURATOR_ACTIVE_ENV="$env_file"
+    export CURATOR_ACTIVE_ENV
+  fi
+}
+
+case "$SHELL" in
+  *zsh*) autoload -Uz add-zsh-hook 2>/dev/null || true; add-zsh-hook chpwd _curator_auto_env 2>/dev/null || true ;;
+esac
+PROMPT_COMMAND="_curator_auto_env${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+_curator_auto_env
+# Curator shell hook
+
+function Get-CuratorGlobalEnvFile {
+  $cfg = if ($env:CURATOR_CONFIG) { $env:CURATOR_CONFIG } else { Join-Path $HOME ".curator/config.json" }
+  $homeDir = Split-Path -Parent $cfg
+  $candidate = Join-Path $homeDir "global/env.ps1"
+  if (Test-Path $candidate) { return $candidate }
+  return $null
+}
+
+function Invoke-CuratorGlobalEnv {
+  $globalEnv = Get-CuratorGlobalEnvFile
+  if ($globalEnv -and $env:CURATOR_ACTIVE_GLOBAL_ENV -ne $globalEnv) {
+    . $globalEnv
+    $env:CURATOR_ACTIVE_GLOBAL_ENV = $globalEnv
+  }
+}
+
+function Invoke-CuratorAutoEnv {
+  Invoke-CuratorGlobalEnv
+  $dir = Get-Location
+  $envFile = $null
+  while ($dir) {
+    $candidate = Join-Path $dir ".agents/env.ps1"
+    if (Test-Path $candidate) { $envFile = $candidate; break }
+    $parent = Split-Path -Parent $dir
+    if ($parent -eq $dir) { break }
+    $dir = $parent
+  }
+  if ($env:CURATOR_ACTIVE_ENV -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:PATH = $env:CURATOR_OLD_PATH
+    Remove-Item Env:\CURATOR_ACTIVE_ENV -ErrorAction SilentlyContinue
+    Remove-Item Env:\CURATOR_OLD_PATH -ErrorAction SilentlyContinue
+  }
+  if ($envFile -and $env:CURATOR_ACTIVE_ENV -ne $envFile) {
+    $env:CURATOR_OLD_PATH = $env:PATH
+    . $envFile
+    $env:CURATOR_ACTIVE_ENV = $envFile
+  }
+}
+if (-not $global:CuratorPromptWrapped) {
+  $global:CuratorOriginalPrompt = (Get-Item Function:prompt -ErrorAction SilentlyContinue).ScriptBlock
+  function global:prompt {
+    Invoke-CuratorAutoEnv
+    if ($global:CuratorOriginalPrompt) {
+      return & $global:CuratorOriginalPrompt
+    }
+    return "PS $($executionContext.SessionState.Path.CurrentLocation)> "
+  }
+  $global:CuratorPromptWrapped = $true
+}
+Invoke-CuratorAutoEnv
+curator: unsupported shell: fish
+error: skill.missing_skill_md (SKILL.md): required SKILL.md not found
+[
+  {
+    "severity": "error",
+    "code": "skill.missing_skill_md",
+    "path": "SKILL.md",
+    "message": "required SKILL.md not found"
+  }
+]
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1041713029/001/config.json
+added project app: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1041713029/003
+alias: app
+path: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1041713029/003
+skillfile: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1041713029/003/Skillfile.json
+skills: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1041713029/003/.agents/skills
+bin: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBootstrapAndProjectCommands1041713029/003/.agents/bin
+app: skill-a tag v1 ab66f00 context=yes commands=[] via=<project> installed
+app: skill-a up-to-date
+app: skill-a content-drift
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigBuildSSHAddListRemove1106619735/001/config.json
+added build_ssh scope zeta.example.com: agent
+added build_ssh scope git.example.com/portals: agent=/run/portals.sock identity=~/.ssh/portals known_hosts=/etc/ssh/known_hosts_portals
+added build_ssh scope git.example.com: identity=/keys/org
+--- FAIL: TestConfigBuildSSHAddListRemove (0.09s)
+    main_test.go:308: replaced credential = {Scope:zeta.example.com Agent:true AgentSocket: Identity:/keys/zeta KnownHosts:}
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigBuildSSHListWithoutScopesPrintsNothing1539202098/001/config.json
+curator: no build_ssh scopes are configured
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigBuildSSHAddRejectsInvalidInvocations1188730340/001/config.json
+curator: config build-ssh add requires exactly one <scope>
+curator: build_ssh.git.example.com: requires 'agent', 'identity', or both
+curator: build_ssh.git.example.com: requires 'agent', 'identity', or both
+curator: build_ssh.git.example.com.identity: must be an absolute path or start with '~/' and carry no control character
+invalid boolean value "run/agent.sock" for -agent: agent socket must be an absolute path or start with '~/' and carry no control character
+Usage of config build-ssh add:
+  -agent
+    	select an SSH agent, optionally by socket path
+  -identity string
+    	identity file offered to the destination
+  -known-hosts string
+    	known-hosts file for this scope
+invalid boolean value "false" for -agent: --agent must be true for the operator's own agent socket, or an agent socket path
+Usage of config build-ssh add:
+  -agent
+    	select an SSH agent, optionally by socket path
+  -identity string
+    	identity file offered to the destination
+  -known-hosts string
+    	known-hosts file for this scope
+flag provided but not defined: -pin
+Usage of config build-ssh add:
+  -agent
+    	select an SSH agent, optionally by socket path
+  -identity string
+    	identity file offered to the destination
+  -known-hosts string
+    	known-hosts file for this scope
+curator: config build-ssh add requires exactly one <scope>
+curator: build_ssh: scope "Git.Example.com" must be a lowercase host optionally followed by '/'-separated path segments of letters, digits, dots, underscores, or hyphens
+curator: build_ssh: scope "git.example.com/../etc" must be a lowercase host optionally followed by '/'-separated path segments of letters, digits, dots, underscores, or hyphens
+curator: build_ssh: scope "git.example.com//portals" must be a lowercase host optionally followed by '/'-separated path segments of letters, digits, dots, underscores, or hyphens
+curator: build_ssh: scope "ssh://git.example.com" must be a lowercase host optionally followed by '/'-separated path segments of letters, digits, dots, underscores, or hyphens
+curator: build_ssh.git.example.com.known_hosts: must be an absolute path or start with '~/' and carry no control character
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigBuildSSHAgentFlagKeepsScopePositional2046169812/001/config.json
+added build_ssh scope alpha.example.com: agent
+added build_ssh scope beta.example.com: agent=/run/beta.sock
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets1259387225/001/config.json
+added build_ssh scope git.example.com: agent
+curator: build_ssh scope "other.example.com" is not configured in /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets1259387225/001/config.json
+curator: config build-ssh remove requires exactly one <scope>
+curator: config build-ssh remove requires exactly one <scope>
+curator: config build-ssh remove requires exactly one <scope>
+wrote /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigSubcommandDispatch3853138091/001/config.json
+curator config: inspect and edit the machine configuration
+
+Usage:
+  curator config show                  print the effective configuration
+  curator config build-ssh <subcommand>
+                                       operator SSH credentials for external
+                                       build repositories (add | list | remove)
+curator config build-ssh: operator SSH credentials for external build repositories
+
+Usage:
+  curator config build-ssh add <scope> [--agent [SOCKET]] [--identity PATH] [--known-hosts PATH]
+  curator config build-ssh list
+  curator config build-ssh remove <scope>
+
+A scope is a lowercase host optionally followed by '/'-separated path segments.
+It is matched against the canonical host/path identity of a build repository on
+whole-segment boundaries, and the longest matching scope wins: scope
+'git.example.com/portals' covers 'git.example.com/portals/app' and never
+'git.example.com/portals-other'.
+
+An entry names an agent, an identity file, or both:
+  --agent                  the agent socket the operator's environment provides
+  --agent SOCKET           a named agent socket
+  --identity PATH          an identity file offered to the destination
+  --agent --identity PATH  an agent pinned to that one identity
+  --known-hosts PATH       a known-hosts file for this scope
+Every path must be absolute or start with '~/'.
+
+add replaces whatever was recorded under the same scope; remove reports a scope
+that is not configured as an error; list prints one line per scope, sorted.
+
+Precedence: command-line flags override CURATOR_BUILD_SSH_* environment values,
+which override the scopes configured here. Credentials are operator-owned: no
+manifest, descriptor, repository, substitution, or marker can select them.
+{
+  "Path": "/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigSubcommandDispatch3853138091/001/config.json",
+  "SkillsRoot": "/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestConfigSubcommandDispatch3853138091/002",
+  "PreferredLocale": "",
+  "DefaultAgents": [
+    "codex_cli"
+  ],
+  "AdapterMode": "auto",
+  "WorktreeAliasPattern": "[A-Z]+-[0-9]+",
+  "Projects": {},
+  "Audit": {
+    "Enabled": false,
+    "Mode": "advisory",
+    "FailOn": "high",
+    "Backend": "null",
+    "Model": "",
+    "AllowCloud": false,
+    "Backends": null,
+    "Grants": null,
+    "Revocations": null,
+    "SourcePolicyClass": "internal",
+    "SourcePolicyRules": null,
+    "RegistryPolicy": "advisory",
+    "MaxRequestBytes": 1048576,
+    "SnapshotMaxAgeSeconds": 604800,
+    "SnapshotClockSkewSeconds": 300,
+    "CacheTTLSeconds": 3600,
+    "OfflineGraceSeconds": 604800
+  },
+  "AllowedSources": null,
+  "AuditRegistries": null,
+  "DisableBuiltinRegistries": false,
+  "BuildSSH": null
+}
+curator config: inspect and edit the machine configuration
+
+Usage:
+  curator config show                  print the effective configuration
+  curator config build-ssh <subcommand>
+                                       operator SSH credentials for external
+                                       build repositories (add | list | remove)
+curator: unknown config subcommand "frobnicate"
+
+curator config: inspect and edit the machine configuration
+
+Usage:
+  curator config show                  print the effective configuration
+  curator config build-ssh <subcommand>
+                                       operator SSH credentials for external
+                                       build repositories (add | list | remove)
+curator config build-ssh: operator SSH credentials for external build repositories
+
+Usage:
+  curator config build-ssh add <scope> [--agent [SOCKET]] [--identity PATH] [--known-hosts PATH]
+  curator config build-ssh list
+  curator config build-ssh remove <scope>
+
+A scope is a lowercase host optionally followed by '/'-separated path segments.
+It is matched against the canonical host/path identity of a build repository on
+whole-segment boundaries, and the longest matching scope wins: scope
+'git.example.com/portals' covers 'git.example.com/portals/app' and never
+'git.example.com/portals-other'.
+
+An entry names an agent, an identity file, or both:
+  --agent                  the agent socket the operator's environment provides
+  --agent SOCKET           a named agent socket
+  --identity PATH          an identity file offered to the destination
+  --agent --identity PATH  an agent pinned to that one identity
+  --known-hosts PATH       a known-hosts file for this scope
+Every path must be absolute or start with '~/'.
+
+add replaces whatever was recorded under the same scope; remove reports a scope
+that is not configured as an error; list prints one line per scope, sorted.
+
+Precedence: command-line flags override CURATOR_BUILD_SSH_* environment values,
+which override the scopes configured here. Credentials are operator-owned: no
+manifest, descriptor, repository, substitution, or marker can select them.
+curator: unknown config build-ssh subcommand "frobnicate"
+
+curator config build-ssh: operator SSH credentials for external build repositories
+
+Usage:
+  curator config build-ssh add <scope> [--agent [SOCKET]] [--identity PATH] [--known-hosts PATH]
+  curator config build-ssh list
+  curator config build-ssh remove <scope>
+
+A scope is a lowercase host optionally followed by '/'-separated path segments.
+It is matched against the canonical host/path identity of a build repository on
+whole-segment boundaries, and the longest matching scope wins: scope
+'git.example.com/portals' covers 'git.example.com/portals/app' and never
+'git.example.com/portals-other'.
+
+An entry names an agent, an identity file, or both:
+  --agent                  the agent socket the operator's environment provides
+  --agent SOCKET           a named agent socket
+  --identity PATH          an identity file offered to the destination
+  --agent --identity PATH  an agent pinned to that one identity
+  --known-hosts PATH       a known-hosts file for this scope
+Every path must be absolute or start with '~/'.
+
+add replaces whatever was recorded under the same scope; remove reports a scope
+that is not configured as an error; list prints one line per scope, sorted.
+
+Precedence: command-line flags override CURATOR_BUILD_SSH_* environment values,
+which override the scopes configured here. Credentials are operator-owned: no
+manifest, descriptor, repository, substitution, or marker can select them.
+FAIL
+FAIL	github.com/relux-works/curator/cmd/curator	2.657s
+--- FAIL: TestSetBuildSSHRecordsReplacesAndPreservesOtherFields (0.06s)
+    write_test.go:79: build_ssh = map[git.example.com:{Scope:git.example.com Agent:true AgentSocket:/run/agent.sock Identity:/keys/org KnownHosts:} git.example.com/portals:{Scope:git.example.com/portals Agent:false AgentSocket: Identity:~/.ssh/portals KnownHosts:~/.ssh/known_hosts}], want map[git.example.com:{Scope:git.example.com Agent:false AgentSocket: Identity:/keys/org KnownHosts:} git.example.com/portals:{Scope:git.example.com/portals Agent:false AgentSocket: Identity:~/.ssh/portals KnownHosts:~/.ssh/known_hosts}]
+FAIL
+FAIL	github.com/relux-works/curator/internal/config	3.303s
+FAIL

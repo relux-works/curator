@@ -1,0 +1,53 @@
+@startuml
+!theme plain
+!pragma layout smetana
+
+title Independent consumers of the shared compiled-build suite
+
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+top to bottom direction
+
+package "curator-spec (the only oracle)" #LightBlue {
+  [Schema v6 and base build vectors] as Base
+  [Executable interop cases\nwith stable case IDs] as Cases
+  [Expected normalized outcomes\nand suite digest] as Expected
+  [Consumer contract\nno cross-imports or local oracles] as Contract
+}
+
+package "Curator repository" #LightGreen {
+  [Go suite consumer] as GoConsumer
+  [Curator manager] as Curator
+}
+
+package "csk repository" #LightYellow {
+  [Python suite consumer] as PyConsumer
+  [csk manager] as Csk
+}
+
+package "Parity verification" #LightGray {
+  [Black-box parity runner] as Runner
+  [Isolation contract\ndisjoint homes, projects, caches, fixtures] as Isolation
+  [Comparison scope\ndecisions, mutation boundaries, launch behavior\nnot compiled binary bytes] as Comparison
+}
+
+Base --> Cases : extends
+Cases --> Expected : generated together
+
+Cases --> GoConsumer : suite
+Expected --> GoConsumer : outcomes
+Contract ..> GoConsumer
+GoConsumer --> Curator : drives
+
+Cases --> PyConsumer : suite
+Expected --> PyConsumer : outcomes
+Contract ..> PyConsumer
+PyConsumer --> Csk : drives
+
+GoConsumer --> Runner : results
+PyConsumer --> Runner : results
+Expected --> Runner : case set
+Isolation ..> Runner
+Comparison ..> Runner
+
+@enduml

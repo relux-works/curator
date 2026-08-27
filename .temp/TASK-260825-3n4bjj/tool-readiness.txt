@@ -1,0 +1,70 @@
+/Users/iv/.local/bin/task-board
+/Users/iv/.goenv/shims/go
+Execute a write operation against the board using the DSL.
+
+Mutations:
+  set_status(ID, status=..., commit_ack=scope_committed?)
+                                        Change status; acknowledge enforced done transitions
+  normalize_legacy_status(ID, expected_raw=..., status=...)
+                                        Repair one exact unparseable raw status (local boards)
+  handoff(ID, role=..., status=...)     Verify checklist/outcome evidence and change status
+  set_estimate(ID, estimate=..., ...)  Set Task/Bug story-point estimate
+  create(type=..., name=..., ...)      Create element
+  set_details(ID, title=..., ...)      Update README fields
+  rename(ID, name=...)                 Rename element name/slug
+  delete(ID)                           Delete element (destructive)
+  assign(ID, agent=...)                Assign agent
+  unassign(ID)                         Remove assignment
+  link(ID, blocked_by=...)             Add dependency
+  unlink(ID, blocked_by=...)           Remove dependency
+  check_item(ID, item=N)              Check checklist item
+  uncheck_item(ID, item=N)            Uncheck checklist item
+  add_checklist_item(ID, text=...)     Add checklist item
+  set_notes(ID, text=..., set=bool?)   Append/set notes
+  set_parent(ID, parent=...)           Move to new parent
+  add_resource(ID, name=..., content=..., type=..., description=...)
+  update_resource(ID, name=..., content=..., type=..., description=...)
+  delete_resource(ID, name=...)        Delete resource (destructive)
+
+Auth (always local):
+  login(user=..., token=...)           Store token in credentials file
+  logout()                             Remove active user's token
+  switch_user(user=...)                Switch active user for remote
+
+Safety:
+  --dry-run     Preview mutation without applying
+  --confirm     Required for destructive mutations (delete, delete_resource)
+
+Introspection:
+  task-board q 'schema(mutation=NAME)' Show one mutation signature
+
+Examples:
+  task-board m --format json 'set_status(TASK-260218-abc, status=development)'
+  task-board m --format json 'normalize_legacy_status(STORY-260713-72b914, expected_raw="in-progress", status=development)'
+  task-board m --format json 'set_status(STORY-260218-abc, status=done, commit_ack=scope_committed)'
+  task-board m --format json 'set_estimate(TASK-260218-abc, estimate=estimated, scale=fibonacci, number=5)'
+  task-board m --format compact 'assign(TASK-260218-abc, agent=claude-opus)'
+  task-board m --format json --dry-run 'delete(TASK-260218-abc)'
+  task-board m --format json --confirm 'delete(TASK-260218-abc)'
+
+Usage:
+  task-board m <mutation> [flags]
+
+Aliases:
+  m, mutate
+
+Flags:
+      --confirm         Confirm destructive mutations
+      --dry-run         Preview the mutation without applying changes
+      --format string   Output format: "json" or "compact"/"llm" (default "json")
+  -h, --help            help for m
+
+Global Flags:
+      --board-dir string         Path to the board directory (overrides TASK_BOARD_DIR and config local.board_dir) (default ".task-board")
+      --context-profile string   Agent context profile override: full or lite
+      --insecure                 Skip TLS certificate verification (for self-signed certs)
+      --json                     Output in JSON format
+      --no-update-check          Disable automatic update check
+      --remote string            Remote board server URL (overrides TASK_BOARD_REMOTE)
+      --remote-board string      Remote board ID (overrides TASK_BOARD_ID)
+go version go1.25.5 darwin/arm64

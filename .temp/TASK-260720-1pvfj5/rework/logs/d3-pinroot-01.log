@@ -1,0 +1,29 @@
+--- FAIL: TestBuildSourceConformanceVectors (0.00s)
+    conformance_test.go:18: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1/vectors/build-drivers.json: no such file or directory
+FAIL
+FAIL	github.com/relux-works/curator/internal/buildsource	0.358s
+--- FAIL: TestCandidateCacheOutcomeVocabulary (0.00s)
+    conformance_test.go:15: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1/vectors/build-drivers.json: no such file or directory
+FAIL
+FAIL	github.com/relux-works/curator/internal/buildcache	2.204s
+--- FAIL: TestAuthoritativeGarbageCollectionRootsAreRetained (0.00s)
+    gc_conformance_test.go:69: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1/vectors/external-repository-lifecycle.json: no such file or directory
+FAIL
+FAIL	github.com/relux-works/curator/internal/scopes	1.399s
+--- FAIL: TestReadAuthoritativeMarkerV2SchemaCases (0.00s)
+    marker_v2_test.go:40: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1/schema-cases/install-marker-v2: no such file or directory
+--- FAIL: TestAuthoritativeCompiledMarkerRoundTripsThroughWriter (0.00s)
+    marker_v2_test.go:115: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1/expected/build-driver/marker.json: no such file or directory
+FAIL
+FAIL	github.com/relux-works/curator/internal/marker	0.610s
+--- FAIL: TestBuildRootContextExclusionConformanceFixture (0.00s)
+    conformance_test.go:27: open /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260729-2kaopg/protocol-spec/conformance/v1/expected/build-driver/context_files.json: no such file or directory
+FAIL
+FAIL	github.com/relux-works/curator/internal/whitelist	1.563s
+--- FAIL: TestSchemaV6ConformanceCases (0.00s)
+    conformance_test.go:83: authoritative index contains no agent-skill-v6.schema.json cases
+--- FAIL: TestSchemaV6FixtureParsingDoesNotExecuteGo (0.00s)
+    conformance_test.go:111: fixture build command = {Name: Type: Command: UnixPath: WinPath: Hint: Driver: SourceDir:}
+FAIL
+FAIL	github.com/relux-works/curator/internal/skillspec	2.128s
+FAIL

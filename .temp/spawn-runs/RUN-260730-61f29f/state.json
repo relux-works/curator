@@ -1,0 +1,52 @@
+{
+  "schema_version": 0,
+  "id": "RUN-260730-61f29f",
+  "task_id": "TASK-260720-2g21eg",
+  "agent_name": "[implementer] developer (codex)",
+  "agent_type": "codex",
+  "status": "cancelled",
+  "phase": "finalizing",
+  "summary": "cancelled by operator directive",
+  "created_at": "2026-07-30T08:54:13.033259Z",
+  "started_at": "2026-07-30T08:54:13.619646Z",
+  "completed_at": "2026-07-30T10:28:05.672605Z",
+  "last_heartbeat_at": "2026-07-30T10:28:05.672605Z",
+  "execution_continuity": {
+    "version": "execution_continuity_v1",
+    "effective_profile": "pedantic",
+    "profile_source": "compatibility_default",
+    "lifecycle_revision": 0,
+    "session_lineage": {},
+    "reused": false,
+    "prompt_mode": "full",
+    "review_attempt": 0,
+    "review_evidence": {},
+    "usage": {
+      "available": false
+    },
+    "wall_time": {
+      "run_duration_ms": 5632639,
+      "lifecycle_elapsed_ms": 0
+    },
+    "session_count": 0,
+    "controlled_input_bytes": 0,
+    "recovery_reason": "legacy_manifest"
+  },
+  "last_progress_at": "2026-07-30T10:28:05.672605Z",
+  "completion_reason": "cancelled",
+  "last_event_seq": 2848,
+  "last_acknowledged_directive": "RUN-260730-61f29f:cancel:5e2ac2",
+  "exit_code": 130,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-12-54-13_-implementer--developer--codex-_TASK-260720-2g21eg.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/TASK-260720-2g21eg/-implementer--developer--codex-_RUN-260730-61f29f.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260730-61f29f/runner.log",
+  "error": "cancelled by operator directive",
+  "max_parallel": 20,
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "provider": "codex",
+    "diagnostic_code": "composition_contract_unavailable"
+  }
+}

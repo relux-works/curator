@@ -1,0 +1,25 @@
+=== iteration 1 exit=2 ===
+error: compilation failed: Cannot run program "/bin/bash": Exec failed, error: 1 (Operation not permitted) 
+exception: java.io.IOException: Cannot run program "/bin/bash": Exec failed, error: 1 (Operation not permitted) 
+Caused by: java.io.IOException: Exec failed, error: 1 (Operation not permitted) 
+allowed: /bin/bash
+=== iteration 2 exit=2 ===
+error: compilation failed: Cannot run program "/usr/bin/xcrun": Exec failed, error: 1 (Operation not permitted) 
+exception: java.io.IOException: Cannot run program "/usr/bin/xcrun": Exec failed, error: 1 (Operation not permitted) 
+Caused by: java.io.IOException: Exec failed, error: 1 (Operation not permitted) 
+allowed: /usr/bin/xcrun
+=== iteration 3 exit=1 ===
+xcrun: error: can't exec '/Applications/Xcode_26_5.app/Contents/Developer/usr/bin/xcodebuild' (errno=Operation not permitted)
+error: an error occurred during an xcrun execution. Make sure that Xcode and its command line tools are properly installed.
+NO-PROGRAM-IN-MESSAGE; stopping
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.jetbrains.kotlin.org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-168smo/kn/dist/kotlin-native-prebuilt-macos-aarch64-2.4.10/konan/lib/kotlin-native-compiler-embeddable.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+/bin/bash: /usr/bin/xcode-select: Operation not permitted
+/bin/bash: /usr/libexec/PlistBuddy: Operation not permitted
+xcrun: error: can't exec '/Applications/Xcode_26_5.app/Contents/Developer/usr/bin/xcodebuild' (errno=Operation not permitted)
+error: an error occurred during an xcrun execution. Make sure that Xcode and its command line tools are properly installed.
+Failed command: /usr/bin/xcrun xcodebuild -version
+Try running this command in Terminal and fix the errors by making Xcode (and its command line tools) configuration correct.

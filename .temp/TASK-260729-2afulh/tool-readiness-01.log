@@ -1,0 +1,31 @@
+2026-07-29 tool readiness
+
+task-board --help
+exit: 0
+result: CLI help rendered; q, m, handoff, resource, spawn commands available.
+
+go version
+exit: 0
+result: go version go1.25.5 darwin/arm64
+
+git --version
+exit: 0
+result: git version 2.50.1 (Apple Git-155)
+
+rg --version
+exit: 0
+result: ripgrep 15.2.0 (rev e89fff89ac), PCRE2 available.
+
+/Users/iv/go/bin/golangci-lint version
+exit: 0
+result: golangci-lint 2.4.0 built with go1.25.5.
+
+Prepared report helper direct invocation
+command: .temp/TASK-260729-2afulh/bin/report.sh
+exit: 126
+result: permission denied because the helper lacked its executable bit.
+
+Prepared report helper via interpreter
+command: bash .temp/TASK-260729-2afulh/bin/report.sh
+exit: 0
+result: report rendered successfully; gate files were readable.

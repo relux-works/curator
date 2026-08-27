@@ -1,0 +1,28 @@
+TASK-260720-3j8pp5 telemetry config-repoint false-accept reproduction
+
+Method:
+- create a fake native-header GOROOT outside all forbidden roots;
+- use the existing ProbeRunner seam;
+- during the exact `go telemetry off` call, replace the private platform
+  config directory with a symlink to a directory outside operation_root;
+- return the exact supported `go version` output and fixed `go env -json`
+  field set with GOTELEMETRY=off and GOTELEMETRYDIR below that external
+  config target;
+- call establish_toolchain and then close.
+
+EXIT
+0
+
+OUTPUT
+RESULT=FALSE_ACCEPT
+operation_root=/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/csk-review-z38_jb0_/private/.csk-go-probe-nk1pm1sd
+reported_telemetry=/private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/csk-review-z38_jb0_/outside-config/go/telemetry
+telemetry_inside_operation_root=False
+operation_root_exists_after_close=False
+outside_telemetry_exists_after_close=True
+
+Interpretation:
+The candidate trusted a reported telemetry directory outside its canonical
+operation root because it followed the relocated config symlink and compared
+the telemetry path only to that relocated target. Nominal root cleanup did not
+remove the accepted external telemetry state.

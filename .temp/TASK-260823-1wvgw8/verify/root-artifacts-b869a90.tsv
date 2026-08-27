@@ -1,0 +1,38 @@
+# Which conformance-root artefacts each package's conformance tests require.
+#
+# `.github/ci/suite-plan.sh` reads this table and the root it is given, and
+# partitions the package set:
+#
+#   served    every declared artefact is present in the root -- the package
+#             runs WITH `CURATOR_CONFORMANCE_ROOT` exported;
+#   deferred  at least one declared artefact is absent -- the package runs
+#             with the variable UNSET, taking the `CURATOR_CONFORMANCE_ROOT is
+#             not set` path its own tests already implement, and the exact
+#             missing artefact is named in the gate report.
+#
+# The partition is DERIVED FROM THE ROOT, never from the lane. Against a root
+# that publishes the whole schema v6 surface the deferred set is empty and the
+# entire module runs with the root exported; that is what `CI_REQUIRE_FULL_ROOT=1`
+# asserts in the candidate lane, so a candidate run can never report success
+# while a package quietly ran without its vectors.
+#
+# Only packages whose conformance tests FAIL rather than skip on a missing
+# artefact need a row: a package that already guards with `t.Skipf("%s
+# publishes no ... vector", root)` is safe under any root and is deliberately
+# absent from this table. A package that later gains an unguarded read and is
+# not listed here goes RED with the open() error naming the missing file --
+# loud, not silent.
+#
+# Columns are TAB separated:
+#   package  artefact[,artefact...]  note
+#
+# package	artefacts	note
+internal/buildsource	vectors/build-drivers.json	TestBuildSourceConformanceVectors reads the vector directly
+internal/buildcache	vectors/build-drivers.json	TestCandidateCacheOutcomeVocabulary reads the vector directly
+internal/scopes	vectors/external-repository-lifecycle.json	TestAuthoritativeGarbageCollectionRootsAreRetained reads the vector directly
+internal/marker	schema-cases/install-marker-v2,schema-cases/install-marker-v4,expected/build-driver/marker.json	the marker v2 and v4 schema cases and the authoritative compiled marker
+internal/whitelist	fixtures/go-build-skill,expected/build-driver/context_files.json	the build-root context exclusion fixture and its expected file list
+internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the vector directly
+internal/godriver	vectors/module-roots.json	TestModuleRootVectorsDriveTheWholeBuild reads the vector directly
+internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v8,fixtures/go-build-skill	the schema v6 and v8 cases and the go-build skill fixture
+internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly

@@ -1,0 +1,428 @@
+semantic classifier: isolated
+regression control:  none
+toolchain-position command: go version
+
+== go version go1.25.1 darwin/arm64 (/usr/local/go/bin/go)
+   semantic isolation harness, built by this toolchain from its own GOROOT:
+     /usr/local/go/src/internal/gover/gover.go
+       whole file, sha256 676d41a053ac52e7dbb95c0a6581d17ffe98a1b170f7e826b1a2c2e746186ba5
+     /usr/local/go/src/cmd/go/internal/gover/toolchain.go
+       whole file, sha256 7ab5c7c2a193570c5ee95b19fcbf4e7adb6dce35bd5fa73b968c120c5decbc55
+       FromToolchain lifted verbatim: 503 bytes, sha256 c9d2cacbabd69c6d940a8111bea3956974a2812fd06261d6cc372c1841b8e29b
+   exact recognised forms are predicted from: go.mod line 3, GOTOOLCHAIN local/local+path, local 1.25.1
+
+-- go.mod `go` directive
+
+value              shape  gover     command   semantic  xchk   curator class                      measured
+--------------------------------------------------------------------------------------------------------------------------
+`1.23`             yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.23.4`           yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.21.0`           yes    yes       accepted  yes       ok     2 release literal (compared)       ok
+`1.23rc1`          yes    yes       accepted  yes       ok     3 prerelease literal (compared)    ok
+`1.26.0`           yes    yes       too-new   yes       ok     2 release literal (compared)       ok
+`1.99.0`           yes    yes       too-new   yes       ok     2 release literal (compared)       ok
+`1.99rc1`          yes    yes       too-new   yes       ok     3 prerelease literal (compared)    ok
+`1.23.4rc1`        yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1.24.0alpha1`     yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1.21.3beta2`      yes    no        rejected  no        ok     4 unrepresentable (mismatch)       ok
+                   gover no; command rejected exit 2: panic: go: internal error: missing go root module
+`1`                no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/go_1/go.mod:3: invalid go version '1': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '1': must match format 1.23.0
+`0.1`              no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/go_0_1/go.mod:3: invalid go version '0.1': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '0.1': must match format 1.23.0
+`1.023`            no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/go_1_023/go.mod:3: invalid go version '1.023': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version '1.023': must match format 1.23.0
+`1.23rc`           no     yes       rejected  yes       n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/go_1_23rc/go.mod:3: invalid go version '1.23rc': must match format 1.23.0; gover yes; command rejected exit 1: go.mod:3: invalid go version '1.23rc': must match format 1.23.0
+`v1.23`            no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/go_v1_23/go.mod:3: invalid go version 'v1.23': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version 'v1.23': must match format 1.23.0
+`1.23/4`           no     no        rejected  no        n/a    4 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/go_1_23_4/go.mod:3: invalid go version '1.23/4': must match format 1.23.0; gover no; command rejected exit 1: go.mod:3: invalid go version '1.23/4': must match format 1.23.0
+
+P1 no widening      (compared subset of upstream):        ok
+P2 no narrowing     (upstream minus forbidden compared):  ok
+   command outcomes inside the recognised closed set:     ok
+   isolated gover vs real command, where shape accepts:   ok
+   no forbidden class in this position, so P2 is C = Upstream
+
+
+-- go.mod `toolchain` directive
+
+value              shape  gover     command   semantic  xchk   curator class                      measured
+--------------------------------------------------------------------------------------------------------------------------
+`default`          yes    yes       accepted  yes       ok     4 default (compared)               ok
+`go1.99.0`         yes    yes       accepted  yes       ok     5 release name (compared)          ok
+`go1.99rc1`        yes    yes       accepted  yes       ok     6 prerelease name (compared)       ok
+`go1`              yes    yes       accepted  yes       ok     5 release name (compared)          ok
+`go1.99.0-custom`  yes    yes       accepted  yes       ok     3 custom-distribution name (forbidden) ok
+`go1.99.0-bigcorp` yes    yes       accepted  yes       ok     3 custom-distribution name (forbidden) ok
+`go1.23/../evil`   yes    no        rejected  no        ok     2 path-bearing name (forbidden)    ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1.23/../evil" in go.mod
+`go1.`             yes    no        rejected  no        ok     7 unclassifiable (mismatch)        ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1." in go.mod
+`go1.99.0rc1x`     yes    no        rejected  no        ok     7 unclassifiable (mismatch)        ok
+                   gover no; command rejected exit 1: go: invalid toolchain "go1.99.0rc1x" in go.mod
+`go2.0.0`          no     yes       rejected  yes       n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/tc_go2_0_0/go.mod:4: invalid toolchain version 'go2.0.0': must match format go1.23.0 or default; gover yes; command rejected exit 1: go: invalid GOTOOLCHAIN "go2.0.0"
+`go1x`             no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/tc_go1x/go.mod:4: invalid toolchain version 'go1x': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "go1x" in go.mod
+`godefault`        no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/tc_godefault/go.mod:4: invalid toolchain version 'godefault': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "godefault" in go.mod
+`1.23.4`           no     no        rejected  no        n/a    7 unclassifiable (mismatch)        ok
+                   shape exit 1: /private/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/curator-goversion-probe-2101750572/tc_1_23_4/go.mod:4: invalid toolchain version '1.23.4': must match format go1.23.0 or default; gover no; command rejected exit 1: go: invalid toolchain "1.23.4" in go.mod
+
+P1 no widening      (compared subset of upstream):        ok
+P2 no narrowing     (upstream minus forbidden compared):  ok
+   command outcomes inside the recognised closed set:     ok
+   isolated gover vs real command, where shape accepts:   ok
+   security partition subtracts from upstream:           ok
+
+
+-- classifier closure
+
+position   origin               outcome                                        value     isolated  classified
+--------------------------------------------------------------------------------------------------------------------------
+toolchain  measured, unrelated  `go build ./...` module-loader refusal         `default` yes       ok
+toolchain  measured, unrelated  `go build ./...` module-loader refusal         `go1.23/../evil` no        ok
+go         measured, unrelated  `go build ./...` package compile error         `1.23`    yes       ok
+go         measured, unrelated  `go build ./...` package compile error         `1.23.4rc1` no        ok
+toolchain  measured             outcome of `go1.99.0`                          `default` yes       ok
+toolchain  measured             outcome of `go1.99.0`                          `go1.99rc1` yes       ok
+toolchain  measured             outcome of `go1.99.0`                          `go1`     yes       ok
+toolchain  measured             outcome of `go1.99.0`                          `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `go1.99.0`                          `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `go1.99.0`                          `go1.23/../evil` no        ok
+toolchain  measured             outcome of `go1.99.0`                          `go1.`    no        ok
+toolchain  measured             outcome of `go1.99.0`                          `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `go1.99.0`                          `go2.0.0` yes       ok
+toolchain  measured             outcome of `go1.99.0`                          `go1x`    no        ok
+toolchain  measured             outcome of `go1.99.0`                          `godefault` no        ok
+toolchain  measured             outcome of `go1.99.0`                          `1.23.4`  no        ok
+toolchain  measured             outcome of `go1.99rc1`                         `default` yes       ok
+toolchain  measured             outcome of `go1.99rc1`                         `go1.99.0` yes       ok
+toolchain  measured             outcome of `go1.99rc1`                         `go1`     yes       ok
+toolchain  measured             outcome of `go1.99rc1`                         `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `go1.99rc1`                         `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `go1.99rc1`                         `go1.23/../evil` no        ok
+toolchain  measured             outcome of `go1.99rc1`                         `go1.`    no        ok
+toolchain  measured             outcome of `go1.99rc1`                         `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `go1.99rc1`                         `go2.0.0` yes       ok
+toolchain  measured             outcome of `go1.99rc1`                         `go1x`    no        ok
+toolchain  measured             outcome of `go1.99rc1`                         `godefault` no        ok
+toolchain  measured             outcome of `go1.99rc1`                         `1.23.4`  no        ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `default` yes       ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go1.99.0` yes       ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go1.99rc1` yes       ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go1`     yes       ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go1.23/../evil` no        ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go1.`    no        ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go2.0.0` yes       ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `go1x`    no        ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `godefault` no        ok
+toolchain  measured             outcome of `go1.99.0-custom`                   `1.23.4`  no        ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `default` yes       ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go1.99.0` yes       ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go1.99rc1` yes       ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go1`     yes       ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go1.23/../evil` no        ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go1.`    no        ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go2.0.0` yes       ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `go1x`    no        ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `godefault` no        ok
+toolchain  measured             outcome of `go1.99.0-bigcorp`                  `1.23.4`  no        ok
+toolchain  measured             outcome of `go1.23/../evil`                    `default` yes       ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go1.99.0` yes       ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go1.99rc1` yes       ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go1`     yes       ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go1.`    no        ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go2.0.0` yes       ok
+toolchain  measured             outcome of `go1.23/../evil`                    `go1x`    no        ok
+toolchain  measured             outcome of `go1.23/../evil`                    `godefault` no        ok
+toolchain  measured             outcome of `go1.23/../evil`                    `1.23.4`  no        ok
+toolchain  measured             outcome of `go1.`                              `default` yes       ok
+toolchain  measured             outcome of `go1.`                              `go1.99.0` yes       ok
+toolchain  measured             outcome of `go1.`                              `go1.99rc1` yes       ok
+toolchain  measured             outcome of `go1.`                              `go1`     yes       ok
+toolchain  measured             outcome of `go1.`                              `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `go1.`                              `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `go1.`                              `go1.23/../evil` no        ok
+toolchain  measured             outcome of `go1.`                              `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `go1.`                              `go2.0.0` yes       ok
+toolchain  measured             outcome of `go1.`                              `go1x`    no        ok
+toolchain  measured             outcome of `go1.`                              `godefault` no        ok
+toolchain  measured             outcome of `go1.`                              `1.23.4`  no        ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `default` yes       ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go1.99.0` yes       ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go1.99rc1` yes       ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go1`     yes       ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go1.23/../evil` no        ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go1.`    no        ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go2.0.0` yes       ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `go1x`    no        ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `godefault` no        ok
+toolchain  measured             outcome of `go1.99.0rc1x`                      `1.23.4`  no        ok
+toolchain  measured             outcome of `go2.0.0`                           `default` yes       ok
+toolchain  measured             outcome of `go2.0.0`                           `go1.99.0` yes       ok
+toolchain  measured             outcome of `go2.0.0`                           `go1.99rc1` yes       ok
+toolchain  measured             outcome of `go2.0.0`                           `go1`     yes       ok
+toolchain  measured             outcome of `go2.0.0`                           `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `go2.0.0`                           `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `go2.0.0`                           `go1.23/../evil` no        ok
+toolchain  measured             outcome of `go2.0.0`                           `go1.`    no        ok
+toolchain  measured             outcome of `go2.0.0`                           `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `go2.0.0`                           `go1x`    no        ok
+toolchain  measured             outcome of `go2.0.0`                           `godefault` no        ok
+toolchain  measured             outcome of `go2.0.0`                           `1.23.4`  no        ok
+toolchain  measured             outcome of `go1x`                              `default` yes       ok
+toolchain  measured             outcome of `go1x`                              `go1.99.0` yes       ok
+toolchain  measured             outcome of `go1x`                              `go1.99rc1` yes       ok
+toolchain  measured             outcome of `go1x`                              `go1`     yes       ok
+toolchain  measured             outcome of `go1x`                              `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `go1x`                              `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `go1x`                              `go1.23/../evil` no        ok
+toolchain  measured             outcome of `go1x`                              `go1.`    no        ok
+toolchain  measured             outcome of `go1x`                              `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `go1x`                              `go2.0.0` yes       ok
+toolchain  measured             outcome of `go1x`                              `godefault` no        ok
+toolchain  measured             outcome of `go1x`                              `1.23.4`  no        ok
+toolchain  measured             outcome of `godefault`                         `default` yes       ok
+toolchain  measured             outcome of `godefault`                         `go1.99.0` yes       ok
+toolchain  measured             outcome of `godefault`                         `go1.99rc1` yes       ok
+toolchain  measured             outcome of `godefault`                         `go1`     yes       ok
+toolchain  measured             outcome of `godefault`                         `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `godefault`                         `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `godefault`                         `go1.23/../evil` no        ok
+toolchain  measured             outcome of `godefault`                         `go1.`    no        ok
+toolchain  measured             outcome of `godefault`                         `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `godefault`                         `go2.0.0` yes       ok
+toolchain  measured             outcome of `godefault`                         `go1x`    no        ok
+toolchain  measured             outcome of `godefault`                         `1.23.4`  no        ok
+toolchain  measured             outcome of `1.23.4`                            `default` yes       ok
+toolchain  measured             outcome of `1.23.4`                            `go1.99.0` yes       ok
+toolchain  measured             outcome of `1.23.4`                            `go1.99rc1` yes       ok
+toolchain  measured             outcome of `1.23.4`                            `go1`     yes       ok
+toolchain  measured             outcome of `1.23.4`                            `go1.99.0-custom` yes       ok
+toolchain  measured             outcome of `1.23.4`                            `go1.99.0-bigcorp` yes       ok
+toolchain  measured             outcome of `1.23.4`                            `go1.23/../evil` no        ok
+toolchain  measured             outcome of `1.23.4`                            `go1.`    no        ok
+toolchain  measured             outcome of `1.23.4`                            `go1.99.0rc1x` no        ok
+toolchain  measured             outcome of `1.23.4`                            `go2.0.0` yes       ok
+toolchain  measured             outcome of `1.23.4`                            `go1x`    no        ok
+toolchain  measured             outcome of `1.23.4`                            `godefault` no        ok
+go         measured             outcome of `1.26.0`                            `1.23`    yes       ok
+go         measured             outcome of `1.26.0`                            `1.23.4`  yes       ok
+go         measured             outcome of `1.26.0`                            `1.21.0`  yes       ok
+go         measured             outcome of `1.26.0`                            `1.23rc1` yes       ok
+go         measured             outcome of `1.26.0`                            `1.99.0`  yes       ok
+go         measured             outcome of `1.26.0`                            `1.99rc1` yes       ok
+go         measured             outcome of `1.26.0`                            `1.23.4rc1` no        ok
+go         measured             outcome of `1.26.0`                            `1.24.0alpha1` no        ok
+go         measured             outcome of `1.26.0`                            `1.21.3beta2` no        ok
+go         measured             outcome of `1.26.0`                            `1`       yes       ok
+go         measured             outcome of `1.26.0`                            `0.1`     yes       ok
+go         measured             outcome of `1.26.0`                            `1.023`   no        ok
+go         measured             outcome of `1.26.0`                            `1.23rc`  yes       ok
+go         measured             outcome of `1.26.0`                            `v1.23`   no        ok
+go         measured             outcome of `1.26.0`                            `1.23/4`  no        ok
+go         measured             outcome of `1.99.0`                            `1.23`    yes       ok
+go         measured             outcome of `1.99.0`                            `1.23.4`  yes       ok
+go         measured             outcome of `1.99.0`                            `1.21.0`  yes       ok
+go         measured             outcome of `1.99.0`                            `1.23rc1` yes       ok
+go         measured             outcome of `1.99.0`                            `1.26.0`  yes       ok
+go         measured             outcome of `1.99.0`                            `1.99rc1` yes       ok
+go         measured             outcome of `1.99.0`                            `1.23.4rc1` no        ok
+go         measured             outcome of `1.99.0`                            `1.24.0alpha1` no        ok
+go         measured             outcome of `1.99.0`                            `1.21.3beta2` no        ok
+go         measured             outcome of `1.99.0`                            `1`       yes       ok
+go         measured             outcome of `1.99.0`                            `0.1`     yes       ok
+go         measured             outcome of `1.99.0`                            `1.023`   no        ok
+go         measured             outcome of `1.99.0`                            `1.23rc`  yes       ok
+go         measured             outcome of `1.99.0`                            `v1.23`   no        ok
+go         measured             outcome of `1.99.0`                            `1.23/4`  no        ok
+go         measured             outcome of `1.99rc1`                           `1.23`    yes       ok
+go         measured             outcome of `1.99rc1`                           `1.23.4`  yes       ok
+go         measured             outcome of `1.99rc1`                           `1.21.0`  yes       ok
+go         measured             outcome of `1.99rc1`                           `1.23rc1` yes       ok
+go         measured             outcome of `1.99rc1`                           `1.26.0`  yes       ok
+go         measured             outcome of `1.99rc1`                           `1.99.0`  yes       ok
+go         measured             outcome of `1.99rc1`                           `1.23.4rc1` no        ok
+go         measured             outcome of `1.99rc1`                           `1.24.0alpha1` no        ok
+go         measured             outcome of `1.99rc1`                           `1.21.3beta2` no        ok
+go         measured             outcome of `1.99rc1`                           `1`       yes       ok
+go         measured             outcome of `1.99rc1`                           `0.1`     yes       ok
+go         measured             outcome of `1.99rc1`                           `1.023`   no        ok
+go         measured             outcome of `1.99rc1`                           `1.23rc`  yes       ok
+go         measured             outcome of `1.99rc1`                           `v1.23`   no        ok
+go         measured             outcome of `1.99rc1`                           `1.23/4`  no        ok
+go         measured             outcome of `1`                                 `1.23`    yes       ok
+go         measured             outcome of `1`                                 `1.23.4`  yes       ok
+go         measured             outcome of `1`                                 `1.21.0`  yes       ok
+go         measured             outcome of `1`                                 `1.23rc1` yes       ok
+go         measured             outcome of `1`                                 `1.26.0`  yes       ok
+go         measured             outcome of `1`                                 `1.99.0`  yes       ok
+go         measured             outcome of `1`                                 `1.99rc1` yes       ok
+go         measured             outcome of `1`                                 `1.23.4rc1` no        ok
+go         measured             outcome of `1`                                 `1.24.0alpha1` no        ok
+go         measured             outcome of `1`                                 `1.21.3beta2` no        ok
+go         measured             outcome of `1`                                 `0.1`     yes       ok
+go         measured             outcome of `1`                                 `1.023`   no        ok
+go         measured             outcome of `1`                                 `1.23rc`  yes       ok
+go         measured             outcome of `1`                                 `v1.23`   no        ok
+go         measured             outcome of `1`                                 `1.23/4`  no        ok
+go         measured             outcome of `0.1`                               `1.23`    yes       ok
+go         measured             outcome of `0.1`                               `1.23.4`  yes       ok
+go         measured             outcome of `0.1`                               `1.21.0`  yes       ok
+go         measured             outcome of `0.1`                               `1.23rc1` yes       ok
+go         measured             outcome of `0.1`                               `1.26.0`  yes       ok
+go         measured             outcome of `0.1`                               `1.99.0`  yes       ok
+go         measured             outcome of `0.1`                               `1.99rc1` yes       ok
+go         measured             outcome of `0.1`                               `1.23.4rc1` no        ok
+go         measured             outcome of `0.1`                               `1.24.0alpha1` no        ok
+go         measured             outcome of `0.1`                               `1.21.3beta2` no        ok
+go         measured             outcome of `0.1`                               `1`       yes       ok
+go         measured             outcome of `0.1`                               `1.023`   no        ok
+go         measured             outcome of `0.1`                               `1.23rc`  yes       ok
+go         measured             outcome of `0.1`                               `v1.23`   no        ok
+go         measured             outcome of `0.1`                               `1.23/4`  no        ok
+go         measured             outcome of `1.023`                             `1.23`    yes       ok
+go         measured             outcome of `1.023`                             `1.23.4`  yes       ok
+go         measured             outcome of `1.023`                             `1.21.0`  yes       ok
+go         measured             outcome of `1.023`                             `1.23rc1` yes       ok
+go         measured             outcome of `1.023`                             `1.26.0`  yes       ok
+go         measured             outcome of `1.023`                             `1.99.0`  yes       ok
+go         measured             outcome of `1.023`                             `1.99rc1` yes       ok
+go         measured             outcome of `1.023`                             `1.23.4rc1` no        ok
+go         measured             outcome of `1.023`                             `1.24.0alpha1` no        ok
+go         measured             outcome of `1.023`                             `1.21.3beta2` no        ok
+go         measured             outcome of `1.023`                             `1`       yes       ok
+go         measured             outcome of `1.023`                             `0.1`     yes       ok
+go         measured             outcome of `1.023`                             `1.23rc`  yes       ok
+go         measured             outcome of `1.023`                             `v1.23`   no        ok
+go         measured             outcome of `1.023`                             `1.23/4`  no        ok
+go         measured             outcome of `1.23rc`                            `1.23`    yes       ok
+go         measured             outcome of `1.23rc`                            `1.23.4`  yes       ok
+go         measured             outcome of `1.23rc`                            `1.21.0`  yes       ok
+go         measured             outcome of `1.23rc`                            `1.23rc1` yes       ok
+go         measured             outcome of `1.23rc`                            `1.26.0`  yes       ok
+go         measured             outcome of `1.23rc`                            `1.99.0`  yes       ok
+go         measured             outcome of `1.23rc`                            `1.99rc1` yes       ok
+go         measured             outcome of `1.23rc`                            `1.23.4rc1` no        ok
+go         measured             outcome of `1.23rc`                            `1.24.0alpha1` no        ok
+go         measured             outcome of `1.23rc`                            `1.21.3beta2` no        ok
+go         measured             outcome of `1.23rc`                            `1`       yes       ok
+go         measured             outcome of `1.23rc`                            `0.1`     yes       ok
+go         measured             outcome of `1.23rc`                            `1.023`   no        ok
+go         measured             outcome of `1.23rc`                            `v1.23`   no        ok
+go         measured             outcome of `1.23rc`                            `1.23/4`  no        ok
+go         measured             outcome of `v1.23`                             `1.23`    yes       ok
+go         measured             outcome of `v1.23`                             `1.23.4`  yes       ok
+go         measured             outcome of `v1.23`                             `1.21.0`  yes       ok
+go         measured             outcome of `v1.23`                             `1.23rc1` yes       ok
+go         measured             outcome of `v1.23`                             `1.26.0`  yes       ok
+go         measured             outcome of `v1.23`                             `1.99.0`  yes       ok
+go         measured             outcome of `v1.23`                             `1.99rc1` yes       ok
+go         measured             outcome of `v1.23`                             `1.23.4rc1` no        ok
+go         measured             outcome of `v1.23`                             `1.24.0alpha1` no        ok
+go         measured             outcome of `v1.23`                             `1.21.3beta2` no        ok
+go         measured             outcome of `v1.23`                             `1`       yes       ok
+go         measured             outcome of `v1.23`                             `0.1`     yes       ok
+go         measured             outcome of `v1.23`                             `1.023`   no        ok
+go         measured             outcome of `v1.23`                             `1.23rc`  yes       ok
+go         measured             outcome of `v1.23`                             `1.23/4`  no        ok
+go         measured             outcome of `1.23/4`                            `1.23`    yes       ok
+go         measured             outcome of `1.23/4`                            `1.23.4`  yes       ok
+go         measured             outcome of `1.23/4`                            `1.21.0`  yes       ok
+go         measured             outcome of `1.23/4`                            `1.23rc1` yes       ok
+go         measured             outcome of `1.23/4`                            `1.26.0`  yes       ok
+go         measured             outcome of `1.23/4`                            `1.99.0`  yes       ok
+go         measured             outcome of `1.23/4`                            `1.99rc1` yes       ok
+go         measured             outcome of `1.23/4`                            `1.23.4rc1` no        ok
+go         measured             outcome of `1.23/4`                            `1.24.0alpha1` no        ok
+go         measured             outcome of `1.23/4`                            `1.21.3beta2` no        ok
+go         measured             outcome of `1.23/4`                            `1`       yes       ok
+go         measured             outcome of `1.23/4`                            `0.1`     yes       ok
+go         measured             outcome of `1.23/4`                            `1.023`   no        ok
+go         measured             outcome of `1.23/4`                            `1.23rc`  yes       ok
+go         measured             outcome of `1.23/4`                            `v1.23`   no        ok
+toolchain  measured, extended   tail appended on `go1.99.0`                    `go1.99.0` yes       ok
+toolchain  measured, extended   wrapped in front on `go1.99.0`                 `go1.99.0` yes       ok
+toolchain  measured, extended   embedded in a longer line on `go1.99.0`        `go1.99.0` yes       ok
+toolchain  measured, extended   tail appended on `go1.99rc1`                   `go1.99rc1` yes       ok
+toolchain  measured, extended   wrapped in front on `go1.99rc1`                `go1.99rc1` yes       ok
+toolchain  measured, extended   embedded in a longer line on `go1.99rc1`       `go1.99rc1` yes       ok
+toolchain  measured, extended   tail appended on `go1.99.0-custom`             `go1.99.0-custom` yes       ok
+toolchain  measured, extended   wrapped in front on `go1.99.0-custom`          `go1.99.0-custom` yes       ok
+toolchain  measured, extended   embedded in a longer line on `go1.99.0-custom` `go1.99.0-custom` yes       ok
+toolchain  measured, extended   tail appended on `go1.99.0-bigcorp`            `go1.99.0-bigcorp` yes       ok
+toolchain  measured, extended   wrapped in front on `go1.99.0-bigcorp`         `go1.99.0-bigcorp` yes       ok
+toolchain  measured, extended   embedded in a longer line on `go1.99.0-bigcor… `go1.99.0-bigcorp` yes       ok
+toolchain  measured, extended   tail appended on `go1.23/../evil`              `go1.23/../evil` no        ok
+toolchain  measured, extended   wrapped in front on `go1.23/../evil`           `go1.23/../evil` no        ok
+toolchain  measured, extended   embedded in a longer line on `go1.23/../evil`  `go1.23/../evil` no        ok
+toolchain  measured, extended   tail appended on `go1.`                        `go1.`    no        ok
+toolchain  measured, extended   wrapped in front on `go1.`                     `go1.`    no        ok
+toolchain  measured, extended   embedded in a longer line on `go1.`            `go1.`    no        ok
+toolchain  measured, extended   tail appended on `go1.99.0rc1x`                `go1.99.0rc1x` no        ok
+toolchain  measured, extended   wrapped in front on `go1.99.0rc1x`             `go1.99.0rc1x` no        ok
+toolchain  measured, extended   embedded in a longer line on `go1.99.0rc1x`    `go1.99.0rc1x` no        ok
+toolchain  measured, extended   tail appended on `go2.0.0`                     `go2.0.0` yes       ok
+toolchain  measured, extended   wrapped in front on `go2.0.0`                  `go2.0.0` yes       ok
+toolchain  measured, extended   embedded in a longer line on `go2.0.0`         `go2.0.0` yes       ok
+toolchain  measured, extended   tail appended on `go1x`                        `go1x`    no        ok
+toolchain  measured, extended   wrapped in front on `go1x`                     `go1x`    no        ok
+toolchain  measured, extended   embedded in a longer line on `go1x`            `go1x`    no        ok
+toolchain  measured, extended   tail appended on `godefault`                   `godefault` no        ok
+toolchain  measured, extended   wrapped in front on `godefault`                `godefault` no        ok
+toolchain  measured, extended   embedded in a longer line on `godefault`       `godefault` no        ok
+toolchain  measured, extended   tail appended on `1.23.4`                      `1.23.4`  no        ok
+toolchain  measured, extended   wrapped in front on `1.23.4`                   `1.23.4`  no        ok
+toolchain  measured, extended   embedded in a longer line on `1.23.4`          `1.23.4`  no        ok
+go         measured, extended   tail appended on `1.26.0`                      `1.26.0`  yes       ok
+go         measured, extended   wrapped in front on `1.26.0`                   `1.26.0`  yes       ok
+go         measured, extended   embedded in a longer line on `1.26.0`          `1.26.0`  yes       ok
+go         measured, extended   tail appended on `1.99.0`                      `1.99.0`  yes       ok
+go         measured, extended   wrapped in front on `1.99.0`                   `1.99.0`  yes       ok
+go         measured, extended   embedded in a longer line on `1.99.0`          `1.99.0`  yes       ok
+go         measured, extended   tail appended on `1.99rc1`                     `1.99rc1` yes       ok
+go         measured, extended   wrapped in front on `1.99rc1`                  `1.99rc1` yes       ok
+go         measured, extended   embedded in a longer line on `1.99rc1`         `1.99rc1` yes       ok
+go         measured, extended   tail appended on `1`                           `1`       yes       ok
+go         measured, extended   wrapped in front on `1`                        `1`       yes       ok
+go         measured, extended   embedded in a longer line on `1`               `1`       yes       ok
+go         measured, extended   tail appended on `0.1`                         `0.1`     yes       ok
+go         measured, extended   wrapped in front on `0.1`                      `0.1`     yes       ok
+go         measured, extended   embedded in a longer line on `0.1`             `0.1`     yes       ok
+go         measured, extended   tail appended on `1.023`                       `1.023`   no        ok
+go         measured, extended   wrapped in front on `1.023`                    `1.023`   no        ok
+go         measured, extended   embedded in a longer line on `1.023`           `1.023`   no        ok
+go         measured, extended   tail appended on `1.23rc`                      `1.23rc`  yes       ok
+go         measured, extended   wrapped in front on `1.23rc`                   `1.23rc`  yes       ok
+go         measured, extended   embedded in a longer line on `1.23rc`          `1.23rc`  yes       ok
+go         measured, extended   tail appended on `v1.23`                       `v1.23`   no        ok
+go         measured, extended   wrapped in front on `v1.23`                    `v1.23`   no        ok
+go         measured, extended   embedded in a longer line on `v1.23`           `v1.23`   no        ok
+go         measured, extended   tail appended on `1.23/4`                      `1.23/4`  no        ok
+go         measured, extended   wrapped in front on `1.23/4`                   `1.23/4`  no        ok
+go         measured, extended   embedded in a longer line on `1.23/4`          `1.23/4`  no        ok
+
+   checks:                                                331
+   outcomes outside the recognised set produce no verdict: ok
+   fabrications the crosscheck could not catch, direction A (as `accepted`, on an isolated-accepted value): 0
+   fabrications the crosscheck could not catch, direction B (as `rejected`, on an isolated-rejected value): 0
+
+== summary
+toolchains probed:  1
+cases:              16 go-directive, 13 toolchain-directive
+semantic classifier: isolated
+failures:           0

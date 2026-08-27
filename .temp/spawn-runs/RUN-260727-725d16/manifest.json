@@ -1,0 +1,322 @@
+{
+  "schema_version": 2,
+  "id": "RUN-260727-725d16",
+  "task_id": "TASK-260720-1zntv0",
+  "created_at": "2026-07-27T17:27:33.834551Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[reviewer] reviewer (codex)",
+  "role": "reviewer",
+  "role_archetype": "reviewer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "lifecycle_id": "RUN-260727-725d16",
+  "provider_session_digest": "sha256:fb073bc9554bf75d10b4c9d0328ed10980736de4e9dfcaa185028a80a47051c1",
+  "lane_key": "da139fd7733388d8bebbc5f6df6ef6cf163088a78679edc85941170a43994e49",
+  "lane_generation": 1,
+  "lane_lease_generation": 1,
+  "execution_continuity": {
+    "policy": {
+      "selected_spawn_key": "spawn",
+      "config_key": "spawn.execution_policy",
+      "profile": {
+        "value": "pedantic",
+        "source": "compatibility_default",
+        "config_key": "spawn.execution_policy.profile"
+      },
+      "sessions": {
+        "producer": {
+          "value": "fresh",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.producer"
+        },
+        "reviewer": {
+          "value": "fresh",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.reviewer"
+        },
+        "max_resumes": {
+          "value": 4,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.max_resumes"
+        },
+        "max_age": {
+          "value": "24h",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.max_age"
+        },
+        "fresh_fallback": {
+          "value": true,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.sessions.fresh_fallback"
+        }
+      },
+      "context": {
+        "rework": {
+          "value": "full",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.context.rework"
+        }
+      },
+      "review": {
+        "max_attempts": {
+          "value": null,
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.review.max_attempts"
+        },
+        "after_limit": {
+          "value": "pause",
+          "source": "compatibility_default",
+          "config_key": "spawn.execution_policy.review.after_limit"
+        },
+        "primary_attempt_limit": null,
+        "final_audit_reserve": 0
+      }
+    },
+    "review_phase": "primary_review",
+    "board": {
+      "mode": "local",
+      "location": "/Users/iv/Developer/ReluxWorks/curator/.task-board"
+    }
+  },
+  "input_snapshot": {
+    "version": "input_snapshot_v1",
+    "entries": [
+      {
+        "type": "checklist",
+        "name": "definition_of_done",
+        "key": "checklist/definition_of_done",
+        "length": 1634,
+        "digest": "sha256:6942fd688da6238903bea69eed200bf7bec181e9943712a6441b4eb114d99c74",
+        "body_base64": "WyJDb21wbGV0ZSBwYWNrYWdlIGdyYXBoIGFuZCBzb3VyY2UgaW5wdXRzIHBhc3MgYWxsIHJlamVjdGlvbiBjbHVzdGVycyIsIk9ubHkgdGhlIGZpeGVkIGdvIGxpc3QgYW5kIGdvIGJ1aWxkIGNvbW1hbmRzIGNhbiBleGVjdXRlIiwiQnVpbHQgb3V0cHV0cyBhcmUgdmVyaWZpZWQgYnV0IG5ldmVyIGxhdW5jaGVkIGR1cmluZyBpbnN0YWxsYXRpb24iLCJSZWFkb25seSBzb3VyY2UsIG5ldHdvcmsgZGVuaWFsLCBhbmQgc3VwcG9ydGVkIGhvc3QgcmVzb3VyY2UgY29udHJvbHMgYXJlIGV4ZWN1dGFibGUgcGxhdGZvcm0gZ2F0ZXMiLCJDb2RlIHdyaXR0ZW4gcGVyIHRhc2sgZGVzY3JpcHRpb24gYW5kIEFDIiwiUmVsZXZhbnQgdGVzdHMgd3JpdHRlbiBmb3IgbmV3IG9yIGNoYW5nZWQgYmVoYXZpb3IgYW5kIHBhc3NpbmciLCJMaW50IGNsZWFuIiwiUmVsZXZhbnQgYnVpbGQvdmFsaWRhdGlvbiBjb21tYW5kcyBydW4gYWZ0ZXIgY2hhbmdlcyBhbmQgYnVpbGQgbm90IGJyb2tlbiIsIk5ldyBvdXRjb21lIGFydGlmYWN0IGF0dGFjaGVkIG9uIHRoZSBib2FyZCB3aXRoIGEgdGFzay1zY29wZWQgbmFtZSB3aGVuIHRoZSB3b3JrIHByb2R1Y2VzIG5vdGVzLCBsb2dzLCBzY3JlZW5zaG90cywgb3Igb3RoZXIgZGVsaXZlcmFibGVzIiwiSW1wb3J0YW50IGZpbmRpbmdzLCBkZWNpc2lvbnMsIGFub21hbGllcywgb3IgcmVncmVzc2lvbnMgcmVjb3JkZWQgaW4gbG9nYm9vayB3aGVuIHJlbGV2YW50IiwiQm9hcmQgc2l6ZSBpcyBwcm9wb3J0aW9uYWwgdG8gdGhlIHNwZWMgYW5kIGlzIHRoZSBzbWFsbGVzdCBkZWNvbXBvc2l0aW9uIHRoYXQgbWFwcyBldmVyeSByZXF1aXJlbWVudCIsIkV2ZXJ5IHN0b3J5IGFuZCB0YXNrIHRyYWNlcyB0byBhIGNvbmNyZXRlIHNwZWMgcmVxdWlyZW1lbnQ7IGp1c3RpZmllZC1nYXAgZWxlbWVudHMgYWxzbyBjYXJyeSBhIHNlbGYtdmVyaWZpZWQgZ2FwIHJlY29yZCIsIkJleW9uZC1saXRlcmFsLXNwZWMgZWxlbWVudHMgaW5jbHVkZSBhIHdyaXR0ZW4ganVzdGlmaWNhdGlvbiBuYW1pbmcgdGhlIGdhcCBhbmQgdGhlIHNwZWMgYW5kIG91dC1vZi1zY29wZSBjaGVja3MgcGVyZm9ybWVkIGJlZm9yZSBjcmVhdGlvbiIsIlJlc2VhcmNoIHRhc2tzIGNpdGUgYW4gZXhhY3QgcXVlc3Rpb24gdGhlIHNwZWMgZ2VudWluZWx5IGxlYXZlcyBvcGVuIiwiRGVwZW5kZW5jaWVzIGxpbmtlZCIsIlRhc2tzIGFyZSBhdG9taWMg4oCUIG9uZSBjbGVhciBkZWxpdmVyYWJsZSBlYWNoIiwiQ29tcGxldGVuZXNzIHZlcmlmaWVkIOKAlCBub3RoaW5nIGZvcmdvdHRlbiIsIkFueSBwbGFubmluZyBhcnRpZmFjdHMgYWN0dWFsbHkgcHJvZHVjZWQgYXJlIGxpbmtlZCBhcyBuZXcgdGFzay1zY29wZWQgb3V0Y29tZSByZXNvdXJjZXM7IGRpYWdyYW1zIGFyZSBzdHJpY3RseSBvcHRpb25hbCwgbmV2ZXIgYSBzdGFuZGluZyBkZWxpdmVyYWJsZSIsIkltcGxlbWVudGF0aW9uIG1hdGNoZXMgQUMiLCJTb2x1dGlvbiBmaXRzIHByb2plY3QgYXJjaGl0ZWN0dXJlIiwiVGVzdHMgZ3JlZW4iLCJJZiByZXZpZXcgZG9lcyBub3QgYWNjZXB0IHRoZSB3b3JrIOKAlCB2ZXJkaWN0IGV2aWRlbmNlIGFkZGVkIGFuZCBzdGF0dXMgcm91dGVkIGJ5IHRoZSBleHBsaWNpdCB2ZXJkaWN0IGJyYW5jaGVzIl0="
+      },
+      {
+        "type": "execution_policy",
+        "name": "digest",
+        "key": "execution_policy/digest",
+        "length": 71,
+        "digest": "sha256:631dca31732b29a626b42e07097ae1301645ac06894e609be1e3f52549f88596",
+        "body_base64": "c2hhMjU2OjcwOTVkY2E3MzExOTk5MzdmODE2MWE2NDdjYzBmNWUzMzJmZmNiNjc3NDE5MmE1MTEyNTBkMTkxMDVlMTczM2I="
+      },
+      {
+        "type": "final_audit_assignment",
+        "name": "current",
+        "key": "final_audit_assignment/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "goal",
+        "name": "revision",
+        "key": "goal/revision",
+        "length": 4,
+        "digest": "sha256:74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        "body_base64": "bnVsbA=="
+      },
+      {
+        "type": "next_action",
+        "name": "reason",
+        "key": "next_action/reason",
+        "length": 22,
+        "digest": "sha256:205f87c0be0dc5b66d88aef7dc6935832fe5f6bfd275ca07da3a91392244f026",
+        "body_base64": "Ym9hcmRfc3RhdHVzOnRvLXJldmlldw=="
+      },
+      {
+        "type": "post_rework_validation",
+        "name": "current",
+        "key": "post_rework_validation/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "producer_resolutions",
+        "name": "current",
+        "key": "producer_resolutions/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "reviewer_authorization",
+        "name": "current",
+        "key": "reviewer_authorization/current",
+        "length": 13,
+        "digest": "sha256:2e2f92c499978b499f71fc5adf3448d4e094f35055ad2a7303212bcc1bff5570",
+        "body_base64": "eyJydW5faWQiOiIifQ=="
+      },
+      {
+        "type": "reviewer_findings",
+        "name": "current",
+        "key": "reviewer_findings/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      },
+      {
+        "type": "role",
+        "name": "body",
+        "key": "role/body",
+        "length": 2044,
+        "digest": "sha256:0571aca5102774ae78178dd47e2a0adc0c391b00bd079254def33430ddbda6a0",
+        "body_base64": "IyByZXZpZXdlcgoKIyMgRGVzY3JpcHRpb24KClJldmlld3MgaG93IGEgdGFzayB3YXMgaW1wbGVtZW50ZWQgYW5kIGhvdyB0aGUgc29sdXRpb24gZml0cyBpbnRvIHRoZSBwcm9qZWN0LiBEb2VzIG5vdCBtb2RpZnkgY29kZTsgcmVjb3JkcyBvbmUgb2YgdGhlIGV4cGxpY2l0IHZlcmRpY3QgYnJhbmNoZXMgYmVsb3cuCgpXaGVuIHRoZSBydW4gaXMgZ29hbC1ib3VuZCwgcXVlcnkgYHRhc2stYm9hcmQgc3Bhd24gZ29hbCAiJFRBU0tfQk9BUkRfUlVOX0lEImAgYmVmb3JlIHJlY29yZGluZyB0aGUgdmVyZGljdC4gVGhlIHJldmlld2VyIGdvYWwgaXMgcm9sZS1kZXJpdmVkIGFzIGByZXZpZXdlcl92ZXJkaWN0L3Jldmlld2VyX3ZlcmRpY3RgLCBjYXJyaWVzIGl0cyBpbW11dGFibGUgcGFyZW50IGdvYWwgSUQvcmV2aXNpb24sIGFuZCBpcyBzYXRpc2ZpZWQgb25seSBieSBleGFjdGx5IG9uZSB2ZXJkaWN0IGJyYW5jaCB3aXRoIGV2aWRlbmNlLiBBIHByb3ZpZGVyIGV4aXQgb3IgYHJldmlld2luZ2Agc3RhdHVzIGlzIG5vdCBhIHZlcmRpY3QuClRoZSBydW5uZXIgcGVyc2lzdHMgdGhlIGJyYW5jaCBmcm9tIHRoZSBhY2NlcHRlZCBib2FyZCBzdGF0dXMgcGx1cyBhIG5ldyBvciB1cGRhdGVkIHRhc2stc2NvcGVkIHZlcmRpY3QgYXJ0aWZhY3QuIE9ubHkgcGVyc2lzdGVkIGBhY2NlcHRlZGAgY2FuIHNhdGlzZnkgdGhlIHBhcmVudCBkZWxpdmVyeSBnb2FsOyBgY2hhbmdlc19yZXF1ZXN0ZWRgIGFuZCBgc3RvcF90aGVfbGluZWAgZmluaXNoIHRoZSByZXZpZXdlciBnb2FsIHdpdGhvdXQgYWNjZXB0aW5nIGRlbGl2ZXJ5LgoKIyMgRGVsaXZlcmFibGUKClZlcmRpY3QgYnJhbmNoZXMgYXJlIGV4cGxpY2l0OgoKLSBhY2NlcHRlZCDihpIgYGRvbmVgCi0gY2hhbmdlcyByZXF1ZXN0ZWQg4oaSIGB0by1kZXZgIGZvciBpbXBsZW1lbnRhdGlvbiByZXdvcmsgb3IgYGFuYWx5c2lzYCBmb3IgcmVzZWFyY2gvZGVjaXNpb24gd29yaywgd2l0aCB2ZXJkaWN0IGV2aWRlbmNlIGZvciB0aGUgbmV4dCBwcm9kdWNlciBhbmQgYW5vdGhlciByZXZpZXdlciBjeWNsZQotIGdlbnVpbmUgc3RvcC10aGUtbGluZSBib3VuZGFyeSDihpIgYGJsb2NrZWRgIG9ubHkgZm9yIGEgY29uY3JldGUgZXh0ZXJuYWwgYmxvY2tlciBvciBhbiB1bnJlc29sdmVkIGh1bWFuLW9ubHkgcGxhdGZvcm0vcHJvZHVjdC9hcmNoaXRlY3R1cmUvdHJhZGVvZmYvYXBwcm92YWwgZGVjaXNpb24sIHdpdGggZXZpZGVuY2UsIGZhaWxlZCBhc3N1bXB0aW9ucy9hdHRlbXB0cywgdmlhYmxlIGFsdGVybmF0aXZlcyBhbmQgdHJhZGVvZmZzLCBhIHJlY29tbWVuZGF0aW9uLCBhbmQgdGhlIGV4YWN0IGh1bWFuIGRlY2lzaW9uIG9yIGV4dGVybmFsIGlucHV0IG5lZWRlZAoKRG8gbm90IGxlYXZlIHRoZSB0YXNrIGluIGByZXZpZXdpbmdgLCBhbmQgZG8gbm90IHVzZSBgYmxvY2tlZGAgZm9yIG9yZGluYXJ5IHJld29yayBvciBhIHJlY292ZXJhYmxlIGNoaWxkL3J1bnRpbWUgZmFpbHVyZS4KCiMjIFN0YXR1cyBUcmFuc2l0aW9ucwoKLSAqKnN0YXJ0X3N0YXR1czoqKiBgcmV2aWV3aW5nYAotICoqZW5kX3N0YXR1czoqKiBubyB1bmNvbmRpdGlvbmFsIGRlZmF1bHQ7IHRoZSByZXZpZXdlciBtdXN0IHNldCBleGFjdGx5IG9uZSB2ZXJkaWN0IHN0YXR1czogYGRvbmVgLCBgdG8tZGV2YCwgYGFuYWx5c2lzYCwgb3IgZXZpZGVuY2UtYmFja2VkIGBibG9ja2VkYAoKIyMgRGVmaW5pdGlvbiBvZiBEb25lCgotIEltcGxlbWVudGF0aW9uIG1hdGNoZXMgQUMKLSBTb2x1dGlvbiBmaXRzIHByb2plY3QgYXJjaGl0ZWN0dXJlCi0gVGVzdHMgZ3JlZW4KLSBJZiByZXZpZXcgZG9lcyBub3QgYWNjZXB0IHRoZSB3b3JrIOKAlCB2ZXJkaWN0IGV2aWRlbmNlIGFkZGVkIHZpYSBgdGFzay1ib2FyZCBtICdzZXRfbm90ZXMoLi4uKSdgIG9yIGFuIG91dGNvbWUgcmVzb3VyY2UsIHRoZW4gc3RhdHVzIHJvdXRlZCBieSB0aGUgZXhwbGljaXQgdmVyZGljdCBicmFuY2hlcyBhYm92ZQoKIyMgQ29uc3RyYWludHMKCkRvZXMgTk9UIG1vZGlmeSBjb2RlLiBSZWFkLW9ubHkgYWNjZXNzLg=="
+      },
+      {
+        "type": "role",
+        "name": "metadata",
+        "key": "role/metadata",
+        "length": 148,
+        "digest": "sha256:ce29a04c3230e295e239ca92ba538b520993f88af99fc1d3c3c84b2ac2869809",
+        "body_base64": "eyJhcmNoZXR5cGUiOiJyZXZpZXdlciIsImRlc2NyaXB0aW9uIjoiUmV2aWV3cyBpbXBsZW1lbnRhdGlvbiBxdWFsaXR5IGFuZCBwcm9qZWN0IGZpdCIsImVuZF9zdGF0dXMiOiIiLCJuYW1lIjoicmV2aWV3ZXIiLCJzdGFydF9zdGF0dXMiOiJyZXZpZXdpbmcifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "Domain skills as needed to evaluate implementation quality",
+        "key": "skill/Domain skills as needed to evaluate implementation quality",
+        "length": 79,
+        "digest": "sha256:e257caafc9ad9c1ceeff028d093e2a5b3455964373f4b8e4af86dc46a8cec4d4",
+        "body_base64": "eyJuYW1lIjoiRG9tYWluIHNraWxscyBhcyBuZWVkZWQgdG8gZXZhbHVhdGUgaW1wbGVtZW50YXRpb24gcXVhbGl0eSIsInBhdGgiOiIifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "architecture-diagrams",
+        "key": "skill/architecture-diagrams",
+        "length": 97,
+        "digest": "sha256:4d77caf872bab194004877589bf7b82672514a42abce5c5e1150027e66b119f8",
+        "body_base64": "eyJuYW1lIjoiYXJjaGl0ZWN0dXJlLWRpYWdyYW1zIiwicGF0aCI6Ii9Vc2Vycy9pdi8uY2xhdWRlL3NraWxscy9hcmNoaXRlY3R1cmUtZGlhZ3JhbXMvU0tJTEwubWQifQ=="
+      },
+      {
+        "type": "skill",
+        "name": "project-management",
+        "key": "skill/project-management",
+        "length": 91,
+        "digest": "sha256:8d1bab60e478d47f7d2ae88871b9a86b0911c06c1bdfa38e7c8c627b91c9fbae",
+        "body_base64": "eyJuYW1lIjoicHJvamVjdC1tYW5hZ2VtZW50IiwicGF0aCI6Ii9Vc2Vycy9pdi8uY2xhdWRlL3NraWxscy9wcm9qZWN0LW1hbmFnZW1lbnQvU0tJTEwubWQifQ=="
+      },
+      {
+        "type": "task",
+        "name": "acceptance_criteria",
+        "key": "task/acceptance_criteria",
+        "length": 1173,
+        "digest": "sha256:0799aeeb3183ef446e385d513ab92646249b84f6f1c542052526e84d70d8a3fc",
+        "body_base64": "VmFsaWQgc3RhbmRhcmQtbGlicmFyeSBhbmQgY29ycmVjdGx5IHZlbmRvcmVkIHRyYW5zaXRpdmUgZml4dHVyZXMgYnVpbGQgd2l0aCB0aGUgZXhhY3QgZW52aXJvbm1lbnQgYW5kIGFyZ3YgZnJvbSB0aGUgcmVhZC1vbmx5IGZyb3plbiBzbmFwc2hvdCBhbmQgcHJvZHVjZSB2ZXJpZmllZCBhcnRpZmFjdCBtZXRhZGF0YTsgb25seSBvcGVyYXRpb24tcHJpdmF0ZSByb290cyBhcmUgd3JpdGFibGUsIG5ldHdvcmsvbW9kdWxlL1ZDUyBhY2Nlc3MgaXMgZGVuaWVkLCBhbmQgZWFjaCBzdXBwb3J0ZWQgcGxhdGZvcm0gYWRhcHRlciBkZW1vbnN0cmFibHkgYXBwbGllcyBpdHMgYXZhaWxhYmxlIGRlYWRsaW5lLCBvdXRwdXQsIGFydGlmYWN0L2Rpc2ssIG1lbW9yeSwgYW5kIHByb2Nlc3MgY29udHJvbHMgd2l0aG91dCBwZXJtaXR0aW5nIGFuIGV4dHJhIGV4ZWN1dGFibGUuIE5vbi1tYWluIG9yIG11bHRpcGxlIHJvb3QgcGFja2FnZXMsIG5lc3RlZCBvciBlc2NhcGVkIG1vZHVsZXMsIG1pc3Npbmcgb3IgaW5jb25zaXN0ZW50IHZlbmRvciBkYXRhLCB3b3Jrc3BhY2Ugb3IgdG9vbGNoYWluIHN3aXRjaGluZywgY2dvLCBDIG9yIFNXSUcgaW5wdXRzLCByb290IG9yIHRyYW5zaXRpdmUgc3lzbywgbm9uLXN0YW5kYXJkIGFzc2VtYmx5LCBlc2NhcGVkIGVtYmVkIGlucHV0cywgZ286Y2dvX2ltcG9ydF9keW5hbWljLCBnZW5lcmF0b3IgYW5kIFBHTyBhdHRlbXB0cywgcG9pc29uZWQgdmFyaWFibGVzLCBzb3VyY2Ugd3JpdGVzLCBleHRlcm5hbC1saW5rIG9yIGxpYmdjYyBmYWxsYmFjaywgdW5leHBlY3RlZCBjaGlsZCBleGVjdXRhYmxlcywgc291cmNlIG9yIHRvb2xjaGFpbiBtdXRhdGlvbiwgcmVzb3VyY2UtbGltaXQgb3Igb3ZlcnNpemVkIG91dHB1dCwgbGlua3MsIGFuZCBub256ZXJvIGV4aXRzIGZhaWwgYmVmb3JlIHB1YmxpY2F0aW9uLiBObyBwYWNrYWdlLXNlbGVjdGVkIGV4ZWN1dGFibGUgYW5kIG5vIGJ1aWx0IG91dHB1dCBpcyBldmVyIHN0YXJ0ZWQuIE1vY2sgZXhlY3V0b3IgYW5kIGhvc3QtcG9saWN5IGludGVyYWN0aW9uIHRlc3RzLCByZWFkb25seS1zb3VyY2UgYW5kIG5ldHdvcmstZGVuaWFsIGFzc2VydGlvbnMsIGFuZCBib3VuZGVkIHJlYWwtdG9vbGNoYWluIGludGVncmF0aW9uIHRlc3RzIHBhc3Mgb24gdGhlIHN1cHBvcnRlZCBDSSBwbGF0Zm9ybXMu"
+      },
+      {
+        "type": "task",
+        "name": "description",
+        "key": "task/description",
+        "length": 239,
+        "digest": "sha256:d8f53482735adbe2b1f6b774a9aed1f7c899074bc5dcf3c18db919c7868fb4c2",
+        "body_base64": "SW1wbGVtZW50IHRoZSBzb3VyY2UtYXdhcmUgZ28tdjEgcGlwZWxpbmUgdGhhdCB2YWxpZGF0ZXMgdGhlIGNvbXBsZXRlIGFjdGl2ZSBwYWNrYWdlIGdyYXBoIHdpdGggb25lIGZpeGVkIGdvIGxpc3QgY29tbWFuZCwgYnVpbGRzIHdpdGggb25lIGZpeGVkIGdvIGJ1aWxkIGNvbW1hbmQsIHZlcmlmaWVzIHRoZSBzdGFnZWQgZXhlY3V0YWJsZSwgYW5kIG5ldmVyIHRyYW5zZmVycyBjb250cm9sIHRvIHBhY2thZ2UgY29kZS4="
+      },
+      {
+        "type": "task",
+        "name": "scope",
+        "key": "task/scope",
+        "length": 1203,
+        "digest": "sha256:3eee55456796554bd643486c5b23e50e453280661c935813fbe8fef00b0e1132",
+        "body_base64": "Q29udGludWUgaW4gaW50ZXJuYWwvZ29kcml2ZXIgdXNpbmcgdGhlIHRydXN0ZWQgc2Vzc2lvbiBhbmQgZnJvemVuIGJ1aWxkIHNvdXJjZS4gU2V0IENXRCB0byBjYW5vbmljYWwgc291cmNlX2RpciBhbmQgZXhwb3NlIGEgYnVpbGQtdGFnZ2VkIGhvc3QtZXhlY3V0aW9uIHBvbGljeSBib3VuZGFyeS4gUHJlc2VudCB0aGUgdmFsaWRhdGVkIHNuYXBzaG90IGFuZCB2ZW5kb3JlZCBtb2R1bGUgdHJlZSByZWFkLW9ubHk7IGFsbG93IHdyaXRlcyBvbmx5IGJlbG93IG9wZXJhdGlvbi1wcml2YXRlIEdvIGNhY2hlLCB0ZW1wLCB0ZWxlbWV0cnksIGFuZCBvdXRwdXQgcm9vdHM7IGVuZm9yY2UgdGhlIGVtcHR5IGZpeGVkIGVudmlyb25tZW50IGFuZCBuZXR3b3JrL21vZHVsZS9WQ1MgZGVuaWFsIG9uIGV2ZXJ5IHBsYXRmb3JtOyBhbmQgYXBwbHkgc3VwcG9ydGVkIGhvc3QgZGVhZGxpbmVzIHBsdXMgYm91bmRlZCBvdXRwdXQsIGFydGlmYWN0L2Rpc2ssIG1lbW9yeSwgYW5kIHByb2Nlc3MgY29udHJvbHMgd2l0aG91dCB3aWRlbmluZyB0aGUgZXhlY3V0YWJsZSBncmFwaC4gUGFyc2UgdGhlIGNvbXBsZXRlIGZpeGVkIGdvIGxpc3Qgc3RyZWFtOyByZXF1aXJlIG9uZSBub24tRGVwT25seSBtYWluIHBhY2thZ2UgYW5kIHZhbGlkYXRlIGV2ZXJ5IHN0YW5kYXJkIGlucHV0IGJlbG93IGZpbmdlcnByaW50ZWQgR09ST09UIGFuZCBldmVyeSBub24tc3RhbmRhcmQgbW9kdWxlLCBzb3VyY2UsIGVtYmVkLCBhbmQgZGVwZW5kZW5jeSBpbnB1dCBiZWxvdyBidWlsZF9yb290LiBSZWplY3QgZXJyb3JzLCBpbmNvbXBsZXRlIHBhY2thZ2VzLCBjZ28gYW5kIG5hdGl2ZSBmaWVsZHMsIGV2ZXJ5IFN5c29GaWxlcyBlbnRyeSwgbm9uLXN0YW5kYXJkIFNGaWxlcywgYW5kIHRoZSBleGFjdCBBU0NJSSAvL2dvOmNnb19pbXBvcnRfZHluYW1pYyB0b2tlbiBpbiBhY3RpdmUgbm9uLXN0YW5kYXJkIEdvRmlsZXMuIEJ1aWxkIG9ubHkgd2l0aCB0aGUgbm9ybWF0aXZlIGludGVybmFsLWxpbmssIG5vLWxpYmdjYyBhcmd2IGludG8gcHJpdmF0ZSBzdGFnaW5nLiBWZXJpZnkgb25lIGJvdW5kZWQgcmVndWxhciBvdXRwdXQsIGFwcGx5IG1hbmFnZXIgcGVybWlzc2lvbnMsIGhhc2ggaXQsIGFuZCBleHBvc2UgYXJ0aWZhY3QgbWV0YWRhdGEuIERvIG5vdCBwdWJsaXNoIGNhY2hlcywgd3JpdGUgbWFya2Vycywgb3IgZXhlY3V0ZSB0aGUgYXJ0aWZhY3Qu"
+      },
+      {
+        "type": "task",
+        "name": "title",
+        "key": "task/title",
+        "length": 44,
+        "digest": "sha256:27e6dedae5dba1fd239181af6f5a11ee3100fb8e7b2126c9326291ade51420ad",
+        "body_base64": "SW1wbGVtZW50IGdvLXYxIHByZWZsaWdodCBhbmQgYXJ0aWZhY3QgYnVpbGQ="
+      },
+      {
+        "type": "validation_manifest",
+        "name": "current",
+        "key": "validation_manifest/current",
+        "length": 2,
+        "digest": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "body_base64": "W10="
+      }
+    ],
+    "root_digest": "sha256:f45a541f32cf70e5abb19aaf2858e8016d190c79dc312a121f66c44f06c384a4"
+  },
+  "prompt_template_data": {
+    "task_id": "TASK-260720-1zntv0",
+    "task_title": "Implement go-v1 preflight and artifact build",
+    "task_description": "Implement the source-aware go-v1 pipeline that validates the complete active package graph with one fixed go list command, builds with one fixed go build command, verifies the staged executable, and never transfers control to package code.",
+    "task_scope": "Continue in internal/godriver using the trusted session and frozen build source. Set CWD to canonical source_dir and expose a build-tagged host-execution policy boundary. Present the validated snapshot and vendored module tree read-only; allow writes only below operation-private Go cache, temp, telemetry, and output roots; enforce the empty fixed environment and network/module/VCS denial on every platform; and apply supported host deadlines plus bounded output, artifact/disk, memory, and process controls without widening the executable graph. Parse the complete fixed go list stream; require one non-DepOnly main package and validate every standard input below fingerprinted GOROOT and every non-standard module, source, embed, and dependency input below build_root. Reject errors, incomplete packages, cgo and native fields, every SysoFiles entry, non-standard SFiles, and the exact ASCII //go:cgo_import_dynamic token in active non-standard GoFiles. Build only with the normative internal-link, no-libgcc argv into private staging. Verify one bounded regular output, apply manager permissions, hash it, and expose artifact metadata. Do not publish caches, write markers, or execute the artifact.",
+    "task_ac": "Valid standard-library and correctly vendored transitive fixtures build with the exact environment and argv from the read-only frozen snapshot and produce verified artifact metadata; only operation-private roots are writable, network/module/VCS access is denied, and each supported platform adapter demonstrably applies its available deadline, output, artifact/disk, memory, and process controls without permitting an extra executable. Non-main or multiple root packages, nested or escaped modules, missing or inconsistent vendor data, workspace or toolchain switching, cgo, C or SWIG inputs, root or transitive syso, non-standard assembly, escaped embed inputs, go:cgo_import_dynamic, generator and PGO attempts, poisoned variables, source writes, external-link or libgcc fallback, unexpected child executables, source or toolchain mutation, resource-limit or oversized output, links, and nonzero exits fail before publication. No package-selected executable and no built output is ever started. Mock executor and host-policy interaction tests, readonly-source and network-denial assertions, and bounded real-toolchain integration tests pass on the supported CI platforms.",
+    "parent_id": "STORY-260720-3plyvy",
+    "agent_name": "[reviewer] reviewer (codex)",
+    "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+    "precondition_resources": null,
+    "role_name": "reviewer",
+    "role_body": "# reviewer\n\n## Description\n\nReviews how a task was implemented and how the solution fits into the project. Does not modify code; records one of the explicit verdict branches below.\n\nWhen the run is goal-bound, query `task-board spawn goal \"$TASK_BOARD_RUN_ID\"` before recording the verdict. The reviewer goal is role-derived as `reviewer_verdict/reviewer_verdict`, carries its immutable parent goal ID/revision, and is satisfied only by exactly one verdict branch with evidence. A provider exit or `reviewing` status is not a verdict.\nThe runner persists the branch from the accepted board status plus a new or updated task-scoped verdict artifact. Only persisted `accepted` can satisfy the parent delivery goal; `changes_requested` and `stop_the_line` finish the reviewer goal without accepting delivery.\n\n## Deliverable\n\nVerdict branches are explicit:\n\n- accepted → `done`\n- changes requested → `to-dev` for implementation rework or `analysis` for research/decision work, with verdict evidence for the next producer and another reviewer cycle\n- genuine stop-the-line boundary → `blocked` only for a concrete external blocker or an unresolved human-only platform/product/architecture/tradeoff/approval decision, with evidence, failed assumptions/attempts, viable alternatives and tradeoffs, a recommendation, and the exact human decision or external input needed\n\nDo not leave the task in `reviewing`, and do not use `blocked` for ordinary rework or a recoverable child/runtime failure.\n\n## Status Transitions\n\n- **start_status:** `reviewing`\n- **end_status:** no unconditional default; the reviewer must set exactly one verdict status: `done`, `to-dev`, `analysis`, or evidence-backed `blocked`\n\n## Definition of Done\n\n- Implementation matches AC\n- Solution fits project architecture\n- Tests green\n- If review does not accept the work — verdict evidence added via `task-board m 'set_notes(...)'` or an outcome resource, then status routed by the explicit verdict branches above\n\n## Constraints\n\nDoes NOT modify code. Read-only access.",
+    "archetype": "reviewer",
+    "skills": [
+      {
+        "name": "project-management",
+        "path": "/Users/iv/.claude/skills/project-management/SKILL.md"
+      },
+      {
+        "name": "architecture-diagrams",
+        "path": "/Users/iv/.claude/skills/architecture-diagrams/SKILL.md"
+      },
+      {
+        "name": "Domain skills as needed to evaluate implementation quality",
+        "path": ""
+      }
+    ],
+    "start_status": "reviewing",
+    "end_status": "",
+    "task_dod_content": "- Complete package graph and source inputs pass all rejection clusters\n- Only the fixed go list and go build commands can execute\n- Built outputs are verified but never launched during installation\n- Readonly source, network denial, and supported host resource controls are executable platform gates\n- Code written per task description and AC\n- Relevant tests written for new or changed behavior and passing\n- Lint clean\n- Relevant build/validation commands run after changes and build not broken\n- New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables\n- Important findings, decisions, anomalies, or regressions recorded in logbook when relevant\n- Board size is proportional to the spec and is the smallest decomposition that maps every requirement\n- Every story and task traces to a concrete spec requirement; justified-gap elements also carry a self-verified gap record\n- Beyond-literal-spec elements include a written justification naming the gap and the spec and out-of-scope checks performed before creation\n- Research tasks cite an exact question the spec genuinely leaves open\n- Dependencies linked\n- Tasks are atomic — one clear deliverable each\n- Completeness verified — nothing forgotten\n- Any planning artifacts actually produced are linked as new task-scoped outcome resources; diagrams are strictly optional, never a standing deliverable",
+    "dod_content": "- [ ] Complete package graph and source inputs pass all rejection clusters\n- [ ] Only the fixed go list and go build commands can execute\n- [ ] Built outputs are verified but never launched during installation\n- [ ] Readonly source, network denial, and supported host resource controls are executable platform gates\n- [ ] Code written per task description and AC\n- [ ] Relevant tests written for new or changed behavior and passing\n- [ ] Lint clean\n- [ ] Relevant build/validation commands run after changes and build not broken\n- [ ] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables\n- [ ] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant\n- [ ] Board size is proportional to the spec and is the smallest decomposition that maps every requirement\n- [ ] Every story and task traces to a concrete spec requirement; justified-gap elements also carry a self-verified gap record\n- [ ] Beyond-literal-spec elements include a written justification naming the gap and the spec and out-of-scope checks performed before creation\n- [ ] Research tasks cite an exact question the spec genuinely leaves open\n- [ ] Dependencies linked\n- [ ] Tasks are atomic — one clear deliverable each\n- [ ] Completeness verified — nothing forgotten\n- [ ] Any planning artifacts actually produced are linked as new task-scoped outcome resources; diagrams are strictly optional, never a standing deliverable\n- [ ] Implementation matches AC\n- [ ] Solution fits project architecture\n- [ ] Tests green\n- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches"
+  },
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "continuation": {
+    "mode": "fresh",
+    "prompt_mode": "full"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260727-21-27-33_-reviewer--reviewer--codex-_TASK-260720-1zntv0.md",
+  "base_prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-continuity/base-prompts/RUN-260727-725d16.md",
+  "prompt_mode": "full",
+  "snapshot_digest": "sha256:f45a541f32cf70e5abb19aaf2858e8016d190c79dc312a121f66c44f06c384a4",
+  "prompt_artifact_dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-continuity/prompts/RUN-260727-725d16",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-1zntv0_spawn-log_-reviewer--reviewer--codex-_RUN-260727-725d16.log",
+  "start_status": "reviewing",
+  "initial_outcome_names": [
+    "TASK-260720-1zntv0_go-v1-execution-boundary.puml",
+    "TASK-260720-1zntv0_go-v1-execution-boundary.svg",
+    "TASK-260720-1zntv0_host-execution-decision.md",
+    "TASK-260720-1zntv0_host-policy-blocker.md",
+    "TASK-260720-1zntv0_results.md",
+    "TASK-260720-1zntv0_review-verdict.md",
+    "TASK-260720-1zntv0_spawn-log_-analyst--solution-architect--codex-_RUN-260727-791dca.log",
+    "TASK-260720-1zntv0_spawn-log_-implementer--developer--codex-.log",
+    "TASK-260720-1zntv0_spawn-log_-reviewer--reviewer--codex-.log"
+  ]
+}

@@ -1,0 +1,56 @@
+cff6319218783241284f1ea237b4abdb052b5bd33b347297d1e2f10e204c896f  /tmp/TASK-260720-1zl1cj-windows.8z9Ibz/TASK-260720-1zl1cj_managerlock-windows-amd64.test.exe
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+
+
+Algorithm : SHA256
+Hash      : CFF6319218783241284F1EA237B4ABDB052B5BD33B347297D1E2F10E204C896F
+Path      : C:\Windows\Temp\TASK-260720-1zl1cj-cycle6-evidence\TASK-260720-1zl1cj_managerlock-windows-amd64.test.exe
+
+
+
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+=== RUN   TestWindowsMissingHomeCaseAliasesShareIdentityAndContention
+--- PASS: TestWindowsMissingHomeCaseAliasesShareIdentityAndContention (0.30s)
+=== RUN   TestWindowsMixedCaseSensitivityKeepsDistinctHomes
+    identity_windows_test.go:88: set directory case sensitivity to true: The request is not supported.
+--- SKIP: TestWindowsMixedCaseSensitivityKeepsDistinctHomes (0.01s)
+=== RUN   TestWindowsCaseSensitivePrefixMultiComponentFirstUse
+    identity_windows_test.go:142: set directory case sensitivity to true: The request is not supported.
+--- SKIP: TestWindowsCaseSensitivePrefixMultiComponentFirstUse (0.01s)
+=== RUN   TestCanonicalProjectIdentitiesAndOrder
+--- PASS: TestCanonicalProjectIdentitiesAndOrder (0.06s)
+=== RUN   TestLockIdentitiesAreDeterministicAndManagerLocal
+--- PASS: TestLockIdentitiesAreDeterministicAndManagerLocal (0.01s)
+=== RUN   TestMissingHomeUsesCanonicalExistingPrefix
+--- PASS: TestMissingHomeUsesCanonicalExistingPrefix (0.01s)
+=== RUN   TestMissingHomeBelowSymlinkKeepsIdentityAndContends
+--- PASS: TestMissingHomeBelowSymlinkKeepsIdentityAndContends (0.24s)
+=== RUN   TestDryRunCreatesNoLockState
+--- PASS: TestDryRunCreatesNoLockState (0.00s)
+=== RUN   TestConcurrentFirstUsePreparesOneManagerIdentity
+--- PASS: TestConcurrentFirstUsePreparesOneManagerIdentity (0.02s)
+=== RUN   TestProjectOrderInversionFailsBeforeWaiting
+--- PASS: TestProjectOrderInversionFailsBeforeWaiting (0.01s)
+=== RUN   TestBuildKeyMustBeReleasedBeforeHome
+--- PASS: TestBuildKeyMustBeReleasedBeforeHome (0.01s)
+=== RUN   TestCancellationReleasesPartialAcquisition
+--- PASS: TestCancellationReleasesPartialAcquisition (0.06s)
+=== RUN   TestReleasedLockFileRemainsAndCanBeReacquired
+--- PASS: TestReleasedLockFileRemainsAndCanBeReacquired (0.01s)
+=== RUN   TestSubprocessContentionAndIndependentProjects
+--- PASS: TestSubprocessContentionAndIndependentProjects (0.65s)
+=== RUN   TestSubprocessBuildKeyDeduplicationAcrossProjects
+--- PASS: TestSubprocessBuildKeyDeduplicationAcrossProjects (0.35s)
+=== RUN   TestAbnormalChildExitReleasesOSLock
+--- PASS: TestAbnormalChildExitReleasesOSLock (0.05s)
+=== RUN   TestManagerLockHelper
+--- PASS: TestManagerLockHelper (0.00s)
+PASS
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+remote cleanup verified

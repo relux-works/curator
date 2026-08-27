@@ -1,0 +1,74 @@
+{
+  "id": "RUN-260730-7f45a4",
+  "task_id": "TASK-260720-2jfnz6",
+  "created_at": "2026-07-30T06:30:33.200007Z",
+  "max_parallel": 20,
+  "agent_type": "codex",
+  "agent_name": "[implementer] developer (codex)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "gpt-5.6-sol",
+  "reasoning_effort": "max",
+  "selection": {
+    "agent": "codex",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "resolved": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "codex",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260730-10-30-33_-implementer--developer--codex-_TASK-260720-2jfnz6.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "network_access": true,
+  "log_resource_name": "TASK-260720-2jfnz6_spawn-log_-implementer--developer--codex-_RUN-260730-7f45a4.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260720-2jfnz6_concurrent-seal-window-probe_RUN-260730-525645.log",
+    "TASK-260720-2jfnz6_concurrent-seal-window-probe_RUN-260730-525645.py",
+    "TASK-260720-2jfnz6_implementation-evidence.md",
+    "TASK-260720-2jfnz6_linux-capability-matrix-evidence.md",
+    "TASK-260720-2jfnz6_linux-ci-rework.md",
+    "TASK-260720-2jfnz6_review-verdict.md",
+    "TASK-260720-2jfnz6_review-verdict_RUN-260730-525645.md",
+    "TASK-260720-2jfnz6_review-verdict_RUN-260730-a67852.md",
+    "TASK-260720-2jfnz6_spawn-log_-implementer--developer--codex-_RUN-260730-06ff92.log",
+    "TASK-260720-2jfnz6_spawn-log_-implementer--developer--codex-_RUN-260730-55691f.log",
+    "TASK-260720-2jfnz6_spawn-log_-implementer--developer--codex-_RUN-260730-5daf43.log",
+    "TASK-260720-2jfnz6_spawn-log_-implementer--developer--codex-_RUN-260730-a03c18.log",
+    "TASK-260720-2jfnz6_spawn-log_-reviewer--reviewer--codex-_RUN-260730-525645.log",
+    "TASK-260720-2jfnz6_spawn-log_-reviewer--reviewer--codex-_RUN-260730-91bfce.log",
+    "TASK-260720-2jfnz6_spawn-log_-reviewer--reviewer--codex-_RUN-260730-a67852.log",
+    "TASK-260720-2jfnz6_tool-readiness.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260720-2jfnz6_concurrent-seal-window-probe_RUN-260730-525645.log": "8f17e90f22f822b20713ee8f3b319846887248d173daf4bc59da04c96f56c01f",
+    "TASK-260720-2jfnz6_concurrent-seal-window-probe_RUN-260730-525645.py": "44680607c85d02da52e7c8ce73fcda212c28dad40c1c57dd7532c9fb0ca31d2b",
+    "TASK-260720-2jfnz6_implementation-evidence.md": "735c509f8739af00003ca65b1777b36388e71ef4fe6dfd306662aede0e5f7d16",
+    "TASK-260720-2jfnz6_linux-capability-matrix-evidence.md": "1f2239ca800410f20afc75cb64f0ce473f6b0664949babaa48bdef092072cf64",
+    "TASK-260720-2jfnz6_linux-ci-rework.md": "f9380cbc8f2c7fea49afd442f9dcecd26edaae9f6fa22168a4dba2f09cc402e6",
+    "TASK-260720-2jfnz6_review-verdict.md": "a5b263a71fc167a798ffa29bbe38320605a407266fd90130ffd5e9f2cda04b4f",
+    "TASK-260720-2jfnz6_review-verdict_RUN-260730-525645.md": "f7f2c44fc619d1fca13db18e6168146467369540eaea78408c7aec2a9f33a976",
+    "TASK-260720-2jfnz6_review-verdict_RUN-260730-a67852.md": "41d6af13c97811bc7a507fb6bedef03a29979282faed76b662c5edc298149f7f",
+    "TASK-260720-2jfnz6_tool-readiness.md": "049eba064d2581f7a806660e9b2ecdc911dcbc5614a2102956793d795b40cb39"
+  },
+  "require_outcome_artifact": true
+}

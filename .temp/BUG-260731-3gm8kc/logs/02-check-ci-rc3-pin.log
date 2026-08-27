@@ -1,0 +1,148 @@
+go vet ./...
+/Applications/Xcode_26_5.app/Contents/Developer/usr/bin/make ledger-check
+bash .github/ci/ledger-consistency.sh '.temp/ci-evidence/ledger'
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix [must=windows skip=-]
+ok    internal/buildcache :: TestWindowsProtectedStateMatrix/* [must=- skip=windows]
+ok    internal/buildcache :: TestValidateWindowsSecurityPolicy [must=windows skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedEntry [must=windows skip=windows]
+ok    internal/buildcache :: TestSweepDoesNotFollowAReparsedCacheRoot [must=windows skip=windows]
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedWindowsScopes [must=windows skip=windows]
+ok    internal/runtimestore :: TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode [must=windows skip=-]
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestRuntimeCommandPath [must=linux,darwin,windows skip=-]
+ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly [must=linux,darwin skip=windows]
+ok    internal/buildcache :: TestUnixProtectedStateMatrix [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed [must=linux,darwin skip=-]
+ok    internal/config :: TestBootstrapAndAddProject [must=linux,darwin,windows skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem [must=linux,darwin skip=-]
+ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot [must=linux,darwin skip=-]
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes [must=linux,darwin skip=-]
+ok    internal/buildsource :: TestRejectsSpecialFile [must=linux,darwin skip=-]
+ok    internal/gitops :: TestArchiveRejectsLinks [must=linux,darwin skip=windows]
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation/* [must=- skip=linux,darwin,windows]
+ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation [must=linux,darwin,windows skip=-]
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation/* [must=- skip=linux,darwin,windows]
+ok    internal/install :: TestDryRunTouchesNothing [must=linux,darwin,windows skip=-]
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext [must=linux,darwin,windows skip=-]
+excl  internal/godriver :: TestResourceLimitsStayInsideManagerBounds (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds [must=darwin,windows skip=-]
+excl  internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly [must=darwin,windows skip=-]
+excl  internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes [must=darwin,windows skip=-]
+excl  internal/godriver :: TestPerFileSizeLimitIsReallyApplied (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied [must=darwin skip=windows]
+excl  internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestBuildFailsClosedWhenTheGoChildCannotStart [must=windows skip=darwin]
+excl  internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation [must=darwin,windows skip=-]
+ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal [must=linux,darwin skip=-]
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects [must=linux,darwin skip=windows]
+ok    internal/shell :: TestPowerShellHookRunsOnEveryPrompt [must=windows skip=linux,darwin]
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing [must=linux,darwin,windows skip=-]
+ok    internal/install :: TestEndToEndInstall [must=linux,darwin,windows skip=-]
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets [must=linux,darwin,windows skip=-]
+ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder [must=linux,darwin,windows skip=-]
+ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry [must=linux,darwin,windows skip=-]
+ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly [must=linux,darwin,windows skip=linux,darwin,windows]
+ok    internal/interop :: TestGoldenContextCopy [must=linux,darwin,windows skip=-]
+excl  internal/godriver :: TestCandidateGoV1SourceAwareContract (package excluded on linux by the supplied root)
+ok    internal/godriver :: TestCandidateGoV1SourceAwareContract [must=darwin,windows skip=darwin,windows]
+ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker [must=linux,darwin,windows skip=-]
+ok    internal/hashing :: TestCrossCheckTree [must=- skip=linux,darwin,windows]
+
+ledger-consistency: 49 rows checked across linux darwin windows
+ledger-consistency: ok
+/Applications/Xcode_26_5.app/Contents/Developer/usr/bin/make ci-test
+GO='go' GO_TEST_TIMEOUT='30m' \
+		bash .github/ci/test-gate.sh '.temp/ci-evidence/test'
+test-gate: flags=<none> timeout=30m
+test-gate: conformance root=/Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260731-3gm8kc/spec-pin-rc3/conformance/v1
+
+suite-plan: GOOS=darwin
+suite-plan: root=/Users/iv/Developer/ReluxWorks/curator/.temp/BUG-260731-3gm8kc/spec-pin-rc3/conformance/v1
+suite-plan: the root publishes no vectors/conformance-claim-v3-qualification.json; the recorded default_excluded_on applies
+
+defer internal/buildcache
+      the supplied root publishes none of: vectors/build-drivers.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/buildsource
+      the supplied root publishes none of: vectors/build-drivers.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/install
+      the supplied root publishes none of: vectors/build-drivers.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/marker
+      the supplied root publishes none of: schema-cases/install-marker-v2 expected/build-driver/marker.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/scopes
+      the supplied root publishes none of: vectors/external-repository-lifecycle.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/skillspec
+      the supplied root publishes none of: schema-cases/agent-skill-v6 fixtures/go-build-skill
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+defer internal/whitelist
+      the supplied root publishes none of: fixtures/go-build-skill expected/build-driver/context_files.json
+      it runs with CURATOR_CONFORMANCE_ROOT unset, taking the path its own tests implement
+
+suite-plan: served=33 deferred=7 excluded=0
+suite-plan: ok
+test-gate: stage served exit=0 (stream: .temp/ci-evidence/test/go-test-served.json)
+test-gate: stage deferred exit=0 (stream: .temp/ci-evidence/test/go-test-deferred.json)
+
+test-gate: go test overall exit=0 (merged stream: .temp/ci-evidence/test/go-test.json)
+
+platform-case gate: GOOS=darwin
+platform-case gate: ledger=.github/ci/platform-cases.tsv
+platform-case gate: deferred packages (root unset): internal/buildcache internal/buildsource internal/install internal/marker internal/scopes internal/skillspec internal/whitelist 
+
+ok    internal/runtimestore :: TestInstallSingleCommandAndShims
+ok    internal/runtimestore :: TestRuntimeCommandPath
+ok    internal/runtimestore :: TestCompiledShimsStageWithoutLaunchThenPostInstallForwardExactly
+ok    internal/buildcache :: TestUnixProtectedStateMatrix
+ok    internal/buildcache :: TestUnixProtectionHelperFailuresFailClosed
+ok    internal/config :: TestBootstrapAndAddProject
+ok    internal/buildcache :: TestSweepDoesNotFollowSymlinkedEntries
+ok    internal/buildcache :: TestSweepDoesNotFollowASymlinkedCacheRoot
+ok    internal/buildcache :: TestRetireEntryRemovesLinksWithoutFollowingThem
+ok    internal/buildcache :: TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot
+ok    internal/scopes :: TestCollectStaysFailSafeOnRedirectedUnixScopes
+ok    internal/buildsource :: TestRejectsSpecialFile
+ok    internal/gitops :: TestArchiveRejectsLinks
+ok    internal/buildsource :: TestFrozenTokenRejectsMutation
+ok    internal/buildsource :: TestFrozenTokenRejectsRootReplacement
+ok    internal/buildsource :: TestWithValidatedOrdersCallbackAndRejectsMutation
+ok    internal/install :: TestDryRunTouchesNothing
+ok    internal/whitelist :: TestRuntimeRootsExcludedFromContext
+ok    internal/godriver :: TestResourceLimitsStayInsideManagerBounds
+ok    internal/godriver :: TestProbeSetGuardMatchesTheInventoryExactly
+ok    internal/godriver :: TestEveryControlSeamFailureRejectsBeforeTheWorkerExecutes
+ok    internal/godriver :: TestPerFileSizeLimitIsReallyApplied
+ok    internal/godriver :: TestExecutableIdentityRejectsSubstitutionAndMutation
+ok    internal/runtimestore :: TestUnixPostInstallShimPropagatesSignal
+ok    internal/shell :: TestPosixHookEntersNestedSwitchesAndLeavesProjects
+ok    internal/envfiles :: TestWriteProjectShapesAndSourcing
+ok    internal/install :: TestEndToEndInstall
+ok    internal/adapters :: TestSymlinkModeStagesRelativeLinkTargets
+ok    internal/transaction :: TestValidateIndependentTargetNamespacesRejectsOverlappingPaths
+ok    internal/transaction :: TestSaveJournalRejectsNamespaceAliasIntroducedBetweenSaves
+ok    internal/transaction :: TestRecoverRejectsDecodedTargetNamespacesAliasedWhileStopped
+ok    internal/install/atomicity :: TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder
+ok    internal/install/atomicity :: TestStaleAdapterRemovalRollsBackToTheExactPriorEntry
+ok    internal/install/atomicity :: TestAdapterMirrorLinksAreJournaledAndRestoredExactly
+ok    internal/interop :: TestGoldenContextCopy
+tol   internal/godriver :: TestCandidateGoV1SourceAwareContract (tolerated skip: root-content)
+ok    internal/godriver :: TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+
+platform-case gate: 46 skips recorded in .temp/ci-evidence/test/skips-observed.tsv
+platform-case gate: ok
+
+test-gate: go test exit=0, platform-case gate exit=0
+EXIT=0

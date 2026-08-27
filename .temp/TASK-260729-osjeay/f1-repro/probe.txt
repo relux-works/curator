@@ -1,0 +1,2 @@
+E="A=1 B=2"
+printf 'A=<%s> B=<%s>\n' "$(env $E printenv A 2>/dev/null)" "$(env $E printenv B 2>/dev/null)"

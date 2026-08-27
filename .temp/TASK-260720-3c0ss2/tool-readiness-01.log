@@ -1,0 +1,54 @@
+TASK-260720-3c0ss2 tool readiness — 2026-07-30
+
+command -v task-board git python python3 rg pytest mypy
+exit: 1
+found:
+  /Users/iv/.local/bin/task-board
+  /usr/bin/git
+  /opt/homebrew/bin/python3
+  /opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex-path/rg
+  /opt/homebrew/bin/pytest
+missing from PATH:
+  python
+  mypy
+
+git --version
+exit: 0
+output: git version 2.50.1 (Apple Git-155)
+
+python3 --version
+exit: 0
+output: Python 3.14.4
+
+rg --version
+exit: 0
+output: ripgrep 15.2.0 (rev e89fff89ac), PCRE2 10.45
+
+pytest --version
+exit: 0
+output: pytest 8.3.4
+
+task-board --version
+exit: 0
+output: task-board version 0.23.0 (commit beec6e9, built 2026-07-27T23:36:53Z)
+
+python3 -m mypy --version
+exit: 1
+output: /opt/homebrew/opt/python@3.14/bin/python3.14: No module named mypy
+
+Disposition:
+Do not assume the Homebrew Python can run the strict mypy gate. Inspect the
+task's intended source checkout and use its declared environment/dependencies.
+
+Canonical CocoaSkills environment:
+/Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python --version
+exit: 0
+output: Python 3.14.4
+
+/Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m pytest --version
+exit: 0
+output: pytest 9.0.3
+
+/Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python -m mypy --version
+exit: 0
+output: mypy 2.1.0 (compiled: yes)

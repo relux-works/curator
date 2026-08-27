@@ -1,0 +1,195 @@
+{
+  "id": "RUN-260731-2e961b",
+  "task_id": "STORY-260720-35dck7",
+  "created_at": "2026-07-31T08:42:52.453998Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[analyst] orchestrator (claude)",
+  "role": "orchestrator",
+  "role_archetype": "analyst",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "disabled",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "launch_composition_disabled"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260731-12-42-25_-analyst--orchestrator--claude-_STORY-260720-35dck7.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "6h0m0s",
+  "log_resource_name": "STORY-260720-35dck7_spawn-log_-analyst--orchestrator--claude-_RUN-260731-2e961b.log",
+  "initial_outcome_names": [
+    "STORY-260720-35dck7_artifact-map.puml",
+    "STORY-260720-35dck7_artifact-map.svg",
+    "STORY-260720-35dck7_canonical-board-plan.md",
+    "STORY-260720-35dck7_canonical-plan-audit.md",
+    "STORY-260720-35dck7_decomposition-audit.md",
+    "STORY-260720-35dck7_decomposition-plan.md",
+    "STORY-260720-35dck7_install-lifecycle.puml",
+    "STORY-260720-35dck7_install-lifecycle.svg",
+    "STORY-260720-35dck7_planning-validation.md",
+    "STORY-260720-35dck7_spawn-log_-analyst--solution-architect--codex-.log"
+  ],
+  "initial_outcome_digests": {
+    "STORY-260720-35dck7_artifact-map.puml": "6306d06f6486577fde811bf8069e0600f5e4255cfce030747cae5b3caf29b21b",
+    "STORY-260720-35dck7_artifact-map.svg": "60be546f017f5a6067c7af3bf0042e38353741d2a95aa701d01ea47f0a5d3584",
+    "STORY-260720-35dck7_canonical-board-plan.md": "c13978f1626e5dbf75cb73449f2366f42f5ed85aa93346461b31a6e76e3cdbca",
+    "STORY-260720-35dck7_canonical-plan-audit.md": "068b766b9b9fbff66de95c11d4b0514e6270627e249c75f4a2e78364817a50f8",
+    "STORY-260720-35dck7_decomposition-audit.md": "bc8c44de802206456f847591a84ff76eb61ce7ab26c7bd84adf80264355465de",
+    "STORY-260720-35dck7_decomposition-plan.md": "72ec405c1f15eefebddafa17e3c2641b9001f934a312624d609f4d5785770b1f",
+    "STORY-260720-35dck7_install-lifecycle.puml": "5e3c0c4773752ac28672f8221923f56c466c151d6cddef41ae4b9c4b1c3bb2a8",
+    "STORY-260720-35dck7_install-lifecycle.svg": "6c873ffe6a6ca5c406fc651487e1beec1d3cf731882c81f1c29fdf89d4c22390",
+    "STORY-260720-35dck7_planning-validation.md": "20d3ba2570e508b19ca61e502fcfa86d40ffbdf7ee9ae2fd57673e15fb7e4f8c"
+  },
+  "launch_goal": {
+    "version": "board-goal-v1",
+    "id": "GOAL-260731-318711",
+    "kind": "delivery_pool",
+    "owner": {
+      "role": {
+        "role": "orchestrator",
+        "archetype": "analyst"
+      },
+      "agent": "[analyst] orchestrator (claude)",
+      "run_id": "RUN-260731-2e961b"
+    },
+    "scope": {
+      "requested_ids": [
+        "BUG-260731-11BPA4",
+        "BUG-260731-3GM8KC",
+        "BUG-260731-LEPEVI"
+      ],
+      "resolved_leaf_items": [
+        {
+          "id": "BUG-260731-11bpa4",
+          "title": "BUG-260731-11bpa4: curator-windows-test-vet-compile-break",
+          "review_policy": "required",
+          "baseline_status": "backlog"
+        },
+        {
+          "id": "BUG-260731-3gm8kc",
+          "title": "BUG-260731-3gm8kc: curator-interop-lifecycle-vector-gate",
+          "review_policy": "required",
+          "baseline_status": "to-review"
+        },
+        {
+          "id": "BUG-260731-lepevi",
+          "title": "BUG-260731-lepevi: curator-main-ci-red-linux-lane",
+          "review_policy": "required",
+          "baseline_status": "backlog"
+        }
+      ]
+    },
+    "role_policy": {},
+    "objective_intent": "Execute BUG-260731-11bpa4, BUG-260731-3gm8kc, BUG-260731-lepevi within the active board delivery scope",
+    "objective": "Intent summary (non-authoritative): Execute BUG-260731-11bpa4, BUG-260731-3gm8kc, BUG-260731-lepevi within the active board delivery scope\nReview-policy snapshot: BUG-260731-11bpa4=required, BUG-260731-3gm8kc=required, BUG-260731-lepevi=required\n\nEnvironment contract: Act with maximum autonomy and keep progressing through recoverable work without asking for routine confirmation. After surfacing final board evidence for a satisfied success predicate, clear the provider goal through its successful-completion path; never early-clear it to evade acceptance. If the requested outcome objectively does not fit, never force it or fake a fit: make the next optimal assumption only when it is unambiguously derivable; otherwise invoke the repository's existing **Stop-The-Line: No Forced Fits** boundary, persist its evidence packet, and surface only the exact human-only decision or external input needed.\n\nOwn board scope **BUG-260731-11bpa4, BUG-260731-3gm8kc, BUG-260731-lepevi** through accepted delivery. Do not stop or hand routine work to the human while any scoped item is not accepted `done`. For every item, autonomously route producer -\u003e reviewer -\u003e rework -\u003e reviewer until the board records `done`; treat `to-review`, requested changes, failed checks, early child exits, transient runtime failures, usage or budget limits, and other recoverable conditions as continuation, retry, or reroute signals. Before marking this goal complete, query the board and surface every scoped ID with its `done` status, current outcome evidence, and an accepted reviewer verdict for `review=required|light`, or the orchestrator evidence check for `review=none`. The only agent-initiated unresolved terminal is the repository's existing **Stop-The-Line: No Forced Fits** contract; apply it by reference, persist its required evidence packet, and request only the exact human-only decision or external input. Never force-fit an impossible design, weaken acceptance, self-accept review-required producer work, or change status merely to satisfy this goal. A revision-bound owner agent may create a role-compatible goal, monotonically expand its scope, and refresh its non-authoritative `objective_intent` without operator acknowledgement. Only an acknowledged operator cancel or reroute may remove scope, replace role-compatible structural goal semantics, weaken acceptance, or terminate ownership; those restricted mutations supersede or cancel the prior goal and are never successful delivery.",
+    "provider_condition": "Own the latest active revision of board goal **GOAL-260731-318711** for run **RUN-260731-2e961b** through its board-defined success predicate. Before nested spawn, at every directive checkpoint, and before claiming success, run `task-board spawn goal RUN-260731-2e961b`; treat the returned objective, resolved scope, and revision as authoritative and surface them with the required board acceptance evidence. A stale revision, cancelled/superseded goal, or missing scoped acceptance evidence is not success.",
+    "success_predicate": "accepted_done",
+    "stop_boundary_ref": "Stop-The-Line: No Forced Fits",
+    "revision": 1,
+    "mutation": {
+      "kind": "created",
+      "reason": "Goal-bound tracked spawn launch",
+      "actor_context": {
+        "kind": "agent",
+        "actor_id": "[analyst] orchestrator (claude)",
+        "run_id": "RUN-260731-dfca53"
+      },
+      "authority": "agent_discretion"
+    },
+    "created_at": "2026-07-31T08:42:25.422443Z"
+  },
+  "managed_session_launch": {
+    "contract": "task-board.claude-session-launch-v1",
+    "primary_session_plan": {
+      "contract": "agents-infra.primary-session-launch-plan",
+      "schema_version": 1,
+      "status": "ok",
+      "producer": {
+        "version": "dev",
+        "commit": "unknown"
+      },
+      "provider": "claude",
+      "project_dir": "/Users/iv/Developer/ReluxWorks/curator",
+      "executable": "/Users/iv/.local/bin/claude",
+      "launch_variants": {
+        "interactive": {
+          "argv": [
+            "--dangerously-skip-permissions",
+            "--model",
+            "claude-opus-5"
+          ]
+        },
+        "managed_host": {
+          "kind": "claude-pty",
+          "argv": [
+            "--dangerously-skip-permissions",
+            "--model",
+            "claude-opus-5"
+          ]
+        },
+        "managed_client": {
+          "argv": []
+        }
+      },
+      "resolved": {
+        "model": {
+          "value": "claude-opus-5",
+          "source": "cli:--model"
+        },
+        "reasoning": {
+          "value": null,
+          "source": "native"
+        },
+        "yolo": {
+          "value": true,
+          "source": "cli:--dangerously-skip-permissions"
+        },
+        "sandbox": {
+          "value": null,
+          "source": "not_applicable"
+        },
+        "profile": {
+          "value": null,
+          "source": "not_applicable"
+        },
+        "approval": {
+          "value": "bypass-permissions",
+          "source": "cli:--dangerously-skip-permissions"
+        },
+        "mcp": {
+          "servers": []
+        }
+      },
+      "required_env_names": [],
+      "sources": []
+    },
+    "term": "xterm-256color",
+    "rows": 40,
+    "cols": 120,
+    "owner_run": {
+      "run_id": "RUN-260731-2e961b",
+      "task_id": "STORY-260720-35dck7",
+      "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+      "delivery_goal_id": "GOAL-260731-318711"
+    }
+  }
+}

@@ -1,0 +1,278 @@
+--- before-worktree/internal/godriver/fingerprint.go	2026-07-29 07:06:01
++++ worktree/internal/godriver/fingerprint.go	2026-07-29 08:08:15
+@@ -25,11 +25,10 @@
+ }
+ 
+ type treeRecord struct {
+-	path       string
+-	filesystem string
+-	kind       byte
+-	link       string
+-	info       fs.FileInfo
++	path string
++	kind byte
++	link string
++	info fs.FileInfo
+ }
+ 
+ func fingerprintToolchain(ctx context.Context, rootPath, version string) (string, []toolchainState, error) {
+@@ -39,71 +38,35 @@
+ 	}
+ 	defer func() { _ = root.Close() }()
+ 
+-	var records []treeRecord
+-	encoded := make(map[string]struct{})
+-	err = fs.WalkDir(root.FS(), ".", func(name string, _ fs.DirEntry, walkErr error) error {
+-		if walkErr != nil {
+-			return diagnosticErr("toolchain_unreadable", walkErr, "cannot walk GOROOT")
+-		}
+-		if err := ctx.Err(); err != nil {
+-			return diagnosticErr("toolchain_timeout", err, "toolchain fingerprint deadline exceeded")
+-		}
+-		if name == "." {
+-			return nil
+-		}
+-		protocolPath := filepath.ToSlash(name)
+-		if !validToolchainPath(protocolPath) {
+-			return diagnostic("invalid_unicode", "toolchain path is not valid protocol UTF-8")
+-		}
+-		if err := claimEncodedPath(encoded, protocolPath); err != nil {
+-			return err
+-		}
+-
+-		info, statErr := root.Lstat(name)
+-		if statErr != nil {
+-			return diagnosticErr("toolchain_unreadable", statErr, "cannot inspect toolchain path %q", protocolPath)
+-		}
+-		record := treeRecord{path: protocolPath, filesystem: name, info: info}
+-		switch {
+-		case info.Mode().IsDir():
+-			record.kind = 'D'
+-		case info.Mode().IsRegular():
+-			record.kind = 'F'
+-		case info.Mode()&fs.ModeSymlink != 0:
+-			record.kind = 'L'
+-			target, readErr := root.Readlink(name)
+-			if readErr != nil {
+-				return diagnosticErr("toolchain_link_dangling", readErr, "cannot read toolchain link %q", protocolPath)
+-			}
+-			if !utf8.ValidString(target) || strings.ContainsRune(target, 0) {
+-				return diagnostic("invalid_unicode", "toolchain link %q has an invalid target", protocolPath)
+-			}
+-			// A rooted target is absolute regardless of host path conventions:
+-			// Windows treats a leading separator as drive-relative rather than
+-			// absolute, so filepath.IsAbs alone would admit "/etc/passwd" there.
+-			if filepath.IsAbs(target) || filepath.VolumeName(target) != "" ||
+-				strings.HasPrefix(target, "/") || strings.HasPrefix(target, `\`) {
+-				return diagnostic("toolchain_link_absolute", "toolchain link %q is absolute", protocolPath)
+-			}
+-			resolvedName := filepath.Clean(filepath.Join(filepath.Dir(name), target))
+-			if resolvedName == ".." || strings.HasPrefix(resolvedName, ".."+string(filepath.Separator)) || filepath.IsAbs(resolvedName) {
+-				return diagnostic("toolchain_link_escape", "toolchain link %q escapes GOROOT", protocolPath)
+-			}
+-			if _, statErr := root.Stat(name); statErr != nil {
+-				return diagnosticErr("toolchain_link_dangling", statErr, "toolchain link %q does not resolve safely", protocolPath)
+-			}
+-			record.link = target
+-		default:
+-			return diagnostic("special_file_forbidden", "toolchain path %q is not a directory, regular file, or link", protocolPath)
+-		}
+-		records = append(records, record)
+-		return nil
+-	})
++	records, err := collectToolchainRecords(ctx, root)
+ 	if err != nil {
+ 		return "", nil, err
+ 	}
++	return digestToolchainRecords(ctx, root, records, version)
++}
++
++// collectToolchainRecords produces the canonical record set in canonical order.
++// It is split from the digest phase so a test can mutate the tree exactly at the
++// boundary between the two and observe which side of the traversal notices.
++func collectToolchainRecords(ctx context.Context, root *os.Root) ([]treeRecord, error) {
++	walk := toolchainWalk{root: root, encoded: make(map[string]struct{})}
++	if err := walk.descend(ctx, root, ""); err != nil {
++		return nil, err
++	}
++	records := walk.records
+ 	sort.Slice(records, func(left, right int) bool { return records[left].path < records[right].path })
++	return records, nil
++}
+ 
++// digestToolchainRecords writes the canonical byte stream and hashes it.
++//
++// Every file is re-opened from GOROOT by its root-relative path, so the bytes
++// that reach the digest always come from whatever is reachable at that
++// canonical path at read time, under the containment os.Root enforces on each
++// component. Reusing an ancestor handle here instead would keep reading through
++// a directory that had been renamed out of the tree, which is why this phase
++// resolves paths and the collection phase does not.
++func digestToolchainRecords(ctx context.Context, root *os.Root, records []treeRecord, version string) (string, []toolchainState, error) {
+ 	digest := sha256.New()
+ 	_, _ = io.WriteString(digest, toolchainDomain)
+ 	state := make([]toolchainState, 0, len(records))
+@@ -124,7 +87,7 @@
+ 			item.size = int64(len(payload))
+ 			item.payload = sha256.Sum256(payload)
+ 		case 'F':
+-			file, openErr := root.Open(record.filesystem)
++			file, openErr := root.Open(record.path)
+ 			if openErr != nil {
+ 				return "", nil, diagnosticErr("toolchain_unreadable", openErr, "cannot open toolchain file %q", record.path)
+ 			}
+@@ -158,6 +121,154 @@
+ 	return "sha256:" + hex.EncodeToString(digest.Sum(nil)), state, nil
+ }
+ 
++// toolchainWalk collects the canonical record set. It reproduces exactly what
++// fs.WalkDir over os.Root.FS() produced — the same entries, the same
++// name-sorted visit order, and therefore the same error precedence — but it
++// takes each entry's Lstat through a handle scoped to the directory the entry
++// lives in instead of re-resolving the entry's whole root-relative path one
++// component at a time. That Lstat is the only step this saves; every
++// step whose result nothing later re-resolves stays anchored at GOROOT:
++//
++//   - each directory is listed through a handle opened by its full root-relative
++//     path, exactly as fs.ReadDir opened it;
++//   - an entry the listing types as a directory is Lstat-ed by its full path,
++//     because the digest phase never revisits a directory record, and it is
++//     descended by its full path, because fs.WalkDir took both decisions from
++//     the listed entry and failed closed when the path stopped being one;
++//   - a link's target and resolvability are read from the root, because a link
++//     target is validated against GOROOT and not against its own directory —
++//     the accepted RC4 vector contains "pkg/tool-link" -> "../bin/go", which
++//     resolves inside the root but outside its own directory.
++//
++// What remains scoped is the Lstat of files and links, and both are re-checked
++// later: a file is re-opened from GOROOT and matched with os.SameFile against
++// this record, and a link is re-read and re-resolved from GOROOT below.
++type toolchainWalk struct {
++	root    *os.Root
++	records []treeRecord
++	encoded map[string]struct{}
++}
++
++func (walk *toolchainWalk) descend(ctx context.Context, dir *os.Root, prefix string) error {
++	if err := ctx.Err(); err != nil {
++		return diagnosticErr("toolchain_timeout", err, "toolchain fingerprint deadline exceeded")
++	}
++	entries, readErr := readScopedDir(dir)
++	if readErr != nil {
++		return diagnosticErr("toolchain_unreadable", readErr, "cannot walk GOROOT")
++	}
++	for _, entry := range entries {
++		if err := ctx.Err(); err != nil {
++			return diagnosticErr("toolchain_timeout", err, "toolchain fingerprint deadline exceeded")
++		}
++		name := entry.Name()
++		protocolPath := filepath.ToSlash(name)
++		if prefix != "" {
++			protocolPath = prefix + "/" + protocolPath
++		}
++		if !validToolchainPath(protocolPath) {
++			return diagnostic("invalid_unicode", "toolchain path is not valid protocol UTF-8")
++		}
++		if err := claimEncodedPath(walk.encoded, protocolPath); err != nil {
++			return err
++		}
++
++		// fs.WalkDir treats the listed entry's own type as the decision that
++		// selects between "leaf" and "directory to read", so the same listed
++		// type selects here which handle resolves the entry. An entry the
++		// listing types as a directory is resolved from GOROOT, because
++		// nothing re-resolves a directory record later and because the descent
++		// below must see whatever occupies that path in the root; every other
++		// entry is resolved through the scoped handle, and each thing its
++		// record asserts is re-resolved from GOROOT before it is trusted.
++		var info fs.FileInfo
++		var statErr error
++		if entry.IsDir() {
++			info, statErr = walk.root.Lstat(protocolPath)
++		} else {
++			info, statErr = dir.Lstat(name)
++		}
++		if statErr != nil {
++			return diagnosticErr("toolchain_unreadable", statErr, "cannot inspect toolchain path %q", protocolPath)
++		}
++		record := treeRecord{path: protocolPath, info: info}
++		switch {
++		case info.Mode().IsDir():
++			record.kind = 'D'
++		case info.Mode().IsRegular():
++			record.kind = 'F'
++		case info.Mode()&fs.ModeSymlink != 0:
++			record.kind = 'L'
++			target, readErr := walk.root.Readlink(protocolPath)
++			if readErr != nil {
++				return diagnosticErr("toolchain_link_dangling", readErr, "cannot read toolchain link %q", protocolPath)
++			}
++			if !utf8.ValidString(target) || strings.ContainsRune(target, 0) {
++				return diagnostic("invalid_unicode", "toolchain link %q has an invalid target", protocolPath)
++			}
++			// A rooted target is absolute regardless of host path conventions:
++			// Windows treats a leading separator as drive-relative rather than
++			// absolute, so filepath.IsAbs alone would admit "/etc/passwd" there.
++			if filepath.IsAbs(target) || filepath.VolumeName(target) != "" ||
++				strings.HasPrefix(target, "/") || strings.HasPrefix(target, `\`) {
++				return diagnostic("toolchain_link_absolute", "toolchain link %q is absolute", protocolPath)
++			}
++			resolvedName := filepath.Clean(filepath.Join(filepath.Dir(protocolPath), target))
++			if resolvedName == ".." || strings.HasPrefix(resolvedName, ".."+string(filepath.Separator)) || filepath.IsAbs(resolvedName) {
++				return diagnostic("toolchain_link_escape", "toolchain link %q escapes GOROOT", protocolPath)
++			}
++			if _, statErr := walk.root.Stat(protocolPath); statErr != nil {
++				return diagnosticErr("toolchain_link_dangling", statErr, "toolchain link %q does not resolve safely", protocolPath)
++			}
++			record.link = target
++		default:
++			return diagnostic("special_file_forbidden", "toolchain path %q is not a directory, regular file, or link", protocolPath)
++		}
++		walk.records = append(walk.records, record)
++
++		// fs.WalkDir descends on the type of the entry it listed, not on a
++		// later lstat, and that entry type is lstat-backed, so a symlinked
++		// directory is never followed. Taking the same decision from the same
++		// listed entry keeps the fail-closed outcome when a listed directory
++		// stops being one: opening it as a root fails exactly where fs.ReadDir
++		// failed, with the same code and the same detail.
++		if !entry.IsDir() {
++			continue
++		}
++		child, openErr := walk.root.OpenRoot(protocolPath)
++		if openErr != nil {
++			return diagnosticErr("toolchain_unreadable", openErr, "cannot walk GOROOT")
++		}
++		descendErr := walk.descend(ctx, child, protocolPath)
++		_ = child.Close()
++		if descendErr != nil {
++			return descendErr
++		}
++	}
++	return nil
++}
++
++// readScopedDir lists one directory through its own handle. os.Root.FS() sorts
++// entries by name before fs.WalkDir sees them; the canonical record set is
++// sorted again later and does not depend on this order, but which offending
++// entry reports the first error does, so the same order is reproduced here.
++func readScopedDir(dir *os.Root) ([]fs.DirEntry, error) {
++	handle, err := dir.Open(".")
++	if err != nil {
++		return nil, err
++	}
++	entries, readErr := handle.ReadDir(-1)
++	closeErr := handle.Close()
++	if readErr != nil {
++		return nil, readErr
++	}
++	if closeErr != nil {
++		return nil, closeErr
++	}
++	sort.Slice(entries, func(left, right int) bool { return entries[left].Name() < entries[right].Name() })
++	return entries, nil
++}
++
+ func claimEncodedPath(encoded map[string]struct{}, path string) error {
+ 	if _, duplicate := encoded[path]; duplicate {
+ 		return diagnostic("duplicate_path", "toolchain contains duplicate encoded path %q", path)

@@ -1,0 +1,10 @@
+# Verify compiled-build interoperability across released implementations
+
+## Description
+Perform an independent acceptance audit of the released protocol suite, both manager consumers, cross-platform parity evidence, author documentation, and pin provenance. Produce evidence only; substantive defects return to the owning task.
+
+## Scope
+Run after the shared cases, consumers, runner, documents, evidence qualification, and all three release-safe pin promotions. Use clean checkouts at the exact qualified refs. Run curator-spec validation and deterministic regeneration checks, the focused and full Curator tests, the focused and full csk tests, and the black-box runner locally where supported; verify required Linux, macOS, and Windows CI records for the full matrix. Inspect diffs for copied expected values and premature pins. Attach a task-scoped coverage and provenance report; do not alter product behavior or manufacture unavailable platform results.
+
+## Acceptance Criteria
+The report maps every story acceptance criterion to a passing command, shared case ID, document section, or immutable CI record. Both managers consume the byte-identical suite digest, enumerate the identical case set without skips or xfails, reject every shared negative case in the same normalized class and boundary, and install then launch the same fixture behavior with matching forwarded arguments, stdout, stderr, and exit status. Dry-run, cache miss, verified hit, corrupt or untrusted rebuild, context exclusion, rollback, and no-package-code-before-user-launch outcomes match. The author guide contains the complete schema v6 example, prerequisites, cache semantics, security limits, and portability caveats; the matrix and future-driver process are complete and name unsafe build-system non-goals. Pin history proves no rc.4 suite or manager ref moved before real release qualification, no release evidence is inferred from local work, all relevant repository validation commands pass, and any substantive divergence is reported against its owning task rather than normalized away.

@@ -1,0 +1,32 @@
+TASK-260720-2284br rework cycle 3 (R4) - final-tree gate summary
+worktree: /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-1zntv0/worktree
+golangci-lint: golangci-lint has version 2.4.0 built with go1.25.5 from (unknown, modified: ?, mod sum: "h1:qz6O6vr7kVzXJqyvHjHSz5fA3D+PM8v96QU5gxZCNWM=") on (unknown)
+started: 2026-07-28 18:42:38
+finished: 2026-07-28 19:03:41
+driver completed: yes
+
+GATE                     EXIT    SECONDS
+build                       0          1
+diff-check                  0          0
+gofmt                       0          0
+lint-repo-nocache           0          3
+lint-repo                   0          1
+overlay-r3-hybrid           0         14
+overlay-r4-manifests        0         23
+race-activation             0         95
+race-concurrency            0         61
+race-revalidation           0        119
+race-staging                0         52
+test-atomicity              0        388
+test-godriver-rerun1        1        304
+test-godriver-rerun2-parallel1      0         26
+test-godriver-rerun3-default      0         25
+test-godriver               1         60
+test-install                0        369
+test-rest                   0         28
+test-revalidation           0         51
+vet                         0          0
+
+negative control (gates-cycle4/negative-control.log): expected-red, exit 1
+  overlay removes exactly the three observed.observe lines; the five
+  mutation cases fail and the control still passes.

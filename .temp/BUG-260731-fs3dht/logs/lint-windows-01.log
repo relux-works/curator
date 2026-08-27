@@ -1,0 +1,28 @@
+internal/buildcache/protection_windows.go:394:18: Error return value of `root.Close` is not checked (errcheck)
+	defer root.Close()
+	                ^
+internal/managerlock/identity_windows.go:96:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+	defer windows.CloseHandle(handle)
+	                         ^
+internal/managerlock/identity_windows_test.go:269:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+	defer windows.CloseHandle(handle)
+	                         ^
+internal/transaction/durability_windows.go:49:27: Error return value of `windows.CloseHandle` is not checked (errcheck)
+	defer windows.CloseHandle(handle)
+	                         ^
+internal/buildcache/protection_windows.go:289:25: G103: Use of unsafe calls should be audited (gosec)
+		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
+		                      ^
+internal/godriver/controls_windows.go:62:11: G103: Use of unsafe calls should be audited (gosec)
+		uintptr(unsafe.Pointer(&information)), uint32(unsafe.Sizeof(information))); err != nil {
+		        ^
+internal/managerlock/identity_windows.go:102:11: G103: Use of unsafe calls should be audited (gosec)
+		(*byte)(unsafe.Pointer(&flags)),
+		        ^
+internal/transaction/namespace.go:310:6: func existingNamespaceAncestor is unused (unused)
+func existingNamespaceAncestor(path string) (string, error) {
+     ^
+8 issues:
+* errcheck: 4
+* gosec: 3
+* unused: 1

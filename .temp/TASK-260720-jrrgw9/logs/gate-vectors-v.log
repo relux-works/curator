@@ -1,0 +1,444 @@
+=== RUN   TestPortableExecutionPolicyMatchesTheAcceptedVector
+--- PASS: TestPortableExecutionPolicyMatchesTheAcceptedVector (0.00s)
+=== RUN   TestMandatoryControlsMatchTheAcceptedVector
+--- PASS: TestMandatoryControlsMatchTheAcceptedVector (0.00s)
+=== RUN   TestNativeControlInventoryMatchesTheAcceptedVector
+--- PASS: TestNativeControlInventoryMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCapabilityEvidenceRecordMatchesTheAcceptedVector
+--- PASS: TestCapabilityEvidenceRecordMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/available-native-control-is-applied
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/unavailable-native-control-does-not-reject
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/capability-evidence-is-not-cache-input
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/unavailable-control-cannot-be-reported-as-applied
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/available-control-cannot-be-reported-as-unavailable
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/unknown-native-control-is-rejected
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/missing-native-control-entry-is-rejected
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/duplicate-native-control-entry-is-rejected
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/unknown-evidence-record-version-is-rejected
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/hardened-guarantee-claimed-under-portable-policy
+=== RUN   TestCapabilityEvidenceCasesMatchTheAcceptedVector/hardened-execution-policy-in-evidence-record
+--- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/available-native-control-is-applied (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/unavailable-native-control-does-not-reject (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/capability-evidence-is-not-cache-input (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/unavailable-control-cannot-be-reported-as-applied (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/available-control-cannot-be-reported-as-unavailable (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/unknown-native-control-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/missing-native-control-entry-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/duplicate-native-control-entry-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/unknown-evidence-record-version-is-rejected (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/hardened-guarantee-claimed-under-portable-policy (0.00s)
+    --- PASS: TestCapabilityEvidenceCasesMatchTheAcceptedVector/hardened-execution-policy-in-evidence-record (0.00s)
+=== RUN   TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector
+--- PASS: TestDeferredGuaranteesAndFailureBoundaryMatchTheAcceptedVector (0.00s)
+=== RUN   TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector
+--- PASS: TestIdentityProtocolAndPackageInfluenceCodesMatchTheAcceptedVector (0.00s)
+=== RUN   TestCacheIdentityMatchesTheAcceptedVector
+--- PASS: TestCacheIdentityMatchesTheAcceptedVector (0.00s)
+=== RUN   TestCandidateGoV1SourceAwareContract
+--- PASS: TestCandidateGoV1SourceAwareContract (0.00s)
+=== RUN   TestFixedEnvironmentAndFiveDirectArgvFormsVector
+=== RUN   TestFixedEnvironmentAndFiveDirectArgvFormsVector/telemetry-off
+=== RUN   TestFixedEnvironmentAndFiveDirectArgvFormsVector/version
+=== RUN   TestFixedEnvironmentAndFiveDirectArgvFormsVector/env
+=== RUN   TestFixedEnvironmentAndFiveDirectArgvFormsVector/list
+=== RUN   TestFixedEnvironmentAndFiveDirectArgvFormsVector/build
+=== RUN   TestFixedEnvironmentAndFiveDirectArgvFormsVector/fixed_environment
+--- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector (2.03s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/telemetry-off (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/version (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/env (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/list (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/build (0.00s)
+    --- PASS: TestFixedEnvironmentAndFiveDirectArgvFormsVector/fixed_environment (2.03s)
+=== RUN   TestToolchainIdentityVectors
+=== RUN   TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link
+=== RUN   TestToolchainIdentityVectors/crlf-version-normalizes-to-lf-identity
+=== RUN   TestToolchainIdentityVectors/toolchain-mode-and-timestamp-are-non-inputs
+=== RUN   TestToolchainIdentityVectors/toolchain-version-missing-terminal-lf
+=== RUN   TestToolchainIdentityVectors/toolchain-version-multiple-terminal-newlines
+=== RUN   TestToolchainIdentityVectors/invalid-unicode-toolchain-path
+    builddriver_positive_conformance_test.go:271: this host cannot create a non-UTF-8 filename: open /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestToolchainIdentityVectorsinvalid-unicode-toolchain-path1750684617/001/bin/ÿ: illegal byte sequence
+=== RUN   TestToolchainIdentityVectors/duplicate-toolchain-path
+=== RUN   TestToolchainIdentityVectors/escaping-toolchain-link
+=== RUN   TestToolchainIdentityVectors/absolute-toolchain-link
+=== RUN   TestToolchainIdentityVectors/dangling-toolchain-link
+=== RUN   TestToolchainIdentityVectors/selected-go-outside-goroot
+=== RUN   TestToolchainIdentityVectors/toolchain-tree-mutation-during-use
+--- PASS: TestToolchainIdentityVectors (0.26s)
+    --- PASS: TestToolchainIdentityVectors/unsorted-directories-files-and-internal-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/crlf-version-normalizes-to-lf-identity (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-mode-and-timestamp-are-non-inputs (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-version-missing-terminal-lf (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-version-multiple-terminal-newlines (0.00s)
+    --- SKIP: TestToolchainIdentityVectors/invalid-unicode-toolchain-path (0.00s)
+    --- PASS: TestToolchainIdentityVectors/duplicate-toolchain-path (0.00s)
+    --- PASS: TestToolchainIdentityVectors/escaping-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/absolute-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/dangling-toolchain-link (0.00s)
+    --- PASS: TestToolchainIdentityVectors/selected-go-outside-goroot (0.00s)
+    --- PASS: TestToolchainIdentityVectors/toolchain-tree-mutation-during-use (0.25s)
+=== RUN   TestValidPackageGraphVectors
+=== RUN   TestValidPackageGraphVectors/valid-standard-library-only-main
+=== RUN   TestValidPackageGraphVectors/valid-vendor-only-main-with-transitive-embed
+--- PASS: TestValidPackageGraphVectors (0.00s)
+    --- PASS: TestValidPackageGraphVectors/valid-standard-library-only-main (0.00s)
+    --- PASS: TestValidPackageGraphVectors/valid-vendor-only-main-with-transitive-embed (0.00s)
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/attempted-go-generate
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/cgo-import-dynamic
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/cgo-only-package
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/child-outside-goroot-tools
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/default-pgo
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/escaped-embed-input
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/external-link-required
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/inconsistent-vendor-modules
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/inherited-goenv
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/inherited-goflags-toolexec
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/inherited-gowork
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/libgcc-fallback-attempt
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/missing-root-go-mod
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/missing-vendored-dependency
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/multiple-packages
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/native-c-input
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/native-cxx-input
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/native-swig-input
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/nested-module
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/non-main-package
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/poisoned-path
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/repository-local-fake-go
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/root-assembly-absolute-include
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/root-syso
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/telemetry-command-failure
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/telemetry-private-dir-escape
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/toolchain-digest-mismatch
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/toolchain-switch-request
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/transitive-assembly-escaping-include
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/transitive-syso
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/unsupported-go-future-family
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/unsupported-go-pre-1-23
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/vcs-metadata
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/workspace-only-dependency
+=== RUN   TestDriverRejectionClustersMapToStableCuratorErrors/wrong-go-executable-path
+--- PASS: TestDriverRejectionClustersMapToStableCuratorErrors (8.31s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/attempted-go-generate (0.29s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/cgo-import-dynamic (0.29s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/cgo-only-package (0.27s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/child-outside-goroot-tools (0.26s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/default-pgo (0.29s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/escaped-embed-input (0.38s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/external-link-required (0.30s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/inconsistent-vendor-modules (0.31s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/inherited-goenv (0.24s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/inherited-goflags-toolexec (0.26s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/inherited-gowork (0.24s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/libgcc-fallback-attempt (0.29s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/missing-root-go-mod (0.27s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/missing-vendored-dependency (0.31s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/multiple-packages (0.27s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/native-c-input (0.31s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/native-cxx-input (0.32s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/native-swig-input (0.29s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/nested-module (0.33s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/non-main-package (0.28s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/poisoned-path (0.25s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/repository-local-fake-go (0.00s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/root-assembly-absolute-include (0.27s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/root-syso (0.27s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/telemetry-command-failure (0.00s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/telemetry-private-dir-escape (0.00s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/toolchain-digest-mismatch (0.26s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/toolchain-switch-request (0.25s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/transitive-assembly-escaping-include (0.28s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/transitive-syso (0.29s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/unsupported-go-future-family (0.00s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/unsupported-go-pre-1-23 (0.00s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/vcs-metadata (0.35s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/workspace-only-dependency (0.25s)
+    --- PASS: TestDriverRejectionClustersMapToStableCuratorErrors/wrong-go-executable-path (0.00s)
+=== RUN   TestToolchainFramingMatchesRC4Vector
+--- PASS: TestToolchainFramingMatchesRC4Vector (0.00s)
+=== RUN   TestCandidateRC4ToolchainArtifacts
+--- PASS: TestCandidateRC4ToolchainArtifacts (0.00s)
+=== RUN   TestFingerprintImplementationMatchesRC4ToolchainVector
+--- PASS: TestFingerprintImplementationMatchesRC4ToolchainVector (0.00s)
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/package_pattern
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/extra_flag
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/short_vector
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/relative_output
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/other_command
+=== RUN   TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/output_outside_private_staging
+--- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector (0.35s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/package_pattern (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/extra_flag (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/short_vector (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/relative_output (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/other_command (0.00s)
+    --- PASS: TestFixedBuildArgvGuardAcceptsOnlyTheProtocolVector/output_outside_private_staging (0.00s)
+=== RUN   TestBuildPermitIsBoundToTheSessionAndVector
+--- PASS: TestBuildPermitIsBoundToTheSessionAndVector (0.00s)
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/relative_CURATOR_GO
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/wrapper
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/repository_toolchain
+=== RUN   TestUnsafeToolchainCandidatesFailBeforeExecution/missing_GOROOT
+--- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/relative_CURATOR_GO (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/wrapper (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/repository_toolchain (0.00s)
+    --- PASS: TestUnsafeToolchainCandidatesFailBeforeExecution/missing_GOROOT (0.00s)
+=== RUN   TestCandidateLinkOutsideDerivedGOROOTFails
+--- PASS: TestCandidateLinkOutsideDerivedGOROOTFails (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/godriver	11.450s
+=== RUN   TestManifestAndFilesystemRejectionVectors
+=== RUN   TestManifestAndFilesystemRejectionVectors/build-root-special-file
+=== RUN   TestManifestAndFilesystemRejectionVectors/build-root-symlink
+=== RUN   TestManifestAndFilesystemRejectionVectors/escaped-source-dir
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-args
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-env
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-hooks
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-output
+=== RUN   TestManifestAndFilesystemRejectionVectors/forbidden-toolchain
+=== RUN   TestManifestAndFilesystemRejectionVectors/missing-build-root-directory
+=== RUN   TestManifestAndFilesystemRejectionVectors/missing-build-roots
+=== RUN   TestManifestAndFilesystemRejectionVectors/mixed-script-build-shape
+=== RUN   TestManifestAndFilesystemRejectionVectors/overlapping-build-roots
+=== RUN   TestManifestAndFilesystemRejectionVectors/root-build-root
+=== RUN   TestManifestAndFilesystemRejectionVectors/root-source-dir
+=== RUN   TestManifestAndFilesystemRejectionVectors/runtime-overlapping-build-root
+=== RUN   TestManifestAndFilesystemRejectionVectors/schema-5-build-command
+=== RUN   TestManifestAndFilesystemRejectionVectors/source-link
+=== RUN   TestManifestAndFilesystemRejectionVectors/source-not-directory
+=== RUN   TestManifestAndFilesystemRejectionVectors/source-outside-root
+=== RUN   TestManifestAndFilesystemRejectionVectors/source-special-file
+=== RUN   TestManifestAndFilesystemRejectionVectors/unknown-driver
+=== RUN   TestManifestAndFilesystemRejectionVectors/unused-build-root
+--- PASS: TestManifestAndFilesystemRejectionVectors (0.03s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/build-root-special-file (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/build-root-symlink (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/escaped-source-dir (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-args (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-env (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-hooks (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-output (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/forbidden-toolchain (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/missing-build-root-directory (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/missing-build-roots (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/mixed-script-build-shape (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/overlapping-build-roots (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/root-build-root (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/root-source-dir (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/runtime-overlapping-build-root (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/schema-5-build-command (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/source-link (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/source-not-directory (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/source-outside-root (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/source-special-file (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/unknown-driver (0.00s)
+    --- PASS: TestManifestAndFilesystemRejectionVectors/unused-build-root (0.00s)
+=== RUN   TestSchemaSixMixedScriptAndBuildCommandsVector
+--- PASS: TestSchemaSixMixedScriptAndBuildCommandsVector (0.00s)
+=== RUN   TestPortablePathConformanceVectors
+--- PASS: TestPortablePathConformanceVectors (0.00s)
+=== RUN   TestSchemaV6ConformanceCases
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/valid.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-missing-driver.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-missing-source-dir.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-root-dot.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-source-dir-dot.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-unsupported-driver.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-mixed-script.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-mixed-system.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-args.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-env.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-flags.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-hooks.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-output.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-scripts.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-tags.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-toolchain.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-build-repositories.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-repository.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-target.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-driver.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-repository.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-target.json
+=== RUN   TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-driver.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/valid.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-missing-driver.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-missing-source-dir.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-root-dot.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-source-dir-dot.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-unsupported-driver.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-mixed-script.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-mixed-system.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-args.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-env.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-flags.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-hooks.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-output.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-scripts.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-tags.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-toolchain.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-build-repositories.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-repository.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-target.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-driver.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-repository.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-target.json
+=== RUN   TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-driver.json
+--- PASS: TestSchemaV6ConformanceCases (0.06s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/valid.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-missing-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-missing-source-dir.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-root-dot.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-source-dir-dot.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-unsupported-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-mixed-script.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-mixed-system.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-args.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-env.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-flags.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-hooks.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-output.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-scripts.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-tags.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-build-toolchain.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-build-repositories.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-repository.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-target.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-top-level-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-repository.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-target.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/agent-skill-v6/invalid-v7-command-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/valid.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-missing-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-missing-source-dir.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-root-dot.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-source-dir-dot.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-unsupported-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-mixed-script.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-mixed-system.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-args.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-env.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-flags.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-hooks.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-output.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-scripts.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-tags.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-build-toolchain.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-build-repositories.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-repository.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-target.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-top-level-driver.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-repository.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-target.json (0.00s)
+    --- PASS: TestSchemaV6ConformanceCases/csk-skill-v6/invalid-v7-command-driver.json (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/skillspec	0.709s
+=== RUN   TestProtectedCacheHitVector
+--- PASS: TestProtectedCacheHitVector (0.02s)
+=== RUN   TestCompilerFreeDryRunMissVector
+--- PASS: TestCompilerFreeDryRunMissVector (0.00s)
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-hash-mismatch
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-link
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-path-mismatch
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-size-mismatch
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-special-file
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-key-mismatch
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-wrong-build-source
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-wrong-policy
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-wrong-target
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-wrong-toolchain
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/concurrent-publisher-different-bytes
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/noncanonical-receipt-trailing-lf
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/noncanonical-receipt-whitespace
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/partial-cache-entry
+=== RUN   TestCacheRejectionClustersMapToStableCuratorOutcomes/receipt-hash-mismatch
+--- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes (0.19s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-hash-mismatch (0.02s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-link (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-path-mismatch (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-size-mismatch (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/artifact-special-file (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-key-mismatch (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-wrong-build-source (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-wrong-policy (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-wrong-target (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/cache-wrong-toolchain (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/concurrent-publisher-different-bytes (0.02s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/noncanonical-receipt-trailing-lf (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/noncanonical-receipt-whitespace (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/partial-cache-entry (0.01s)
+    --- PASS: TestCacheRejectionClustersMapToStableCuratorOutcomes/receipt-hash-mismatch (0.01s)
+=== RUN   TestCandidateCacheOutcomeVocabulary
+=== RUN   TestCandidateCacheOutcomeVocabulary/shared_publication_vocabulary
+    conformance_test.go:44: this conformance root publishes no cache_publication_cases group
+--- PASS: TestCandidateCacheOutcomeVocabulary (0.00s)
+    --- SKIP: TestCandidateCacheOutcomeVocabulary/shared_publication_vocabulary (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/buildcache	1.090s
+=== RUN   TestBuildSourceIdentityVectors
+=== RUN   TestBuildSourceIdentityVectors/fixture-exact-build-source
+=== RUN   TestBuildSourceIdentityVectors/domain-prefix-ordering-framing-empty-binary-and-root-marker
+=== RUN   TestBuildSourceIdentityVectors/mode-and-timestamp-are-non-inputs
+=== RUN   TestBuildSourceIdentityVectors/invalid-unicode-build-source-path
+    builddriver_conformance_test.go:220: this host cannot create a non-UTF-8 filename: open /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestBuildSourceIdentityVectorsinvalid-unicode-build-source-path485733931/001/ÿ: illegal byte sequence
+=== RUN   TestBuildSourceIdentityVectors/duplicate-build-source-path
+    builddriver_conformance_test.go:238: this host folds the alias into one directory member, so no duplicate encoded path is reachable
+=== RUN   TestBuildSourceIdentityVectors/build-source-symbolic-link
+=== RUN   TestBuildSourceIdentityVectors/build-source-special-file
+=== RUN   TestBuildSourceIdentityVectors/build-source-mutation-during-use
+=== RUN   TestBuildSourceIdentityVectors/legacy-nul-stream-structural-collision
+=== RUN   TestBuildSourceIdentityVectors/root-marker-bytes-are-build-input
+--- PASS: TestBuildSourceIdentityVectors (0.01s)
+    --- PASS: TestBuildSourceIdentityVectors/fixture-exact-build-source (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/domain-prefix-ordering-framing-empty-binary-and-root-marker (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/mode-and-timestamp-are-non-inputs (0.00s)
+    --- SKIP: TestBuildSourceIdentityVectors/invalid-unicode-build-source-path (0.00s)
+    --- SKIP: TestBuildSourceIdentityVectors/duplicate-build-source-path (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/build-source-symbolic-link (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/build-source-special-file (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/build-source-mutation-during-use (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/legacy-nul-stream-structural-collision (0.00s)
+    --- PASS: TestBuildSourceIdentityVectors/root-marker-bytes-are-build-input (0.00s)
+=== RUN   TestAuthoritativeFramingVectors
+=== RUN   TestAuthoritativeFramingVectors/empty
+=== RUN   TestAuthoritativeFramingVectors/binary_ordering_marker_and_framing
+=== RUN   TestAuthoritativeFramingVectors/legacy_structural_collision_is_separated
+--- PASS: TestAuthoritativeFramingVectors (0.00s)
+    --- PASS: TestAuthoritativeFramingVectors/empty (0.00s)
+    --- PASS: TestAuthoritativeFramingVectors/binary_ordering_marker_and_framing (0.00s)
+    --- PASS: TestAuthoritativeFramingVectors/legacy_structural_collision_is_separated (0.00s)
+=== RUN   TestBuildSourceConformanceVectors
+=== RUN   TestBuildSourceConformanceVectors/fixture-exact-build-source
+=== RUN   TestBuildSourceConformanceVectors/domain-prefix-ordering-framing-empty-binary-and-root-marker
+--- PASS: TestBuildSourceConformanceVectors (0.01s)
+    --- PASS: TestBuildSourceConformanceVectors/fixture-exact-build-source (0.01s)
+    --- PASS: TestBuildSourceConformanceVectors/domain-prefix-ordering-framing-empty-binary-and-root-marker (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/buildsource	1.106s
+=== RUN   TestCandidateBuildMetadataArtifacts
+--- PASS: TestCandidateBuildMetadataArtifacts (0.00s)
+=== RUN   TestCandidateBuildReceiptSchemaCase
+--- PASS: TestCandidateBuildReceiptSchemaCase (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/buildmeta	2.169s
+=== RUN   TestBuildRootContentInContextVector
+--- PASS: TestBuildRootContentInContextVector (0.01s)
+PASS
+ok  	github.com/relux-works/curator/internal/skillcheck	1.520s
+=== RUN   TestBuildRootExcludedFromAgentContextVector
+--- PASS: TestBuildRootExcludedFromAgentContextVector (0.00s)
+=== RUN   TestBuildRootContextExclusionConformanceFixture
+--- PASS: TestBuildRootContextExclusionConformanceFixture (0.00s)
+PASS
+ok  	github.com/relux-works/curator/internal/whitelist	1.852s

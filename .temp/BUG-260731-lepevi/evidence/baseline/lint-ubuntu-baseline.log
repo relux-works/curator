@@ -1,0 +1,325 @@
+Lint	Set up job	﻿2026-07-31T08:17:14.3967100Z Current runner version: '2.336.0'
+Lint	Set up job	2026-07-31T08:17:14.3987675Z ##[group]Runner Image Provisioner
+Lint	Set up job	2026-07-31T08:17:14.3988385Z Hosted Compute Agent
+Lint	Set up job	2026-07-31T08:17:14.3988864Z Version: 20260707.563
+Lint	Set up job	2026-07-31T08:17:14.3989439Z Commit: 02667638d2b423fbc733a8e32a88b44996a3ba6e
+Lint	Set up job	2026-07-31T08:17:14.3990002Z Build Date: 2026-07-07T19:33:50Z
+Lint	Set up job	2026-07-31T08:17:14.3990608Z Worker ID: {0536884c-2f26-4fe8-a918-49ab90c3d0c1}
+Lint	Set up job	2026-07-31T08:17:14.3991201Z Azure Region: northcentralus
+Lint	Set up job	2026-07-31T08:17:14.3991690Z ##[endgroup]
+Lint	Set up job	2026-07-31T08:17:14.3993056Z ##[group]Operating System
+Lint	Set up job	2026-07-31T08:17:14.3993570Z Ubuntu
+Lint	Set up job	2026-07-31T08:17:14.3993976Z 24.04.4
+Lint	Set up job	2026-07-31T08:17:14.3994444Z LTS
+Lint	Set up job	2026-07-31T08:17:14.3994868Z ##[endgroup]
+Lint	Set up job	2026-07-31T08:17:14.3995363Z ##[group]Runner Image
+Lint	Set up job	2026-07-31T08:17:14.3995849Z Image: ubuntu-24.04
+Lint	Set up job	2026-07-31T08:17:14.3996496Z Version: 20260720.247.2
+Lint	Set up job	2026-07-31T08:17:14.3997389Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260720.247/images/ubuntu/Ubuntu2404-Readme.md
+Lint	Set up job	2026-07-31T08:17:14.3998817Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260720.247
+Lint	Set up job	2026-07-31T08:17:14.3999648Z ##[endgroup]
+Lint	Set up job	2026-07-31T08:17:14.4000533Z ##[group]GITHUB_TOKEN Permissions
+Lint	Set up job	2026-07-31T08:17:14.4002089Z Contents: read
+Lint	Set up job	2026-07-31T08:17:14.4002610Z Metadata: read
+Lint	Set up job	2026-07-31T08:17:14.4003113Z ##[endgroup]
+Lint	Set up job	2026-07-31T08:17:14.4004736Z Secret source: Actions
+Lint	Set up job	2026-07-31T08:17:14.4005621Z Prepare workflow directory
+Lint	Set up job	2026-07-31T08:17:14.4342282Z Prepare all required actions
+Lint	Set up job	2026-07-31T08:17:14.4381197Z Getting action download info
+Lint	Set up job	2026-07-31T08:17:14.6606531Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Lint	Set up job	2026-07-31T08:17:15.5183295Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+Lint	Set up job	2026-07-31T08:17:16.3496225Z Download action repository 'golangci/golangci-lint-action@v7' (SHA:9fae48acfc02a90574d7c304a1758ef9895495fa)
+Lint	Set up job	2026-07-31T08:17:16.7394307Z Complete job name: Lint
+Lint	Run actions/checkout@v4	﻿2026-07-31T08:17:16.7950563Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7956882Z ##[group]Run actions/checkout@v4
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7957293Z with:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7957508Z   submodules: true
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7957743Z   repository: relux-works/curator
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7959647Z   token: ***
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7959855Z   ssh-strict: true
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7960064Z   ssh-user: git
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7960278Z   persist-credentials: true
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7960519Z   clean: true
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7960738Z   sparse-checkout-cone-mode: true
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7960980Z   fetch-depth: 1
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7961198Z   fetch-tags: false
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7961417Z   show-progress: true
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7961652Z   lfs: false
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7961893Z   set-safe-directory: true
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7962130Z   allow-unsafe-pr-checkout: false
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7962604Z env:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7962837Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7963121Z   GOTOOLCHAIN: local
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7963324Z   GOENV: off
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.7963516Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.8743836Z Syncing repository: relux-works/curator
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.8745459Z ##[group]Getting Git version info
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.8746038Z Working directory is '/home/runner/work/curator/curator'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.8746958Z [command]/usr/bin/git version
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9121144Z git version 2.54.0
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9146914Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9153284Z Temporarily overriding HOME='/home/runner/work/_temp/5ce2da28-6218-4763-a7ec-c605378bb2d4' before making global git config changes
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9154069Z Adding repository directory to the temporary git global config as a safe directory
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9157602Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/curator/curator
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9190675Z Deleting the contents of '/home/runner/work/curator/curator'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9194108Z ##[group]Initializing the repository
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9197983Z [command]/usr/bin/git init /home/runner/work/curator/curator
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9300095Z hint: Using 'master' as the name for the initial branch. This default branch name
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9301087Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9303934Z hint: to use in all of your new repositories, which will suppress this warning,
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9304795Z hint: call:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9305386Z hint:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9306268Z hint: 	git config --global init.defaultBranch <name>
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9307020Z hint:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9307548Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9308347Z hint: 'development'. The just-created branch can be renamed via this command:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9309046Z hint:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9309400Z hint: 	git branch -m <name>
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9309754Z hint:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9310133Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9310773Z Initialized empty Git repository in /home/runner/work/curator/curator/.git/
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9311942Z [command]/usr/bin/git remote add origin https://github.com/relux-works/curator
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9337594Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9341431Z ##[group]Disabling automatic garbage collection
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9341924Z [command]/usr/bin/git config --local gc.auto 0
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9369296Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9370000Z ##[group]Setting up auth
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9375243Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9407930Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9668142Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9698345Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9890600Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:16.9920880Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.0112006Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.0144865Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.0145577Z ##[group]Fetching the repository
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.0152151Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +2f3ec629b6a0532ae209d210d74b933f9bd3b828:refs/remotes/pull/9/merge
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3824981Z From https://github.com/relux-works/curator
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3825852Z  * [new ref]         2f3ec629b6a0532ae209d210d74b933f9bd3b828 -> pull/9/merge
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3846522Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3847170Z ##[group]Determining the checkout info
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3849091Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3853977Z [command]/usr/bin/git sparse-checkout disable
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3890232Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3972217Z ##[group]Checking out the ref
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.3975018Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/9/merge
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4208295Z Note: switching to 'refs/remotes/pull/9/merge'.
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4208685Z 
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4209283Z You are in 'detached HEAD' state. You can look around, make experimental
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4210314Z changes and commit them, and you can discard any commits you make in this
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4211112Z state without impacting any branches by switching back to a branch.
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4211505Z 
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4218030Z If you want to create a new branch to retain commits you create, you may
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4218996Z do so (now or later) by using -c with the switch command. Example:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4219576Z 
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4219777Z   git switch -c <new-branch-name>
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4220104Z 
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4220277Z Or undo this operation with:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4220547Z 
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4220687Z   git switch -
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4220947Z 
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4221323Z Turn off this advice by setting config variable advice.detachedHead to false
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4221817Z 
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4222328Z HEAD is now at 2f3ec62 Merge bd6ba08acda3dc801512c408c759ac0ac6f79f26 into cfffd7cd7be33aba9ca44d26993ce5ab19b5fa4d
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4225126Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4225909Z ##[group]Setting up auth for fetching submodules
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4226837Z [command]/usr/bin/git config --global http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4260628Z [command]/usr/bin/git config --global --unset-all url.https://github.com/.insteadOf
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4291065Z [command]/usr/bin/git config --global --add url.https://github.com/.insteadOf git@github.com:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4322775Z [command]/usr/bin/git config --global --add url.https://github.com/.insteadOf org-261817730@github.com:
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4352163Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4352854Z ##[group]Fetching submodules
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4355516Z [command]/usr/bin/git submodule sync
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4562323Z [command]/usr/bin/git -c protocol.version=2 submodule update --init --force --depth=1
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4761621Z Submodule 'agents/skills/skill-go-testing-tools' (https://github.com/relux-works/skill-go-testing-tools.git) registered for path 'agents/skills/skill-go-testing-tools'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:17.4783415Z Cloning into '/home/runner/work/curator/curator/agents/skills/skill-go-testing-tools'...
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4265170Z From https://github.com/relux-works/skill-go-testing-tools
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4265863Z  * branch            21585d0e937cae47e54a788d8ae36b1780eae47f -> FETCH_HEAD
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4378267Z Submodule path 'agents/skills/skill-go-testing-tools': checked out '21585d0e937cae47e54a788d8ae36b1780eae47f'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4389848Z [command]/usr/bin/git submodule foreach git config --local gc.auto 0
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4571935Z Entering 'agents/skills/skill-go-testing-tools'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4598711Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4599341Z ##[group]Persisting credentials for submodules
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4607978Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'url\.https\:\/\/github\.com\/\.insteadOf' && git config --local --unset-all 'url.https://github.com/.insteadOf' || :"
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4785685Z Entering 'agents/skills/skill-go-testing-tools'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.4833071Z [command]/usr/bin/git submodule foreach sh -c "git config --local 'http.https://github.com/.extraheader' 'AUTHORIZATION: basic ***' && git config --local --show-origin --name-only --get-regexp remote.origin.url"
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5017854Z Entering 'agents/skills/skill-go-testing-tools'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5049056Z file:/home/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5074199Z [command]/usr/bin/git submodule foreach git config --local --add 'url.https://github.com/.insteadOf' 'git@github.com:'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5259294Z Entering 'agents/skills/skill-go-testing-tools'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5291964Z [command]/usr/bin/git submodule foreach git config --local --add 'url.https://github.com/.insteadOf' 'org-261817730@github.com:'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5475388Z Entering 'agents/skills/skill-go-testing-tools'
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5502430Z ##[endgroup]
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5539058Z [command]/usr/bin/git log -1 --format=%H
+Lint	Run actions/checkout@v4	2026-07-31T08:17:18.5563380Z 2f3ec629b6a0532ae209d210d74b933f9bd3b828
+Lint	Run actions/setup-go@v5	﻿2026-07-31T08:17:18.5828278Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5829665Z ##[group]Run actions/setup-go@v5
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5829866Z with:
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5830029Z   go-version-file: go.mod
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5830223Z   check-latest: false
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5831994Z   token: ***
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5832154Z   cache: true
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5832310Z env:
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5832497Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5832742Z   GOTOOLCHAIN: local
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5832946Z   GOENV: off
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.5833152Z ##[endgroup]
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.6853443Z Setup go version spec 1.25.5
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.6860982Z Attempting to download 1.25.5...
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.6945086Z (node:2404) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:18.6945747Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:19.1874216Z matching 1.25.5...
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:19.1934438Z Acquiring 1.25.5 from https://github.com/actions/go-versions/releases/download/1.25.5-19880500865/go-1.25.5-linux-x64.tar.gz
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:19.5282847Z Extracting Go...
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:19.5374779Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/f422f814-d106-42f5-ae57-a46a8e871d7b -f /home/runner/work/_temp/a4da63ec-4d3b-4fad-8445-5a30326bacfb
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:20.7641603Z Successfully extracted go to /home/runner/work/_temp/f422f814-d106-42f5-ae57-a46a8e871d7b
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:20.7642080Z Adding to the cache ...
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.2767921Z Successfully cached go to /opt/hostedtoolcache/go/1.25.5/x64
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.2770017Z Added go to the path
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.2772490Z Successfully set up Go version 1.25.5
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.2944013Z [command]/opt/hostedtoolcache/go/1.25.5/x64/bin/go env GOMODCACHE
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.2975543Z [command]/opt/hostedtoolcache/go/1.25.5/x64/bin/go env GOCACHE
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.3008991Z /home/runner/go/pkg/mod
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.3022298Z /home/runner/.cache/go-build
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.4190377Z Cache is not found
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.4207966Z go version go1.25.5 linux/amd64
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.4208143Z 
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.4208409Z ##[group]go env
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8210409Z AR='ar'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8210735Z CC='gcc'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8211002Z CGO_CFLAGS='-O2 -g'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8211282Z CGO_CPPFLAGS=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8211545Z CGO_CXXFLAGS='-O2 -g'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8211829Z CGO_ENABLED='1'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8212114Z CGO_FFLAGS='-O2 -g'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8212372Z CGO_LDFLAGS='-O2 -g'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8212619Z CXX='g++'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8212848Z GCCGO='gccgo'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8213079Z GO111MODULE=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8213356Z GOAMD64='v1'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8213584Z GOARCH='amd64'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8213792Z GOAUTH='netrc'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8213944Z GOBIN=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8214128Z GOCACHE='/home/runner/.cache/go-build'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8214350Z GOCACHEPROG=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8214514Z GODEBUG=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8214663Z GOENV=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8214804Z GOEXE=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8214951Z GOEXPERIMENT=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8215118Z GOFIPS140='off'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8215269Z GOFLAGS=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8216079Z GOGCCFLAGS='-fPIC -m64 -pthread -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=/tmp/go-build2065924118=/tmp/go-build -gno-record-gcc-switches'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8216784Z GOHOSTARCH='amd64'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8216954Z GOHOSTOS='linux'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8217395Z GOINSECURE=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8217590Z GOMOD='/home/runner/work/curator/curator/go.mod'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8217845Z GOMODCACHE='/home/runner/go/pkg/mod'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8218051Z GONOPROXY=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8218354Z GONOSUMDB=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8218502Z GOOS='linux'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8218684Z GOPATH='/home/runner/go'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8218890Z GOPRIVATE=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8219102Z GOPROXY='https://proxy.golang.org,direct'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8219371Z GOROOT='/opt/hostedtoolcache/go/1.25.5/x64'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8219633Z GOSUMDB='sum.golang.org'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8219815Z GOTELEMETRY='local'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8220021Z GOTELEMETRYDIR='/home/runner/.config/go/telemetry'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8220256Z GOTMPDIR=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8220432Z GOTOOLCHAIN='local'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8220682Z GOTOOLDIR='/opt/hostedtoolcache/go/1.25.5/x64/pkg/tool/linux_amd64'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8220956Z GOVCS=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8221108Z GOVERSION='go1.25.5'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8221280Z GOWORK=''
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8221437Z PKG_CONFIG='pkg-config'
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8221547Z 
+Lint	Run actions/setup-go@v5	2026-07-31T08:17:31.8221868Z ##[endgroup]
+Lint	Verify Go toolchain identity	﻿2026-07-31T08:17:31.8385832Z ##[group]Run bash .github/ci/toolchain-identity.sh
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8386517Z [36;1mbash .github/ci/toolchain-identity.sh[0m
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8430442Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8430736Z env:
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8430936Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8431182Z   GOTOOLCHAIN: local
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8431350Z   GOENV: off
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8431504Z ##[endgroup]
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8689326Z toolchain: go version go1.25.5 linux/amd64
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8711329Z toolchain: GOROOT=/opt/hostedtoolcache/go/1.25.5/x64
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8748026Z toolchain: GOTOOLCHAIN=local
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8769409Z toolchain: GOENV=<none>
+Lint	Verify Go toolchain identity	2026-07-31T08:17:31.8769776Z ci-toolchain-identity: ok
+Lint	Run golangci/golangci-lint-action@v7	﻿2026-07-31T08:17:31.8834440Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8835406Z ##[group]Run golangci/golangci-lint-action@v7
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8835635Z with:
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8835790Z   version: v2.12.2
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8835959Z   install-mode: binary
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838095Z   github-token: ***
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838317Z   verify: true
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838484Z   only-new-issues: false
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838669Z   skip-cache: false
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8838835Z   skip-save-cache: false
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839014Z   problem-matchers: false
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839212Z   cache-invalidation-interval: 7
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839406Z env:
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839585Z   SPEC_PIN: 00b1688a9b2457ca397a0bb550acf47cad8ee967
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8839859Z   GOTOOLCHAIN: local
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8840028Z   GOENV: off
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.8840181Z ##[endgroup]
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.9872120Z ##[group]prepare environment
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.9874909Z Checking for go.mod: go.mod
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.9879389Z (node:2501) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:31.9880135Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0918918Z Cache not found for input keys: golangci-lint.cache-Linux-2952-8519b13fa584c7e05466568513eadf49618073e2, golangci-lint.cache-Linux-2952-
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0920058Z Finding needed golangci-lint version...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0922766Z Installation mode: binary
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0923273Z Installing golangci-lint binary v2.12.2...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.0924039Z Downloading binary https://github.com/golangci/golangci-lint/releases/download/v2.12.2/golangci-lint-2.12.2-linux-amd64.tar.gz ...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.2382925Z [command]/usr/bin/tar xz --overwrite --warning=no-unknown-keyword --overwrite -C /home/runner -f /home/runner/work/_temp/8049ef25-cdc4-4eb0-a7cc-15b89e0e14d2
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4759946Z Installed golangci-lint into /home/runner/golangci-lint-2.12.2-linux-amd64/golangci-lint in 383ms
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4761227Z Prepared env in 489ms
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4762151Z ##[endgroup]
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4763956Z ##[group]run golangci-lint
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.4768356Z Running [/home/runner/golangci-lint-2.12.2-linux-amd64/golangci-lint config path] in [/home/runner/work/curator/curator] ...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.5364801Z Running [/home/runner/golangci-lint-2.12.2-linux-amd64/golangci-lint config verify] in [/home/runner/work/curator/curator] ...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:32.6063627Z Running [/home/runner/golangci-lint-2.12.2-linux-amd64/golangci-lint run] in [/home/runner/work/curator/curator] ...
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1265438Z ##[error]internal/godriver/controls_other.go:35:30: func (*controlDomain).destroy is unused (unused)
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1271380Z func (domain *controlDomain) destroy(_ *exec.Cmd) {}
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1271778Z                              ^
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1272682Z ##[error]internal/transaction/namespace.go:310:6: func existingNamespaceAncestor is unused (unused)
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1273655Z func existingNamespaceAncestor(path string) (string, error) {
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1273966Z      ^
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1274136Z 2 issues:
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1274306Z * unused: 2
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1274401Z 
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1282610Z ##[error]issues found
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1283368Z Ran golangci-lint in 20517ms
+Lint	Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1283816Z ##[endgroup]
+Lint	Post Run golangci/golangci-lint-action@v7	﻿2026-07-31T08:17:53.1426687Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Post Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.1427666Z Post job cleanup.
+Lint	Post Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.2525563Z (node:5161) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Lint	Post Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.2550741Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Lint	Post Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.2706445Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/curator/curator --files-from manifest.txt --use-compress-program zstdmt
+Lint	Post Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.4482161Z (node:5161) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Lint	Post Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.6795521Z Sent 343344 of 343344 (100.0%), 1.4 MBs/sec
+Lint	Post Run golangci/golangci-lint-action@v7	2026-07-31T08:17:53.8195147Z Saved cache for golangci-lint from paths '/home/runner/.cache/golangci-lint' in 569ms
+Lint	Post Run actions/checkout@v4	﻿2026-07-31T08:17:53.8329430Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.8330398Z Post job cleanup.
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9000352Z [command]/usr/bin/git version
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9033020Z git version 2.54.0
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9061572Z Temporarily overriding HOME='/home/runner/work/_temp/b3803fde-d2e1-4c99-aba7-3912ef3abfae' before making global git config changes
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9062756Z Adding repository directory to the temporary git global config as a safe directory
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9066257Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/curator/curator
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9096743Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9125734Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9330567Z Entering 'agents/skills/skill-go-testing-tools'
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9411680Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9431464Z http.https://github.com/.extraheader
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9443492Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9469709Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9662203Z Entering 'agents/skills/skill-go-testing-tools'
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9683169Z http.https://github.com/.extraheader
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9728124Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9765937Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9965510Z Entering 'agents/skills/skill-go-testing-tools'
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:53.9981962Z file:/home/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config	remote.origin.url
+Lint	Post Run actions/checkout@v4	2026-07-31T08:17:54.0010540Z [command]/usr/bin/git config --file /home/runner/work/curator/curator/.git/modules/agents/skills/skill-go-testing-tools/config --name-only --get-regexp ^includeIf\.gitdir:
+Lint	Complete job	﻿2026-07-31T08:17:54.0159487Z Cleaning up orphan processes
+Lint	Complete job	2026-07-31T08:17:54.0389943Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, golangci/golangci-lint-action@v7. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

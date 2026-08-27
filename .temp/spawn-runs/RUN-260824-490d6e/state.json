@@ -1,0 +1,57 @@
+{
+  "id": "RUN-260824-490d6e",
+  "task_id": "BUG-260825-1l1st9",
+  "agent_name": "[implementer] developer (claude)",
+  "agent_type": "claude",
+  "status": "failed",
+  "phase": "finalizing",
+  "summary": "run exceeded --timeout 50m0s and was terminated by the launcher",
+  "created_at": "2026-08-24T23:22:18.186522Z",
+  "started_at": "2026-08-24T23:22:18.879178Z",
+  "completed_at": "2026-08-25T00:12:20.041897Z",
+  "last_heartbeat_at": "2026-08-25T00:12:20.041897Z",
+  "last_progress_at": "2026-08-25T00:12:20.041897Z",
+  "completion_reason": "failure",
+  "last_event_seq": 1515,
+  "exit_code": 124,
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260825-03-22-18_-implementer--developer--claude-_BUG-260825-1l1st9.md",
+  "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260825-1l1st9/-implementer--developer--claude-_RUN-260824-490d6e.log",
+  "runner_log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/spawn-runs/RUN-260824-490d6e/runner.log",
+  "error": "run exceeded --timeout 50m0s and was terminated by the launcher",
+  "max_parallel": 20,
+  "story_id": "STORY-260822-2lvw0e",
+  "workspace": {
+    "workspace_id": "WS-bdfb6e6fd005",
+    "story_id": "STORY-260822-2lvw0e",
+    "branch_ref": "refs/heads/task-board/story/STORY-260822-2lvw0e",
+    "base_ref": "refs/heads/main",
+    "relative_path": ".temp/STORY-260822-2lvw0e/worktree",
+    "repository_id": "repo-722cfaff56906ed1"
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "empty",
+    "provider": "claude",
+    "producer_version": "v1.6.1",
+    "diagnostic_code": "launch_composition_empty"
+  },
+  "recovery_root_run_id": "RUN-260824-490d6e",
+  "element_routing_message": "spawn run RUN-260824-490d6e failed; operator action required; failure: run exceeded --timeout 50m0s and was terminated by the launcher",
+  "element_routing_note_recorded": true,
+  "element_routing_last_attempt_at": "2026-08-25T00:12:20.046599Z",
+  "element_routed_at": "2026-08-25T00:12:20.046599Z",
+  "provider_attempts": [
+    {
+      "attempt": 1,
+      "provider": "claude",
+      "model": "claude-opus-5",
+      "reasoning_effort": "high",
+      "group": "claude-plan",
+      "started_at": "2026-08-24T23:22:19.011705Z",
+      "completed_at": "2026-08-25T00:12:19.846399Z",
+      "exit_code": 124,
+      "log_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/logwork/BUG-260825-1l1st9/-implementer--developer--claude-_RUN-260824-490d6e.log"
+    }
+  ]
+}

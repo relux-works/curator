@@ -1,0 +1,48 @@
+TASK-260720-3ag6pi — review cycle 4 provenance and preservation
+Date: 2026-07-30
+
+Active source:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/rework-cycle-3
+  repository HEAD: f5d7673039226ab81de2f4f87e2155ae995c4df3
+  published identity: v1.0.0-rc.5 / origin/main at task start
+
+Retained reviewed product candidate:
+  commit: ddb181ca3b8e243f212e90ff26fcabe2234fb669
+  sole parent: f5d7673039226ab81de2f4f87e2155ae995c4df3
+  tree: fa0eb87cacf6cd9ec8510f7d26a91ea76b6d74fd
+  signature state: N
+
+Cycle-4 gate candidate:
+  /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260720-3ag6pi/cycle-4-gates-candidate
+  HEAD: ddb181ca3b8e243f212e90ff26fcabe2234fb669
+
+Preservation checks:
+  diff -qr active-source cycle-4-gates-candidate excluding .git and Python caches
+    exit code: 0
+  git diff --cached --quiet in active source
+    exit code: 0
+  git diff --cached --quiet in cycle-4 gate candidate
+    exit code: 0
+
+Exact cycle-4 delta against the reviewed product commit:
+  .github/workflows/ci.yml
+  .github/workflows/release.yml
+  tools/test_validate.py
+  3 files changed, 37 insertions, 2 deletions
+
+Current byte identities:
+  conformance/v1/manifest.json
+    sha256:72c5d717027ca096b14bc32f5d60bb740676974e9429f3d09b730897e5fba89b
+  release/1.0.0-rc.5.json
+    sha256:75ae17fc029b4f51ca40ce768d04fd72991ec3db2602b8fe59213bee6ac34583
+  release/1.0.0-rc.6.json
+    sha256:5844b32cdee1bc089e15a7c6b52046bcd9135f493fbcd027088e97b7c0971f0f
+  .github/workflows/ci.yml
+    sha256:217769d6c057f10d95f82e654788158d9a8c3f7a65bac5095da33659369c348b
+  .github/workflows/release.yml
+    sha256:819e40b298438bb8647f9d41d7b134f3150ccdf71df27b9be1503657740674f6
+  tools/test_validate.py
+    sha256:9e7c9278d4c6005e83e0eb6e7862ecfe508ea730e2a6b0cde89f53e282e5a1fb
+
+No stage, commit, push, tag, release, claim, checksum publication, signature,
+attestation, or implementation pin was created.

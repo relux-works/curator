@@ -1,0 +1,26 @@
+--- FAIL: TestBrokenCskSkillNeverFallsBackToLegacy (0.01s)
+    --- FAIL: TestBrokenCskSkillNeverFallsBackToLegacy/newer_schema_version (0.00s)
+        parse_test.go:320: broken csk-skill.json parsed instead of failing: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+    --- FAIL: TestBrokenCskSkillNeverFallsBackToLegacy/malformed_json (0.00s)
+        parse_test.go:320: broken csk-skill.json parsed instead of failing: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+    --- FAIL: TestBrokenCskSkillNeverFallsBackToLegacy/not_a_json_object (0.00s)
+        parse_test.go:320: broken csk-skill.json parsed instead of failing: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+    --- FAIL: TestBrokenCskSkillNeverFallsBackToLegacy/empty_file (0.00s)
+        parse_test.go:320: broken csk-skill.json parsed instead of failing: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+    --- FAIL: TestBrokenCskSkillNeverFallsBackToLegacy/valid_schema,_invalid_body (0.00s)
+        parse_test.go:320: broken csk-skill.json parsed instead of failing: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestNewerSchemaVersionReportsUpgradeHint (0.00s)
+    parse_test.go:336: schema_version 99 parsed instead of failing: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestUnreadableCskSkillNeverFallsBackToLegacy (0.00s)
+    parse_test.go:412: present manifest degraded into a parsed spec: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestCskSkillDirectoryNeverFallsBackToLegacy (0.00s)
+    parse_test.go:426: present manifest degraded into a parsed spec: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestDanglingCskSkillSymlinkNeverFallsBackToLegacy (0.00s)
+    parse_test.go:438: present manifest degraded into a parsed spec: &{SchemaVersion:1 SourceFile:agents/runtime.json RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[fallback:{Name:fallback Type:script Command: UnixPath:scripts/fallback WinPath: Hint:}] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestUnreadableSnapshotNeverDegradesToEmptySpec (0.00s)
+    parse_test.go:453: present manifest degraded into a parsed spec: &{SchemaVersion:0 SourceFile: RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[] Dependencies:map[] Requirements:map[] McpServers:map[]}
+--- FAIL: TestDanglingLegacyManifestNeverDegradesToEmptySpec (0.00s)
+    parse_test.go:471: present manifest degraded into a parsed spec: &{SchemaVersion:0 SourceFile: RuntimeRoots:[] Capabilities:{Network:[] Filesystem:{Keyword: Paths:[]} Exec:[] Secrets:[] EnvRead:[] PromptScope:} Commands:map[] Dependencies:map[] Requirements:map[] McpServers:map[]}
+FAIL
+FAIL	github.com/relux-works/curator/internal/skillspec	0.273s
+FAIL

@@ -1,0 +1,3075 @@
+{
+ "fixture_version": "rust-boundary-fixture-v1",
+ "task": "TASK-260728-12pnm1",
+ "host": {
+  "operating_system": "macos",
+  "architecture": "arm64",
+  "probe_go_version": "go1.25.5"
+ },
+ "toolchain": {
+  "root": "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin",
+  "available": true,
+  "cargo_path": "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+  "rustc_path": "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+  "linker_path": "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld",
+  "rust_version": "1.91.0",
+  "cargo_version": "cargo 1.91.0 (ea2d97820 2025-10-10)",
+  "host_tuple": "aarch64-apple-darwin",
+  "stdlib_present": true,
+  "sdk_root": "/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+  "linker_flavor": "ld64.lld"
+ },
+ "cases": [
+  {
+   "case": {
+    "id": "accept.two-component",
+    "literal": "\"1.85\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.85\"",
+    "edition_cause_line": "rust-version 1.85 is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-accept-two-component@0.1.0 requires rustc 1.85",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "reported-value"
+   },
+   "corroborating": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "exit-zero-no-rejection"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-two-component",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "{\"packages\":[{\"name\":\"probe-accept-two-component\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-two-component#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-accept-two-component\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-two-component/src/main.rs\",\"edition\":\"2021\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-two-component/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2021\",\"links\":null,\"default_run\":null,\"rust_version\":\"1.85\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-two-component#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-two-component#0.1.0\"],\"resolve\":null,\"target_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"build_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"version\":1,\"workspace_root\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-two-component\",\"metadata\":null}\n",
+     "stderr": ""
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-two-component",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "",
+     "stderr": ""
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "accept.three-component",
+    "literal": "\"1.85.0\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.85.0\"",
+    "edition_cause_line": "rust-version 1.85.0 is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-accept-three-component@0.1.0 requires rustc 1.85.0",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "reported-value"
+   },
+   "corroborating": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "exit-zero-no-rejection"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-three-component",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "{\"packages\":[{\"name\":\"probe-accept-three-component\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-three-component#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-accept-three-component\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-three-component/src/main.rs\",\"edition\":\"2021\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-three-component/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2021\",\"links\":null,\"default_run\":null,\"rust_version\":\"1.85.0\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-three-component#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-three-component#0.1.0\"],\"resolve\":null,\"target_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"build_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"version\":1,\"workspace_root\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-three-component\",\"metadata\":null}\n",
+     "stderr": ""
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-three-component",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "",
+     "stderr": ""
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "accept.bare-major-edition-2015",
+    "literal": "\"1\"",
+    "edition": "2015",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true,
+    "note": "grammar-representable; edition 2015 has the lowest floor"
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1\"",
+    "edition_cause_line": "rust-version 1 is older than first version (1.0.0) required by the specified edition (2015)",
+    "host_gate_cause_line": "probe-accept-bare-major-edition-2015@0.1.0 requires rustc 1",
+    "edition_floor": "1.0.0"
+   },
+   "isolated": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "reported-value"
+   },
+   "corroborating": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "exit-zero-no-rejection"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-bare-major-edition-2015",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "{\"packages\":[{\"name\":\"probe-accept-bare-major-edition-2015\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-bare-major-edition-2015#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-accept-bare-major-edition-2015\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-bare-major-edition-2015/src/main.rs\",\"edition\":\"2015\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-bare-major-edition-2015/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2015\",\"links\":null,\"default_run\":null,\"rust_version\":\"1\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-bare-major-edition-2015#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-bare-major-edition-2015#0.1.0\"],\"resolve\":null,\"target_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"build_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"version\":1,\"workspace_root\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-bare-major-edition-2015\",\"metadata\":null}\n",
+     "stderr": ""
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-bare-major-edition-2015",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "",
+     "stderr": ""
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "accept.edition-2018-at-floor",
+    "literal": "\"1.31\"",
+    "edition": "2018",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.31\"",
+    "edition_cause_line": "rust-version 1.31 is older than first version (1.31.0) required by the specified edition (2018)",
+    "host_gate_cause_line": "probe-accept-edition-2018-at-floor@0.1.0 requires rustc 1.31",
+    "edition_floor": "1.31.0"
+   },
+   "isolated": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "reported-value"
+   },
+   "corroborating": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "exit-zero-no-rejection"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2018-at-floor",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "{\"packages\":[{\"name\":\"probe-accept-edition-2018-at-floor\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2018-at-floor#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-accept-edition-2018-at-floor\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2018-at-floor/src/main.rs\",\"edition\":\"2018\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2018-at-floor/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2018\",\"links\":null,\"default_run\":null,\"rust_version\":\"1.31\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2018-at-floor#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2018-at-floor#0.1.0\"],\"resolve\":null,\"target_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"build_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"version\":1,\"workspace_root\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2018-at-floor\",\"metadata\":null}\n",
+     "stderr": ""
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2018-at-floor",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "",
+     "stderr": ""
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "accept.edition-2024-at-floor",
+    "literal": "\"1.85\"",
+    "edition": "2024",
+    "expect_layer": "accepted",
+    "curator_class": 5,
+    "compared": true
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.85\"",
+    "edition_cause_line": "rust-version 1.85 is older than first version (1.85.0) required by the specified edition (2024)",
+    "host_gate_cause_line": "probe-accept-edition-2024-at-floor@0.1.0 requires rustc 1.85",
+    "edition_floor": "1.85.0"
+   },
+   "isolated": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "reported-value"
+   },
+   "corroborating": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "exit-zero-no-rejection"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2024-at-floor",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "{\"packages\":[{\"name\":\"probe-accept-edition-2024-at-floor\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2024-at-floor#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-accept-edition-2024-at-floor\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2024-at-floor/src/main.rs\",\"edition\":\"2024\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2024-at-floor/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2024\",\"links\":null,\"default_run\":null,\"rust_version\":\"1.85\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2024-at-floor#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2024-at-floor#0.1.0\"],\"resolve\":null,\"target_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"build_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"version\":1,\"workspace_root\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2024-at-floor\",\"metadata\":null}\n",
+     "stderr": ""
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-edition-2024-at-floor",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "",
+     "stderr": ""
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "accept.above-host",
+    "literal": "\"1.99\"",
+    "edition": "2021",
+    "expect_layer": "accepted",
+    "curator_class": 4,
+    "compared": true,
+    "note": "isolation witness: representable and above the resolved toolchain, so a command that reports it cannot be applying the host gate"
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.99\"",
+    "edition_cause_line": "rust-version 1.99 is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-accept-above-host@0.1.0 requires rustc 1.99",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "reported-value"
+   },
+   "corroborating": {
+    "layer": "host-gate",
+    "recognised": true,
+    "matched_by": "host-gate"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-above-host",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "{\"packages\":[{\"name\":\"probe-accept-above-host\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-above-host#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-accept-above-host\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-above-host/src/main.rs\",\"edition\":\"2021\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-above-host/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2021\",\"links\":null,\"default_run\":null,\"rust_version\":\"1.99\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-above-host#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-above-host#0.1.0\"],\"resolve\":null,\"target_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"build_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"version\":1,\"workspace_root\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-above-host\",\"metadata\":null}\n",
+     "stderr": ""
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-accept-above-host",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: rustc 1.91.0 is not supported by the following package:\n  probe-accept-above-host@0.1.0 requires rustc 1.99\n\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "document.float",
+    "literal": "1.85",
+    "edition": "2021",
+    "toml_type_phrase": "floating point `1.85`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = 1.85",
+    "edition_cause_line": "rust-version 1.85 is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-document-float@0.1.0 requires rustc 1.85",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "document",
+    "recognised": true,
+    "matched_by": "document"
+   },
+   "corroborating": {
+    "layer": "document",
+    "recognised": true,
+    "matched_by": "document"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-document-float",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: invalid type: floating point `1.85`, expected a semver or workspace\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = 1.85\n  |                ^^^^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-document-float",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: invalid type: floating point `1.85`, expected a semver or workspace\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = 1.85\n  |                ^^^^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "document.integer",
+    "literal": "1",
+    "edition": "2021",
+    "toml_type_phrase": "integer `1`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = 1",
+    "edition_cause_line": "rust-version 1 is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-document-integer@0.1.0 requires rustc 1",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "document",
+    "recognised": true,
+    "matched_by": "document"
+   },
+   "corroborating": {
+    "layer": "document",
+    "recognised": true,
+    "matched_by": "document"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-document-integer",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: invalid type: integer `1`, expected a semver or workspace\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = 1\n  |                ^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-document-integer",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: invalid type: integer `1`, expected a semver or workspace\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = 1\n  |                ^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "document.boolean",
+    "literal": "true",
+    "edition": "2021",
+    "toml_type_phrase": "boolean `true`",
+    "expect_layer": "document",
+    "curator_class": 1,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = true",
+    "edition_cause_line": "rust-version true is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-document-boolean@0.1.0 requires rustc true",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "document",
+    "recognised": true,
+    "matched_by": "document"
+   },
+   "corroborating": {
+    "layer": "document",
+    "recognised": true,
+    "matched_by": "document"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-document-boolean",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: invalid type: boolean `true`, expected a semver or workspace\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = true\n  |                ^^^^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-document-boolean",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: invalid type: boolean `true`, expected a semver or workspace\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = true\n  |                ^^^^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "grammar.prerelease",
+    "literal": "\"1.85.0-beta\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.85.0-beta\"",
+    "edition_cause_line": "rust-version 1.85.0-beta is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-grammar-prerelease@0.1.0 requires rustc 1.85.0-beta",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/prerelease"
+   },
+   "corroborating": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/prerelease"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-prerelease",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: unexpected prerelease field, expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"1.85.0-beta\"\n  |                ^^^^^^^^^^^^^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-prerelease",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: unexpected prerelease field, expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"1.85.0-beta\"\n  |                ^^^^^^^^^^^^^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "grammar.nonnumeric",
+    "literal": "\"not-a-version\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"not-a-version\"",
+    "edition_cause_line": "rust-version not-a-version is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-grammar-nonnumeric@0.1.0 requires rustc not-a-version",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/prerelease"
+   },
+   "corroborating": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/prerelease"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-nonnumeric",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: unexpected prerelease field, expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"not-a-version\"\n  |                ^^^^^^^^^^^^^^^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-nonnumeric",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: unexpected prerelease field, expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"not-a-version\"\n  |                ^^^^^^^^^^^^^^^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "grammar.build-metadata",
+    "literal": "\"1.85.0+build\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.85.0+build\"",
+    "edition_cause_line": "rust-version 1.85.0+build is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-grammar-build-metadata@0.1.0 requires rustc 1.85.0+build",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/build"
+   },
+   "corroborating": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/build"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-build-metadata",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: unexpected build field, expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"1.85.0+build\"\n  |                ^^^^^^^^^^^^^^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-build-metadata",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: unexpected build field, expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"1.85.0+build\"\n  |                ^^^^^^^^^^^^^^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "grammar.four-components",
+    "literal": "\"1.85.0.1\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.85.0.1\"",
+    "edition_cause_line": "rust-version 1.85.0.1 is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-grammar-four-components@0.1.0 requires rustc 1.85.0.1",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/other"
+   },
+   "corroborating": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/other"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-four-components",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"1.85.0.1\"\n  |                ^^^^^^^^^^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-four-components",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"1.85.0.1\"\n  |                ^^^^^^^^^^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "grammar.track-token",
+    "literal": "\"stable\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"stable\"",
+    "edition_cause_line": "rust-version stable is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-grammar-track-token@0.1.0 requires rustc stable",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/other"
+   },
+   "corroborating": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/other"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-track-token",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"stable\"\n  |                ^^^^^^^^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-track-token",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"stable\"\n  |                ^^^^^^^^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "grammar.empty",
+    "literal": "\"\"",
+    "edition": "2021",
+    "expect_layer": "grammar",
+    "curator_class": 2,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"\"",
+    "edition_cause_line": "rust-version  is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-grammar-empty@0.1.0 requires rustc ",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/other"
+   },
+   "corroborating": {
+    "layer": "grammar",
+    "recognised": true,
+    "matched_by": "grammar/other"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-empty",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"\"\n  |                ^^\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-grammar-empty",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: expected a version like \"1.32\"\n --\u003e Cargo.toml:5:16\n  |\n5 | rust-version = \"\"\n  |                ^^\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "edition.bare-major-2018",
+    "literal": "\"1\"",
+    "edition": "2018",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false,
+    "note": "independence witness: the grammar layer accepts this value, the edition floor does not"
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1\"",
+    "edition_cause_line": "rust-version 1 is older than first version (1.31.0) required by the specified edition (2018)",
+    "host_gate_cause_line": "probe-edition-bare-major-2018@0.1.0 requires rustc 1",
+    "edition_floor": "1.31.0"
+   },
+   "isolated": {
+    "layer": "edition-floor",
+    "recognised": true,
+    "matched_by": "edition-floor"
+   },
+   "corroborating": {
+    "layer": "edition-floor",
+    "recognised": true,
+    "matched_by": "edition-floor"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-bare-major-2018",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-bare-major-2018/Cargo.toml`\n\nCaused by:\n  rust-version 1 is older than first version (1.31.0) required by the specified edition (2018)\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-bare-major-2018",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-bare-major-2018/Cargo.toml`\n\nCaused by:\n  rust-version 1 is older than first version (1.31.0) required by the specified edition (2018)\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "edition.below-2021",
+    "literal": "\"1.31\"",
+    "edition": "2021",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.31\"",
+    "edition_cause_line": "rust-version 1.31 is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-edition-below-2021@0.1.0 requires rustc 1.31",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "edition-floor",
+    "recognised": true,
+    "matched_by": "edition-floor"
+   },
+   "corroborating": {
+    "layer": "edition-floor",
+    "recognised": true,
+    "matched_by": "edition-floor"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-below-2021",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-below-2021/Cargo.toml`\n\nCaused by:\n  rust-version 1.31 is older than first version (1.56.0) required by the specified edition (2021)\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-below-2021",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-below-2021/Cargo.toml`\n\nCaused by:\n  rust-version 1.31 is older than first version (1.56.0) required by the specified edition (2021)\n"
+    }
+   ]
+  },
+  {
+   "case": {
+    "id": "edition.below-2024",
+    "literal": "\"1.56\"",
+    "edition": "2024",
+    "expect_layer": "edition-floor",
+    "curator_class": 3,
+    "compared": false
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.56\"",
+    "edition_cause_line": "rust-version 1.56 is older than first version (1.85.0) required by the specified edition (2024)",
+    "host_gate_cause_line": "probe-edition-below-2024@0.1.0 requires rustc 1.56",
+    "edition_floor": "1.85.0"
+   },
+   "isolated": {
+    "layer": "edition-floor",
+    "recognised": true,
+    "matched_by": "edition-floor"
+   },
+   "corroborating": {
+    "layer": "edition-floor",
+    "recognised": true,
+    "matched_by": "edition-floor"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-below-2024",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-below-2024/Cargo.toml`\n\nCaused by:\n  rust-version 1.56 is older than first version (1.85.0) required by the specified edition (2024)\n"
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-below-2024",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-edition-below-2024/Cargo.toml`\n\nCaused by:\n  rust-version 1.56 is older than first version (1.85.0) required by the specified edition (2024)\n"
+    }
+   ]
+  }
+ ],
+ "host_gate_cases": [
+  {
+   "case": {
+    "id": "hostgate.above-resolved",
+    "literal": "\"1.99\"",
+    "edition": "2021",
+    "expect_layer": "host-gate",
+    "curator_class": 4,
+    "compared": true,
+    "note": "same value as accept.above-host; the isolated command reports it, the corroborating command gates on it"
+   },
+   "status": "match",
+   "predicted": {
+    "caret_line": "5 | rust-version = \"1.99\"",
+    "edition_cause_line": "rust-version 1.99 is older than first version (1.56.0) required by the specified edition (2021)",
+    "host_gate_cause_line": "probe-hostgate-above-resolved@0.1.0 requires rustc 1.99",
+    "edition_floor": "1.56.0"
+   },
+   "isolated": {
+    "layer": "accepted",
+    "recognised": true,
+    "matched_by": "reported-value"
+   },
+   "corroborating": {
+    "layer": "host-gate",
+    "recognised": true,
+    "matched_by": "host-gate"
+   },
+   "agreed": true,
+   "matched_expectation": true,
+   "runs": [
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "metadata",
+      "--no-deps",
+      "--format-version",
+      "1",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-hostgate-above-resolved",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 0,
+     "stdout": "{\"packages\":[{\"name\":\"probe-hostgate-above-resolved\",\"version\":\"0.1.0\",\"id\":\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-hostgate-above-resolved#0.1.0\",\"license\":null,\"license_file\":null,\"description\":null,\"source\":null,\"dependencies\":[],\"targets\":[{\"kind\":[\"bin\"],\"crate_types\":[\"bin\"],\"name\":\"probe-hostgate-above-resolved\",\"src_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-hostgate-above-resolved/src/main.rs\",\"edition\":\"2021\",\"doc\":true,\"doctest\":false,\"test\":true}],\"features\":{},\"manifest_path\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-hostgate-above-resolved/Cargo.toml\",\"metadata\":null,\"publish\":null,\"authors\":[],\"categories\":[],\"keywords\":[],\"readme\":null,\"repository\":null,\"homepage\":null,\"documentation\":null,\"edition\":\"2021\",\"links\":null,\"default_run\":null,\"rust_version\":\"1.99\"}],\"workspace_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-hostgate-above-resolved#0.1.0\"],\"workspace_default_members\":[\"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-hostgate-above-resolved#0.1.0\"],\"resolve\":null,\"target_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"build_directory\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target\",\"version\":1,\"workspace_root\":\"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-hostgate-above-resolved\",\"metadata\":null}\n",
+     "stderr": ""
+    },
+    {
+     "argv": [
+      "/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo",
+      "build",
+      "--offline",
+      "--color",
+      "never",
+      "--quiet",
+      "--target",
+      "aarch64-apple-darwin"
+     ],
+     "dir": "/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cases/probe-hostgate-above-resolved",
+     "env_delta": [
+      "CARGO_ENCODED_RUSTDOCFLAGS=",
+      "CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld\u001f-Clinker-flavor=ld64.lld",
+      "CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/cargo-home",
+      "CARGO_INCREMENTAL=0",
+      "CARGO_NET_GIT_FETCH_WITH_CLI=false",
+      "CARGO_NET_OFFLINE=true",
+      "CARGO_NET_RETRY=0",
+      "CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/target",
+      "CARGO_TERM_COLOR=never",
+      "HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/home",
+      "LANG=C",
+      "LC_ALL=C",
+      "PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/empty-path",
+      "RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc",
+      "RUSTC_WORKSPACE_WRAPPER=",
+      "RUSTC_WRAPPER=",
+      "SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/tmp",
+      "XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-cache",
+      "XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework3/probe-work-controls/xdg-config"
+     ],
+     "exit_code": 101,
+     "stdout": "",
+     "stderr": "error: rustc 1.91.0 is not supported by the following package:\n  probe-hostgate-above-resolved@0.1.0 requires rustc 1.99\n\n"
+    }
+   ]
+  }
+ ],
+ "alignment": {
+  "security_partition_empty": true,
+  "p1_no_widening": true,
+  "p2_no_narrowing": true
+ },
+ "closure": [
+  {
+   "id": "A/no-manifest",
+   "direction": "acceptance-laundering",
+   "kind": "real-unrelated-failure",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "exit=101"
+  },
+  {
+   "id": "A/unknown-subcommand",
+   "direction": "acceptance-laundering",
+   "kind": "real-unrelated-failure",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "exit=101"
+  },
+  {
+   "id": "A/locked-without-lockfile",
+   "direction": "acceptance-laundering",
+   "kind": "real-unrelated-failure",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "exit=101"
+  },
+  {
+   "id": "A/bad-flag",
+   "direction": "acceptance-laundering",
+   "kind": "real-unrelated-failure",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "exit=1"
+  },
+  {
+   "id": "B/crossfeed/document.float",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/document.integer",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/document.boolean",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/grammar.prerelease",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/grammar.nonnumeric",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/grammar.build-metadata",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/grammar.four-components",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/grammar.track-token",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/grammar.empty",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/edition.bare-major-2018",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/edition.below-2021",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "B/crossfeed/edition.below-2024",
+   "direction": "rejection-laundering",
+   "kind": "measured-outcome-under-wrong-value",
+   "yielded": "unknown",
+   "no_verdict": true
+  },
+  {
+   "id": "C/grammar-lead-extended",
+   "direction": "rejection-laundering",
+   "kind": "constructed-extension",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "constructed, not measured: an outcome upstream has not yet written cannot be measured on any host"
+  },
+  {
+   "id": "C/grammar-prerelease-retitled",
+   "direction": "rejection-laundering",
+   "kind": "constructed-extension",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "constructed, not measured: an outcome upstream has not yet written cannot be measured on any host"
+  },
+  {
+   "id": "C/edition-floor-reworded",
+   "direction": "rejection-laundering",
+   "kind": "constructed-extension",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "constructed, not measured: an outcome upstream has not yet written cannot be measured on any host"
+  },
+  {
+   "id": "C/host-gate-extended",
+   "direction": "rejection-laundering",
+   "kind": "constructed-extension",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "constructed, not measured: an outcome upstream has not yet written cannot be measured on any host"
+  },
+  {
+   "id": "C/caret-line-renumbered",
+   "direction": "rejection-laundering",
+   "kind": "constructed-extension",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "constructed, not measured: an outcome upstream has not yet written cannot be measured on any host"
+  },
+  {
+   "id": "C/first-line-only",
+   "direction": "rejection-laundering",
+   "kind": "constructed-extension",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "constructed, not measured: an outcome upstream has not yet written cannot be measured on any host"
+  },
+  {
+   "id": "C/second-line-only",
+   "direction": "rejection-laundering",
+   "kind": "constructed-extension",
+   "yielded": "unknown",
+   "no_verdict": true,
+   "detail": "constructed, not measured: an outcome upstream has not yet written cannot be measured on any host"
+  },
+  {
+   "id": "C/exit-zero-wrong-value",
+   "direction": "acceptance-laundering",
+   "kind": "constructed-extension",
+   "yielded": "unknown",
+   "no_verdict": true
+  }
+ ],
+ "controls": [
+  {
+   "id": "C1/open-classifier",
+   "guards": "closure in both laundering directions",
+   "failed": true,
+   "findings": 4,
+   "detail": "a fall-through branch would name a verdict for 4 measured unrelated failures that the closed classifier leaves without one"
+  },
+  {
+   "id": "C2/lead-only-recognition",
+   "guards": "three grammar classes collapsing into one",
+   "failed": true,
+   "findings": 6,
+   "detail": "a lead-only classifier recognised 6 diagnostics that were produced for a different value under test (examples: grammar.prerelease, grammar.nonnumeric, grammar.build-metadata)"
+  },
+  {
+   "id": "C3/exit-status-as-semantics",
+   "guards": "the host gate folded into the grammar layer",
+   "failed": true,
+   "findings": 1,
+   "detail": "1 cases where the corroborating command's exit status disagrees with the isolated representability measurement (examples: accept.above-host)"
+  },
+  {
+   "id": "C4/build-as-isolated",
+   "guards": "the host gate folded in by command choice",
+   "failed": true,
+   "findings": 1,
+   "detail": "isolated=accepted corroborating=host-gate for a representable value above the resolved toolchain; using the corroborating command as the isolated one yields a P1 violation"
+  },
+  {
+   "id": "C5/edition-folded-into-grammar",
+   "guards": "one host-independent layer swallowing another",
+   "failed": true,
+   "findings": 3,
+   "detail": "3 measured values are grammar-representable and rejected only by the edition floor; a merged classifier would report them as grammar rejections"
+  },
+  {
+   "id": "C6/substring-matching",
+   "guards": "recognising a family rather than an outcome",
+   "failed": true,
+   "findings": 6,
+   "detail": "a substring matcher recognised 6 outcomes that belong to a different value under test"
+  },
+  {
+   "id": "C7/graph-without-all-features",
+   "guards": "a proc macro reachable only through a non-default feature, invisible to the matrix",
+   "failed": true,
+   "findings": 1,
+   "detail": "the proc-macro package is absent from packages[]: probefeat"
+  },
+  {
+   "id": "C8/escape-decided-after-cargo-read",
+   "guards": "cargo opening, parsing and reporting a manifest outside the build root",
+   "failed": true,
+   "findings": 1,
+   "detail": "cargo quoted the outside manifest before any verdict could be computed"
+  },
+  {
+   "id": "C9/naive-basic-string-config",
+   "guards": "a package-influenced vendor path injecting tables into the manager-written config",
+   "failed": true,
+   "findings": 6,
+   "detail": "the written document carries 6 table headers and an injected offline=false"
+  },
+  {
+   "id": "C10/operator-cargo-state-inherited",
+   "guards": "the operator's Cargo configuration and cache supplying package bytes",
+   "failed": true,
+   "findings": 1,
+   "detail": "inherited operator state resolved the dependency (exit 0) where isolation failed (exit 101)"
+  },
+  {
+   "id": "C11/raw-limit-before-folding",
+   "guards": "line-ending-equivalent version streams receiving different verdicts",
+   "failed": true,
+   "findings": 2,
+   "detail": "the superseded order admitted an LF stream and rejected its CRLF equivalent: folded=4096 LF(raw 4096) admitted=true CRLF(raw 4098) admitted=false; folded=4096 LF(raw 4096) admitted=true CRLF(raw 4506) admitted=false"
+  },
+  {
+   "id": "C12/key-only-build-script-gate",
+   "guards": "an auto-discovered build script that no manifest key declares",
+   "failed": true,
+   "findings": 1,
+   "detail": "no manifest key declares a build script, yet cargo reported a custom-build target; before the file rule this shape reached cargo"
+  }
+ ],
+ "structural": null,
+ "vectors": [
+  {
+   "id": "N0/embedded-sample",
+   "group": "normalization",
+   "title": "the embedded measured stream reproduces the recorded digests",
+   "expected": "payload=191 sha=7d8e08339e557ede5a9e565773c4cf17f83dea27f7d0c6591869f184bd1b81b5 record=208 sha=7fc35c11acae420849418f9c9f9b5681651beedc6d68f00bf1e4db022cd5f06b",
+   "observed": "payload=191 sha=7d8e08339e557ede5a9e565773c4cf17f83dea27f7d0c6591869f184bd1b81b5 record=208 sha=7fc35c11acae420849418f9c9f9b5681651beedc6d68f00bf1e4db022cd5f06b",
+   "verdict": "match"
+  },
+  {
+   "id": "N0/embedded-cargo",
+   "group": "normalization",
+   "title": "the embedded cargo --version stream reproduces the recorded digests",
+   "expected": "payload=35 sha=8d712854de14f22840767bc824c5ac08098f35ddaa44437256e31b53cb546165 record=52 sha=d677e668d65108419fd197d147f31f2dda30a1364233440f3b0138d5185c2f78",
+   "observed": "payload=35 sha=8d712854de14f22840767bc824c5ac08098f35ddaa44437256e31b53cb546165 record=52 sha=d677e668d65108419fd197d147f31f2dda30a1364233440f3b0138d5185c2f78",
+   "verdict": "match"
+  },
+  {
+   "id": "N1/live-stream",
+   "group": "normalization",
+   "title": "live rustc -vV stdout normalizes and frames deterministically",
+   "expected": "normalizes; digest equals the constant when the bytes equal the sample",
+   "observed": "normalizes; digest equals the constant when the bytes equal the sample",
+   "verdict": "match",
+   "detail": "host-dependent by construction"
+  },
+  {
+   "id": "N2/crlf-folds",
+   "group": "normalization",
+   "title": "CRLF line endings fold to the same payload",
+   "expected": "same digest",
+   "observed": "same digest",
+   "verdict": "match"
+  },
+  {
+   "id": "N3/line-removed",
+   "group": "normalization",
+   "title": "one interior line removed",
+   "expected": "different digest",
+   "observed": "different digest",
+   "verdict": "match"
+  },
+  {
+   "id": "N4/byte-changed",
+   "group": "normalization",
+   "title": "one payload byte changed",
+   "expected": "different digest",
+   "observed": "different digest",
+   "verdict": "match"
+  },
+  {
+   "id": "N5/lines-transposed",
+   "group": "normalization",
+   "title": "two whole lines transposed",
+   "expected": "different digest",
+   "observed": "different digest",
+   "verdict": "match"
+  },
+  {
+   "id": "N6/bare-cr",
+   "group": "normalization",
+   "title": "a bare CR inserted",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "contains a bare CR"
+  },
+  {
+   "id": "N7/no-terminal-lf",
+   "group": "normalization",
+   "title": "no terminal LF",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "does not end with LF"
+  },
+  {
+   "id": "N8/two-terminal-lf",
+   "group": "normalization",
+   "title": "two terminal LFs",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "ends with more than one LF"
+  },
+  {
+   "id": "N9/nul",
+   "group": "normalization",
+   "title": "a NUL inserted",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "contains NUL"
+  },
+  {
+   "id": "N10/invalid-utf8",
+   "group": "normalization",
+   "title": "invalid UTF-8 inserted",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "not valid UTF-8"
+  },
+  {
+   "id": "N11/empty",
+   "group": "normalization",
+   "title": "empty stdout",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "shorter than two bytes"
+  },
+  {
+   "id": "N12/too-long",
+   "group": "normalization",
+   "title": "a folded stream of 4097 bytes",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "over 4096 bytes after folding"
+  },
+  {
+   "id": "N13/c-record-multiline",
+   "group": "normalization",
+   "title": "a C payload carrying an interior LF",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "single-line record carries an interior LF"
+  },
+  {
+   "id": "N14/boundary-4096-two-line",
+   "group": "normalization",
+   "title": "folded stream of exactly 4096 bytes, two lines",
+   "expected": "both admitted, identical payload and digest",
+   "observed": "both admitted, identical payload and digest",
+   "verdict": "match",
+   "detail": "folded=4096 raw LF=4096 raw CRLF=4098 payload=4095 sha=f168ab077a348ef9"
+  },
+  {
+   "id": "N15/boundary-4097-two-line",
+   "group": "normalization",
+   "title": "folded stream of exactly 4097 bytes, two lines",
+   "expected": "both rejected",
+   "observed": "both rejected",
+   "verdict": "match",
+   "detail": "folded=4097 raw LF=4097 raw CRLF=4099 reason=over 4096 bytes after folding"
+  },
+  {
+   "id": "N16/boundary-4096-many-line",
+   "group": "normalization",
+   "title": "folded stream of exactly 4096 bytes over 410 lines",
+   "expected": "both admitted, identical payload and digest",
+   "observed": "both admitted, identical payload and digest",
+   "verdict": "match",
+   "detail": "folded=4096 raw LF=4096 raw CRLF=4506 payload=4095 sha=f8bf84b67b4517c4"
+  },
+  {
+   "id": "N17/boundary-4097-many-line",
+   "group": "normalization",
+   "title": "folded stream of exactly 4097 bytes over 410 lines",
+   "expected": "both rejected",
+   "observed": "both rejected",
+   "verdict": "match",
+   "detail": "folded=4097 raw LF=4097 raw CRLF=4507 reason=over 4096 bytes after folding"
+  },
+  {
+   "id": "N18/raw-bound-not-preemptive",
+   "group": "normalization",
+   "title": "the maximal CRLF expansion of an in-bound folded stream reaches the semantic rules",
+   "expected": "rejected for a semantic reason",
+   "observed": "rejected for a semantic reason",
+   "verdict": "match",
+   "detail": "raw=8192 folded=4096 reason=\"ends with more than one LF\""
+  },
+  {
+   "id": "N19/raw-bound-is-non-lossy",
+   "group": "normalization",
+   "title": "no raw length above the capture bound can fold within the semantic bound",
+   "expected": "0 such lengths",
+   "observed": "0 such lengths",
+   "verdict": "match",
+   "detail": "checked raw lengths 0..32768"
+  },
+  {
+   "id": "P1/plain",
+   "group": "prewalk",
+   "title": "lexical path grammar: P1/plain",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P2/nested",
+   "group": "prewalk",
+   "title": "lexical path grammar: P2/nested",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P3/vendored",
+   "group": "prewalk",
+   "title": "lexical path grammar: P3/vendored",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P4/non-ascii",
+   "group": "prewalk",
+   "title": "lexical path grammar: P4/non-ascii",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P5/parent",
+   "group": "prewalk",
+   "title": "lexical path grammar: P5/parent",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 6: dot component"
+  },
+  {
+   "id": "P6/parent-deep",
+   "group": "prewalk",
+   "title": "lexical path grammar: P6/parent-deep",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 6: dot component"
+  },
+  {
+   "id": "P7/absolute",
+   "group": "prewalk",
+   "title": "lexical path grammar: P7/absolute",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 4: absolute"
+  },
+  {
+   "id": "P8/drive",
+   "group": "prewalk",
+   "title": "lexical path grammar: P8/drive",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 5: drive prefix"
+  },
+  {
+   "id": "P9/drive-lower",
+   "group": "prewalk",
+   "title": "lexical path grammar: P9/drive-lower",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 5: drive prefix"
+  },
+  {
+   "id": "P10/unc",
+   "group": "prewalk",
+   "title": "lexical path grammar: P10/unc",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 5: UNC prefix"
+  },
+  {
+   "id": "P11/backslash",
+   "group": "prewalk",
+   "title": "lexical path grammar: P11/backslash",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: backslash"
+  },
+  {
+   "id": "P12/backslash-inner",
+   "group": "prewalk",
+   "title": "lexical path grammar: P12/backslash-inner",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: backslash"
+  },
+  {
+   "id": "P13/empty-component",
+   "group": "prewalk",
+   "title": "lexical path grammar: P13/empty-component",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 6: empty component"
+  },
+  {
+   "id": "P14/dot-component",
+   "group": "prewalk",
+   "title": "lexical path grammar: P14/dot-component",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 6: dot component"
+  },
+  {
+   "id": "P15/trailing-dot",
+   "group": "prewalk",
+   "title": "lexical path grammar: P15/trailing-dot",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 7: trailing dot or space"
+  },
+  {
+   "id": "P16/trailing-space",
+   "group": "prewalk",
+   "title": "lexical path grammar: P16/trailing-space",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 7: trailing dot or space"
+  },
+  {
+   "id": "P17/reserved-con",
+   "group": "prewalk",
+   "title": "lexical path grammar: P17/reserved-con",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 7: reserved device name"
+  },
+  {
+   "id": "P18/reserved-com1-ext",
+   "group": "prewalk",
+   "title": "lexical path grammar: P18/reserved-com1-ext",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 7: reserved device name"
+  },
+  {
+   "id": "P19/control-char",
+   "group": "prewalk",
+   "title": "lexical path grammar: P19/control-char",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: control character"
+  },
+  {
+   "id": "P20/nul",
+   "group": "prewalk",
+   "title": "lexical path grammar: P20/nul",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: NUL"
+  },
+  {
+   "id": "P21/home",
+   "group": "prewalk",
+   "title": "lexical path grammar: P21/home",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 5: home prefix"
+  },
+  {
+   "id": "P22/empty",
+   "group": "prewalk",
+   "title": "lexical path grammar: P22/empty",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 1: empty"
+  },
+  {
+   "id": "P23/too-long",
+   "group": "prewalk",
+   "title": "lexical path grammar: P23/too-long",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 1: over 1024 bytes"
+  },
+  {
+   "id": "P24/symlink-component",
+   "group": "prewalk",
+   "title": "a lexically clean path traversing a symlink",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match"
+  },
+  {
+   "id": "P25/physical-ok",
+   "group": "prewalk",
+   "title": "a real directory with a manifest",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match"
+  },
+  {
+   "id": "P26/missing-dependency",
+   "group": "prewalk",
+   "title": "a dependency path that does not exist",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "dependency path does not exist"
+  },
+  {
+   "id": "P27/missing-target",
+   "group": "prewalk",
+   "title": "a target path that does not exist",
+   "expected": "admitted",
+   "observed": "admitted",
+   "verdict": "match",
+   "detail": "a vendored crate may declare a target whose sources were not vendored"
+  },
+  {
+   "id": "P31/absent-leaf-has-no-canonical-form",
+   "group": "prewalk",
+   "title": "the canonical form of a permitted absent leaf",
+   "expected": "cannot be canonicalized",
+   "observed": "cannot be canonicalized",
+   "verdict": "match",
+   "detail": "this is why the rule anchors on the deepest existing ancestor"
+  },
+  {
+   "id": "P32/absent-leaf-safe-ancestors",
+   "group": "prewalk",
+   "title": "an absent target path below real directories",
+   "expected": "admitted, leaf_exists=false anchor_is_deepest_existing=true",
+   "observed": "admitted, leaf_exists=false anchor_is_deepest_existing=true",
+   "verdict": "match"
+  },
+  {
+   "id": "P33/absent-leaf-symlink-ancestor",
+   "group": "prewalk",
+   "title": "an absent target path below a symbolic-link ancestor",
+   "expected": "rejected at the symbolic link component",
+   "observed": "rejected at the symbolic link component",
+   "verdict": "match",
+   "detail": "the walk rejects before the leaf is looked at"
+  },
+  {
+   "id": "P34/dependency-symlink-ancestor",
+   "group": "prewalk",
+   "title": "a dependency path below a symbolic-link ancestor",
+   "expected": "rejected at the symbolic link component",
+   "observed": "rejected at the symbolic link component",
+   "verdict": "match"
+  },
+  {
+   "id": "P35/non-directory-ancestor",
+   "group": "prewalk",
+   "title": "a path below an existing regular file",
+   "expected": "target=admitted dependency=rejected (dependency path does not exist)",
+   "observed": "target=admitted dependency=rejected (dependency path does not exist)",
+   "verdict": "match"
+  },
+  {
+   "id": "P36/symlink-leaf",
+   "group": "prewalk",
+   "title": "a target path that is itself a symbolic link",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "a link inside R is still a redirection the manager did not admit"
+  },
+  {
+   "id": "P37/auto-discovered-build-script",
+   "group": "prewalk",
+   "title": "the build.rs file gate over a manifest directory",
+   "expected": "without build.rs=true with build.rs=false",
+   "observed": "without build.rs=true with build.rs=false",
+   "verdict": "match",
+   "detail": "an entry named build.rs exists in the manifest directory"
+  },
+  {
+   "id": "P28/ancestor-clean",
+   "group": "prewalk",
+   "title": "no ancestor Cargo.toml or .cargo",
+   "expected": "clean",
+   "observed": "clean",
+   "verdict": "match"
+  },
+  {
+   "id": "P29/ancestor-manifest",
+   "group": "prewalk",
+   "title": "an ancestor Cargo.toml is detected",
+   "expected": "offending ancestor manifest found",
+   "observed": "offending ancestor manifest found",
+   "verdict": "match",
+   "detail": "/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/rustprobe-anc-1918659571/parent/Cargo.toml"
+  },
+  {
+   "id": "P30/ancestor-cargo-dir",
+   "group": "prewalk",
+   "title": "an ancestor .cargo directory is detected",
+   "expected": "offending ancestor config directory found",
+   "observed": "offending ancestor config directory found",
+   "verdict": "match",
+   "detail": "/var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/rustprobe-anc-1918659571/parent/.cargo"
+  },
+  {
+   "id": "S1/ascii",
+   "group": "config",
+   "title": "directory serialization: S1/ascii",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S1/ascii/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S2/space",
+   "group": "config",
+   "title": "directory serialization: S2/space",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S2/space/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S3/non-ascii",
+   "group": "config",
+   "title": "directory serialization: S3/non-ascii",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S3/non-ascii/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S4/double-quote",
+   "group": "config",
+   "title": "directory serialization: S4/double-quote",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S4/double-quote/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S5/backslash-unix",
+   "group": "config",
+   "title": "directory serialization: S5/backslash-unix",
+   "expected": "written",
+   "observed": "written",
+   "verdict": "match"
+  },
+  {
+   "id": "S5/backslash-unix/write-back",
+   "group": "config",
+   "title": "the written bytes re-parse to the intended structure",
+   "expected": "four tables, directory byte-equal",
+   "observed": "four tables, directory byte-equal",
+   "verdict": "match"
+  },
+  {
+   "id": "S6/apostrophe",
+   "group": "config",
+   "title": "directory serialization: S6/apostrophe",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 4: apostrophe"
+  },
+  {
+   "id": "S7/newline",
+   "group": "config",
+   "title": "directory serialization: S7/newline",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: control character"
+  },
+  {
+   "id": "S8/tab",
+   "group": "config",
+   "title": "directory serialization: S8/tab",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: control character"
+  },
+  {
+   "id": "S9/del",
+   "group": "config",
+   "title": "directory serialization: S9/del",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: control character"
+  },
+  {
+   "id": "S10/nul",
+   "group": "config",
+   "title": "directory serialization: S10/nul",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 3: NUL"
+  },
+  {
+   "id": "S11/relative",
+   "group": "config",
+   "title": "directory serialization: S11/relative",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: not absolute"
+  },
+  {
+   "id": "S12/empty",
+   "group": "config",
+   "title": "directory serialization: S12/empty",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 1: empty"
+  },
+  {
+   "id": "S13/unc",
+   "group": "config",
+   "title": "directory serialization: S13/unc",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: not absolute"
+  },
+  {
+   "id": "S14/verbatim",
+   "group": "config",
+   "title": "directory serialization: S14/verbatim",
+   "expected": "rejected",
+   "observed": "rejected",
+   "verdict": "match",
+   "detail": "rule 2: not absolute"
+  },
+  {
+   "id": "S15/template-length",
+   "group": "config",
+   "title": "the constant part of the template is 150 bytes",
+   "expected": "prefix=89 suffix=61 total=183",
+   "observed": "prefix=89 suffix=61 total=183",
+   "verdict": "match"
+  },
+  {
+   "id": "S16/template-digest",
+   "group": "config",
+   "title": "the sample document reproduces its recorded digest",
+   "expected": "41aaeac44f7f26e747bbd29fafddd0715b813e5b06edbad967755ac3f87b60f2",
+   "observed": "41aaeac44f7f26e747bbd29fafddd0715b813e5b06edbad967755ac3f87b60f2",
+   "verdict": "match"
+  },
+  {
+   "id": "S17/table-count",
+   "group": "config",
+   "title": "the intended document has exactly four table headers",
+   "expected": "4",
+   "observed": "4",
+   "verdict": "match",
+   "detail": "[source.crates-io] [source.curator-vendor] [net] [term]"
+  },
+  {
+   "id": "S18/no-crlf",
+   "group": "config",
+   "title": "the template carries no CR and exactly one terminal LF",
+   "expected": "true",
+   "observed": "true",
+   "verdict": "match"
+  }
+ ],
+ "summary": {
+  "cases": 19,
+  "matched": 19,
+  "divergences": 0,
+  "not_run": 0,
+  "closure_checks": 24,
+  "closure_failures": 0,
+  "controls_total": 12,
+  "controls_failing_as_required": 12,
+  "structural_total": 0,
+  "structural_divergences": 0,
+  "vectors_total": 81,
+  "vector_divergences": 0,
+  "green": true
+ }
+}

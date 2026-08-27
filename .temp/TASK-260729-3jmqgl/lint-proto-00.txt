@@ -1,0 +1,143 @@
+prototypes/macos-hardened-probes/cmd/hardened-probe/main.go:54:14: Error return value of `fmt.Fprintf` is not checked (errcheck)
+		fmt.Fprintf(fs.Output(), "usage: hardened-probe [flags]\n\nProbes macOS for the capability classes of %s.\n\nFlags:\n", spec.SpecRevision)
+		           ^
+prototypes/macos-hardened-probes/cmd/hardened-probe/main.go:86:21: Error return value of `os.RemoveAll` is not checked (errcheck)
+		defer os.RemoveAll(dir)
+		                  ^
+prototypes/macos-hardened-probes/cmd/hardened-probe/main.go:144:18: Error return value of `os.Stdout.Write` is not checked (errcheck)
+		os.Stdout.Write(result.Evidence.JSON())
+		               ^
+prototypes/macos-hardened-probes/cmd/hardened-probe/main.go:169:13: Error return value of `fmt.Fprintf` is not checked (errcheck)
+	fmt.Fprintf(out, "\nplatform            %s / %s (%s)\n",
+	           ^
+prototypes/macos-hardened-probes/cmd/hardened-probe/main.go:171:13: Error return value of `fmt.Fprintf` is not checked (errcheck)
+	fmt.Fprintf(out, "backend             %s (%s)\n", result.Report.Backend, spec.QualificationUnqualified)
+	           ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:139:17: Error return value of `os.Stdout.Write` is not checked (errcheck)
+	os.Stdout.Write(append(data, '\n'))
+	               ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:240:17: Error return value of `syscall.Close` is not checked (errcheck)
+			syscall.Close(fd)
+			             ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:261:17: Error return value of `listener.Close` is not checked (errcheck)
+		listener.Close()
+		              ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:270:16: Error return value of `syscall.Close` is not checked (errcheck)
+		syscall.Close(pair[0])
+		             ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:271:16: Error return value of `syscall.Close` is not checked (errcheck)
+		syscall.Close(pair[1])
+		             ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:281:13: Error return value of `conn.Close` is not checked (errcheck)
+		conn.Close()
+		          ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:318:11: Error return value of `f.Close` is not checked (errcheck)
+			f.Close()
+			       ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:324:11: Error return value of `f.Close` is not checked (errcheck)
+			f.Close()
+			       ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:347:10: Error return value of `f.Close` is not checked (errcheck)
+		f.Close()
+		       ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:348:12: Error return value of `os.Remove` is not checked (errcheck)
+		os.Remove(created)
+		         ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:355:12: Error return value of `os.Remove` is not checked (errcheck)
+		os.Remove(newDir)
+		         ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:362:12: Error return value of `os.Remove` is not checked (errcheck)
+		os.Remove(link)
+		         ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:604:20: Error return value of `cmd.Process.Kill` is not checked (errcheck)
+			cmd.Process.Kill()
+			                ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:633:16: Error return value of `syscall.Munmap` is not checked (errcheck)
+	syscall.Munmap(data)
+	              ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:716:14: Error return value of `os.WriteFile` is not checked (errcheck)
+	os.WriteFile(marker+".survived", []byte("survived\n"), 0o600)
+	            ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:811:19: Error return value of `syscall.Setrlimit` is not checked (errcheck)
+	syscall.Setrlimit(syscall.RLIMIT_NOFILE, &original)
+	                 ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:139:19: Error return value of `conn.Close` is not checked (errcheck)
+		defer conn.Close()
+		                ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:150:19: Error return value of `file.Close` is not checked (errcheck)
+		defer file.Close()
+		                ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:236:15: Error return value of `os.RemoveAll` is not checked (errcheck)
+		os.RemoveAll(filepath.Join(dir, leftover))
+		            ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:241:15: Error return value of `os.WriteFile` is not checked (errcheck)
+		os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o600)
+		            ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:242:15: Error return value of `os.WriteFile` is not checked (errcheck)
+		os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module probe\n\ngo 1.25.5\n"), 0o600)
+		            ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:249:14: Error return value of `os.MkdirAll` is not checked (errcheck)
+		os.MkdirAll(filepath.Join(dir, "bin"), 0o700)
+		           ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:502:14: Error return value of `os.RemoveAll` is not checked (errcheck)
+	os.RemoveAll(r.env.MarkerDir)
+	            ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:503:13: Error return value of `os.MkdirAll` is not checked (errcheck)
+	os.MkdirAll(r.env.MarkerDir, 0o700)
+	           ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:540:15: Error return value of `syscall.Kill` is not checked (errcheck)
+		syscall.Kill(-res.pgid, syscall.SIGKILL)
+		            ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:557:16: Error return value of `syscall.Kill` is not checked (errcheck)
+			syscall.Kill(pid, syscall.SIGKILL)
+			            ^
+prototypes/macos-hardened-probes/internal/probe/environment.go:106:17: Error return value of `listener.Close` is not checked (errcheck)
+		listener.Close()
+		              ^
+prototypes/macos-hardened-probes/internal/probe/environment.go:144:11: Error return value of `io.Copy` is not checked (errcheck)
+			io.Copy(io.Discard, conn)
+			       ^
+prototypes/macos-hardened-probes/internal/probe/environment.go:145:14: Error return value of `conn.Close` is not checked (errcheck)
+			conn.Close()
+			          ^
+prototypes/macos-hardened-probes/internal/probe/environment.go:155:20: Error return value of `e.listener.Close` is not checked (errcheck)
+			e.listener.Close()
+			                ^
+prototypes/macos-hardened-probes/internal/probe/environment.go:158:24: Error return value of `e.unixListener.Close` is not checked (errcheck)
+			e.unixListener.Close()
+			                    ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:316:13: G304: Potential file inclusion via variable (gosec)
+		f, err := os.OpenFile(existing, os.O_WRONLY, 0)
+		          ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:322:12: G304: Potential file inclusion via variable (gosec)
+		f, err = os.OpenFile(existing, os.O_WRONLY|os.O_TRUNC, 0)
+		         ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:345:12: G304: Potential file inclusion via variable (gosec)
+	f, err := os.OpenFile(created, os.O_CREATE|os.O_WRONLY, 0o600)
+	          ^
+prototypes/macos-hardened-probes/internal/inside/inside.go:760:37: G115: integer overflow conversion int -> uint64 (gosec)
+	limit := syscall.Rlimit{Cur: uint64(cap64), Max: original.Max}
+	                                   ^
+prototypes/macos-hardened-probes/internal/inside/xattr_darwin.go:30:11: G103: Use of unsafe calls should be audited (gosec)
+		uintptr(unsafe.Pointer(pathPtr)),
+		        ^
+prototypes/macos-hardened-probes/internal/inside/xattr_darwin.go:31:11: G103: Use of unsafe calls should be audited (gosec)
+		uintptr(unsafe.Pointer(namePtr)),
+		        ^
+prototypes/macos-hardened-probes/internal/inside/xattr_darwin.go:32:11: G103: Use of unsafe calls should be audited (gosec)
+		uintptr(unsafe.Pointer(&value[0])),
+		        ^
+prototypes/macos-hardened-probes/internal/seatbelt/seatbelt.go:216:9: G204: Subprocess launched with a potential tainted input or cmd arguments (gosec)
+	cmd := exec.CommandContext(ctx, full[0], full[1:]...)
+	       ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:179:53: unused-parameter: parameter 'envKey' seems to be unused, consider removing or renaming it as _ (revive)
+func (r runContext) probeReadOnlyView(class, label, envKey string, viewDir string) ClassResult {
+                                                    ^
+prototypes/macos-hardened-probes/internal/probe/classes.go:55:21: func runContext.runUncontained is unused (unused)
+func (r runContext) runUncontained(op string, extraEnv []string, extraFiles []*os.File) (inside.Report, error) {
+                    ^
+46 issues:
+* errcheck: 36
+* gosec: 8
+* revive: 1
+* unused: 1

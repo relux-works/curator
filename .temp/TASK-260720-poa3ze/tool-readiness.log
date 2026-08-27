@@ -1,0 +1,21 @@
+/Users/iv/.local/bin/task-board
+task-board version 0.20.1-15-g5e2c927 (commit 5e2c927, built 2026-07-16T21:58:34Z)
+/usr/bin/git
+git version 2.50.1 (Apple Git-155)
+/opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex-path/rg
+ripgrep 15.1.0 (rev af60c2de9d)
+/opt/homebrew/bin/python3
+Python 3.14.4
+/usr/bin/curl
+curl 8.7.1 (x86_64-apple-darwin25.0) libcurl/8.7.1 (SecureTransport) LibreSSL/3.3.6 zlib/1.2.12 nghttp2/1.68.1
+readiness retry note: initial make/go probe from the detached curator-spec worktree used a relative .temp log path and failed with "no such file or directory" before invoking make, go, or tests; rerun below uses the absolute task log.
+/usr/bin/make
+GNU Make 3.81
+/opt/homebrew/bin/go
+go version go1.25.5 darwin/arm64
+/opt/homebrew/bin/uv
+uv 0.11.3 (45da18ac3 2026-04-01 aarch64-apple-darwin)
+Python 3.14.4
+pytest 9.0.3
+pytest readiness note: detached cocoaskills worktree had no local .venv and system Python lacked pytest; the verified repository environment /Users/iv/Developer/Wildberries/cocoaskills/.venv/bin/python supplies pytest 9.0.3 and is used for the exact-ref gate.
+spec gate environment note: spec-validate-04 stopped before validation because system Python lacked jsonschema. The verified Python environment provides jsonschema 4.25.1; an exploratory import also found unrelated PyNaCl absent, but the spec tools do not import it. spec-validate-05 selected the verified environment and passed the full Makefile gate.

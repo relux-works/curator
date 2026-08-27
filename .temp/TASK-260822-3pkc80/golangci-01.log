@@ -1,0 +1,5 @@
+cmd/curator/main_test.go:442:18: QF1001: could apply De Morgan's law (staticcheck)
+	if flags < 0 || !(flags < environment && environment < scopes) {
+	                ^
+1 issues:
+* staticcheck: 1

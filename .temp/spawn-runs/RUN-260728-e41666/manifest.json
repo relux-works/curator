@@ -1,0 +1,56 @@
+{
+  "id": "RUN-260728-e41666",
+  "task_id": "TASK-260728-1g0z69",
+  "created_at": "2026-07-28T17:24:47.088339Z",
+  "max_parallel": 20,
+  "agent_type": "claude",
+  "agent_name": "[implementer] developer (claude)",
+  "role": "developer",
+  "role_archetype": "implementer",
+  "model": "claude-opus-5",
+  "selection": {
+    "agent": "claude",
+    "agent_selection_path": "explicit_override",
+    "requested": {
+      "model": "claude-opus-5"
+    },
+    "resolved": {
+      "model": "claude-opus-5"
+    },
+    "constrained": false,
+    "adjustments": []
+  },
+  "launch_composition": {
+    "contract": "agents-infra.child-launch-composition",
+    "schema_version": 1,
+    "status": "degraded_contract_unavailable",
+    "agent": "claude",
+    "producer": {
+      "version": "",
+      "commit": ""
+    },
+    "diagnostic_code": "composition_contract_unavailable"
+  },
+  "prompt_file": "/Users/iv/Developer/ReluxWorks/curator/.temp/prompts/260728-21-24-47_-implementer--developer--claude-_TASK-260728-1g0z69.md",
+  "work_dir": "/Users/iv/Developer/ReluxWorks/curator",
+  "board_dir": "/Users/iv/Developer/ReluxWorks/curator/.task-board",
+  "timeout": "2h0m0s",
+  "log_resource_name": "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-e41666.log",
+  "start_status": "development",
+  "end_status": "to-review",
+  "initial_outcome_names": [
+    "TASK-260728-1g0z69_decision-0007.md",
+    "TASK-260728-1g0z69_results.md",
+    "TASK-260728-1g0z69_review-verdict.md",
+    "TASK-260728-1g0z69_spawn-log_-implementer--developer--claude-_RUN-260728-af7289.log",
+    "TASK-260728-1g0z69_spawn-log_-reviewer--reviewer--codex-_RUN-260728-e30a89.log",
+    "TASK-260728-1g0z69_toolchain-reference.md"
+  ],
+  "initial_outcome_digests": {
+    "TASK-260728-1g0z69_decision-0007.md": "296a74fda739fcfca2fcca6ce1484ec082815ab1078c74eeef1dfb766c7155d3",
+    "TASK-260728-1g0z69_results.md": "be1cc89df678163a73cb186512692708087667fdf8404d193894391eb21a186f",
+    "TASK-260728-1g0z69_review-verdict.md": "aae37815c5d0fe510a56ecf6cdade27a3c388b950c9eb2b0c00a5d25b76075b0",
+    "TASK-260728-1g0z69_toolchain-reference.md": "bb4ab0dfb8168a44e4e9748d17c2f010ecf740aae473c59d9dff99597a6feb96"
+  },
+  "require_outcome_artifact": true
+}

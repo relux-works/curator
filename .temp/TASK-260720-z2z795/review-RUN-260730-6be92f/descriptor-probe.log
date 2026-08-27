@@ -1,0 +1,15 @@
+{"all_binary": true, "labels": ["build", "home", "project"], "stable_open_count": 3, "synthetic_posix_flag": true}
+Traceback (most recent call last):
+  File "<stdin>", line 25, in <module>
+  File "/opt/homebrew/Cellar/python@3.11/3.11.14_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/tempfile.py", line 943, in __exit__
+    self.cleanup()
+  File "/opt/homebrew/Cellar/python@3.11/3.11.14_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/tempfile.py", line 947, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "/opt/homebrew/Cellar/python@3.11/3.11.14_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/tempfile.py", line 929, in _rmtree
+    _shutil.rmtree(name, onerror=onerror)
+  File "/opt/homebrew/Cellar/python@3.11/3.11.14_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/shutil.py", line 748, in rmtree
+    onerror(os.open, path, sys.exc_info())
+  File "/opt/homebrew/Cellar/python@3.11/3.11.14_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/shutil.py", line 745, in rmtree
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK, dir_fd=dir_fd)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: capture_open() got an unexpected keyword argument 'dir_fd'

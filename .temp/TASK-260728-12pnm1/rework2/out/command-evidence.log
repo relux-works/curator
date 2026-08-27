@@ -1,0 +1,2114 @@
+==============================================================================
+Rust driver-pair boundary probe — command evidence
+fixture   rust-boundary-fixture-v1
+task      TASK-260728-12pnm1
+host      macos arm64, probe go1.25.5
+toolchain available=True root=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin
+          rustc 1.91.0  cargo 'cargo 1.91.0 (ea2d97820 2025-10-10)'
+          host tuple aarch64-apple-darwin
+          launcher   /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo
+          compiler   /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+          linker     /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld (flavor ld64.lld)
+          sdk root   /Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+==============================================================================
+
+------------------------------------------------------------------------------
+SECTION 1 — acceptance-layer cases
+------------------------------------------------------------------------------
+[match     ] accept.two-component
+    literal        "1.85"   edition 2021
+    curator class  5  compared=True  expect=accepted
+    predicted caret line   '5 | rust-version = "1.85"'
+    predicted edition line 'rust-version 1.85 is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=accepted recognised=True by=reported-value
+    corroborating  layer=accepted recognised=True by=exit-zero-no-rejection
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-two-component
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+      stdout:
+        {"packages":[{"name":"probe-accept-two-component","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-two-component#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-accept-two-component","src_path":"/Users/i …[truncated]
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-two-component
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+
+[match     ] accept.three-component
+    literal        "1.85.0"   edition 2021
+    curator class  5  compared=True  expect=accepted
+    predicted caret line   '5 | rust-version = "1.85.0"'
+    predicted edition line 'rust-version 1.85.0 is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=accepted recognised=True by=reported-value
+    corroborating  layer=accepted recognised=True by=exit-zero-no-rejection
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-three-component
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+      stdout:
+        {"packages":[{"name":"probe-accept-three-component","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-three-component#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-accept-three-component","src_path":"/U …[truncated]
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-three-component
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+
+[match     ] accept.bare-major-edition-2015
+    literal        "1"   edition 2015
+    curator class  5  compared=True  expect=accepted
+    predicted caret line   '5 | rust-version = "1"'
+    predicted edition line 'rust-version 1 is older than first version (1.0.0) required by the specified edition (2015)'
+    isolated       layer=accepted recognised=True by=reported-value
+    corroborating  layer=accepted recognised=True by=exit-zero-no-rejection
+    note           grammar-representable; edition 2015 has the lowest floor
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-bare-major-edition-2015
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+      stdout:
+        {"packages":[{"name":"probe-accept-bare-major-edition-2015","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-bare-major-edition-2015#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-accept-bare-major-edit …[truncated]
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-bare-major-edition-2015
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+
+[match     ] accept.edition-2018-at-floor
+    literal        "1.31"   edition 2018
+    curator class  5  compared=True  expect=accepted
+    predicted caret line   '5 | rust-version = "1.31"'
+    predicted edition line 'rust-version 1.31 is older than first version (1.31.0) required by the specified edition (2018)'
+    isolated       layer=accepted recognised=True by=reported-value
+    corroborating  layer=accepted recognised=True by=exit-zero-no-rejection
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-edition-2018-at-floor
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+      stdout:
+        {"packages":[{"name":"probe-accept-edition-2018-at-floor","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-edition-2018-at-floor#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-accept-edition-2018-at-flo …[truncated]
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-edition-2018-at-floor
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+
+[match     ] accept.edition-2024-at-floor
+    literal        "1.85"   edition 2024
+    curator class  5  compared=True  expect=accepted
+    predicted caret line   '5 | rust-version = "1.85"'
+    predicted edition line 'rust-version 1.85 is older than first version (1.85.0) required by the specified edition (2024)'
+    isolated       layer=accepted recognised=True by=reported-value
+    corroborating  layer=accepted recognised=True by=exit-zero-no-rejection
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-edition-2024-at-floor
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+      stdout:
+        {"packages":[{"name":"probe-accept-edition-2024-at-floor","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-edition-2024-at-floor#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-accept-edition-2024-at-flo …[truncated]
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-edition-2024-at-floor
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+
+[match     ] accept.above-host
+    literal        "1.99"   edition 2021
+    curator class  4  compared=True  expect=accepted
+    predicted caret line   '5 | rust-version = "1.99"'
+    predicted edition line 'rust-version 1.99 is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=accepted recognised=True by=reported-value
+    corroborating  layer=host-gate recognised=True by=host-gate
+    note           isolation witness: representable and above the resolved toolchain, so a command that reports it cannot be applying the host gate
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-above-host
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+      stdout:
+        {"packages":[{"name":"probe-accept-above-host","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-above-host#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-accept-above-host","src_path":"/Users/iv/Develop …[truncated]
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-accept-above-host
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: rustc 1.91.0 is not supported by the following package:
+          probe-accept-above-host@0.1.0 requires rustc 1.99
+
+[match     ] document.float
+    literal        1.85   edition 2021
+    curator class  1  compared=False  expect=document
+    predicted caret line   '5 | rust-version = 1.85'
+    predicted edition line 'rust-version 1.85 is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=document recognised=True by=document
+    corroborating  layer=document recognised=True by=document
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-document-float
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: invalid type: floating point `1.85`, expected a semver or workspace
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = 1.85
+          |                ^^^^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-document-float
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: invalid type: floating point `1.85`, expected a semver or workspace
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = 1.85
+          |                ^^^^
+
+[match     ] document.integer
+    literal        1   edition 2021
+    curator class  1  compared=False  expect=document
+    predicted caret line   '5 | rust-version = 1'
+    predicted edition line 'rust-version 1 is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=document recognised=True by=document
+    corroborating  layer=document recognised=True by=document
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-document-integer
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: invalid type: integer `1`, expected a semver or workspace
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = 1
+          |                ^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-document-integer
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: invalid type: integer `1`, expected a semver or workspace
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = 1
+          |                ^
+
+[match     ] document.boolean
+    literal        true   edition 2021
+    curator class  1  compared=False  expect=document
+    predicted caret line   '5 | rust-version = true'
+    predicted edition line 'rust-version true is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=document recognised=True by=document
+    corroborating  layer=document recognised=True by=document
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-document-boolean
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: invalid type: boolean `true`, expected a semver or workspace
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = true
+          |                ^^^^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-document-boolean
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: invalid type: boolean `true`, expected a semver or workspace
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = true
+          |                ^^^^
+
+[match     ] grammar.prerelease
+    literal        "1.85.0-beta"   edition 2021
+    curator class  2  compared=False  expect=grammar
+    predicted caret line   '5 | rust-version = "1.85.0-beta"'
+    predicted edition line 'rust-version 1.85.0-beta is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=grammar recognised=True by=grammar/prerelease
+    corroborating  layer=grammar recognised=True by=grammar/prerelease
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-prerelease
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: unexpected prerelease field, expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "1.85.0-beta"
+          |                ^^^^^^^^^^^^^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-prerelease
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: unexpected prerelease field, expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "1.85.0-beta"
+          |                ^^^^^^^^^^^^^
+
+[match     ] grammar.nonnumeric
+    literal        "not-a-version"   edition 2021
+    curator class  2  compared=False  expect=grammar
+    predicted caret line   '5 | rust-version = "not-a-version"'
+    predicted edition line 'rust-version not-a-version is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=grammar recognised=True by=grammar/prerelease
+    corroborating  layer=grammar recognised=True by=grammar/prerelease
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-nonnumeric
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: unexpected prerelease field, expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "not-a-version"
+          |                ^^^^^^^^^^^^^^^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-nonnumeric
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: unexpected prerelease field, expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "not-a-version"
+          |                ^^^^^^^^^^^^^^^
+
+[match     ] grammar.build-metadata
+    literal        "1.85.0+build"   edition 2021
+    curator class  2  compared=False  expect=grammar
+    predicted caret line   '5 | rust-version = "1.85.0+build"'
+    predicted edition line 'rust-version 1.85.0+build is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=grammar recognised=True by=grammar/build
+    corroborating  layer=grammar recognised=True by=grammar/build
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-build-metadata
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: unexpected build field, expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "1.85.0+build"
+          |                ^^^^^^^^^^^^^^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-build-metadata
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: unexpected build field, expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "1.85.0+build"
+          |                ^^^^^^^^^^^^^^
+
+[match     ] grammar.four-components
+    literal        "1.85.0.1"   edition 2021
+    curator class  2  compared=False  expect=grammar
+    predicted caret line   '5 | rust-version = "1.85.0.1"'
+    predicted edition line 'rust-version 1.85.0.1 is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=grammar recognised=True by=grammar/other
+    corroborating  layer=grammar recognised=True by=grammar/other
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-four-components
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "1.85.0.1"
+          |                ^^^^^^^^^^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-four-components
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "1.85.0.1"
+          |                ^^^^^^^^^^
+
+[match     ] grammar.track-token
+    literal        "stable"   edition 2021
+    curator class  2  compared=False  expect=grammar
+    predicted caret line   '5 | rust-version = "stable"'
+    predicted edition line 'rust-version stable is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=grammar recognised=True by=grammar/other
+    corroborating  layer=grammar recognised=True by=grammar/other
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-track-token
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "stable"
+          |                ^^^^^^^^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-track-token
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = "stable"
+          |                ^^^^^^^^
+
+[match     ] grammar.empty
+    literal        ""   edition 2021
+    curator class  2  compared=False  expect=grammar
+    predicted caret line   '5 | rust-version = ""'
+    predicted edition line 'rust-version  is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=grammar recognised=True by=grammar/other
+    corroborating  layer=grammar recognised=True by=grammar/other
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-empty
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = ""
+          |                ^^
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-grammar-empty
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: expected a version like "1.32"
+         --> Cargo.toml:5:16
+          |
+        5 | rust-version = ""
+          |                ^^
+
+[match     ] edition.bare-major-2018
+    literal        "1"   edition 2018
+    curator class  3  compared=False  expect=edition-floor
+    predicted caret line   '5 | rust-version = "1"'
+    predicted edition line 'rust-version 1 is older than first version (1.31.0) required by the specified edition (2018)'
+    isolated       layer=edition-floor recognised=True by=edition-floor
+    corroborating  layer=edition-floor recognised=True by=edition-floor
+    note           independence witness: the grammar layer accepts this value, the edition floor does not
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-bare-major-2018
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-bare-major-2018/Cargo.toml`
+        
+        Caused by:
+          rust-version 1 is older than first version (1.31.0) required by the specified edition (2018)
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-bare-major-2018
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-bare-major-2018/Cargo.toml`
+        
+        Caused by:
+          rust-version 1 is older than first version (1.31.0) required by the specified edition (2018)
+
+[match     ] edition.below-2021
+    literal        "1.31"   edition 2021
+    curator class  3  compared=False  expect=edition-floor
+    predicted caret line   '5 | rust-version = "1.31"'
+    predicted edition line 'rust-version 1.31 is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=edition-floor recognised=True by=edition-floor
+    corroborating  layer=edition-floor recognised=True by=edition-floor
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-below-2021
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-below-2021/Cargo.toml`
+        
+        Caused by:
+          rust-version 1.31 is older than first version (1.56.0) required by the specified edition (2021)
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-below-2021
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-below-2021/Cargo.toml`
+        
+        Caused by:
+          rust-version 1.31 is older than first version (1.56.0) required by the specified edition (2021)
+
+[match     ] edition.below-2024
+    literal        "1.56"   edition 2024
+    curator class  3  compared=False  expect=edition-floor
+    predicted caret line   '5 | rust-version = "1.56"'
+    predicted edition line 'rust-version 1.56 is older than first version (1.85.0) required by the specified edition (2024)'
+    isolated       layer=edition-floor recognised=True by=edition-floor
+    corroborating  layer=edition-floor recognised=True by=edition-floor
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-below-2024
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-below-2024/Cargo.toml`
+        
+        Caused by:
+          rust-version 1.56 is older than first version (1.85.0) required by the specified edition (2024)
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-below-2024
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: failed to parse manifest at `/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-edition-below-2024/Cargo.toml`
+        
+        Caused by:
+          rust-version 1.56 is older than first version (1.85.0) required by the specified edition (2024)
+
+[match     ] hostgate.above-resolved
+    literal        "1.99"   edition 2021
+    curator class  4  compared=True  expect=host-gate
+    predicted caret line   '5 | rust-version = "1.99"'
+    predicted edition line 'rust-version 1.99 is older than first version (1.56.0) required by the specified edition (2021)'
+    isolated       layer=accepted recognised=True by=reported-value
+    corroborating  layer=host-gate recognised=True by=host-gate
+    note           same value as accept.above-host; the isolated command reports it, the corroborating command gates on it
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --no-deps --format-version 1 --offline --color never --quiet
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-hostgate-above-resolved
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     0
+      stdout:
+        {"packages":[{"name":"probe-hostgate-above-resolved","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-hostgate-above-resolved#0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-hostgate-above-resolved","src_path": …[truncated]
+
+    $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --target aarch64-apple-darwin
+      cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cases/probe-hostgate-above-resolved
+      env      CARGO_ENCODED_RUSTDOCFLAGS=
+      env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+      env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+      env      CARGO_INCREMENTAL=0
+      env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+      env      CARGO_NET_OFFLINE=true
+      env      CARGO_NET_RETRY=0
+      env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+      env      CARGO_TERM_COLOR=never
+      env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+      env      LANG=C
+      env      LC_ALL=C
+      env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+      env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+      env      RUSTC_WORKSPACE_WRAPPER=
+      env      RUSTC_WRAPPER=
+      env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+      env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+      env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+      env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+      exit     101
+      stderr:
+        error: rustc 1.91.0 is not supported by the following package:
+          probe-hostgate-above-resolved@0.1.0 requires rustc 1.99
+
+------------------------------------------------------------------------------
+SECTION 2 — alignment properties
+------------------------------------------------------------------------------
+security partition empty : True
+P1 no widening (C subset of Upstream)          : True
+P2 no narrowing (Upstream minus F subset of C) : True
+
+------------------------------------------------------------------------------
+SECTION 3 — closure: outcomes outside the recognised set
+------------------------------------------------------------------------------
+  [no verdict          ] A/no-manifest                                direction=acceptance-laundering  kind=real-unrelated-failure
+      exit=101
+  [no verdict          ] A/unknown-subcommand                         direction=acceptance-laundering  kind=real-unrelated-failure
+      exit=101
+  [no verdict          ] A/locked-without-lockfile                    direction=acceptance-laundering  kind=real-unrelated-failure
+      exit=101
+  [no verdict          ] A/bad-flag                                   direction=acceptance-laundering  kind=real-unrelated-failure
+      exit=1
+  [no verdict          ] B/crossfeed/document.float                   direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/document.integer                 direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/document.boolean                 direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/grammar.prerelease               direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/grammar.nonnumeric               direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/grammar.build-metadata           direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/grammar.four-components          direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/grammar.track-token              direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/grammar.empty                    direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/edition.bare-major-2018          direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/edition.below-2021               direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] B/crossfeed/edition.below-2024               direction=rejection-laundering   kind=measured-outcome-under-wrong-value
+  [no verdict          ] C/grammar-lead-extended                      direction=rejection-laundering   kind=constructed-extension
+      constructed, not measured: an outcome upstream has not yet written cannot be measured on any host
+  [no verdict          ] C/grammar-prerelease-retitled                direction=rejection-laundering   kind=constructed-extension
+      constructed, not measured: an outcome upstream has not yet written cannot be measured on any host
+  [no verdict          ] C/edition-floor-reworded                     direction=rejection-laundering   kind=constructed-extension
+      constructed, not measured: an outcome upstream has not yet written cannot be measured on any host
+  [no verdict          ] C/host-gate-extended                         direction=rejection-laundering   kind=constructed-extension
+      constructed, not measured: an outcome upstream has not yet written cannot be measured on any host
+  [no verdict          ] C/caret-line-renumbered                      direction=rejection-laundering   kind=constructed-extension
+      constructed, not measured: an outcome upstream has not yet written cannot be measured on any host
+  [no verdict          ] C/first-line-only                            direction=rejection-laundering   kind=constructed-extension
+      constructed, not measured: an outcome upstream has not yet written cannot be measured on any host
+  [no verdict          ] C/second-line-only                           direction=rejection-laundering   kind=constructed-extension
+      constructed, not measured: an outcome upstream has not yet written cannot be measured on any host
+  [no verdict          ] C/exit-zero-wrong-value                      direction=acceptance-laundering  kind=constructed-extension
+
+------------------------------------------------------------------------------
+SECTION 4 — controls, each required to fail
+------------------------------------------------------------------------------
+  [FAILS-AS-REQUIRED ] C1/open-classifier
+      guards   closure in both laundering directions
+      findings 4
+      detail   a fall-through branch would name a verdict for 4 measured unrelated failures that the closed classifier leaves without one
+  [FAILS-AS-REQUIRED ] C2/lead-only-recognition
+      guards   three grammar classes collapsing into one
+      findings 6
+      detail   a lead-only classifier recognised 6 diagnostics that were produced for a different value under test (examples: grammar.prerelease, grammar.nonnumeric, grammar.build-metadata)
+  [FAILS-AS-REQUIRED ] C3/exit-status-as-semantics
+      guards   the host gate folded into the grammar layer
+      findings 1
+      detail   1 cases where the corroborating command's exit status disagrees with the isolated representability measurement (examples: accept.above-host)
+  [FAILS-AS-REQUIRED ] C4/build-as-isolated
+      guards   the host gate folded in by command choice
+      findings 1
+      detail   isolated=accepted corroborating=host-gate for a representable value above the resolved toolchain; using the corroborating command as the isolated one yields a P1 violation
+  [FAILS-AS-REQUIRED ] C5/edition-folded-into-grammar
+      guards   one host-independent layer swallowing another
+      findings 3
+      detail   3 measured values are grammar-representable and rejected only by the edition floor; a merged classifier would report them as grammar rejections
+  [FAILS-AS-REQUIRED ] C6/substring-matching
+      guards   recognising a family rather than an outcome
+      findings 6
+      detail   a substring matcher recognised 6 outcomes that belong to a different value under test
+  [FAILS-AS-REQUIRED ] C7/graph-without-all-features
+      guards   a proc macro reachable only through a non-default feature, invisible to the matrix
+      findings 1
+      detail   the proc-macro package is absent from packages[]: probefeat
+  [FAILS-AS-REQUIRED ] C8/escape-decided-after-cargo-read
+      guards   cargo opening, parsing and reporting a manifest outside the build root
+      findings 1
+      detail   cargo quoted the outside manifest before any verdict could be computed
+  [FAILS-AS-REQUIRED ] C9/naive-basic-string-config
+      guards   a package-influenced vendor path injecting tables into the manager-written config
+      findings 6
+      detail   the written document carries 6 table headers and an injected offline=false
+  [FAILS-AS-REQUIRED ] C10/operator-cargo-state-inherited
+      guards   the operator's Cargo configuration and cache supplying package bytes
+      findings 1
+      detail   inherited operator state resolved the dependency (exit 0) where isolation failed (exit 101)
+
+------------------------------------------------------------------------------
+SECTION 5 — structural measurements
+------------------------------------------------------------------------------
+  [match      ] graph-phase-executes-no-package-code
+      cargo metadata does not run build scripts or procedural macros
+      expected  no marker written; exit 0
+      observed  no marker written; exit 0
+      obligation The pre-compile rejection matrix may be computed from this command's output, because the command does not compile or run any package unit.
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/graph
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probe-bs","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/graph/bs#probe-bs@0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["lib"],"crate_types":["lib"],"name":"probe_bs","src_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-26 …[truncated]
+
+  [match      ] graph-surfaces-visible
+      custom-build, proc-macro, links and source are all reported by the graph command
+      expected  custom-build=yes proc-macro=yes links=yes source=yes
+      observed  custom-build=yes proc-macro=yes links=yes source=yes
+      obligation Rows G2, G3, G4 and G5 of the rejection matrix are decidable from this output alone, with no compile phase and no host input.
+      evidence  links=probelib on probe-bs
+      evidence  custom-build target build-script-build in probe-bs
+      evidence  proc-macro target probe_pm in probe-pm
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/graph
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probe-bs","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/graph/bs#probe-bs@0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["lib"],"crate_types":["lib"],"name":"probe_bs","src_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-26 …[truncated]
+
+  [match      ] locked-prevents-snapshot-write
+      --locked stops cargo metadata writing Cargo.lock into the source tree
+      expected  without --locked: lockfile written; with --locked: exit 101 and no lockfile
+      observed  without --locked: lockfile written; with --locked: exit 101 and no lockfile
+      obligation --locked is mandatory on both vectors. Without it the graph phase writes to the frozen snapshot, which the execution policy forbids.
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/lock-a
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probe-lock","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/lock-a#probe-lock@0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-lock","src_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TAS …[truncated]
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --locked --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/lock-b
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     101
+        stderr:
+          error: the lock file /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/lock-b/Cargo.lock needs to be updated but --locked was passed to prevent this
+          If you want to try to generate the lock file without accessing the network, remove the --locked flag and use --offline instead.
+
+  [match      ] package-cargo-config-is-live
+      a package .cargo/config.toml runs a package-named rustc wrapper, and an empty RUSTC_WRAPPER neutralises it
+      expected  unneutralised: wrapper ran; neutralised: wrapper did not run
+      observed  unneutralised: wrapper ran; neutralised: wrapper did not run
+      obligation Row L5 rejects the file outright; the empty-valued environment variables are a second layer, never the answer, because [source], [registries], [patch] and [http] have no environment counterpart.
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/pkgconfig
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     101
+        stderr:
+          warning: invoking `"xcrun" "--sdk" "macosx" "--show-sdk-path"` to find MacOSX.sdk failed: No such file or directory (os error 2)
+            |
+            = note: the SDK is needed by the linker to know where to find symbols in system libraries and for embedding the SDK version in the final object file
+            = help: pass the path of an Xcode installation via the DEVELOPER_DIR environment variable, or an SDK with the SDKR …[truncated]
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/pkgconfig
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     101
+        stderr:
+          warning: invoking `"xcrun" "--sdk" "macosx" "--show-sdk-path"` to find MacOSX.sdk failed: No such file or directory (os error 2)
+            |
+            = note: the SDK is needed by the linker to know where to find symbols in system libraries and for embedding the SDK version in the final object file
+            = help: pass the path of an Xcode installation via the DEVELOPER_DIR environment variable, or an SDK with the SDKR …[truncated]
+
+  [match      ] ancestor-cargo-config-discovered
+      a .cargo/config.toml above the build root is discovered and applied
+      expected  wrapper ran
+      observed  wrapper ran
+      obligation The manager MUST guarantee that no .cargo directory exists in any ancestor of the compile working directory. That is a staging obligation, not a package check.
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/ancestor/proj
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     101
+        stderr:
+          warning: invoking `"xcrun" "--sdk" "macosx" "--show-sdk-path"` to find MacOSX.sdk failed: No such file or directory (os error 2)
+            |
+            = note: the SDK is needed by the linker to know where to find symbols in system libraries and for embedding the SDK version in the final object file
+            = help: pass the path of an Xcode installation via the DEVELOPER_DIR environment variable, or an SDK with the SDKR …[truncated]
+
+  [match      ] process-closure-no-path-resolution
+      with the linker and SDK pinned, neither phase resolves an executable through PATH
+      expected  pinned: 0 resolutions; control: at least 1 resolution
+      observed  pinned: 0 resolutions; control: at least 1 resolution
+      obligation The manager-worker-v2 process graph is satisfied by the Rust distribution root alone; the platform SDK is a data-only second fingerprinted root.
+      evidence  pinned graph exit=0 build exit=0
+      evidence  control build exit=101
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/closure-build
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/poisoned-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probe-closure-build","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/closure-build#probe-closure-build@0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probe-closure-build","src_path":"/Users/iv/Deve …[truncated]
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --release --target aarch64-apple-darwin
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/closure-build
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/poisoned-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --offline --color never --quiet --release --target aarch64-apple-darwin
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/closure-build
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/poisoned-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     101
+        stderr:
+          warning: failed running `"xcrun" "--sdk" "macosx" "--show-sdk-path"` to find MacOSX.sdk
+            |
+            = note: 
+            = note: the SDK is needed by the linker to know where to find symbols in system libraries and for embedding the SDK version in the final object file
+            = help: pass the path of an Xcode installation via the DEVELOPER_DIR environment variable, or an SDK with the SDKROOT environment variable
+          
+          erro …[truncated]
+
+  [match      ] target-admission-is-manager-owned
+      --print target-libdir exits 0 for a target whose standard library is absent
+      expected  absent-std: exit 0; unknown-triple: non-zero
+      observed  absent-std: exit 0; unknown-triple: non-zero
+      obligation Admission is a manager-side stat of <root>/lib/rustlib/<target>/lib inside the fingerprinted tree. Representability prints are not the admission test.
+      evidence  stat /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/x86_64-unknown-linux-gnu/lib -> present=false
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc --print target-libdir --target x86_64-unknown-linux-gnu
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/x86_64-unknown-linux-gnu/lib
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc --print target-libdir --target not-a-real-target
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     1
+        stderr:
+          error: error loading target specification: could not find specification for target "not-a-real-target"
+            |
+            = help: run `rustc --print target-list` for a list of built-in targets
+
+  [match      ] git-dependency-rejected-in-graph-phase
+      a git dependency fails in the graph phase under --offline
+      expected  non-zero exit, no compile phase
+      observed  non-zero exit, no compile phase
+      obligation Row G5 is an exact-match allowlist of two source values; cargo's own offline refusal is a fail-closed backstop rather than the gate.
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/gitdep
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     101
+        stderr:
+          error: failed to get `anyhow` as a dependency of package `probe-gitdep v0.1.0 (/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/gitdep)`
+          
+          Caused by:
+            failed to load source for dependency `anyhow`
+          
+          Caused by:
+            Unable to update https://example.invalid/anyhow
+          
+          Caused by:
+            can't checkout from 'https://example.invalid/anyhow': you are in the offline mode (--o …[truncated]
+
+  [match      ] exact-pipeline-vendored-isolated
+      the exact graph and compile vectors over a vendored dependency with the manager-written config
+      expected  graph 0, build 0, 0 PATH resolutions, artifact runs
+      observed  graph 0, build 0, 0 PATH resolutions, artifact runs
+      obligation Every element is normative: --all-features on the graph vector, --locked, the literal-string directory value, an operation-private CARGO_HOME and HOME, and an empty PATH.
+      evidence  graph exit=0 build exit=0 artifact exit=0
+      evidence  PATH resolutions=0
+      evidence  graph packages=probedep,probemain
+      evidence  config bytes=263
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --locked --offline --color never --quiet --all-features
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/build_root
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/poisoned-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      RUSTDOC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustdoc
+        env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probedep","version":"0.1.0","id":"registry+https://github.com/rust-lang/crates.io-index#probedep@0.1.0","license":null,"license_file":null,"description":null,"source":"registry+https://github.com/rust-lang/crates.io-index","dependencies":[],"targets":[{"kind":["lib"],"crate_types":["lib"],"name":"probedep","src_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1 …[truncated]
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo build --locked --offline --color never --quiet --release --target aarch64-apple-darwin --bin probemain
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/build_root
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/poisoned-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      RUSTDOC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustdoc
+        env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+
+      $ /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/target/aarch64-apple-darwin/release/probemain
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/exact/poisoned-path
+        exit     0
+        stdout:
+          42
+
+  [match      ] local-and-external-source-mapping-equivalence
+      byte-identical build roots in local and nested-external layouts produce the same graph
+      expected  identical build-root digest, identical graph after substitution
+      observed  identical build-root digest, identical graph after substitution
+      obligation Only the selected build root is compiler-visible; the surrounding external snapshot contributes no input.
+      evidence  local digest=4dbe32f4fdce0c8e127d02bd8a20913019951c10c48d31c1a9d7c4c562a7ad29
+      evidence  external digest=4dbe32f4fdce0c8e127d02bd8a20913019951c10c48d31c1a9d7c4c562a7ad29
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --locked --offline --color never --quiet --all-features
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/modes/local/build_root
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/modes/cargo-home-0
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/modes/target-0
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/modes/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      RUSTDOC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustdoc
+        env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probedep","version":"0.1.0","id":"registry+https://github.com/rust-lang/crates.io-index#probedep@0.1.0","license":null,"license_file":null,"description":null,"source":"registry+https://github.com/rust-lang/crates.io-index","dependencies":[],"targets":[{"kind":["lib"],"crate_types":["lib"],"name":"probedep","src_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1 …[truncated]
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --locked --offline --color never --quiet --all-features
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/modes/external/repo/crates/tool
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_ENCODED_RUSTFLAGS=-Clinker=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/lib/rustlib/aarch64-apple-darwin/bin/rust-lld-Clinker-flavor=ld64.lld
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/modes/cargo-home-1
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/modes/target-1
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/modes/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      RUSTDOC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustdoc
+        env      SDKROOT=/Applications/Xcode_26_5.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probedep","version":"0.1.0","id":"registry+https://github.com/rust-lang/crates.io-index#probedep@0.1.0","license":null,"license_file":null,"description":null,"source":"registry+https://github.com/rust-lang/crates.io-index","dependencies":[],"targets":[{"kind":["lib"],"crate_types":["lib"],"name":"probedep","src_path":"/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-1 …[truncated]
+
+  [match      ] all-features-exposes-optional-proc-macro
+      a proc macro behind a non-default feature is in the graph only with --all-features
+      expected  with: proc-macro present; without: absent
+      observed  with: proc-macro present; without: absent
+      obligation Conformance vector 23 depends on this; without the flag the rejection matrix cannot see the surface at all.
+      evidence  with --all-features: probefeat,probepm
+      evidence  without: probefeat
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --locked --offline --color never --quiet --all-features
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/featgate
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probefeat","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/featgate#probefeat@0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[{"name":"probepm","source":null,"req":"*","kind":null,"rename":null,"optional":true,"uses_default_features":true,"features":[],"tar …[truncated]
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --locked --offline --color never --quiet
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/featgate
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probefeat","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/featgate#probefeat@0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[{"name":"probepm","source":null,"req":"*","kind":null,"rename":null,"optional":true,"uses_default_features":true,"features":[],"tar …[truncated]
+
+  [match      ] graph-phase-reads-outside-build-root
+      cargo reports an outside manifest, and the Stage P grammar rejects it first
+      expected  cargo reads the outside manifest; the lexical rule rejects the declaration
+      observed  cargo reads the outside manifest; the lexical rule rejects the declaration
+      obligation A post-resolution check prevents compilation, not the read. Stage P decides on the declared string.
+      evidence  graph exit=0 packages=probeesc,probeoutside
+      evidence  lexical verdict: rule 6: dot component
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --offline --color never --quiet --all-features
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/escape/build_root
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probeesc","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/escape/build_root#probeesc@0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[{"name":"probeoutside","source":null,"req":"*","kind":null,"rename":null,"optional":false,"uses_default_features":true,"feat …[truncated]
+
+  [match      ] ancestor-workspace-manifest-escapes-old-rows
+      an ancestor Cargo.toml moves workspace_root while workspace_members stays length one
+      expected  workspace_root above the build root, one member, that member is the build root package
+      observed  workspace_root above the build root, one member, that member is the build root package
+      obligation Manager staging must guarantee no ancestor Cargo.toml; the graph must additionally require workspace_root to equal the build root.
+      evidence  workspace_root=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/ancman/parent
+      evidence  workspace_members=1
+      evidence  staging obligation detects it=true
+
+      $ /Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/cargo metadata --format-version 1 --offline --color never --quiet --all-features
+        cwd      /Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/ancman/parent/build_root
+        env      CARGO_ENCODED_RUSTDOCFLAGS=
+        env      CARGO_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/cargo-home
+        env      CARGO_INCREMENTAL=0
+        env      CARGO_NET_GIT_FETCH_WITH_CLI=false
+        env      CARGO_NET_OFFLINE=true
+        env      CARGO_NET_RETRY=0
+        env      CARGO_TARGET_DIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/target
+        env      CARGO_TERM_COLOR=never
+        env      HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/home
+        env      LANG=C
+        env      LC_ALL=C
+        env      PATH=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/empty-path
+        env      RUSTC=/Users/iv/.rustup/toolchains/1.91.0-aarch64-apple-darwin/bin/rustc
+        env      RUSTC_WORKSPACE_WRAPPER=
+        env      RUSTC_WRAPPER=
+        env      TMPDIR=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/tmp
+        env      XDG_CACHE_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-cache
+        env      XDG_CONFIG_HOME=/Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/xdg-config
+        exit     0
+        stdout:
+          {"packages":[{"name":"probeanc","version":"0.1.0","id":"path+file:///Users/iv/Developer/ReluxWorks/curator/.temp/TASK-260728-12pnm1/rework2/probe-work/struct/ancman/parent/build_root#probeanc@0.1.0","license":null,"license_file":null,"description":null,"source":null,"dependencies":[],"targets":[{"kind":["bin"],"crate_types":["bin"],"name":"probeanc","src_path":"/Users/iv/Developer/ReluxWorks/curat …[truncated]
+
+------------------------------------------------------------------------------
+SECTION 6 — host-independent vectors
+------------------------------------------------------------------------------
+  group normalization (15 vectors)
+    [match      ] N0/embedded-sample               expected 'payload=191 sha=7d8e08339e557ede5a9e565773c4cf17f83dea27f7d0c6591869f184bd1b81b5 record=208 sha=7fc35c11acae420849418f9c9f9b5681651beedc6d68f00bf1e4db022cd5f06b' observed 'payload=191 sha=7d8e08339e557ede5a9e565773c4cf17f83dea27f7d0c6591869f184bd1b81b5 record=208 sha=7fc35c11acae420849418f9c9f9b5681651beedc6d68f00bf1e4db022cd5f06b'
+    [match      ] N0/embedded-cargo                expected 'payload=35 sha=8d712854de14f22840767bc824c5ac08098f35ddaa44437256e31b53cb546165 record=52 sha=d677e668d65108419fd197d147f31f2dda30a1364233440f3b0138d5185c2f78' observed 'payload=35 sha=8d712854de14f22840767bc824c5ac08098f35ddaa44437256e31b53cb546165 record=52 sha=d677e668d65108419fd197d147f31f2dda30a1364233440f3b0138d5185c2f78'
+    [match      ] N1/live-stream                   expected 'normalizes; digest equals the constant when the bytes equal the sample' observed 'normalizes; digest equals the constant when the bytes equal the sample'
+        detail host-dependent by construction
+    [match      ] N2/crlf-folds                    expected 'same digest' observed 'same digest'
+    [match      ] N3/line-removed                  expected 'different digest' observed 'different digest'
+    [match      ] N4/byte-changed                  expected 'different digest' observed 'different digest'
+    [match      ] N5/lines-transposed              expected 'different digest' observed 'different digest'
+    [match      ] N6/bare-cr                       expected 'rejected' observed 'rejected'
+        detail contains a bare CR
+    [match      ] N7/no-terminal-lf                expected 'rejected' observed 'rejected'
+        detail does not end with LF
+    [match      ] N8/two-terminal-lf               expected 'rejected' observed 'rejected'
+        detail ends with more than one LF
+    [match      ] N9/nul                           expected 'rejected' observed 'rejected'
+        detail contains NUL
+    [match      ] N10/invalid-utf8                 expected 'rejected' observed 'rejected'
+        detail not valid UTF-8
+    [match      ] N11/empty                        expected 'rejected' observed 'rejected'
+        detail shorter than two bytes
+    [match      ] N12/too-long                     expected 'rejected' observed 'rejected'
+        detail over 4096 bytes
+    [match      ] N13/c-record-multiline           expected 'rejected' observed 'rejected'
+        detail single-line record carries an interior LF
+
+  group prewalk (30 vectors)
+    [match      ] P1/plain                         expected 'admitted' observed 'admitted'
+    [match      ] P2/nested                        expected 'admitted' observed 'admitted'
+    [match      ] P3/vendored                      expected 'admitted' observed 'admitted'
+    [match      ] P4/non-ascii                     expected 'admitted' observed 'admitted'
+    [match      ] P5/parent                        expected 'rejected' observed 'rejected'
+        detail rule 6: dot component
+    [match      ] P6/parent-deep                   expected 'rejected' observed 'rejected'
+        detail rule 6: dot component
+    [match      ] P7/absolute                      expected 'rejected' observed 'rejected'
+        detail rule 4: absolute
+    [match      ] P8/drive                         expected 'rejected' observed 'rejected'
+        detail rule 5: drive prefix
+    [match      ] P9/drive-lower                   expected 'rejected' observed 'rejected'
+        detail rule 5: drive prefix
+    [match      ] P10/unc                          expected 'rejected' observed 'rejected'
+        detail rule 5: UNC prefix
+    [match      ] P11/backslash                    expected 'rejected' observed 'rejected'
+        detail rule 3: backslash
+    [match      ] P12/backslash-inner              expected 'rejected' observed 'rejected'
+        detail rule 3: backslash
+    [match      ] P13/empty-component              expected 'rejected' observed 'rejected'
+        detail rule 6: empty component
+    [match      ] P14/dot-component                expected 'rejected' observed 'rejected'
+        detail rule 6: dot component
+    [match      ] P15/trailing-dot                 expected 'rejected' observed 'rejected'
+        detail rule 7: trailing dot or space
+    [match      ] P16/trailing-space               expected 'rejected' observed 'rejected'
+        detail rule 7: trailing dot or space
+    [match      ] P17/reserved-con                 expected 'rejected' observed 'rejected'
+        detail rule 7: reserved device name
+    [match      ] P18/reserved-com1-ext            expected 'rejected' observed 'rejected'
+        detail rule 7: reserved device name
+    [match      ] P19/control-char                 expected 'rejected' observed 'rejected'
+        detail rule 2: control character
+    [match      ] P20/nul                          expected 'rejected' observed 'rejected'
+        detail rule 2: NUL
+    [match      ] P21/home                         expected 'rejected' observed 'rejected'
+        detail rule 5: home prefix
+    [match      ] P22/empty                        expected 'rejected' observed 'rejected'
+        detail rule 1: empty
+    [match      ] P23/too-long                     expected 'rejected' observed 'rejected'
+        detail rule 1: over 1024 bytes
+    [match      ] P24/symlink-component            expected 'rejected' observed 'rejected'
+    [match      ] P25/physical-ok                  expected 'admitted' observed 'admitted'
+    [match      ] P26/missing-dependency           expected 'rejected' observed 'rejected'
+        detail missing component: absent
+    [match      ] P27/missing-target               expected 'admitted' observed 'admitted'
+        detail a vendored crate may declare a target whose sources were not vendored
+    [match      ] P28/ancestor-clean               expected 'clean' observed 'clean'
+    [match      ] P29/ancestor-manifest            expected 'offending ancestor manifest found' observed 'offending ancestor manifest found'
+        detail /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/rustprobe-anc-1888754066/parent/Cargo.toml
+    [match      ] P30/ancestor-cargo-dir           expected 'offending ancestor config directory found' observed 'offending ancestor config directory found'
+        detail /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/rustprobe-anc-1888754066/parent/.cargo
+
+  group config (23 vectors)
+    [match      ] S1/ascii                         expected 'written' observed 'written'
+    [match      ] S1/ascii/write-back              expected 'four tables, directory byte-equal' observed 'four tables, directory byte-equal'
+    [match      ] S2/space                         expected 'written' observed 'written'
+    [match      ] S2/space/write-back              expected 'four tables, directory byte-equal' observed 'four tables, directory byte-equal'
+    [match      ] S3/non-ascii                     expected 'written' observed 'written'
+    [match      ] S3/non-ascii/write-back          expected 'four tables, directory byte-equal' observed 'four tables, directory byte-equal'
+    [match      ] S4/double-quote                  expected 'written' observed 'written'
+    [match      ] S4/double-quote/write-back       expected 'four tables, directory byte-equal' observed 'four tables, directory byte-equal'
+    [match      ] S5/backslash-unix                expected 'written' observed 'written'
+    [match      ] S5/backslash-unix/write-back     expected 'four tables, directory byte-equal' observed 'four tables, directory byte-equal'
+    [match      ] S6/apostrophe                    expected 'rejected' observed 'rejected'
+        detail rule 4: apostrophe
+    [match      ] S7/newline                       expected 'rejected' observed 'rejected'
+        detail rule 3: control character
+    [match      ] S8/tab                           expected 'rejected' observed 'rejected'
+        detail rule 3: control character
+    [match      ] S9/del                           expected 'rejected' observed 'rejected'
+        detail rule 3: control character
+    [match      ] S10/nul                          expected 'rejected' observed 'rejected'
+        detail rule 3: NUL
+    [match      ] S11/relative                     expected 'rejected' observed 'rejected'
+        detail rule 2: not absolute
+    [match      ] S12/empty                        expected 'rejected' observed 'rejected'
+        detail rule 1: empty
+    [match      ] S13/unc                          expected 'rejected' observed 'rejected'
+        detail rule 2: not absolute
+    [match      ] S14/verbatim                     expected 'rejected' observed 'rejected'
+        detail rule 2: not absolute
+    [match      ] S15/template-length              expected 'prefix=89 suffix=61 total=183' observed 'prefix=89 suffix=61 total=183'
+    [match      ] S16/template-digest              expected '41aaeac44f7f26e747bbd29fafddd0715b813e5b06edbad967755ac3f87b60f2' observed '41aaeac44f7f26e747bbd29fafddd0715b813e5b06edbad967755ac3f87b60f2'
+    [match      ] S17/table-count                  expected '4' observed '4'
+        detail [source.crates-io] [source.curator-vendor] [net] [term]
+    [match      ] S18/no-crlf                      expected 'true' observed 'true'
+
+------------------------------------------------------------------------------
+SUMMARY
+------------------------------------------------------------------------------
+  cases                              19
+  matched                            19
+  divergences                        0
+  not_run                            0
+  closure_checks                     24
+  closure_failures                   0
+  controls_total                     10
+  controls_failing_as_required       10
+  structural_total                   13
+  structural_divergences             0
+  vectors_total                      68
+  vector_divergences                 0
+  green                              True
