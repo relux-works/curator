@@ -40,6 +40,7 @@ func Validate(skillDir, localeValue string) []Issue {
 		})
 	} else {
 		issues = append(issues, runtimeRootReferenceWarnings(skillDir, spec)...)
+		issues = append(issues, buildRootReferenceWarnings(skillDir, spec)...)
 		issues = append(issues, commandResolutionWarnings(skillDir, spec)...)
 	}
 	analysis := locale.Analyze(skillDir, localeValue)
@@ -70,7 +71,8 @@ func runtimeRootReferenceWarnings(skillDir string, spec *skillspec.Spec) []Issue
 	}
 
 	var issues []Issue
-	for _, path := range promptMarkdownFiles(skillDir) {
+	excludeRoots := whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
+	for _, path := range promptMarkdownFiles(skillDir, excludeRoots) {
 		payload, err := os.ReadFile(path) // #nosec G304 -- path is below the validated skill directory
 		if err != nil {
 			continue
@@ -109,15 +111,56 @@ func runtimeRootReferenceWarnings(skillDir string, spec *skillspec.Spec) []Issue
 	return issues
 }
 
-func commandResolutionWarnings(skillDir string, spec *skillspec.Spec) []Issue {
-	hasScriptCommands := false
-	hasWindowsCommand := false
-	for _, command := range spec.Commands {
-		if command.Type != "script" {
+func buildRootReferenceWarnings(skillDir string, spec *skillspec.Spec) []Issue {
+	if len(spec.BuildRoots) == 0 {
+		return nil
+	}
+	roots := append([]string(nil), spec.BuildRoots...)
+	sort.Strings(roots)
+	excludeRoots := whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
+	var issues []Issue
+	for _, path := range promptMarkdownFiles(skillDir, excludeRoots) {
+		payload, err := os.ReadFile(path) // #nosec G304 -- path is below the validated skill directory
+		if err != nil {
 			continue
 		}
-		hasScriptCommands = true
-		if command.WinPath != "" {
+		text := string(payload)
+		for _, buildRoot := range roots {
+			windowsRoot := strings.ReplaceAll(buildRoot, "/", `\`)
+			tokens := []string{buildRoot + "/", windowsRoot + `\`}
+			for _, token := range tokens {
+				if !strings.Contains(text, token) {
+					continue
+				}
+				relative, _ := filepath.Rel(skillDir, path)
+				issues = append(issues, Issue{
+					Severity: "warning",
+					Code:     "skill.build_root_in_prompt_context",
+					Path:     filepath.ToSlash(relative),
+					Message: fmt.Sprintf(
+						"prompt-visible text references build-only path %q; Curator excludes that build root from installed skill context and runtime storage. Use the exported compiled command shim and keep manifest-relative build source paths source-checkout-only",
+						token,
+					),
+				})
+				break
+			}
+		}
+	}
+	return issues
+}
+
+func commandResolutionWarnings(skillDir string, spec *skillspec.Spec) []Issue {
+	hasManagedCommands := false
+	hasWindowsCommand := false
+	for _, command := range spec.Commands {
+		switch command.Type {
+		case "script":
+			hasManagedCommands = true
+			if command.WinPath != "" {
+				hasWindowsCommand = true
+			}
+		case "build":
+			hasManagedCommands = true
 			hasWindowsCommand = true
 		}
 	}
@@ -136,12 +179,13 @@ func commandResolutionWarnings(skillDir string, spec *skillspec.Spec) []Issue {
 			}
 		}
 	}
-	if !hasScriptCommands && !hasProviderCommands {
+	if !hasManagedCommands && !hasProviderCommands {
 		return nil
 	}
 
 	var content strings.Builder
-	for _, path := range promptMarkdownFiles(skillDir) {
+	excludeRoots := whitelist.ContextExcludedRoots(spec.RuntimeRoots, spec.BuildRoots)
+	for _, path := range promptMarkdownFiles(skillDir, excludeRoots) {
 		payload, err := os.ReadFile(path) // #nosec G304 -- path is below the validated skill directory
 		if err == nil {
 			content.Write(payload)
@@ -175,13 +219,16 @@ func commandResolutionWarnings(skillDir string, spec *skillspec.Spec) []Issue {
 	}}
 }
 
-func promptMarkdownFiles(skillDir string) []string {
+func promptMarkdownFiles(skillDir string, excludeRoots []string) []string {
 	seen := map[string]bool{}
 	var paths []string
 	for _, root := range whitelist.IncludeRoots {
 		candidate := filepath.Join(skillDir, root)
 		info, err := os.Stat(candidate)
 		if err != nil {
+			continue
+		}
+		if whitelist.PathExcluded(filepath.ToSlash(root), excludeRoots) {
 			continue
 		}
 		if !info.IsDir() {
@@ -192,7 +239,20 @@ func promptMarkdownFiles(skillDir string) []string {
 			continue
 		}
 		_ = filepath.WalkDir(candidate, func(path string, entry os.DirEntry, walkErr error) error {
-			if walkErr != nil || entry.IsDir() || !strings.EqualFold(filepath.Ext(path), ".md") || seen[path] {
+			if walkErr != nil {
+				return nil
+			}
+			relative, relErr := filepath.Rel(skillDir, path)
+			if relErr != nil {
+				return nil
+			}
+			if path != candidate && whitelist.PathExcluded(filepath.ToSlash(relative), excludeRoots) {
+				if entry.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if entry.IsDir() || !strings.EqualFold(filepath.Ext(path), ".md") || seen[path] {
 				return nil
 			}
 			seen[path] = true
