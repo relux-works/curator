@@ -58,6 +58,25 @@ const (
 	SelectionGOROOT = "GOROOT"
 )
 
+// toolchainSelectionRemedy is the operator remedy every
+// toolchain_executable_mismatch carries. It answers exactly one host
+// condition, which is the only one that produces the code in practice: a
+// version-manager launcher — a goenv, asdf, or mise shim, or any wrapper that
+// resolves outside a real GOROOT/bin — was selected, either because it is what
+// the selection variables name or because it answers `go env` with a root
+// other than the one selected. The verdict alone does not tell an operator
+// that, and the fix is one host fact: the real GOROOT/bin ahead of the wrapper,
+// which is where the trusted selection variables are then read from.
+//
+// It is advice for the operator's own shell. The driver itself still never
+// searches PATH and never downloads a toolchain, and the guidance the CLI adds
+// from the code says so.
+//
+// The text is short on purpose: an install boundary bounds a rendered
+// diagnostic, and a remedy that pushed the line past that bound would be
+// truncated away exactly where an operator reads it.
+const toolchainSelectionRemedy = `put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
+
 // TestedFamilies lists the Go release families this manager has tested against
 // the go-v1 conformance vectors, in ascending order. A release outside the list
 // is rejected rather than downloaded or approximated, so operator-facing
@@ -500,7 +519,8 @@ func selectToolchain(config Config, runtimeRoot string) (string, string, fs.File
 	}
 	expected := filepath.Join(resolvedRoot, "bin", platformGoName)
 	if resolvedCandidate != expected {
-		return "", "", nil, diagnostic("toolchain_executable_mismatch", "selected Go executable is not the regular executable under the derived GOROOT")
+		return "", "", nil, diagnosticRemedy("toolchain_executable_mismatch", toolchainSelectionRemedy,
+			"selected Go executable is not the regular executable under the derived GOROOT")
 	}
 	for _, forbidden := range config.ForbiddenRoots {
 		forbiddenAbs, resolveErr := absolutePhysical(forbidden)
@@ -647,7 +667,8 @@ func decodeProbeEnvironment(payload []byte) (map[string]string, error) {
 func validateProbe(values map[string]string, goroot, versionOS, versionArch string, host hostFacts, configRoot string) error {
 	probedRoot, err := absolutePhysical(values["GOROOT"])
 	if err != nil || probedRoot != goroot {
-		return diagnosticErr("toolchain_executable_mismatch", err, "go env GOROOT does not match the selected toolchain")
+		return diagnosticErrRemedy("toolchain_executable_mismatch", toolchainSelectionRemedy, err,
+			"go env GOROOT does not match the selected toolchain")
 	}
 	if values["GOHOSTOS"] != host.goos || values["GOOS"] != host.goos || versionOS != host.goos ||
 		values["GOHOSTARCH"] != host.goarch || values["GOARCH"] != host.goarch || versionArch != host.goarch {

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/relux-works/curator/internal/godriver"
 )
 
 func TestRedactDiagnosticReplacesEveryAbsoluteLocation(t *testing.T) {
@@ -131,6 +133,34 @@ func TestPlanLinesRedactAnUntrustedReason(t *testing.T) {
 	}
 	if !strings.Contains(line, "<path>") {
 		t.Fatalf("plan line did not redact the location: %s", line)
+	}
+}
+
+// TestBuildFailureKeepsTheToolchainRemedyAnOperatorMustRead proves the half of
+// the remedy contract that lives outside the driver: a remedy attached at a
+// trust boundary only reaches an operator if the boundary that renders the
+// failure keeps it. This rendering redacts locations and bounds length, and the
+// remedy names a GOROOT-relative path and an example command, so it is exactly
+// the kind of text that could be redacted or truncated away without anyone
+// noticing.
+func TestBuildFailureKeepsTheToolchainRemedyAnOperatorMustRead(t *testing.T) {
+	t.Parallel()
+	const (
+		detail = "selected Go executable is not the regular executable under the derived GOROOT"
+		remedy = `put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`
+	)
+	var result Result
+	result.failBuild(&godriver.Diagnostic{
+		Code:   "toolchain_executable_mismatch",
+		Detail: detail,
+		Remedy: remedy,
+	})
+	if len(result.Errors) != 1 {
+		t.Fatalf("result = %+v", result)
+	}
+	want := "go-v1 toolchain_executable_mismatch: " + detail + "; " + remedy
+	if result.Errors[0] != want {
+		t.Fatalf("rendered failure = %q, want %q", result.Errors[0], want)
 	}
 }
 
