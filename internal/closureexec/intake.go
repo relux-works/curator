@@ -1,7 +1,6 @@
 package closureexec
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -259,7 +258,7 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
 			return walkErr
 		}
 		if entry.IsDir() {
-			return os.Chmod(current, 0o500) // #nosec G302 -- immutable directories require owner execute permission for read-only traversal.
+			return markTreeDirImmutable(current)
 		}
 		return nil
 	}); err != nil {
@@ -276,7 +275,11 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
 	}
 	target := filepath.Join(s.trees, strings.TrimPrefix(string(idValue), "sha256:"))
 	if err = os.Rename(tmp, target); err != nil {
-		if !errors.Is(err, fs.ErrExist) {
+		// A digest-named tree that already exists is a reuse, and VerifyAtUse
+		// below re-proves its exact content either way. Windows reports the
+		// occupied target as access-denied rather than fs.ErrExist, so the
+		// reuse condition is read from the target itself, not the error kind.
+		if info, statErr := os.Lstat(target); statErr != nil || !info.IsDir() {
 			return nil, err
 		}
 	}
@@ -322,7 +325,7 @@ func (h *SourceTreeHandle) VerifyAtUse() error {
 	if err != nil {
 		return err
 	}
-	if !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 || rootInfo.Mode().Perm()&0o222 != 0 {
+	if !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 || !treeDirIsImmutable(rootInfo) {
 		return failure("closure_derivation_drift", "source tree root is mutable or linked")
 	}
 	files := []SnapshotFile{}
@@ -349,11 +352,14 @@ func (h *SourceTreeHandle) VerifyAtUse() error {
 		if infoErr != nil {
 			return infoErr
 		}
+		if entry.IsDir() {
+			if !treeDirIsImmutable(info) {
+				return failure("closure_derivation_drift", "source tree member is writable")
+			}
+			return nil
+		}
 		if info.Mode().Perm()&0o222 != 0 {
 			return failure("closure_derivation_drift", "source tree member is writable")
-		}
-		if entry.IsDir() {
-			return nil
 		}
 		if !info.Mode().IsRegular() {
 			return failure("closure_derivation_drift", "source tree contains a special node")
@@ -436,13 +442,8 @@ func (s *CaptureStore) Capture(origin string, size int64, reader io.Reader) (*Ca
 	digest := h.id()
 	id := captureID(origin, digest, size)
 	target := filepath.Join(s.root, strings.TrimPrefix(id, "sha256:"))
-	if e = os.Chmod(tmpPath, 0o400); e != nil {
+	if e = publishByLink(tmpPath, target, 0o400); e != nil {
 		return nil, e
-	}
-	if e = os.Link(tmpPath, target); e != nil {
-		if !errors.Is(e, fs.ErrExist) {
-			return nil, e
-		}
 	}
 	handle := &CaptureHandle{store: s, id: id, path: target, digest: digest, size: size}
 	if e = handle.Recheck(); e != nil {

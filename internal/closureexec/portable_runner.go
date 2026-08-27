@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // ManagerProcessRunner is the portable CLI process implementation. It reports
@@ -128,7 +129,7 @@ func (runner *ManagerProcessRunner) Run(ctx context.Context, request ExecutionRe
 			_ = filepath.WalkDir(target, func(current string, entry fs.DirEntry, walkErr error) error {
 				if walkErr == nil {
 					if entry.IsDir() {
-						_ = os.Chmod(current, 0o700) // #nosec G302 -- cleanup must restore owner traversal before removing private replay trees.
+						_ = restoreTreeDirMutable(current)
 					} else {
 						_ = os.Chmod(current, 0o600)
 					}
@@ -343,7 +344,7 @@ func copyReplayTree(source, target string) error {
 			return walkErr
 		}
 		if entry.IsDir() {
-			return os.Chmod(current, 0o500) // #nosec G302 -- immutable replay directories remain traversable.
+			return markTreeDirImmutable(current)
 		}
 		return nil
 	})
@@ -401,7 +402,7 @@ func verifyReplayTree(root string, expected []SnapshotFile) error {
 		}
 		if entry.IsDir() {
 			info, infoErr := entry.Info()
-			if infoErr != nil || info.Mode().Perm()&0o222 != 0 {
+			if infoErr != nil || !treeDirIsImmutable(info) {
 				return failure("closure_input_mutated", "portable replay directory became writable")
 			}
 			return nil
@@ -479,14 +480,14 @@ func safeExecutionPath(root, logical string) (string, error) {
 }
 
 func ensureEmptyDirectory(root string) error {
-	info, err := os.Lstat(root)
+	_, err := os.Lstat(root)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return os.MkdirAll(root, 0o700)
+			return privatedir.MakeAll(root)
 		}
 		return err
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0o700 {
+	if privatedir.Validate(root) != nil {
 		return failure("closure_input_undeclared", "portable output root is not a private real directory")
 	}
 	entries, err := os.ReadDir(root)

@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
 	"github.com/relux-works/curator/internal/nodesource"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // invocation is a non-authoritative projection used to construct the canonical
@@ -122,7 +123,7 @@ func DerivePrivateMirror(ctx context.Context, capture *Capture, destination, wor
 	if _, err = filepath.Abs(workRoot); err != nil || workRoot == "" {
 		return nil, fail(CodeInputUndeclared, "Yarn mirror work root is invalid", nil)
 	}
-	if err = os.Mkdir(dest, 0o700); err != nil {
+	if err = privatedir.Make(dest); err != nil {
 		return nil, err
 	}
 	success := false
@@ -132,7 +133,7 @@ func DerivePrivateMirror(ctx context.Context, capture *Capture, destination, wor
 		}
 	}()
 	mirrorDir := filepath.Join(dest, "mirror")
-	if err = os.Mkdir(mirrorDir, 0o700); err != nil {
+	if err = privatedir.Make(mirrorDir); err != nil {
 		return nil, err
 	}
 	keys := make([]string, 0, len(capture.tarballs))
@@ -220,10 +221,10 @@ func DerivePrivateMirror(ctx context.Context, capture *Capture, destination, wor
 		return nil, err
 	}
 	emptyRoot := filepath.Join(workRoot, "empty-yarn-cache")
-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
+	if err = privatedir.MakeAll(workRoot); err != nil {
 		return nil, err
 	}
-	if err = os.Mkdir(emptyRoot, 0o700); err != nil {
+	if err = privatedir.Make(emptyRoot); err != nil {
 		return nil, err
 	}
 	defer func() { _ = os.RemoveAll(emptyRoot) }()
@@ -1061,12 +1062,12 @@ func copyContainedTreeDereferencingLinks(root, source, destination string, activ
 		if readErr != nil {
 			return readErr
 		}
-		if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+		if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
 			return err
 		}
 		return os.WriteFile(destination, payload, 0o600)
 	}
-	if err = os.MkdirAll(destination, 0o700); err != nil {
+	if err = privatedir.MakeAll(destination); err != nil {
 		return err
 	}
 	entries, err := os.ReadDir(realSource)

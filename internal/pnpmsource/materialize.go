@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
 	"github.com/relux-works/curator/internal/nodesource"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // ExecutionContext supplies the shared protected executor and exact C0/C5 authority.
@@ -997,7 +998,7 @@ func cleanAbsentAbsolute(value string) (string, error) {
 	return absolute, nil
 }
 func copyWritableTree(source, destination string) error {
-	if err := os.MkdirAll(destination, 0o700); err != nil {
+	if err := privatedir.MakeAll(destination); err != nil {
 		return err
 	}
 	return filepath.WalkDir(source, func(current string, entry fs.DirEntry, err error) error {
@@ -1013,7 +1014,7 @@ func copyWritableTree(source, destination string) error {
 			return fail(CodeInputUndeclared, "derived pnpm store contains link", map[string]string{"path": filepath.ToSlash(rel)})
 		}
 		if entry.IsDir() {
-			return os.Mkdir(target, 0o700)
+			return privatedir.Make(target)
 		}
 		if !entry.Type().IsRegular() {
 			return fail(CodeInputUndeclared, "derived pnpm store contains special node", nil)
@@ -1056,12 +1057,12 @@ func copyContainedNode(realRoot, source, destination string, active map[string]b
 		if err != nil {
 			return err
 		}
-		if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+		if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
 			return err
 		}
 		return os.WriteFile(destination, payload, 0o600)
 	}
-	if err = os.MkdirAll(destination, 0o700); err != nil {
+	if err = privatedir.MakeAll(destination); err != nil {
 		return err
 	}
 	entries, err := os.ReadDir(realSource)

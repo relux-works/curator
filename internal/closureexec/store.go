@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -245,7 +246,7 @@ func (s *ProtectedStore) Inspect(cacheInput AssuredCacheInput) (PublishedHit, er
 			return PublishedHit{}, err
 		}
 		info, err := os.Stat(blob)
-		if err != nil || (observation.Class == "native.executable" && info.Mode().Perm() != 0o500) || (observation.Class != "native.executable" && info.Mode().Perm() != 0o400) {
+		if err != nil || !blobModeMatchesClass(info, observation.Class == "native.executable") {
 			return PublishedHit{}, failure("artifact_local_output_drift", "protected blob mode differs from output class")
 		}
 		b, err := os.ReadFile(blob) // #nosec G304 -- blob is derived from a validated content identity below the protected root.
@@ -323,17 +324,10 @@ func writeNoReplace(dir, target string, payload []byte, mode fs.FileMode) error 
 		_ = tmp.Close()
 		return err
 	}
-	if err = tmp.Chmod(mode); err != nil {
-		_ = tmp.Close()
-		return err
-	}
 	if err = tmp.Close(); err != nil {
 		return err
 	}
-	if err = os.Link(name, target); err != nil && !errors.Is(err, fs.ErrExist) {
-		return err
-	}
-	return nil
+	return publishByLink(name, target, mode)
 }
 func protectedRegular(path string) error {
 	info, err := os.Lstat(path)
@@ -347,24 +341,18 @@ func protectedRegular(path string) error {
 }
 
 func preparePrivateDirectory(path string) error {
-	info, err := os.Lstat(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return os.Mkdir(path, 0o700)
-	}
-	if err != nil {
+	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
+		return privatedir.Make(path)
+	} else if err != nil {
 		return err
 	}
-	return validatePrivateDirectoryInfo(info)
+	return validatePrivateDirectory(path)
 }
 func validatePrivateDirectory(path string) error {
-	info, err := os.Lstat(path)
-	if err != nil {
+	if _, err := os.Lstat(path); err != nil {
 		return err
 	}
-	return validatePrivateDirectoryInfo(info)
-}
-func validatePrivateDirectoryInfo(info fs.FileInfo) error {
-	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 || info.Mode().Perm() != 0o700 {
+	if privatedir.Validate(path) != nil {
 		return failure("artifact_local_output_drift", "protected directory is pre-existing, mutable, or not owner-only")
 	}
 	return nil

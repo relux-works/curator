@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/curator/internal/artifactpolicy"
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 var versionManifestPattern = regexp.MustCompile(`\APackage@swift-([0-9]+(?:\.[0-9]+){0,2})\.swift\z`)
@@ -301,7 +302,7 @@ func captureMirror(ctx context.Context, config Config, pin Pin, snapshot Snapsho
 	mirrorRelative := filepath.ToSlash(filepath.Join(".swiftpm-authority", "mirrors", pin.Identity+"-"+pin.Revision+".git"))
 	mirrorRoot := filepath.Join(broker.authority.executionRoot, filepath.FromSlash(mirrorRelative))
 	permit := closureexec.DerivationPermit{SchemaID: closureexec.SchemaDerivationPermit, PreviousCausalHead: broker.authority.derivation.CurrentCausalHead(), InvocationKey: "source-control-mirror-v1:" + string(acquisitionID), InvocationSubtype: closureexec.DerivationMirror, AdmittedInputReceiptIDs: receiptIDs, InputMounts: mounts, C0CheckpointID: broker.authority.c0ID, ToolchainNodeID: mustToolNodeID(config.Toolchain.Git), ToolchainFingerprint: config.Toolchain.Git.Fingerprint, ExecutableSHA256: config.Toolchain.Git.ExecutableSHA256, Executable: config.Toolchain.Git.ExecutableRelativePath, CWD: filepath.ToSlash(filepath.Join(".swiftpm-authority", "work")), Argv: []string{"curator-source-control-mirror-v1"}, Environment: map[string]string{"CURATOR_GIT_REVISION": pin.Revision, "CURATOR_GIT_TREE": snapshot.GitTree, "CURATOR_MIRROR_ROOT": mirrorRelative, "CURATOR_OUTPUT_ROOT": filepath.ToSlash(filepath.Join(".swiftpm-authority", "mirror-output")), "CURATOR_SOURCE_CONTROL_KIND": string(pin.Kind), "HOME": "empty/home", "TZ": "UTC"}, HostID: mustPlatformID(config.Toolchain.Git.PlatformABI), TargetID: mustPlatformID(config.Toolchain.Git.PlatformABI), AllowedProcesses: []string{config.Toolchain.Git.ExecutableRelativePath}, ReadRoots: sortedUniqueStrings([]string{filepath.ToSlash(filepath.Dir(config.Toolchain.Git.ExecutableRelativePath)), mounts[0].Path, mounts[1].Path}), WriteRoots: sortedUniqueStrings([]string{evidencePath, mirrorRelative}), ExpectedEvidence: expected, LocalOutputs: []closureexec.LocalOutputDeclaration{{Path: mirrorRelative, SchemaID: "source-control-mirror-v1"}}, Network: "none", RecheckRule: "immediate-exact-v1", ResourceLimits: limits, ResourceLimitID: limitID, EvidenceSchemaID: evidenceSchemaID}
-	if err = os.MkdirAll(filepath.Join(broker.authority.executionRoot, filepath.FromSlash(permit.CWD)), 0o700); err != nil {
+	if err = privatedir.MakeAll(filepath.Join(broker.authority.executionRoot, filepath.FromSlash(permit.CWD))); err != nil {
 		return Mirror{}, err
 	}
 	permitID, err := broker.authority.derivation.Commit(permit)

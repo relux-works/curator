@@ -8,6 +8,7 @@ import (
 
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 type metadataExecution struct {
@@ -38,7 +39,7 @@ func (runner *managerMetadataRunner) CommitMetadata(ctx context.Context, invocat
 	if err := os.RemoveAll(configRoot); err != nil {
 		return permit{}, err
 	}
-	if err := os.Mkdir(configRoot, 0o700); err != nil {
+	if err := privatedir.Make(configRoot); err != nil {
 		return permit{}, err
 	}
 	configBytes, err := DeriveSourceReplacementConfig(filepath.Join(runner.manager.execRoot, "vendor"), runner.manager.lock.Packages)

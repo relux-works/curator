@@ -18,6 +18,7 @@ import (
 
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // GitBroker is the production source-control acquisition boundary. It fetches
@@ -310,7 +311,7 @@ func (broker *GitBroker) ResolvePinWithEvidence(ctx context.Context, dependency 
 	if err != nil {
 		return Pin{}, journal, err
 	}
-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
+	if err = privatedir.MakeAll(workRoot); err != nil {
 		return Pin{}, journal, err
 	}
 	prefix, value, ok := strings.Cut(dependency.Requirement, ":")
@@ -367,7 +368,7 @@ func (broker *GitBroker) Acquire(ctx context.Context, pin Pin) (Snapshot, error)
 		return Snapshot{}, err
 	}
 	journal := GitVerificationEvidence{}
-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
+	if err = privatedir.MakeAll(workRoot); err != nil {
 		return Snapshot{}, err
 	}
 	runRoot, err := os.MkdirTemp(workRoot, "acquire-"+pin.Identity+"-")
@@ -637,7 +638,7 @@ func (verifier GitMirrorVerifier) run(ctx context.Context, executable, cwd, phas
 }
 
 func extractSourceArchive(root string, payload []byte) error {
-	if err := os.Mkdir(root, 0o700); err != nil {
+	if err := privatedir.Make(root); err != nil {
 		return err
 	}
 	reader := tar.NewReader(bytes.NewReader(payload))
@@ -662,11 +663,11 @@ func extractSourceArchive(root string, payload []byte) error {
 		case tar.TypeXHeader, tar.TypeXGlobalHeader:
 			continue
 		case tar.TypeDir:
-			if err = os.MkdirAll(destination, 0o700); err != nil {
+			if err = privatedir.MakeAll(destination); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+			if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
 				return err
 			}
 			mode := fs.FileMode(0o600)
@@ -693,7 +694,7 @@ func extractSourceArchive(root string, payload []byte) error {
 
 func gitEnvironment(root, executable string) []string {
 	home := filepath.Join(root, "empty-home")
-	_ = os.MkdirAll(home, 0o700)
+	_ = privatedir.MakeAll(home)
 	return []string{"GIT_CONFIG_NOSYSTEM=1", "GIT_LFS_SKIP_SMUDGE=1", "GIT_TERMINAL_PROMPT=0", "HOME=" + home, "LANG=C", "LC_ALL=C", "PATH=" + filepath.Dir(executable), "TZ=UTC"}
 }
 

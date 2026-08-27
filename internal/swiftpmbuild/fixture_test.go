@@ -4,11 +4,17 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/relux-works/curator/internal/artifactpolicy"
@@ -44,7 +50,7 @@ type fixture struct {
 	runner     *closureexec.ManagerProcessRunner
 	launches   []closureexec.ProcessLaunch
 	starts     int
-	stubExtra  string
+	stubExtra  []stubAction
 
 	materializeHook func()
 }
@@ -144,22 +150,63 @@ func (f *fixture) writeTree(files map[string]string, root string) {
 	}
 }
 
-// swiftStub is the deterministic stand-in for the selected SwiftPM driver. It
-// reproduces the exact native build layout: one product, one build directory
-// per target, one object per source, and one compiler dependency file.
-func (f *fixture) swiftStub() string {
+var (
+	swiftStubOnce  sync.Once
+	swiftStubBytes []byte
+	swiftStubErr   error
+)
+
+// builtSwiftStub compiles the scenario-driven SwiftPM stand-in once per test
+// process and returns its executable bytes; every fixture installs its own
+// copy below its private execution root.
+func builtSwiftStub(t *testing.T) []byte {
+	t.Helper()
+	swiftStubOnce.Do(func() {
+		output := filepath.Join(os.TempDir(), "curator-swiftpm-stub-"+strconv.Itoa(os.Getpid()))
+		build := exec.Command("go", "build", "-o", output, "./testdata/swiftpm_stub")
+		build.Env = os.Environ()
+		if combined, err := build.CombinedOutput(); err != nil {
+			swiftStubErr = fmt.Errorf("build swiftpm stub: %v\n%s", err, combined)
+			return
+		}
+		swiftStubBytes, swiftStubErr = os.ReadFile(output)
+		_ = os.Remove(output)
+	})
+	if swiftStubErr != nil {
+		t.Fatal(swiftStubErr)
+	}
+	return swiftStubBytes
+}
+
+// stubAction is one declarative step of the SwiftPM driver stand-in. The
+// stand-in was previously a POSIX shell script, which Windows cannot execute;
+// the compiled scenario runner in testdata/swiftpm_stub reproduces the same
+// observable build layout on every platform.
+type stubAction struct {
+	Op      string `json:"op"`
+	Path    string `json:"path"`
+	Payload string `json:"payload,omitempty"`
+}
+
+// swiftStubActions is the deterministic stand-in for the selected SwiftPM
+// driver. It reproduces the exact native build layout: one product, one build
+// directory per target, one object per source, and one compiler dependency
+// file. {{PWD}} expands to the process working directory inside the stub.
+func (f *fixture) swiftStubActions() []stubAction {
 	scratch := ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration
-	return "#!/bin/sh\nset -e\n" +
-		"d=\"" + scratch + "\"\n" +
-		"/bin/mkdir -p \"$d/App.build\" \"$d/CLib.build\"\n" +
-		"printf 'curator-product' > \"$d/" + fixtureProduct + "\"\n" +
-		"/bin/chmod 0500 \"$d/" + fixtureProduct + "\"\n" +
-		"printf 'app-object' > \"$d/App.build/main.swift.o\"\n" +
-		"printf 'clib-object' > \"$d/CLib.build/lib.c.o\"\n" +
-		"printf '%s\\n' \"$PWD/$d/App.build/main.swift.o : $PWD/Sources/App/main.swift $PWD/$d/CLib.build/module.modulemap\" > \"$d/App.build/App.d\"\n" +
-		"printf '%s\\n' \"$PWD/$d/CLib.build/lib.c.o : $PWD/Sources/CLib/lib.c $PWD/Sources/CLib/include/CLib.h\" > \"$d/CLib.build/lib.c.d\"\n" +
-		"printf '{}' > \"$d/description.json\"\n" +
-		f.stubExtra
+	return append([]stubAction{
+		{Op: "mkdir", Path: scratch + "/App.build"},
+		{Op: "mkdir", Path: scratch + "/CLib.build"},
+		{Op: "write", Path: scratch + "/" + fixtureProduct, Payload: "curator-product"},
+		{Op: "chmod-readonly-exec", Path: scratch + "/" + fixtureProduct},
+		{Op: "write", Path: scratch + "/App.build/main.swift.o", Payload: "app-object"},
+		{Op: "write", Path: scratch + "/CLib.build/lib.c.o", Payload: "clib-object"},
+		{Op: "write", Path: scratch + "/App.build/App.d",
+			Payload: "{{PWD}}/" + scratch + "/App.build/main.swift.o : {{PWD}}/Sources/App/main.swift {{PWD}}/" + scratch + "/CLib.build/module.modulemap\n"},
+		{Op: "write", Path: scratch + "/CLib.build/lib.c.d",
+			Payload: "{{PWD}}/" + scratch + "/CLib.build/lib.c.o : {{PWD}}/Sources/CLib/lib.c {{PWD}}/Sources/CLib/include/CLib.h\n"},
+		{Op: "write", Path: scratch + "/description.json", Payload: "{}"},
+	}, f.stubExtra...)
 }
 
 func (f *fixture) materialize() {
@@ -168,12 +215,19 @@ func (f *fixture) materialize() {
 	if err := os.MkdirAll(filepath.Join(f.execRoot, "bin"), 0o700); err != nil {
 		f.t.Fatal(err)
 	}
-	stub := []byte(f.swiftStub())
-	stubPath := filepath.Join(f.execRoot, "bin", "swiftpm")
+	stubPath := filepath.Join(f.execRoot, filepath.FromSlash(stubExecutableRelative()))
 	if err := os.RemoveAll(stubPath); err != nil {
 		f.t.Fatal(err)
 	}
+	stub := builtSwiftStub(f.t)
 	if err := os.WriteFile(stubPath, stub, 0o500); err != nil {
+		f.t.Fatal(err)
+	}
+	scenario, err := json.Marshal(f.swiftStubActions())
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(f.execRoot, "bin", "swiftpm-scenario.json"), scenario, 0o600); err != nil {
 		f.t.Fatal(err)
 	}
 	sum := sha256.Sum256(stub)
@@ -223,7 +277,7 @@ func (f *fixture) materialize() {
 			PolicySelector: "apple-linker-v1", VersionOutput: "ld 1234", Fingerprint: id('9'), ExecutableSHA256: id('a'),
 		},
 		Configuration: fixtureConfiguration, Assurance: closureexec.AssurancePortable,
-		AllowedProcesses: []string{"bin/swiftpm"},
+		AllowedProcesses: []string{stubExecutableRelative()},
 		Slots: map[ToolSlot]string{
 			SlotSwiftPM: "swiftpm", SlotSwiftCompiler: "swift", SlotPackageDescription: "package-description",
 			SlotClang: "clang", SlotSDK: "macos-sdk",
@@ -287,9 +341,23 @@ func rechecker(_ context.Context, expected swiftpmsource.ToolIdentity) (closuree
 
 var hexAlphabet = "0123456789abcdef"
 
+// stubExecutableRelative is the driver stub's permit-relative path. Windows
+// CreateProcess resolution in os/exec requires a PATHEXT extension, so the
+// same fixture identity carries the platform's real executable spelling.
+func stubExecutableRelative() string {
+	if runtime.GOOS == "windows" {
+		return "bin/swiftpm.exe"
+	}
+	return "bin/swiftpm"
+}
+
 func tool(role string, value byte) swiftpmsource.ToolIdentity {
+	relative := "bin/" + strings.ReplaceAll(role, "+", "x")
+	if role == "swiftpm" {
+		relative = stubExecutableRelative()
+	}
 	return swiftpmsource.ToolIdentity{
-		Role: role, ExecutableRelativePath: "bin/" + strings.ReplaceAll(role, "+", "x"),
+		Role: role, ExecutableRelativePath: relative,
 		VersionOutput: role + " 6.3.2 (Apple Swift version 6.3.2)", PlatformABI: "darwin-arm64", PolicySelector: "swift-toolchain-v1",
 		Fingerprint: id(value), ExecutableSHA256: id(hexAlphabet[(strings.IndexByte(hexAlphabet, value)+8)%16]),
 	}

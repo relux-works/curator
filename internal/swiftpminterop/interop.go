@@ -413,7 +413,9 @@ func (state *closeState) inspectSystemTarget(interop *TargetInterop) error {
 	if err != nil {
 		return err
 	}
-	baseDirectory := path.Dir(resolution.AbsolutePath)
+	// resolution.AbsolutePath is a host path; the slash-only path.Dir would
+	// return "." for a Windows spelling and turn every reference relative.
+	baseDirectory := filepath.Dir(resolution.AbsolutePath)
 	resolved := []Resolution{}
 	for _, reference := range parsed.References {
 		reference := reference

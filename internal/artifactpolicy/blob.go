@@ -1,6 +1,8 @@
 package artifactpolicy
 
 import (
+	"github.com/relux-works/curator/internal/privatedir"
+
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -26,7 +28,7 @@ func newBlobStore() (*blobStore, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.Chmod(directory, 0o700); err != nil { // #nosec G302 -- this is a private directory, not a regular file.
+	if err := privatedir.Protect(directory); err != nil {
 		_ = os.RemoveAll(directory)
 		return nil, err
 	}

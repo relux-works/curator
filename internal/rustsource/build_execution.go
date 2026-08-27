@@ -12,6 +12,7 @@ import (
 
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 type cargoBuildExecution struct {
@@ -98,7 +99,7 @@ func (state *managerState) executeBuildCargo(
 	}
 	defer func() { _ = os.RemoveAll(seedRoot) }()
 	for _, name := range []string{"cargo-home", "target", "tmp"} {
-		if err = os.Mkdir(filepath.Join(seedRoot, name), 0o700); err != nil {
+		if err = privatedir.Make(filepath.Join(seedRoot, name)); err != nil {
 			return cargoBuildExecution{}, err
 		}
 	}

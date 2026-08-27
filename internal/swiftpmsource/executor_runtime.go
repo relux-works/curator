@@ -12,6 +12,7 @@ import (
 
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // ExecutorSwiftPM is the production manifest evaluator backed by the shared
@@ -98,7 +99,7 @@ func (runtime *ExecutorSwiftPM) Replay(ctx context.Context, capture *Capture) (O
 		return OfflineMetadataResult{}, err
 	}
 	configRoot := filepath.Join(replayRoot, ".curator", "config")
-	if err = os.MkdirAll(configRoot, 0o700); err != nil {
+	if err = privatedir.MakeAll(configRoot); err != nil {
 		return OfflineMetadataResult{}, err
 	}
 	if err = os.WriteFile(filepath.Join(configRoot, "mirrors.json"), mirrorPayload, 0o600); err != nil {
@@ -171,7 +172,7 @@ func copyRegularTree(source, target string) error {
 			return fail(CodeOfflineReplayFailed, "offline root contains a link")
 		}
 		if entry.IsDir() {
-			return os.MkdirAll(destination, 0o700)
+			return privatedir.MakeAll(destination)
 		}
 		info, err := entry.Info()
 		if err != nil || !info.Mode().IsRegular() {

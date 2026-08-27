@@ -52,7 +52,7 @@ func NativeCargoUnavailableReason() string {
 		return ""
 	}
 	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
-	executable := filepath.Join(root, "bin", "cargo")
+	executable := filepath.Join(root, "bin", cargoExecutableName())
 	return cargoHostCapabilityReason(target, true, root, executable)
 }
 
@@ -98,7 +98,7 @@ func registerCargoAtC0(ctx context.Context) cargoRegistration {
 		return cargoRegistration{err: fmt.Errorf("no operator-approved Cargo descriptor for native target %s", target)}
 	}
 	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
-	executable := filepath.Join(root, "bin", "cargo")
+	executable := filepath.Join(root, "bin", cargoExecutableName())
 	executable, err = filepath.EvalSymlinks(executable)
 	if err != nil {
 		return cargoRegistration{err: fmt.Errorf("canonicalize pinned Cargo executable: %w", err)}
@@ -143,11 +143,20 @@ func registerCargoAtC0(ctx context.Context) cargoRegistration {
 
 func nativeRustTarget() (string, bool) {
 	arch := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[runtime.GOARCH]
-	osName := map[string]string{"darwin": "apple-darwin", "linux": "unknown-linux-gnu"}[runtime.GOOS]
+	osName := map[string]string{"darwin": "apple-darwin", "linux": "unknown-linux-gnu", "windows": "pc-windows-msvc"}[runtime.GOOS]
 	if arch == "" || osName == "" {
 		return "", false
 	}
 	return arch + "-" + osName, true
+}
+
+// cargoExecutableName is the pinned Cargo binary's file name below the
+// toolchain root's bin directory on this platform.
+func cargoExecutableName() string {
+	if runtime.GOOS == "windows" {
+		return "cargo.exe"
+	}
+	return "cargo"
 }
 
 func (registration cargoRegistration) recheck(ctx context.Context) (cargoToolchain, error) {

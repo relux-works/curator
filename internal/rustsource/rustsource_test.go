@@ -744,7 +744,13 @@ func TestCGP05ReconcileReusesSelectionNeutralCaptureAndSeparatesTargetBinding(t 
 }
 
 func testToolchain() cargoToolchain {
-	return cargoToolchain{CargoPath: "/toolchain/bin/cargo", Version: "1.91.0", ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43", BinarySHA256: "sha256:" + digest([]byte("cargo")), Fingerprint: "sha256:" + digest([]byte("toolchain")), C0CheckpointID: "sha256:" + digest([]byte("c0"))}
+	// The fixture path must satisfy filepath.IsAbs on every platform; a bare
+	// slash-rooted spelling is not absolute on Windows.
+	cargoPath := filepath.Join(string(filepath.Separator), "toolchain", "bin", "cargo")
+	if abs, err := filepath.Abs(cargoPath); err == nil {
+		cargoPath = abs
+	}
+	return cargoToolchain{CargoPath: cargoPath, Version: "1.91.0", ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43", BinarySHA256: "sha256:" + digest([]byte("cargo")), Fingerprint: "sha256:" + digest([]byte("toolchain")), C0CheckpointID: "sha256:" + digest([]byte("c0"))}
 }
 func crateBytes(t *testing.T, key PackageKey, files map[string][]byte) []byte {
 	t.Helper()

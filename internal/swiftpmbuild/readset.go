@@ -277,6 +277,10 @@ func harvestDependencyFiles(observer *ReadSetObserver, scratchRootPath string) (
 				return nil, fileErr
 			}
 			for _, dependency := range parseDependencyFile(string(payload)) {
+				// The grammar treats a backslash as an escape, so drivers on
+				// every platform spell dependency paths with forward slashes;
+				// the platform spelling is restored before path comparison.
+				dependency = filepath.Clean(filepath.FromSlash(dependency))
 				reads[dependency] = classifyRead(dependency)
 			}
 		}

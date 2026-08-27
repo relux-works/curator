@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"hash/adler32"
 	"io/fs"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -578,8 +579,29 @@ func Cases() []Case {
 
 	for index := range cases {
 		cases[index].Expected.ManifestDigest = goldenDigests[cases[index].Key()]
+		if runtime.GOOS == "windows" {
+			if digest, ok := windowsGoldenDigests[cases[index].Key()]; ok {
+				cases[index].Expected.ManifestDigest = digest
+			}
+		}
 	}
 	return cases
+}
+
+// windowsGoldenDigests pins the manifest identities whose role evidence
+// embeds the fixture toolchain root. That root is host evidence, not protocol
+// surface: the central-manager receipt records the physically resolved
+// toolchain paths, validateToolchainRecord requires them to be absolute on the
+// host, and an absolute Windows path necessarily spells a drive. The five
+// affected manifests therefore legitimately differ per platform, and both
+// spellings are pinned so drift is caught on each. Every other case's digest
+// is platform-neutral and stays in goldenDigests alone.
+var windowsGoldenDigests = map[string]string{
+	"A07":                         "sha256:c038435eb421c1376bd6145db965499f84b2802751db57fc0327ba417ea53945",
+	"A07/native-archive-metadata": "sha256:c60f47f4a3426d66278f965254e8a24c974c42e4edd0f26b2130a0e2a2937d89",
+	"T03":                         "sha256:796d496fd3d25a96f8509e537e3f1f0a06fb9495e3e92d5990b164bb750195c6",
+	"T03/link-escape":             "sha256:97ca81fd96bd8b0d309677492ddd129550d56702c0611c7e9425f16934c0e1ce",
+	"T03/special-node":            "sha256:de25b5a51788943306aefb613d9e3ac5a524a9e8929c3414d0f5a8ed56dfca76",
 }
 
 func fixture(

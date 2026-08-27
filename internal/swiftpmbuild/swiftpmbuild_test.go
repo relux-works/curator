@@ -345,7 +345,7 @@ func TestOfflineBuildLaunchesExactlyTheCommittedCommand(t *testing.T) {
 	if !equalStrings(launch.Argv, plan.Command.Argv) {
 		t.Fatalf("launched argv = %v, want %v", launch.Argv, plan.Command.Argv)
 	}
-	if filepath.Base(launch.Executable) != "swiftpm" {
+	if filepath.Base(launch.Executable) != filepath.Base(filepath.FromSlash(stubExecutableRelative())) {
 		t.Fatalf("launched executable = %q", launch.Executable)
 	}
 	for _, entry := range launch.Environment {
@@ -358,7 +358,7 @@ func TestOfflineBuildLaunchesExactlyTheCommittedCommand(t *testing.T) {
 // A declared write the build never produced fails closed without publication.
 func TestMissingDeclaredObjectFailsClosedWithoutPublication(t *testing.T) {
 	fixture := newFixture(t)
-	fixture.stubExtra = "/bin/rm -rf \".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/CLib.build\"\n"
+	fixture.stubExtra = []stubAction{{Op: "remove-all", Path: ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/CLib.build"}}
 	plan := fixture.mustPlan()
 	_, err := fixture.manager().Build(t.Context(), plan)
 	requireCode(t, err, CodeOutputUnreceipted)
@@ -368,7 +368,7 @@ func TestMissingDeclaredObjectFailsClosedWithoutPublication(t *testing.T) {
 // A build that never wrote the declared product fails closed.
 func TestMissingProductFailsClosedWithoutPublication(t *testing.T) {
 	fixture := newFixture(t)
-	fixture.stubExtra = "/bin/rm -f \".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/" + fixtureProduct + "\"\n"
+	fixture.stubExtra = []stubAction{{Op: "remove", Path: ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/" + fixtureProduct}}
 	plan := fixture.mustPlan()
 	_, err := fixture.manager().Build(t.Context(), plan)
 	if err == nil {
@@ -486,9 +486,10 @@ func TestObserverAuthorityContract(t *testing.T) {
 // is rewritten to that dependency's protected root. A checkout that matches no
 // admitted package identity fails closed rather than being dropped.
 func TestObservedReadMappingSeparatesBuildTreeFromAdmittedSource(t *testing.T) {
-	work := filepath.Join(string(filepath.Separator), "exec", "work", "package")
-	admitted := filepath.Join(string(filepath.Separator), "store", "root")
-	dependency := filepath.Join(string(filepath.Separator), "store", "dep")
+	base := t.TempDir()
+	work := filepath.Join(base, "exec", "work", "package")
+	admitted := filepath.Join(base, "store", "root")
+	dependency := filepath.Join(base, "store", "dep")
 	roots := map[string]string{"root": admitted, "dep": dependency}
 	resolved, generated, err := mapObservedRead(filepath.Join(work, "Sources", "App", "main.swift"), work, "root", roots)
 	if err != nil || generated || resolved != filepath.Join(admitted, "Sources", "App", "main.swift") {
@@ -508,7 +509,7 @@ func TestObservedReadMappingSeparatesBuildTreeFromAdmittedSource(t *testing.T) {
 	if _, _, err = mapObservedRead(filepath.Join(work, ".curator", "scratch", "checkouts"), work, "root", roots); ErrorCode(err) != CodeHeaderInputUndeclared {
 		t.Fatal("a bare checkouts read was not rejected")
 	}
-	external := filepath.Join(string(filepath.Separator), "sdk", "usr", "include", "stdio.h")
+	external := filepath.Join(base, "sdk", "usr", "include", "stdio.h")
 	if resolved, generated, err = mapObservedRead(external, work, "root", roots); err != nil || generated || resolved != external {
 		t.Fatalf("external read mapping = %q generated=%v (%v)", resolved, generated, err)
 	}
@@ -596,7 +597,11 @@ func writeDependencyFile(t *testing.T, directory, name string, reads []string) {
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	payload := filepath.Join(directory, "out.o") + " : " + strings.Join(reads, " ") + "\n"
+	slashed := make([]string, 0, len(reads))
+	for _, read := range reads {
+		slashed = append(slashed, filepath.ToSlash(read))
+	}
+	payload := filepath.ToSlash(filepath.Join(directory, "out.o")) + " : " + strings.Join(slashed, " ") + "\n"
 	if err := os.WriteFile(filepath.Join(directory, name), []byte(payload), 0o600); err != nil {
 		t.Fatal(err)
 	}

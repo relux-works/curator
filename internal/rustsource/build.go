@@ -18,6 +18,7 @@ import (
 
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 const buildProfileID = "curator"
@@ -192,7 +193,7 @@ func (m *Manager) Build(ctx context.Context, request BuildRequest) (BuildResult,
 	}
 	defer func() { _ = os.RemoveAll(staging) }()
 	artifactPath := filepath.Join(staging, filepath.FromSlash(output.LogicalPath))
-	if err = os.MkdirAll(filepath.Dir(artifactPath), 0o700); err != nil {
+	if err = privatedir.MakeAll(filepath.Dir(artifactPath)); err != nil {
 		return BuildResult{}, err
 	}
 	payload, err := os.ReadFile(executable) // #nosec G304 -- executable path is validated from Cargo JSON below the private target root.
@@ -405,7 +406,7 @@ func buildEnvironment(tools rustBuildToolchain, home, target, temp, root string)
 		"CARGO_PROFILE_CURATOR_INCREMENTAL": "false", "CARGO_PROFILE_CURATOR_STRIP": "none",
 		"CARGO_TARGET_" + tripleKey + "_LINKER": tools.items[BuildToolLinker].PhysicalPath,
 	}
-	_ = os.Mkdir(env["HOME"], 0o700)
+	_ = privatedir.Make(env["HOME"])
 	if tools.items[BuildToolSDK].PhysicalPath != tools.items[BuildToolSysroot].PhysicalPath {
 		env["SDKROOT"] = tools.items[BuildToolSDK].PhysicalPath
 	}

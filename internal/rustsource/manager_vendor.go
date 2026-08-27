@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/artifactpolicy"
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 type managerVendorRunner struct {
@@ -33,7 +34,7 @@ func (runner *managerVendorRunner) stageCargoHome(_ context.Context, root string
 	if runner == nil || runner.manager == nil || root != runner.manager.cargoHome {
 		return fail(CodeConfigUntrusted, "Cargo home staging authority differs", nil)
 	}
-	if err := os.Mkdir(root, 0o700); err != nil {
+	if err := privatedir.Make(root); err != nil {
 		return err
 	}
 	for _, origin := range runner.registry {
@@ -42,7 +43,7 @@ func (runner *managerVendorRunner) stageCargoHome(_ context.Context, root string
 			return err
 		}
 		cacheRoot := filepath.Join(root, "registry", "cache", sourceID)
-		if err = os.MkdirAll(cacheRoot, 0o700); err != nil {
+		if err = privatedir.MakeAll(cacheRoot); err != nil {
 			return err
 		}
 		if err = os.WriteFile(filepath.Join(cacheRoot, packageDirectory(origin.Package)+".crate"), origin.Archive, 0o400); err != nil {
@@ -50,7 +51,7 @@ func (runner *managerVendorRunner) stageCargoHome(_ context.Context, root string
 		}
 		indexRoot := filepath.Join(root, "registry", "index", sourceID)
 		indexPath := filepath.Join(indexRoot, ".cache", filepath.FromSlash(registryIndexPath(origin.Package.Name)))
-		if err = os.MkdirAll(filepath.Dir(indexPath), 0o700); err != nil {
+		if err = privatedir.MakeAll(filepath.Dir(indexPath)); err != nil {
 			return err
 		}
 		cacheRecord := append([]byte{3, 2, 0, 0, 0}, []byte("etag: \"curator-admitted\"\x00")...)
@@ -142,7 +143,7 @@ func expectedPackage(packages []VendorPackage, key PackageKey) (VendorPackage, b
 }
 
 func materializePackage(root string, pkg VendorPackage, cargoOK bool) error {
-	if err := os.MkdirAll(root, 0o700); err != nil {
+	if err := privatedir.MakeAll(root); err != nil {
 		return err
 	}
 	for _, leaf := range pkg.Files {
@@ -150,7 +151,7 @@ func materializePackage(root string, pkg VendorPackage, cargoOK bool) error {
 			continue
 		}
 		path := filepath.Join(root, filepath.FromSlash(leaf.Path))
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		if err := privatedir.MakeAll(filepath.Dir(path)); err != nil {
 			return err
 		}
 		if err := os.WriteFile(path, leaf.Bytes, 0o400); err != nil {
@@ -181,7 +182,7 @@ func copyAdministrativeTree(source, destination string) error {
 		}
 		target := filepath.Join(destination, rel)
 		if entry.IsDir() {
-			return os.MkdirAll(target, 0o700)
+			return privatedir.MakeAll(target)
 		}
 		if entry.Type()&fs.ModeSymlink != 0 {
 			return fail(CodeGitIdentityInvalid, "Git administrative store contains a link", nil)
@@ -215,7 +216,7 @@ func copyGitMarkers(source, destination string) error {
 				return err
 			}
 			target := filepath.Join(destination, rel)
-			if err = os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+			if err = privatedir.MakeAll(filepath.Dir(target)); err != nil {
 				return err
 			}
 			return os.WriteFile(target, payload, 0o400)
@@ -335,7 +336,7 @@ func (runner *managerVendorRunner) RunVendor(ctx context.Context, legacy permit,
 		return "", err
 	}
 	if len(runner.expected) == 0 {
-		if err = os.Mkdir(invocation.Destination, 0o700); err != nil && !os.IsExist(err) {
+		if err = privatedir.Make(invocation.Destination); err != nil && !os.IsExist(err) {
 			return "", err
 		}
 	}

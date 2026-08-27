@@ -17,6 +17,7 @@ import (
 	"github.com/relux-works/curator/internal/artifactpolicy"
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/swiftpminterop"
 	"github.com/relux-works/curator/internal/swiftpmsource"
 )
@@ -532,7 +533,7 @@ func stageDeclaredWrites(offline offlineEvidence, staging string) error {
 
 func writeStagedFile(staging, logical string, payload []byte, mode fs.FileMode) error {
 	target := filepath.Join(staging, filepath.FromSlash(logical))
-	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+	if err := privatedir.MakeAll(filepath.Dir(target)); err != nil {
 		return err
 	}
 	return os.WriteFile(target, payload, mode)
@@ -688,7 +689,7 @@ func materializeCaptureRoot(config Config, capture *swiftpmsource.Capture) (stri
 		return "", func() {}, err
 	}
 	for _, directory := range []string{"cache", "config", "home", "scratch", "security"} {
-		if err = os.MkdirAll(filepath.Join(target, scratchRoot, directory), 0o700); err != nil {
+		if err = privatedir.MakeAll(filepath.Join(target, scratchRoot, directory)); err != nil {
 			cleanup()
 			return "", func() {}, err
 		}
@@ -704,7 +705,7 @@ func requireEmptyOutputRoot(root string) error {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return os.MkdirAll(root, 0o700)
+			return privatedir.MakeAll(root)
 		}
 		return err
 	}
@@ -808,7 +809,7 @@ func copyRegularTree(source, target string) error {
 		}
 		switch {
 		case entry.IsDir():
-			return os.MkdirAll(destination, 0o700)
+			return privatedir.MakeAll(destination)
 		case info.Mode().IsRegular():
 			payload, readErr := os.ReadFile(current) // #nosec G304 -- admitted protected tree walked below its own root.
 			if readErr != nil {

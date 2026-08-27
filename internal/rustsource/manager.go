@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/artifactpolicy"
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -151,7 +152,7 @@ func NewManager(ctx context.Context, config ManagerConfig) (*Manager, error) {
 	if !filepath.IsAbs(config.WorkRoot) {
 		return nil, fail(CodeConfigUntrusted, "manager work root must be absolute", nil)
 	}
-	if err := os.MkdirAll(config.WorkRoot, 0o700); err != nil {
+	if err := privatedir.MakeAll(config.WorkRoot); err != nil {
 		return nil, err
 	}
 	session, err := os.MkdirTemp(config.WorkRoot, "rust-source-v1-")
@@ -171,11 +172,11 @@ func NewManager(ctx context.Context, config ManagerConfig) (*Manager, error) {
 	}
 	execRoot := filepath.Join(session, "execution")
 	outputRoot := filepath.Join(execRoot, "output")
-	if err = os.MkdirAll(filepath.Join(execRoot, "bin"), 0o700); err != nil {
+	if err = privatedir.MakeAll(filepath.Join(execRoot, "bin")); err != nil {
 		_ = os.RemoveAll(session)
 		return nil, err
 	}
-	if err = os.Mkdir(filepath.Join(execRoot, "work"), 0o700); err != nil {
+	if err = privatedir.Make(filepath.Join(execRoot, "work")); err != nil {
 		_ = os.RemoveAll(session)
 		return nil, err
 	}
@@ -379,7 +380,7 @@ func (m *Manager) preAdmitGitSourceTrees(ctx context.Context, lock LockFile, val
 }
 
 func copySourceTree(source, destination string) error {
-	if err := os.MkdirAll(destination, 0o700); err != nil {
+	if err := privatedir.MakeAll(destination); err != nil {
 		return err
 	}
 	return filepath.WalkDir(source, func(current string, entry fs.DirEntry, walkErr error) error {
@@ -401,7 +402,7 @@ func copySourceTree(source, destination string) error {
 		}
 		target := filepath.Join(destination, rel)
 		if entry.IsDir() {
-			return os.Mkdir(target, 0o700)
+			return privatedir.Make(target)
 		}
 		if !entry.Type().IsRegular() {
 			return fail(CodeGitIdentityInvalid, "raw Git source contains non-regular member", map[string]string{"path": filepath.ToSlash(rel)})

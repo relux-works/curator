@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/relux-works/curator/internal/privatedir"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -113,7 +114,7 @@ func runRustGitOracleWorker() int {
 	if err != nil {
 		return 1
 	}
-	if err = os.MkdirAll(outputRoot, 0o700); err != nil {
+	if err = privatedir.MakeAll(outputRoot); err != nil {
 		return 1
 	}
 	if err = os.WriteFile(filepath.Join(outputRoot, "rust-git-projection-v1.json"), encoded, 0o600); err != nil {

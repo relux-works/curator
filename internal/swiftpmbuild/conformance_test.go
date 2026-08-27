@@ -38,7 +38,7 @@ func TestS03MultiSourceTargetDeclaresEveryObject(t *testing.T) {
 	fixture := newFixture(t)
 	fixture.files["Sources/CLib/extra.c"] = "#include \"CLib.h\"\nint extra(void) { return 2; }\n"
 	fixture.manifest.Targets[1].Sources = []string{"Sources/CLib/extra.c", "Sources/CLib/lib.c"}
-	fixture.stubExtra = "printf 'extra-object' > \".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/CLib.build/extra.c.o\"\n"
+	fixture.stubExtra = []stubAction{{Op: "write", Path: ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/CLib.build/extra.c.o", Payload: "extra-object"}}
 	plan := fixture.mustPlan()
 	if len(plan.Objects) != 3 {
 		t.Fatalf("declared object slots = %d, want one per source", len(plan.Objects))
@@ -62,9 +62,12 @@ func TestS03SameBaseNameSourcesInDifferentDirectoriesResolve(t *testing.T) {
 	fixture.files["Sources/CLib/b/x.c"] = "#include \"CLib.h\"\nint right(void) { return 3; }\n"
 	fixture.manifest.Targets[1].Sources = []string{"Sources/CLib/a/x.c", "Sources/CLib/b/x.c", "Sources/CLib/lib.c"}
 	scratch := ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration
-	fixture.stubExtra = "/bin/mkdir -p \"" + scratch + "/CLib.build/a\" \"" + scratch + "/CLib.build/b\"\n" +
-		"printf 'left-object' > \"" + scratch + "/CLib.build/a/x.c.o\"\n" +
-		"printf 'right-object' > \"" + scratch + "/CLib.build/b/x.c.o\"\n"
+	fixture.stubExtra = []stubAction{
+		{Op: "mkdir", Path: scratch + "/CLib.build/a"},
+		{Op: "mkdir", Path: scratch + "/CLib.build/b"},
+		{Op: "write", Path: scratch + "/CLib.build/a/x.c.o", Payload: "left-object"},
+		{Op: "write", Path: scratch + "/CLib.build/b/x.c.o", Payload: "right-object"},
+	}
 	plan := fixture.mustPlan()
 	if len(plan.Objects) != 4 {
 		t.Fatalf("declared object slots = %d, want one per source", len(plan.Objects))
@@ -113,9 +116,12 @@ func TestR01R05OfflineBuildMountsAdmittedInputsWithNetworkDenied(t *testing.T) {
 		"Sources/CDep/include/CDep.h": "#ifndef CDEP_H\n#define CDEP_H\nint dep(void);\n#endif\n",
 	})
 	scratch := ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration
-	fixture.stubExtra = "/bin/mkdir -p \"" + scratch + "/CDep.build\"\n" +
-		"printf 'dep-object' > \"" + scratch + "/CDep.build/dep.c.o\"\n" +
-		"printf '%s\\n' \"$PWD/" + scratch + "/CDep.build/dep.c.o : $PWD/.curator/scratch/checkouts/dep/Sources/CDep/dep.c\" > \"" + scratch + "/CDep.build/dep.c.d\"\n"
+	fixture.stubExtra = []stubAction{
+		{Op: "mkdir", Path: scratch + "/CDep.build"},
+		{Op: "write", Path: scratch + "/CDep.build/dep.c.o", Payload: "dep-object"},
+		{Op: "write", Path: scratch + "/CDep.build/dep.c.d",
+			Payload: "{{PWD}}/" + scratch + "/CDep.build/dep.c.o : {{PWD}}/.curator/scratch/checkouts/dep/Sources/CDep/dep.c\n"},
+	}
 	fixture.materialize()
 	capture, interop := fixture.closure()
 	plan, err := NewPlan(t.Context(), fixture.build, capture, interop)
@@ -240,8 +246,10 @@ func TestGraphDriftIsRejectedBeforeExecution(t *testing.T) {
 func TestUndeclaredGeneratedObjectFailsClosed(t *testing.T) {
 	scratch := ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration
 	fixture := newFixture(t)
-	fixture.stubExtra = "/bin/mkdir -p \"" + scratch + "/CLib.build/generated\"\n" +
-		"printf 'undeclared' > \"" + scratch + "/CLib.build/generated/smuggled.c.o\"\n"
+	fixture.stubExtra = []stubAction{
+		{Op: "mkdir", Path: scratch + "/CLib.build/generated"},
+		{Op: "write", Path: scratch + "/CLib.build/generated/smuggled.c.o", Payload: "undeclared"},
+	}
 	plan := fixture.mustPlan()
 	slot := ObjectSlot{}
 	for _, declared := range plan.Objects {
@@ -261,14 +269,14 @@ func TestUndeclaredGeneratedObjectFailsClosed(t *testing.T) {
 // assurance, drops the exact declared product, or claims a network attempt.
 func TestCommandReconciliationRejectsInflatedOrDriftedEvidence(t *testing.T) {
 	permit := closureexec.DerivationPermit{
-		Executable: "bin/swiftpm", CWD: "work/package", Argv: []string{"build"},
+		Executable: stubExecutableRelative(), CWD: "work/package", Argv: []string{"build"},
 		ReadRoots: []string{"inputs/build-root"}, WriteRoots: []string{"work/package"},
-		AllowedProcesses: []string{"bin/swiftpm"},
+		AllowedProcesses: []string{stubExecutableRelative()},
 		ExpectedEvidence: []closureexec.EvidenceRequirement{{Path: "work/package/product", SchemaID: ExecutablePayloadSchemaID}},
 	}
 	base := closureexec.DerivationReceipt{
 		AssuranceMode: closureexec.AssurancePortable, BeforeFingerprint: id('1'), AfterFingerprint: id('1'),
-		Audit:   closureexec.Audit{Executable: "bin/swiftpm", CWD: "work/package", Argv: []string{"build"}, Network: "not-observed"},
+		Audit:   closureexec.Audit{Executable: stubExecutableRelative(), CWD: "work/package", Argv: []string{"build"}, Network: "not-observed"},
 		Outputs: []closureexec.DerivationOutput{{Path: "work/package/product", SchemaID: ExecutablePayloadSchemaID}},
 	}
 	if err := reconcileCommand(permit, base); err != nil {

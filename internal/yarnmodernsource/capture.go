@@ -25,6 +25,7 @@ import (
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
 	"github.com/relux-works/curator/internal/nodesource"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // RawArchive binds either raw npm tgz bytes or an exact normalized Yarn cache ZIP.
@@ -116,7 +117,7 @@ func CaptureAndAdmit(ctx context.Context, request CaptureRequest) (*Capture, err
 	if err != nil || request.WorkRoot == "" {
 		return nil, fail(CodeInputUndeclared, "Yarn work root is invalid", nil)
 	}
-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
+	if err = privatedir.MakeAll(workRoot); err != nil {
 		return nil, err
 	}
 	stage, err := os.MkdirTemp(workRoot, "yarn-modern-project-stage-")
@@ -840,7 +841,7 @@ func copyProjectSource(source, destination, _ string) ([]string, error) {
 		}
 		target := filepath.Join(destination, rel)
 		if entry.IsDir() {
-			return os.Mkdir(target, 0o700)
+			return privatedir.Make(target)
 		}
 		info, err := entry.Info()
 		if err != nil || !info.Mode().IsRegular() {

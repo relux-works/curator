@@ -15,6 +15,7 @@ import (
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
 	"github.com/relux-works/curator/internal/nodesource"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 // invocation is a non-authoritative projection used to construct the canonical
@@ -117,7 +118,7 @@ func DerivePrivateCache(ctx context.Context, capture *Capture, destination, work
 	if _, err = filepath.Abs(workRoot); err != nil || workRoot == "" {
 		return nil, fail(CodeInputUndeclared, "npm cache work root is invalid", nil)
 	}
-	if err = os.Mkdir(dest, 0o700); err != nil {
+	if err = privatedir.Make(dest); err != nil {
 		return nil, err
 	}
 	success := false
@@ -940,7 +941,7 @@ func cleanAbsentAbsolute(value string) (string, error) {
 	return abs, nil
 }
 func copyWritableTree(source, destination string) error {
-	if err := os.Mkdir(destination, 0o700); err != nil {
+	if err := privatedir.Make(destination); err != nil {
 		return err
 	}
 	return filepath.WalkDir(source, func(current string, entry fs.DirEntry, walkErr error) error {
@@ -959,7 +960,7 @@ func copyWritableTree(source, destination string) error {
 			return fail(CodeInputUndeclared, "derived tree contains a link", map[string]string{"path": filepath.ToSlash(rel)})
 		}
 		if entry.IsDir() {
-			return os.Mkdir(target, 0o700)
+			return privatedir.Make(target)
 		}
 		info, err := entry.Info()
 		if err != nil || !info.Mode().IsRegular() {
@@ -987,7 +988,7 @@ func mergeWritableTree(source, destination string) error {
 			return fail(CodeInputUndeclared, "derived npm cache contains a link", map[string]string{"path": filepath.ToSlash(rel)})
 		}
 		if entry.IsDir() {
-			return os.MkdirAll(target, 0o700)
+			return privatedir.MakeAll(target)
 		}
 		if !entry.Type().IsRegular() {
 			return fail(CodeInputUndeclared, "derived npm cache contains a special node", map[string]string{"path": filepath.ToSlash(rel)})
@@ -1008,7 +1009,7 @@ func mergeWritableTree(source, destination string) error {
 		} else if !errors.Is(readErr, fs.ErrNotExist) {
 			return readErr
 		}
-		if err = os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+		if err = privatedir.MakeAll(filepath.Dir(target)); err != nil {
 			return err
 		}
 		return os.WriteFile(target, payload, 0o600)
@@ -1082,12 +1083,12 @@ func copyContainedTreeDereferencingLinks(root, source, destination string, activ
 		if readErr != nil {
 			return readErr
 		}
-		if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+		if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
 			return err
 		}
 		return os.WriteFile(destination, payload, 0o600)
 	}
-	if err = os.MkdirAll(destination, 0o700); err != nil {
+	if err = privatedir.MakeAll(destination); err != nil {
 		return err
 	}
 	entries, err := os.ReadDir(realSource)

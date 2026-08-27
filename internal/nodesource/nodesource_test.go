@@ -37,6 +37,12 @@ func TestIndependentPythonProtocolGoldens(t *testing.T) {
 	if err != nil {
 		t.Skip("python3 unavailable for independent protocol oracle")
 	}
+	// A name on PATH is not yet an interpreter: the Windows app-execution
+	// alias resolves python3 to a Microsoft Store stub that exits 9009
+	// without running anything, so the probe has to execute, not stat.
+	if err := exec.Command(python, "-c", "pass").Run(); err != nil {
+		t.Skip("python3 unavailable for independent protocol oracle")
+	}
 	command := exec.Command(python, "testdata/python_protocol_golden.py")
 	output, err := command.Output()
 	if err != nil {
