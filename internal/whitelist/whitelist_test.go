@@ -3,6 +3,7 @@ package whitelist
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -102,6 +103,49 @@ func TestRuntimeRootsExcludedFromContext(t *testing.T) {
 		if file == "agents/tool.py" || file == "agents/info.md" {
 			t.Fatalf("runtime root leaked into context: %v", files)
 		}
+	}
+}
+
+func TestRuntimeAndBuildRootsExcludedFromContext(t *testing.T) {
+	snapshot := t.TempDir()
+	lay(t, snapshot, map[string]string{
+		"SKILL.md":                         "skill",
+		"assets/prompt.md":                 "prompt context",
+		"assets/build-tool/go.mod":         "module example.com/tool\n",
+		"assets/build-tool/cmd/main.go":    "package main\n",
+		"assets/build-tool/docs/source.md": "build-only docs",
+		"references/notes.md":              "reference context",
+		"scripts/helper":                   "runtime-only helper",
+	})
+	excludeRoots := ContextExcludedRoots(
+		[]string{"scripts"},
+		[]string{"assets/build-tool"},
+	)
+	if got, want := excludeRoots, []string{"assets/build-tool", "scripts"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("excluded roots = %v, want %v", got, want)
+	}
+	dest := filepath.Join(t.TempDir(), "ctx")
+	files, err := CopyContext(snapshot, dest, false, excludeRoots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"SKILL.md", "assets/prompt.md", "references/notes.md"}
+	if !reflect.DeepEqual(files, want) {
+		t.Fatalf("copied files = %v, want %v", files, want)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "assets", "build-tool")); !os.IsNotExist(err) {
+		t.Fatalf("build root exists in copied context: %v", err)
+	}
+}
+
+func TestContextExcludedRootsAreSortedAndUnique(t *testing.T) {
+	got := ContextExcludedRoots(
+		[]string{"scripts", "assets/runtime"},
+		[]string{"tools/build", "scripts"},
+	)
+	want := []string{"assets/runtime", "scripts", "tools/build"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("excluded roots = %v, want %v", got, want)
 	}
 }
 
