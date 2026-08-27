@@ -2,6 +2,7 @@ package crossconformance_test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -32,6 +33,15 @@ var pathProfiles = map[crossconformance.PathID]struct {
 	crossconformance.PathYarnClassic: {adapter: yarnclassicsource.ProfileID, profile: artifactpolicy.ProfileNodeV1},
 	crossconformance.PathYarnModern:  {adapter: yarnmodernsource.ProfileID, profile: artifactpolicy.ProfileNodeV1},
 	crossconformance.PathSwiftPM:     {adapter: swiftpmsource.ProfileID, profile: artifactpolicy.ProfileSwiftPMV1},
+}
+
+var rustUnavailableManagerObligationGaps = []string{
+	"binding.diverges_per_target/rust",
+	"binding.target_authority/rust",
+	"capture.selection_neutral/rust",
+	"capture.stable_across_targets/rust",
+	"evidence.causal_chain/rust",
+	"records.deterministic/rust",
 }
 
 // TestCrossAdapterConformance is the single integration proof over the already
@@ -148,23 +158,10 @@ func TestCrossAdapterConformance(t *testing.T) {
 		// -run that skips the proving subtests must fail here rather than
 		// report a green integration proof over an empty matrix.
 		missing := coverage.MissingObligations()
-		if rustUnavailableReason == "" {
-			if len(missing) != 0 {
-				t.Errorf("obligations never proved (a filtered -run cannot satisfy this gate): %s", strings.Join(missing, ", "))
-			}
-		} else {
-			expected := []string{}
-			for _, obligation := range crossconformance.Obligations() {
-				if obligation != crossconformance.ObligationSharedArtifactAdmission {
-					expected = append(expected, string(obligation)+"/"+string(crossconformance.PathRust))
-				}
-			}
-			sort.Strings(expected)
-			if strings.Join(missing, "\n") != strings.Join(expected, "\n") {
-				t.Errorf("available-path obligations never proved: got %s, want only unavailable Rust obligations %s", strings.Join(missing, ", "), strings.Join(expected, ", "))
-			} else {
-				t.Logf("rust manager path unavailable on this host: %s", rustUnavailableReason)
-			}
+		if err := requireCompleteCoverage(missing, rustUnavailableReason != ""); err != nil {
+			t.Error(err)
+		} else if rustUnavailableReason != "" {
+			t.Logf("rust manager path unavailable on this host: %s", rustUnavailableReason)
 		}
 		if uncovered := coverage.UncoveredRejections(); len(uncovered) != 0 {
 			t.Errorf("rejection vectors never proved: %s", strings.Join(uncovered, ", "))
@@ -172,6 +169,35 @@ func TestCrossAdapterConformance(t *testing.T) {
 		t.Logf("rejection coverage:\n%s", strings.Join(coverage.RejectionPaths(), "\n"))
 		t.Logf("delegated to the owning accepted suites:\n%s", strings.Join(coverage.DelegatedRejections(), "\n"))
 	})
+}
+
+func requireCompleteCoverage(missing []string, rustUnavailable bool) error {
+	expected := []string{}
+	if rustUnavailable {
+		expected = rustUnavailableManagerObligationGaps
+	}
+	if strings.Join(missing, "\n") != strings.Join(expected, "\n") {
+		return fmt.Errorf("obligations never proved (a filtered -run cannot satisfy this gate): got %s, want only %s", strings.Join(missing, ", "), strings.Join(expected, ", "))
+	}
+	return nil
+}
+
+func TestRustUnavailableCoverageRejectsExtraRustGap(t *testing.T) {
+	missing := append([]string{}, rustUnavailableManagerObligationGaps...)
+	missing = append(missing, "future.manager_obligation/rust")
+	sort.Strings(missing)
+	if err := requireCompleteCoverage(missing, true); err == nil {
+		t.Fatal("completeness gate accepted a Rust gap outside the closed six-pair enumeration")
+	}
+}
+
+func TestRustUnavailableCoverageRejectsNonRustGap(t *testing.T) {
+	missing := append([]string{}, rustUnavailableManagerObligationGaps...)
+	missing = append(missing, "capture.selection_neutral/npm")
+	sort.Strings(missing)
+	if err := requireCompleteCoverage(missing, true); err == nil {
+		t.Fatal("completeness gate accepted a gap in an available non-Rust path")
+	}
 }
 
 // repeatProjection re-derives the first target's projection from freshly
