@@ -33,3 +33,13 @@ Updated the existing LOGBOOK claim to name the six explicitly enumerated classes
 | `git diff --check` | 0 | `git-diff-check.log` |
 
 No files were staged, committed, pushed, reset, or cleaned.
+
+## Lifecycle blocker
+
+The required developer handoff command refused with exit code 1 because checklist items 6 (full remote CI matrix plus passing URL) and 13 (overall AC) remain unchecked. This run cannot honestly check them: the focused rework brief forbids commit and push, the corrected bytes are therefore not on the PR branch, and reviewer RUN-260827-34e3b7 explicitly assigns fresh remote matrix evidence to the landing Orchestrator.
+
+- Constraint: `task-board handoff` has no scoped or partial mode and fails closed until every checklist item is checked.
+- Failed attempt: `task-board --no-update-check handoff TASK-260827-18tswm --role developer` exited 1 and left the status unchanged.
+- Rejected workaround: checking the remote-CI and overall-AC items without a passing run URL would violate the evidence honesty contract.
+- Viable path: the landing Orchestrator publishes/integrates the reviewed candidate, obtains and attaches a green full-matrix run URL and artifacts, checks items 6 and 13, then reruns the developer handoff or otherwise routes the evidence-backed review lifecycle.
+- Exact external input needed: a passing CI run URL and its evidence artifacts for these corrected bytes on the PR branch.

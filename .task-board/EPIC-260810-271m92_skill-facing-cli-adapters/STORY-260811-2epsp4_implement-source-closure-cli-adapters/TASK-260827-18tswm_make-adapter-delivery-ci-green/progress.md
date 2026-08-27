@@ -1,5 +1,5 @@
 ## Status
-development
+to-review
 
 ## Review
 required
@@ -61,6 +61,15 @@ spawn agent resolution: Agent selection: codex via explicit_override
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260827-9339ff, max_parallel=20)
 spawn run started: [implementer] developer (codex) (run=RUN-260827-9339ff)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260827-9339ff, pid=1376, exit=0)
+No Change Request revision was published for TASK-260827-18tswm (handoff_unsatisfied): the board is not at to-review
+spawn agent resolution: Agent selection: codex via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (codex) (run=RUN-260827-00c793, max_parallel=20)
+spawn run started: [implementer] developer (codex) (run=RUN-260827-00c793)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260827-00c793, pid=41336, exit=0)
 
 ## Precondition Resources
 (none)
@@ -72,13 +81,16 @@ spawn run started: [implementer] developer (codex) (run=RUN-260827-9339ff)
 - [TASK-260827-18tswm_spawn-log_-reviewer--reviewer--codex-_RUN-260827-34e3b7.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-reviewer--reviewer--codex-_RUN-260827-34e3b7.log) — System spawn log captured by task-board
 - [TASK-260827-18tswm_review-verdict_RUN-260827-34e3b7.md](file://TASK-260827-18tswm/TASK-260827-18tswm_review-verdict_RUN-260827-34e3b7.md) — Reviewer verdict: changes requested because Rust-unavailable completeness exception is dynamically open to future obligations; includes per-item review and rerun evidence
 - [TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-9339ff.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-9339ff.log) — System spawn log captured by task-board
-- [TASK-260827-18tswm_rework-outcome_RUN-260827-9339ff.md](file://TASK-260827-18tswm/TASK-260827-18tswm_rework-outcome_RUN-260827-9339ff.md) — Focused rework: closed six-pair Rust gap enumeration, negative regressions, and validation evidence
+- [TASK-260827-18tswm_rework-outcome_RUN-260827-9339ff.md](file://TASK-260827-18tswm/TASK-260827-18tswm_rework-outcome_RUN-260827-9339ff.md) — Focused rework evidence plus lifecycle blocker: remote CI URL is owned by landing Orchestrator
+- [TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-00c793.log](file://TASK-260827-18tswm/TASK-260827-18tswm_spawn-log_-implementer--developer--codex-_RUN-260827-00c793.log) — System spawn log captured by task-board
+- [TASK-260827-18tswm_macos-residuals_RUN-260827-00c793.md](file://TASK-260827-18tswm/TASK-260827-18tswm_macos-residuals_RUN-260827-00c793.md) — Focused macOS residual disposition: strict Rust host-capability classification, rc.9 dry-run diagnosis, local validation evidence, and handoff boundary
+- [TASK-260827-18tswm_change-request_rev1.patch](file://TASK-260827-18tswm/TASK-260827-18tswm_change-request_rev1.patch) — Change Request CR-TASK-260827-18tswm-1 revision 1 candidate patch (repository_delta=present, 17 changed paths)
 
 ## Created
 2026-08-27T02:58:38Z
 
 ## Last Update
-2026-08-27T04:01:35Z
+2026-08-27T04:18:03Z
 
 ## Assigned To
 [implementer] developer (codex)

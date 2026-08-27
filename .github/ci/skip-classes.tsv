@@ -84,6 +84,7 @@ host-capability	no trusted Go toolchain is resolvable here	allow	no trusted tool
 host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
 host-capability	no home directory	allow	the runner exposes no home directory to expand a `~/` credential path against
 host-capability	no operator-approved Cargo descriptor for native target 	allow	the closed Cargo registry has no approved descriptor for this native host target; no toolchain identity is inferred or invented
+host-capability	pinned Cargo toolchain root or executable unavailable for native target 	allow	the runner does not have the pinned Cargo toolchain root or executable; present but mismatched identities remain fatal
 host-capability	(pinned pnpm executable unavailable|pnpm .* is outside pinned profile .*)	allow	the runner does not expose the exact pnpm executable admitted by the integration profile
 host-capability	(Yarn Classic is not installed|exact Yarn .* is unavailable)	allow	the runner does not expose the exact Yarn Classic release admitted by the integration profile
 host-capability	exact Yarn .* is installed without a supported pinned tool root	allow	the exact Yarn release is present but its installation layout cannot be staged by the pinned integration harness

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -32,17 +33,44 @@ var approvedCargoDescriptors = map[string]approvedCargoDescriptor{
 	},
 }
 
-// NativeCargoDescriptorAvailable reports whether the closed operator registry
-// contains an approved Cargo identity for this process's native Rust target.
-// It does not inspect or discover a host toolchain; callers must still use
-// registerCargoAtC0 to prove the selected executable bytes match the descriptor.
-func NativeCargoDescriptorAvailable() (target string, approved bool) {
+// NativeCargoUnavailableReason reports only the two host-capability absences
+// that prevent the native Cargo path from starting: no approved descriptor for
+// this target, or no pinned toolchain root/executable on disk. A present
+// executable is not trusted here; registerCargoAtC0 remains the sole authority
+// that verifies its canonical path, bytes, descriptor, and whole-root identity.
+func NativeCargoUnavailableReason() string {
 	target, supported := nativeRustTarget()
 	if !supported {
-		return "", false
+		return ""
 	}
-	_, approved = approvedCargoDescriptors[target]
-	return target, approved
+	_, approved := approvedCargoDescriptors[target]
+	if !approved {
+		return "no operator-approved Cargo descriptor for native target " + target
+	}
+	currentUser, err := user.Current()
+	if err != nil || currentUser.HomeDir == "" {
+		return ""
+	}
+	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
+	executable := filepath.Join(root, "bin", "cargo")
+	return cargoHostCapabilityReason(target, true, root, executable)
+}
+
+func cargoHostCapabilityReason(target string, approved bool, root, executable string) string {
+	if !approved {
+		return "no operator-approved Cargo descriptor for native target " + target
+	}
+	rootInfo, err := os.Stat(root)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "pinned Cargo toolchain root or executable unavailable for native target " + target
+	}
+	if err != nil || !rootInfo.IsDir() {
+		return ""
+	}
+	if _, err := os.Stat(executable); errors.Is(err, fs.ErrNotExist) {
+		return "pinned Cargo toolchain root or executable unavailable for native target " + target
+	}
+	return ""
 }
 
 // cargoRegistration is selected by NewManager while establishing C0. Adapter

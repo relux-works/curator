@@ -1,0 +1,807 @@
+diff --git a/.github/ci/skip-classes.tsv b/.github/ci/skip-classes.tsv
+index cd9f2f99..95a8d8e0 100644
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -83,9 +83,17 @@ host-capability	temporary directory uses case-sensitive Windows path semantics	a
+ host-capability	no trusted Go toolchain is resolvable here	allow	no trusted toolchain is resolvable on this runner
+ host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
+ host-capability	no home directory	allow	the runner exposes no home directory to expand a `~/` credential path against
++host-capability	no operator-approved Cargo descriptor for native target 	allow	the closed Cargo registry has no approved descriptor for this native host target; no toolchain identity is inferred or invented
++host-capability	pinned Cargo toolchain root or executable unavailable for native target 	allow	the runner does not have the pinned Cargo toolchain root or executable; present but mismatched identities remain fatal
++host-capability	(pinned pnpm executable unavailable|pnpm .* is outside pinned profile .*)	allow	the runner does not expose the exact pnpm executable admitted by the integration profile
++host-capability	(Yarn Classic is not installed|exact Yarn .* is unavailable)	allow	the runner does not expose the exact Yarn Classic release admitted by the integration profile
++host-capability	exact Yarn .* is installed without a supported pinned tool root	allow	the exact Yarn release is present but its installation layout cannot be staged by the pinned integration harness
++host-capability	OS-level network-denial harness is unavailable	allow	the runner does not provide the sandbox control required by the real Yarn Classic zero-network vector
++host-capability	SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest	allow	the Swift executable is present but its manifest compiler cannot spawn the host linker
+ 
+ # --- opt-in probes ----------------------------------------------------------
+ opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable
++opt-in	set CURATOR_TEST_YARN_MODERN_JS to the @yarnpkg/cli-dist 4[.]9[.]2 bin/yarn[.]js integration tool	allow	enabled by an explicit path to the exact modern Yarn integration entry point
+ opt-in	cross-check env not set	allow	enabled by an explicit developer environment variable
+ opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
+ 
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index d6a3ce74..a975c9e0 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -5,6 +5,44 @@
+ 
+ ## 2026-08-27
+ 
++### 0732 — CI portability requires classifying absent authority, not minting it (TASK-260827-18tswm)
++
++- RUST AUTHORITY BOUNDARY: the Cargo registry deliberately approves only
++  `aarch64-apple-darwin`. An x86_64 host therefore lacks authority to execute
++  the real-tool tests; it is not evidence that another Cargo binary is safe.
++  Tests now skip with the exact native target when the closed registry has no
++  descriptor, while a descriptor that exists but fails its byte digest remains
++  a fatal `rust_vendor_transform_unsupported` rejection. Cross-conformance
++  records that same unavailable path, runs every other adapter plus Rust's
++  shared artifact-admission proof, and accepts only the explicitly enumerated
++  Rust gaps for selection-neutral capture, capture stability, target authority,
++  target divergence, deterministic records, and causal evidence. Any other
++  Rust gap or any non-Rust gap still fails the completeness gate.
++- FIX, NOT A SKIP: the npm real-tool fixture claimed a Darwin/arm64 target even
++  on Linux. npm correctly installed a Linux-only optional package and the
++  closure validator correctly rejected it as outside that target's lock graph.
++  Only the two native real-tool cases now derive npm OS, CPU, and libc from the
++  host; parser and cross-target tests keep the frozen Darwin fixture. The pnpm
++  Linux failure was a test-runner defect: it attempted an empty symlink for an
++  intentionally omitted package before production validation could issue
++  `closure_graph_incomplete`.
++- HOST-LAYOUT HANDLING: Swift integration skips only the captured compound
++  failure (`Invalid manifest` plus clang's linker `posix_spawn` error), not a
++  merely installed Swift. Yarn Classic now recognizes both Homebrew `libexec`
++  and the global package-root `bin/yarn.js` layout; an exact Yarn in any other
++  layout gets a precise classified host-capability skip. Pinned pnpm absence
++  and the explicit Yarn Modern integration path are likewise classified from
++  their verbatim observed reasons.
++- EVIDENCE: all nine affected packages and the two targeted CLI cases pass
++  locally; `go build ./...`, `go vet ./...`, pinned `golangci-lint` 2.12.2,
++  gofmt, CI gate self-tests, ledger consistency, broad-suppression guard, and
++  `git diff --check` exit 0. Replaying the captured macOS platform evidence
++  exits 0. The captured Ubuntu Tier-2 classification exits 0 with zero
++  unclassified skips; its full historical replay still exits 1 only because
++  the current ledger requires a `godriver` case absent from that older run.
++  Remote matrix execution and its passing URL remain the landing
++  orchestrator's responsibility; neither is inferred from local evidence.
++
+ ### 0123 — `BUG-260823-1vx45a`: the helper protocol reported "someone holds this lock" whenever it meant "I ran out of time"
+ 
+ - ROOT CAUSE: `TestManagerLockHelper` gave one 200ms context to lock-state directory creation, lock-file opening, the 10ms retry loop of `acquireFileLock`, and — in build-key mode — two sequential acquisitions. `acquireFileLock` returns `ctx.Err()` for a deadline expiry no matter what caused it, and the helper serialized every expiry as `blocked`. An uncontended lock on a slow runner was therefore indistinguishable from a lock another process held.
+@@ -4014,3 +4052,24 @@ identifier allowlist inside a reject-by-default grammar needs the question
+   setting` subtests plus the module-import and operand-separation cases fail
+   without it; all six source controls, the pruned case, and the benign positive
+   pass either way — which is what they are for.
++
++## 2026-08-27 — macOS adapter-delivery CI residuals (TASK-260827-18tswm)
++
++- The approved `aarch64-apple-darwin` Cargo descriptor and an installed pinned
++  toolchain are separate facts. A hosted runner may satisfy the first and lack
++  the second. The Rust test boundary now classifies only an absent pinned root
++  or executable as `host-capability`; a present malformed root, unreadable
++  path, changed executable, descriptor mismatch, or byte mismatch still reaches
++  the closed C0 registry and remains fatal. No descriptor or digest was added.
++- Crossconformance consumes that same reason through its existing Rust-manager
++  unavailable path. Its exception remains the closed six manager-derived Rust
++  obligation gaps; `artifact.shared_admission/rust` continues to run, and an
++  extra future Rust gap still fails the completeness gate.
++- The rc.9 `compiled-cache-miss-is-read-only` failure was not classified. The
++  captured macOS stream separately shows the hosted GOROOT completing the real
++  fingerprint test, while the exact pinned rc.9 case passed four consecutive
++  arm64 runs locally. The delivery diff does not change the
++  `toolchain-unavailable` selection after a successful probe. Evidence therefore
++  supports a transient probe failure, not a persistent missing-toolchain host
++  capability or a contract change; a fresh remote matrix rerun remains the
++  landing Orchestrator's evidence boundary.
+diff --git a/cmd/curator/main_test.go b/cmd/curator/main_test.go
+index 8eaa3c13..b2902c8c 100644
+--- a/cmd/curator/main_test.go
++++ b/cmd/curator/main_test.go
+@@ -198,6 +198,7 @@ func cliVerifiedToolchainIdentity() buildmeta.Toolchain {
+ }
+ 
+ func TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt(t *testing.T) {
++	requireNativeControlInventoryPlatform(t)
+ 	_, home := compiledProject(t)
+ 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+ 		t.Fatalf("portable seed install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+@@ -245,6 +246,7 @@ func TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt(t *testing.T)
+ }
+ 
+ func TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache(t *testing.T) {
++	requireNativeControlInventoryPlatform(t)
+ 	_, home := compiledProject(t)
+ 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+ 		t.Fatalf("portable seed install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+diff --git a/internal/crossconformance/rejection_test.go b/internal/crossconformance/rejection_test.go
+index aee3b387..95832103 100644
+--- a/internal/crossconformance/rejection_test.go
++++ b/internal/crossconformance/rejection_test.go
+@@ -20,7 +20,7 @@ import (
+ // proveRejectionMatrix runs the published cross-adapter rejection matrix. Each
+ // vector requires the same three things from every path that runs it: a stable
+ // diagnostic from the closed set, no affected process, and no publication.
+-func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage) {
++func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage, rustManagerUnavailable bool) {
+ 	vectors := map[string]crossconformance.RejectionVector{}
+ 	for _, vector := range crossconformance.RejectionVectors() {
+ 		vectors[vector.ID] = vector
+@@ -35,7 +35,7 @@ func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage) {
+ 	}
+ 
+ 	t.Run("compiled-dependency-bytes", func(t *testing.T) {
+-		for _, outcome := range compiledByteOutcomes(t) {
++		for _, outcome := range compiledByteOutcomes(t, rustManagerUnavailable) {
+ 			record(t, "compiled-dependency-bytes", outcome)
+ 		}
+ 	})
+@@ -182,7 +182,7 @@ func crossDescriptor(adapter string, profile artifactpolicy.ProfileID, manager s
+ // compiledByteOutcomes drives one pinned GNU shared object through every
+ // delivered path's real capture and admission API. No path may admit it, and
+ // no path may start a manager process first.
+-func compiledByteOutcomes(t *testing.T) map[crossconformance.PathID]crossconformance.RejectionOutcome {
++func compiledByteOutcomes(t *testing.T, rustManagerUnavailable bool) map[crossconformance.PathID]crossconformance.RejectionOutcome {
+ 	t.Helper()
+ 	outcomes := map[crossconformance.PathID]crossconformance.RejectionOutcome{}
+ 	extra := sharedCompiledPayload()
+@@ -205,8 +205,10 @@ func compiledByteOutcomes(t *testing.T) map[crossconformance.PathID]crossconform
+ 	_, swiftErr := swiftpmsource.CaptureAndClose(context.Background(), swift.config, swiftpmsource.Request{Root: swift.root, Product: "cli", Resolved: swiftLock()})
+ 	outcomes[crossconformance.PathSwiftPM] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathSwiftPM, Err: swiftErr, Code: diagnosticCode(swiftErr), ProcessStarts: starts}
+ 
+-	rustErr := captureRustCompiledWorkspace(t)
+-	outcomes[crossconformance.PathRust] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathRust, Err: rustErr, Code: diagnosticCode(rustErr)}
++	if !rustManagerUnavailable {
++		rustErr := captureRustCompiledWorkspace(t)
++		outcomes[crossconformance.PathRust] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathRust, Err: rustErr, Code: diagnosticCode(rustErr)}
++	}
+ 	return outcomes
+ }
+ 
+diff --git a/internal/crossconformance/suite_test.go b/internal/crossconformance/suite_test.go
+index 47292ea1..f0eece68 100644
+--- a/internal/crossconformance/suite_test.go
++++ b/internal/crossconformance/suite_test.go
+@@ -2,7 +2,9 @@ package crossconformance_test
+ 
+ import (
+ 	"context"
++	"fmt"
+ 	"path/filepath"
++	"sort"
+ 	"strings"
+ 	"testing"
+ 
+@@ -33,6 +35,15 @@ var pathProfiles = map[crossconformance.PathID]struct {
+ 	crossconformance.PathSwiftPM:     {adapter: swiftpmsource.ProfileID, profile: artifactpolicy.ProfileSwiftPMV1},
+ }
+ 
++var rustUnavailableManagerObligationGaps = []string{
++	"binding.diverges_per_target/rust",
++	"binding.target_authority/rust",
++	"capture.selection_neutral/rust",
++	"capture.stable_across_targets/rust",
++	"evidence.causal_chain/rust",
++	"records.deterministic/rust",
++}
++
+ // TestCrossAdapterConformance is the single integration proof over the already
+ // accepted adapter contracts. It runs one normative semantic suite against
+ // every delivered path, runs the published rejection matrix, and then refuses
+@@ -43,6 +54,7 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 	projections := map[crossconformance.PathID][2]crossconformance.TargetProjection{}
+ 	captureText := map[crossconformance.PathID]string{}
+ 	var rustManifestIDs []string
++	rustUnavailableReason := ""
+ 
+ 	t.Run("project-every-path", func(t *testing.T) {
+ 		nodeSources := map[crossconformance.PathID]nodeCapture{
+@@ -58,22 +70,28 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 		projections[crossconformance.PathSwiftPM] = [2]crossconformance.TargetProjection{projectSwiftPath(t, 0), projectSwiftPath(t, 1)}
+ 		captureText[crossconformance.PathSwiftPM] = swiftCaptureText(t)
+ 
+-		rust := runRustManager(t)
+-		rustManifestIDs = rust.artifactManifestIDs
+-		first := projectRustPath(t, 0, rustManifestIDs)
+-		second := projectRustPath(t, 1, rustManifestIDs)
+-		// The Rust manager owns the C0 Cargo registration, the pinned vendor
+-		// transform, and the metadata derivations; the reconciliation seam
+-		// owns the selection-neutral lock superset and the exact active
+-		// identity. Both belong to one rust-source-v1 projection.
+-		first.DerivationReceipts, second.DerivationReceipts = rust.receipts, rust.receipts
+-		first.ToolIdentities = append(first.ToolIdentities, rust.tools...)
+-		second.ToolIdentities = append(second.ToolIdentities, rust.tools...)
+-		projections[crossconformance.PathRust] = [2]crossconformance.TargetProjection{first, second}
+-		captureText[crossconformance.PathRust] = rustCaptureText(t)
++		t.Run("rust", func(t *testing.T) {
++			if reason := rustsource.NativeCargoUnavailableReason(); reason != "" {
++				rustUnavailableReason = reason
++				t.Skip(rustUnavailableReason)
++			}
++			rust := runRustManager(t)
++			rustManifestIDs = rust.artifactManifestIDs
++			first := projectRustPath(t, 0, rustManifestIDs)
++			second := projectRustPath(t, 1, rustManifestIDs)
++			// The Rust manager owns the C0 Cargo registration, the pinned vendor
++			// transform, and the metadata derivations; the reconciliation seam
++			// owns the selection-neutral lock superset and the exact active
++			// identity. Both belong to one rust-source-v1 projection.
++			first.DerivationReceipts, second.DerivationReceipts = rust.receipts, rust.receipts
++			first.ToolIdentities = append(first.ToolIdentities, rust.tools...)
++			second.ToolIdentities = append(second.ToolIdentities, rust.tools...)
++			projections[crossconformance.PathRust] = [2]crossconformance.TargetProjection{first, second}
++			captureText[crossconformance.PathRust] = rustCaptureText(t)
++		})
+ 	})
+ 	if t.Failed() {
+-		t.Fatal("no path could be projected; the normative suite cannot run")
++		t.Fatal("one or more available paths could not be projected; the normative suite cannot run")
+ 	}
+ 
+ 	t.Run("normative-suite", func(t *testing.T) {
+@@ -81,6 +99,10 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 			path := path
+ 			pair, present := projections[path]
+ 			if !present {
++				if path == crossconformance.PathRust && rustUnavailableReason != "" {
++					t.Run(string(path), func(t *testing.T) { t.Skip(rustUnavailableReason) })
++					continue
++				}
+ 				t.Errorf("%s produced no projection", path)
+ 				continue
+ 			}
+@@ -127,15 +149,18 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 	})
+ 
+ 	t.Run("rejection-matrix", func(t *testing.T) {
+-		proveRejectionMatrix(t, coverage)
++		proveRejectionMatrix(t, coverage, rustUnavailableReason != "")
+ 	})
+ 
+ 	t.Run("coverage-is-complete", func(t *testing.T) {
+ 		// This gate only means something when the whole test ran: a filtered
+ 		// -run that skips the proving subtests must fail here rather than
+ 		// report a green integration proof over an empty matrix.
+-		if missing := coverage.MissingObligations(); len(missing) != 0 {
+-			t.Errorf("obligations never proved (a filtered -run cannot satisfy this gate): %s", strings.Join(missing, ", "))
++		missing := coverage.MissingObligations()
++		if err := requireCompleteCoverage(missing, rustUnavailableReason != ""); err != nil {
++			t.Error(err)
++		} else if rustUnavailableReason != "" {
++			t.Logf("rust manager path unavailable on this host: %s", rustUnavailableReason)
+ 		}
+ 		if uncovered := coverage.UncoveredRejections(); len(uncovered) != 0 {
+ 			t.Errorf("rejection vectors never proved: %s", strings.Join(uncovered, ", "))
+@@ -145,6 +170,35 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 	})
+ }
+ 
++func requireCompleteCoverage(missing []string, rustUnavailable bool) error {
++	expected := []string{}
++	if rustUnavailable {
++		expected = rustUnavailableManagerObligationGaps
++	}
++	if strings.Join(missing, "\n") != strings.Join(expected, "\n") {
++		return fmt.Errorf("obligations never proved (a filtered -run cannot satisfy this gate): got %s, want only %s", strings.Join(missing, ", "), strings.Join(expected, ", "))
++	}
++	return nil
++}
++
++func TestRustUnavailableCoverageRejectsExtraRustGap(t *testing.T) {
++	missing := append([]string{}, rustUnavailableManagerObligationGaps...)
++	missing = append(missing, "future.manager_obligation/rust")
++	sort.Strings(missing)
++	if err := requireCompleteCoverage(missing, true); err == nil {
++		t.Fatal("completeness gate accepted a Rust gap outside the closed six-pair enumeration")
++	}
++}
++
++func TestRustUnavailableCoverageRejectsNonRustGap(t *testing.T) {
++	missing := append([]string{}, rustUnavailableManagerObligationGaps...)
++	missing = append(missing, "capture.selection_neutral/npm")
++	sort.Strings(missing)
++	if err := requireCompleteCoverage(missing, true); err == nil {
++		t.Fatal("completeness gate accepted a gap in an available non-Rust path")
++	}
++}
++
+ // repeatProjection re-derives the first target's projection from freshly
+ // captured inputs so determinism is a property of the adapter rather than of
+ // one retained value.
+diff --git a/internal/npmsource/conformance_test.go b/internal/npmsource/conformance_test.go
+index 2cd64a18..392ec6fc 100644
+--- a/internal/npmsource/conformance_test.go
++++ b/internal/npmsource/conformance_test.go
+@@ -17,6 +17,7 @@ import (
+ 	"os/exec"
+ 	"path/filepath"
+ 	"reflect"
++	"runtime"
+ 	"sort"
+ 	"strings"
+ 	"testing"
+@@ -107,6 +108,30 @@ func newNPMFixture(t *testing.T) npmFixture {
+ 	return npmFixture{root: root, work: work, request: request, tarballs: tarballs, payloads: payloads, graph: graph}
+ }
+ 
++func newNativeNPMFixture(t *testing.T) npmFixture {
++	t.Helper()
++	fixture := newNPMFixture(t)
++	osName := map[string]string{"windows": "win32"}[runtime.GOOS]
++	if osName == "" {
++		osName = runtime.GOOS
++	}
++	architecture := map[string]string{"amd64": "x64", "arm64": "arm64"}[runtime.GOARCH]
++	if architecture == "" {
++		architecture = runtime.GOARCH
++	}
++	libc := "none"
++	if runtime.GOOS == "linux" {
++		libc = "glibc"
++	}
++	fixture.request.Target = Target{OS: osName, Architecture: architecture, Libc: libc, IncludeDev: true}
++	graph, err := Parse(fixture.request)
++	if err != nil {
++		t.Fatal(err)
++	}
++	fixture.graph = graph
++	return fixture
++}
++
+ func TestS01N01ClosedGraphCaptureAndExactTarballs(t *testing.T) {
+ 	fixture := newNPMFixture(t)
+ 	if fixture.graph.LockfileVersion != 3 || len(fixture.graph.Packages) != 6 || len(fixture.graph.Workspaces) != 1 {
+@@ -628,7 +653,7 @@ func TestVerifiedProviderObservesRealNodeLaunchedNPMBoundary(t *testing.T) {
+ 	if _, err := exec.LookPath("npm"); err != nil {
+ 		t.Skip("npm unavailable")
+ 	}
+-	fixture := newNPMFixture(t)
++	fixture := newNativeNPMFixture(t)
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcreteNPMRunner(t)
+ 	provider := newVerifiedFixtureProvider()
+@@ -881,7 +906,7 @@ func TestN01RealNPMCIUsesOnlyDerivedPrivateCache(t *testing.T) {
+ 	if _, err := exec.LookPath("npm"); err != nil {
+ 		t.Skip("npm unavailable")
+ 	}
+-	fixture := newNPMFixture(t)
++	fixture := newNativeNPMFixture(t)
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcreteNPMRunner(t)
+ 	cache := deriveCacheFixture(t, capture, runner)
+@@ -896,7 +921,12 @@ func TestN01RealNPMCIUsesOnlyDerivedPrivateCache(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if !reflect.DeepEqual(materialized.MaterializedPackages, []string{"node_modules/a", "node_modules/b", "node_modules/workspace"}) {
++	wantPackages := []string{"node_modules/a", "node_modules/b", "node_modules/workspace"}
++	if runtime.GOOS == "linux" {
++		wantPackages = append(wantPackages, "node_modules/opt")
++		sort.Strings(wantPackages)
++	}
++	if !reflect.DeepEqual(materialized.MaterializedPackages, wantPackages) {
+ 		t.Fatalf("real npm ci materialized unexpected graph: %v", materialized.MaterializedPackages)
+ 	}
+ 	if _, err = Invoke(t.Context(), materialized, "index.js", nil, runner.context); err != nil {
+diff --git a/internal/pnpmsource/conformance_test.go b/internal/pnpmsource/conformance_test.go
+index fa45be6b..82a523ac 100644
+--- a/internal/pnpmsource/conformance_test.go
++++ b/internal/pnpmsource/conformance_test.go
+@@ -1453,6 +1453,9 @@ func (runner *fakePNPMRunner) Run(_ context.Context, request closureexec.Executi
+ 						target = filepath.Join(cwd, filepath.FromSlash(path))
+ 					}
+ 				}
++				if target == "" {
++					continue
++				}
+ 				link := filepath.Join(owner, "node_modules", filepath.FromSlash(edge.Name))
+ 				if err := os.MkdirAll(filepath.Dir(link), 0o700); err != nil {
+ 					return closureexec.PortableRunResult{}, err
+diff --git a/internal/rustsource/authority_external_test.go b/internal/rustsource/authority_external_test.go
+index 21789458..9e35fbfd 100644
+--- a/internal/rustsource/authority_external_test.go
++++ b/internal/rustsource/authority_external_test.go
+@@ -51,6 +51,7 @@ func TestRawCaptureAPIContainsNoAuthorityOrDerivedSeam(t *testing.T) {
+ }
+ 
+ func TestProductionManagerCapturesRegistryFromRawPaths(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
+ 		t.Fatal(err)
+@@ -101,6 +102,7 @@ func TestProductionManagerCapturesRegistryFromRawPaths(t *testing.T) {
+ }
+ 
+ func TestZeroManagerAndForeignCaptureFailClosed(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	var zero rustsource.Manager
+ 	if _, err := zero.Capture(t.Context(), rustsource.RawCaptureRequest{}); err == nil {
+ 		t.Fatal("zero manager authorized capture")
+@@ -120,6 +122,7 @@ func TestZeroManagerAndForeignCaptureFailClosed(t *testing.T) {
+ }
+ 
+ func TestProductionManagerCapturesGitWithoutCallerProjection(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	submodule := t.TempDir()
+ 	if err := os.WriteFile(filepath.Join(submodule, "nested.txt"), []byte("submodule evidence\n"), 0o600); err != nil {
+ 		t.Fatal(err)
+@@ -204,6 +207,13 @@ func TestProductionManagerCapturesGitWithoutCallerProjection(t *testing.T) {
+ 	}
+ }
+ 
++func requireNativeCargoDescriptor(t *testing.T) {
++	t.Helper()
++	if reason := rustsource.NativeCargoUnavailableReason(); reason != "" {
++		t.Skip(reason)
++	}
++}
++
+ func git(t *testing.T, root string, args ...string) string {
+ 	t.Helper()
+ 	command := exec.Command("git", append([]string{"-C", root}, args...)...) // #nosec G204 -- fixed test fixture command.
+diff --git a/internal/rustsource/build_conformance_test.go b/internal/rustsource/build_conformance_test.go
+index a4c48dca..623331f8 100644
+--- a/internal/rustsource/build_conformance_test.go
++++ b/internal/rustsource/build_conformance_test.go
+@@ -14,6 +14,7 @@ import (
+ )
+ 
+ func TestRustConformanceR03R05R06R07PathWorkspaceBuild(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	files := map[string]string{
+ 		"Cargo.toml":             "[workspace]\nmembers=[\"app\",\"dep1\",\"dep2\"]\nexclude=[\"unix_dep\",\"windows_dep\"]\nresolver=\"2\"\n",
+@@ -114,6 +115,7 @@ func TestRustConformanceR03R05R06R07PathWorkspaceBuild(t *testing.T) {
+ }
+ 
+ func TestRustConformanceR02GitBuildWithoutOriginalRemoteOrCache(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	submodule := t.TempDir()
+ 	writeRustFixtureFiles(t, submodule, map[string]string{"nested.txt": "submodule evidence\n"})
+ 	runGitFixture(t, submodule, "init", "-q")
+@@ -258,6 +260,7 @@ func TestRustConformanceRH09ToolchainCopyIsDependencyArtifact(t *testing.T) {
+ }
+ 
+ func TestRustConformanceRH10BuildRejectsToolchainDriftBeforeProcessOrPublication(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	writeRustFixtureFiles(t, workspace, map[string]string{
+ 		"Cargo.toml":  "[package]\nname='rh10_app'\nversion='0.1.0'\nedition='2021'\n[[bin]]\nname='rh10-app'\npath='src/main.rs'\n",
+@@ -351,6 +354,7 @@ func TestRustConformanceR04FeatureSelectionKeepsCaptureNeutral(t *testing.T) {
+ }
+ 
+ func TestRustConformanceR04FeatureSelectedBuildsHaveDistinctIdentities(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	writeRustFixtureFiles(t, workspace, map[string]string{
+ 		"Cargo.toml":              "[package]\nname=\"feature_app\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[dependencies]\noptional_dep={path=\"optional_dep\",optional=true}\n[features]\nextra=[\"dep:optional_dep\"]\n[[bin]]\nname=\"feature-app\"\npath=\"src/main.rs\"\n",
+diff --git a/internal/rustsource/build_test.go b/internal/rustsource/build_test.go
+index 10632b1b..92c97184 100644
+--- a/internal/rustsource/build_test.go
++++ b/internal/rustsource/build_test.go
+@@ -22,6 +22,7 @@ import (
+ )
+ 
+ func TestBuildToolchainRegistrationStartsNoProcessBeforeC0(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	var starts []closureexec.DerivationPermit
+ 	manager, err := NewManager(t.Context(), ManagerConfig{WorkRoot: t.TempDir(), ProcessStartObserver: func(permit closureexec.DerivationPermit) {
+ 		starts = append(starts, permit)
+@@ -79,6 +80,7 @@ func TestBuildToolchainRegistrationStartsNoProcessBeforeC0(t *testing.T) {
+ }
+ 
+ func TestCargoRegistrationBindsApprovedExecutableBytes(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	registration := registerCargoAtC0(t.Context())
+ 	if registration.err != nil {
+ 		t.Fatal(registration.err)
+@@ -237,6 +239,7 @@ func TestBuildBindingRequiresUniqueNativePlatformAndEveryPhysicalTool(t *testing
+ }
+ 
+ func TestRustConformanceR01R08R09RH05RH06RH08AndProtectedCache(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
+ 		t.Fatal(err)
+@@ -439,6 +442,7 @@ func TestVerifiedManagerWithoutProviderFailsBeforeSessionOrProcess(t *testing.T)
+ }
+ 
+ func TestPathOnlyClosureDerivesFreshFrozenMetadata(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/rustsource/main_test.go b/internal/rustsource/main_test.go
+index 56fa76df..a5b18ff9 100644
+--- a/internal/rustsource/main_test.go
++++ b/internal/rustsource/main_test.go
+@@ -5,6 +5,13 @@ import (
+ 	"testing"
+ )
+ 
++func requireNativeCargoDescriptor(t *testing.T) {
++	t.Helper()
++	if reason := NativeCargoUnavailableReason(); reason != "" {
++		t.Skip(reason)
++	}
++}
++
+ func TestMain(m *testing.M) {
+ 	if handled, code := DispatchInternalWorker(os.Args[1:], os.Stdin, os.Stdout); handled {
+ 		os.Exit(code)
+diff --git a/internal/rustsource/rustsource_test.go b/internal/rustsource/rustsource_test.go
+index 58b66a70..60acc8df 100644
+--- a/internal/rustsource/rustsource_test.go
++++ b/internal/rustsource/rustsource_test.go
+@@ -311,6 +311,7 @@ path = "src/main.rs"
+ }
+ 
+ func TestManagerRejectsCompiledGitBeforeOracleVendorOrPrivateCargoState(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	manifestPath := filepath.Join(workspace, "Cargo.toml")
+ 	lockPath := filepath.Join(workspace, "Cargo.lock")
+@@ -352,6 +353,7 @@ func TestManagerRejectsCompiledGitBeforeOracleVendorOrPrivateCargoState(t *testi
+ }
+ 
+ func TestGitProtectedSnapshotMutationPreventsOracleStart(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	repository := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(repository, "src"), 0o700); err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/rustsource/toolchain_registry.go b/internal/rustsource/toolchain_registry.go
+index af3d29dc..06b39dd8 100644
+--- a/internal/rustsource/toolchain_registry.go
++++ b/internal/rustsource/toolchain_registry.go
+@@ -4,6 +4,7 @@ import (
+ 	"context"
+ 	"crypto/sha256"
+ 	"encoding/hex"
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"io/fs"
+@@ -32,6 +33,46 @@ var approvedCargoDescriptors = map[string]approvedCargoDescriptor{
+ 	},
+ }
+ 
++// NativeCargoUnavailableReason reports only the two host-capability absences
++// that prevent the native Cargo path from starting: no approved descriptor for
++// this target, or no pinned toolchain root/executable on disk. A present
++// executable is not trusted here; registerCargoAtC0 remains the sole authority
++// that verifies its canonical path, bytes, descriptor, and whole-root identity.
++func NativeCargoUnavailableReason() string {
++	target, supported := nativeRustTarget()
++	if !supported {
++		return ""
++	}
++	_, approved := approvedCargoDescriptors[target]
++	if !approved {
++		return "no operator-approved Cargo descriptor for native target " + target
++	}
++	currentUser, err := user.Current()
++	if err != nil || currentUser.HomeDir == "" {
++		return ""
++	}
++	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
++	executable := filepath.Join(root, "bin", "cargo")
++	return cargoHostCapabilityReason(target, true, root, executable)
++}
++
++func cargoHostCapabilityReason(target string, approved bool, root, executable string) string {
++	if !approved {
++		return "no operator-approved Cargo descriptor for native target " + target
++	}
++	rootInfo, err := os.Stat(root)
++	if errors.Is(err, fs.ErrNotExist) {
++		return "pinned Cargo toolchain root or executable unavailable for native target " + target
++	}
++	if err != nil || !rootInfo.IsDir() {
++		return ""
++	}
++	if _, err := os.Stat(executable); errors.Is(err, fs.ErrNotExist) {
++		return "pinned Cargo toolchain root or executable unavailable for native target " + target
++	}
++	return ""
++}
++
+ // cargoRegistration is selected by NewManager while establishing C0. Adapter
+ // requests cannot replace it and selection never performs PATH, environment,
+ // shell, or rustup process lookup.
+diff --git a/internal/rustsource/toolchain_registry_test.go b/internal/rustsource/toolchain_registry_test.go
+new file mode 100644
+index 00000000..db4ae739
+--- /dev/null
++++ b/internal/rustsource/toolchain_registry_test.go
+@@ -0,0 +1,74 @@
++package rustsource
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestCargoHostCapabilityReasonClassifiesOnlyAbsence(t *testing.T) {
++	target := "aarch64-apple-darwin"
++	missingReason := "pinned Cargo toolchain root or executable unavailable for native target " + target
++
++	t.Run("descriptor absent", func(t *testing.T) {
++		if got := cargoHostCapabilityReason(target, false, "", ""); got != "no operator-approved Cargo descriptor for native target "+target {
++			t.Fatalf("reason = %q", got)
++		}
++	})
++
++	t.Run("toolchain root absent", func(t *testing.T) {
++		root := filepath.Join(t.TempDir(), "absent")
++		if got := cargoHostCapabilityReason(target, true, root, filepath.Join(root, "bin", "cargo")); got != missingReason {
++			t.Fatalf("reason = %q, want %q", got, missingReason)
++		}
++	})
++
++	t.Run("executable absent", func(t *testing.T) {
++		root := t.TempDir()
++		if got := cargoHostCapabilityReason(target, true, root, filepath.Join(root, "bin", "cargo")); got != missingReason {
++			t.Fatalf("reason = %q, want %q", got, missingReason)
++		}
++	})
++
++	t.Run("present executable identity is not inferred", func(t *testing.T) {
++		root := t.TempDir()
++		executable := filepath.Join(root, "bin", "cargo")
++		if err := os.MkdirAll(filepath.Dir(executable), 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(executable, []byte("not an approved Cargo executable"), 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if got := cargoHostCapabilityReason(target, true, root, executable); got != "" {
++			t.Fatalf("present mismatched executable was classified as unavailable: %q", got)
++		}
++		rootInfo, err := os.Stat(root)
++		if err != nil {
++			t.Fatal(err)
++		}
++		registration := cargoRegistration{
++			root:             root,
++			executable:       executable,
++			rootInfo:         rootInfo,
++			executableSHA256: "sha256:" + strings.Repeat("0", 64),
++			descriptor: approvedCargoDescriptor{
++				Version: "1.91.0", ImplementationCommit: "fixture",
++				ExecutableSHA256: "sha256:" + strings.Repeat("1", 64),
++			},
++		}
++		if _, err := registration.recheck(t.Context()); err == nil || !strings.Contains(err.Error(), "registered Cargo executable changed") {
++			t.Fatalf("present mismatched executable was not fatal: %v", err)
++		}
++	})
++
++	t.Run("present non-directory root is not absence", func(t *testing.T) {
++		root := filepath.Join(t.TempDir(), "toolchain")
++		if err := os.WriteFile(root, []byte("not a directory"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if got := cargoHostCapabilityReason(target, true, root, filepath.Join(root, "bin", "cargo")); got != "" {
++			t.Fatalf("malformed present root was classified as unavailable: %q", got)
++		}
++	})
++}
+diff --git a/internal/swiftpmbuild/swift_integration_test.go b/internal/swiftpmbuild/swift_integration_test.go
+index 532ebd1e..2510a163 100644
+--- a/internal/swiftpmbuild/swift_integration_test.go
++++ b/internal/swiftpmbuild/swift_integration_test.go
+@@ -56,6 +56,9 @@ func TestRealSwiftPMBuildMatchesThePlannedLayout(t *testing.T) {
+ 	process.Dir = root
+ 	process.Env = []string{"HOME=" + filepath.Join(root, "empty-home"), "PATH=" + filepath.Dir(swift), "TZ=UTC"}
+ 	if output, runErr := process.CombinedOutput(); runErr != nil {
++		if text := string(output); strings.Contains(text, "Invalid manifest") && strings.Contains(text, "clang: error: unable to execute command: posix_spawn failed: No such file or directory") {
++			t.Skip("SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest")
++		}
+ 		t.Fatalf("real SwiftPM build with the planned argv: %v: %s", runErr, output)
+ 	}
+ 
+diff --git a/internal/swiftpmsource/swift_integration_test.go b/internal/swiftpmsource/swift_integration_test.go
+index 6460a023..b86bf9a0 100644
+--- a/internal/swiftpmsource/swift_integration_test.go
++++ b/internal/swiftpmsource/swift_integration_test.go
+@@ -44,8 +44,9 @@ let package = Package(name: "Fixture", products: [.executable(name: "fixture", t
+ 	command := exec.CommandContext(t.Context(), swift, manifestArgv()...) // #nosec G204 -- resolved test tool and production permit argv.
+ 	command.Dir = root
+ 	command.Env = []string{"HOME=" + filepath.Join(root, "empty-home"), "PATH=" + filepath.Dir(swift), "TZ=UTC"}
+-	output, err := command.Output()
++	output, err := command.CombinedOutput()
+ 	if err != nil {
++		skipIfSwiftManifestLinkerUnavailable(t, output)
+ 		t.Fatalf("real SwiftPM dump-package: %v", err)
+ 	}
+ 	if !bytes.Contains(output, []byte(`"name" : "Fixture"`)) && !bytes.Contains(output, []byte(`"name":"Fixture"`)) {
+@@ -194,6 +195,7 @@ func TestRealSwiftPMManifestRunsThroughProductionManagerAndExecutor(t *testing.T
+ 	}
+ 	capture, err := manager.CaptureAndClose(t.Context(), Request{Root: root, Product: "fixture", Resolved: resolved})
+ 	if err != nil {
++		skipIfSwiftManifestLinkerUnavailable(t, []byte(err.Error()))
+ 		t.Fatal(err)
+ 	}
+ 	if starts != 2 || capture.SelectionProduct() != "fixture" || len(capture.Packages) != 2 || len(capture.Mirrors) != 1 {
+@@ -241,6 +243,14 @@ func TestRealSwiftPMManifestRunsThroughProductionManagerAndExecutor(t *testing.T
+ 	}
+ }
+ 
++func skipIfSwiftManifestLinkerUnavailable(t *testing.T, output []byte) {
++	t.Helper()
++	text := string(output)
++	if strings.Contains(text, "Invalid manifest") && strings.Contains(text, "clang: error: unable to execute command: posix_spawn failed: No such file or directory") {
++		t.Skip("SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest")
++	}
++}
++
+ func TestGitBrokerCapturesExactLocalRevisionTreeAndMirrorR01R07R08R09(t *testing.T) {
+ 	git, err := exec.LookPath("git")
+ 	if err != nil {
+diff --git a/internal/yarnclassicsource/conformance_test.go b/internal/yarnclassicsource/conformance_test.go
+index 5c5fe1f4..bfa6ad0b 100644
+--- a/internal/yarnclassicsource/conformance_test.go
++++ b/internal/yarnclassicsource/conformance_test.go
+@@ -706,7 +706,10 @@ func newConcreteYarnRunner(t *testing.T) *concreteYarnRunner {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	yarnPackageRoot := filepath.Join(filepath.Dir(filepath.Dir(yarnBin)), "libexec")
++	yarnPackageRoot, err := yarnClassicPackageRoot(yarnBin)
++	if err != nil {
++		t.Skipf("exact Yarn %s is installed without a supported pinned tool root: %v", SupportedYarnVersion, err)
++	}
+ 	stagedYarnRoot := filepath.Join(executionRoot, "toolchain", "yarn")
+ 	if err = copyContainedTreeDereferencingLinks(yarnPackageRoot, yarnPackageRoot, stagedYarnRoot, map[string]bool{}); err != nil {
+ 		t.Fatal(err)
+@@ -730,6 +733,48 @@ func newConcreteYarnRunner(t *testing.T) *concreteYarnRunner {
+ 	return runner
+ }
+ 
++func yarnClassicPackageRoot(yarnBin string) (string, error) {
++	candidates := []string{filepath.Join(filepath.Dir(filepath.Dir(yarnBin)), "libexec")}
++	if filepath.Base(yarnBin) == "yarn.js" && filepath.Base(filepath.Dir(yarnBin)) == "bin" {
++		candidates = append(candidates, filepath.Dir(filepath.Dir(yarnBin)))
++	}
++	for _, candidate := range candidates {
++		entrypoint := filepath.Join(candidate, "bin", "yarn.js")
++		if info, err := os.Stat(entrypoint); err == nil && info.Mode().IsRegular() {
++			return candidate, nil
++		}
++	}
++	return "", fmt.Errorf("neither Homebrew libexec nor package-root bin/yarn.js exists for %s", yarnBin)
++}
++
++func TestYarnClassicPackageRootRecognizesPinnedInstallLayouts(t *testing.T) {
++	for _, layout := range []struct {
++		name, command, root string
++	}{
++		{name: "homebrew-libexec", command: "bin/yarn", root: "libexec"},
++		{name: "package-root", command: "bin/yarn.js", root: "."},
++	} {
++		t.Run(layout.name, func(t *testing.T) {
++			prefix := t.TempDir()
++			root := filepath.Clean(filepath.Join(prefix, layout.root))
++			entrypoint := filepath.Join(root, "bin", "yarn.js")
++			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(entrypoint, []byte("fixture"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			got, err := yarnClassicPackageRoot(filepath.Join(prefix, layout.command))
++			if err != nil || got != root {
++				t.Fatalf("root=%q err=%v, want %q", got, err, root)
++			}
++		})
++	}
++	if _, err := yarnClassicPackageRoot(filepath.Join(t.TempDir(), "bin", "yarn.js")); err == nil {
++		t.Fatal("missing pinned Yarn tool root was accepted")
++	}
++}
++
+ func (runner *concreteYarnRunner) Run(ctx context.Context, request closureexec.ExecutionRequest) (closureexec.PortableRunResult, error) {
+ 	if err := prepareFakeExecution(request, runner.executionRoot); err != nil {
+ 		return closureexec.PortableRunResult{}, err

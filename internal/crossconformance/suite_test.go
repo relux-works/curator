@@ -71,9 +71,8 @@ func TestCrossAdapterConformance(t *testing.T) {
 		captureText[crossconformance.PathSwiftPM] = swiftCaptureText(t)
 
 		t.Run("rust", func(t *testing.T) {
-			target, approved := rustsource.NativeCargoDescriptorAvailable()
-			if target != "" && !approved {
-				rustUnavailableReason = "no operator-approved Cargo descriptor for native target " + target
+			if reason := rustsource.NativeCargoUnavailableReason(); reason != "" {
+				rustUnavailableReason = reason
 				t.Skip(rustUnavailableReason)
 			}
 			rust := runRustManager(t)

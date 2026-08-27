@@ -7,9 +7,8 @@ import (
 
 func requireNativeCargoDescriptor(t *testing.T) {
 	t.Helper()
-	target, approved := NativeCargoDescriptorAvailable()
-	if target != "" && !approved {
-		t.Skipf("no operator-approved Cargo descriptor for native target %s", target)
+	if reason := NativeCargoUnavailableReason(); reason != "" {
+		t.Skip(reason)
 	}
 }
 

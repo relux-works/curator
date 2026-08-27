@@ -3,6 +3,27 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-08-27 — macOS adapter-delivery CI residuals (TASK-260827-18tswm)
+
+- The approved `aarch64-apple-darwin` Cargo descriptor and an installed pinned
+  toolchain are separate facts. A hosted runner may satisfy the first and lack
+  the second. The Rust test boundary now classifies only an absent pinned root
+  or executable as `host-capability`; a present malformed root, unreadable
+  path, changed executable, descriptor mismatch, or byte mismatch still reaches
+  the closed C0 registry and remains fatal. No descriptor or digest was added.
+- Crossconformance consumes that same reason through its existing Rust-manager
+  unavailable path. Its exception remains the closed six manager-derived Rust
+  obligation gaps; `artifact.shared_admission/rust` continues to run, and an
+  extra future Rust gap still fails the completeness gate.
+- The rc.9 `compiled-cache-miss-is-read-only` failure was not classified. The
+  captured macOS stream separately shows the hosted GOROOT completing the real
+  fingerprint test, while the exact pinned rc.9 case passed four consecutive
+  arm64 runs locally. The delivery diff does not change the
+  `toolchain-unavailable` selection after a successful probe. Evidence therefore
+  supports a transient probe failure, not a persistent missing-toolchain host
+  capability or a contract change; a fresh remote matrix rerun remains the
+  landing Orchestrator's evidence boundary.
+
 ## 2026-08-27
 
 ### 0640 — A month of run evidence lived on one laptop; it is on the remote now, in a ref namespace nothing fetches by default
@@ -30,9 +51,10 @@
   descriptor, while a descriptor that exists but fails its byte digest remains
   a fatal `rust_vendor_transform_unsupported` rejection. Cross-conformance
   records that same unavailable path, runs every other adapter plus Rust's
-  shared artifact-admission proof, and accepts only the six explicitly
-  enumerated Rust manager-obligation gaps. Any additional gap still fails the
-  completeness gate.
+  shared artifact-admission proof, and accepts only the explicitly enumerated
+  Rust gaps for selection-neutral capture, capture stability, target authority,
+  target divergence, deterministic records, and causal evidence. Any other
+  Rust gap or any non-Rust gap still fails the completeness gate.
 - FIX, NOT A SKIP: the npm real-tool fixture claimed a Darwin/arm64 target even
   on Linux. npm correctly installed a Linux-only optional package and the
   closure validator correctly rejected it as outside that target's lock graph.
