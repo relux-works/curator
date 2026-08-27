@@ -86,6 +86,7 @@ func registryEnv(t *testing.T, status string) (*env, *httptest.Server) {
 }
 
 func TestRegistryRevocationDeniesInstall(t *testing.T) {
+	t.Parallel()
 	e, server := registryEnv(t, "revoked")
 	defer server.Close()
 	result := e.install(Options{})
@@ -95,6 +96,7 @@ func TestRegistryRevocationDeniesInstall(t *testing.T) {
 }
 
 func TestRegistryAttestationLandsInMarker(t *testing.T) {
+	t.Parallel()
 	e, server := registryEnv(t, "audited")
 	defer server.Close()
 	result := e.install(Options{})
@@ -108,6 +110,7 @@ func TestRegistryAttestationLandsInMarker(t *testing.T) {
 }
 
 func TestStrictRegistryPolicyFailsUnknown(t *testing.T) {
+	t.Parallel()
 	e, server := registryEnv(t, "pending") // pending resolves as unknown
 	defer server.Close()
 	e.cfg.Audit.RegistryPolicy = "strict"

@@ -11,7 +11,8 @@ import (
 
 func TestWriteUsesWireCompatibleEmptyValues(t *testing.T) {
 	dir := t.TempDir()
-	m := &Marker{Name: "skill-a", Source: "skill-a", RefKind: "tag", Ref: "v1", Commit: "abc"}
+	m := validMarkerV2()
+	m.Locale = ""
 	if err := Write(dir, m); err != nil {
 		t.Fatal(err)
 	}
@@ -26,11 +27,14 @@ func TestWriteUsesWireCompatibleEmptyValues(t *testing.T) {
 	if localeValue, present := object["locale"]; !present || localeValue != nil {
 		t.Fatalf("locale = %#v, present=%v; want explicit null", localeValue, present)
 	}
-	for _, field := range []string{"agents", "commands", "dependencies", "runtime_roots", "files"} {
+	for _, field := range []string{"commands", "dependencies", "runtime_roots", "build_roots", "files"} {
 		value, ok := object[field].([]any)
 		if !ok || len(value) != 0 {
 			t.Fatalf("%s = %#v; want []", field, object[field])
 		}
+	}
+	if builds, ok := object["builds"].(map[string]any); !ok || len(builds) != 0 {
+		t.Fatalf("builds = %#v; want {}", object["builds"])
 	}
 }
 
@@ -187,7 +191,9 @@ func TestReadRejectsSchemaViolations(t *testing.T) {
 	cases := map[string]func(map[string]any){
 		"unknown":          func(value map[string]any) { value["extension"] = true },
 		"missing locale":   func(value map[string]any) { delete(value, "locale") },
+		"invalid locale":   func(value map[string]any) { value["locale"] = "!" },
 		"duplicate agents": func(value map[string]any) { value["agents"] = []any{"codex_cli", "codex_cli"} },
+		"unsorted agents":  func(value map[string]any) { value["agents"] = []any{"zed", "alpha"} },
 		"bad timestamp":    func(value map[string]any) { value["installed_at"] = "2026-07-13T00:00:00+00:00" },
 	}
 	for name, mutate := range cases {
