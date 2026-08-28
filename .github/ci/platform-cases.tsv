@@ -187,7 +187,9 @@ internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,wi
 # skipping there on its own and only `must_run_on` below needs widening.
 # ===========================================================================
 cmd/curator	TestCompiledInstallFollowsTheNativeControlInventoryExactly	linux,darwin,windows	-	-	a compiled install succeeds on exactly the platforms rc5-native-control-inventory-v1 covers, and fails closed on the others
-cmd/curator	TestCompiledProjectStatusRepairRollbackRecovery	darwin,windows	linux	platform-control	compiled currentness, corrupt-cache repair, commit rollback and untrusted-state repair over one real installation
+cmd/curator	TestCompiledProjectStatusAndUntrustedRecovery	darwin,windows	linux	platform-control	compiled currentness and untrusted-state repair over one real installation
+cmd/curator	TestCompiledProjectRepairsCorruptCompiledState	darwin,windows	linux	platform-control	corrupt compiled-cache repair over one real installation
+cmd/curator	TestCompiledProjectRestoresCacheWhenCommitFails	darwin,windows	linux	platform-control	commit rollback restoring the displaced cache over one real installation
 cmd/curator	TestStatusReportsATransitivelyResolvedCompiledCommand	darwin,windows	linux	platform-control	project status resolves and classifies a compiled command reached only through a dependency
 cmd/curator	TestStatusReportsAnUnusableToolchainPerCompiledCommand	darwin,windows	linux	platform-control	an unusable Go toolchain is reported per compiled command as a warning, and `--check` turns it non-zero
 cmd/curator	TestGCRetainsAndReportsReferencedCompiledState	darwin,windows	linux	platform-control	gc neither removes nor reports removing a cache entry a live marker references
