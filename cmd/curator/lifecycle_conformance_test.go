@@ -10,7 +10,6 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
-	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // The published manager-lifecycle document is the only source of expected
@@ -63,6 +62,7 @@ const invalidConfigBytes = "this is intentionally not valid JSON\n"
 // and the published outcome selects the assertion, so neither can drift from
 // the suite without failing here.
 func TestAuthoritativeBootstrapCasesAreExecutable(t *testing.T) {
+	t.Parallel()
 	document := authoritativeLifecycleDocument(t)
 	if len(document.BootstrapCases) == 0 {
 		t.Fatal("the authoritative suite publishes no bootstrap case to bind")
@@ -88,7 +88,6 @@ func runBootstrapCase(t *testing.T, published authoritativeBootstrapCase, state 
 	root := t.TempDir()
 	configPath := filepath.Join(root, "home", "config.json")
 	skillsRoot := filepath.Join(root, "skills")
-	t.Setenv("CURATOR_CONFIG", configPath)
 
 	switch state {
 	case "missing":
@@ -110,7 +109,7 @@ func runBootstrapCase(t *testing.T, published authoritativeBootstrapCase, state 
 	if published.Force {
 		arguments = append(arguments, "--force")
 	}
-	code, stdout, stderr := capture(t, arguments...)
+	code, stdout, stderr := capture(t, configPath, arguments...)
 
 	switch published.Outcome {
 	case "created":
@@ -189,7 +188,6 @@ func newUpgradeFixture(t *testing.T, projectAliases ...string) upgradeFixture {
 		skillsRoot: filepath.Join(root, "skills"),
 		projects:   map[string]string{},
 	}
-	t.Setenv("CURATOR_CONFIG", fixture.configPath)
 
 	transitiveWorking := filepath.Join(fixture.skillsRoot, "transitive")
 	publishSkillRepo(t, filepath.Join(upstream, "transitive"), "transitive", "")
@@ -300,7 +298,7 @@ func (fixture upgradeFixture) declareGlobal(t *testing.T, names ...string) {
 // the published exclusion was never reached, and — where the case requires it —
 // a repository shared by two selected scopes is fetched exactly once.
 func TestAuthoritativeUpgradeCasesAreExecutable(t *testing.T) {
-	testtoolchain.LockHostGOROOT(t)
+	t.Parallel()
 	document := authoritativeLifecycleDocument(t)
 	if len(document.UpgradeCases) == 0 {
 		t.Fatal("the authoritative suite publishes no upgrade case to bind")
@@ -329,7 +327,7 @@ func runSelectedProjectUpgrade(t *testing.T, published authoritativeUpgradeCase)
 	fixture.declare(t, "app", "direct")
 	fixture.declare(t, "other", "unrelated")
 
-	code, stdout, stderr := capture(t, "upgrade", "app")
+	code, stdout, stderr := capture(t, fixture.configPath, "upgrade", "app")
 	if code != exitOK {
 		t.Fatalf("upgrade app = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
@@ -346,7 +344,7 @@ func runAllProjectsUpgrade(t *testing.T, published authoritativeUpgradeCase) {
 	fixture.declare(t, "app", "direct")
 	fixture.declare(t, "other", "direct")
 
-	code, stdout, stderr := capture(t, "upgrade", "--all")
+	code, stdout, stderr := capture(t, fixture.configPath, "upgrade", "--all")
 	if code != exitOK {
 		t.Fatalf("upgrade --all = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
@@ -370,7 +368,7 @@ func runGlobalUpgrade(t *testing.T, published authoritativeUpgradeCase) {
 	fixture := newUpgradeFixture(t)
 	fixture.declareGlobal(t, "direct")
 
-	code, stdout, stderr := capture(t, "global", "upgrade")
+	code, stdout, stderr := capture(t, fixture.configPath, "global", "upgrade")
 	if code != exitOK {
 		t.Fatalf("global upgrade = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}

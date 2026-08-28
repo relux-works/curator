@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,13 +54,13 @@ func gcHome(t *testing.T) string {
 	if err := os.WriteFile(configPath, payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CURATOR_CONFIG", configPath)
 	return home
 }
 
 // TestGCPrunesDeadConsumersUnderTheHomeLock proves the standalone command does
 // the same serialized maintenance an install does.
 func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
+	t.Parallel()
 	home := gcHome(t)
 	dead := filepath.Join(t.TempDir(), "gone")
 	if err := scopes.RecordConsumer(home, dead); err != nil {
@@ -69,7 +70,7 @@ func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if code := run([]string{"gc"}); code != exitOK {
+	if code := run([]string{"gc"}, fileConfigSource(filepath.Join(home, "config.json")), io.Discard, io.Discard); code != exitOK {
 		t.Fatalf("gc = %d", code)
 	}
 	if consumers := scopes.LoadConsumers(home); len(consumers) != 0 {
@@ -83,6 +84,7 @@ func TestGCPrunesDeadConsumersUnderTheHomeLock(t *testing.T) {
 // TestGCWaitsForTheHomeLock proves maintenance serializes on the same lock
 // install, rollback, and recovery take, instead of running beside them.
 func TestGCWaitsForTheHomeLock(t *testing.T) {
+	t.Parallel()
 	home := gcHome(t)
 	dead := filepath.Join(t.TempDir(), "gone")
 	if err := scopes.RecordConsumer(home, dead); err != nil {
@@ -104,7 +106,9 @@ func TestGCWaitsForTheHomeLock(t *testing.T) {
 	}()
 
 	finished := make(chan int, 1)
-	go func() { finished <- run([]string{"gc"}) }()
+	go func() {
+		finished <- run([]string{"gc"}, fileConfigSource(filepath.Join(home, "config.json")), io.Discard, io.Discard)
+	}()
 
 	select {
 	case code := <-finished:
@@ -136,6 +140,7 @@ func TestGCWaitsForTheHomeLock(t *testing.T) {
 // passes over one home cannot lose a consumer update: each pass observes a
 // complete registry, so the live consumer always survives.
 func TestGCRunsSerializedAcrossConcurrentInvocations(t *testing.T) {
+	t.Parallel()
 	home := gcHome(t)
 	live := t.TempDir()
 	installTestMarker(t, filepath.Join(live, ".agents", "skills"), "skill-a")

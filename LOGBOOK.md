@@ -4141,3 +4141,62 @@ The task board in .task-board/ is the live plan.`).
 - VERIFICATION:
   - Custom Python validation script verifying zero blacklist hits, zero non-ASCII violations outside negative examples, complete parenthesis balance, zero broken local links/anchors, and bidirectional cross-links: exit 0.
   - `go test ./cmd/curator/...`: exit 0.
+## 2026-08-28 — Swift host-capability skip is one closed predicate (TASK-260827-18tswm rework)
+
+- The CI-green delivery paths were reconstructed from PR #47 head `c2215f9b`
+  instead of reusing stale Change Request revision 1. The reconstructed scope
+  includes the later host-GOROOT isolation and Windows portability corrections;
+  board files and the parallel-refactor task's independent delta remain outside
+  this task's candidate.
+- The Swift manifest linker skip had the right conjunction at both call sites
+  but no executable negative boundary. Both `swiftpmsource` and `swiftpmbuild`
+  now call `testtoolchain.SwiftManifestLinkerUnavailable`, so the decision has
+  one owner.
+- A table regression proves that only `Invalid manifest` plus the exact clang
+  `posix_spawn` diagnostic classifies as host-unavailable. Either token alone
+  and an adjacent Swift derivation-permit failure remain fatal. This narrows the
+  gate without weakening the integration assertions or inventing a toolchain
+  identity.
+
+## 2026-08-28 — Invocation-scoped curator CLI tests (TASK-260825-1yzubs)
+
+- `run` now receives a configuration source plus stdout/stderr writers at its
+  production entry point. Command helpers retain those dependencies through a
+  `cli` value, so tests no longer select config through `CURATOR_CONFIG` or
+  capture output by swapping process-global streams. An explicit concurrent
+  test runs two distinct config/project/writer sets and rejects cross-output.
+- The prior five-way compiled repair/recovery test was split into independent
+  parallel fixtures. A first merged-base run still took 323 seconds because
+  each fixture held the Darwin host-GOROOT lock until test cleanup, serializing
+  the split. Moving that same cross-process ownership to `TestMain` preserves
+  isolation from other package processes while allowing safe parallelism inside
+  `cmd/curator`; worker and CLI-helper subprocesses bypass the parent-owned
+  lock to avoid self-deadlock.
+- Applying the task delta onto checkpoint `defbc368` exposed one merge-only
+  self-deadlock: three landed helpers still took the per-test Darwin lock after
+  the task moved ownership to `TestMain`. An exact compiled-fixture probe timed
+  out at two minutes with both acquisitions in its stack. Removing only those
+  redundant in-package acquisitions made the same probe pass in 1.259 seconds;
+  the process-level lock continues to isolate `cmd/curator` from other packages.
+- Three consecutive uncached checkpoint package runs exited zero in 220.48,
+  220.41, and 214.14 seconds. Exact pre-change/final coverage was 62.2%
+  (929/1492 statements) and 63.3% (951/1502), respectively. Focused race,
+  build, vet, pinned golangci-lint 2.12.2, gofmt, and diff gates exited zero.
+  `task-board validate` also exited zero while its output reported 1741
+  issue(s) found; that result is not semantically clean. Raw evidence is
+  attached to the task.
+- The accepted candidate was rebuilt on `de31754e`, the current `main` and
+  `origin/main`, after preserving the exact task delta. The refreshed diff has
+  exactly the 11 task-owned paths; all six documentation-campaign files named
+  by the base-refresh brief remain present, and no documentation path is part
+  of the candidate.
+- Three refreshed-base uncached wall-clock runs exited zero in 215.77, 215.48,
+  and 215.09 seconds. Focused race, coverage (63.3%, 951/1502 statements),
+  build, vet, pinned golangci-lint 2.12.2, gofmt, and diff gates also exited
+  zero. The refreshed `task-board validate` run exited zero while the current
+  authoritative board reported 598 issue(s); the earlier checkpoint artifact
+  remains the evidence for the prior 1741-issue board snapshot.
+- The brief said `internal/testtoolchain/swift.go` and `swift_test.go` existed on
+  current `main`, but neither `2bb54a25` (PR #47) nor `de31754e` tracks them.
+  Their leftover worktree bytes matched checkpoint `defbc368` exactly and were
+  excluded from the candidate to preserve the explicit 11-path scope.

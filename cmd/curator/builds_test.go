@@ -931,6 +931,7 @@ func markerAtSchema(schema int) *marker.Marker {
 // schema fails the v3 and v4 cases; widening it to accept anything fails the
 // schema-1 and unknown-schema cases, which genuinely cannot describe a build.
 func TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema(t *testing.T) {
+	t.Parallel()
 	facts := []buildFacts{testFacts(string(install.BuildCacheHit))}
 
 	for _, schema := range []int{marker.SchemaVersion, marker.ExternalSchemaVersion, marker.PolicySchemaVersion} {
@@ -976,6 +977,7 @@ func TestClassifySkillBuildsAcceptsEveryBuildBearingMarkerSchema(t *testing.T) {
 // schema the writer picks and the schema the status reader admits are proven to
 // agree rather than assumed to.
 func TestStatusReportFindsASchema8InstallationCurrent(t *testing.T) {
+	t.Parallel()
 	for _, band := range []struct {
 		skillSchema  int
 		markerSchema int

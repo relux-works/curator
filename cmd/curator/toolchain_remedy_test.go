@@ -18,7 +18,8 @@ import (
 // it. A remedy is only worth attaching if it survives all three, so the
 // assertion is on what stderr actually says.
 func TestInstallPrintsTheRemedyAVersionManagerSelectionEarns(t *testing.T) {
-	compiledProject(t)
+	t.Parallel()
+	_, home := compiledProject(t)
 
 	realRoot := build.Default.GOROOT
 	if realRoot == "" {
@@ -39,9 +40,9 @@ func TestInstallPrintsTheRemedyAVersionManagerSelectionEarns(t *testing.T) {
 	if err := os.Symlink(filepath.Join(realRoot, "bin", launcher), wrapper); err != nil {
 		t.Skipf("this host cannot create the symbolic link the case needs: %v", err)
 	}
-	t.Setenv(godriver.SelectionCuratorGo, wrapper)
-
-	code, _, stderr := capture(t, "install", "app")
+	code, _, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), map[string]string{
+		godriver.SelectionCuratorGo: wrapper,
+	}, "install", "app")
 	if code != exitFail {
 		t.Fatalf("install with a version-manager selection = %d, want %d\n%s", code, exitFail, stderr)
 	}

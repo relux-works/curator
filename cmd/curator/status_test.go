@@ -1,18 +1,21 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/buildcache"
@@ -27,6 +30,11 @@ import (
 	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
+const (
+	cliHelperProcess = "CURATOR_TEST_CLI_HELPER"
+	cliHelperConfig  = "CURATOR_TEST_CONFIG_PATH"
+)
+
 // TestMain gives the test binary the same fixed hidden worker mode the
 // installed manager dispatches before command parsing, so a compiled
 // installation in these tests runs the real identity-verified process graph
@@ -35,45 +43,92 @@ func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
 		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
 	}
-	os.Exit(m.Run())
+	if os.Getenv(cliHelperProcess) == "1" {
+		os.Exit(m.Run())
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	lock, err := testtoolchain.AcquireHostGOROOT(ctx)
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, "acquire package host GOROOT test lock:", err)
+		os.Exit(1)
+	}
+	code := m.Run()
+	if lock != nil {
+		if closeErr := lock.Close(); closeErr != nil {
+			_, _ = fmt.Fprintln(os.Stderr, "release package host GOROOT test lock:", closeErr)
+			code = 1
+		}
+	}
+	os.Exit(code)
 }
 
-// capture runs one CLI invocation with both standard streams redirected.
-//
-// It replaces the process-global os.Stdout and os.Stderr for the duration of
-// the call, so every case that reaches the CLI through it must stay serial: a
-// case that calls capture, or a helper that does, must never call t.Parallel().
-// The same rule covers the cases that point run() at a fixture through the
-// process-global CURATOR_CONFIG environment variable, which the testing package
-// already refuses to combine with t.Parallel(). Go releases paused parallel
-// cases only after the whole serial pass has finished, so the parallel cases in
-// this package can never observe a swapped stream.
-func capture(t *testing.T, args ...string) (int, string, string) {
+func TestCLIHelperProcess(t *testing.T) {
+	if os.Getenv(cliHelperProcess) != "1" {
+		t.Parallel()
+		return
+	}
+	separator := -1
+	for index, arg := range os.Args {
+		if arg == "--" {
+			separator = index
+			break
+		}
+	}
+	if separator < 0 {
+		os.Exit(exitUsage)
+	}
+	os.Exit(run(os.Args[separator+1:], fileConfigSource(os.Getenv(cliHelperConfig)), os.Stdout, os.Stderr))
+}
+
+// capture runs one CLI invocation with a private config source and output
+// buffers. It never mutates process-global environment or standard streams.
+func capture(t *testing.T, configPath string, args ...string) (int, string, string) {
 	t.Helper()
-	outReader, outWriter, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
+	userHome := filepath.Join(filepath.Dir(filepath.Dir(configPath)), "user")
+	return captureWithUserHome(t, configPath, func() (string, error) { return userHome, nil }, args...)
+}
+
+func captureWithUserHome(t *testing.T, configPath string, userHome func() (string, error), args ...string) (int, string, string) {
+	t.Helper()
+	var stdout, stderr strings.Builder
+	command := cli{config: fileConfigSource(configPath), stdout: &stdout, stderr: &stderr, userHome: userHome}
+	code := command.run(args)
+	return code, stdout.String(), stderr.String()
+}
+
+// captureWithEnv drives the real CLI core in an isolated helper process for
+// cases whose contract is specifically about process environment selection.
+func captureWithEnv(t *testing.T, configPath string, environment map[string]string, args ...string) (int, string, string) {
+	t.Helper()
+	commandArgs := []string{"-test.run=^TestCLIHelperProcess$", "--"}
+	commandArgs = append(commandArgs, args...)
+	command := exec.Command(os.Args[0], commandArgs...)
+	overrides := map[string]string{cliHelperProcess: "1", cliHelperConfig: configPath}
+	for key, value := range environment {
+		overrides[key] = value
 	}
-	errReader, errWriter, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if _, replaced := overrides[key]; !replaced {
+			command.Env = append(command.Env, entry)
+		}
 	}
-	realOut, realErr := os.Stdout, os.Stderr
-	os.Stdout, os.Stderr = outWriter, errWriter
-
-	var stdout, stderr []byte
-	var readers sync.WaitGroup
-	readers.Add(2)
-	go func() { defer readers.Done(); stdout, _ = io.ReadAll(outReader) }()
-	go func() { defer readers.Done(); stderr, _ = io.ReadAll(errReader) }()
-
-	code := run(args)
-
-	os.Stdout, os.Stderr = realOut, realErr
-	_ = outWriter.Close()
-	_ = errWriter.Close()
-	readers.Wait()
-	return code, string(stdout), string(stderr)
+	for key, value := range overrides {
+		command.Env = append(command.Env, key+"="+value)
+	}
+	var stdout, stderr strings.Builder
+	command.Stdout, command.Stderr = &stdout, &stderr
+	err := command.Run()
+	code := exitOK
+	if err != nil {
+		var exitError *exec.ExitError
+		if !errors.As(err, &exitError) {
+			t.Fatal(err)
+		}
+		code = exitError.ExitCode()
+	}
+	return code, stdout.String(), stderr.String()
 }
 
 // statusPayload is the machine-readable status document one project produces.
@@ -98,7 +153,6 @@ func decodeStatus(t *testing.T, payload string) statusPayload {
 // declares it. It returns the project root and the manager home.
 func compiledProject(t *testing.T) (string, string) {
 	t.Helper()
-	testtoolchain.LockHostGOROOT(t)
 	return compiledProjectDeclaring(t, `{"name":"build-skill","tag":"v1"}`)
 }
 
@@ -110,7 +164,6 @@ func compiledProjectDeclaring(t *testing.T, declarations string) (string, string
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
 	configPath := filepath.Join(home, "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
 	skillsRoot := filepath.Join(root, "skills")
 	project := filepath.Join(root, "project")
 
@@ -159,11 +212,10 @@ func writeCompiledSkillRepo(t *testing.T, skill string) {
 
 // legacyProject creates a project that declares one script-only skill, so a
 // test can pin the pre-compiled-command behaviour of the same surfaces.
-func legacyProject(t *testing.T) string {
+func legacyProject(t *testing.T) (string, string) {
 	t.Helper()
 	root := t.TempDir()
 	configPath := filepath.Join(root, "home", "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
 	skillsRoot := filepath.Join(root, "skills")
 	project := filepath.Join(root, "project")
 
@@ -187,14 +239,14 @@ func legacyProject(t *testing.T) string {
 	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
 		t.Fatal(err)
 	}
-	return project
+	return project, filepath.Dir(configPath)
 }
 
 // reinstall runs the ordinary reconciliation path, which is also the only
 // repair path Curator has.
-func reinstall(t *testing.T) {
+func reinstall(t *testing.T, home string) {
 	t.Helper()
-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("restoring install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 }
@@ -412,7 +464,7 @@ type compiledProjectFixture struct {
 func newInstalledCompiledProject(t *testing.T) compiledProjectFixture {
 	t.Helper()
 	project, home := compiledProject(t)
-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	return compiledProjectFixture{
@@ -428,29 +480,40 @@ func newInstalledCompiledProject(t *testing.T) compiledProjectFixture {
 // that failed after a real publication, protected cache state that moves during
 // a check, and the repair of cache bytes outside a provable boundary.
 //
-// The cases run sequentially and share live state deliberately, so each one
-// re-reads the marker, cache, and plan evidence it asserts against instead of
-// carrying a baseline in, and each returns the fixture to a current state
-// before the next one opens its own window.
-func TestCompiledProjectStatusRepairRollbackRecovery(t *testing.T) {
+// Each scenario owns an installed fixture so the expensive compiler sessions
+// can run concurrently without sharing mutable marker or cache state.
+func TestCompiledProjectStatusAndUntrustedRecovery(t *testing.T) {
+	t.Parallel()
 	requireNativeControlInventoryPlatform(t)
 	fixture := newInstalledCompiledProject(t)
+	assertCompiledCurrentnessAndFailedCheck(t, fixture)
+	assertProtectedCacheStateThatMovedDuringTheCheck(t, fixture)
+	assertUntrustedCompiledStateIsRepaired(t, fixture)
+}
 
-	t.Run("status reports compiled currentness and fails check", func(t *testing.T) {
-		assertCompiledCurrentnessAndFailedCheck(t, fixture)
-	})
-	t.Run("install and upgrade repair corrupt compiled state", func(t *testing.T) {
-		assertCorruptCompiledStateIsRepaired(t, fixture)
-	})
-	t.Run("install and upgrade restore the cache when the commit fails", func(t *testing.T) {
-		assertTheCacheIsRestoredWhenTheCommitFails(t, fixture)
-	})
-	t.Run("status reports protected cache state that moved during the check", func(t *testing.T) {
-		assertProtectedCacheStateThatMovedDuringTheCheck(t, fixture)
-	})
-	t.Run("install repairs untrusted compiled state and preserves the old install", func(t *testing.T) {
-		assertUntrustedCompiledStateIsRepaired(t, fixture)
-	})
+func TestCompiledProjectRepairsCorruptCompiledState(t *testing.T) {
+	t.Parallel()
+	requireNativeControlInventoryPlatform(t)
+	for _, command := range []string{"install", "upgrade"} {
+		t.Run(command, func(t *testing.T) {
+			t.Parallel()
+			fixture := newInstalledCompiledProject(t)
+			for _, corrupt := range []func(t *testing.T, home string){corruptCacheReceipt, corruptCacheArtifact} {
+				assertCorruptCompiledStateIsRepaired(t, fixture, command, corrupt)
+			}
+		})
+	}
+}
+
+func TestCompiledProjectRestoresCacheWhenCommitFails(t *testing.T) {
+	t.Parallel()
+	requireNativeControlInventoryPlatform(t)
+	for _, command := range []string{"install", "upgrade"} {
+		t.Run(command, func(t *testing.T) {
+			t.Parallel()
+			assertTheCacheIsRestoredWhenTheCommitFails(t, newInstalledCompiledProject(t), command)
+		})
+	}
 }
 
 // assertCompiledCurrentnessAndFailedCheck is the end-to-end proof of the
@@ -460,7 +523,7 @@ func TestCompiledProjectStatusRepairRollbackRecovery(t *testing.T) {
 func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProjectFixture) {
 	project, home, installed := fixture.project, fixture.home, fixture.installed
 
-	code, stdout, stderr := capture(t, "status", "app", "--json")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
 	if code != exitOK {
 		t.Fatalf("status --json = %d\nstderr:\n%s", code, stderr)
 	}
@@ -495,7 +558,7 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
 			t.Fatalf("build rows published the private location %q:\n%s", forbidden, stdout)
 		}
 	}
-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
 		t.Fatalf("clean compiled status --check = %d, want %d", code, exitOK)
 	}
 
@@ -701,7 +764,7 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
 			// `--json` and `--check` are combined so one invocation proves the
 			// published document and the fail-closed exit are the same run's
 			// verdict, rather than two classifications of drifting live state.
-			code, stdout, stderr := capture(t, "status", "app", "--json", "--check")
+			code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json", "--check")
 			if code != exitFail {
 				t.Fatalf("status --json --check on %s = %d, want %d\nstdout:\n%s\nstderr:\n%s",
 					name, code, exitFail, stdout, stderr)
@@ -747,7 +810,7 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
 			// pins the rendering above to the line the command really prints —
 			// and proves the plain report still exits zero, because reporting a
 			// verdict is not itself a failure.
-			code, human, _ := capture(t, "status", "app")
+			code, human, _ := capture(t, filepath.Join(home, "config.json"), "status", "app")
 			if code != exitOK {
 				t.Fatalf("plain human status on %s = %d, want %d\n%s", name, code, exitOK, human)
 			}
@@ -763,74 +826,64 @@ func assertCompiledCurrentnessAndFailedCheck(t *testing.T, fixture compiledProje
 // corrupt artifact bytes are rebuilt by install and by upgrade, only after
 // every gate has passed, and a run that fails leaves the previous installation
 // and the live cache exactly as they were.
-func assertCorruptCompiledStateIsRepaired(t *testing.T, fixture compiledProjectFixture) {
-	home, installed := fixture.home, fixture.installed
+func assertCorruptCompiledStateIsRepaired(
+	t *testing.T,
+	fixture compiledProjectFixture,
+	command string,
+	corrupt func(t *testing.T, home string),
+) {
+	project, home, installed := fixture.project, fixture.home, fixture.installed
+	before := marker.Read(installed)
+	if before == nil || len(before.Builds) != 1 {
+		t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
+	}
 
-	for _, command := range []string{"install", "upgrade"} {
-		t.Run(command, func(t *testing.T) {
-			for _, corruption := range []struct {
-				name    string
-				corrupt func(t *testing.T, home string)
-			}{
-				{"receipt bytes", corruptCacheReceipt},
-				{"artifact bytes", corruptCacheArtifact},
-			} {
-				t.Run(corruption.name, func(t *testing.T) {
-					// The shared fixture is current when this case starts, and a
-					// preceding repair legitimately republished the entry the marker
-					// names, so the compiled state every assertion below compares
-					// against is re-read here instead of being carried in.
-					before := marker.Read(installed)
-					if before == nil || len(before.Builds) != 1 {
-						t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
-					}
+	corrupt(t, home)
+	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json"); code != exitOK ||
+		decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+		t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
+	}
 
-					corruption.corrupt(t, home)
-					if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
-						decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
-						t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
-					}
+	corruptedCache := cacheFingerprint(t, home)
+	manifestPath := filepath.Join(project, manifest.Name)
+	declared, err := os.ReadFile(manifestPath) // #nosec G304 -- test fixture path
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, manifestPath,
+		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"build-skill","tag":"missing"}]}`)
+	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), command, "app"); code != exitFail {
+		t.Fatalf("%s with an unresolvable declaration = %d, want %d\n%s", command, code, exitFail, stdout)
+	}
+	if cacheFingerprint(t, home) != corruptedCache {
+		t.Fatal("a refused run changed the live build cache")
+	}
+	if refused := marker.Read(installed); refused == nil || refused.Builds["build-tool"] != before.Builds["build-tool"] {
+		t.Fatalf("a refused run changed the previous compiled state: %+v", refused)
+	}
+	if _, err := os.Stat(filepath.Join(installed, "SKILL.md")); err != nil {
+		t.Fatalf("a refused run removed the previous installation: %v", err)
+	}
+	if err := os.WriteFile(manifestPath, declared, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-					// A gate that fails must refuse before the repair: the corrupt
-					// entry, the installed marker, and the installed content are all
-					// still exactly as this run found them.
-					corruptedCache := cacheFingerprint(t, home)
-					t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
-					if code, stdout, _ := capture(t, command, "app"); code != exitFail {
-						t.Fatalf("%s without a usable toolchain = %d, want %d\n%s", command, code, exitFail, stdout)
-					}
-					if cacheFingerprint(t, home) != corruptedCache {
-						t.Fatal("a refused run changed the live build cache")
-					}
-					if refused := marker.Read(installed); refused == nil ||
-						refused.Builds["build-tool"] != before.Builds["build-tool"] {
-						t.Fatalf("a refused run changed the previous compiled state: %+v", refused)
-					}
-					if _, err := os.Stat(filepath.Join(installed, "SKILL.md")); err != nil {
-						t.Fatalf("a refused run removed the previous installation: %v", err)
-					}
-					t.Setenv(godriver.SelectionCuratorGo, "")
-
-					code, stdout, stderr := capture(t, command, "app")
-					if code != exitOK {
-						t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
-					}
-					if !strings.Contains(stdout, "rebuilt corrupt build cache state into a new protected entry") {
-						t.Fatalf("%s did not report the repair:\n%s", command, stdout)
-					}
-					if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
-						t.Fatalf("status --check after repairing %s = %d, want %d", corruption.name, code, exitOK)
-					}
-					after := marker.Read(installed)
-					if after == nil || after.Builds["build-tool"].CacheKey != before.Builds["build-tool"].CacheKey {
-						t.Fatalf("a repair changed the logical key: %+v", after)
-					}
-					if len(cacheEntries(t, home)) != 1 {
-						t.Fatalf("repair left %d live protected entries, want 1", len(cacheEntries(t, home)))
-					}
-				})
-			}
-		})
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), command, "app")
+	if code != exitOK {
+		t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "rebuilt corrupt build cache state into a new protected entry") {
+		t.Fatalf("%s did not report the repair:\n%s", command, stdout)
+	}
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
+		t.Fatalf("status --check after repairing cache state = %d, want %d", code, exitOK)
+	}
+	after := marker.Read(installed)
+	if after == nil || after.Builds["build-tool"].CacheKey != before.Builds["build-tool"].CacheKey {
+		t.Fatalf("a repair changed the logical key: %+v", after)
+	}
+	if len(cacheEntries(t, home)) != 1 {
+		t.Fatalf("repair left %d live protected entries, want 1", len(cacheEntries(t, home)))
 	}
 }
 
@@ -848,95 +901,90 @@ func assertCorruptCompiledStateIsRepaired(t *testing.T, fixture compiledProjectF
 // The commit is failed by taking away write access to the context store the
 // first target class swaps in, which is the last moment a real installation can
 // still fail without leaving a durable transaction behind.
-func assertTheCacheIsRestoredWhenTheCommitFails(t *testing.T, fixture compiledProjectFixture) {
+func assertTheCacheIsRestoredWhenTheCommitFails(t *testing.T, fixture compiledProjectFixture, command string) {
 	project, home, installed := fixture.project, fixture.home, fixture.installed
+	// The shared fixture is current when this case starts, and a preceding
+	// repair legitimately republished the entry the marker names, so the
+	// compiled state this case must find unchanged is re-read here.
+	before := marker.Read(installed)
+	if before == nil || len(before.Builds) != 1 {
+		t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
+	}
 
-	for _, command := range []string{"install", "upgrade"} {
-		t.Run(command, func(t *testing.T) {
-			// The shared fixture is current when this case starts, and a preceding
-			// repair legitimately republished the entry the marker names, so the
-			// compiled state this case must find unchanged is re-read here.
-			before := marker.Read(installed)
-			if before == nil || len(before.Builds) != 1 {
-				t.Fatalf("the installation this case starts from records no compiled state: %+v", before)
-			}
+	corruptCacheArtifact(t, home)
+	// A privileged process ignores the directory mode this case fails the
+	// commit with, and skips below with the cache already corrupted. The
+	// next case is handed a current fixture on that path too.
+	t.Cleanup(func() {
+		if t.Skipped() {
+			reinstall(t, home)
+		}
+	})
+	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json"); code != exitOK ||
+		decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+		t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
+	}
+	corruptArtifact := liveArtifactBytes(t, home)
+	installedBefore := installedFingerprint(t, project, home)
+	// Withdrawn entries are never deleted, only collected by the ordinary
+	// sweep, so a shared cache root still holds what earlier cases withdrew.
+	// The count this case owns is therefore measured against what it found.
+	withdrawnBefore := quarantinedEntries(t, home)
 
-			corruptCacheArtifact(t, home)
-			// A privileged process ignores the directory mode this case fails the
-			// commit with, and skips below with the cache already corrupted. The
-			// next case is handed a current fixture on that path too.
-			t.Cleanup(func() {
-				if t.Skipped() {
-					reinstall(t)
-				}
-			})
-			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
-				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
-				t.Fatalf("status did not report corrupt compiled state:\n%s", stdout)
-			}
-			corruptArtifact := liveArtifactBytes(t, home)
-			installedBefore := installedFingerprint(t, project, home)
-			// Withdrawn entries are never deleted, only collected by the ordinary
-			// sweep, so a shared cache root still holds what earlier cases withdrew.
-			// The count this case owns is therefore measured against what it found.
-			withdrawnBefore := quarantinedEntries(t, home)
+	store := filepath.Join(project, ".agents", "skills")
+	denyWrites(t, store)
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), command, "app")
+	restoreWrites(t, store)
+	if code != exitFail {
+		t.Fatalf("%s over an unwritable context store = %d, want %d\nstdout:\n%s\nstderr:\n%s",
+			command, code, exitFail, stdout, stderr)
+	}
 
-			store := filepath.Join(project, ".agents", "skills")
-			denyWrites(t, store)
-			code, stdout, stderr := capture(t, command, "app")
-			restoreWrites(t, store)
-			if code != exitFail {
-				t.Fatalf("%s over an unwritable context store = %d, want %d\nstdout:\n%s\nstderr:\n%s",
-					command, code, exitFail, stdout, stderr)
-			}
+	// The case only proves anything if the repair really did publish before
+	// the commit failed. Publication quarantines the corrupt entry and the
+	// reversal withdraws the replacement the same way, so exactly one
+	// withdrawn entry is left behind for the ordinary sweep.
+	if withdrawn := quarantinedEntries(t, home) - withdrawnBefore; withdrawn != 1 {
+		t.Fatalf("withdrawn cache entries = %d, want exactly the one this run published", withdrawn)
+	}
+	// Nothing half-built survives in the shared cache root either: a
+	// publication that failed or was reversed leaves no private staging
+	// directory behind for the next run to trip over.
+	if staged := stagedEntries(t, home); staged != 0 {
+		t.Fatalf("private staging directories left in the shared cache root = %d, want 0", staged)
+	}
 
-			// The case only proves anything if the repair really did publish before
-			// the commit failed. Publication quarantines the corrupt entry and the
-			// reversal withdraws the replacement the same way, so exactly one
-			// withdrawn entry is left behind for the ordinary sweep.
-			if withdrawn := quarantinedEntries(t, home) - withdrawnBefore; withdrawn != 1 {
-				t.Fatalf("withdrawn cache entries = %d, want exactly the one this run published", withdrawn)
-			}
-			// Nothing half-built survives in the shared cache root either: a
-			// publication that failed or was reversed leaves no private staging
-			// directory behind for the next run to trip over.
-			if staged := stagedEntries(t, home); staged != 0 {
-				t.Fatalf("private staging directories left in the shared cache root = %d, want 0", staged)
-			}
+	// Exact restoration: the entry the run displaced is live again, with
+	// the bytes it had, and the installation is untouched.
+	if got := liveArtifactBytes(t, home); got != corruptArtifact {
+		t.Fatal("a failed commit did not restore the build cache entry it replaced")
+	}
+	if len(cacheEntries(t, home)) != 1 {
+		t.Fatalf("a failed commit left %d live protected entries, want 1", len(cacheEntries(t, home)))
+	}
+	if failed := marker.Read(installed); failed == nil ||
+		failed.Builds["build-tool"] != before.Builds["build-tool"] {
+		t.Fatalf("a failed commit changed the previous compiled state: %+v", failed)
+	}
+	// The marker is only one class of what an installation commits. The
+	// launcher bytes the previous install placed, its adapter mirrors, the
+	// machine runtime, and the consumer ledger all have to be at the exact
+	// value the run found them at.
+	if got := installedFingerprint(t, project, home); got != installedBefore {
+		t.Fatalf("a failed commit changed installed state\nbefore:\n%s\nafter:\n%s",
+			installedBefore, got)
+	}
+	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json"); code != exitOK ||
+		decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
+		t.Fatalf("the previous installation no longer reports the state it had:\n%s", stdout)
+	}
 
-			// Exact restoration: the entry the run displaced is live again, with
-			// the bytes it had, and the installation is untouched.
-			if got := liveArtifactBytes(t, home); got != corruptArtifact {
-				t.Fatal("a failed commit did not restore the build cache entry it replaced")
-			}
-			if len(cacheEntries(t, home)) != 1 {
-				t.Fatalf("a failed commit left %d live protected entries, want 1", len(cacheEntries(t, home)))
-			}
-			if failed := marker.Read(installed); failed == nil ||
-				failed.Builds["build-tool"] != before.Builds["build-tool"] {
-				t.Fatalf("a failed commit changed the previous compiled state: %+v", failed)
-			}
-			// The marker is only one class of what an installation commits. The
-			// launcher bytes the previous install placed, its adapter mirrors, the
-			// machine runtime, and the consumer ledger all have to be at the exact
-			// value the run found them at.
-			if got := installedFingerprint(t, project, home); got != installedBefore {
-				t.Fatalf("a failed commit changed installed state\nbefore:\n%s\nafter:\n%s",
-					installedBefore, got)
-			}
-			if code, stdout, _ := capture(t, "status", "app", "--json"); code != exitOK ||
-				decodeStatus(t, stdout).Builds[0].State != buildCorruptCache {
-				t.Fatalf("the previous installation no longer reports the state it had:\n%s", stdout)
-			}
-
-			// The ordinary reconciliation path still repairs it afterwards.
-			if code, stdout, stderr := capture(t, command, "app"); code != exitOK {
-				t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
-			}
-			if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
-				t.Fatalf("status --check after the repair = %d, want %d", code, exitOK)
-			}
-		})
+	// The ordinary reconciliation path still repairs it afterwards.
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), command, "app"); code != exitOK {
+		t.Fatalf("repairing %s = %d\nstdout:\n%s\nstderr:\n%s", command, code, stdout, stderr)
+	}
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
+		t.Fatalf("status --check after the repair = %d, want %d", code, exitOK)
 	}
 }
 
@@ -1142,6 +1190,7 @@ func restoreWrites(t *testing.T, dir string) {
 // node the project reaches only through a dependency is reported, classified,
 // and fails --check on its own, even though no declaration names it.
 func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+	t.Parallel()
 	requireNativeControlInventoryPlatform(t)
 	project, home := compiledProjectDeclaring(t, `{"name":"consumer","tag":"v1"}`)
 	consumer := filepath.Join(filepath.Dir(project), "skills", "consumer")
@@ -1164,11 +1213,11 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 	runGit(t, consumer, "commit", "-qm", "initial consumer")
 	runGit(t, consumer, "tag", "v1")
 
-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 
-	code, stdout, stderr := capture(t, "status", "app", "--json")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
 	if code != exitOK {
 		t.Fatalf("status --json = %d\nstderr:\n%s", code, stderr)
 	}
@@ -1180,7 +1229,7 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 	if _, declared := report.Skills["build-skill"]; declared {
 		t.Fatalf("the provider is a transitive node, not a declaration: %v", report.Skills)
 	}
-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
 		t.Fatalf("clean transitive compiled status --check = %d, want %d", code, exitOK)
 	}
 
@@ -1191,7 +1240,7 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	code, stdout, _ = capture(t, "status", "app", "--json")
+	code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
 	if code != exitOK {
 		t.Fatalf("status --json after the entry was removed = %d", code)
 	}
@@ -1199,7 +1248,7 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 		drifted.Builds[0].State != buildMissingArtifact {
 		t.Fatalf("transitive drift was not reported:\n%s", stdout)
 	}
-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitFail {
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitFail {
 		t.Fatalf("transitive compiled drift passed --check: %d", code)
 	}
 }
@@ -1209,16 +1258,19 @@ func TestStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 // compiled command still gets a machine-readable row carrying the stable
 // go-v1 boundary code, and `status --check` fails.
 func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
+	t.Parallel()
 	requireNativeControlInventoryPlatform(t)
-	compiledProject(t)
-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+	_, home := compiledProject(t)
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
-	t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
+	selected := map[string]string{
+		godriver.SelectionCuratorGo: filepath.Join(t.TempDir(), "nowhere", "bin", "go"),
+	}
 
 	// Reporting a refusal is not itself a failure: the row carries the verdict
 	// and `--check` is what turns a non-current verdict into a non-zero exit.
-	code, stdout, stderr := capture(t, "status", "app", "--json")
+	code, stdout, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app", "--json")
 	if code != exitOK {
 		t.Fatalf("status --json with an unusable toolchain = %d, want %d\n%s", code, exitOK, stderr)
 	}
@@ -1252,7 +1304,7 @@ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
 		t.Fatalf("skills = %v", report.Skills)
 	}
 
-	code, human, _ := capture(t, "status", "app")
+	code, human, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app")
 	if code != exitOK || !strings.Contains(human, "state="+buildUnusableToolchain) ||
 		!strings.Contains(human, "cause="+row.Cause) {
 		t.Fatalf("human status = %d and does not report the toolchain row:\n%s", code, human)
@@ -1276,7 +1328,7 @@ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
 			t.Fatalf("human status published %q for a command nothing was derived for:\n%s", absent, human)
 		}
 	}
-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitFail {
+	if code, _, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app", "--check"); code != exitFail {
 		t.Fatalf("status --check with an unusable toolchain = %d, want %d", code, exitFail)
 	}
 }
@@ -1297,7 +1349,8 @@ func TestStatusReportsAnUnusableToolchainPerCompiledCommand(t *testing.T) {
 func assertProtectedCacheStateThatMovedDuringTheCheck(t *testing.T, fixture compiledProjectFixture) {
 	project, home := fixture.project, fixture.home
 
-	cfg, code := loadConfig()
+	command := cli{config: fileConfigSource(filepath.Join(home, "config.json")), stderr: io.Discard}
+	cfg, code := command.loadConfig()
 	if code != exitOK {
 		t.Fatalf("loading the configuration = %d", code)
 	}
@@ -1400,8 +1453,9 @@ func assertProtectedCacheStateThatMovedDuringTheCheck(t *testing.T, fixture comp
 // compatibility boundary of the change above: a failure that derived no
 // compiled command still reports exactly the historical error and nothing else.
 func TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands(t *testing.T) {
-	project := legacyProject(t)
-	if code, _, stderr := capture(t, "install", "app"); code != exitOK {
+	t.Parallel()
+	project, home := legacyProject(t)
+	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\n%s", code, stderr)
 	}
 	// A declaration that cannot be resolved fails the read-only plan long
@@ -1409,7 +1463,7 @@ func TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands(t *test
 	writeFile(t, filepath.Join(project, manifest.Name),
 		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"skill-a","tag":"v9"}]}`)
 
-	code, stdout, stderr := capture(t, "status", "app", "--json")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
 	if code != exitFail {
 		t.Fatalf("status over an unresolvable declaration = %d, want %d", code, exitFail)
 	}
@@ -1425,7 +1479,7 @@ func TestStatusKeepsLegacyBehaviourWhenAPlanFailsWithoutCompiledCommands(t *test
 // path: install rebuilds candidate bytes that are outside a provable protected
 // boundary instead of adopting them.
 func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjectFixture) {
-	home, installed := fixture.home, fixture.installed
+	project, home, installed := fixture.project, fixture.home, fixture.installed
 
 	// The shared fixture is current when this case starts, and a preceding
 	// repair legitimately republished the entry the marker names, so the
@@ -1438,7 +1492,7 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
 		breakCacheProtection(t, entry)
 	}
 
-	code, dryRun, _ := capture(t, "install", "app", "--dry-run")
+	code, dryRun, _ := capture(t, filepath.Join(home, "config.json"), "install", "app", "--dry-run")
 	if code != exitOK {
 		t.Fatalf("dry run over untrusted cache state = %d\n%s", code, dryRun)
 	}
@@ -1449,14 +1503,14 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
 		t.Fatalf("dry run claimed a completed repair:\n%s", dryRun)
 	}
 
-	code, stdout, stderr := capture(t, "install", "app")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app")
 	if code != exitOK {
 		t.Fatalf("repairing install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	if !strings.Contains(stdout, "rebuilt untrusted build cache state into a new protected entry") {
 		t.Fatalf("install did not report the repair:\n%s", stdout)
 	}
-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
 		t.Fatalf("status --check after repair = %d, want %d", code, exitOK)
 	}
 	after := marker.Read(installed)
@@ -1468,11 +1522,20 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
 			before.Builds["build-tool"].CacheKey, after.Builds["build-tool"].CacheKey)
 	}
 
-	// A run that cannot pass the toolchain gate repairs nothing and leaves the
+	// A run that cannot resolve its declaration repairs nothing and leaves the
 	// durable installation exactly as the successful run left it.
-	t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
-	if code, stdout, _ := capture(t, "install", "app"); code != exitFail {
-		t.Fatalf("install without a usable toolchain = %d, want %d\n%s", code, exitFail, stdout)
+	manifestPath := filepath.Join(project, manifest.Name)
+	declared, err := os.ReadFile(manifestPath) // #nosec G304 -- test fixture path
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, manifestPath,
+		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"build-skill","tag":"missing"}]}`)
+	if code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitFail {
+		t.Fatalf("install with an unresolvable declaration = %d, want %d\n%s", code, exitFail, stdout)
+	}
+	if err := os.WriteFile(manifestPath, declared, 0o644); err != nil {
+		t.Fatal(err)
 	}
 	failed := marker.Read(installed)
 	if failed == nil || failed.Builds["build-tool"] != after.Builds["build-tool"] {
@@ -1487,9 +1550,10 @@ func assertUntrustedCompiledStateIsRepaired(t *testing.T, fixture compiledProjec
 // surface: a cache entry a live marker references is neither removed nor
 // reported as removed.
 func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
+	t.Parallel()
 	requireNativeControlInventoryPlatform(t)
 	_, home := compiledProject(t)
-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	entries := cacheEntries(t, home)
@@ -1497,7 +1561,7 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
 		t.Fatalf("protected build cache holds %d entries, want 1", len(entries))
 	}
 
-	code, stdout, stderr := capture(t, "gc")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "gc")
 	if code != exitOK {
 		t.Fatalf("gc = %d\nstderr:\n%s", code, stderr)
 	}
@@ -1510,7 +1574,7 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
 	if _, err := os.Stat(entries[0]); err != nil {
 		t.Fatalf("gc removed a referenced protected entry: %v", err)
 	}
-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitOK {
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); code != exitOK {
 		t.Fatalf("status --check after gc = %d, want %d", code, exitOK)
 	}
 }
@@ -1535,8 +1599,9 @@ func TestGCRetainsAndReportsReferencedCompiledState(t *testing.T) {
 // recorded boundary rather than a quiet omission: the uncovered runner still
 // proves the refusal it is carved out by.
 func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
+	t.Parallel()
 	_, home := compiledProject(t)
-	code, stdout, stderr := capture(t, "install", "app")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app")
 
 	if godriver.InventoryPlatform(runtime.GOOS) != "" {
 		if code != exitOK {
@@ -1585,7 +1650,7 @@ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
 	}
 	// And the status surface fails closed rather than reporting the command as
 	// current on a platform that cannot produce it.
-	if checkCode, checkOut, _ := capture(t, "status", "app", "--check"); checkCode == exitOK {
+	if checkCode, checkOut, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check"); checkCode == exitOK {
 		t.Fatalf("status --check passed after a refused compiled install:\n%s", checkOut)
 	}
 }
@@ -1593,8 +1658,9 @@ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
 // TestDryRunNeverClaimsACompletedCompilerCheck pins the compiler-free dry-run
 // vocabulary: a miss is planned, never reported as preflighted or built.
 func TestDryRunNeverClaimsACompletedCompilerCheck(t *testing.T) {
-	compiledProject(t)
-	code, stdout, stderr := capture(t, "install", "app", "--dry-run")
+	t.Parallel()
+	_, home := compiledProject(t)
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app", "--dry-run")
 	if code != exitOK {
 		t.Fatalf("dry run = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
@@ -1614,7 +1680,7 @@ func TestDryRunNeverClaimsACompletedCompilerCheck(t *testing.T) {
 
 	// upgrade shares the install phase, so it reports the same compiler-free
 	// planning vocabulary.
-	code, upgraded, stderr := capture(t, "upgrade", "app", "--dry-run")
+	code, upgraded, stderr := capture(t, filepath.Join(home, "config.json"), "upgrade", "app", "--dry-run")
 	if code != exitOK {
 		t.Fatalf("upgrade --dry-run = %d\nstdout:\n%s\nstderr:\n%s", code, upgraded, stderr)
 	}
@@ -1627,10 +1693,13 @@ func TestDryRunNeverClaimsACompletedCompilerCheck(t *testing.T) {
 // toolchain diagnostic names every accepted selection mechanism and the tested
 // release families, on any host, without suggesting a PATH lookup or download.
 func TestStatusExplainsAnUnusableGoToolchain(t *testing.T) {
-	compiledProject(t)
-	t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
+	t.Parallel()
+	_, home := compiledProject(t)
+	selected := map[string]string{
+		godriver.SelectionCuratorGo: filepath.Join(t.TempDir(), "nowhere", "bin", "go"),
+	}
 
-	code, _, stderr := capture(t, "status", "app")
+	code, _, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app")
 	if code != exitOK {
 		t.Fatalf("status with an unusable toolchain = %d, want %d\n%s", code, exitOK, stderr)
 	}
@@ -1642,10 +1711,10 @@ func TestStatusExplainsAnUnusableGoToolchain(t *testing.T) {
 			t.Fatalf("toolchain diagnostic does not name %q:\n%s", want, stderr)
 		}
 	}
-	if code, _, _ := capture(t, "status", "app", "--check"); code != exitFail {
+	if code, _, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "status", "app", "--check"); code != exitFail {
 		t.Fatalf("status --check with an unusable toolchain = %d, want %d", code, exitFail)
 	}
-	if code, _, _ := capture(t, "install", "app"); code != exitFail {
+	if code, _, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "install", "app"); code != exitFail {
 		t.Fatalf("install with an unusable toolchain = %d, want %d", code, exitFail)
 	}
 }
@@ -1654,12 +1723,13 @@ func TestStatusExplainsAnUnusableGoToolchain(t *testing.T) {
 // compatibility: a closure with no build command produces exactly the
 // historical document, with no build key at all.
 func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
-	legacyProject(t)
-	if code, _, stderr := capture(t, "install", "app"); code != exitOK {
+	t.Parallel()
+	_, home := legacyProject(t)
+	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\n%s", code, stderr)
 	}
 
-	code, stdout, _ := capture(t, "status", "app", "--json")
+	code, stdout, _ := capture(t, filepath.Join(home, "config.json"), "status", "app", "--json")
 	if code != exitOK {
 		t.Fatalf("status --json = %d", code)
 	}
@@ -1680,8 +1750,9 @@ func TestStatusJSONKeepsTheLegacyShapeWithoutCompiledCommands(t *testing.T) {
 // marker below the current schema still describes a current schema 1 through 5
 // installation and must not be reported as unsupported.
 func TestStatusAcceptsAnUnchangedLegacyMarkerSchema(t *testing.T) {
-	project := legacyProject(t)
-	if code, _, stderr := capture(t, "install", "app"); code != exitOK {
+	t.Parallel()
+	project, home := legacyProject(t)
+	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "install", "app"); code != exitOK {
 		t.Fatalf("install = %d\n%s", code, stderr)
 	}
 
@@ -1693,7 +1764,7 @@ func TestStatusAcceptsAnUnchangedLegacyMarkerSchema(t *testing.T) {
 		delete(object, "builds")
 	})
 
-	code, stdout, stderr := capture(t, "status", "app", "--check")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "status", "app", "--check")
 	if code != exitOK {
 		t.Fatalf("legacy marker status --check = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
 	}
