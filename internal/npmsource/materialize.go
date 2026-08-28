@@ -910,15 +910,17 @@ func installedPackagePaths(root string) (map[string]bool, error) {
 					return err
 				}
 				for _, leaf := range scoped {
-					if leaf.IsDir() || leaf.Type()&fs.ModeSymlink != 0 {
-						rel, _ := filepath.Rel(root, filepath.Join(current, child.Name(), leaf.Name()))
+					leafPath := filepath.Join(current, child.Name(), leaf.Name())
+					if leaf.IsDir() || linkedPackageEntry(leaf, leafPath) {
+						rel, _ := filepath.Rel(root, leafPath)
 						result[filepath.ToSlash(rel)] = true
 					}
 				}
 				continue
 			}
-			if child.IsDir() || child.Type()&fs.ModeSymlink != 0 {
-				rel, _ := filepath.Rel(root, filepath.Join(current, child.Name()))
+			childPath := filepath.Join(current, child.Name())
+			if child.IsDir() || linkedPackageEntry(child, childPath) {
+				rel, _ := filepath.Rel(root, childPath)
 				result[filepath.ToSlash(rel)] = true
 			}
 		}
@@ -1096,7 +1098,11 @@ func copyContainedTreeDereferencingLinks(root, source, destination string, activ
 		return err
 	}
 	for _, entry := range entries {
-		if err = copyContainedTreeDereferencingLinks(root, filepath.Join(realSource, entry.Name()), filepath.Join(destination, entry.Name()), active); err != nil {
+		childSource, linkErr := normalizeTreeLink(filepath.Join(realSource, entry.Name()), entry)
+		if linkErr != nil {
+			return linkErr
+		}
+		if err = copyContainedTreeDereferencingLinks(root, childSource, filepath.Join(destination, entry.Name()), active); err != nil {
 			return err
 		}
 	}

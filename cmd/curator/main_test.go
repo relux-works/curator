@@ -758,10 +758,19 @@ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
 	}
 }
 
+// productionBinarySuffix names the extension the platform requires before it
+// will exec a freshly built binary by absolute path.
+func productionBinarySuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
+}
+
 func TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery(t *testing.T) {
 	t.Parallel()
 	testtoolchain.LockHostGOROOT(t)
-	binary := filepath.Join(t.TempDir(), "curator")
+	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build production curator: %v\n%s", err, output)

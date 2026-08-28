@@ -590,7 +590,10 @@ func TestNodeCGP05AcceptedExactRecordDigests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lines := strings.Split(string(contents), "\n")
+	// The records are canonical in LF form; a checkout that translated the
+	// file to CRLF (git autocrlf on Windows runners) must not shift names or
+	// digest inputs.
+	lines := strings.Split(strings.ReplaceAll(string(contents), "\r\n", "\n"), "\n")
 	seen := map[string]bool{}
 	for index, line := range lines {
 		if !strings.HasPrefix(line, "name=cgp05.") || index+3 >= len(lines) {

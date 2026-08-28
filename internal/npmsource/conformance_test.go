@@ -1010,6 +1010,19 @@ func newConcreteNPMRunner(t *testing.T) *concreteNPMRunner {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if runtime.GOOS == "windows" {
+		// npm.cmd is a batch wrapper, not a symlink to the CLI script, so
+		// resolving it does not land inside the npm package the way a Unix
+		// bin symlink does. Deriving the root from the wrapper's directory
+		// would name the whole installation prefix (C:\Program Files) and the
+		// staging copy below would try to capture everything under it. The
+		// real entry point lives in the adjacent node_modules tree.
+		entry := filepath.Join(filepath.Dir(npmPath), "node_modules", "npm", "bin", "npm-cli.js")
+		if _, statErr := os.Stat(entry); statErr != nil {
+			t.Skipf("npm CLI entry point is not beside %s: %v", npmPath, statErr)
+		}
+		npmPath = entry
+	}
 	npmRoot := filepath.Dir(filepath.Dir(npmPath))
 	stagedNPMRoot := filepath.Join(executionRoot, "toolchain", "npm")
 	if err = copyContainedTreeDereferencingLinks(npmRoot, npmRoot, stagedNPMRoot, map[string]bool{}); err != nil {
@@ -1032,6 +1045,11 @@ func newConcreteNPMRunner(t *testing.T) *concreteNPMRunner {
 		t.Fatal(err)
 	}
 	nodeRoot := filepath.Dir(filepath.Dir(nodePath))
+	if runtime.GOOS == "windows" {
+		// node.exe sits directly in the installation directory rather than
+		// under a bin/ level, so its root is its own directory.
+		nodeRoot = filepath.Dir(nodePath)
+	}
 	stagedNodeRoot := filepath.Join(executionRoot, "toolchain", "node")
 	if err = os.MkdirAll(filepath.Join(stagedNodeRoot, "bin"), 0o700); err != nil {
 		t.Fatal(err)
