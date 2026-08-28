@@ -13,7 +13,16 @@ import (
 	"github.com/relux-works/curator/internal/managerlock"
 )
 
-const hostGOROOTLockTimeout = 5 * time.Minute
+// hostGOROOTLockTimeout bounds how long a waiter queues for the host-toolchain
+// lock. It has to exceed the longest legitimate hold, and since
+// AcquireHostGOROOT lets a package take the lock once for its whole test
+// process, the longest hold is now a complete package run rather than a single
+// test: cmd/curator holds it from TestMain to exit. Five minutes was sized for
+// the old per-test hold and expired on a hosted macOS runner while cmd/curator
+// still had the lock, failing internal/install with a deadline instead of a
+// real fault. This stays well under the per-package go test timeout so a
+// genuine deadlock still surfaces as a lock error rather than a suite timeout.
+const hostGOROOTLockTimeout = 20 * time.Minute
 
 // AcquireHostGOROOT acquires the cross-process host-toolchain lock for a whole
 // test process. A package whose tests may safely share the host toolchain with
