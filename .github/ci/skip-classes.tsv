@@ -59,6 +59,8 @@ platform-control	local TLS fixture relies on the platform Git shipped on Unix CI
 platform-control	controlled launcher symlink is a Unix regression fixture	allow	the launcher symlink fixture is asserted on unix runners
 platform-control	hard-link count is enforced by the native Windows protected-root backend	allow	the generic hard-link fixture is replaced by the native Windows backend case
 platform-control	an operator agent socket is a unix-domain rendezvous point	allow	the SSH agent-socket fixture is a POSIX unix-domain socket; Windows reaches an agent over a named pipe, so the shape is asserted on the unix runners
+platform-control	Windows cannot create the invalid-name flood used to keep evidence bounded	allow	the walker-limit fixture floods a directory with colon-bearing names NTFS refuses to create; the entry-limit stop is asserted on the unix runners
+platform-control	Windows does not expose portable executable permission bits	allow	the fixture strips the execute bit to prove mode-mutation detection, and Windows synthesizes permission bits with no execute bit to strip; the detection is asserted on the unix runners
 
 # --- host capability --------------------------------------------------------
 host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
