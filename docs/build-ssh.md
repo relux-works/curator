@@ -15,6 +15,8 @@ key happened to be loaded in the operator agent is a fetch nobody authorized.
 An SSH build repository the operator has not covered stops the run with
 `build_repository_ssh_credential_missing` before the first fetch.
 
+For HTTPS repository credentials, see [HTTPS credentials for external build repositories](build-https.md).
+
 Contents:
 
 - [What needs a selection](#what-needs-a-selection)
@@ -367,7 +369,7 @@ credential [1-4, m, q] (default 1): scope [git.example.test/portals] (r for this
   repository-namespace scope to the current precheck but never calls the
   configuration writer.
 - Nothing is persisted before both questions are answered. The operator
-  authorizes a scope, not just a key.
+  authorizes both a scope and a key.
 - `q` at either question, and end of input, abort with
   `build_repository_ssh_credential_missing`. An abort is a refusal to
   authenticate, not a licence to fall back on ambient SSH state.

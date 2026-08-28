@@ -10,6 +10,8 @@ and credential ownership and disclosure by `Spec core §12.2`.
 Credentials are selected only by the operator. A manifest, descriptor,
 repository, substitution, or marker cannot choose one.
 
+For SSH repository credentials, see [Operator SSH credentials for external build repositories](build-ssh.md).
+
 ## Configuration
 
 `build_https` is an optional object in the machine configuration
@@ -90,10 +92,10 @@ replaced build_https scope git.example.com/portals: source=keyring
 
 `login` reads one token from a hidden terminal prompt. When either standard
 input or standard error is not a terminal, it reads one line from standard
-input instead. It stores the token
-through the operator's Git credential machinery under a scope-namespaced
-entry, then records a `keyring` source for that scope. A token is never a
-command-line argument and is never written as a literal configuration value.
+input instead. It stores the token through the operator's Git credential
+machinery under a scope-namespaced entry, then records a `keyring` source for
+that scope. A token is never a command-line argument and is never written as a
+literal configuration value.
 
 `list` sorts scopes and reports whether their named source resolves now:
 

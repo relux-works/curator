@@ -3,6 +3,19 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-08-28 — Authoring CLI commands documentation refresh (TASK-260827-21xw9d)
+
+- **Documentation created**: Added `docs/authoring-cli-commands.md` detailing how skill authors ship CLI utilities with skills. Covered command placements (embedded build roots vs external build repositories), per-language admission matrix derived from `internal/godriver/` and `internal/skillspec/`, script command interpreters (`node-v1`, `python3-v1`), schema-8 enforced script policy (`script-worker-v1`), three minimal worked examples (`embedded_go`, `external_go_repo`, `script_skill`), and planned driver error handling (`commands.<name>.driver: must be 'go-v1' or 'go-repository-v1'`).
+- **README integration**: Updated `README.md` under the Skill packages bullet to link `docs/authoring-cli-commands.md`.
+- **Validation & evidence**: Verified all three worked examples with `go run ./cmd/curator skill check <dir>` (all exit code 0). Verified planned driver error handling with `go run ./cmd/curator skill check <dir>` (exit code 1, expected failure error `commands.mytool.driver: must be 'go-v1' or 'go-repository-v1'`). Ran Go tests in `internal/skillspec/` and `internal/skillcheck/` (exit code 0). Attached outcome evidence to the board as `TASK-260827-21xw9d_results.md`.
+
+## 2026-08-28 — Curator CLI reference and troubleshooting documentation refresh (TASK-260827-1nauj3)
+
+- **Documentation structure**: Added `docs/cli.md` (verbatim command reference for all Curator command and subcommand groups, verified against `./bin/curator` built via `make build`), `docs/troubleshooting.md` (symptom-cause-remedy entries for compiled-command status codes, toolchain preflight checks, and SSH/HTTPS credential errors), and updated `README.md` with a collapsible `## Commands` section.
+- **CLI Reference Rework (CR-TASK-260827-1nauj3-1 rev 1 & rev 2)**: Corrected command entries in `docs/cli.md` (`curator project add`, `global add`, `hybrid status`, `global install`, `global upgrade`, `skill check`, `list`, `ui`) to match `cmd/curator/main.go` verbatim for flag sets, value types, defaults, and positionals. Applied Rev 2 fixes (G1-G6): removed `--project` from `global add`, added `--project` to `curator add`, added `--all` to `install`, `upgrade`, `status`, updated `Shared flags` in `docs/cli.md`, and corrected `curator project add` summary in `README.md`.
+- **Troubleshooting Rework (CR-TASK-260827-1nauj3-1 rev 1 & rev 2)**: Replaced improper Git version probe mapping under Go toolchain with authentic Go toolchain preflight diagnostics (`untrusted_go_executable` at `internal/godriver/session.go:489` and `toolchain_executable_mismatch` at `internal/godriver/session.go:521` / `cmd/curator/toolchain_remedy_test.go:51`), gave Git admission failures (`trusted Git version probe failed` / `Git release family is not operator-pinned` at `internal/buildrepo/admission.go:203, 211`) a dedicated entry, noted `GOROOT/bin/%s` platform derivation, and updated SSH credential error cause prose.
+- **Test synchronization**: `cmd/curator/builds_test.go` enforces that `README.md` contains backtick references for all `currentnessCodes()` and `inputCauses()`. `README.md` retains those status codes and cause subcodes so `TestEveryCurrentnessCodeIsDocumented` and `TestInputCausesAreDistinctAndDocumented` pass without regression.
+
 ## 2026-08-27 — macOS adapter-delivery CI residuals (TASK-260827-18tswm)
 
 - The approved `aarch64-apple-darwin` Cargo descriptor and an installed pinned
@@ -4089,3 +4102,42 @@ identifier allowlist inside a reject-by-default grammar needs the question
   setting` subtests plus the module-import and operand-separation cases fail
   without it; all six source controls, the pruned case, and the benign positive
   pass either way — which is what they are for.
+
+## 2026-08-28 — TASK-260827-2232c0: readme-restructure (round 4 rework)
+
+- FINDINGS & DECISIONS:
+  Restructured `README.md` to tighten the core pitch and moved detailed reference dumps to standalone documents in `docs/`:
+  - `docs/compiled-commands.md`: holds the complete status codes, cause subcodes, logical cache key derivation, reconciliation, repair, global status, maintenance, and garbage collection grace period specifications. All 10 load-bearing facts (B1-B10) restored and verified.
+  - `docs/ci-gates.md`: holds the complete 17-row gate catalog (10 core gates + 6 language profile harnesses + 1 cross-adapter gate), protocol-suite pin verification specification, platform carve-out rules, relative repo links (`../.github/...`), exact gate callers (`suite-plan.sh`, `ledger-consistency.sh`), and suite consumption specifications.
+  - `docs/implementation-plan.md`: updated with the required two-line historical plan header (`Historical plan of record for Curator v0.1 against protocol 1.0.0-rc.8.
+The task board in .task-board/ is the live plan.`).
+  - `README.md`: condensed to 122 lines with collapsible `<details>` install blocks, accurate forwarding shim PATH claims matching `internal/globalbins`, explicit non-fallback verified execution assurance with fail-closed, no-provider, disjoint key, and receipt tracking guarantees, full adapter enumeration (including Rust), tightened protocol and development links, and no reference dumps or style guide violations.
+- VERIFICATION:
+  All commands and flags verified against `go run ./cmd/curator ... --help` and built binary `/tmp/curator-rev`.
+
+
+## 2026-08-28 — TASK-260827-xdbobc: style-sweep-and-delivery-prep
+
+- FINDINGS & DECISIONS:
+  - Swept `README.md` and all `docs/*.md` files against `docs/prose-style.md` and its blacklist.
+  - Resolved em-dash violations in `docs/authoring-language-adapters.md`, `docs/ci-gates.md`, and `docs/source-closure-adapter-conformance.md` by replacing em-dashes with parentheses, colons, or commas.
+  - Fixed antithesis constructions in `docs/build-ssh.md` ("not just a key" -> "both a scope and a key") and `docs/build-https.md` ("not a terminal" -> "non-terminal pipe or file").
+  - Added required cross-links between `docs/build-ssh.md` and `docs/build-https.md`.
+  - Verified 100% resolution of all internal markdown relative links and section anchor fragments across all 12 shipped documentation files.
+  - Confirmed 0 blacklist hits across all shipped documentation files (excluding explicit negative examples in `docs/prose-style.md`).
+- VERIFICATION:
+  - Blacklist & link resolution validation python script: exit 0.
+  - Cross-link verification: exit 0.
+  - Build & package test execution (`make build` & `go test ./cmd/curator/... ./internal/skillspec/...`): exit 0.
+
+
+## 2026-08-28 — TASK-260827-xdbobc: style-sweep-and-delivery-prep (rework round 1)
+
+- REWORK FINDINGS & FIXES:
+  - F1 (unbalanced parenthesis): Fixed `docs/authoring-language-adapters.md:331` by closing the parenthesis after `internal/swiftpmsource` at line 333: `swiftpmsource_test.go`/`swift_integration_test.go` in `internal/swiftpmsource`).
+  - F2 (fail-closed predicate wording): Restored original sentence in `docs/build-https.md:93` verbatim (`When either standard input or standard error is not a terminal, it reads one line from standard input instead.`) and rewrapped to ~76-column convention.
+  - F3 (delivery file list reconciliation): Reverted `.gitignore` (uncommitted dogfooding artifact) and removed untracked dogfooding directories `.agents/`, `.claude/skills/.csk-managed.json`, `.codex/skills/.csk-managed.json`. Reconciled the delivery file list to match the exact working-tree delta including `LOGBOOK.md`.
+  - Nit: Updated link text in `docs/build-https.md:13` to match exact title of `build-ssh.md` ("Operator SSH credentials for external build repositories").
+- VERIFICATION:
+  - Custom Python validation script verifying zero blacklist hits, zero non-ASCII violations outside negative examples, complete parenthesis balance, zero broken local links/anchors, and bidirectional cross-links: exit 0.
+  - `go test ./cmd/curator/...`: exit 0.

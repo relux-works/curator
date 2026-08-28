@@ -291,8 +291,8 @@ declares an unsupported hook or native build. That precedence is implemented by
 `internal/artifactpolicy` and asserted by the adapter conformance suites.
 
 Do not copy or fork the matrix. Its graph, artifact, identity, execution, and
-output vectors—and the delegated `network-attempted`, `undeclared-write`, and
-`output-drift` ownership—are listed in
+output vectors (and the delegated `network-attempted`, `undeclared-write`, and
+`output-drift` ownership) are listed in
 [the conformance document's rejection matrix](source-closure-adapter-conformance.md#the-cross-adapter-conformance-suite)
 and defined once in `internal/crossconformance/suite.go`. If a new ecosystem
 cannot construct a delegated vector without forging sealed evidence, add its
@@ -327,10 +327,10 @@ and [**Explicit unsupported cases**](source-closure-adapter-conformance.md#expli
 
 Before proposing a path, provide all of the following evidence:
 
-1. A package-local normative suite alongside the existing per-adapter suites —
-   `conformance_test.go` in `internal/{npmsource,pnpmsource,yarnclassicsource,yarnmodernsource,swiftpminterop,swiftpmbuild}`,
+1. A package-local normative suite alongside the existing per-adapter suites
+   (`conformance_test.go` in `internal/{npmsource,pnpmsource,yarnclassicsource,yarnmodernsource,swiftpminterop,swiftpmbuild}`,
    `build_conformance_test.go` in `internal/rustsource`, and
-   `swiftpmsource_test.go`/`swift_integration_test.go` in `internal/swiftpmsource`.
+   `swiftpmsource_test.go`/`swift_integration_test.go` in `internal/swiftpmsource`).
    Drive the real capture, bind, plan, materialize/build, and publish
    entry points. Include positive fixtures and negative fixtures for lock,
    integrity, artifact, graph, target/toolchain, hook/generator, offline I/O,

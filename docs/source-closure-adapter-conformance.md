@@ -43,9 +43,9 @@ file suffix, or a successful unmanaged build never stands in for this proof.
 | Swift and the SwiftPM C family | `swiftpm-source-v1` | One executable product and one exact destination; source-only Swift targets plus separate Clang targets for C, C++, Objective-C, and Objective-C++ within the accepted toolchain/destination fixtures. | `internal/swiftpmsource`, `internal/swiftpminterop`, `internal/swiftpmbuild` |
 | Python | protocol compatibility only | Curator ships no Python adapter. It exports canonical records, diagnostics, and conformance goldens for an independent implementation to consume. | `internal/nodesource` goldens, `internal/crossconformance` export |
 
-All four Node package managers share one common Node contract — capture graph,
+All four Node package managers share one common Node contract (capture graph,
 lifecycle suppression, runtime/manager binding, declared TypeScript and
-generator lineage — and keep four separate lock parsers and materializers,
+generator lineage) and keep four separate lock parsers and materializers,
 because their lock and installation semantics are not interchangeable.
 
 ## Explicit unsupported cases
@@ -210,9 +210,9 @@ constant keeps the delegation honest:
 | `output-drift` | `internal/artifactpolicy`, `internal/swiftpmbuild`, `internal/nodesource` |
 
 **4. A protocol export for independent implementations.** The suite emits the
-whole contract — the accepted corpus with independently derived identities, the
+whole contract (the accepted corpus with independently derived identities, the
 counters this package derived from it, the obligation set, the delivered paths,
-and the rejection matrix — as exact CCJ-1 at
+and the rejection matrix) as exact CCJ-1 at
 [`internal/crossconformance/testdata/cross-adapter-protocol-export.json`](../internal/crossconformance/testdata/cross-adapter-protocol-export.json).
 The file is committed, so a change to the corpus, the obligations, or the
 matrix is a reviewable diff rather than a silent protocol change. No Python
@@ -224,7 +224,7 @@ The suite is portable except for the Rust path, which drives the real
 `rust-source-v1` manager so that the cross-adapter proof consumes the same C0
 Cargo registration, pinned vendor transform, and metadata receipts the accepted
 Rust suite does. `rust-source-v1` admits exactly one approved Cargo descriptor
-per native target, so the Rust cases need that toolchain present — the same
+per native target, so the Rust cases need that toolchain present, following the same
 requirement `internal/rustsource` already carries. Nothing else in the suite
 needs Node, npm, pnpm, Yarn, or Swift installed.
 
