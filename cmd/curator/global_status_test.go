@@ -2,12 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/relux-works/curator/internal/buildmeta"
@@ -16,7 +16,6 @@ import (
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
-	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // globalPayload is the machine-readable document the machine-wide scope
@@ -52,14 +51,11 @@ func globalScopeDeclaring(t *testing.T, declarations string) string {
 	if err := os.MkdirAll(userHome, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CURATOR_CONFIG", configPath)
-	t.Setenv("HOME", userHome)
-	t.Setenv("USERPROFILE", userHome)
 
 	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
 		t.Fatal(err)
 	}
-	if code, stdout, stderr := capture(t, "global", "init"); code != exitOK {
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "init"); code != exitOK {
 		t.Fatalf("global init = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	writeFile(t, filepath.Join(install.GlobalRoot(home), manifest.Name),
@@ -71,7 +67,6 @@ func globalScopeDeclaring(t *testing.T, declarations string) string {
 // command, so the machine-wide scope activates a compiled command.
 func compiledGlobalScope(t *testing.T) string {
 	t.Helper()
-	testtoolchain.LockHostGOROOT(t)
 	home := globalScopeDeclaring(t, `{"name":"build-skill","tag":"v1"}`)
 	writeCompiledSkillRepo(t, filepath.Join(filepath.Dir(home), "skills", "build-skill"))
 	return home
@@ -91,60 +86,36 @@ func legacyGlobalScope(t *testing.T) string {
 	return home
 }
 
-// captureReport runs one internal reporting phase with both standard streams
-// redirected. It is the in-process counterpart of capture: capture proves the
-// whole command path, this proves the same phase a command path reaches, driven
-// from a plan the test already acquired.
-func captureReport(t *testing.T, call func() int) (int, string, string) {
-	t.Helper()
-	outReader, outWriter, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	errReader, errWriter, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	realOut, realErr := os.Stdout, os.Stderr
-	os.Stdout, os.Stderr = outWriter, errWriter
-
-	var stdout, stderr []byte
-	var readers sync.WaitGroup
-	readers.Add(2)
-	go func() { defer readers.Done(); stdout, _ = io.ReadAll(outReader) }()
-	go func() { defer readers.Done(); stderr, _ = io.ReadAll(errReader) }()
-
-	code := call()
-
-	os.Stdout, os.Stderr = realOut, realErr
-	_ = outWriter.Close()
-	_ = errWriter.Close()
-	readers.Wait()
-	return code, string(stdout), string(stderr)
-}
-
 // globalPlan is one read-only machine-wide plan a test acquired for itself,
 // through the exact acquisition phase a command run uses.
 type globalPlan struct {
 	result     install.Result
 	unprovable bool
+	configPath string
+	userHome   string
 }
 
 // acquireGlobalPlan runs the read-only machine-wide plan once. Every plan is a
 // full fingerprint of the trusted toolchain, so a test acquires one and replays
 // every rendering of the same live state from it instead of deriving an
 // identical plan per assertion.
-func acquireGlobalPlan(t *testing.T) globalPlan {
+func acquireGlobalPlan(t *testing.T, home string) globalPlan {
 	t.Helper()
-	cfg, code := loadConfig()
+	configPath := filepath.Join(home, "config.json")
+	userHome := filepath.Join(filepath.Dir(home), "user")
+	command := cli{
+		config: fileConfigSource(configPath), stdout: io.Discard, stderr: io.Discard,
+		userHome: func() (string, error) { return userHome, nil },
+	}
+	cfg, code := command.loadConfig()
 	if code != exitOK {
 		t.Fatalf("loading the manager configuration = %d", code)
 	}
-	result, unprovable := globalStatusPlan(cfg)
+	result, unprovable := command.globalStatusPlan(cfg)
 	if len(result.Builds) == 0 {
 		t.Fatalf("the read-only global plan describes no compiled command: %+v", result)
 	}
-	return globalPlan{result: result, unprovable: unprovable}
+	return globalPlan{result: result, unprovable: unprovable, configPath: configPath, userHome: userHome}
 }
 
 // replay renders one report from this plan through the same production
@@ -152,15 +123,19 @@ func acquireGlobalPlan(t *testing.T) globalPlan {
 // runs, so every replayed assertion is an assertion about production behaviour.
 func (plan globalPlan) replay(t *testing.T, opts globalStatusOptions) (int, string, string) {
 	t.Helper()
-	cfg, code := loadConfig()
+	var stdout, stderr strings.Builder
+	command := cli{
+		config: fileConfigSource(plan.configPath), stdout: &stdout, stderr: &stderr,
+		userHome: func() (string, error) { return plan.userHome, nil },
+	}
+	cfg, code := command.loadConfig()
 	if code != exitOK {
 		t.Fatalf("loading the manager configuration = %d", code)
 	}
-	return captureReport(t, func() int {
-		return reportGlobalStatus(cfg, opts, func(*config.Config) (install.Result, bool) {
-			return plan.result, plan.unprovable
-		})
+	code = command.reportGlobalStatus(cfg, opts, func(*config.Config) (install.Result, bool) {
+		return plan.result, plan.unprovable
 	})
+	return code, stdout.String(), stderr.String()
 }
 
 // restoreMarkerAfter copies one install marker aside and puts the exact bytes
@@ -348,16 +323,17 @@ func assertGlobalDriftHuman(t *testing.T, want driftExpectation, code int, human
 // while that state is live, because a replayed one would describe cache
 // evidence that no longer exists.
 func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
+	t.Parallel()
 	requireNativeControlInventoryPlatform(t)
 	home := compiledGlobalScope(t)
-	if code, stdout, stderr := capture(t, "global", "install"); code != exitOK {
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "install"); code != exitOK {
 		t.Fatalf("global install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	installed := filepath.Join(install.GlobalRoot(home), "skills", "build-skill")
 
 	// `--json` and `--check` are combined so one invocation proves the published
 	// document and the exit code it produced are the same run's verdict.
-	code, stdout, stderr := capture(t, "global", "status", "--json", "--check")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
 	if code != exitOK {
 		t.Fatalf("clean compiled global status --json --check = %d\nstderr:\n%s", code, stderr)
 	}
@@ -396,7 +372,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 
 	// One plan of the unchanged installation, acquired once and reused by every
 	// case below that cannot change what a plan derives.
-	unchanged := acquireGlobalPlan(t)
+	unchanged := acquireGlobalPlan(t, home)
 
 	for _, testCase := range []struct {
 		name     string
@@ -446,7 +422,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 			if testCase.endToEnd {
 				// One case in this group also runs the whole command path, so the
 				// replayed classification is pinned to what the CLI publishes.
-				code, stdout, _ = capture(t, "global", "status", "--json", "--check")
+				code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
 				assertGlobalDriftDocument(t, testCase.want, code, stdout)
 			}
 
@@ -483,7 +459,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 
 			// Protected cache evidence is read by planning itself, so this state is
 			// classified from a plan acquired while it is live.
-			drifted := acquireGlobalPlan(t)
+			drifted := acquireGlobalPlan(t, home)
 			code, stdout, _ := drifted.replay(t, globalStatusOptions{jsonOut: true, check: true})
 			assertGlobalDriftDocument(t, testCase.want, code, stdout)
 
@@ -509,7 +485,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 		// command path is run once here to pin that to what the CLI publishes.
 		code, stdout, _ := unchanged.replay(t, globalStatusOptions{jsonOut: true, check: true})
 		assertGlobalDriftDocument(t, want, code, stdout)
-		code, stdout, _ = capture(t, "global", "status", "--json", "--check")
+		code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
 		assertGlobalDriftDocument(t, want, code, stdout)
 
 		code, human, _ := unchanged.replay(t, globalStatusOptions{})
@@ -521,9 +497,11 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 	// identical one. The plan cannot be replayed here: refusing the toolchain is
 	// exactly what the acquisition phase has to report.
 	t.Run("trusted go toolchain cannot be resolved", func(t *testing.T) {
-		t.Setenv(godriver.SelectionCuratorGo, filepath.Join(t.TempDir(), "nowhere", "bin", "go"))
+		selected := map[string]string{
+			godriver.SelectionCuratorGo: filepath.Join(t.TempDir(), "nowhere", "bin", "go"),
+		}
 
-		code, stdout, stderr := capture(t, "global", "status", "--json", "--check")
+		code, stdout, stderr := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "global", "status", "--json", "--check")
 		if code != exitFail {
 			t.Fatalf("global status --json --check with an unusable toolchain = %d, want %d\n%s",
 				code, exitFail, stderr)
@@ -557,7 +535,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 		if refused.Skills["build-skill"] != buildUnusableToolchain {
 			t.Fatalf("skills = %v", refused.Skills)
 		}
-		if code, human, _ := capture(t, "global", "status"); code != exitOK ||
+		if code, human, _ := captureWithEnv(t, filepath.Join(home, "config.json"), selected, "global", "status"); code != exitOK ||
 			!strings.Contains(human, "state="+buildUnusableToolchain) {
 			t.Fatalf("plain global status over an unusable toolchain = %d\n%s", code, human)
 		}
@@ -571,6 +549,7 @@ func TestGlobalStatusReportsCompiledCurrentnessAndFailsCheck(t *testing.T) {
 // through a dependency must still be found, classified, and able to fail
 // `--check` on its own.
 func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
+	t.Parallel()
 	requireNativeControlInventoryPlatform(t)
 	home := globalScopeDeclaring(t, `{"name":"consumer","tag":"v1"}`)
 	skillsRoot := filepath.Join(filepath.Dir(home), "skills")
@@ -596,11 +575,11 @@ func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 	runGit(t, consumer, "commit", "-qm", "initial consumer")
 	runGit(t, consumer, "tag", "v1")
 
-	if code, stdout, stderr := capture(t, "global", "install"); code != exitOK {
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "install"); code != exitOK {
 		t.Fatalf("global install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 
-	code, stdout, stderr := capture(t, "global", "status", "--json", "--check")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
 	if code != exitOK {
 		t.Fatalf("clean transitive compiled global status --json --check = %d\nstderr:\n%s", code, stderr)
 	}
@@ -620,7 +599,7 @@ func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	code, stdout, _ = capture(t, "global", "status", "--json", "--check")
+	code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status", "--json", "--check")
 	if code != exitFail {
 		t.Fatalf("transitive compiled drift passed global status --check: %d\n%s", code, stdout)
 	}
@@ -635,12 +614,13 @@ func TestGlobalStatusReportsATransitivelyResolvedCompiledCommand(t *testing.T) {
 // command prints exactly the lines it printed before this surface existed, adds
 // no `builds` key to the machine-readable document, and still exits zero.
 func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *testing.T) {
+	t.Parallel()
 	home := legacyGlobalScope(t)
-	if code, stdout, stderr := capture(t, "global", "install"); code != exitOK {
+	if code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "install"); code != exitOK {
 		t.Fatalf("global install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 
-	code, stdout, stderr := capture(t, "global", "status")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "status")
 	if code != exitOK {
 		t.Fatalf("global status = %d\nstderr:\n%s", code, stderr)
 	}
@@ -650,11 +630,11 @@ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *test
 	if stderr != "" {
 		t.Fatalf("a clean global status wrote to standard error:\n%s", stderr)
 	}
-	if code, _, _ := capture(t, "global", "status", "--check"); code != exitOK {
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "--check"); code != exitOK {
 		t.Fatalf("clean global status --check = %d, want %d", code, exitOK)
 	}
 
-	code, stdout, _ = capture(t, "global", "status", "--json")
+	code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status", "--json")
 	if code != exitOK {
 		t.Fatalf("global status --json = %d", code)
 	}
@@ -673,11 +653,11 @@ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *test
 	// fails the new fail-closed verdict.
 	installed := filepath.Join(install.GlobalRoot(home), "skills", "skill-a")
 	writeFile(t, filepath.Join(installed, "SKILL.md"), "tampered\n")
-	code, stdout, _ = capture(t, "global", "status")
+	code, stdout, _ = capture(t, filepath.Join(home, "config.json"), "global", "status")
 	if code != exitOK || stdout != "global: skill-a "+stateContentDrift+"\n" {
 		t.Fatalf("global status over tampered content = %d\n%s", code, stdout)
 	}
-	if code, _, _ := capture(t, "global", "status", "--check"); code != exitFail {
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "--check"); code != exitFail {
 		t.Fatalf("global status --check over tampered content = %d, want %d", code, exitFail)
 	}
 }
@@ -686,15 +666,13 @@ func TestGlobalStatusKeepsTheDeclaredSkillSurfaceWithoutCompiledCommands(t *test
 // declares nothing keeps its historical behaviour: no output, exit zero, and
 // nothing for the fail-closed verdict to refuse.
 func TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	userHome := filepath.Join(root, "user")
 	if err := os.MkdirAll(userHome, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	configPath := filepath.Join(root, "home", "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
-	t.Setenv("HOME", userHome)
-	t.Setenv("USERPROFILE", userHome)
 	if err := config.Bootstrap(configPath, filepath.Join(root, "skills"), "", []string{"codex_cli"}, false); err != nil {
 		t.Fatal(err)
 	}
@@ -703,7 +681,7 @@ func TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent(t *testing.T) {
 		{"global", "status"},
 		{"global", "status", "--check"},
 	} {
-		code, stdout, stderr := capture(t, args...)
+		code, stdout, stderr := capture(t, configPath, args...)
 		if code != exitOK {
 			t.Fatalf("%v = %d, want %d\nstderr:\n%s", args, code, exitOK, stderr)
 		}
@@ -719,18 +697,14 @@ func TestGlobalStatusWithoutASkillfileStaysSilentAndCurrent(t *testing.T) {
 // Plain reporting keeps the historical zero exit; the fail-closed verdict does
 // not.
 func TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	configPath := filepath.Join(root, "home", "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
-	t.Setenv("HOME", "")
-	t.Setenv("USERPROFILE", "")
-	t.Setenv("HOMEDRIVE", "")
-	t.Setenv("HOMEPATH", "")
 	if err := config.Bootstrap(configPath, filepath.Join(root, "skills"), "", []string{"codex_cli"}, false); err != nil {
 		t.Fatal(err)
 	}
 
-	code, stdout, stderr := capture(t, "global", "status")
+	code, stdout, stderr := captureWithUserHome(t, configPath, func() (string, error) { return "", errors.New("test user home unavailable") }, "global", "status")
 	if code != exitOK {
 		t.Fatalf("global status without a resolvable user home = %d, want %d", code, exitOK)
 	}
@@ -741,7 +715,7 @@ func TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved(t *testing.T) {
 		!strings.Contains(stderr, "could not resolve the user home") {
 		t.Fatalf("global status did not explain the unprovable scope:\n%s", stderr)
 	}
-	if code, _, _ := capture(t, "global", "status", "--check"); code != exitFail {
+	if code, _, _ := captureWithUserHome(t, configPath, func() (string, error) { return "", errors.New("test user home unavailable") }, "global", "status", "--check"); code != exitFail {
 		t.Fatalf("global status --check without a resolvable user home = %d, want %d", code, exitFail)
 	}
 }
@@ -751,8 +725,9 @@ func TestGlobalStatusFailsCheckWhenTheUserHomeCannotBeResolved(t *testing.T) {
 // state still publishes the declared-skill report and still exits zero, but
 // `--check` refuses to call an unprovable scope current.
 func TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven(t *testing.T) {
+	t.Parallel()
 	home := legacyGlobalScope(t)
-	if code, _, stderr := capture(t, "global", "install"); code != exitOK {
+	if code, _, stderr := capture(t, filepath.Join(home, "config.json"), "global", "install"); code != exitOK {
 		t.Fatalf("global install = %d\n%s", code, stderr)
 	}
 	// A declaration that cannot be resolved fails the read-only plan long before
@@ -761,7 +736,7 @@ func TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven(t *testing.T) {
 	writeFile(t, filepath.Join(install.GlobalRoot(home), manifest.Name),
 		`{"schema_version":1,"agents":["codex_cli"],"skills":[{"name":"skill-a","tag":"v9"}]}`)
 
-	code, stdout, stderr := capture(t, "global", "status")
+	code, stdout, stderr := capture(t, filepath.Join(home, "config.json"), "global", "status")
 	if code != exitOK {
 		t.Fatalf("global status over an unresolvable declaration = %d, want %d", code, exitOK)
 	}
@@ -771,7 +746,7 @@ func TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven(t *testing.T) {
 	if !strings.Contains(stderr, "warning:") {
 		t.Fatalf("global status did not report the refusal as a warning:\n%s", stderr)
 	}
-	if code, _, _ := capture(t, "global", "status", "--check"); code != exitFail {
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "--check"); code != exitFail {
 		t.Fatalf("global status --check over an unprovable closure = %d, want %d", code, exitFail)
 	}
 }
@@ -780,8 +755,9 @@ func TestGlobalStatusFailsCheckWhenTheClosureCannotBeProven(t *testing.T) {
 // takes no target: it is one scope, and a stray path must not be silently
 // ignored.
 func TestGlobalStatusRejectsPositionalArguments(t *testing.T) {
-	legacyGlobalScope(t)
-	if code, _, _ := capture(t, "global", "status", "somewhere"); code != exitUsage {
+	t.Parallel()
+	home := legacyGlobalScope(t)
+	if code, _, _ := capture(t, filepath.Join(home, "config.json"), "global", "status", "somewhere"); code != exitUsage {
 		t.Fatalf("global status with a positional argument = %d, want %d", code, exitUsage)
 	}
 }

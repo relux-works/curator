@@ -691,9 +691,9 @@ func markerMoved(before, after map[string]string, installedDir string) bool {
 // candidate bytes by changing permissions or rewriting a marker. These notices
 // state which of the two happened, so an operator can see that a failed run
 // left the previous installation in place.
-func printRepairNotices(result install.Result) {
+func (c cli) printRepairNotices(result install.Result) {
 	for _, notice := range repairNotices(result.Alias, factsList(result.Builds), result.Status, result.BuildCacheRetained) {
-		fmt.Println(notice)
+		_, _ = fmt.Fprintln(c.stdout, notice)
 	}
 }
 

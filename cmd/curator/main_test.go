@@ -28,8 +28,47 @@ import (
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/rustsource"
-	"github.com/relux-works/curator/internal/testtoolchain"
+	"github.com/relux-works/curator/internal/version"
 )
+
+type stubConfigSource struct {
+	path string
+	cfg  *config.Config
+	err  error
+}
+
+func (source stubConfigSource) Path() string { return source.path }
+
+func (source stubConfigSource) Load(func(string)) (*config.Config, error) {
+	return source.cfg, source.err
+}
+
+func TestRunUsesInjectedConfigSourceAndWriters(t *testing.T) {
+	t.Parallel()
+	for _, alias := range []string{"alpha", "beta"} {
+		alias := alias
+		t.Run(alias, func(t *testing.T) {
+			t.Parallel()
+			project := t.TempDir()
+			source := stubConfigSource{
+				path: filepath.Join(t.TempDir(), alias+".json"),
+				cfg: &config.Config{Projects: map[string]config.Project{
+					alias: {Path: project},
+				}},
+			}
+			var stdout, stderr strings.Builder
+			if code := run([]string{"list"}, source, &stdout, &stderr); code != exitOK {
+				t.Fatalf("list with injected config = %d\nstderr:\n%s", code, stderr.String())
+			}
+			if got, want := stdout.String(), alias+"\t"+project+"\n"; got != want {
+				t.Fatalf("stdout = %q, want %q", got, want)
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("list wrote stderr: %q", stderr.String())
+			}
+		})
+	}
+}
 
 func writeAssuranceCLIConfig(t *testing.T, mode string) string {
 	t.Helper()
@@ -201,20 +240,21 @@ func cliVerifiedToolchainIdentity() buildmeta.Toolchain {
 func TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt(t *testing.T) {
 	requireNativeControlInventoryPlatform(t)
 	_, home := compiledProject(t)
-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+	configPath := filepath.Join(home, "config.json")
+	if code, stdout, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 		t.Fatalf("portable seed install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	portableEntries := publishedCacheEntries(t, home)
 	if len(portableEntries) != 1 {
 		t.Fatalf("portable seed published %d entries", len(portableEntries))
 	}
-	configureVerifiedCLI(t)
+	configureVerifiedCLI(t, configPath)
 	provider := newCLIVerifiedProvider()
 	prior := resolveCLIProvider
 	resolveCLIProvider = func(config.Execution) install.VerifiedBuildSessionProvider { return provider }
 	t.Cleanup(func() { resolveCLIProvider = prior })
 
-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+	if code, stdout, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 		t.Fatalf("verified install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	if provider.dispatches != 1 {
@@ -249,14 +289,15 @@ func TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt(t *testing.T) 
 func TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache(t *testing.T) {
 	requireNativeControlInventoryPlatform(t)
 	_, home := compiledProject(t)
-	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+	configPath := filepath.Join(home, "config.json")
+	if code, stdout, stderr := capture(t, configPath, "install", "app"); code != exitOK {
 		t.Fatalf("portable seed install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	before := publishedCacheEntries(t, home)
 	if len(before) != 1 {
 		t.Fatalf("portable seed published %d entries", len(before))
 	}
-	configureVerifiedCLI(t)
+	configureVerifiedCLI(t, configPath)
 	provider := newCLIVerifiedProvider()
 	provider.mutateCapabilities = func(receipt *closureexec.ProviderCapabilityReceipt) {
 		receipt.Capabilities[0].Status = "advisory"
@@ -265,7 +306,7 @@ func TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache(t *testing.T) {
 	resolveCLIProvider = func(config.Execution) install.VerifiedBuildSessionProvider { return provider }
 	t.Cleanup(func() { resolveCLIProvider = prior })
 
-	if code, _, stderr := capture(t, "install", "app"); code != exitFail || !strings.Contains(stderr, "verified_capabilities_unsatisfied") {
+	if code, _, stderr := capture(t, configPath, "install", "app"); code != exitFail || !strings.Contains(stderr, "verified_capabilities_unsatisfied") {
 		t.Fatalf("capability drift = code %d stderr %q", code, stderr)
 	}
 	if provider.dispatches != 0 {
@@ -276,9 +317,8 @@ func TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache(t *testing.T) {
 	}
 }
 
-func configureVerifiedCLI(t *testing.T) {
+func configureVerifiedCLI(t *testing.T, configPath string) {
 	t.Helper()
-	configPath := os.Getenv("CURATOR_CONFIG")
 	payload, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatal(err)
@@ -299,20 +339,23 @@ func configureVerifiedCLI(t *testing.T) {
 
 func TestCLIExecutionAssuranceSelectionIsPortableDefaultAndVerifiedFailClosed(t *testing.T) {
 	t.Run("portable", func(t *testing.T) {
-		t.Setenv("CURATOR_CONFIG", writeAssuranceCLIConfig(t, ""))
-		if code := run([]string{"install", "app", "--dry-run"}); code != exitOK {
+		t.Parallel()
+		configPath := writeAssuranceCLIConfig(t, "")
+		if code := runCode(t, configPath, []string{"install", "app", "--dry-run"}); code != exitOK {
 			t.Fatalf("portable install dry-run exit=%d", code)
 		}
 	})
 	t.Run("verified missing provider", func(t *testing.T) {
-		t.Setenv("CURATOR_CONFIG", writeAssuranceCLIConfig(t, "verified"))
-		if code := run([]string{"install", "app", "--dry-run"}); code != exitFail {
+		t.Parallel()
+		configPath := writeAssuranceCLIConfig(t, "verified")
+		if code := runCode(t, configPath, []string{"install", "app", "--dry-run"}); code != exitFail {
 			t.Fatalf("verified install dry-run exit=%d", code)
 		}
 	})
 	t.Run("unknown mode", func(t *testing.T) {
-		t.Setenv("CURATOR_CONFIG", writeAssuranceCLIConfig(t, "unknown"))
-		if code := run([]string{"install", "app", "--dry-run"}); code != exitFail {
+		t.Parallel()
+		configPath := writeAssuranceCLIConfig(t, "unknown")
+		if code := runCode(t, configPath, []string{"install", "app", "--dry-run"}); code != exitFail {
 			t.Fatalf("unknown-mode install dry-run exit=%d", code)
 		}
 	})
@@ -372,48 +415,51 @@ func TestUsageEnumeratesDocumentedCommands(t *testing.T) {
 
 func TestRunVersionExitsZero(t *testing.T) {
 	t.Parallel()
-	if code := run([]string{"--version"}); code != 0 {
+	code, stdout, stderr := capture(t, filepath.Join(t.TempDir(), "config.json"), "--version")
+	if code != 0 || stdout != "curator "+version.String()+"\n" || stderr != "" {
 		t.Fatalf("run(--version) = %d, want 0", code)
 	}
 }
 
 func TestRunNoArgsPrintsUsage(t *testing.T) {
 	t.Parallel()
-	if code := run(nil); code != 2 {
+	code, stdout, stderr := capture(t, filepath.Join(t.TempDir(), "config.json"))
+	if code != 2 || stdout != "" || stderr != usage {
 		t.Fatalf("run() = %d, want 2", code)
 	}
 }
 
 func TestRunUnknownCommand(t *testing.T) {
 	t.Parallel()
-	if code := run([]string{"frobnicate"}); code != 2 {
+	code, _, stderr := capture(t, filepath.Join(t.TempDir(), "config.json"), "frobnicate")
+	if code != 2 || !strings.Contains(stderr, `curator: unknown command "frobnicate"`) {
 		t.Fatalf("run(frobnicate) = %d, want 2", code)
 	}
 }
 
 func TestShellInitPrintsHooks(t *testing.T) {
 	t.Parallel()
+	configPath := filepath.Join(t.TempDir(), "config.json")
 	for _, shellName := range []string{"auto", "zsh", "bash", "powershell"} {
-		if code := run([]string{"shell-init", shellName}); code != 0 {
+		if code, _, _ := capture(t, configPath, "shell-init", shellName); code != 0 {
 			t.Fatalf("shell-init %s = %d", shellName, code)
 		}
 	}
-	if code := run([]string{"shell-init"}); code != 0 {
+	if code, _, _ := capture(t, configPath, "shell-init"); code != 0 {
 		t.Fatalf("auto shell-init = %d", code)
 	}
-	if code := run([]string{"shell-init", "fish"}); code != 2 {
+	if code, _, _ := capture(t, configPath, "shell-init", "fish"); code != 2 {
 		t.Fatalf("unsupported shell must be usage error")
 	}
-	if code := run([]string{"shell-init", "fish", "--install"}); code != 2 {
+	if code, _, _ := capture(t, configPath, "shell-init", "fish", "--install"); code != 2 {
 		t.Fatalf("unsupported installed shell must be usage error")
 	}
 }
 
 func TestShellInitInstallCachesHookWithoutConfig(t *testing.T) {
+	t.Parallel()
 	configPath := filepath.Join(t.TempDir(), "manager home", "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
-	t.Setenv("SHELL", "/bin/bash")
-	if code := run([]string{"shell-init", "--install", "--no-global"}); code != exitOK {
+	if code, _, _ := capture(t, configPath, "shell-init", "bash", "--install", "--no-global"); code != exitOK {
 		t.Fatalf("shell-init --install = %d", code)
 	}
 	hookPath := filepath.Join(filepath.Dir(configPath), "hooks", "curator.bash")
@@ -430,17 +476,18 @@ func TestSkillCheckOnTempDir(t *testing.T) {
 	t.Parallel()
 	// an empty directory fails validation (missing SKILL.md)
 	dir := t.TempDir()
-	if code := run([]string{"skill", "check", dir}); code != 1 {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	if code, _, _ := capture(t, configPath, "skill", "check", dir); code != 1 {
 		t.Fatalf("skill check on empty dir = %d, want 1", code)
 	}
-	if code := run([]string{"skill", "check", dir, "--json"}); code != 1 {
+	if code, _, _ := capture(t, configPath, "skill", "check", dir, "--json"); code != 1 {
 		t.Fatalf("skill check with trailing --json = %d, want 1", code)
 	}
 }
 
 func TestInstallFlagsAcceptTrailingOptions(t *testing.T) {
 	t.Parallel()
-	opts, positional, all, auditMode, err := installFlags([]string{"project-a", "--dry-run", "--strict-tags", "--audit", "strict"})
+	opts, positional, all, auditMode, err := testInstallFlags([]string{"project-a", "--dry-run", "--strict-tags", "--audit", "strict"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,11 +501,11 @@ func TestInstallFlagsAcceptTrailingOptions(t *testing.T) {
 
 func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
 	t.Parallel()
-	_, positional, _, auditMode, err := installFlags([]string{"--audit", "project-a"})
+	_, positional, _, auditMode, err := testInstallFlags([]string{"--audit", "project-a"})
 	if err != nil || auditMode != "advisory" || len(positional) != 1 || positional[0] != "project-a" {
 		t.Fatalf("bare --audit: positional=%v mode=%q err=%v", positional, auditMode, err)
 	}
-	_, positional, _, auditMode, err = installFlags([]string{"project-a", "--audit", "strict"})
+	_, positional, _, auditMode, err = testInstallFlags([]string{"project-a", "--audit", "strict"})
 	if err != nil || auditMode != "strict" || len(positional) != 1 || positional[0] != "project-a" {
 		t.Fatalf("strict --audit: positional=%v mode=%q err=%v", positional, auditMode, err)
 	}
@@ -467,7 +514,8 @@ func TestInstallAuditFlagAcceptsOptionalMode(t *testing.T) {
 // The run-wide SSH selection reaches an install from the command line, and the
 // environment fills only what the command line left unsaid.
 func TestInstallFlagsCarryTheRunWideBuildSSHSelection(t *testing.T) {
-	opts, positional, _, _, err := installFlags([]string{
+	t.Parallel()
+	opts, positional, _, _, err := testInstallFlags([]string{
 		"project-a", "--build-ssh-agent", "auto", "--build-ssh-identity", "/operator/id.pub",
 		"--build-ssh-known-hosts", "/operator/known_hosts",
 	})
@@ -553,20 +601,20 @@ func TestStatusDriftDetectsContentTampering(t *testing.T) {
 }
 
 func TestBootstrapAndProjectCommands(t *testing.T) {
+	t.Parallel()
 	configPath := filepath.Join(t.TempDir(), "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
 	skillsRoot := t.TempDir()
-	if code := run([]string{"bootstrap", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
+	if code := runCode(t, configPath, []string{"bootstrap", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
 		t.Fatalf("bootstrap = %d", code)
 	}
 	project := t.TempDir()
-	if code := run([]string{"project", "add", "app", project, "--agents", "codex_cli"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"project", "add", "app", project, "--agents", "codex_cli"}); code != exitOK {
 		t.Fatalf("project add = %d", code)
 	}
 	if _, err := os.Stat(filepath.Join(project, manifest.Name)); err != nil {
 		t.Fatalf("project manifest missing: %v", err)
 	}
-	if code := run([]string{"project", "resolve", "app"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"project", "resolve", "app"}); code != exitOK {
 		t.Fatalf("project resolve = %d", code)
 	}
 	cfg, err := config.Load(configPath, nil)
@@ -576,14 +624,14 @@ func TestBootstrapAndProjectCommands(t *testing.T) {
 }
 
 func TestBootstrapIfMissingKeepsExistingConfigWithoutParsing(t *testing.T) {
+	t.Parallel()
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	original := []byte("this is intentionally not valid JSON\n")
 	if err := os.WriteFile(configPath, original, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CURATOR_CONFIG", configPath)
 
-	if code := run([]string{"bootstrap", "--if-missing", "--non-interactive"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"bootstrap", "--if-missing", "--non-interactive"}); code != exitOK {
 		t.Fatalf("bootstrap --if-missing = %d", code)
 	}
 	payload, err := os.ReadFile(configPath)
@@ -596,11 +644,11 @@ func TestBootstrapIfMissingKeepsExistingConfigWithoutParsing(t *testing.T) {
 }
 
 func TestBootstrapIfMissingCreatesAbsentConfig(t *testing.T) {
+	t.Parallel()
 	configPath := filepath.Join(t.TempDir(), "home", "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
 	skillsRoot := filepath.Join(t.TempDir(), "skills")
 
-	if code := run([]string{"bootstrap", "--if-missing", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
+	if code := runCode(t, configPath, []string{"bootstrap", "--if-missing", "--non-interactive", "--skills-root", skillsRoot}); code != exitOK {
 		t.Fatalf("bootstrap --if-missing = %d", code)
 	}
 	loaded, err := config.Load(configPath, nil)
@@ -613,13 +661,15 @@ func TestBootstrapIfMissingCreatesAbsentConfig(t *testing.T) {
 }
 
 func TestBootstrapIfMissingRejectsForce(t *testing.T) {
-	t.Setenv("CURATOR_CONFIG", filepath.Join(t.TempDir(), "config.json"))
-	if code := run([]string{"bootstrap", "--if-missing", "--force"}); code != exitUsage {
+	t.Parallel()
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	if code := runCode(t, configPath, []string{"bootstrap", "--if-missing", "--force"}); code != exitUsage {
 		t.Fatalf("bootstrap --if-missing --force = %d, want %d", code, exitUsage)
 	}
 }
 
 func TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	configPath := filepath.Join(root, "home", "config.json")
 	skillsRoot := filepath.Join(root, "missing-skills")
@@ -639,9 +689,8 @@ func TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot(t *testing.T) {
 	if err := config.AddProject(configPath, "app", project, []string{"codex_cli"}); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CURATOR_CONFIG", configPath)
 
-	if code := run([]string{"upgrade", "app", "--dry-run"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"upgrade", "app", "--dry-run"}); code != exitOK {
 		t.Fatalf("upgrade --dry-run = %d", code)
 	}
 	if _, err := os.Stat(skillsRoot); !os.IsNotExist(err) {
@@ -650,17 +699,17 @@ func TestUpgradeDryRunDoesNotCreateOrFetchSkillsRoot(t *testing.T) {
 }
 
 func TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	configPath := filepath.Join(root, "home", "config.json")
 	skillsRoot := filepath.Join(root, "missing-skills")
 	if err := config.Bootstrap(configPath, skillsRoot, "", []string{"codex_cli"}, false); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CURATOR_CONFIG", configPath)
-	if code := run([]string{"global", "init"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"global", "init"}); code != exitOK {
 		t.Fatalf("global init = %d", code)
 	}
-	if code := run([]string{"global", "upgrade", "--dry-run"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"global", "upgrade", "--dry-run"}); code != exitOK {
 		t.Fatalf("global upgrade --dry-run = %d", code)
 	}
 	if _, err := os.Stat(skillsRoot); !os.IsNotExist(err) {
@@ -669,9 +718,9 @@ func TestGlobalUpgradeDryRunDoesNotCreateSkillsRoot(t *testing.T) {
 }
 
 func TestCLIEndToEndInstallStatusAndTamperCheck(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	configPath := filepath.Join(root, "home", "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
 	skillsRoot := filepath.Join(root, "skills")
 	project := filepath.Join(root, "project")
 	if err := os.MkdirAll(filepath.Join(skillsRoot, "skill-a"), 0o755); err != nil {
@@ -705,20 +754,20 @@ func TestCLIEndToEndInstallStatusAndTamperCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if code := run([]string{"install", "app"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"install", "app"}); code != exitOK {
 		t.Fatalf("install = %d", code)
 	}
 	installedSkill := filepath.Join(project, ".agents", "skills", "skill-a", "SKILL.md")
 	if _, err := os.Stat(installedSkill); err != nil {
 		t.Fatalf("installed skill missing: %v", err)
 	}
-	if code := run([]string{"status", "app", "--check"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"status", "app", "--check"}); code != exitOK {
 		t.Fatalf("clean status = %d", code)
 	}
 	if err := os.WriteFile(installedSkill, []byte("tampered\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code := run([]string{"status", "app", "--check"}); code != exitFail {
+	if code := runCode(t, configPath, []string{"status", "app", "--check"}); code != exitFail {
 		t.Fatalf("tampered status = %d, want %d", code, exitFail)
 	}
 }
@@ -740,19 +789,30 @@ func runGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
+func runCode(t *testing.T, configPath string, args []string) int {
+	t.Helper()
+	code, _, _ := capture(t, configPath, args...)
+	return code
+}
+
+func testInstallFlags(args []string) (install.Options, []string, bool, string, error) {
+	return (cli{stderr: io.Discard}).installFlags(args)
+}
+
 // TestHiddenWorkerModeIsNotAUserVisibleCommand proves the fixed go-v1 worker
 // mode is dispatched before command parsing and never appears in the CLI
 // surface, so no package, manifest, or user option can reach it by name.
 func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
 	t.Parallel()
+	configPath := filepath.Join(t.TempDir(), "config.json")
 	for _, mode := range []string{godriver.WorkerMode, "__curator_rust_git_oracle_v1"} {
 		if strings.Contains(usage, mode) {
 			t.Fatalf("hidden worker mode %q appears in the user-visible command surface", mode)
 		}
-		if code := run([]string{mode}); code != exitUsage {
+		if code := runCode(t, configPath, []string{mode}); code != exitUsage {
 			t.Fatalf("run(%q) = %d, want the unknown-command usage exit", mode, code)
 		}
-		if code := run([]string{mode, "extra"}); code != exitUsage {
+		if code := runCode(t, configPath, []string{mode, "extra"}); code != exitUsage {
 			t.Fatalf("run with %q and an extra argument = %d, want the unknown-command usage exit", mode, code)
 		}
 	}
@@ -769,7 +829,6 @@ func productionBinarySuffix() string {
 
 func TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery(t *testing.T) {
 	t.Parallel()
-	testtoolchain.LockHostGOROOT(t)
 	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
 	build := exec.Command("go", "build", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
@@ -849,33 +908,20 @@ func TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery(t *test
 func bootstrapConfig(t *testing.T) string {
 	t.Helper()
 	configPath := filepath.Join(t.TempDir(), "config.json")
-	t.Setenv("CURATOR_CONFIG", configPath)
-	if code := run([]string{"bootstrap", "--non-interactive", "--skills-root", t.TempDir()}); code != exitOK {
+	if code := runCode(t, configPath, []string{"bootstrap", "--non-interactive", "--skills-root", t.TempDir()}); code != exitOK {
 		t.Fatalf("bootstrap = %d", code)
 	}
 	return configPath
 }
 
-// captureStdout collects what a command prints, so a test can assert on the
-// listing itself rather than only on its exit code.
-func captureStdout(t *testing.T, body func()) string {
+// captureStdout collects one invocation's private stdout.
+func captureStdout(t *testing.T, configPath string, args ...string) string {
 	t.Helper()
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
+	code, stdout, stderr := capture(t, configPath, args...)
+	if code != exitOK {
+		t.Fatalf("%v = %d\nstderr:\n%s", args, code, stderr)
 	}
-	saved := os.Stdout
-	os.Stdout = writer
-	defer func() { os.Stdout = saved }()
-	body()
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	output, err := io.ReadAll(reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(output)
+	return stdout
 }
 
 // withStdin feeds content to a command reading from os.Stdin, standing in for
@@ -900,6 +946,16 @@ func withStdin(t *testing.T, content string, body func()) {
 	body()
 }
 
+func captureWithStdin(t *testing.T, configPath, content string, args ...string) (int, string, string) {
+	t.Helper()
+	var code int
+	var stdout, stderr string
+	withStdin(t, content, func() {
+		code, stdout, stderr = capture(t, configPath, args...)
+	})
+	return code, stdout, stderr
+}
+
 // buildHTTPSGitHome isolates a Git credential store under an operator home
 // this process's HOME/USERPROFILE resolve to, so a build-https login test
 // exercises the same gitcred.Access{} zero value the command itself uses,
@@ -920,6 +976,7 @@ func buildHTTPSGitHome(t *testing.T) string {
 }
 
 func TestConfigBuildSSHAddListRemove(t *testing.T) {
+	t.Parallel()
 	configPath := bootstrapConfig(t)
 
 	for _, args := range [][]string{
@@ -928,7 +985,7 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
 			"--identity", "~/.ssh/portals", "--known-hosts", "/etc/ssh/known_hosts_portals"},
 		{"config", "build-ssh", "add", "git.example.com", "--identity", "/keys/org"},
 	} {
-		if code := run(args); code != exitOK {
+		if code := runCode(t, configPath, args); code != exitOK {
 			t.Fatalf("%v = %d, want %d", args, code, exitOK)
 		}
 	}
@@ -947,11 +1004,7 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
 
 	// A second add under the same scope replaces the entry rather than
 	// merging with it: the leftover agent selection would still authenticate.
-	replaceOutput := captureStdout(t, func() {
-		if code := run([]string{"config", "build-ssh", "add", "zeta.example.com", "--identity", "/keys/zeta"}); code != exitOK {
-			t.Fatalf("replace add = %d", code)
-		}
-	})
+	replaceOutput := captureStdout(t, configPath, "config", "build-ssh", "add", "zeta.example.com", "--identity", "/keys/zeta")
 	if !strings.HasPrefix(replaceOutput, "replaced build_ssh scope zeta.example.com: identity=/keys/zeta") {
 		t.Fatalf("replace output = %q", replaceOutput)
 	}
@@ -963,11 +1016,7 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
 		t.Fatalf("replaced credential = %+v", replaced)
 	}
 
-	listing := captureStdout(t, func() {
-		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
-			t.Fatalf("list = %d", code)
-		}
-	})
+	listing := captureStdout(t, configPath, "config", "build-ssh", "list")
 	wantListing := "git.example.com\tidentity=/keys/org\n" +
 		"git.example.com/portals\tagent=/run/portals.sock identity=~/.ssh/portals known_hosts=/etc/ssh/known_hosts_portals\n" +
 		"zeta.example.com\tidentity=/keys/zeta\n"
@@ -975,7 +1024,7 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
 		t.Fatalf("listing =\n%q\nwant\n%q", listing, wantListing)
 	}
 
-	if code := run([]string{"config", "build-ssh", "remove", "git.example.com/portals"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"config", "build-ssh", "remove", "git.example.com/portals"}); code != exitOK {
 		t.Fatalf("remove = %d", code)
 	}
 	cfg, err = config.Load(configPath, nil)
@@ -991,18 +1040,16 @@ func TestConfigBuildSSHAddListRemove(t *testing.T) {
 }
 
 func TestConfigBuildSSHListWithoutScopesPrintsNothing(t *testing.T) {
-	bootstrapConfig(t)
-	listing := captureStdout(t, func() {
-		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
-			t.Fatalf("empty list = %d", code)
-		}
-	})
+	t.Parallel()
+	configPath := bootstrapConfig(t)
+	listing := captureStdout(t, configPath, "config", "build-ssh", "list")
 	if listing != "" {
 		t.Fatalf("empty listing = %q, want no stdout", listing)
 	}
 }
 
 func TestConfigBuildSSHAddRejectsInvalidInvocations(t *testing.T) {
+	t.Parallel()
 	configPath := bootstrapConfig(t)
 	before, err := os.ReadFile(configPath)
 	if err != nil {
@@ -1023,7 +1070,7 @@ func TestConfigBuildSSHAddRejectsInvalidInvocations(t *testing.T) {
 		"negated agent":       {"config", "build-ssh", "add", "git.example.com", "--agent=false"},
 		"unknown flag":        {"config", "build-ssh", "add", "git.example.com", "--agent", "--pin", "x"},
 	} {
-		if code := run(args); code != exitUsage {
+		if code := runCode(t, configPath, args); code != exitUsage {
 			t.Fatalf("%s: %v = %d, want %d", name, args, code, exitUsage)
 		}
 	}
@@ -1037,11 +1084,12 @@ func TestConfigBuildSSHAddRejectsInvalidInvocations(t *testing.T) {
 }
 
 func TestConfigBuildSSHAgentFlagKeepsScopePositional(t *testing.T) {
+	t.Parallel()
 	configPath := bootstrapConfig(t)
-	if code := run([]string{"config", "build-ssh", "add", "--agent", "alpha.example.com"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"config", "build-ssh", "add", "--agent", "alpha.example.com"}); code != exitOK {
 		t.Fatalf("bare --agent before the scope = %d", code)
 	}
-	if code := run([]string{"config", "build-ssh", "add", "beta.example.com", "--agent", "/run/beta.sock"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"config", "build-ssh", "add", "beta.example.com", "--agent", "/run/beta.sock"}); code != exitOK {
 		t.Fatalf("--agent with a socket = %d", code)
 	}
 	cfg, err := config.Load(configPath, nil)
@@ -1059,11 +1107,12 @@ func TestConfigBuildSSHAgentFlagKeepsScopePositional(t *testing.T) {
 }
 
 func TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets(t *testing.T) {
-	bootstrapConfig(t)
-	if code := run([]string{"config", "build-ssh", "add", "git.example.com", "--agent"}); code != exitOK {
+	t.Parallel()
+	configPath := bootstrapConfig(t)
+	if code := runCode(t, configPath, []string{"config", "build-ssh", "add", "git.example.com", "--agent"}); code != exitOK {
 		t.Fatalf("add = %d", code)
 	}
-	if code := run([]string{"config", "build-ssh", "remove", "other.example.com"}); code != exitFail {
+	if code := runCode(t, configPath, []string{"config", "build-ssh", "remove", "other.example.com"}); code != exitFail {
 		t.Fatalf("remove of an unconfigured scope = %d, want %d", code, exitFail)
 	}
 	for _, args := range [][]string{
@@ -1071,13 +1120,14 @@ func TestConfigBuildSSHRemoveRejectsMissingAndMalformedTargets(t *testing.T) {
 		{"config", "build-ssh", "remove", "a.example.com", "b.example.com"},
 		{"config", "build-ssh", "remove", "--agent"},
 	} {
-		if code := run(args); code != exitUsage {
+		if code := runCode(t, configPath, args); code != exitUsage {
 			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
 		}
 	}
 }
 
 func TestConfigBuildHTTPSAddListRemove(t *testing.T) {
+	t.Parallel()
 	configPath := bootstrapConfig(t)
 
 	for _, args := range [][]string{
@@ -1085,7 +1135,7 @@ func TestConfigBuildHTTPSAddListRemove(t *testing.T) {
 		{"config", "build-https", "add", "git.example.com/portals", "--token-env", "PORTALS_TOKEN", "--username", "oauth2"},
 		{"config", "build-https", "add", "git.example.com", "--keyring"},
 	} {
-		if code := run(args); code != exitOK {
+		if code := runCode(t, configPath, args); code != exitOK {
 			t.Fatalf("%v = %d, want %d", args, code, exitOK)
 		}
 	}
@@ -1104,11 +1154,8 @@ func TestConfigBuildHTTPSAddListRemove(t *testing.T) {
 	// A second add under the same scope replaces the entry rather than
 	// merging with it: a leftover username from the previous spelling would
 	// still be sent alongside the new token.
-	replaceOutput := captureStdout(t, func() {
-		if code := run([]string{"config", "build-https", "add", "zeta.example.com", "--token-env", "ZETA_TOKEN"}); code != exitOK {
-			t.Fatalf("replace add = %d", code)
-		}
-	})
+	replaceOutput := captureStdout(t, configPath,
+		"config", "build-https", "add", "zeta.example.com", "--token-env", "ZETA_TOKEN")
 	if !strings.HasPrefix(replaceOutput, "replaced build_https scope zeta.example.com: token_env=ZETA_TOKEN") {
 		t.Fatalf("replace output = %q", replaceOutput)
 	}
@@ -1120,11 +1167,7 @@ func TestConfigBuildHTTPSAddListRemove(t *testing.T) {
 		t.Fatalf("replaced credential = %+v", replaced)
 	}
 
-	listing := captureStdout(t, func() {
-		if code := run([]string{"config", "build-https", "list"}); code != exitOK {
-			t.Fatalf("list = %d", code)
-		}
-	})
+	listing := captureStdout(t, configPath, "config", "build-https", "list")
 	wantListing := "git.example.com\tsource=keyring present=false\n" +
 		"git.example.com/portals\ttoken_env=PORTALS_TOKEN username=oauth2 present=false\n" +
 		"zeta.example.com\ttoken_env=ZETA_TOKEN present=false\n"
@@ -1132,7 +1175,7 @@ func TestConfigBuildHTTPSAddListRemove(t *testing.T) {
 		t.Fatalf("listing =\n%q\nwant\n%q", listing, wantListing)
 	}
 
-	if code := run([]string{"config", "build-https", "remove", "git.example.com/portals"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"config", "build-https", "remove", "git.example.com/portals"}); code != exitOK {
 		t.Fatalf("remove = %d", code)
 	}
 	cfg, err = config.Load(configPath, nil)
@@ -1148,18 +1191,16 @@ func TestConfigBuildHTTPSAddListRemove(t *testing.T) {
 }
 
 func TestConfigBuildHTTPSListWithoutScopesPrintsNothing(t *testing.T) {
-	bootstrapConfig(t)
-	listing := captureStdout(t, func() {
-		if code := run([]string{"config", "build-https", "list"}); code != exitOK {
-			t.Fatalf("empty list = %d", code)
-		}
-	})
+	t.Parallel()
+	configPath := bootstrapConfig(t)
+	listing := captureStdout(t, configPath, "config", "build-https", "list")
 	if listing != "" {
 		t.Fatalf("empty listing = %q, want no stdout", listing)
 	}
 }
 
 func TestConfigBuildHTTPSAddRejectsInvalidInvocations(t *testing.T) {
+	t.Parallel()
 	configPath := bootstrapConfig(t)
 	before, err := os.ReadFile(configPath)
 	if err != nil {
@@ -1175,7 +1216,7 @@ func TestConfigBuildHTTPSAddRejectsInvalidInvocations(t *testing.T) {
 		"invalid token_env": {"config", "build-https", "add", "git.example.com", "--token-env", "1_TOKEN"},
 		"unknown flag":      {"config", "build-https", "add", "git.example.com", "--git-credentials", "--pin", "x"},
 	} {
-		if code := run(args); code != exitUsage {
+		if code := runCode(t, configPath, args); code != exitUsage {
 			t.Fatalf("%s: %v = %d, want %d", name, args, code, exitUsage)
 		}
 	}
@@ -1189,11 +1230,12 @@ func TestConfigBuildHTTPSAddRejectsInvalidInvocations(t *testing.T) {
 }
 
 func TestConfigBuildHTTPSRemoveRejectsMissingAndMalformedTargets(t *testing.T) {
-	bootstrapConfig(t)
-	if code := run([]string{"config", "build-https", "add", "git.example.com", "--git-credentials"}); code != exitOK {
+	t.Parallel()
+	configPath := bootstrapConfig(t)
+	if code := runCode(t, configPath, []string{"config", "build-https", "add", "git.example.com", "--git-credentials"}); code != exitOK {
 		t.Fatalf("add = %d", code)
 	}
-	if code := run([]string{"config", "build-https", "remove", "other.example.com"}); code != exitFail {
+	if code := runCode(t, configPath, []string{"config", "build-https", "remove", "other.example.com"}); code != exitFail {
 		t.Fatalf("remove of an unconfigured scope = %d, want %d", code, exitFail)
 	}
 	for _, args := range [][]string{
@@ -1201,20 +1243,21 @@ func TestConfigBuildHTTPSRemoveRejectsMissingAndMalformedTargets(t *testing.T) {
 		{"config", "build-https", "remove", "a.example.com", "b.example.com"},
 		{"config", "build-https", "remove", "--git-credentials"},
 	} {
-		if code := run(args); code != exitUsage {
+		if code := runCode(t, configPath, args); code != exitUsage {
 			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
 		}
 	}
 }
 
 func TestConfigBuildHTTPSLoginRejectsInvalidInvocations(t *testing.T) {
-	bootstrapConfig(t)
+	t.Parallel()
+	configPath := bootstrapConfig(t)
 	for name, args := range map[string][]string{
 		"no scope":       {"config", "build-https", "login"},
 		"two scopes":     {"config", "build-https", "login", "a.example.com", "b.example.com"},
 		"uppercase host": {"config", "build-https", "login", "Git.Example.com"},
 	} {
-		if code := run(args); code != exitUsage {
+		if code := runCode(t, configPath, args); code != exitUsage {
 			t.Fatalf("%s: %v = %d, want %d", name, args, code, exitUsage)
 		}
 	}
@@ -1229,15 +1272,11 @@ func TestConfigBuildHTTPSLoginStoresThroughTheOperatorHelperAndSelectsIt(t *test
 	buildHTTPSGitHome(t)
 	configPath := bootstrapConfig(t)
 
-	loginOutput := captureStdout(t, func() {
-		withStdin(t, "s3cr3t-token\n", func() {
-			if code := run([]string{
-				"config", "build-https", "login", "git.example.com/portals", "--username", "oauth2",
-			}); code != exitOK {
-				t.Fatalf("login = %d", code)
-			}
-		})
-	})
+	code, loginOutput, loginStderr := captureWithStdin(t, configPath, "s3cr3t-token\n",
+		"config", "build-https", "login", "git.example.com/portals", "--username", "oauth2")
+	if code != exitOK {
+		t.Fatalf("login = %d\nstderr:\n%s", code, loginStderr)
+	}
 	if !strings.Contains(loginOutput, "build_https scope git.example.com/portals") {
 		t.Fatalf("login output = %q", loginOutput)
 	}
@@ -1256,24 +1295,18 @@ func TestConfigBuildHTTPSLoginStoresThroughTheOperatorHelperAndSelectsIt(t *test
 		t.Fatalf("credential = %+v, want %+v", got, want)
 	}
 
-	listing := captureStdout(t, func() {
-		if code := run([]string{"config", "build-https", "list"}); code != exitOK {
-			t.Fatalf("list = %d", code)
-		}
-	})
+	listing := captureStdout(t, configPath, "config", "build-https", "list")
 	if !strings.Contains(listing, "git.example.com/portals\tsource=keyring username=oauth2 present=true\n") {
 		t.Fatalf("listing = %q, want the stored token reported present", listing)
 	}
 
 	// A second login for the same scope replaces the stored token rather than
 	// leaving the old one behind under it.
-	replaceOutput := captureStdout(t, func() {
-		withStdin(t, "second-token\n", func() {
-			if code := run([]string{"config", "build-https", "login", "git.example.com/portals"}); code != exitOK {
-				t.Fatalf("second login = %d", code)
-			}
-		})
-	})
+	code, replaceOutput, replaceStderr := captureWithStdin(t, configPath, "second-token\n",
+		"config", "build-https", "login", "git.example.com/portals")
+	if code != exitOK {
+		t.Fatalf("second login = %d\nstderr:\n%s", code, replaceStderr)
+	}
 	if !strings.HasPrefix(replaceOutput, "replaced the login for build_https scope git.example.com/portals") {
 		t.Fatalf("replace login output = %q", replaceOutput)
 	}
@@ -1282,7 +1315,7 @@ func TestConfigBuildHTTPSLoginStoresThroughTheOperatorHelperAndSelectsIt(t *test
 		t.Fatalf("stored secret = %q, %v; want the replacement token", secret, ok)
 	}
 
-	if code := run([]string{"config", "build-https", "remove", "git.example.com/portals"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"config", "build-https", "remove", "git.example.com/portals"}); code != exitOK {
 		t.Fatalf("remove = %d", code)
 	}
 	cfg, err = config.Load(configPath, nil)
@@ -1303,7 +1336,7 @@ func TestConfigBuildHTTPSLoginStoresThroughTheOperatorHelperAndSelectsIt(t *test
 // delete.
 func TestConfigBuildHTTPSRemoveNeverTouchesTheOperatorsOwnGitCredential(t *testing.T) {
 	home := buildHTTPSGitHome(t)
-	bootstrapConfig(t)
+	configPath := bootstrapConfig(t)
 	// The operator's own credential, recorded exactly the way `git credential
 	// approve` (or an interactive Git login) would leave it, before the
 	// manager stores anything of its own.
@@ -1311,10 +1344,10 @@ func TestConfigBuildHTTPSRemoveNeverTouchesTheOperatorsOwnGitCredential(t *testi
 	if err := os.WriteFile(credentials, []byte("https://operator:operator-secret@git.example.com\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if code := run([]string{"config", "build-https", "add", "git.example.com", "--git-credentials"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"config", "build-https", "add", "git.example.com", "--git-credentials"}); code != exitOK {
 		t.Fatalf("add = %d", code)
 	}
-	if code := run([]string{"config", "build-https", "remove", "git.example.com"}); code != exitOK {
+	if code := runCode(t, configPath, []string{"config", "build-https", "remove", "git.example.com"}); code != exitOK {
 		t.Fatalf("remove = %d", code)
 	}
 	access := gitcred.Access{}
@@ -1325,6 +1358,7 @@ func TestConfigBuildHTTPSRemoveNeverTouchesTheOperatorsOwnGitCredential(t *testi
 }
 
 func TestConfigHelpDocumentsPrecedenceAndSubcommands(t *testing.T) {
+	t.Parallel()
 	for _, fragment := range []string{
 		"curator config build-ssh add <scope>",
 		"curator config build-ssh list",
@@ -1358,6 +1392,7 @@ func TestConfigHelpDocumentsPrecedenceAndSubcommands(t *testing.T) {
 // requires the identity-unbound run-wide override to come with an explicit
 // exposure warning.
 func TestConfigBuildHTTPSHelpDocumentsPrecedenceAndDisclosure(t *testing.T) {
+	t.Parallel()
 	for _, fragment := range []string{
 		"curator config build-https add <scope>",
 		"curator config build-https login <scope>",
@@ -1398,14 +1433,15 @@ func TestConfigBuildHTTPSHelpDocumentsPrecedenceAndDisclosure(t *testing.T) {
 }
 
 func TestConfigSubcommandDispatch(t *testing.T) {
-	bootstrapConfig(t)
+	t.Parallel()
+	configPath := bootstrapConfig(t)
 	for _, args := range [][]string{
 		{"config", "-h"},
 		{"config", "build-ssh", "-h"},
 		{"config", "build-https", "-h"},
 		{"config", "show"},
 	} {
-		if code := run(args); code != exitOK {
+		if code := runCode(t, configPath, args); code != exitOK {
 			t.Fatalf("%v = %d, want %d", args, code, exitOK)
 		}
 	}
@@ -1417,7 +1453,7 @@ func TestConfigSubcommandDispatch(t *testing.T) {
 		{"config", "build-https"},
 		{"config", "build-https", "frobnicate"},
 	} {
-		if code := run(args); code != exitUsage {
+		if code := runCode(t, configPath, args); code != exitUsage {
 			t.Fatalf("%v = %d, want %d", args, code, exitUsage)
 		}
 	}
@@ -1428,17 +1464,19 @@ func TestConfigSubcommandDispatch(t *testing.T) {
 // terminal, so both cases here are the fail-closed one; the dry-run case is
 // asserted separately because it must hold even in front of a real terminal.
 func TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt(t *testing.T) {
+	t.Parallel()
 	cfg := &config.Config{Path: filepath.Join(t.TempDir(), "config.json")}
-	if resolver := operatorBuildSSHResolver(cfg, true); resolver != nil {
+	command := cli{stderr: io.Discard}
+	if resolver := command.operatorBuildSSHResolver(cfg, true); resolver != nil {
 		t.Fatal("a dry run offered to persist a credential")
 	}
-	if resolver := operatorBuildHTTPSResolver(cfg, true); resolver != nil {
+	if resolver := command.operatorBuildHTTPSResolver(cfg, true); resolver != nil {
 		t.Fatal("a dry run offered the HTTPS credential prompt")
 	}
-	if resolver := operatorBuildSSHResolver(cfg, false); resolver != nil {
+	if resolver := command.operatorBuildSSHResolver(cfg, false); resolver != nil {
 		t.Fatal("a non-interactive process offered a prompt nobody can answer")
 	}
-	if resolver := operatorBuildHTTPSResolver(cfg, false); resolver != nil {
+	if resolver := command.operatorBuildHTTPSResolver(cfg, false); resolver != nil {
 		t.Fatal("a non-interactive process offered an HTTPS prompt instead of continuing anonymously")
 	}
 	// `< /dev/null` is a character device. Treating that as a terminal would
@@ -1465,6 +1503,7 @@ func TestTheCredentialPromptIsWiredOnlyWhereAnOperatorCanAnswerIt(t *testing.T) 
 // wiring records exactly what `curator config build-ssh add` would, so a
 // prompted answer and a typed command leave the same configuration behind.
 func TestThePromptPersistsThroughTheOrdinaryConfigWriter(t *testing.T) {
+	t.Parallel()
 	configPath := bootstrapConfig(t)
 	cfg, err := config.Load(configPath, nil)
 	if err != nil {
@@ -1501,17 +1540,14 @@ func TestThePromptPersistsThroughTheOrdinaryConfigWriter(t *testing.T) {
 		t.Fatalf("persisted credential = %+v, want %+v", got, want)
 	}
 	// The same entry the CLI would have written, byte for byte in the listing.
-	listing := captureStdout(t, func() {
-		if code := run([]string{"config", "build-ssh", "list"}); code != exitOK {
-			t.Fatalf("list = %d", code)
-		}
-	})
+	listing := captureStdout(t, configPath, "config", "build-ssh", "list")
 	if listing != "git.example.test/portals\tagent identity=~/.ssh/id_ed25519.pub\n" {
 		t.Fatalf("listing = %q", listing)
 	}
 }
 
 func TestSSHThisRunOnlyPromptNeverReachesTheSavedConfig(t *testing.T) {
+	t.Parallel()
 	configPath := bootstrapConfig(t)
 	before, err := os.ReadFile(configPath)
 	if err != nil {

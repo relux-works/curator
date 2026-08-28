@@ -1,0 +1,3689 @@
+diff --git a/.github/ci/skip-classes.tsv b/.github/ci/skip-classes.tsv
+index cd9f2f99..e3830ce1 100644
+--- a/.github/ci/skip-classes.tsv
++++ b/.github/ci/skip-classes.tsv
+@@ -59,6 +59,8 @@ platform-control	local TLS fixture relies on the platform Git shipped on Unix CI
+ platform-control	controlled launcher symlink is a Unix regression fixture	allow	the launcher symlink fixture is asserted on unix runners
+ platform-control	hard-link count is enforced by the native Windows protected-root backend	allow	the generic hard-link fixture is replaced by the native Windows backend case
+ platform-control	an operator agent socket is a unix-domain rendezvous point	allow	the SSH agent-socket fixture is a POSIX unix-domain socket; Windows reaches an agent over a named pipe, so the shape is asserted on the unix runners
++platform-control	Windows cannot create the invalid-name flood used to keep evidence bounded	allow	the walker-limit fixture floods a directory with colon-bearing names NTFS refuses to create; the entry-limit stop is asserted on the unix runners
++platform-control	Windows does not expose portable executable permission bits	allow	the fixture strips the execute bit to prove mode-mutation detection, and Windows synthesizes permission bits with no execute bit to strip; the detection is asserted on the unix runners
+ 
+ # --- host capability --------------------------------------------------------
+ host-capability	(symlink|symlinks|hard links|named pipes|symlink canonical-prefix test) unavailable	allow	the runner filesystem provides no such link
+@@ -83,9 +85,17 @@ host-capability	temporary directory uses case-sensitive Windows path semantics	a
+ host-capability	no trusted Go toolchain is resolvable here	allow	no trusted toolchain is resolvable on this runner
+ host-capability	(no GOROOT available|GOROOT .* unreadable)	allow	the host GOROOT is absent or unreadable
+ host-capability	no home directory	allow	the runner exposes no home directory to expand a `~/` credential path against
++host-capability	no operator-approved Cargo descriptor for native target 	allow	the closed Cargo registry has no approved descriptor for this native host target; no toolchain identity is inferred or invented
++host-capability	pinned Cargo toolchain root or executable unavailable for native target 	allow	the runner does not have the pinned Cargo toolchain root or executable; present but mismatched identities remain fatal
++host-capability	(pinned pnpm executable unavailable|pnpm .* is outside pinned profile .*)	allow	the runner does not expose the exact pnpm executable admitted by the integration profile
++host-capability	(Yarn Classic is not installed|exact Yarn .* is unavailable)	allow	the runner does not expose the exact Yarn Classic release admitted by the integration profile
++host-capability	exact Yarn .* is installed without a supported pinned tool root	allow	the exact Yarn release is present but its installation layout cannot be staged by the pinned integration harness
++host-capability	OS-level network-denial harness is unavailable	allow	the runner does not provide the sandbox control required by the real Yarn Classic zero-network vector
++host-capability	SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest	allow	the Swift executable is present but its manifest compiler cannot spawn the host linker
+ 
+ # --- opt-in probes ----------------------------------------------------------
+ opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment variable
++opt-in	set CURATOR_TEST_YARN_MODERN_JS to the @yarnpkg/cli-dist 4[.]9[.]2 bin/yarn[.]js integration tool	allow	enabled by an explicit path to the exact modern Yarn integration entry point
+ opt-in	cross-check env not set	allow	enabled by an explicit developer environment variable
+ opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
+ 
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index d6a3ce74..c2a84e15 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,8 +3,83 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-08-27 — macOS adapter-delivery CI residuals (TASK-260827-18tswm)
++
++- The approved `aarch64-apple-darwin` Cargo descriptor and an installed pinned
++  toolchain are separate facts. A hosted runner may satisfy the first and lack
++  the second. The Rust test boundary now classifies only an absent pinned root
++  or executable as `host-capability`; a present malformed root, unreadable
++  path, changed executable, descriptor mismatch, or byte mismatch still reaches
++  the closed C0 registry and remains fatal. No descriptor or digest was added.
++- Crossconformance consumes that same reason through its existing Rust-manager
++  unavailable path. Its exception remains the closed six manager-derived Rust
++  obligation gaps; `artifact.shared_admission/rust` continues to run, and an
++  extra future Rust gap still fails the completeness gate.
++- The rc.9 `compiled-cache-miss-is-read-only` failure was not classified. The
++  captured macOS stream separately shows the hosted GOROOT completing the real
++  fingerprint test, while the exact pinned rc.9 case passed four consecutive
++  arm64 runs locally. The delivery diff does not change the
++  `toolchain-unavailable` selection after a successful probe. Evidence therefore
++  supports a transient probe failure, not a persistent missing-toolchain host
++  capability or a contract change; a fresh remote matrix rerun remains the
++  landing Orchestrator's evidence boundary.
++
+ ## 2026-08-27
+ 
++### 0640 — A month of run evidence lived on one laptop; it is on the remote now, in a ref namespace nothing fetches by default
++
++- FINDING: `.temp/` held 15GB across 96 registered worktrees, and `LOGBOOK.md` on `origin/main` carried 16 entries against 344 locally. Neither the scratch evidence nor most of the institutional memory existed anywhere but one working copy. Entry [[0650]] had already recorded the logbook half and left it unresolved.
++- DECISION: preserve rather than delete. Every dirty worktree became a commit under `refs/archive/wt/<slug>`; the non-git evidence became one orphan commit at `refs/archive/temp/evidence-2026-08-27` — 38555 files of run transcripts, verdicts, briefs, patches and inventories. Both namespaces are pushed.
++- MEASUREMENT, WHY NOT LFS: 38555 files reduce to 13841 unique blobs — 64% are byte-identical duplicates — totalling 1.09GB raw. Packed, those same blobs occupy **165MB**. Git LFS stores each object whole and deltas nothing, so it would have cost 1.09GB against a 1GB included quota, needed a client, and thrown away the 7x compression that text logs are the ideal case for. LFS is for binaries that do not delta; this is the opposite.
++- WHY A CUSTOM NAMESPACE IS SAFE: the default fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so `refs/archive/*` is invisible to an ordinary clone, fetch, `git branch` and `git log`. It costs a normal user nothing and GitHub accepts the namespace on push — both verified.
++- RECOVERY, verified end-to-end against a fresh blobless clone of the remote:
++  ```
++  git fetch origin 'refs/archive/*:refs/archive/*'
++  git ls-tree -r --name-only refs/archive/temp/evidence-2026-08-27
++  git show refs/archive/temp/evidence-2026-08-27:.temp/spawn-runs/<RUN>/runner.log
++  ```
++  A spawn log round-tripped with an identical SHA-256 from the remote clone.
++- NOT ARCHIVED, deliberately: downloads rather than data — seven copies of `golangci-lint`, a Go toolchain tarball, an 88MB Alpine ISO, a disk image, five Python virtualenvs and their bytecode. Also files inside nested git repositories, which their own repositories still hold.
++- RESULT: `.temp` 15GB to 914MB, registered worktrees 96 to 3, `.git` 280MB to 271MB — smaller than before while holding all of it, because `gc` deltas near-identical runner logs against each other.
++
++### 0732 — CI portability requires classifying absent authority, not minting it (TASK-260827-18tswm)
++
++- RUST AUTHORITY BOUNDARY: the Cargo registry deliberately approves only
++  `aarch64-apple-darwin`. An x86_64 host therefore lacks authority to execute
++  the real-tool tests; it is not evidence that another Cargo binary is safe.
++  Tests now skip with the exact native target when the closed registry has no
++  descriptor, while a descriptor that exists but fails its byte digest remains
++  a fatal `rust_vendor_transform_unsupported` rejection. Cross-conformance
++  records that same unavailable path, runs every other adapter plus Rust's
++  shared artifact-admission proof, and accepts only the explicitly enumerated
++  Rust gaps for selection-neutral capture, capture stability, target authority,
++  target divergence, deterministic records, and causal evidence. Any other
++  Rust gap or any non-Rust gap still fails the completeness gate.
++- FIX, NOT A SKIP: the npm real-tool fixture claimed a Darwin/arm64 target even
++  on Linux. npm correctly installed a Linux-only optional package and the
++  closure validator correctly rejected it as outside that target's lock graph.
++  Only the two native real-tool cases now derive npm OS, CPU, and libc from the
++  host; parser and cross-target tests keep the frozen Darwin fixture. The pnpm
++  Linux failure was a test-runner defect: it attempted an empty symlink for an
++  intentionally omitted package before production validation could issue
++  `closure_graph_incomplete`.
++- HOST-LAYOUT HANDLING: Swift integration skips only the captured compound
++  failure (`Invalid manifest` plus clang's linker `posix_spawn` error), not a
++  merely installed Swift. Yarn Classic now recognizes both Homebrew `libexec`
++  and the global package-root `bin/yarn.js` layout; an exact Yarn in any other
++  layout gets a precise classified host-capability skip. Pinned pnpm absence
++  and the explicit Yarn Modern integration path are likewise classified from
++  their verbatim observed reasons.
++- EVIDENCE: all nine affected packages and the two targeted CLI cases pass
++  locally; `go build ./...`, `go vet ./...`, pinned `golangci-lint` 2.12.2,
++  gofmt, CI gate self-tests, ledger consistency, broad-suppression guard, and
++  `git diff --check` exit 0. Replaying the captured macOS platform evidence
++  exits 0. The captured Ubuntu Tier-2 classification exits 0 with zero
++  unclassified skips; its full historical replay still exits 1 only because
++  the current ledger requires a `godriver` case absent from that older run.
++  Remote matrix execution and its passing URL remain the landing
++  orchestrator's responsibility; neither is inferred from local evidence.
++
+ ### 0123 — `BUG-260823-1vx45a`: the helper protocol reported "someone holds this lock" whenever it meant "I ran out of time"
+ 
+ - ROOT CAUSE: `TestManagerLockHelper` gave one 200ms context to lock-state directory creation, lock-file opening, the 10ms retry loop of `acquireFileLock`, and — in build-key mode — two sequential acquisitions. `acquireFileLock` returns `ctx.Err()` for a deadline expiry no matter what caused it, and the helper serialized every expiry as `blocked`. An uncontended lock on a slow runner was therefore indistinguishable from a lock another process held.
+@@ -4014,3 +4089,20 @@ identifier allowlist inside a reject-by-default grammar needs the question
+   setting` subtests plus the module-import and operand-separation cases fail
+   without it; all six source controls, the pruned case, and the benign positive
+   pass either way — which is what they are for.
++
++## 2026-08-28 — Swift host-capability skip is one closed predicate (TASK-260827-18tswm rework)
++
++- The CI-green delivery paths were reconstructed from PR #47 head `c2215f9b`
++  instead of reusing stale Change Request revision 1. The reconstructed scope
++  includes the later host-GOROOT isolation and Windows portability corrections;
++  board files and the parallel-refactor task's independent delta remain outside
++  this task's candidate.
++- The Swift manifest linker skip had the right conjunction at both call sites
++  but no executable negative boundary. Both `swiftpmsource` and `swiftpmbuild`
++  now call `testtoolchain.SwiftManifestLinkerUnavailable`, so the decision has
++  one owner.
++- A table regression proves that only `Invalid manifest` plus the exact clang
++  `posix_spawn` diagnostic classifies as host-unavailable. Either token alone
++  and an adjacent Swift derivation-permit failure remain fatal. This narrows the
++  gate without weakening the integration assertions or inventing a toolchain
++  identity.
+diff --git a/cmd/curator/global_status_test.go b/cmd/curator/global_status_test.go
+index abbcf273..ef7a0bc0 100644
+--- a/cmd/curator/global_status_test.go
++++ b/cmd/curator/global_status_test.go
+@@ -16,6 +16,7 @@ import (
+ 	"github.com/relux-works/curator/internal/install"
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
++	"github.com/relux-works/curator/internal/testtoolchain"
+ )
+ 
+ // globalPayload is the machine-readable document the machine-wide scope
+@@ -70,6 +71,7 @@ func globalScopeDeclaring(t *testing.T, declarations string) string {
+ // command, so the machine-wide scope activates a compiled command.
+ func compiledGlobalScope(t *testing.T) string {
+ 	t.Helper()
++	testtoolchain.LockHostGOROOT(t)
+ 	home := globalScopeDeclaring(t, `{"name":"build-skill","tag":"v1"}`)
+ 	writeCompiledSkillRepo(t, filepath.Join(filepath.Dir(home), "skills", "build-skill"))
+ 	return home
+diff --git a/cmd/curator/lifecycle_conformance_test.go b/cmd/curator/lifecycle_conformance_test.go
+index e67e0a62..f615a354 100644
+--- a/cmd/curator/lifecycle_conformance_test.go
++++ b/cmd/curator/lifecycle_conformance_test.go
+@@ -10,6 +10,7 @@ import (
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/install"
+ 	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/testtoolchain"
+ )
+ 
+ // The published manager-lifecycle document is the only source of expected
+@@ -299,6 +300,7 @@ func (fixture upgradeFixture) declareGlobal(t *testing.T, names ...string) {
+ // the published exclusion was never reached, and — where the case requires it —
+ // a repository shared by two selected scopes is fetched exactly once.
+ func TestAuthoritativeUpgradeCasesAreExecutable(t *testing.T) {
++	testtoolchain.LockHostGOROOT(t)
+ 	document := authoritativeLifecycleDocument(t)
+ 	if len(document.UpgradeCases) == 0 {
+ 		t.Fatal("the authoritative suite publishes no upgrade case to bind")
+diff --git a/cmd/curator/main_test.go b/cmd/curator/main_test.go
+index 8eaa3c13..1484cf99 100644
+--- a/cmd/curator/main_test.go
++++ b/cmd/curator/main_test.go
+@@ -28,6 +28,7 @@ import (
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/rustsource"
++	"github.com/relux-works/curator/internal/testtoolchain"
+ )
+ 
+ func writeAssuranceCLIConfig(t *testing.T, mode string) string {
+@@ -198,6 +199,7 @@ func cliVerifiedToolchainIdentity() buildmeta.Toolchain {
+ }
+ 
+ func TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt(t *testing.T) {
++	requireNativeControlInventoryPlatform(t)
+ 	_, home := compiledProject(t)
+ 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+ 		t.Fatalf("portable seed install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+@@ -245,6 +247,7 @@ func TestCLICompatibleVerifiedProviderOwnsBuildDispatchAndReceipt(t *testing.T)
+ }
+ 
+ func TestCLIVerifiedCapabilityDriftStartsNothingAndAdoptsNoCache(t *testing.T) {
++	requireNativeControlInventoryPlatform(t)
+ 	_, home := compiledProject(t)
+ 	if code, stdout, stderr := capture(t, "install", "app"); code != exitOK {
+ 		t.Fatalf("portable seed install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+@@ -755,9 +758,19 @@ func TestHiddenWorkerModeIsNotAUserVisibleCommand(t *testing.T) {
+ 	}
+ }
+ 
++// productionBinarySuffix names the extension the platform requires before it
++// will exec a freshly built binary by absolute path.
++func productionBinarySuffix() string {
++	if runtime.GOOS == "windows" {
++		return ".exe"
++	}
++	return ""
++}
++
+ func TestProductionBinaryDispatchesRustOracleBeforeAmbientCargoDiscovery(t *testing.T) {
+ 	t.Parallel()
+-	binary := filepath.Join(t.TempDir(), "curator")
++	testtoolchain.LockHostGOROOT(t)
++	binary := filepath.Join(t.TempDir(), "curator"+productionBinarySuffix())
+ 	build := exec.Command("go", "build", "-o", binary, ".")
+ 	if output, err := build.CombinedOutput(); err != nil {
+ 		t.Fatalf("build production curator: %v\n%s", err, output)
+diff --git a/cmd/curator/status_test.go b/cmd/curator/status_test.go
+index 13d6e42a..f991971e 100644
+--- a/cmd/curator/status_test.go
++++ b/cmd/curator/status_test.go
+@@ -24,6 +24,7 @@ import (
+ 	"github.com/relux-works/curator/internal/manifest"
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/scopes"
++	"github.com/relux-works/curator/internal/testtoolchain"
+ )
+ 
+ // TestMain gives the test binary the same fixed hidden worker mode the
+@@ -97,6 +98,7 @@ func decodeStatus(t *testing.T, payload string) statusPayload {
+ // declares it. It returns the project root and the manager home.
+ func compiledProject(t *testing.T) (string, string) {
+ 	t.Helper()
++	testtoolchain.LockHostGOROOT(t)
+ 	return compiledProjectDeclaring(t, `{"name":"build-skill","tag":"v1"}`)
+ }
+ 
+diff --git a/internal/artifactpolicy/blob.go b/internal/artifactpolicy/blob.go
+index 8b2e4439..1689ed21 100644
+--- a/internal/artifactpolicy/blob.go
++++ b/internal/artifactpolicy/blob.go
+@@ -1,6 +1,8 @@
+ package artifactpolicy
+ 
+ import (
++	"github.com/relux-works/curator/internal/privatedir"
++
+ 	"context"
+ 	"crypto/sha256"
+ 	"encoding/hex"
+@@ -26,7 +28,7 @@ func newBlobStore() (*blobStore, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	if err := os.Chmod(directory, 0o700); err != nil { // #nosec G302 -- this is a private directory, not a regular file.
++	if err := privatedir.Protect(directory); err != nil {
+ 		_ = os.RemoveAll(directory)
+ 		return nil, err
+ 	}
+diff --git a/internal/artifactpolicy/conformance/corpus.go b/internal/artifactpolicy/conformance/corpus.go
+index eafe4ab2..fa416e43 100644
+--- a/internal/artifactpolicy/conformance/corpus.go
++++ b/internal/artifactpolicy/conformance/corpus.go
+@@ -15,6 +15,7 @@ import (
+ 	"fmt"
+ 	"hash/adler32"
+ 	"io/fs"
++	"runtime"
+ 	"sort"
+ 	"strings"
+ 	"time"
+@@ -578,10 +579,31 @@ func Cases() []Case {
+ 
+ 	for index := range cases {
+ 		cases[index].Expected.ManifestDigest = goldenDigests[cases[index].Key()]
++		if runtime.GOOS == "windows" {
++			if digest, ok := windowsGoldenDigests[cases[index].Key()]; ok {
++				cases[index].Expected.ManifestDigest = digest
++			}
++		}
+ 	}
+ 	return cases
+ }
+ 
++// windowsGoldenDigests pins the manifest identities whose role evidence
++// embeds the fixture toolchain root. That root is host evidence, not protocol
++// surface: the central-manager receipt records the physically resolved
++// toolchain paths, validateToolchainRecord requires them to be absolute on the
++// host, and an absolute Windows path necessarily spells a drive. The five
++// affected manifests therefore legitimately differ per platform, and both
++// spellings are pinned so drift is caught on each. Every other case's digest
++// is platform-neutral and stays in goldenDigests alone.
++var windowsGoldenDigests = map[string]string{
++	"A07":                         "sha256:c038435eb421c1376bd6145db965499f84b2802751db57fc0327ba417ea53945",
++	"A07/native-archive-metadata": "sha256:c60f47f4a3426d66278f965254e8a24c974c42e4edd0f26b2130a0e2a2937d89",
++	"T03":                         "sha256:796d496fd3d25a96f8509e537e3f1f0a06fb9495e3e92d5990b164bb750195c6",
++	"T03/link-escape":             "sha256:97ca81fd96bd8b0d309677492ddd129550d56702c0611c7e9425f16934c0e1ce",
++	"T03/special-node":            "sha256:de25b5a51788943306aefb613d9e3ac5a524a9e8929c3414d0f5a8ed56dfca76",
++}
++
+ func fixture(
+ 	id, variant string,
+ 	scenario Scenario,
+diff --git a/internal/buildcache/protection_windows.go b/internal/buildcache/protection_windows.go
+index 0df52c58..9fabac1b 100644
+--- a/internal/buildcache/protection_windows.go
++++ b/internal/buildcache/protection_windows.go
+@@ -9,6 +9,7 @@ import (
+ 	"os"
+ 	"path/filepath"
+ 	"strings"
++	"time"
+ 	"unsafe"
+ 
+ 	"golang.org/x/sys/windows"
+@@ -197,19 +198,37 @@ func openWindowsProtected(path string, directory, executable bool) (*os.File, er
+ 	if directory {
+ 		flags |= windows.FILE_FLAG_BACKUP_SEMANTICS
+ 	}
+-	handle, err := windows.CreateFile(
+-		path16,
+-		windows.GENERIC_READ|windows.READ_CONTROL,
+-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+-		nil,
+-		windows.OPEN_EXISTING,
+-		flags,
+-		0,
+-	)
+-	if err != nil {
++	var handle windows.Handle
++	for attempt := 0; ; attempt++ {
++		handle, err = windows.CreateFile(
++			path16,
++			windows.GENERIC_READ|windows.READ_CONTROL,
++			windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
++			nil,
++			windows.OPEN_EXISTING,
++			flags,
++			0,
++		)
++		if err == nil {
++			break
++		}
+ 		if errors.Is(err, windows.ERROR_FILE_NOT_FOUND) || errors.Is(err, windows.ERROR_PATH_NOT_FOUND) {
+ 			return nil, fmt.Errorf("cache entry is incomplete: %w", os.ErrNotExist)
+ 		}
++		// A sharing violation states that a concurrent handle exists — an
++		// antivirus sweep of freshly renamed state, or an in-flight rename —
++		// and says nothing about ownership or the DACL. Treating it as an
++		// untrusted-provenance verdict once made a racing publisher withdraw
++		// a valid live winner, so it is waited out briefly instead, and a
++		// persistent holder surfaces as a plain read failure, never as a
++		// provenance judgement.
++		if errors.Is(err, windows.ERROR_SHARING_VIOLATION) {
++			if attempt < 40 {
++				time.Sleep(50 * time.Millisecond)
++				continue
++			}
++			return nil, fmt.Errorf("open protected path: %w", err)
++		}
+ 		return nil, untrustedf("open protected path without following reparse points: %v", err)
+ 	}
+ 	if err := validateWindowsHandle(handle, path, directory, executable); err != nil {
+@@ -369,15 +388,24 @@ func ownerOnlyACL(container bool) (*windows.ACL, error) {
+ }
+ 
+ func protectWindowsPath(path string, container bool) error {
++	user, err := windows.GetCurrentProcessToken().GetTokenUser()
++	if err != nil {
++		return err
++	}
+ 	acl, err := ownerOnlyACL(container)
+ 	if err != nil {
+ 		return err
+ 	}
++	// The owner is written alongside the DACL. On an administrator token the
++	// default owner policy can assign new objects to the Administrators group
++	// instead of the personal SID, and validateWindowsOwner would then refuse
++	// an entry this manager had just created correctly. Assigning one's own
++	// SID needs no special privilege on an object the caller already controls.
+ 	return windows.SetNamedSecurityInfo(
+ 		path,
+ 		windows.SE_FILE_OBJECT,
+-		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
+-		nil,
++		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
++		user.User.Sid,
+ 		nil,
+ 		acl,
+ 		nil,
+@@ -396,6 +424,10 @@ func protectWindowsPath(path string, container bool) error {
+ // window because mkdir takes the mode at creation; this gives Windows the same
+ // property. It returns os.ErrExist for an existing name, like os.Mkdir.
+ func createProtectedDirectory(path string) error {
++	user, err := windows.GetCurrentProcessToken().GetTokenUser()
++	if err != nil {
++		return err
++	}
+ 	acl, err := ownerOnlyACL(true)
+ 	if err != nil {
+ 		return err
+@@ -407,6 +439,12 @@ func createProtectedDirectory(path string) error {
+ 	if err := descriptor.SetDACL(acl, true, false); err != nil {
+ 		return err
+ 	}
++	// The owner is stated explicitly for the same reason protectWindowsPath
++	// writes it: an administrator token's default owner policy may otherwise
++	// hand the new directory to the Administrators group and fail validation.
++	if err := descriptor.SetOwner(user.User.Sid, false); err != nil {
++		return err
++	}
+ 	// Without SE_DACL_PROTECTED the DACL supplied here is merged with the
+ 	// parent's inheritable entries, which is exactly the state being avoided.
+ 	if err := descriptor.SetControl(windows.SE_DACL_PROTECTED, windows.SE_DACL_PROTECTED); err != nil {
+@@ -507,12 +545,38 @@ func ownedInheritingDirectory(path string) bool {
+ 		return false
+ 	}
+ 	if validateWindowsOwner(owner, user.User.Sid, path) != nil {
+-		return false
++		// A directory made by this process through plain os calls is owned by
++		// the token's DEFAULT owner, which an administrator's owner policy may
++		// set to the Administrators group rather than the personal SID. That
++		// state is still "our own unprotected creation", so it is repairable;
++		// any other principal's directory remains refused, never seized.
++		defaultOwner, ownerErr := tokenDefaultOwner(windows.GetCurrentProcessToken())
++		if ownerErr != nil || defaultOwner == nil || !defaultOwner.IsValid() || owner == nil || !owner.Equals(defaultOwner) {
++			return false
++		}
+ 	}
+ 	control, _, err := descriptor.Control()
+ 	return err == nil && control&windows.SE_DACL_PROTECTED == 0
+ }
+ 
++// tokenDefaultOwner returns the SID the token assigns as the owner of new
++// objects created without an explicit descriptor.
++func tokenDefaultOwner(token windows.Token) (*windows.SID, error) {
++	size := uint32(64)
++	for {
++		buffer := make([]byte, size)
++		err := windows.GetTokenInformation(token, windows.TokenOwner, &buffer[0], size, &size)
++		if err == nil {
++			// TOKEN_OWNER is a single PSID; the cast reads the buffer the API
++			// itself sized and filled.
++			return (*struct{ Owner *windows.SID })(unsafe.Pointer(&buffer[0])).Owner, nil // #nosec G103 -- fixed TOKEN_OWNER layout from GetTokenInformation.
++		}
++		if err != windows.ERROR_INSUFFICIENT_BUFFER || int(size) <= len(buffer) {
++			return nil, err
++		}
++	}
++}
++
+ func ensureProtectedBase(home, base string) error {
+ 	root, err := prepareProtectedDirectory(home)
+ 	if err != nil {
+diff --git a/internal/closureexec/intake.go b/internal/closureexec/intake.go
+index 7cd87076..147af0b0 100644
+--- a/internal/closureexec/intake.go
++++ b/internal/closureexec/intake.go
+@@ -1,7 +1,6 @@
+ package closureexec
+ 
+ import (
+-	"errors"
+ 	"fmt"
+ 	"io"
+ 	"io/fs"
+@@ -259,7 +258,7 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
+ 			return walkErr
+ 		}
+ 		if entry.IsDir() {
+-			return os.Chmod(current, 0o500) // #nosec G302 -- immutable directories require owner execute permission for read-only traversal.
++			return markTreeDirImmutable(current)
+ 		}
+ 		return nil
+ 	}); err != nil {
+@@ -276,7 +275,11 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
+ 	}
+ 	target := filepath.Join(s.trees, strings.TrimPrefix(string(idValue), "sha256:"))
+ 	if err = os.Rename(tmp, target); err != nil {
+-		if !errors.Is(err, fs.ErrExist) {
++		// A digest-named tree that already exists is a reuse, and VerifyAtUse
++		// below re-proves its exact content either way. Windows reports the
++		// occupied target as access-denied rather than fs.ErrExist, so the
++		// reuse condition is read from the target itself, not the error kind.
++		if info, statErr := os.Lstat(target); statErr != nil || !info.IsDir() {
+ 			return nil, err
+ 		}
+ 	}
+@@ -322,7 +325,7 @@ func (h *SourceTreeHandle) VerifyAtUse() error {
+ 	if err != nil {
+ 		return err
+ 	}
+-	if !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 || rootInfo.Mode().Perm()&0o222 != 0 {
++	if !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 || !treeDirIsImmutable(rootInfo) {
+ 		return failure("closure_derivation_drift", "source tree root is mutable or linked")
+ 	}
+ 	files := []SnapshotFile{}
+@@ -349,12 +352,15 @@ func (h *SourceTreeHandle) VerifyAtUse() error {
+ 		if infoErr != nil {
+ 			return infoErr
+ 		}
+-		if info.Mode().Perm()&0o222 != 0 {
+-			return failure("closure_derivation_drift", "source tree member is writable")
+-		}
+ 		if entry.IsDir() {
++			if !treeDirIsImmutable(info) {
++				return failure("closure_derivation_drift", "source tree member is writable")
++			}
+ 			return nil
+ 		}
++		if info.Mode().Perm()&0o222 != 0 {
++			return failure("closure_derivation_drift", "source tree member is writable")
++		}
+ 		if !info.Mode().IsRegular() {
+ 			return failure("closure_derivation_drift", "source tree contains a special node")
+ 		}
+@@ -436,14 +442,9 @@ func (s *CaptureStore) Capture(origin string, size int64, reader io.Reader) (*Ca
+ 	digest := h.id()
+ 	id := captureID(origin, digest, size)
+ 	target := filepath.Join(s.root, strings.TrimPrefix(id, "sha256:"))
+-	if e = os.Chmod(tmpPath, 0o400); e != nil {
++	if e = publishByLink(tmpPath, target, 0o400); e != nil {
+ 		return nil, e
+ 	}
+-	if e = os.Link(tmpPath, target); e != nil {
+-		if !errors.Is(e, fs.ErrExist) {
+-			return nil, e
+-		}
+-	}
+ 	handle := &CaptureHandle{store: s, id: id, path: target, digest: digest, size: size}
+ 	if e = handle.Recheck(); e != nil {
+ 		return nil, e
+diff --git a/internal/closureexec/linkpublish_unix.go b/internal/closureexec/linkpublish_unix.go
+new file mode 100644
+index 00000000..a567734e
+--- /dev/null
++++ b/internal/closureexec/linkpublish_unix.go
+@@ -0,0 +1,23 @@
++//go:build unix
++
++package closureexec
++
++import (
++	"errors"
++	"io/fs"
++	"os"
++)
++
++// publishByLink makes the written temporary file immutable and then installs
++// it under target with a no-replace hard link. On Unix the mode travels with
++// the inode, so the member is never observable in a mutable state, and the
++// caller's later removal of the temporary name only drops a directory entry.
++func publishByLink(tmpName, target string, mode fs.FileMode) error {
++	if err := os.Chmod(tmpName, mode); err != nil {
++		return err
++	}
++	if err := os.Link(tmpName, target); err != nil && !errors.Is(err, fs.ErrExist) {
++		return err
++	}
++	return nil
++}
+diff --git a/internal/closureexec/linkpublish_windows.go b/internal/closureexec/linkpublish_windows.go
+new file mode 100644
+index 00000000..8e17969c
+--- /dev/null
++++ b/internal/closureexec/linkpublish_windows.go
+@@ -0,0 +1,34 @@
++//go:build windows
++
++package closureexec
++
++import (
++	"errors"
++	"io/fs"
++	"os"
++)
++
++// publishByLink installs the written temporary file under target with a
++// no-replace hard link and only then makes the member immutable.
++//
++// The order is deliberately different from Unix. Windows hard links share the
++// read-only attribute, and os.Remove retries an access-denied delete by
++// clearing that attribute first — so removing a temporary name whose inode was
++// already made read-only silently strips the protection from the published
++// member it still shares. Deferring the attribute until the temporary link is
++// the caller's only remaining concern makes its removal an ordinary delete,
++// and the member becomes immutable before publication is acknowledged. The
++// no-replace property is unaffected: an existing target still returns
++// fs.ErrExist untouched.
++func publishByLink(tmpName, target string, mode fs.FileMode) error {
++	if err := os.Link(tmpName, target); err != nil {
++		if errors.Is(err, fs.ErrExist) {
++			return nil
++		}
++		return err
++	}
++	if err := os.Remove(tmpName); err != nil {
++		return err
++	}
++	return os.Chmod(target, mode)
++}
+diff --git a/internal/closureexec/portable_runner.go b/internal/closureexec/portable_runner.go
+index d4085bb7..550b648e 100644
+--- a/internal/closureexec/portable_runner.go
++++ b/internal/closureexec/portable_runner.go
+@@ -15,6 +15,7 @@ import (
+ 	"time"
+ 
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // ManagerProcessRunner is the portable CLI process implementation. It reports
+@@ -128,7 +129,7 @@ func (runner *ManagerProcessRunner) Run(ctx context.Context, request ExecutionRe
+ 			_ = filepath.WalkDir(target, func(current string, entry fs.DirEntry, walkErr error) error {
+ 				if walkErr == nil {
+ 					if entry.IsDir() {
+-						_ = os.Chmod(current, 0o700) // #nosec G302 -- cleanup must restore owner traversal before removing private replay trees.
++						_ = restoreTreeDirMutable(current)
+ 					} else {
+ 						_ = os.Chmod(current, 0o600)
+ 					}
+@@ -343,7 +344,7 @@ func copyReplayTree(source, target string) error {
+ 			return walkErr
+ 		}
+ 		if entry.IsDir() {
+-			return os.Chmod(current, 0o500) // #nosec G302 -- immutable replay directories remain traversable.
++			return markTreeDirImmutable(current)
+ 		}
+ 		return nil
+ 	})
+@@ -401,7 +402,7 @@ func verifyReplayTree(root string, expected []SnapshotFile) error {
+ 		}
+ 		if entry.IsDir() {
+ 			info, infoErr := entry.Info()
+-			if infoErr != nil || info.Mode().Perm()&0o222 != 0 {
++			if infoErr != nil || !treeDirIsImmutable(info) {
+ 				return failure("closure_input_mutated", "portable replay directory became writable")
+ 			}
+ 			return nil
+@@ -479,14 +480,14 @@ func safeExecutionPath(root, logical string) (string, error) {
+ }
+ 
+ func ensureEmptyDirectory(root string) error {
+-	info, err := os.Lstat(root)
++	_, err := os.Lstat(root)
+ 	if err != nil {
+ 		if os.IsNotExist(err) {
+-			return os.MkdirAll(root, 0o700)
++			return privatedir.MakeAll(root)
+ 		}
+ 		return err
+ 	}
+-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0o700 {
++	if privatedir.Validate(root) != nil {
+ 		return failure("closure_input_undeclared", "portable output root is not a private real directory")
+ 	}
+ 	entries, err := os.ReadDir(root)
+diff --git a/internal/closureexec/store.go b/internal/closureexec/store.go
+index 900fe022..66ee8a20 100644
+--- a/internal/closureexec/store.go
++++ b/internal/closureexec/store.go
+@@ -11,6 +11,7 @@ import (
+ 	"strings"
+ 
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+@@ -245,7 +246,7 @@ func (s *ProtectedStore) Inspect(cacheInput AssuredCacheInput) (PublishedHit, er
+ 			return PublishedHit{}, err
+ 		}
+ 		info, err := os.Stat(blob)
+-		if err != nil || (observation.Class == "native.executable" && info.Mode().Perm() != 0o500) || (observation.Class != "native.executable" && info.Mode().Perm() != 0o400) {
++		if err != nil || !blobModeMatchesClass(info, observation.Class == "native.executable") {
+ 			return PublishedHit{}, failure("artifact_local_output_drift", "protected blob mode differs from output class")
+ 		}
+ 		b, err := os.ReadFile(blob) // #nosec G304 -- blob is derived from a validated content identity below the protected root.
+@@ -323,17 +324,10 @@ func writeNoReplace(dir, target string, payload []byte, mode fs.FileMode) error
+ 		_ = tmp.Close()
+ 		return err
+ 	}
+-	if err = tmp.Chmod(mode); err != nil {
+-		_ = tmp.Close()
+-		return err
+-	}
+ 	if err = tmp.Close(); err != nil {
+ 		return err
+ 	}
+-	if err = os.Link(name, target); err != nil && !errors.Is(err, fs.ErrExist) {
+-		return err
+-	}
+-	return nil
++	return publishByLink(name, target, mode)
+ }
+ func protectedRegular(path string) error {
+ 	info, err := os.Lstat(path)
+@@ -347,24 +341,18 @@ func protectedRegular(path string) error {
+ }
+ 
+ func preparePrivateDirectory(path string) error {
+-	info, err := os.Lstat(path)
+-	if errors.Is(err, fs.ErrNotExist) {
+-		return os.Mkdir(path, 0o700)
+-	}
+-	if err != nil {
++	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
++		return privatedir.Make(path)
++	} else if err != nil {
+ 		return err
+ 	}
+-	return validatePrivateDirectoryInfo(info)
++	return validatePrivateDirectory(path)
+ }
+ func validatePrivateDirectory(path string) error {
+-	info, err := os.Lstat(path)
+-	if err != nil {
++	if _, err := os.Lstat(path); err != nil {
+ 		return err
+ 	}
+-	return validatePrivateDirectoryInfo(info)
+-}
+-func validatePrivateDirectoryInfo(info fs.FileInfo) error {
+-	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 || info.Mode().Perm() != 0o700 {
++	if privatedir.Validate(path) != nil {
+ 		return failure("artifact_local_output_drift", "protected directory is pre-existing, mutable, or not owner-only")
+ 	}
+ 	return nil
+diff --git a/internal/closureexec/storemode_unix.go b/internal/closureexec/storemode_unix.go
+new file mode 100644
+index 00000000..7869509a
+--- /dev/null
++++ b/internal/closureexec/storemode_unix.go
+@@ -0,0 +1,16 @@
++//go:build unix
++
++package closureexec
++
++import "io/fs"
++
++// blobModeMatchesClass reports whether a protected blob's permission bits are
++// exactly the ones its output class publishes: owner read-and-execute for a
++// native executable, owner read-only for everything else. On Unix the bits are
++// the contract itself.
++func blobModeMatchesClass(info fs.FileInfo, executable bool) bool {
++	if executable {
++		return info.Mode().Perm() == 0o500
++	}
++	return info.Mode().Perm() == 0o400
++}
+diff --git a/internal/closureexec/storemode_windows.go b/internal/closureexec/storemode_windows.go
+new file mode 100644
+index 00000000..22c37a5b
+--- /dev/null
++++ b/internal/closureexec/storemode_windows.go
+@@ -0,0 +1,15 @@
++//go:build windows
++
++package closureexec
++
++import "io/fs"
++
++// blobModeMatchesClass reports whether a protected blob carries the read-only
++// shape on Windows. Windows synthesizes permission bits from the read-only
++// attribute and has no execute bit, so the executable class is not expressible
++// through the mode; the immutability half of the contract — a regular file the
++// write attribute cannot touch — is what the platform can prove, and the
++// class itself remains bound by the observation record's content digest.
++func blobModeMatchesClass(info fs.FileInfo, _ bool) bool {
++	return info.Mode().IsRegular() && info.Mode().Perm()&0o222 == 0
++}
+diff --git a/internal/closureexec/treemode_unix.go b/internal/closureexec/treemode_unix.go
+new file mode 100644
+index 00000000..4c5b2da1
+--- /dev/null
++++ b/internal/closureexec/treemode_unix.go
+@@ -0,0 +1,27 @@
++//go:build unix
++
++package closureexec
++
++import (
++	"io/fs"
++	"os"
++)
++
++// markTreeDirImmutable removes the write bits from one directory of an
++// admitted or replay tree. On Unix that is the whole mechanism: a 0o500
++// directory blocks accidental member creation and the validation below can
++// read the property back from the permission bits.
++func markTreeDirImmutable(path string) error {
++	return os.Chmod(path, 0o500) // #nosec G302 -- immutable directories require owner execute permission for read-only traversal.
++}
++
++// treeDirIsImmutable reports whether a directory of an admitted tree still
++// carries the immutable shape markTreeDirImmutable gave it.
++func treeDirIsImmutable(info fs.FileInfo) bool {
++	return info.Mode().Perm()&0o222 == 0
++}
++
++// restoreTreeDirMutable undoes markTreeDirImmutable for cleanup.
++func restoreTreeDirMutable(path string) error {
++	return os.Chmod(path, 0o700) // #nosec G302 -- cleanup must restore owner traversal before removal.
++}
+diff --git a/internal/closureexec/treemode_windows.go b/internal/closureexec/treemode_windows.go
+new file mode 100644
+index 00000000..d4eed575
+--- /dev/null
++++ b/internal/closureexec/treemode_windows.go
+@@ -0,0 +1,25 @@
++//go:build windows
++
++package closureexec
++
++import (
++	"io/fs"
++)
++
++// markTreeDirImmutable is a no-op on Windows, deliberately. The read-only
++// attribute Unix mode bits map to does not restrict writing INTO a Windows
++// directory — it only breaks MoveFileEx, so setting it would forbid the
++// store's atomic tmp-to-digest rename while protecting nothing. The
++// immutability of an admitted tree on Windows rests on what the platform can
++// actually enforce and prove: every member file carries the read-only
++// attribute (set and validated through the shared file checks), and the tree
++// content is re-hashed against its digest at every use.
++func markTreeDirImmutable(string) error { return nil }
++
++// treeDirIsImmutable accepts every real directory on Windows: synthesized
++// directory permission bits carry no write semantics here, so the bits can
++// prove nothing either way. Member files remain individually validated.
++func treeDirIsImmutable(fs.FileInfo) bool { return true }
++
++// restoreTreeDirMutable mirrors markTreeDirImmutable and is a no-op.
++func restoreTreeDirMutable(string) error { return nil }
+diff --git a/internal/crossconformance/rejection_test.go b/internal/crossconformance/rejection_test.go
+index aee3b387..95832103 100644
+--- a/internal/crossconformance/rejection_test.go
++++ b/internal/crossconformance/rejection_test.go
+@@ -20,7 +20,7 @@ import (
+ // proveRejectionMatrix runs the published cross-adapter rejection matrix. Each
+ // vector requires the same three things from every path that runs it: a stable
+ // diagnostic from the closed set, no affected process, and no publication.
+-func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage) {
++func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage, rustManagerUnavailable bool) {
+ 	vectors := map[string]crossconformance.RejectionVector{}
+ 	for _, vector := range crossconformance.RejectionVectors() {
+ 		vectors[vector.ID] = vector
+@@ -35,7 +35,7 @@ func proveRejectionMatrix(t *testing.T, coverage *crossconformance.Coverage) {
+ 	}
+ 
+ 	t.Run("compiled-dependency-bytes", func(t *testing.T) {
+-		for _, outcome := range compiledByteOutcomes(t) {
++		for _, outcome := range compiledByteOutcomes(t, rustManagerUnavailable) {
+ 			record(t, "compiled-dependency-bytes", outcome)
+ 		}
+ 	})
+@@ -182,7 +182,7 @@ func crossDescriptor(adapter string, profile artifactpolicy.ProfileID, manager s
+ // compiledByteOutcomes drives one pinned GNU shared object through every
+ // delivered path's real capture and admission API. No path may admit it, and
+ // no path may start a manager process first.
+-func compiledByteOutcomes(t *testing.T) map[crossconformance.PathID]crossconformance.RejectionOutcome {
++func compiledByteOutcomes(t *testing.T, rustManagerUnavailable bool) map[crossconformance.PathID]crossconformance.RejectionOutcome {
+ 	t.Helper()
+ 	outcomes := map[crossconformance.PathID]crossconformance.RejectionOutcome{}
+ 	extra := sharedCompiledPayload()
+@@ -205,8 +205,10 @@ func compiledByteOutcomes(t *testing.T) map[crossconformance.PathID]crossconform
+ 	_, swiftErr := swiftpmsource.CaptureAndClose(context.Background(), swift.config, swiftpmsource.Request{Root: swift.root, Product: "cli", Resolved: swiftLock()})
+ 	outcomes[crossconformance.PathSwiftPM] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathSwiftPM, Err: swiftErr, Code: diagnosticCode(swiftErr), ProcessStarts: starts}
+ 
+-	rustErr := captureRustCompiledWorkspace(t)
+-	outcomes[crossconformance.PathRust] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathRust, Err: rustErr, Code: diagnosticCode(rustErr)}
++	if !rustManagerUnavailable {
++		rustErr := captureRustCompiledWorkspace(t)
++		outcomes[crossconformance.PathRust] = crossconformance.RejectionOutcome{Vector: "compiled-dependency-bytes", Path: crossconformance.PathRust, Err: rustErr, Code: diagnosticCode(rustErr)}
++	}
+ 	return outcomes
+ }
+ 
+diff --git a/internal/crossconformance/suite_test.go b/internal/crossconformance/suite_test.go
+index 47292ea1..f0eece68 100644
+--- a/internal/crossconformance/suite_test.go
++++ b/internal/crossconformance/suite_test.go
+@@ -2,7 +2,9 @@ package crossconformance_test
+ 
+ import (
+ 	"context"
++	"fmt"
+ 	"path/filepath"
++	"sort"
+ 	"strings"
+ 	"testing"
+ 
+@@ -33,6 +35,15 @@ var pathProfiles = map[crossconformance.PathID]struct {
+ 	crossconformance.PathSwiftPM:     {adapter: swiftpmsource.ProfileID, profile: artifactpolicy.ProfileSwiftPMV1},
+ }
+ 
++var rustUnavailableManagerObligationGaps = []string{
++	"binding.diverges_per_target/rust",
++	"binding.target_authority/rust",
++	"capture.selection_neutral/rust",
++	"capture.stable_across_targets/rust",
++	"evidence.causal_chain/rust",
++	"records.deterministic/rust",
++}
++
+ // TestCrossAdapterConformance is the single integration proof over the already
+ // accepted adapter contracts. It runs one normative semantic suite against
+ // every delivered path, runs the published rejection matrix, and then refuses
+@@ -43,6 +54,7 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 	projections := map[crossconformance.PathID][2]crossconformance.TargetProjection{}
+ 	captureText := map[crossconformance.PathID]string{}
+ 	var rustManifestIDs []string
++	rustUnavailableReason := ""
+ 
+ 	t.Run("project-every-path", func(t *testing.T) {
+ 		nodeSources := map[crossconformance.PathID]nodeCapture{
+@@ -58,22 +70,28 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 		projections[crossconformance.PathSwiftPM] = [2]crossconformance.TargetProjection{projectSwiftPath(t, 0), projectSwiftPath(t, 1)}
+ 		captureText[crossconformance.PathSwiftPM] = swiftCaptureText(t)
+ 
+-		rust := runRustManager(t)
+-		rustManifestIDs = rust.artifactManifestIDs
+-		first := projectRustPath(t, 0, rustManifestIDs)
+-		second := projectRustPath(t, 1, rustManifestIDs)
+-		// The Rust manager owns the C0 Cargo registration, the pinned vendor
+-		// transform, and the metadata derivations; the reconciliation seam
+-		// owns the selection-neutral lock superset and the exact active
+-		// identity. Both belong to one rust-source-v1 projection.
+-		first.DerivationReceipts, second.DerivationReceipts = rust.receipts, rust.receipts
+-		first.ToolIdentities = append(first.ToolIdentities, rust.tools...)
+-		second.ToolIdentities = append(second.ToolIdentities, rust.tools...)
+-		projections[crossconformance.PathRust] = [2]crossconformance.TargetProjection{first, second}
+-		captureText[crossconformance.PathRust] = rustCaptureText(t)
++		t.Run("rust", func(t *testing.T) {
++			if reason := rustsource.NativeCargoUnavailableReason(); reason != "" {
++				rustUnavailableReason = reason
++				t.Skip(rustUnavailableReason)
++			}
++			rust := runRustManager(t)
++			rustManifestIDs = rust.artifactManifestIDs
++			first := projectRustPath(t, 0, rustManifestIDs)
++			second := projectRustPath(t, 1, rustManifestIDs)
++			// The Rust manager owns the C0 Cargo registration, the pinned vendor
++			// transform, and the metadata derivations; the reconciliation seam
++			// owns the selection-neutral lock superset and the exact active
++			// identity. Both belong to one rust-source-v1 projection.
++			first.DerivationReceipts, second.DerivationReceipts = rust.receipts, rust.receipts
++			first.ToolIdentities = append(first.ToolIdentities, rust.tools...)
++			second.ToolIdentities = append(second.ToolIdentities, rust.tools...)
++			projections[crossconformance.PathRust] = [2]crossconformance.TargetProjection{first, second}
++			captureText[crossconformance.PathRust] = rustCaptureText(t)
++		})
+ 	})
+ 	if t.Failed() {
+-		t.Fatal("no path could be projected; the normative suite cannot run")
++		t.Fatal("one or more available paths could not be projected; the normative suite cannot run")
+ 	}
+ 
+ 	t.Run("normative-suite", func(t *testing.T) {
+@@ -81,6 +99,10 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 			path := path
+ 			pair, present := projections[path]
+ 			if !present {
++				if path == crossconformance.PathRust && rustUnavailableReason != "" {
++					t.Run(string(path), func(t *testing.T) { t.Skip(rustUnavailableReason) })
++					continue
++				}
+ 				t.Errorf("%s produced no projection", path)
+ 				continue
+ 			}
+@@ -127,15 +149,18 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 	})
+ 
+ 	t.Run("rejection-matrix", func(t *testing.T) {
+-		proveRejectionMatrix(t, coverage)
++		proveRejectionMatrix(t, coverage, rustUnavailableReason != "")
+ 	})
+ 
+ 	t.Run("coverage-is-complete", func(t *testing.T) {
+ 		// This gate only means something when the whole test ran: a filtered
+ 		// -run that skips the proving subtests must fail here rather than
+ 		// report a green integration proof over an empty matrix.
+-		if missing := coverage.MissingObligations(); len(missing) != 0 {
+-			t.Errorf("obligations never proved (a filtered -run cannot satisfy this gate): %s", strings.Join(missing, ", "))
++		missing := coverage.MissingObligations()
++		if err := requireCompleteCoverage(missing, rustUnavailableReason != ""); err != nil {
++			t.Error(err)
++		} else if rustUnavailableReason != "" {
++			t.Logf("rust manager path unavailable on this host: %s", rustUnavailableReason)
+ 		}
+ 		if uncovered := coverage.UncoveredRejections(); len(uncovered) != 0 {
+ 			t.Errorf("rejection vectors never proved: %s", strings.Join(uncovered, ", "))
+@@ -145,6 +170,35 @@ func TestCrossAdapterConformance(t *testing.T) {
+ 	})
+ }
+ 
++func requireCompleteCoverage(missing []string, rustUnavailable bool) error {
++	expected := []string{}
++	if rustUnavailable {
++		expected = rustUnavailableManagerObligationGaps
++	}
++	if strings.Join(missing, "\n") != strings.Join(expected, "\n") {
++		return fmt.Errorf("obligations never proved (a filtered -run cannot satisfy this gate): got %s, want only %s", strings.Join(missing, ", "), strings.Join(expected, ", "))
++	}
++	return nil
++}
++
++func TestRustUnavailableCoverageRejectsExtraRustGap(t *testing.T) {
++	missing := append([]string{}, rustUnavailableManagerObligationGaps...)
++	missing = append(missing, "future.manager_obligation/rust")
++	sort.Strings(missing)
++	if err := requireCompleteCoverage(missing, true); err == nil {
++		t.Fatal("completeness gate accepted a Rust gap outside the closed six-pair enumeration")
++	}
++}
++
++func TestRustUnavailableCoverageRejectsNonRustGap(t *testing.T) {
++	missing := append([]string{}, rustUnavailableManagerObligationGaps...)
++	missing = append(missing, "capture.selection_neutral/npm")
++	sort.Strings(missing)
++	if err := requireCompleteCoverage(missing, true); err == nil {
++		t.Fatal("completeness gate accepted a gap in an available non-Rust path")
++	}
++}
++
+ // repeatProjection re-derives the first target's projection from freshly
+ // captured inputs so determinism is a property of the adapter rather than of
+ // one retained value.
+diff --git a/internal/install/assurance_test.go b/internal/install/assurance_test.go
+index 9633cc31..63f3d812 100644
+--- a/internal/install/assurance_test.go
++++ b/internal/install/assurance_test.go
+@@ -75,6 +75,20 @@ func (toolchain assuredTestToolchain) Establish(context.Context) (BuildSession,
+ 	return toolchain.session, nil
+ }
+ 
++type assuredProbeFailureToolchain struct {
++	err    error
++	probes int
++}
++
++func (toolchain *assuredProbeFailureToolchain) Probe(context.Context) (buildmeta.Target, buildmeta.Toolchain, error) {
++	toolchain.probes++
++	return buildmeta.Target{}, buildmeta.Toolchain{}, toolchain.err
++}
++
++func (*assuredProbeFailureToolchain) Establish(context.Context) (BuildSession, error) {
++	return nil, errors.New("establish is not part of this probe test")
++}
++
+ type assuredTestSession struct {
+ 	target    buildmeta.Target
+ 	toolchain buildmeta.Toolchain
+@@ -169,6 +183,34 @@ func TestVerifiedBuildAuthorityCarriesOneBindingThroughCacheAndDispatch(t *testi
+ 	}
+ }
+ 
++func TestAssuredToolchainProbeKeepsAuthorityAndInnerFailuresDisjoint(t *testing.T) {
++	innerErr := errors.New("inner trusted-toolchain probe failed")
++
++	t.Run("authority refusal never reaches the inner probe", func(t *testing.T) {
++		inner := &assuredProbeFailureToolchain{err: innerErr}
++		toolchain := &assuredToolchain{authority: &BuildAuthority{}, inner: inner}
++		_, _, err := toolchain.Probe(t.Context())
++		if err == nil || !strings.Contains(err.Error(), "execution_mode_unknown") {
++			t.Fatalf("probe error = %v, want the authority refusal", err)
++		}
++		if inner.probes != 0 {
++			t.Fatalf("authority refusal reached the inner probe %d times", inner.probes)
++		}
++	})
++
++	t.Run("valid portable authority preserves the inner failure", func(t *testing.T) {
++		inner := &assuredProbeFailureToolchain{err: innerErr}
++		toolchain := &assuredToolchain{authority: NewPortableBuildAuthority(), inner: inner}
++		_, _, err := toolchain.Probe(t.Context())
++		if !errors.Is(err, innerErr) {
++			t.Fatalf("probe error = %v, want the inner failure", err)
++		}
++		if inner.probes != 1 {
++			t.Fatalf("valid authority reached the inner probe %d times, want once", inner.probes)
++		}
++	})
++}
++
+ func TestVerifiedBuildAuthorityFailsBeforeCacheOrDispatchOnProviderDrift(t *testing.T) {
+ 	tests := []struct {
+ 		name   string
+diff --git a/internal/install/dryrun_conformance_test.go b/internal/install/dryrun_conformance_test.go
+index 72794145..0d4462b0 100644
+--- a/internal/install/dryrun_conformance_test.go
++++ b/internal/install/dryrun_conformance_test.go
+@@ -24,6 +24,7 @@ import (
+ 	"github.com/relux-works/curator/internal/marker"
+ 	"github.com/relux-works/curator/internal/registry"
+ 	"github.com/relux-works/curator/internal/scopes"
++	"github.com/relux-works/curator/internal/testtoolchain"
+ )
+ 
+ // authoritativeDryRunCase is the published no-mutation contract. Only the field
+@@ -260,6 +261,7 @@ func (baseline *dryRunBaseline) declareEvery(t *testing.T, root string, extra ..
+ // parallel ancestor. Nothing about the assertions depends on it: the cases run
+ // in sequence and each still arms, plans, and measures its own machine.
+ func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
++	testtoolchain.LockHostGOROOT(t)
+ 	document := authoritativeLifecycle(t)
+ 	for _, published := range document.DryRunCases {
+ 		published := published
+@@ -454,14 +456,14 @@ func (baseline *dryRunBaseline) assertCompiledCase(
+ 		}
+ 		build := result.Builds[0]
+ 		if !reported[string(build.Outcome())] {
+-			t.Fatalf("project %d reported build outcome %q, which the published case does not admit: %v",
+-				index, build.Outcome(), published.ReportedBuildOutcomes)
++			t.Fatalf("project %d reported build outcome %q (reason %q, diagnostic %q), which the published case does not admit: %v",
++				index, build.Outcome(), build.Reason(), build.DiagnosticCode(), published.ReportedBuildOutcomes)
+ 		}
+ 		// The shared protected entry is absent, and the case name says what that
+ 		// has to report: a miss, planned without preflighting or building.
+ 		if build.Outcome() != BuildWouldPreflightAndBuild {
+-			t.Fatalf("project %d reported %q against an empty protected cache, want %q",
+-				index, build.Outcome(), BuildWouldPreflightAndBuild)
++			t.Fatalf("project %d reported %q against an empty protected cache (reason %q, diagnostic %q), want %q",
++				index, build.Outcome(), build.Reason(), build.DiagnosticCode(), BuildWouldPreflightAndBuild)
+ 		}
+ 		if len(result.Staged) != 0 {
+ 			t.Fatalf("project %d staged an artifact during a dry run: %+v", index, result.Staged)
+diff --git a/internal/nodesource/nodesource_test.go b/internal/nodesource/nodesource_test.go
+index d2ce9045..8707f2b5 100644
+--- a/internal/nodesource/nodesource_test.go
++++ b/internal/nodesource/nodesource_test.go
+@@ -37,6 +37,12 @@ func TestIndependentPythonProtocolGoldens(t *testing.T) {
+ 	if err != nil {
+ 		t.Skip("python3 unavailable for independent protocol oracle")
+ 	}
++	// A name on PATH is not yet an interpreter: the Windows app-execution
++	// alias resolves python3 to a Microsoft Store stub that exits 9009
++	// without running anything, so the probe has to execute, not stat.
++	if err := exec.Command(python, "-c", "pass").Run(); err != nil {
++		t.Skip("python3 unavailable for independent protocol oracle")
++	}
+ 	command := exec.Command(python, "testdata/python_protocol_golden.py")
+ 	output, err := command.Output()
+ 	if err != nil {
+@@ -584,7 +590,10 @@ func TestNodeCGP05AcceptedExactRecordDigests(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	lines := strings.Split(string(contents), "\n")
++	// The records are canonical in LF form; a checkout that translated the
++	// file to CRLF (git autocrlf on Windows runners) must not shift names or
++	// digest inputs.
++	lines := strings.Split(strings.ReplaceAll(string(contents), "\r\n", "\n"), "\n")
+ 	seen := map[string]bool{}
+ 	for index, line := range lines {
+ 		if !strings.HasPrefix(line, "name=cgp05.") || index+3 >= len(lines) {
+diff --git a/internal/npmsource/capture.go b/internal/npmsource/capture.go
+index fdfb13c1..7b8da916 100644
+--- a/internal/npmsource/capture.go
++++ b/internal/npmsource/capture.go
+@@ -25,6 +25,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // RawTarball names exact caller-captured registry bytes for one lock instance.
+@@ -106,7 +107,7 @@ func CaptureAndAdmit(ctx context.Context, request CaptureRequest) (*Capture, err
+ 	if err != nil || request.WorkRoot == "" {
+ 		return nil, fail(CodeInputUndeclared, "npm work root is invalid", nil)
+ 	}
+-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(workRoot); err != nil {
+ 		return nil, err
+ 	}
+ 	stage, err := os.MkdirTemp(workRoot, "npm-project-stage-")
+@@ -451,7 +452,7 @@ func copyProjectSource(source, destination string) ([]string, error) {
+ 		}
+ 		target := filepath.Join(destination, rel)
+ 		if entry.IsDir() {
+-			return os.Mkdir(target, 0o700)
++			return privatedir.Make(target)
+ 		}
+ 		info, err := entry.Info()
+ 		if err != nil || !info.Mode().IsRegular() {
+diff --git a/internal/npmsource/conformance_test.go b/internal/npmsource/conformance_test.go
+index 2cd64a18..790400af 100644
+--- a/internal/npmsource/conformance_test.go
++++ b/internal/npmsource/conformance_test.go
+@@ -17,6 +17,7 @@ import (
+ 	"os/exec"
+ 	"path/filepath"
+ 	"reflect"
++	"runtime"
+ 	"sort"
+ 	"strings"
+ 	"testing"
+@@ -107,6 +108,30 @@ func newNPMFixture(t *testing.T) npmFixture {
+ 	return npmFixture{root: root, work: work, request: request, tarballs: tarballs, payloads: payloads, graph: graph}
+ }
+ 
++func newNativeNPMFixture(t *testing.T) npmFixture {
++	t.Helper()
++	fixture := newNPMFixture(t)
++	osName := map[string]string{"windows": "win32"}[runtime.GOOS]
++	if osName == "" {
++		osName = runtime.GOOS
++	}
++	architecture := map[string]string{"amd64": "x64", "arm64": "arm64"}[runtime.GOARCH]
++	if architecture == "" {
++		architecture = runtime.GOARCH
++	}
++	libc := "none"
++	if runtime.GOOS == "linux" {
++		libc = "glibc"
++	}
++	fixture.request.Target = Target{OS: osName, Architecture: architecture, Libc: libc, IncludeDev: true}
++	graph, err := Parse(fixture.request)
++	if err != nil {
++		t.Fatal(err)
++	}
++	fixture.graph = graph
++	return fixture
++}
++
+ func TestS01N01ClosedGraphCaptureAndExactTarballs(t *testing.T) {
+ 	fixture := newNPMFixture(t)
+ 	if fixture.graph.LockfileVersion != 3 || len(fixture.graph.Packages) != 6 || len(fixture.graph.Workspaces) != 1 {
+@@ -628,7 +653,7 @@ func TestVerifiedProviderObservesRealNodeLaunchedNPMBoundary(t *testing.T) {
+ 	if _, err := exec.LookPath("npm"); err != nil {
+ 		t.Skip("npm unavailable")
+ 	}
+-	fixture := newNPMFixture(t)
++	fixture := newNativeNPMFixture(t)
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcreteNPMRunner(t)
+ 	provider := newVerifiedFixtureProvider()
+@@ -881,7 +906,7 @@ func TestN01RealNPMCIUsesOnlyDerivedPrivateCache(t *testing.T) {
+ 	if _, err := exec.LookPath("npm"); err != nil {
+ 		t.Skip("npm unavailable")
+ 	}
+-	fixture := newNPMFixture(t)
++	fixture := newNativeNPMFixture(t)
+ 	capture := captureFixture(t, fixture)
+ 	runner := newConcreteNPMRunner(t)
+ 	cache := deriveCacheFixture(t, capture, runner)
+@@ -896,7 +921,12 @@ func TestN01RealNPMCIUsesOnlyDerivedPrivateCache(t *testing.T) {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	if !reflect.DeepEqual(materialized.MaterializedPackages, []string{"node_modules/a", "node_modules/b", "node_modules/workspace"}) {
++	wantPackages := []string{"node_modules/a", "node_modules/b", "node_modules/workspace"}
++	if runtime.GOOS == "linux" {
++		wantPackages = append(wantPackages, "node_modules/opt")
++		sort.Strings(wantPackages)
++	}
++	if !reflect.DeepEqual(materialized.MaterializedPackages, wantPackages) {
+ 		t.Fatalf("real npm ci materialized unexpected graph: %v", materialized.MaterializedPackages)
+ 	}
+ 	if _, err = Invoke(t.Context(), materialized, "index.js", nil, runner.context); err != nil {
+@@ -980,6 +1010,19 @@ func newConcreteNPMRunner(t *testing.T) *concreteNPMRunner {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
++	if runtime.GOOS == "windows" {
++		// npm.cmd is a batch wrapper, not a symlink to the CLI script, so
++		// resolving it does not land inside the npm package the way a Unix
++		// bin symlink does. Deriving the root from the wrapper's directory
++		// would name the whole installation prefix (C:\Program Files) and the
++		// staging copy below would try to capture everything under it. The
++		// real entry point lives in the adjacent node_modules tree.
++		entry := filepath.Join(filepath.Dir(npmPath), "node_modules", "npm", "bin", "npm-cli.js")
++		if _, statErr := os.Stat(entry); statErr != nil {
++			t.Skipf("npm CLI entry point is not beside %s: %v", npmPath, statErr)
++		}
++		npmPath = entry
++	}
+ 	npmRoot := filepath.Dir(filepath.Dir(npmPath))
+ 	stagedNPMRoot := filepath.Join(executionRoot, "toolchain", "npm")
+ 	if err = copyContainedTreeDereferencingLinks(npmRoot, npmRoot, stagedNPMRoot, map[string]bool{}); err != nil {
+@@ -1002,6 +1045,11 @@ func newConcreteNPMRunner(t *testing.T) *concreteNPMRunner {
+ 		t.Fatal(err)
+ 	}
+ 	nodeRoot := filepath.Dir(filepath.Dir(nodePath))
++	if runtime.GOOS == "windows" {
++		// node.exe sits directly in the installation directory rather than
++		// under a bin/ level, so its root is its own directory.
++		nodeRoot = filepath.Dir(nodePath)
++	}
+ 	stagedNodeRoot := filepath.Join(executionRoot, "toolchain", "node")
+ 	if err = os.MkdirAll(filepath.Join(stagedNodeRoot, "bin"), 0o700); err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/npmsource/linkentry_unix.go b/internal/npmsource/linkentry_unix.go
+new file mode 100644
+index 00000000..2f3e708c
+--- /dev/null
++++ b/internal/npmsource/linkentry_unix.go
+@@ -0,0 +1,18 @@
++//go:build unix
++
++package npmsource
++
++import "io/fs"
++
++// linkedPackageEntry reports whether a node_modules child is the link spelling
++// of an installed package. npm materializes workspace and file dependencies as
++// symlinks on Unix.
++func linkedPackageEntry(entry fs.DirEntry, _ string) bool {
++	return entry.Type()&fs.ModeSymlink != 0
++}
++
++// normalizeTreeLink is the identity on Unix: symlink components are resolved
++// by filepath.EvalSymlinks inside the dereferencing copy itself.
++func normalizeTreeLink(path string, _ fs.DirEntry) (string, error) {
++	return path, nil
++}
+diff --git a/internal/npmsource/linkentry_windows.go b/internal/npmsource/linkentry_windows.go
+new file mode 100644
+index 00000000..0cb393e6
+--- /dev/null
++++ b/internal/npmsource/linkentry_windows.go
+@@ -0,0 +1,49 @@
++//go:build windows
++
++package npmsource
++
++import (
++	"io/fs"
++	"os"
++
++	"golang.org/x/sys/windows"
++)
++
++// linkedPackageEntry reports whether a node_modules child is the link spelling
++// of an installed package. npm materializes workspace and file dependencies as
++// directory junctions on Windows, which Go reports as ModeIrregular rather
++// than ModeSymlink, so the junction shape is read back from the attributes:
++// a reparse point that is also a directory. Any other irregular node stays
++// refused.
++func linkedPackageEntry(entry fs.DirEntry, path string) bool {
++	if entry.Type()&fs.ModeSymlink != 0 {
++		return true
++	}
++	return entry.Type() == fs.ModeIrregular && directoryJunction(path)
++}
++
++func directoryJunction(path string) bool {
++	path16, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return false
++	}
++	attributes, err := windows.GetFileAttributes(path16)
++	if err != nil {
++		return false
++	}
++	return attributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 &&
++		attributes&windows.FILE_ATTRIBUTE_DIRECTORY != 0
++}
++
++// normalizeTreeLink resolves npm's junction spelling of a workspace link to
++// its stated target before the dereferencing copy descends through it.
++// filepath.EvalSymlinks does not evaluate junctions and refuses any path that
++// still carries one as a component, while os.Readlink resolves the junction
++// itself; the containment check downstream still decides whether the target
++// is admissible.
++func normalizeTreeLink(path string, entry fs.DirEntry) (string, error) {
++	if entry.Type() == fs.ModeIrregular && directoryJunction(path) {
++		return os.Readlink(path)
++	}
++	return path, nil
++}
+diff --git a/internal/npmsource/materialize.go b/internal/npmsource/materialize.go
+index 417ae0dc..556c2370 100644
+--- a/internal/npmsource/materialize.go
++++ b/internal/npmsource/materialize.go
+@@ -15,6 +15,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // invocation is a non-authoritative projection used to construct the canonical
+@@ -117,7 +118,7 @@ func DerivePrivateCache(ctx context.Context, capture *Capture, destination, work
+ 	if _, err = filepath.Abs(workRoot); err != nil || workRoot == "" {
+ 		return nil, fail(CodeInputUndeclared, "npm cache work root is invalid", nil)
+ 	}
+-	if err = os.Mkdir(dest, 0o700); err != nil {
++	if err = privatedir.Make(dest); err != nil {
+ 		return nil, err
+ 	}
+ 	success := false
+@@ -909,15 +910,17 @@ func installedPackagePaths(root string) (map[string]bool, error) {
+ 					return err
+ 				}
+ 				for _, leaf := range scoped {
+-					if leaf.IsDir() || leaf.Type()&fs.ModeSymlink != 0 {
+-						rel, _ := filepath.Rel(root, filepath.Join(current, child.Name(), leaf.Name()))
++					leafPath := filepath.Join(current, child.Name(), leaf.Name())
++					if leaf.IsDir() || linkedPackageEntry(leaf, leafPath) {
++						rel, _ := filepath.Rel(root, leafPath)
+ 						result[filepath.ToSlash(rel)] = true
+ 					}
+ 				}
+ 				continue
+ 			}
+-			if child.IsDir() || child.Type()&fs.ModeSymlink != 0 {
+-				rel, _ := filepath.Rel(root, filepath.Join(current, child.Name()))
++			childPath := filepath.Join(current, child.Name())
++			if child.IsDir() || linkedPackageEntry(child, childPath) {
++				rel, _ := filepath.Rel(root, childPath)
+ 				result[filepath.ToSlash(rel)] = true
+ 			}
+ 		}
+@@ -940,7 +943,7 @@ func cleanAbsentAbsolute(value string) (string, error) {
+ 	return abs, nil
+ }
+ func copyWritableTree(source, destination string) error {
+-	if err := os.Mkdir(destination, 0o700); err != nil {
++	if err := privatedir.Make(destination); err != nil {
+ 		return err
+ 	}
+ 	return filepath.WalkDir(source, func(current string, entry fs.DirEntry, walkErr error) error {
+@@ -959,7 +962,7 @@ func copyWritableTree(source, destination string) error {
+ 			return fail(CodeInputUndeclared, "derived tree contains a link", map[string]string{"path": filepath.ToSlash(rel)})
+ 		}
+ 		if entry.IsDir() {
+-			return os.Mkdir(target, 0o700)
++			return privatedir.Make(target)
+ 		}
+ 		info, err := entry.Info()
+ 		if err != nil || !info.Mode().IsRegular() {
+@@ -987,7 +990,7 @@ func mergeWritableTree(source, destination string) error {
+ 			return fail(CodeInputUndeclared, "derived npm cache contains a link", map[string]string{"path": filepath.ToSlash(rel)})
+ 		}
+ 		if entry.IsDir() {
+-			return os.MkdirAll(target, 0o700)
++			return privatedir.MakeAll(target)
+ 		}
+ 		if !entry.Type().IsRegular() {
+ 			return fail(CodeInputUndeclared, "derived npm cache contains a special node", map[string]string{"path": filepath.ToSlash(rel)})
+@@ -1008,7 +1011,7 @@ func mergeWritableTree(source, destination string) error {
+ 		} else if !errors.Is(readErr, fs.ErrNotExist) {
+ 			return readErr
+ 		}
+-		if err = os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
++		if err = privatedir.MakeAll(filepath.Dir(target)); err != nil {
+ 			return err
+ 		}
+ 		return os.WriteFile(target, payload, 0o600)
+@@ -1082,12 +1085,12 @@ func copyContainedTreeDereferencingLinks(root, source, destination string, activ
+ 		if readErr != nil {
+ 			return readErr
+ 		}
+-		if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
++		if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
+ 			return err
+ 		}
+ 		return os.WriteFile(destination, payload, 0o600)
+ 	}
+-	if err = os.MkdirAll(destination, 0o700); err != nil {
++	if err = privatedir.MakeAll(destination); err != nil {
+ 		return err
+ 	}
+ 	entries, err := os.ReadDir(realSource)
+@@ -1095,7 +1098,11 @@ func copyContainedTreeDereferencingLinks(root, source, destination string, activ
+ 		return err
+ 	}
+ 	for _, entry := range entries {
+-		if err = copyContainedTreeDereferencingLinks(root, filepath.Join(realSource, entry.Name()), filepath.Join(destination, entry.Name()), active); err != nil {
++		childSource, linkErr := normalizeTreeLink(filepath.Join(realSource, entry.Name()), entry)
++		if linkErr != nil {
++			return linkErr
++		}
++		if err = copyContainedTreeDereferencingLinks(root, childSource, filepath.Join(destination, entry.Name()), active); err != nil {
+ 			return err
+ 		}
+ 	}
+diff --git a/internal/pnpmsource/capture.go b/internal/pnpmsource/capture.go
+index 3267d611..d3140580 100644
+--- a/internal/pnpmsource/capture.go
++++ b/internal/pnpmsource/capture.go
+@@ -26,6 +26,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // RawTarball names exact caller-captured registry bytes by packages-table key.
+@@ -125,7 +126,7 @@ func CaptureAndAdmit(ctx context.Context, request CaptureRequest) (*Capture, err
+ 	if err != nil || request.WorkRoot == "" || workRoot != filepath.Clean(request.WorkRoot) {
+ 		return nil, fail(CodeInputUndeclared, "pnpm work root must be absolute and clean", nil)
+ 	}
+-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(workRoot); err != nil {
+ 		return nil, err
+ 	}
+ 	stage, err := os.MkdirTemp(workRoot, "pnpm-project-stage-")
+@@ -557,7 +558,7 @@ func copyProjectSource(source, destination string) ([]string, error) {
+ 		}
+ 		target := filepath.Join(destination, rel)
+ 		if entry.IsDir() {
+-			return os.Mkdir(target, 0o700)
++			return privatedir.Make(target)
+ 		}
+ 		info, err := entry.Info()
+ 		if err != nil || !info.Mode().IsRegular() {
+diff --git a/internal/pnpmsource/conformance_test.go b/internal/pnpmsource/conformance_test.go
+index fa45be6b..82a523ac 100644
+--- a/internal/pnpmsource/conformance_test.go
++++ b/internal/pnpmsource/conformance_test.go
+@@ -1453,6 +1453,9 @@ func (runner *fakePNPMRunner) Run(_ context.Context, request closureexec.Executi
+ 						target = filepath.Join(cwd, filepath.FromSlash(path))
+ 					}
+ 				}
++				if target == "" {
++					continue
++				}
+ 				link := filepath.Join(owner, "node_modules", filepath.FromSlash(edge.Name))
+ 				if err := os.MkdirAll(filepath.Dir(link), 0o700); err != nil {
+ 					return closureexec.PortableRunResult{}, err
+diff --git a/internal/pnpmsource/materialize.go b/internal/pnpmsource/materialize.go
+index 5a85ed1e..3a034c38 100644
+--- a/internal/pnpmsource/materialize.go
++++ b/internal/pnpmsource/materialize.go
+@@ -18,6 +18,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // ExecutionContext supplies the shared protected executor and exact C0/C5 authority.
+@@ -997,7 +998,7 @@ func cleanAbsentAbsolute(value string) (string, error) {
+ 	return absolute, nil
+ }
+ func copyWritableTree(source, destination string) error {
+-	if err := os.MkdirAll(destination, 0o700); err != nil {
++	if err := privatedir.MakeAll(destination); err != nil {
+ 		return err
+ 	}
+ 	return filepath.WalkDir(source, func(current string, entry fs.DirEntry, err error) error {
+@@ -1013,7 +1014,7 @@ func copyWritableTree(source, destination string) error {
+ 			return fail(CodeInputUndeclared, "derived pnpm store contains link", map[string]string{"path": filepath.ToSlash(rel)})
+ 		}
+ 		if entry.IsDir() {
+-			return os.Mkdir(target, 0o700)
++			return privatedir.Make(target)
+ 		}
+ 		if !entry.Type().IsRegular() {
+ 			return fail(CodeInputUndeclared, "derived pnpm store contains special node", nil)
+@@ -1056,12 +1057,12 @@ func copyContainedNode(realRoot, source, destination string, active map[string]b
+ 		if err != nil {
+ 			return err
+ 		}
+-		if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
++		if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
+ 			return err
+ 		}
+ 		return os.WriteFile(destination, payload, 0o600)
+ 	}
+-	if err = os.MkdirAll(destination, 0o700); err != nil {
++	if err = privatedir.MakeAll(destination); err != nil {
+ 		return err
+ 	}
+ 	entries, err := os.ReadDir(realSource)
+diff --git a/internal/privatedir/privatedir.go b/internal/privatedir/privatedir.go
+new file mode 100644
+index 00000000..e2ca9e0b
+--- /dev/null
++++ b/internal/privatedir/privatedir.go
+@@ -0,0 +1,51 @@
++// Package privatedir creates and validates owner-only private directories in
++// a platform-faithful way.
++//
++// The portable execution and protected-output boundaries in
++// internal/closureexec require directories that only the effective user can
++// read, enter, or mutate, and they must be able to prove that property later
++// rather than assume it. On Unix that property is the 0o700 permission bits.
++// On Windows permission bits are synthesized from the read-only attribute and
++// say nothing about who may access a directory, so the same property is an
++// owner-only, inheritance-protected DACL — the exact shape the reviewed
++// protected-root backend in internal/buildcache already creates and validates
++// for the build cache. This package gives the closure boundaries that shape
++// without importing internal/buildcache (which itself depends on
++// internal/closureexec).
++//
++// The four operations deliberately mirror the call sites they serve:
++//
++//   - Make creates one directory that is private the instant it becomes
++//     observable, like os.Mkdir(path, 0o700) is on Unix.
++//   - MakeAll creates a directory and any missing parents, each private at
++//     creation, like os.MkdirAll(path, 0o700) is on Unix.
++//   - Validate proves an existing path is a real, unlinked, owner-only
++//     directory this manager could have created.
++//   - Protect makes an existing directory the caller just created private,
++//     for the one case (os.MkdirTemp) where creation cannot carry the shape.
++//
++// Validate returns plain errors; each boundary wraps them in its own
++// diagnostic code, because the same property failure is
++// artifact_local_output_drift at the protected store and
++// closure_input_undeclared at the portable output root.
++package privatedir
++
++// Make creates path as an owner-only private directory. It fails with
++// os.ErrExist (wrapped in *os.PathError) when path already exists, matching
++// os.Mkdir.
++func Make(path string) error { return makePrivate(path) }
++
++// MakeAll creates path and any missing parents as owner-only private
++// directories. Levels that already exist are left untouched and are not
++// validated; callers that need the leaf proven private call Validate.
++func MakeAll(path string) error { return makeAllPrivate(path) }
++
++// Validate reports whether path is a real directory, not a symlink or
++// reparse point, owned by the effective user, and accessible to that user
++// only. The nil return is the proof the protected boundaries rely on.
++func Validate(path string) error { return validatePrivate(path) }
++
++// Protect makes an existing directory private. It is for directories whose
++// creation API cannot attach the private shape atomically (os.MkdirTemp); a
++// directory created by Make or MakeAll never needs it.
++func Protect(path string) error { return protectPrivate(path) }
+diff --git a/internal/privatedir/privatedir_test.go b/internal/privatedir/privatedir_test.go
+new file mode 100644
+index 00000000..a3a2f307
+--- /dev/null
++++ b/internal/privatedir/privatedir_test.go
+@@ -0,0 +1,122 @@
++package privatedir
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++)
++
++func TestMakeCreatesADirectoryValidateAccepts(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "private")
++	if err := Make(path); err != nil {
++		t.Fatal(err)
++	}
++	if err := Validate(path); err != nil {
++		t.Fatalf("fresh private directory rejected: %v", err)
++	}
++	if err := Make(path); !errors.Is(err, os.ErrExist) {
++		t.Fatalf("second Make = %v, want os.ErrExist", err)
++	}
++}
++
++func TestMakeAllCreatesEveryMissingLevel(t *testing.T) {
++	base := t.TempDir()
++	leaf := filepath.Join(base, "a", "b", "c")
++	if err := MakeAll(leaf); err != nil {
++		t.Fatal(err)
++	}
++	if err := Validate(leaf); err != nil {
++		t.Fatalf("MakeAll leaf rejected: %v", err)
++	}
++	// Idempotent over an existing tree, like os.MkdirAll.
++	if err := MakeAll(leaf); err != nil {
++		t.Fatalf("repeated MakeAll = %v", err)
++	}
++}
++
++func TestValidateRejectsWhatIsNotAPrivateDirectory(t *testing.T) {
++	base := t.TempDir()
++
++	missing := filepath.Join(base, "missing")
++	if err := Validate(missing); !errors.Is(err, os.ErrNotExist) {
++		t.Fatalf("missing path error = %v, want os.ErrNotExist", err)
++	}
++
++	file := filepath.Join(base, "file")
++	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if Validate(file) == nil {
++		t.Fatal("a regular file validated as a private directory")
++	}
++
++	// A directory created by plain os.Mkdir carries the platform's default
++	// shape (group/other bits from the mode on Unix, an inherited DACL on
++	// Windows) and must be rejected: the boundary only trusts what it made.
++	ordinary := filepath.Join(base, "ordinary")
++	if err := os.Mkdir(ordinary, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if runtime.GOOS != "windows" {
++		// Pin the loose shape regardless of the process umask.
++		if err := os.Chmod(ordinary, 0o755); err != nil {
++			t.Fatal(err)
++		}
++	}
++	if Validate(ordinary) == nil {
++		t.Fatal("an ordinary directory validated as private")
++	}
++
++	if runtime.GOOS != "windows" {
++		linked := filepath.Join(base, "linked")
++		target := filepath.Join(base, "target")
++		if err := Make(target); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.Symlink(target, linked); err != nil {
++			t.Fatal(err)
++		}
++		if Validate(linked) == nil {
++			t.Fatal("a symlink to a private directory validated as private")
++		}
++	}
++}
++
++func TestProtectUpgradesAnExistingDirectory(t *testing.T) {
++	// os.MkdirTemp is the one creation path the boundary uses that cannot
++	// attach the private shape at creation; Protect must close that gap.
++	path, err := os.MkdirTemp(t.TempDir(), "blob-")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := Protect(path); err != nil {
++		t.Fatal(err)
++	}
++	if err := Validate(path); err != nil {
++		t.Fatalf("protected directory rejected: %v", err)
++	}
++}
++
++func TestPrivateDirectoryIsUsableByItsOwner(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "private")
++	if err := Make(path); err != nil {
++		t.Fatal(err)
++	}
++	child := filepath.Join(path, "child.txt")
++	if err := os.WriteFile(child, []byte("payload"), 0o600); err != nil {
++		t.Fatalf("owner cannot write inside its private directory: %v", err)
++	}
++	payload, err := os.ReadFile(child)
++	if err != nil || string(payload) != "payload" {
++		t.Fatalf("owner cannot read back its file: %v %q", err, payload)
++	}
++	nested := filepath.Join(path, "nested")
++	if err := os.Mkdir(nested, 0o700); err != nil {
++		t.Fatalf("owner cannot create a nested directory: %v", err)
++	}
++	if err := os.RemoveAll(path); err != nil {
++		t.Fatalf("owner cannot remove its private tree: %v", err)
++	}
++}
+diff --git a/internal/privatedir/privatedir_unix.go b/internal/privatedir/privatedir_unix.go
+new file mode 100644
+index 00000000..cc2c5e35
+--- /dev/null
++++ b/internal/privatedir/privatedir_unix.go
+@@ -0,0 +1,31 @@
++//go:build unix
++
++package privatedir
++
++import (
++	"fmt"
++	"io/fs"
++	"os"
++)
++
++// On Unix the private shape is the 0o700 permission bits on a real directory.
++// 0o700 grants nothing to group or other, so no common umask weakens it.
++
++func makePrivate(path string) error { return os.Mkdir(path, 0o700) }
++
++func makeAllPrivate(path string) error { return os.MkdirAll(path, 0o700) }
++
++func validatePrivate(path string) error {
++	info, err := os.Lstat(path)
++	if err != nil {
++		return err
++	}
++	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 || info.Mode().Perm() != 0o700 {
++		return fmt.Errorf("%s is not a private owner-only directory", path)
++	}
++	return nil
++}
++
++func protectPrivate(path string) error {
++	return os.Chmod(path, 0o700) // #nosec G302 -- a private directory, not a regular file.
++}
+diff --git a/internal/privatedir/privatedir_unsupported.go b/internal/privatedir/privatedir_unsupported.go
+new file mode 100644
+index 00000000..8165d680
+--- /dev/null
++++ b/internal/privatedir/privatedir_unsupported.go
+@@ -0,0 +1,24 @@
++//go:build !unix && !windows
++
++package privatedir
++
++import "fmt"
++
++// A platform with neither Unix permission bits nor Windows DACLs cannot
++// express the private shape, so every operation fails closed.
++
++func makePrivate(string) error {
++	return fmt.Errorf("private directories are unsupported on this platform")
++}
++
++func makeAllPrivate(string) error {
++	return fmt.Errorf("private directories are unsupported on this platform")
++}
++
++func validatePrivate(string) error {
++	return fmt.Errorf("private directories are unsupported on this platform")
++}
++
++func protectPrivate(string) error {
++	return fmt.Errorf("private directories are unsupported on this platform")
++}
+diff --git a/internal/privatedir/privatedir_windows.go b/internal/privatedir/privatedir_windows.go
+new file mode 100644
+index 00000000..fc48b7a7
+--- /dev/null
++++ b/internal/privatedir/privatedir_windows.go
+@@ -0,0 +1,257 @@
++//go:build windows
++
++package privatedir
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"unsafe"
++
++	"golang.org/x/sys/windows"
++)
++
++// The Windows private shape is the one the reviewed protected-root backend in
++// internal/buildcache/protection_windows.go establishes for the build cache:
++// an owner-only DACL whose control word carries SE_DACL_PROTECTED, attached at
++// creation time so the directory never exists with a DACL inherited from its
++// parent. Validation proves the effective user owns the directory, that the
++// DACL is protected from inheritance, and that every entry names the owner and
++// allows access — a deny, inherited, or foreign entry is a refusal, not an
++// access-check exercise. That package cannot be imported from here (it depends
++// on internal/closureexec), so the shape is restated with the same semantics.
++
++// windowsPropagationFlags are the ACE flags that describe what a child
++// inherits. They grant nothing on the object itself, so they are the only
++// flags an owner-only DACL may carry; INHERITED_ACE is deliberately absent.
++const windowsPropagationFlags = byte(windows.CONTAINER_INHERIT_ACE | windows.OBJECT_INHERIT_ACE |
++	windows.NO_PROPAGATE_INHERIT_ACE | windows.INHERIT_ONLY_ACE)
++
++const windowsFileDeleteChild windows.ACCESS_MASK = 0x00000040
++
++// windowsConcreteMutationRights are the specific rights that together prove
++// the owner can mutate and replace the directory, for a DACL that spells
++// rights concretely instead of via GENERIC_ALL.
++const windowsConcreteMutationRights windows.ACCESS_MASK = windows.FILE_WRITE_DATA |
++	windows.FILE_APPEND_DATA | windows.FILE_WRITE_EA | windows.FILE_WRITE_ATTRIBUTES |
++	windowsFileDeleteChild | windows.WRITE_DAC | windows.WRITE_OWNER | windows.DELETE
++
++func ownerOnlyACL() (*windows.ACL, error) {
++	user, err := windows.GetCurrentProcessToken().GetTokenUser()
++	if err != nil {
++		return nil, err
++	}
++	return windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
++		AccessPermissions: windows.GENERIC_ALL,
++		AccessMode:        windows.SET_ACCESS,
++		// Children created by ordinary os calls inherit the owner-only entry;
++		// without propagation they would carry an empty DACL and be unopenable
++		// even by their owner. The single entry names the owner either way.
++		Inheritance: windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
++		Trustee: windows.TRUSTEE{
++			TrusteeForm:  windows.TRUSTEE_IS_SID,
++			TrusteeType:  windows.TRUSTEE_IS_USER,
++			TrusteeValue: windows.TrusteeValueFromSID(user.User.Sid),
++		},
++	}}, nil)
++}
++
++// makePrivate creates the directory with the owner-only protected descriptor
++// supplied to the create call itself. os.Mkdir followed by re-securing is not
++// equivalent: between the calls the directory exists with the parent's
++// inherited DACL, and a concurrent validator would fail closed on state this
++// manager had just created correctly.
++func makePrivate(path string) error {
++	user, err := windows.GetCurrentProcessToken().GetTokenUser()
++	if err != nil {
++		return err
++	}
++	acl, err := ownerOnlyACL()
++	if err != nil {
++		return err
++	}
++	descriptor, err := windows.NewSecurityDescriptor()
++	if err != nil {
++		return err
++	}
++	if err := descriptor.SetDACL(acl, true, false); err != nil {
++		return err
++	}
++	// The owner is stated explicitly. When the effective user is an
++	// administrator, the default owner policy can assign new objects to the
++	// Administrators group instead of the personal SID, and Validate would
++	// then refuse a directory this manager had just created correctly.
++	if err := descriptor.SetOwner(user.User.Sid, false); err != nil {
++		return err
++	}
++	// Without SE_DACL_PROTECTED the supplied DACL is merged with the parent's
++	// inheritable entries, which is exactly the state being avoided.
++	if err := descriptor.SetControl(windows.SE_DACL_PROTECTED, windows.SE_DACL_PROTECTED); err != nil {
++		return err
++	}
++	attributes := windows.SecurityAttributes{SecurityDescriptor: descriptor}
++	attributes.Length = uint32(unsafe.Sizeof(attributes))
++	path16, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return err
++	}
++	if err := windows.CreateDirectory(path16, &attributes); err != nil {
++		if errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
++			return &os.PathError{Op: "mkdir", Path: path, Err: os.ErrExist}
++		}
++		return &os.PathError{Op: "mkdir", Path: path, Err: err}
++	}
++	return nil
++}
++
++func makeAllPrivate(path string) error {
++	abs, err := filepath.Abs(path)
++	if err != nil {
++		return err
++	}
++	if info, statErr := os.Lstat(abs); statErr == nil {
++		if info.IsDir() {
++			return nil
++		}
++		return &os.PathError{Op: "mkdir", Path: abs, Err: windows.ERROR_DIRECTORY}
++	}
++	if parent := filepath.Dir(abs); parent != abs {
++		if err := makeAllPrivate(parent); err != nil {
++			return err
++		}
++	}
++	if err := makePrivate(abs); err != nil && !errors.Is(err, os.ErrExist) {
++		return err
++	}
++	return nil
++}
++
++func validatePrivate(path string) error {
++	handle, err := openNoFollow(path)
++	if err != nil {
++		return err
++	}
++	defer func() { _ = windows.CloseHandle(handle) }()
++
++	var info windows.ByHandleFileInformation
++	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
++		return fmt.Errorf("read %s attributes: %w", path, err)
++	}
++	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
++		return fmt.Errorf("%s is a reparse point, not a private directory", path)
++	}
++	if info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 {
++		return fmt.Errorf("%s is not a directory", path)
++	}
++
++	descriptor, err := windows.GetSecurityInfo(
++		handle,
++		windows.SE_FILE_OBJECT,
++		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION,
++	)
++	if err != nil {
++		return fmt.Errorf("read %s owner and DACL: %w", path, err)
++	}
++	owner, _, err := descriptor.Owner()
++	if err != nil || owner == nil || !owner.IsValid() {
++		return fmt.Errorf("%s has no valid owner", path)
++	}
++	user, err := windows.GetCurrentProcessToken().GetTokenUser()
++	if err != nil {
++		return fmt.Errorf("resolve effective Windows user: %w", err)
++	}
++	if !owner.Equals(user.User.Sid) {
++		return fmt.Errorf("%s owner does not match the effective user", path)
++	}
++	control, _, err := descriptor.Control()
++	if err != nil || control&windows.SE_DACL_PROTECTED == 0 {
++		return fmt.Errorf("%s DACL is not protected from inheritance", path)
++	}
++	dacl, _, err := descriptor.DACL()
++	if err != nil || dacl == nil {
++		return fmt.Errorf("%s has no protected DACL", path)
++	}
++	return validateOwnerOnlyDACL(dacl, owner, path)
++}
++
++func validateOwnerOnlyDACL(dacl *windows.ACL, owner *windows.SID, path string) error {
++	var ownerRights windows.ACCESS_MASK
++	for index := uint32(0); index < uint32(dacl.AceCount); index++ {
++		var ace *windows.ACCESS_ALLOWED_ACE
++		if err := windows.GetAce(dacl, index, &ace); err != nil || ace == nil {
++			return fmt.Errorf("read %s DACL entry: %w", path, err)
++		}
++		if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
++			return fmt.Errorf("%s DACL contains a deny or unsupported entry", path)
++		}
++		if ace.Header.AceFlags&^windowsPropagationFlags != 0 {
++			return fmt.Errorf("%s DACL contains an inherited or unsupported entry", path)
++		}
++		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart)) // #nosec G103 -- fixed ACCESS_ALLOWED_ACE layout: the SID begins at SidStart.
++		if sid == nil || !sid.IsValid() {
++			return fmt.Errorf("%s DACL contains an invalid SID", path)
++		}
++		if !owner.Equals(sid) {
++			return fmt.Errorf("%s DACL grants access to another principal", path)
++		}
++		if ace.Header.AceFlags&windows.INHERIT_ONLY_ACE == 0 {
++			ownerRights |= ace.Mask
++		}
++	}
++	if ownerRights&windows.GENERIC_ALL == 0 && ownerRights&windowsConcreteMutationRights != windowsConcreteMutationRights {
++		return fmt.Errorf("%s owner lacks required mutation rights", path)
++	}
++	return nil
++}
++
++func protectPrivate(path string) error {
++	user, err := windows.GetCurrentProcessToken().GetTokenUser()
++	if err != nil {
++		return err
++	}
++	acl, err := ownerOnlyACL()
++	if err != nil {
++		return err
++	}
++	// The owner is set alongside the DACL for the same reason makePrivate
++	// states it: an administrator's new objects may default to the
++	// Administrators group as owner. Assigning one's own SID needs no special
++	// privilege on an object the caller just created and can already control.
++	return windows.SetNamedSecurityInfo(
++		path,
++		windows.SE_FILE_OBJECT,
++		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
++		user.User.Sid,
++		nil,
++		acl,
++		nil,
++	)
++}
++
++func openNoFollow(path string) (windows.Handle, error) {
++	if strings.TrimSpace(path) == "" {
++		return 0, fmt.Errorf("empty path")
++	}
++	path16, err := windows.UTF16PtrFromString(path)
++	if err != nil {
++		return 0, err
++	}
++	handle, err := windows.CreateFile(
++		path16,
++		windows.GENERIC_READ|windows.READ_CONTROL,
++		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
++		nil,
++		windows.OPEN_EXISTING,
++		windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_BACKUP_SEMANTICS,
++		0,
++	)
++	if err != nil {
++		if errors.Is(err, windows.ERROR_FILE_NOT_FOUND) || errors.Is(err, windows.ERROR_PATH_NOT_FOUND) {
++			return 0, &os.PathError{Op: "open", Path: path, Err: os.ErrNotExist}
++		}
++		return 0, &os.PathError{Op: "open", Path: path, Err: err}
++	}
++	return handle, nil
++}
+diff --git a/internal/rustsource/authority_external_test.go b/internal/rustsource/authority_external_test.go
+index 21789458..9e35fbfd 100644
+--- a/internal/rustsource/authority_external_test.go
++++ b/internal/rustsource/authority_external_test.go
+@@ -51,6 +51,7 @@ func TestRawCaptureAPIContainsNoAuthorityOrDerivedSeam(t *testing.T) {
+ }
+ 
+ func TestProductionManagerCapturesRegistryFromRawPaths(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
+ 		t.Fatal(err)
+@@ -101,6 +102,7 @@ func TestProductionManagerCapturesRegistryFromRawPaths(t *testing.T) {
+ }
+ 
+ func TestZeroManagerAndForeignCaptureFailClosed(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	var zero rustsource.Manager
+ 	if _, err := zero.Capture(t.Context(), rustsource.RawCaptureRequest{}); err == nil {
+ 		t.Fatal("zero manager authorized capture")
+@@ -120,6 +122,7 @@ func TestZeroManagerAndForeignCaptureFailClosed(t *testing.T) {
+ }
+ 
+ func TestProductionManagerCapturesGitWithoutCallerProjection(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	submodule := t.TempDir()
+ 	if err := os.WriteFile(filepath.Join(submodule, "nested.txt"), []byte("submodule evidence\n"), 0o600); err != nil {
+ 		t.Fatal(err)
+@@ -204,6 +207,13 @@ func TestProductionManagerCapturesGitWithoutCallerProjection(t *testing.T) {
+ 	}
+ }
+ 
++func requireNativeCargoDescriptor(t *testing.T) {
++	t.Helper()
++	if reason := rustsource.NativeCargoUnavailableReason(); reason != "" {
++		t.Skip(reason)
++	}
++}
++
+ func git(t *testing.T, root string, args ...string) string {
+ 	t.Helper()
+ 	command := exec.Command("git", append([]string{"-C", root}, args...)...) // #nosec G204 -- fixed test fixture command.
+diff --git a/internal/rustsource/build.go b/internal/rustsource/build.go
+index 4f0c1948..92eaa40a 100644
+--- a/internal/rustsource/build.go
++++ b/internal/rustsource/build.go
+@@ -18,6 +18,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ const buildProfileID = "curator"
+@@ -192,7 +193,7 @@ func (m *Manager) Build(ctx context.Context, request BuildRequest) (BuildResult,
+ 	}
+ 	defer func() { _ = os.RemoveAll(staging) }()
+ 	artifactPath := filepath.Join(staging, filepath.FromSlash(output.LogicalPath))
+-	if err = os.MkdirAll(filepath.Dir(artifactPath), 0o700); err != nil {
++	if err = privatedir.MakeAll(filepath.Dir(artifactPath)); err != nil {
+ 		return BuildResult{}, err
+ 	}
+ 	payload, err := os.ReadFile(executable) // #nosec G304 -- executable path is validated from Cargo JSON below the private target root.
+@@ -405,7 +406,7 @@ func buildEnvironment(tools rustBuildToolchain, home, target, temp, root string)
+ 		"CARGO_PROFILE_CURATOR_INCREMENTAL": "false", "CARGO_PROFILE_CURATOR_STRIP": "none",
+ 		"CARGO_TARGET_" + tripleKey + "_LINKER": tools.items[BuildToolLinker].PhysicalPath,
+ 	}
+-	_ = os.Mkdir(env["HOME"], 0o700)
++	_ = privatedir.Make(env["HOME"])
+ 	if tools.items[BuildToolSDK].PhysicalPath != tools.items[BuildToolSysroot].PhysicalPath {
+ 		env["SDKROOT"] = tools.items[BuildToolSDK].PhysicalPath
+ 	}
+diff --git a/internal/rustsource/build_conformance_test.go b/internal/rustsource/build_conformance_test.go
+index a4c48dca..623331f8 100644
+--- a/internal/rustsource/build_conformance_test.go
++++ b/internal/rustsource/build_conformance_test.go
+@@ -14,6 +14,7 @@ import (
+ )
+ 
+ func TestRustConformanceR03R05R06R07PathWorkspaceBuild(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	files := map[string]string{
+ 		"Cargo.toml":             "[workspace]\nmembers=[\"app\",\"dep1\",\"dep2\"]\nexclude=[\"unix_dep\",\"windows_dep\"]\nresolver=\"2\"\n",
+@@ -114,6 +115,7 @@ func TestRustConformanceR03R05R06R07PathWorkspaceBuild(t *testing.T) {
+ }
+ 
+ func TestRustConformanceR02GitBuildWithoutOriginalRemoteOrCache(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	submodule := t.TempDir()
+ 	writeRustFixtureFiles(t, submodule, map[string]string{"nested.txt": "submodule evidence\n"})
+ 	runGitFixture(t, submodule, "init", "-q")
+@@ -258,6 +260,7 @@ func TestRustConformanceRH09ToolchainCopyIsDependencyArtifact(t *testing.T) {
+ }
+ 
+ func TestRustConformanceRH10BuildRejectsToolchainDriftBeforeProcessOrPublication(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	writeRustFixtureFiles(t, workspace, map[string]string{
+ 		"Cargo.toml":  "[package]\nname='rh10_app'\nversion='0.1.0'\nedition='2021'\n[[bin]]\nname='rh10-app'\npath='src/main.rs'\n",
+@@ -351,6 +354,7 @@ func TestRustConformanceR04FeatureSelectionKeepsCaptureNeutral(t *testing.T) {
+ }
+ 
+ func TestRustConformanceR04FeatureSelectedBuildsHaveDistinctIdentities(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	writeRustFixtureFiles(t, workspace, map[string]string{
+ 		"Cargo.toml":              "[package]\nname=\"feature_app\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[dependencies]\noptional_dep={path=\"optional_dep\",optional=true}\n[features]\nextra=[\"dep:optional_dep\"]\n[[bin]]\nname=\"feature-app\"\npath=\"src/main.rs\"\n",
+diff --git a/internal/rustsource/build_execution.go b/internal/rustsource/build_execution.go
+index c7bfb483..fe30584b 100644
+--- a/internal/rustsource/build_execution.go
++++ b/internal/rustsource/build_execution.go
+@@ -12,6 +12,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ type cargoBuildExecution struct {
+@@ -98,7 +99,7 @@ func (state *managerState) executeBuildCargo(
+ 	}
+ 	defer func() { _ = os.RemoveAll(seedRoot) }()
+ 	for _, name := range []string{"cargo-home", "target", "tmp"} {
+-		if err = os.Mkdir(filepath.Join(seedRoot, name), 0o700); err != nil {
++		if err = privatedir.Make(filepath.Join(seedRoot, name)); err != nil {
+ 			return cargoBuildExecution{}, err
+ 		}
+ 	}
+diff --git a/internal/rustsource/build_test.go b/internal/rustsource/build_test.go
+index 10632b1b..92c97184 100644
+--- a/internal/rustsource/build_test.go
++++ b/internal/rustsource/build_test.go
+@@ -22,6 +22,7 @@ import (
+ )
+ 
+ func TestBuildToolchainRegistrationStartsNoProcessBeforeC0(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	var starts []closureexec.DerivationPermit
+ 	manager, err := NewManager(t.Context(), ManagerConfig{WorkRoot: t.TempDir(), ProcessStartObserver: func(permit closureexec.DerivationPermit) {
+ 		starts = append(starts, permit)
+@@ -79,6 +80,7 @@ func TestBuildToolchainRegistrationStartsNoProcessBeforeC0(t *testing.T) {
+ }
+ 
+ func TestCargoRegistrationBindsApprovedExecutableBytes(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	registration := registerCargoAtC0(t.Context())
+ 	if registration.err != nil {
+ 		t.Fatal(registration.err)
+@@ -237,6 +239,7 @@ func TestBuildBindingRequiresUniqueNativePlatformAndEveryPhysicalTool(t *testing
+ }
+ 
+ func TestRustConformanceR01R08R09RH05RH06RH08AndProtectedCache(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
+ 		t.Fatal(err)
+@@ -439,6 +442,7 @@ func TestVerifiedManagerWithoutProviderFailsBeforeSessionOrProcess(t *testing.T)
+ }
+ 
+ func TestPathOnlyClosureDerivesFreshFrozenMetadata(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(workspace, "src"), 0o700); err != nil {
+ 		t.Fatal(err)
+diff --git a/internal/rustsource/main_test.go b/internal/rustsource/main_test.go
+index 56fa76df..a5b18ff9 100644
+--- a/internal/rustsource/main_test.go
++++ b/internal/rustsource/main_test.go
+@@ -5,6 +5,13 @@ import (
+ 	"testing"
+ )
+ 
++func requireNativeCargoDescriptor(t *testing.T) {
++	t.Helper()
++	if reason := NativeCargoUnavailableReason(); reason != "" {
++		t.Skip(reason)
++	}
++}
++
+ func TestMain(m *testing.M) {
+ 	if handled, code := DispatchInternalWorker(os.Args[1:], os.Stdin, os.Stdout); handled {
+ 		os.Exit(code)
+diff --git a/internal/rustsource/manager.go b/internal/rustsource/manager.go
+index f4f20164..77a55760 100644
+--- a/internal/rustsource/manager.go
++++ b/internal/rustsource/manager.go
+@@ -20,6 +20,7 @@ import (
+ 	"github.com/relux-works/curator/internal/artifactpolicy"
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+@@ -151,7 +152,7 @@ func NewManager(ctx context.Context, config ManagerConfig) (*Manager, error) {
+ 	if !filepath.IsAbs(config.WorkRoot) {
+ 		return nil, fail(CodeConfigUntrusted, "manager work root must be absolute", nil)
+ 	}
+-	if err := os.MkdirAll(config.WorkRoot, 0o700); err != nil {
++	if err := privatedir.MakeAll(config.WorkRoot); err != nil {
+ 		return nil, err
+ 	}
+ 	session, err := os.MkdirTemp(config.WorkRoot, "rust-source-v1-")
+@@ -171,11 +172,11 @@ func NewManager(ctx context.Context, config ManagerConfig) (*Manager, error) {
+ 	}
+ 	execRoot := filepath.Join(session, "execution")
+ 	outputRoot := filepath.Join(execRoot, "output")
+-	if err = os.MkdirAll(filepath.Join(execRoot, "bin"), 0o700); err != nil {
++	if err = privatedir.MakeAll(filepath.Join(execRoot, "bin")); err != nil {
+ 		_ = os.RemoveAll(session)
+ 		return nil, err
+ 	}
+-	if err = os.Mkdir(filepath.Join(execRoot, "work"), 0o700); err != nil {
++	if err = privatedir.Make(filepath.Join(execRoot, "work")); err != nil {
+ 		_ = os.RemoveAll(session)
+ 		return nil, err
+ 	}
+@@ -379,7 +380,7 @@ func (m *Manager) preAdmitGitSourceTrees(ctx context.Context, lock LockFile, val
+ }
+ 
+ func copySourceTree(source, destination string) error {
+-	if err := os.MkdirAll(destination, 0o700); err != nil {
++	if err := privatedir.MakeAll(destination); err != nil {
+ 		return err
+ 	}
+ 	return filepath.WalkDir(source, func(current string, entry fs.DirEntry, walkErr error) error {
+@@ -401,7 +402,7 @@ func copySourceTree(source, destination string) error {
+ 		}
+ 		target := filepath.Join(destination, rel)
+ 		if entry.IsDir() {
+-			return os.Mkdir(target, 0o700)
++			return privatedir.Make(target)
+ 		}
+ 		if !entry.Type().IsRegular() {
+ 			return fail(CodeGitIdentityInvalid, "raw Git source contains non-regular member", map[string]string{"path": filepath.ToSlash(rel)})
+diff --git a/internal/rustsource/manager_metadata.go b/internal/rustsource/manager_metadata.go
+index baf32c7f..540078cf 100644
+--- a/internal/rustsource/manager_metadata.go
++++ b/internal/rustsource/manager_metadata.go
+@@ -8,6 +8,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ type metadataExecution struct {
+@@ -38,7 +39,7 @@ func (runner *managerMetadataRunner) CommitMetadata(ctx context.Context, invocat
+ 	if err := os.RemoveAll(configRoot); err != nil {
+ 		return permit{}, err
+ 	}
+-	if err := os.Mkdir(configRoot, 0o700); err != nil {
++	if err := privatedir.Make(configRoot); err != nil {
+ 		return permit{}, err
+ 	}
+ 	configBytes, err := DeriveSourceReplacementConfig(filepath.Join(runner.manager.execRoot, "vendor"), runner.manager.lock.Packages)
+diff --git a/internal/rustsource/manager_vendor.go b/internal/rustsource/manager_vendor.go
+index 6e5e4fa1..ea331aaa 100644
+--- a/internal/rustsource/manager_vendor.go
++++ b/internal/rustsource/manager_vendor.go
+@@ -11,6 +11,7 @@ import (
+ 	"github.com/relux-works/curator/internal/artifactpolicy"
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ type managerVendorRunner struct {
+@@ -33,7 +34,7 @@ func (runner *managerVendorRunner) stageCargoHome(_ context.Context, root string
+ 	if runner == nil || runner.manager == nil || root != runner.manager.cargoHome {
+ 		return fail(CodeConfigUntrusted, "Cargo home staging authority differs", nil)
+ 	}
+-	if err := os.Mkdir(root, 0o700); err != nil {
++	if err := privatedir.Make(root); err != nil {
+ 		return err
+ 	}
+ 	for _, origin := range runner.registry {
+@@ -42,7 +43,7 @@ func (runner *managerVendorRunner) stageCargoHome(_ context.Context, root string
+ 			return err
+ 		}
+ 		cacheRoot := filepath.Join(root, "registry", "cache", sourceID)
+-		if err = os.MkdirAll(cacheRoot, 0o700); err != nil {
++		if err = privatedir.MakeAll(cacheRoot); err != nil {
+ 			return err
+ 		}
+ 		if err = os.WriteFile(filepath.Join(cacheRoot, packageDirectory(origin.Package)+".crate"), origin.Archive, 0o400); err != nil {
+@@ -50,7 +51,7 @@ func (runner *managerVendorRunner) stageCargoHome(_ context.Context, root string
+ 		}
+ 		indexRoot := filepath.Join(root, "registry", "index", sourceID)
+ 		indexPath := filepath.Join(indexRoot, ".cache", filepath.FromSlash(registryIndexPath(origin.Package.Name)))
+-		if err = os.MkdirAll(filepath.Dir(indexPath), 0o700); err != nil {
++		if err = privatedir.MakeAll(filepath.Dir(indexPath)); err != nil {
+ 			return err
+ 		}
+ 		cacheRecord := append([]byte{3, 2, 0, 0, 0}, []byte("etag: \"curator-admitted\"\x00")...)
+@@ -142,7 +143,7 @@ func expectedPackage(packages []VendorPackage, key PackageKey) (VendorPackage, b
+ }
+ 
+ func materializePackage(root string, pkg VendorPackage, cargoOK bool) error {
+-	if err := os.MkdirAll(root, 0o700); err != nil {
++	if err := privatedir.MakeAll(root); err != nil {
+ 		return err
+ 	}
+ 	for _, leaf := range pkg.Files {
+@@ -150,7 +151,7 @@ func materializePackage(root string, pkg VendorPackage, cargoOK bool) error {
+ 			continue
+ 		}
+ 		path := filepath.Join(root, filepath.FromSlash(leaf.Path))
+-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
++		if err := privatedir.MakeAll(filepath.Dir(path)); err != nil {
+ 			return err
+ 		}
+ 		if err := os.WriteFile(path, leaf.Bytes, 0o400); err != nil {
+@@ -181,7 +182,7 @@ func copyAdministrativeTree(source, destination string) error {
+ 		}
+ 		target := filepath.Join(destination, rel)
+ 		if entry.IsDir() {
+-			return os.MkdirAll(target, 0o700)
++			return privatedir.MakeAll(target)
+ 		}
+ 		if entry.Type()&fs.ModeSymlink != 0 {
+ 			return fail(CodeGitIdentityInvalid, "Git administrative store contains a link", nil)
+@@ -215,7 +216,7 @@ func copyGitMarkers(source, destination string) error {
+ 				return err
+ 			}
+ 			target := filepath.Join(destination, rel)
+-			if err = os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
++			if err = privatedir.MakeAll(filepath.Dir(target)); err != nil {
+ 				return err
+ 			}
+ 			return os.WriteFile(target, payload, 0o400)
+@@ -335,7 +336,7 @@ func (runner *managerVendorRunner) RunVendor(ctx context.Context, legacy permit,
+ 		return "", err
+ 	}
+ 	if len(runner.expected) == 0 {
+-		if err = os.Mkdir(invocation.Destination, 0o700); err != nil && !os.IsExist(err) {
++		if err = privatedir.Make(invocation.Destination); err != nil && !os.IsExist(err) {
+ 			return "", err
+ 		}
+ 	}
+diff --git a/internal/rustsource/oracle_worker.go b/internal/rustsource/oracle_worker.go
+index bedff108..b5f4bda3 100644
+--- a/internal/rustsource/oracle_worker.go
++++ b/internal/rustsource/oracle_worker.go
+@@ -8,6 +8,7 @@ import (
+ 	"sort"
+ 	"strings"
+ 
++	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/protocoljson"
+ )
+ 
+@@ -113,7 +114,7 @@ func runRustGitOracleWorker() int {
+ 	if err != nil {
+ 		return 1
+ 	}
+-	if err = os.MkdirAll(outputRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(outputRoot); err != nil {
+ 		return 1
+ 	}
+ 	if err = os.WriteFile(filepath.Join(outputRoot, "rust-git-projection-v1.json"), encoded, 0o600); err != nil {
+diff --git a/internal/rustsource/rustsource_test.go b/internal/rustsource/rustsource_test.go
+index 58b66a70..840d449a 100644
+--- a/internal/rustsource/rustsource_test.go
++++ b/internal/rustsource/rustsource_test.go
+@@ -311,6 +311,7 @@ path = "src/main.rs"
+ }
+ 
+ func TestManagerRejectsCompiledGitBeforeOracleVendorOrPrivateCargoState(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	workspace := t.TempDir()
+ 	manifestPath := filepath.Join(workspace, "Cargo.toml")
+ 	lockPath := filepath.Join(workspace, "Cargo.lock")
+@@ -352,6 +353,7 @@ func TestManagerRejectsCompiledGitBeforeOracleVendorOrPrivateCargoState(t *testi
+ }
+ 
+ func TestGitProtectedSnapshotMutationPreventsOracleStart(t *testing.T) {
++	requireNativeCargoDescriptor(t)
+ 	repository := t.TempDir()
+ 	if err := os.Mkdir(filepath.Join(repository, "src"), 0o700); err != nil {
+ 		t.Fatal(err)
+@@ -742,7 +744,13 @@ func TestCGP05ReconcileReusesSelectionNeutralCaptureAndSeparatesTargetBinding(t
+ }
+ 
+ func testToolchain() cargoToolchain {
+-	return cargoToolchain{CargoPath: "/toolchain/bin/cargo", Version: "1.91.0", ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43", BinarySHA256: "sha256:" + digest([]byte("cargo")), Fingerprint: "sha256:" + digest([]byte("toolchain")), C0CheckpointID: "sha256:" + digest([]byte("c0"))}
++	// The fixture path must satisfy filepath.IsAbs on every platform; a bare
++	// slash-rooted spelling is not absolute on Windows.
++	cargoPath := filepath.Join(string(filepath.Separator), "toolchain", "bin", "cargo")
++	if abs, err := filepath.Abs(cargoPath); err == nil {
++		cargoPath = abs
++	}
++	return cargoToolchain{CargoPath: cargoPath, Version: "1.91.0", ImplementationCommit: "ea2d97820c16195b0ca3fadb4319fe512c199a43", BinarySHA256: "sha256:" + digest([]byte("cargo")), Fingerprint: "sha256:" + digest([]byte("toolchain")), C0CheckpointID: "sha256:" + digest([]byte("c0"))}
+ }
+ func crateBytes(t *testing.T, key PackageKey, files map[string][]byte) []byte {
+ 	t.Helper()
+diff --git a/internal/rustsource/toolchain_registry.go b/internal/rustsource/toolchain_registry.go
+index af3d29dc..9c88bceb 100644
+--- a/internal/rustsource/toolchain_registry.go
++++ b/internal/rustsource/toolchain_registry.go
+@@ -4,6 +4,7 @@ import (
+ 	"context"
+ 	"crypto/sha256"
+ 	"encoding/hex"
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"io/fs"
+@@ -32,6 +33,46 @@ var approvedCargoDescriptors = map[string]approvedCargoDescriptor{
+ 	},
+ }
+ 
++// NativeCargoUnavailableReason reports only the two host-capability absences
++// that prevent the native Cargo path from starting: no approved descriptor for
++// this target, or no pinned toolchain root/executable on disk. A present
++// executable is not trusted here; registerCargoAtC0 remains the sole authority
++// that verifies its canonical path, bytes, descriptor, and whole-root identity.
++func NativeCargoUnavailableReason() string {
++	target, supported := nativeRustTarget()
++	if !supported {
++		return ""
++	}
++	_, approved := approvedCargoDescriptors[target]
++	if !approved {
++		return "no operator-approved Cargo descriptor for native target " + target
++	}
++	currentUser, err := user.Current()
++	if err != nil || currentUser.HomeDir == "" {
++		return ""
++	}
++	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
++	executable := filepath.Join(root, "bin", cargoExecutableName())
++	return cargoHostCapabilityReason(target, true, root, executable)
++}
++
++func cargoHostCapabilityReason(target string, approved bool, root, executable string) string {
++	if !approved {
++		return "no operator-approved Cargo descriptor for native target " + target
++	}
++	rootInfo, err := os.Stat(root)
++	if errors.Is(err, fs.ErrNotExist) {
++		return "pinned Cargo toolchain root or executable unavailable for native target " + target
++	}
++	if err != nil || !rootInfo.IsDir() {
++		return ""
++	}
++	if _, err := os.Stat(executable); errors.Is(err, fs.ErrNotExist) {
++		return "pinned Cargo toolchain root or executable unavailable for native target " + target
++	}
++	return ""
++}
++
+ // cargoRegistration is selected by NewManager while establishing C0. Adapter
+ // requests cannot replace it and selection never performs PATH, environment,
+ // shell, or rustup process lookup.
+@@ -57,7 +98,7 @@ func registerCargoAtC0(ctx context.Context) cargoRegistration {
+ 		return cargoRegistration{err: fmt.Errorf("no operator-approved Cargo descriptor for native target %s", target)}
+ 	}
+ 	root := filepath.Join(currentUser.HomeDir, ".rustup", "toolchains", "1.91.0-"+target)
+-	executable := filepath.Join(root, "bin", "cargo")
++	executable := filepath.Join(root, "bin", cargoExecutableName())
+ 	executable, err = filepath.EvalSymlinks(executable)
+ 	if err != nil {
+ 		return cargoRegistration{err: fmt.Errorf("canonicalize pinned Cargo executable: %w", err)}
+@@ -102,13 +143,22 @@ func registerCargoAtC0(ctx context.Context) cargoRegistration {
+ 
+ func nativeRustTarget() (string, bool) {
+ 	arch := map[string]string{"amd64": "x86_64", "arm64": "aarch64"}[runtime.GOARCH]
+-	osName := map[string]string{"darwin": "apple-darwin", "linux": "unknown-linux-gnu"}[runtime.GOOS]
++	osName := map[string]string{"darwin": "apple-darwin", "linux": "unknown-linux-gnu", "windows": "pc-windows-msvc"}[runtime.GOOS]
+ 	if arch == "" || osName == "" {
+ 		return "", false
+ 	}
+ 	return arch + "-" + osName, true
+ }
+ 
++// cargoExecutableName is the pinned Cargo binary's file name below the
++// toolchain root's bin directory on this platform.
++func cargoExecutableName() string {
++	if runtime.GOOS == "windows" {
++		return "cargo.exe"
++	}
++	return "cargo"
++}
++
+ func (registration cargoRegistration) recheck(ctx context.Context) (cargoToolchain, error) {
+ 	if registration.err != nil {
+ 		return cargoToolchain{}, fail(CodeVendorTransformUnsupported, registration.err.Error(), nil)
+diff --git a/internal/rustsource/toolchain_registry_test.go b/internal/rustsource/toolchain_registry_test.go
+new file mode 100644
+index 00000000..db4ae739
+--- /dev/null
++++ b/internal/rustsource/toolchain_registry_test.go
+@@ -0,0 +1,74 @@
++package rustsource
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++)
++
++func TestCargoHostCapabilityReasonClassifiesOnlyAbsence(t *testing.T) {
++	target := "aarch64-apple-darwin"
++	missingReason := "pinned Cargo toolchain root or executable unavailable for native target " + target
++
++	t.Run("descriptor absent", func(t *testing.T) {
++		if got := cargoHostCapabilityReason(target, false, "", ""); got != "no operator-approved Cargo descriptor for native target "+target {
++			t.Fatalf("reason = %q", got)
++		}
++	})
++
++	t.Run("toolchain root absent", func(t *testing.T) {
++		root := filepath.Join(t.TempDir(), "absent")
++		if got := cargoHostCapabilityReason(target, true, root, filepath.Join(root, "bin", "cargo")); got != missingReason {
++			t.Fatalf("reason = %q, want %q", got, missingReason)
++		}
++	})
++
++	t.Run("executable absent", func(t *testing.T) {
++		root := t.TempDir()
++		if got := cargoHostCapabilityReason(target, true, root, filepath.Join(root, "bin", "cargo")); got != missingReason {
++			t.Fatalf("reason = %q, want %q", got, missingReason)
++		}
++	})
++
++	t.Run("present executable identity is not inferred", func(t *testing.T) {
++		root := t.TempDir()
++		executable := filepath.Join(root, "bin", "cargo")
++		if err := os.MkdirAll(filepath.Dir(executable), 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(executable, []byte("not an approved Cargo executable"), 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if got := cargoHostCapabilityReason(target, true, root, executable); got != "" {
++			t.Fatalf("present mismatched executable was classified as unavailable: %q", got)
++		}
++		rootInfo, err := os.Stat(root)
++		if err != nil {
++			t.Fatal(err)
++		}
++		registration := cargoRegistration{
++			root:             root,
++			executable:       executable,
++			rootInfo:         rootInfo,
++			executableSHA256: "sha256:" + strings.Repeat("0", 64),
++			descriptor: approvedCargoDescriptor{
++				Version: "1.91.0", ImplementationCommit: "fixture",
++				ExecutableSHA256: "sha256:" + strings.Repeat("1", 64),
++			},
++		}
++		if _, err := registration.recheck(t.Context()); err == nil || !strings.Contains(err.Error(), "registered Cargo executable changed") {
++			t.Fatalf("present mismatched executable was not fatal: %v", err)
++		}
++	})
++
++	t.Run("present non-directory root is not absence", func(t *testing.T) {
++		root := filepath.Join(t.TempDir(), "toolchain")
++		if err := os.WriteFile(root, []byte("not a directory"), 0o600); err != nil {
++			t.Fatal(err)
++		}
++		if got := cargoHostCapabilityReason(target, true, root, filepath.Join(root, "bin", "cargo")); got != "" {
++			t.Fatalf("malformed present root was classified as unavailable: %q", got)
++		}
++	})
++}
+diff --git a/internal/shell/shell_test.go b/internal/shell/shell_test.go
+index 9f962eb1..6349a00c 100644
+--- a/internal/shell/shell_test.go
++++ b/internal/shell/shell_test.go
+@@ -386,7 +386,10 @@ Write-Output ("left={0}:{1}:{2}" -f $active, $restored, $secondPrompt)
+ 	if err := os.WriteFile(scriptPath, []byte(script), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	command := exec.Command(powerShell, "-NoProfile", "-File", scriptPath)
++	// Bypass applies only to this child process: hosts with a Restricted
++	// machine policy would otherwise refuse the harness script itself, which
++	// proves nothing about the hook under test.
++	command := exec.Command(powerShell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
+ 	command.Env = append(os.Environ(), "HOOK_PATH="+hookPath, "NESTED="+nested, "OUTSIDE="+outside)
+ 	output, err := command.CombinedOutput()
+ 	if err != nil {
+diff --git a/internal/swiftpmbuild/build.go b/internal/swiftpmbuild/build.go
+index f5b4e0c6..68c89606 100644
+--- a/internal/swiftpmbuild/build.go
++++ b/internal/swiftpmbuild/build.go
+@@ -17,6 +17,7 @@ import (
+ 	"github.com/relux-works/curator/internal/artifactpolicy"
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ 	"github.com/relux-works/curator/internal/swiftpminterop"
+ 	"github.com/relux-works/curator/internal/swiftpmsource"
+ )
+@@ -532,7 +533,7 @@ func stageDeclaredWrites(offline offlineEvidence, staging string) error {
+ 
+ func writeStagedFile(staging, logical string, payload []byte, mode fs.FileMode) error {
+ 	target := filepath.Join(staging, filepath.FromSlash(logical))
+-	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
++	if err := privatedir.MakeAll(filepath.Dir(target)); err != nil {
+ 		return err
+ 	}
+ 	return os.WriteFile(target, payload, mode)
+@@ -688,7 +689,7 @@ func materializeCaptureRoot(config Config, capture *swiftpmsource.Capture) (stri
+ 		return "", func() {}, err
+ 	}
+ 	for _, directory := range []string{"cache", "config", "home", "scratch", "security"} {
+-		if err = os.MkdirAll(filepath.Join(target, scratchRoot, directory), 0o700); err != nil {
++		if err = privatedir.MakeAll(filepath.Join(target, scratchRoot, directory)); err != nil {
+ 			cleanup()
+ 			return "", func() {}, err
+ 		}
+@@ -704,7 +705,7 @@ func requireEmptyOutputRoot(root string) error {
+ 	entries, err := os.ReadDir(root)
+ 	if err != nil {
+ 		if os.IsNotExist(err) {
+-			return os.MkdirAll(root, 0o700)
++			return privatedir.MakeAll(root)
+ 		}
+ 		return err
+ 	}
+@@ -808,7 +809,7 @@ func copyRegularTree(source, target string) error {
+ 		}
+ 		switch {
+ 		case entry.IsDir():
+-			return os.MkdirAll(destination, 0o700)
++			return privatedir.MakeAll(destination)
+ 		case info.Mode().IsRegular():
+ 			payload, readErr := os.ReadFile(current) // #nosec G304 -- admitted protected tree walked below its own root.
+ 			if readErr != nil {
+diff --git a/internal/swiftpmbuild/conformance_test.go b/internal/swiftpmbuild/conformance_test.go
+index f6838401..1d221a52 100644
+--- a/internal/swiftpmbuild/conformance_test.go
++++ b/internal/swiftpmbuild/conformance_test.go
+@@ -38,7 +38,7 @@ func TestS03MultiSourceTargetDeclaresEveryObject(t *testing.T) {
+ 	fixture := newFixture(t)
+ 	fixture.files["Sources/CLib/extra.c"] = "#include \"CLib.h\"\nint extra(void) { return 2; }\n"
+ 	fixture.manifest.Targets[1].Sources = []string{"Sources/CLib/extra.c", "Sources/CLib/lib.c"}
+-	fixture.stubExtra = "printf 'extra-object' > \".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/CLib.build/extra.c.o\"\n"
++	fixture.stubExtra = []stubAction{{Op: "write", Path: ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/CLib.build/extra.c.o", Payload: "extra-object"}}
+ 	plan := fixture.mustPlan()
+ 	if len(plan.Objects) != 3 {
+ 		t.Fatalf("declared object slots = %d, want one per source", len(plan.Objects))
+@@ -62,9 +62,12 @@ func TestS03SameBaseNameSourcesInDifferentDirectoriesResolve(t *testing.T) {
+ 	fixture.files["Sources/CLib/b/x.c"] = "#include \"CLib.h\"\nint right(void) { return 3; }\n"
+ 	fixture.manifest.Targets[1].Sources = []string{"Sources/CLib/a/x.c", "Sources/CLib/b/x.c", "Sources/CLib/lib.c"}
+ 	scratch := ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration
+-	fixture.stubExtra = "/bin/mkdir -p \"" + scratch + "/CLib.build/a\" \"" + scratch + "/CLib.build/b\"\n" +
+-		"printf 'left-object' > \"" + scratch + "/CLib.build/a/x.c.o\"\n" +
+-		"printf 'right-object' > \"" + scratch + "/CLib.build/b/x.c.o\"\n"
++	fixture.stubExtra = []stubAction{
++		{Op: "mkdir", Path: scratch + "/CLib.build/a"},
++		{Op: "mkdir", Path: scratch + "/CLib.build/b"},
++		{Op: "write", Path: scratch + "/CLib.build/a/x.c.o", Payload: "left-object"},
++		{Op: "write", Path: scratch + "/CLib.build/b/x.c.o", Payload: "right-object"},
++	}
+ 	plan := fixture.mustPlan()
+ 	if len(plan.Objects) != 4 {
+ 		t.Fatalf("declared object slots = %d, want one per source", len(plan.Objects))
+@@ -113,9 +116,12 @@ func TestR01R05OfflineBuildMountsAdmittedInputsWithNetworkDenied(t *testing.T) {
+ 		"Sources/CDep/include/CDep.h": "#ifndef CDEP_H\n#define CDEP_H\nint dep(void);\n#endif\n",
+ 	})
+ 	scratch := ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration
+-	fixture.stubExtra = "/bin/mkdir -p \"" + scratch + "/CDep.build\"\n" +
+-		"printf 'dep-object' > \"" + scratch + "/CDep.build/dep.c.o\"\n" +
+-		"printf '%s\\n' \"$PWD/" + scratch + "/CDep.build/dep.c.o : $PWD/.curator/scratch/checkouts/dep/Sources/CDep/dep.c\" > \"" + scratch + "/CDep.build/dep.c.d\"\n"
++	fixture.stubExtra = []stubAction{
++		{Op: "mkdir", Path: scratch + "/CDep.build"},
++		{Op: "write", Path: scratch + "/CDep.build/dep.c.o", Payload: "dep-object"},
++		{Op: "write", Path: scratch + "/CDep.build/dep.c.d",
++			Payload: "{{PWD}}/" + scratch + "/CDep.build/dep.c.o : {{PWD}}/.curator/scratch/checkouts/dep/Sources/CDep/dep.c\n"},
++	}
+ 	fixture.materialize()
+ 	capture, interop := fixture.closure()
+ 	plan, err := NewPlan(t.Context(), fixture.build, capture, interop)
+@@ -240,8 +246,10 @@ func TestGraphDriftIsRejectedBeforeExecution(t *testing.T) {
+ func TestUndeclaredGeneratedObjectFailsClosed(t *testing.T) {
+ 	scratch := ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration
+ 	fixture := newFixture(t)
+-	fixture.stubExtra = "/bin/mkdir -p \"" + scratch + "/CLib.build/generated\"\n" +
+-		"printf 'undeclared' > \"" + scratch + "/CLib.build/generated/smuggled.c.o\"\n"
++	fixture.stubExtra = []stubAction{
++		{Op: "mkdir", Path: scratch + "/CLib.build/generated"},
++		{Op: "write", Path: scratch + "/CLib.build/generated/smuggled.c.o", Payload: "undeclared"},
++	}
+ 	plan := fixture.mustPlan()
+ 	slot := ObjectSlot{}
+ 	for _, declared := range plan.Objects {
+@@ -261,14 +269,14 @@ func TestUndeclaredGeneratedObjectFailsClosed(t *testing.T) {
+ // assurance, drops the exact declared product, or claims a network attempt.
+ func TestCommandReconciliationRejectsInflatedOrDriftedEvidence(t *testing.T) {
+ 	permit := closureexec.DerivationPermit{
+-		Executable: "bin/swiftpm", CWD: "work/package", Argv: []string{"build"},
++		Executable: stubExecutableRelative(), CWD: "work/package", Argv: []string{"build"},
+ 		ReadRoots: []string{"inputs/build-root"}, WriteRoots: []string{"work/package"},
+-		AllowedProcesses: []string{"bin/swiftpm"},
++		AllowedProcesses: []string{stubExecutableRelative()},
+ 		ExpectedEvidence: []closureexec.EvidenceRequirement{{Path: "work/package/product", SchemaID: ExecutablePayloadSchemaID}},
+ 	}
+ 	base := closureexec.DerivationReceipt{
+ 		AssuranceMode: closureexec.AssurancePortable, BeforeFingerprint: id('1'), AfterFingerprint: id('1'),
+-		Audit:   closureexec.Audit{Executable: "bin/swiftpm", CWD: "work/package", Argv: []string{"build"}, Network: "not-observed"},
++		Audit:   closureexec.Audit{Executable: stubExecutableRelative(), CWD: "work/package", Argv: []string{"build"}, Network: "not-observed"},
+ 		Outputs: []closureexec.DerivationOutput{{Path: "work/package/product", SchemaID: ExecutablePayloadSchemaID}},
+ 	}
+ 	if err := reconcileCommand(permit, base); err != nil {
+diff --git a/internal/swiftpmbuild/fixture_test.go b/internal/swiftpmbuild/fixture_test.go
+index dd17cf77..6bb1a76f 100644
+--- a/internal/swiftpmbuild/fixture_test.go
++++ b/internal/swiftpmbuild/fixture_test.go
+@@ -4,11 +4,17 @@ import (
+ 	"context"
+ 	"crypto/sha256"
+ 	"encoding/hex"
++	"encoding/json"
+ 	"errors"
++	"fmt"
+ 	"os"
++	"os/exec"
+ 	"path/filepath"
++	"runtime"
+ 	"sort"
++	"strconv"
+ 	"strings"
++	"sync"
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/artifactpolicy"
+@@ -44,7 +50,7 @@ type fixture struct {
+ 	runner     *closureexec.ManagerProcessRunner
+ 	launches   []closureexec.ProcessLaunch
+ 	starts     int
+-	stubExtra  string
++	stubExtra  []stubAction
+ 
+ 	materializeHook func()
+ }
+@@ -144,22 +150,63 @@ func (f *fixture) writeTree(files map[string]string, root string) {
+ 	}
+ }
+ 
+-// swiftStub is the deterministic stand-in for the selected SwiftPM driver. It
+-// reproduces the exact native build layout: one product, one build directory
+-// per target, one object per source, and one compiler dependency file.
+-func (f *fixture) swiftStub() string {
++var (
++	swiftStubOnce  sync.Once
++	swiftStubBytes []byte
++	swiftStubErr   error
++)
++
++// builtSwiftStub compiles the scenario-driven SwiftPM stand-in once per test
++// process and returns its executable bytes; every fixture installs its own
++// copy below its private execution root.
++func builtSwiftStub(t *testing.T) []byte {
++	t.Helper()
++	swiftStubOnce.Do(func() {
++		output := filepath.Join(os.TempDir(), "curator-swiftpm-stub-"+strconv.Itoa(os.Getpid()))
++		build := exec.Command("go", "build", "-o", output, "./testdata/swiftpm_stub")
++		build.Env = os.Environ()
++		if combined, err := build.CombinedOutput(); err != nil {
++			swiftStubErr = fmt.Errorf("build swiftpm stub: %v\n%s", err, combined)
++			return
++		}
++		swiftStubBytes, swiftStubErr = os.ReadFile(output)
++		_ = os.Remove(output)
++	})
++	if swiftStubErr != nil {
++		t.Fatal(swiftStubErr)
++	}
++	return swiftStubBytes
++}
++
++// stubAction is one declarative step of the SwiftPM driver stand-in. The
++// stand-in was previously a POSIX shell script, which Windows cannot execute;
++// the compiled scenario runner in testdata/swiftpm_stub reproduces the same
++// observable build layout on every platform.
++type stubAction struct {
++	Op      string `json:"op"`
++	Path    string `json:"path"`
++	Payload string `json:"payload,omitempty"`
++}
++
++// swiftStubActions is the deterministic stand-in for the selected SwiftPM
++// driver. It reproduces the exact native build layout: one product, one build
++// directory per target, one object per source, and one compiler dependency
++// file. {{PWD}} expands to the process working directory inside the stub.
++func (f *fixture) swiftStubActions() []stubAction {
+ 	scratch := ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration
+-	return "#!/bin/sh\nset -e\n" +
+-		"d=\"" + scratch + "\"\n" +
+-		"/bin/mkdir -p \"$d/App.build\" \"$d/CLib.build\"\n" +
+-		"printf 'curator-product' > \"$d/" + fixtureProduct + "\"\n" +
+-		"/bin/chmod 0500 \"$d/" + fixtureProduct + "\"\n" +
+-		"printf 'app-object' > \"$d/App.build/main.swift.o\"\n" +
+-		"printf 'clib-object' > \"$d/CLib.build/lib.c.o\"\n" +
+-		"printf '%s\\n' \"$PWD/$d/App.build/main.swift.o : $PWD/Sources/App/main.swift $PWD/$d/CLib.build/module.modulemap\" > \"$d/App.build/App.d\"\n" +
+-		"printf '%s\\n' \"$PWD/$d/CLib.build/lib.c.o : $PWD/Sources/CLib/lib.c $PWD/Sources/CLib/include/CLib.h\" > \"$d/CLib.build/lib.c.d\"\n" +
+-		"printf '{}' > \"$d/description.json\"\n" +
+-		f.stubExtra
++	return append([]stubAction{
++		{Op: "mkdir", Path: scratch + "/App.build"},
++		{Op: "mkdir", Path: scratch + "/CLib.build"},
++		{Op: "write", Path: scratch + "/" + fixtureProduct, Payload: "curator-product"},
++		{Op: "chmod-readonly-exec", Path: scratch + "/" + fixtureProduct},
++		{Op: "write", Path: scratch + "/App.build/main.swift.o", Payload: "app-object"},
++		{Op: "write", Path: scratch + "/CLib.build/lib.c.o", Payload: "clib-object"},
++		{Op: "write", Path: scratch + "/App.build/App.d",
++			Payload: "{{PWD}}/" + scratch + "/App.build/main.swift.o : {{PWD}}/Sources/App/main.swift {{PWD}}/" + scratch + "/CLib.build/module.modulemap\n"},
++		{Op: "write", Path: scratch + "/CLib.build/lib.c.d",
++			Payload: "{{PWD}}/" + scratch + "/CLib.build/lib.c.o : {{PWD}}/Sources/CLib/lib.c {{PWD}}/Sources/CLib/include/CLib.h\n"},
++		{Op: "write", Path: scratch + "/description.json", Payload: "{}"},
++	}, f.stubExtra...)
+ }
+ 
+ func (f *fixture) materialize() {
+@@ -168,14 +215,21 @@ func (f *fixture) materialize() {
+ 	if err := os.MkdirAll(filepath.Join(f.execRoot, "bin"), 0o700); err != nil {
+ 		f.t.Fatal(err)
+ 	}
+-	stub := []byte(f.swiftStub())
+-	stubPath := filepath.Join(f.execRoot, "bin", "swiftpm")
++	stubPath := filepath.Join(f.execRoot, filepath.FromSlash(stubExecutableRelative()))
+ 	if err := os.RemoveAll(stubPath); err != nil {
+ 		f.t.Fatal(err)
+ 	}
++	stub := builtSwiftStub(f.t)
+ 	if err := os.WriteFile(stubPath, stub, 0o500); err != nil {
+ 		f.t.Fatal(err)
+ 	}
++	scenario, err := json.Marshal(f.swiftStubActions())
++	if err != nil {
++		f.t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(f.execRoot, "bin", "swiftpm-scenario.json"), scenario, 0o600); err != nil {
++		f.t.Fatal(err)
++	}
+ 	sum := sha256.Sum256(stub)
+ 	stubDigest := closuregraph.ID("sha256:" + hex.EncodeToString(sum[:]))
+ 
+@@ -223,7 +277,7 @@ func (f *fixture) materialize() {
+ 			PolicySelector: "apple-linker-v1", VersionOutput: "ld 1234", Fingerprint: id('9'), ExecutableSHA256: id('a'),
+ 		},
+ 		Configuration: fixtureConfiguration, Assurance: closureexec.AssurancePortable,
+-		AllowedProcesses: []string{"bin/swiftpm"},
++		AllowedProcesses: []string{stubExecutableRelative()},
+ 		Slots: map[ToolSlot]string{
+ 			SlotSwiftPM: "swiftpm", SlotSwiftCompiler: "swift", SlotPackageDescription: "package-description",
+ 			SlotClang: "clang", SlotSDK: "macos-sdk",
+@@ -287,9 +341,23 @@ func rechecker(_ context.Context, expected swiftpmsource.ToolIdentity) (closuree
+ 
+ var hexAlphabet = "0123456789abcdef"
+ 
++// stubExecutableRelative is the driver stub's permit-relative path. Windows
++// CreateProcess resolution in os/exec requires a PATHEXT extension, so the
++// same fixture identity carries the platform's real executable spelling.
++func stubExecutableRelative() string {
++	if runtime.GOOS == "windows" {
++		return "bin/swiftpm.exe"
++	}
++	return "bin/swiftpm"
++}
++
+ func tool(role string, value byte) swiftpmsource.ToolIdentity {
++	relative := "bin/" + strings.ReplaceAll(role, "+", "x")
++	if role == "swiftpm" {
++		relative = stubExecutableRelative()
++	}
+ 	return swiftpmsource.ToolIdentity{
+-		Role: role, ExecutableRelativePath: "bin/" + strings.ReplaceAll(role, "+", "x"),
++		Role: role, ExecutableRelativePath: relative,
+ 		VersionOutput: role + " 6.3.2 (Apple Swift version 6.3.2)", PlatformABI: "darwin-arm64", PolicySelector: "swift-toolchain-v1",
+ 		Fingerprint: id(value), ExecutableSHA256: id(hexAlphabet[(strings.IndexByte(hexAlphabet, value)+8)%16]),
+ 	}
+diff --git a/internal/swiftpmbuild/readset.go b/internal/swiftpmbuild/readset.go
+index fc291012..3a95bb2f 100644
+--- a/internal/swiftpmbuild/readset.go
++++ b/internal/swiftpmbuild/readset.go
+@@ -277,6 +277,10 @@ func harvestDependencyFiles(observer *ReadSetObserver, scratchRootPath string) (
+ 				return nil, fileErr
+ 			}
+ 			for _, dependency := range parseDependencyFile(string(payload)) {
++				// The grammar treats a backslash as an escape, so drivers on
++				// every platform spell dependency paths with forward slashes;
++				// the platform spelling is restored before path comparison.
++				dependency = filepath.Clean(filepath.FromSlash(dependency))
+ 				reads[dependency] = classifyRead(dependency)
+ 			}
+ 		}
+diff --git a/internal/swiftpmbuild/swift_integration_test.go b/internal/swiftpmbuild/swift_integration_test.go
+index 532ebd1e..5ce7696c 100644
+--- a/internal/swiftpmbuild/swift_integration_test.go
++++ b/internal/swiftpmbuild/swift_integration_test.go
+@@ -12,6 +12,7 @@ import (
+ 	"testing"
+ 
+ 	"github.com/relux-works/curator/internal/swiftpminterop"
++	"github.com/relux-works/curator/internal/testtoolchain"
+ )
+ 
+ // One real tool vector keeps the planned command honest. The adapter tests own
+@@ -56,6 +57,9 @@ func TestRealSwiftPMBuildMatchesThePlannedLayout(t *testing.T) {
+ 	process.Dir = root
+ 	process.Env = []string{"HOME=" + filepath.Join(root, "empty-home"), "PATH=" + filepath.Dir(swift), "TZ=UTC"}
+ 	if output, runErr := process.CombinedOutput(); runErr != nil {
++		if testtoolchain.SwiftManifestLinkerUnavailable(output) {
++			t.Skip("SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest")
++		}
+ 		t.Fatalf("real SwiftPM build with the planned argv: %v: %s", runErr, output)
+ 	}
+ 
+diff --git a/internal/swiftpmbuild/swiftpmbuild_test.go b/internal/swiftpmbuild/swiftpmbuild_test.go
+index 4d47f338..3fb5839b 100644
+--- a/internal/swiftpmbuild/swiftpmbuild_test.go
++++ b/internal/swiftpmbuild/swiftpmbuild_test.go
+@@ -345,7 +345,7 @@ func TestOfflineBuildLaunchesExactlyTheCommittedCommand(t *testing.T) {
+ 	if !equalStrings(launch.Argv, plan.Command.Argv) {
+ 		t.Fatalf("launched argv = %v, want %v", launch.Argv, plan.Command.Argv)
+ 	}
+-	if filepath.Base(launch.Executable) != "swiftpm" {
++	if filepath.Base(launch.Executable) != filepath.Base(filepath.FromSlash(stubExecutableRelative())) {
+ 		t.Fatalf("launched executable = %q", launch.Executable)
+ 	}
+ 	for _, entry := range launch.Environment {
+@@ -358,7 +358,7 @@ func TestOfflineBuildLaunchesExactlyTheCommittedCommand(t *testing.T) {
+ // A declared write the build never produced fails closed without publication.
+ func TestMissingDeclaredObjectFailsClosedWithoutPublication(t *testing.T) {
+ 	fixture := newFixture(t)
+-	fixture.stubExtra = "/bin/rm -rf \".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/CLib.build\"\n"
++	fixture.stubExtra = []stubAction{{Op: "remove-all", Path: ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/CLib.build"}}
+ 	plan := fixture.mustPlan()
+ 	_, err := fixture.manager().Build(t.Context(), plan)
+ 	requireCode(t, err, CodeOutputUnreceipted)
+@@ -368,7 +368,7 @@ func TestMissingDeclaredObjectFailsClosedWithoutPublication(t *testing.T) {
+ // A build that never wrote the declared product fails closed.
+ func TestMissingProductFailsClosedWithoutPublication(t *testing.T) {
+ 	fixture := newFixture(t)
+-	fixture.stubExtra = "/bin/rm -f \".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/" + fixtureProduct + "\"\n"
++	fixture.stubExtra = []stubAction{{Op: "remove", Path: ".curator/scratch/" + fixtureScratchTriple + "/" + fixtureConfiguration + "/" + fixtureProduct}}
+ 	plan := fixture.mustPlan()
+ 	_, err := fixture.manager().Build(t.Context(), plan)
+ 	if err == nil {
+@@ -486,9 +486,10 @@ func TestObserverAuthorityContract(t *testing.T) {
+ // is rewritten to that dependency's protected root. A checkout that matches no
+ // admitted package identity fails closed rather than being dropped.
+ func TestObservedReadMappingSeparatesBuildTreeFromAdmittedSource(t *testing.T) {
+-	work := filepath.Join(string(filepath.Separator), "exec", "work", "package")
+-	admitted := filepath.Join(string(filepath.Separator), "store", "root")
+-	dependency := filepath.Join(string(filepath.Separator), "store", "dep")
++	base := t.TempDir()
++	work := filepath.Join(base, "exec", "work", "package")
++	admitted := filepath.Join(base, "store", "root")
++	dependency := filepath.Join(base, "store", "dep")
+ 	roots := map[string]string{"root": admitted, "dep": dependency}
+ 	resolved, generated, err := mapObservedRead(filepath.Join(work, "Sources", "App", "main.swift"), work, "root", roots)
+ 	if err != nil || generated || resolved != filepath.Join(admitted, "Sources", "App", "main.swift") {
+@@ -508,7 +509,7 @@ func TestObservedReadMappingSeparatesBuildTreeFromAdmittedSource(t *testing.T) {
+ 	if _, _, err = mapObservedRead(filepath.Join(work, ".curator", "scratch", "checkouts"), work, "root", roots); ErrorCode(err) != CodeHeaderInputUndeclared {
+ 		t.Fatal("a bare checkouts read was not rejected")
+ 	}
+-	external := filepath.Join(string(filepath.Separator), "sdk", "usr", "include", "stdio.h")
++	external := filepath.Join(base, "sdk", "usr", "include", "stdio.h")
+ 	if resolved, generated, err = mapObservedRead(external, work, "root", roots); err != nil || generated || resolved != external {
+ 		t.Fatalf("external read mapping = %q generated=%v (%v)", resolved, generated, err)
+ 	}
+@@ -596,7 +597,11 @@ func writeDependencyFile(t *testing.T, directory, name string, reads []string) {
+ 	if err := os.MkdirAll(directory, 0o700); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	payload := filepath.Join(directory, "out.o") + " : " + strings.Join(reads, " ") + "\n"
++	slashed := make([]string, 0, len(reads))
++	for _, read := range reads {
++		slashed = append(slashed, filepath.ToSlash(read))
++	}
++	payload := filepath.ToSlash(filepath.Join(directory, "out.o")) + " : " + strings.Join(slashed, " ") + "\n"
+ 	if err := os.WriteFile(filepath.Join(directory, name), []byte(payload), 0o600); err != nil {
+ 		t.Fatal(err)
+ 	}
+diff --git a/internal/swiftpmbuild/testdata/swiftpm_stub/stub_main.go b/internal/swiftpmbuild/testdata/swiftpm_stub/stub_main.go
+new file mode 100644
+index 00000000..a1e15b39
+--- /dev/null
++++ b/internal/swiftpmbuild/testdata/swiftpm_stub/stub_main.go
+@@ -0,0 +1,83 @@
++// Command swiftpm_stub is the deterministic cross-platform stand-in for the
++// selected SwiftPM driver in this package's tests. The previous stand-in was a
++// POSIX shell script, which Windows cannot execute; this binary reproduces the
++// same observable effect from a declarative scenario instead of shell text.
++//
++// It reads swiftpm-scenario.json from its own directory and applies each
++// action relative to the process working directory — the exact working
++// directory the committed permit binds. The literal token {{PWD}} inside a
++// payload is replaced with that absolute working directory, which is how the
++// compiler dependency files spell absolute source paths.
++package main
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++)
++
++type action struct {
++	// Op is mkdir, write, chmod-readonly-exec, remove, or remove-all.
++	Op string `json:"op"`
++	// Path is slash-separated and relative to the working directory.
++	Path string `json:"path"`
++	// Payload is the file content for write, with {{PWD}} expanded.
++	Payload string `json:"payload,omitempty"`
++}
++
++func main() {
++	if err := run(); err != nil {
++		fmt.Fprintln(os.Stderr, err)
++		os.Exit(1)
++	}
++}
++
++func run() error {
++	self, err := os.Executable()
++	if err != nil {
++		return err
++	}
++	scenarioBytes, err := os.ReadFile(filepath.Join(filepath.Dir(self), "swiftpm-scenario.json"))
++	if err != nil {
++		return err
++	}
++	var actions []action
++	if err := json.Unmarshal(scenarioBytes, &actions); err != nil {
++		return err
++	}
++	workingDirectory, err := os.Getwd()
++	if err != nil {
++		return err
++	}
++	for _, step := range actions {
++		target := filepath.FromSlash(step.Path)
++		switch step.Op {
++		case "mkdir":
++			if err := os.MkdirAll(target, 0o700); err != nil {
++				return err
++			}
++		case "write":
++			payload := strings.ReplaceAll(step.Payload, "{{PWD}}", filepath.ToSlash(workingDirectory))
++			if err := os.WriteFile(target, []byte(payload), 0o600); err != nil {
++				return err
++			}
++		case "chmod-readonly-exec":
++			if err := os.Chmod(target, 0o500); err != nil {
++				return err
++			}
++		case "remove":
++			if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
++				return err
++			}
++		case "remove-all":
++			if err := os.RemoveAll(target); err != nil {
++				return err
++			}
++		default:
++			return fmt.Errorf("unknown scenario op %q", step.Op)
++		}
++	}
++	return nil
++}
+diff --git a/internal/swiftpminterop/interop.go b/internal/swiftpminterop/interop.go
+index ef15495e..231fc048 100644
+--- a/internal/swiftpminterop/interop.go
++++ b/internal/swiftpminterop/interop.go
+@@ -413,7 +413,9 @@ func (state *closeState) inspectSystemTarget(interop *TargetInterop) error {
+ 	if err != nil {
+ 		return err
+ 	}
+-	baseDirectory := path.Dir(resolution.AbsolutePath)
++	// resolution.AbsolutePath is a host path; the slash-only path.Dir would
++	// return "." for a Windows spelling and turn every reference relative.
++	baseDirectory := filepath.Dir(resolution.AbsolutePath)
+ 	resolved := []Resolution{}
+ 	for _, reference := range parsed.References {
+ 		reference := reference
+diff --git a/internal/swiftpmsource/capture.go b/internal/swiftpmsource/capture.go
+index 5d5067e3..79e1c30d 100644
+--- a/internal/swiftpmsource/capture.go
++++ b/internal/swiftpmsource/capture.go
+@@ -19,6 +19,7 @@ import (
+ 	"github.com/relux-works/curator/internal/artifactpolicy"
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ var versionManifestPattern = regexp.MustCompile(`\APackage@swift-([0-9]+(?:\.[0-9]+){0,2})\.swift\z`)
+@@ -301,7 +302,7 @@ func captureMirror(ctx context.Context, config Config, pin Pin, snapshot Snapsho
+ 	mirrorRelative := filepath.ToSlash(filepath.Join(".swiftpm-authority", "mirrors", pin.Identity+"-"+pin.Revision+".git"))
+ 	mirrorRoot := filepath.Join(broker.authority.executionRoot, filepath.FromSlash(mirrorRelative))
+ 	permit := closureexec.DerivationPermit{SchemaID: closureexec.SchemaDerivationPermit, PreviousCausalHead: broker.authority.derivation.CurrentCausalHead(), InvocationKey: "source-control-mirror-v1:" + string(acquisitionID), InvocationSubtype: closureexec.DerivationMirror, AdmittedInputReceiptIDs: receiptIDs, InputMounts: mounts, C0CheckpointID: broker.authority.c0ID, ToolchainNodeID: mustToolNodeID(config.Toolchain.Git), ToolchainFingerprint: config.Toolchain.Git.Fingerprint, ExecutableSHA256: config.Toolchain.Git.ExecutableSHA256, Executable: config.Toolchain.Git.ExecutableRelativePath, CWD: filepath.ToSlash(filepath.Join(".swiftpm-authority", "work")), Argv: []string{"curator-source-control-mirror-v1"}, Environment: map[string]string{"CURATOR_GIT_REVISION": pin.Revision, "CURATOR_GIT_TREE": snapshot.GitTree, "CURATOR_MIRROR_ROOT": mirrorRelative, "CURATOR_OUTPUT_ROOT": filepath.ToSlash(filepath.Join(".swiftpm-authority", "mirror-output")), "CURATOR_SOURCE_CONTROL_KIND": string(pin.Kind), "HOME": "empty/home", "TZ": "UTC"}, HostID: mustPlatformID(config.Toolchain.Git.PlatformABI), TargetID: mustPlatformID(config.Toolchain.Git.PlatformABI), AllowedProcesses: []string{config.Toolchain.Git.ExecutableRelativePath}, ReadRoots: sortedUniqueStrings([]string{filepath.ToSlash(filepath.Dir(config.Toolchain.Git.ExecutableRelativePath)), mounts[0].Path, mounts[1].Path}), WriteRoots: sortedUniqueStrings([]string{evidencePath, mirrorRelative}), ExpectedEvidence: expected, LocalOutputs: []closureexec.LocalOutputDeclaration{{Path: mirrorRelative, SchemaID: "source-control-mirror-v1"}}, Network: "none", RecheckRule: "immediate-exact-v1", ResourceLimits: limits, ResourceLimitID: limitID, EvidenceSchemaID: evidenceSchemaID}
+-	if err = os.MkdirAll(filepath.Join(broker.authority.executionRoot, filepath.FromSlash(permit.CWD)), 0o700); err != nil {
++	if err = privatedir.MakeAll(filepath.Join(broker.authority.executionRoot, filepath.FromSlash(permit.CWD))); err != nil {
+ 		return Mirror{}, err
+ 	}
+ 	permitID, err := broker.authority.derivation.Commit(permit)
+diff --git a/internal/swiftpmsource/executor_runtime.go b/internal/swiftpmsource/executor_runtime.go
+index 305adc18..e99af3df 100644
+--- a/internal/swiftpmsource/executor_runtime.go
++++ b/internal/swiftpmsource/executor_runtime.go
+@@ -12,6 +12,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // ExecutorSwiftPM is the production manifest evaluator backed by the shared
+@@ -98,7 +99,7 @@ func (runtime *ExecutorSwiftPM) Replay(ctx context.Context, capture *Capture) (O
+ 		return OfflineMetadataResult{}, err
+ 	}
+ 	configRoot := filepath.Join(replayRoot, ".curator", "config")
+-	if err = os.MkdirAll(configRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(configRoot); err != nil {
+ 		return OfflineMetadataResult{}, err
+ 	}
+ 	if err = os.WriteFile(filepath.Join(configRoot, "mirrors.json"), mirrorPayload, 0o600); err != nil {
+@@ -171,7 +172,7 @@ func copyRegularTree(source, target string) error {
+ 			return fail(CodeOfflineReplayFailed, "offline root contains a link")
+ 		}
+ 		if entry.IsDir() {
+-			return os.MkdirAll(destination, 0o700)
++			return privatedir.MakeAll(destination)
+ 		}
+ 		info, err := entry.Info()
+ 		if err != nil || !info.Mode().IsRegular() {
+diff --git a/internal/swiftpmsource/git.go b/internal/swiftpmsource/git.go
+index 7a8bd7c4..2c3c9af1 100644
+--- a/internal/swiftpmsource/git.go
++++ b/internal/swiftpmsource/git.go
+@@ -18,6 +18,7 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // GitBroker is the production source-control acquisition boundary. It fetches
+@@ -310,7 +311,7 @@ func (broker *GitBroker) ResolvePinWithEvidence(ctx context.Context, dependency
+ 	if err != nil {
+ 		return Pin{}, journal, err
+ 	}
+-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(workRoot); err != nil {
+ 		return Pin{}, journal, err
+ 	}
+ 	prefix, value, ok := strings.Cut(dependency.Requirement, ":")
+@@ -367,7 +368,7 @@ func (broker *GitBroker) Acquire(ctx context.Context, pin Pin) (Snapshot, error)
+ 		return Snapshot{}, err
+ 	}
+ 	journal := GitVerificationEvidence{}
+-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(workRoot); err != nil {
+ 		return Snapshot{}, err
+ 	}
+ 	runRoot, err := os.MkdirTemp(workRoot, "acquire-"+pin.Identity+"-")
+@@ -637,7 +638,7 @@ func (verifier GitMirrorVerifier) run(ctx context.Context, executable, cwd, phas
+ }
+ 
+ func extractSourceArchive(root string, payload []byte) error {
+-	if err := os.Mkdir(root, 0o700); err != nil {
++	if err := privatedir.Make(root); err != nil {
+ 		return err
+ 	}
+ 	reader := tar.NewReader(bytes.NewReader(payload))
+@@ -662,11 +663,11 @@ func extractSourceArchive(root string, payload []byte) error {
+ 		case tar.TypeXHeader, tar.TypeXGlobalHeader:
+ 			continue
+ 		case tar.TypeDir:
+-			if err = os.MkdirAll(destination, 0o700); err != nil {
++			if err = privatedir.MakeAll(destination); err != nil {
+ 				return err
+ 			}
+ 		case tar.TypeReg:
+-			if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
++			if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
+ 				return err
+ 			}
+ 			mode := fs.FileMode(0o600)
+@@ -693,7 +694,7 @@ func extractSourceArchive(root string, payload []byte) error {
+ 
+ func gitEnvironment(root, executable string) []string {
+ 	home := filepath.Join(root, "empty-home")
+-	_ = os.MkdirAll(home, 0o700)
++	_ = privatedir.MakeAll(home)
+ 	return []string{"GIT_CONFIG_NOSYSTEM=1", "GIT_LFS_SKIP_SMUDGE=1", "GIT_TERMINAL_PROMPT=0", "HOME=" + home, "LANG=C", "LC_ALL=C", "PATH=" + filepath.Dir(executable), "TZ=UTC"}
+ }
+ 
+diff --git a/internal/swiftpmsource/swift_integration_test.go b/internal/swiftpmsource/swift_integration_test.go
+index 6460a023..b0ff19b6 100644
+--- a/internal/swiftpmsource/swift_integration_test.go
++++ b/internal/swiftpmsource/swift_integration_test.go
+@@ -17,6 +17,7 @@ import (
+ 	"github.com/relux-works/curator/internal/artifactpolicy"
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
++	"github.com/relux-works/curator/internal/testtoolchain"
+ )
+ 
+ // TestRealSwiftPMManifestVector keeps one real tool vector beside the semantic
+@@ -44,8 +45,9 @@ let package = Package(name: "Fixture", products: [.executable(name: "fixture", t
+ 	command := exec.CommandContext(t.Context(), swift, manifestArgv()...) // #nosec G204 -- resolved test tool and production permit argv.
+ 	command.Dir = root
+ 	command.Env = []string{"HOME=" + filepath.Join(root, "empty-home"), "PATH=" + filepath.Dir(swift), "TZ=UTC"}
+-	output, err := command.Output()
++	output, err := command.CombinedOutput()
+ 	if err != nil {
++		skipIfSwiftManifestLinkerUnavailable(t, output)
+ 		t.Fatalf("real SwiftPM dump-package: %v", err)
+ 	}
+ 	if !bytes.Contains(output, []byte(`"name" : "Fixture"`)) && !bytes.Contains(output, []byte(`"name":"Fixture"`)) {
+@@ -194,6 +196,7 @@ func TestRealSwiftPMManifestRunsThroughProductionManagerAndExecutor(t *testing.T
+ 	}
+ 	capture, err := manager.CaptureAndClose(t.Context(), Request{Root: root, Product: "fixture", Resolved: resolved})
+ 	if err != nil {
++		skipIfSwiftManifestLinkerUnavailable(t, []byte(err.Error()))
+ 		t.Fatal(err)
+ 	}
+ 	if starts != 2 || capture.SelectionProduct() != "fixture" || len(capture.Packages) != 2 || len(capture.Mirrors) != 1 {
+@@ -241,6 +244,13 @@ func TestRealSwiftPMManifestRunsThroughProductionManagerAndExecutor(t *testing.T
+ 	}
+ }
+ 
++func skipIfSwiftManifestLinkerUnavailable(t *testing.T, output []byte) {
++	t.Helper()
++	if testtoolchain.SwiftManifestLinkerUnavailable(output) {
++		t.Skip("SwiftPM manifest linker unavailable: clang posix_spawn failed while linking a manifest")
++	}
++}
++
+ func TestGitBrokerCapturesExactLocalRevisionTreeAndMirrorR01R07R08R09(t *testing.T) {
+ 	git, err := exec.LookPath("git")
+ 	if err != nil {
+diff --git a/internal/testtoolchain/lock.go b/internal/testtoolchain/lock.go
+new file mode 100644
+index 00000000..ddab8222
+--- /dev/null
++++ b/internal/testtoolchain/lock.go
+@@ -0,0 +1,45 @@
++// Package testtoolchain owns shared host-toolchain capability checks and
++// coordinates tests that use host installations as external fixtures.
++package testtoolchain
++
++import (
++	"context"
++	"os"
++	"path/filepath"
++	"runtime"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/managerlock"
++)
++
++const hostGOROOTLockTimeout = 5 * time.Minute
++
++// LockHostGOROOT serializes only the macOS tests that either keep a whole-tree
++// GOROOT fingerprint across an operation or execute the real tools from that
++// same host tree. Two hosted macOS runs observed the tool tree change while
++// those exact test classes overlapped; the lock gives that shared external test
++// fixture one owner without changing production toolchain verification or
++// serializing unrelated tests.
++func LockHostGOROOT(t testing.TB) {
++	t.Helper()
++	if runtime.GOOS != "darwin" {
++		return
++	}
++
++	manager, err := managerlock.New(filepath.Join(os.TempDir(), "curator-host-goroot-test-lock-v1"))
++	if err != nil {
++		t.Fatalf("create host GOROOT test lock: %v", err)
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), hostGOROOTLockTimeout)
++	t.Cleanup(cancel)
++	lock, err := manager.AcquireHomeOnly(ctx, false)
++	if err != nil {
++		t.Fatalf("acquire host GOROOT test lock: %v", err)
++	}
++	t.Cleanup(func() {
++		if closeErr := lock.Close(); closeErr != nil {
++			t.Errorf("release host GOROOT test lock: %v", closeErr)
++		}
++	})
++}
+diff --git a/internal/testtoolchain/swift.go b/internal/testtoolchain/swift.go
+new file mode 100644
+index 00000000..2e2901bb
+--- /dev/null
++++ b/internal/testtoolchain/swift.go
+@@ -0,0 +1,18 @@
++package testtoolchain
++
++import "strings"
++
++const (
++	swiftInvalidManifestDiagnostic = "Invalid manifest"
++	swiftManifestSpawnDiagnostic   = "clang: error: unable to execute command: posix_spawn failed: No such file or directory"
++)
++
++// SwiftManifestLinkerUnavailable reports the exact hosted-runner diagnostic
++// that proves SwiftPM found the manifest but the host could not start clang to
++// link it. Either diagnostic alone, and every adjacent Swift or permit failure,
++// remains an ordinary test failure.
++func SwiftManifestLinkerUnavailable(output []byte) bool {
++	text := string(output)
++	return strings.Contains(text, swiftInvalidManifestDiagnostic) &&
++		strings.Contains(text, swiftManifestSpawnDiagnostic)
++}
+diff --git a/internal/testtoolchain/swift_test.go b/internal/testtoolchain/swift_test.go
+new file mode 100644
+index 00000000..ffd649b2
+--- /dev/null
++++ b/internal/testtoolchain/swift_test.go
+@@ -0,0 +1,40 @@
++package testtoolchain
++
++import "testing"
++
++func TestSwiftManifestLinkerUnavailableClassifiesOnlyExactConjunction(t *testing.T) {
++	t.Parallel()
++
++	tests := []struct {
++		name   string
++		output string
++		want   bool
++	}{
++		{
++			name:   "exact conjunction",
++			output: "error: Invalid manifest\nclang: error: unable to execute command: posix_spawn failed: No such file or directory",
++			want:   true,
++		},
++		{
++			name:   "invalid manifest alone",
++			output: "error: Invalid manifest",
++		},
++		{
++			name:   "posix spawn diagnostic alone",
++			output: "clang: error: unable to execute command: posix_spawn failed: No such file or directory",
++		},
++		{
++			name:   "unrelated Swift permit failure",
++			output: "error: Invalid manifest\nswiftpm derivation permit refused: executable identity drift",
++		},
++	}
++
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			t.Parallel()
++			if got := SwiftManifestLinkerUnavailable([]byte(test.output)); got != test.want {
++				t.Fatalf("SwiftManifestLinkerUnavailable(%q) = %t, want %t", test.output, got, test.want)
++			}
++		})
++	}
++}
+diff --git a/internal/yarnclassicsource/capture.go b/internal/yarnclassicsource/capture.go
+index b14f7e60..e7811041 100644
+--- a/internal/yarnclassicsource/capture.go
++++ b/internal/yarnclassicsource/capture.go
+@@ -25,6 +25,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // RawTarball names exact caller-captured registry bytes for one lock instance.
+@@ -106,7 +107,7 @@ func CaptureAndAdmit(ctx context.Context, request CaptureRequest) (*Capture, err
+ 	if err != nil || request.WorkRoot == "" {
+ 		return nil, fail(CodeInputUndeclared, "Yarn work root is invalid", nil)
+ 	}
+-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(workRoot); err != nil {
+ 		return nil, err
+ 	}
+ 	stage, err := os.MkdirTemp(workRoot, "yarn-classic-project-stage-")
+@@ -551,7 +552,7 @@ func copyProjectSource(source, destination, modulesFolder string) ([]string, err
+ 		}
+ 		target := filepath.Join(destination, rel)
+ 		if entry.IsDir() {
+-			return os.Mkdir(target, 0o700)
++			return privatedir.Make(target)
+ 		}
+ 		info, err := entry.Info()
+ 		if err != nil || !info.Mode().IsRegular() {
+diff --git a/internal/yarnclassicsource/conformance_test.go b/internal/yarnclassicsource/conformance_test.go
+index 5c5fe1f4..bfa6ad0b 100644
+--- a/internal/yarnclassicsource/conformance_test.go
++++ b/internal/yarnclassicsource/conformance_test.go
+@@ -706,7 +706,10 @@ func newConcreteYarnRunner(t *testing.T) *concreteYarnRunner {
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+-	yarnPackageRoot := filepath.Join(filepath.Dir(filepath.Dir(yarnBin)), "libexec")
++	yarnPackageRoot, err := yarnClassicPackageRoot(yarnBin)
++	if err != nil {
++		t.Skipf("exact Yarn %s is installed without a supported pinned tool root: %v", SupportedYarnVersion, err)
++	}
+ 	stagedYarnRoot := filepath.Join(executionRoot, "toolchain", "yarn")
+ 	if err = copyContainedTreeDereferencingLinks(yarnPackageRoot, yarnPackageRoot, stagedYarnRoot, map[string]bool{}); err != nil {
+ 		t.Fatal(err)
+@@ -730,6 +733,48 @@ func newConcreteYarnRunner(t *testing.T) *concreteYarnRunner {
+ 	return runner
+ }
+ 
++func yarnClassicPackageRoot(yarnBin string) (string, error) {
++	candidates := []string{filepath.Join(filepath.Dir(filepath.Dir(yarnBin)), "libexec")}
++	if filepath.Base(yarnBin) == "yarn.js" && filepath.Base(filepath.Dir(yarnBin)) == "bin" {
++		candidates = append(candidates, filepath.Dir(filepath.Dir(yarnBin)))
++	}
++	for _, candidate := range candidates {
++		entrypoint := filepath.Join(candidate, "bin", "yarn.js")
++		if info, err := os.Stat(entrypoint); err == nil && info.Mode().IsRegular() {
++			return candidate, nil
++		}
++	}
++	return "", fmt.Errorf("neither Homebrew libexec nor package-root bin/yarn.js exists for %s", yarnBin)
++}
++
++func TestYarnClassicPackageRootRecognizesPinnedInstallLayouts(t *testing.T) {
++	for _, layout := range []struct {
++		name, command, root string
++	}{
++		{name: "homebrew-libexec", command: "bin/yarn", root: "libexec"},
++		{name: "package-root", command: "bin/yarn.js", root: "."},
++	} {
++		t.Run(layout.name, func(t *testing.T) {
++			prefix := t.TempDir()
++			root := filepath.Clean(filepath.Join(prefix, layout.root))
++			entrypoint := filepath.Join(root, "bin", "yarn.js")
++			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(entrypoint, []byte("fixture"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			got, err := yarnClassicPackageRoot(filepath.Join(prefix, layout.command))
++			if err != nil || got != root {
++				t.Fatalf("root=%q err=%v, want %q", got, err, root)
++			}
++		})
++	}
++	if _, err := yarnClassicPackageRoot(filepath.Join(t.TempDir(), "bin", "yarn.js")); err == nil {
++		t.Fatal("missing pinned Yarn tool root was accepted")
++	}
++}
++
+ func (runner *concreteYarnRunner) Run(ctx context.Context, request closureexec.ExecutionRequest) (closureexec.PortableRunResult, error) {
+ 	if err := prepareFakeExecution(request, runner.executionRoot); err != nil {
+ 		return closureexec.PortableRunResult{}, err
+diff --git a/internal/yarnclassicsource/materialize.go b/internal/yarnclassicsource/materialize.go
+index 448bc880..2105895e 100644
+--- a/internal/yarnclassicsource/materialize.go
++++ b/internal/yarnclassicsource/materialize.go
+@@ -18,6 +18,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // invocation is a non-authoritative projection used to construct the canonical
+@@ -122,7 +123,7 @@ func DerivePrivateMirror(ctx context.Context, capture *Capture, destination, wor
+ 	if _, err = filepath.Abs(workRoot); err != nil || workRoot == "" {
+ 		return nil, fail(CodeInputUndeclared, "Yarn mirror work root is invalid", nil)
+ 	}
+-	if err = os.Mkdir(dest, 0o700); err != nil {
++	if err = privatedir.Make(dest); err != nil {
+ 		return nil, err
+ 	}
+ 	success := false
+@@ -132,7 +133,7 @@ func DerivePrivateMirror(ctx context.Context, capture *Capture, destination, wor
+ 		}
+ 	}()
+ 	mirrorDir := filepath.Join(dest, "mirror")
+-	if err = os.Mkdir(mirrorDir, 0o700); err != nil {
++	if err = privatedir.Make(mirrorDir); err != nil {
+ 		return nil, err
+ 	}
+ 	keys := make([]string, 0, len(capture.tarballs))
+@@ -220,10 +221,10 @@ func DerivePrivateMirror(ctx context.Context, capture *Capture, destination, wor
+ 		return nil, err
+ 	}
+ 	emptyRoot := filepath.Join(workRoot, "empty-yarn-cache")
+-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(workRoot); err != nil {
+ 		return nil, err
+ 	}
+-	if err = os.Mkdir(emptyRoot, 0o700); err != nil {
++	if err = privatedir.Make(emptyRoot); err != nil {
+ 		return nil, err
+ 	}
+ 	defer func() { _ = os.RemoveAll(emptyRoot) }()
+@@ -1061,12 +1062,12 @@ func copyContainedTreeDereferencingLinks(root, source, destination string, activ
+ 		if readErr != nil {
+ 			return readErr
+ 		}
+-		if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
++		if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
+ 			return err
+ 		}
+ 		return os.WriteFile(destination, payload, 0o600)
+ 	}
+-	if err = os.MkdirAll(destination, 0o700); err != nil {
++	if err = privatedir.MakeAll(destination); err != nil {
+ 		return err
+ 	}
+ 	entries, err := os.ReadDir(realSource)
+diff --git a/internal/yarnmodernsource/capture.go b/internal/yarnmodernsource/capture.go
+index f0f5a816..8ed7de54 100644
+--- a/internal/yarnmodernsource/capture.go
++++ b/internal/yarnmodernsource/capture.go
+@@ -25,6 +25,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // RawArchive binds either raw npm tgz bytes or an exact normalized Yarn cache ZIP.
+@@ -116,7 +117,7 @@ func CaptureAndAdmit(ctx context.Context, request CaptureRequest) (*Capture, err
+ 	if err != nil || request.WorkRoot == "" {
+ 		return nil, fail(CodeInputUndeclared, "Yarn work root is invalid", nil)
+ 	}
+-	if err = os.MkdirAll(workRoot, 0o700); err != nil {
++	if err = privatedir.MakeAll(workRoot); err != nil {
+ 		return nil, err
+ 	}
+ 	stage, err := os.MkdirTemp(workRoot, "yarn-modern-project-stage-")
+@@ -840,7 +841,7 @@ func copyProjectSource(source, destination, _ string) ([]string, error) {
+ 		}
+ 		target := filepath.Join(destination, rel)
+ 		if entry.IsDir() {
+-			return os.Mkdir(target, 0o700)
++			return privatedir.Make(target)
+ 		}
+ 		info, err := entry.Info()
+ 		if err != nil || !info.Mode().IsRegular() {
+diff --git a/internal/yarnmodernsource/materialize.go b/internal/yarnmodernsource/materialize.go
+index ce608bc4..9150fb02 100644
+--- a/internal/yarnmodernsource/materialize.go
++++ b/internal/yarnmodernsource/materialize.go
+@@ -19,6 +19,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ // invocation is a non-authoritative projection used to construct the canonical
+@@ -157,7 +158,7 @@ func DerivePrivateMirror(ctx context.Context, capture *Capture, destination, wor
+ 	if _, err = filepath.Abs(workRoot); err != nil || workRoot == "" {
+ 		return nil, fail(CodeInputUndeclared, "Yarn mirror work root is invalid", nil)
+ 	}
+-	if err = os.Mkdir(dest, 0o700); err != nil {
++	if err = privatedir.Make(dest); err != nil {
+ 		return nil, err
+ 	}
+ 	success := false
+@@ -174,7 +175,7 @@ func DerivePrivateMirror(ctx context.Context, capture *Capture, destination, wor
+ 		return nil, err
+ 	}
+ 	cacheDir := filepath.Join(dest, ".yarn", "cache")
+-	if err = os.MkdirAll(cacheDir, 0o700); err != nil {
++	if err = privatedir.MakeAll(cacheDir); err != nil {
+ 		return nil, err
+ 	}
+ 	keys := make([]string, 0, len(capture.tarballs))
+@@ -1472,12 +1473,12 @@ func copyContainedTreeDereferencingLinks(root, source, destination string, activ
+ 		if readErr != nil {
+ 			return readErr
+ 		}
+-		if err = os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
++		if err = privatedir.MakeAll(filepath.Dir(destination)); err != nil {
+ 			return err
+ 		}
+ 		return os.WriteFile(destination, payload, 0o600)
+ 	}
+-	if err = os.MkdirAll(destination, 0o700); err != nil {
++	if err = privatedir.MakeAll(destination); err != nil {
+ 		return err
+ 	}
+ 	entries, err := os.ReadDir(realSource)

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -93,70 +94,109 @@ func main() {
 	if len(os.Args) == 2 && os.Args[1] == godriver.WorkerMode {
 		os.Exit(godriver.RunWorker(os.Stdin, os.Stdout))
 	}
-	os.Exit(run(os.Args[1:]))
+	// Resolve the environment-backed user path once at the process boundary.
+	// The command core receives an explicit source so independent invocations
+	// never consult CURATOR_CONFIG themselves.
+	os.Exit(run(os.Args[1:], fileConfigSource(config.UserPath()), os.Stdout, os.Stderr))
 }
 
-func run(args []string) int {
+// configSource is the injectable configuration seam used by one CLI invocation.
+// Path is also used by commands that create config before it can be loaded.
+type configSource interface {
+	Path() string
+	Load(warn func(string)) (*config.Config, error)
+}
+
+type fileConfigSource string
+
+func (source fileConfigSource) Path() string { return string(source) }
+
+func (source fileConfigSource) Load(warn func(string)) (*config.Config, error) {
+	return config.Load(source.Path(), warn)
+}
+
+type cli struct {
+	config   configSource
+	stdout   io.Writer
+	stderr   io.Writer
+	userHome func() (string, error)
+}
+
+func (c cli) newFlagSet(name string) *flag.FlagSet {
+	flags := flag.NewFlagSet(name, flag.ContinueOnError)
+	flags.SetOutput(c.stderr)
+	return flags
+}
+
+// run executes one isolated CLI invocation. Its configuration source and
+// output writers are explicit so callers can run concurrent invocations without
+// mutating CURATOR_CONFIG, os.Stdout, or os.Stderr.
+func run(args []string, source configSource, stdout, stderr io.Writer) int {
+	command := cli{config: source, stdout: stdout, stderr: stderr, userHome: os.UserHomeDir}
+	return command.run(args)
+}
+
+func (c cli) run(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprint(os.Stderr, usage)
+		_, _ = fmt.Fprint(c.stderr, usage)
 		return exitUsage
 	}
 	switch args[0] {
 	case "--version", "version":
-		fmt.Println("curator " + version.String())
+		_, _ = fmt.Fprintln(c.stdout, "curator "+version.String())
 		return exitOK
 	case "init":
-		return cmdInit(args[1:])
+		return c.cmdInit(args[1:])
 	case "bootstrap":
-		return cmdBootstrap(args[1:])
+		return c.cmdBootstrap(args[1:])
 	case "add":
-		return cmdAdd(args[1:])
+		return c.cmdAdd(args[1:])
 	case "remove":
-		return cmdRemove(args[1:])
+		return c.cmdRemove(args[1:])
 	case "install":
-		return cmdInstall(args[1:])
+		return c.cmdInstall(args[1:])
 	case "update":
-		return cmdUpdate()
+		return c.cmdUpdate()
 	case "upgrade":
-		return cmdInstallMode(args[1:], true)
+		return c.cmdInstallMode(args[1:], true)
 	case "status":
-		return cmdStatus(args[1:])
+		return c.cmdStatus(args[1:])
 	case "list":
-		return cmdList()
+		return c.cmdList()
 	case "project":
-		return cmdProject(args[1:])
+		return c.cmdProject(args[1:])
 	case "skill":
 		if len(args) >= 2 && args[1] == "check" {
-			return cmdSkillCheck(args[2:])
+			return c.cmdSkillCheck(args[2:])
 		}
 	case "global":
-		return cmdGlobal(args[1:])
+		return c.cmdGlobal(args[1:])
 	case "hybrid":
-		return cmdHybrid(args[1:])
+		return c.cmdHybrid(args[1:])
 	case "audit":
-		return cmdAudit(args[1:])
+		return c.cmdAudit(args[1:])
 	case "gc":
-		return cmdGC()
+		return c.cmdGC()
 	case "shell-init":
-		return cmdShellInit(args[1:])
+		return c.cmdShellInit(args[1:])
 	case "ui":
-		return cmdUI()
+		return c.cmdUI()
 	case "config":
-		return cmdConfig(args[1:])
+		return c.cmdConfig(args[1:])
 	case "-h", "--help", "help":
-		fmt.Print(usage)
+		_, _ = fmt.Fprint(c.stdout, usage)
 		return exitOK
 	}
-	fmt.Fprintf(os.Stderr, "curator: unknown command %q\n\n%s", args[0], usage)
+	_, _ = fmt.Fprintf(c.stderr, "curator: unknown command %q\n\n%s", args[0], usage)
 	return exitUsage
 }
 
-func loadConfig() (*config.Config, int) {
-	cfg, err := config.Load("", func(message string) {
-		fmt.Fprintln(os.Stderr, "warning: "+message)
+func (c cli) loadConfig() (*config.Config, int) {
+	cfg, err := c.config.Load(func(message string) {
+		_, _ = fmt.Fprintln(c.stderr, "warning: "+message)
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return nil, exitFail
 	}
 	return cfg, exitOK
@@ -313,8 +353,8 @@ func nearestProjectRoot(start string) string {
 	}
 }
 
-func cmdBootstrap(args []string) int {
-	flags := flag.NewFlagSet("bootstrap", flag.ContinueOnError)
+func (c cli) cmdBootstrap(args []string) int {
+	flags := c.newFlagSet("bootstrap")
 	skillsRoot := flags.String("skills-root", "", "directory containing skill repositories")
 	preferredLocale := flags.String("preferred-locale", "", "preferred locale")
 	defaultAgents := flags.String("default-agents", "codex_cli", "comma-separated default agents")
@@ -326,21 +366,21 @@ func cmdBootstrap(args []string) int {
 		return exitUsage
 	}
 	if *force && *ifMissing {
-		fmt.Fprintln(os.Stderr, "curator: bootstrap --if-missing and --force are mutually exclusive")
+		_, _ = fmt.Fprintln(c.stderr, "curator: bootstrap --if-missing and --force are mutually exclusive")
 		return exitUsage
 	}
-	path := config.UserPath()
+	path := c.config.Path()
 	if *ifMissing {
 		if _, statErr := os.Stat(path); statErr == nil {
-			fmt.Println("kept existing config:", path)
+			_, _ = fmt.Fprintln(c.stdout, "kept existing config:", path)
 			return exitOK
 		} else if !os.IsNotExist(statErr) {
-			fmt.Fprintln(os.Stderr, "curator:", statErr)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", statErr)
 			return exitFail
 		}
 	}
 	if *skillsRoot == "" && !*nonInteractive {
-		fmt.Fprint(os.Stderr, "skills_root: ")
+		_, _ = fmt.Fprint(c.stderr, "skills_root: ")
 		reader := bufio.NewReader(os.Stdin)
 		value, readErr := reader.ReadString('\n')
 		if readErr == nil {
@@ -348,16 +388,16 @@ func cmdBootstrap(args []string) int {
 		}
 	}
 	if *skillsRoot == "" {
-		fmt.Fprintln(os.Stderr, "curator: bootstrap requires --skills-root")
+		_, _ = fmt.Fprintln(c.stderr, "curator: bootstrap requires --skills-root")
 		return exitUsage
 	}
 	if err := config.Bootstrap(path, *skillsRoot, *preferredLocale, splitNonEmpty(*defaultAgents), *force); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	fmt.Println("wrote", path)
-	fmt.Println("shell profile changes are not required: agent skills can invoke project and global command shims directly")
-	fmt.Println("optional bare commands for interactive use: curator shell-init --install")
+	_, _ = fmt.Fprintln(c.stdout, "wrote", path)
+	_, _ = fmt.Fprintln(c.stdout, "shell profile changes are not required: agent skills can invoke project and global command shims directly")
+	_, _ = fmt.Fprintln(c.stdout, "optional bare commands for interactive use: curator shell-init --install")
 	return exitOK
 }
 
@@ -371,20 +411,20 @@ func splitNonEmpty(value string) []string {
 	return result
 }
 
-func cmdInit(args []string) int {
+func (c cli) cmdInit(args []string) int {
 	root := projectRootArg(args)
 	path, err := manifest.EnsureEmpty(root)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	entries := adapters.RequiredGitignoreEntries(sortedKnownAgents())
 	entries = append(entries, "Skillfile.dev.json")
 	if err := gitignore.Append(filepath.Join(root, ".gitignore"), entries); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	fmt.Println("initialized", path)
+	_, _ = fmt.Fprintln(c.stdout, "initialized", path)
 	return exitOK
 }
 
@@ -398,8 +438,8 @@ func sortedKnownAgents() []string {
 	return agents
 }
 
-func cmdAdd(args []string) int {
-	flags := flag.NewFlagSet("add", flag.ContinueOnError)
+func (c cli) cmdAdd(args []string) int {
+	flags := c.newFlagSet("add")
 	git := flags.String("git", "", "git clone URL")
 	source := flags.String("source", "", "source directory under skills_root")
 	tag := flags.String("tag", "", "git tag")
@@ -411,7 +451,7 @@ func cmdAdd(args []string) int {
 		return exitUsage
 	}
 	if len(positional) < 1 {
-		fmt.Fprintln(os.Stderr, "curator: add requires a skill name")
+		_, _ = fmt.Fprintln(c.stderr, "curator: add requires a skill name")
 		return exitUsage
 	}
 	name := positional[0]
@@ -419,46 +459,46 @@ func cmdAdd(args []string) int {
 	for kind, value := range map[string]string{"tag": *tag, "branch": *branch, "revision": *revision} {
 		if value != "" {
 			if refKind != "" {
-				fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
+				_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
 				return exitUsage
 			}
 			refKind, refValue = kind, value
 		}
 	}
 	if refKind == "" {
-		fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
+		_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
 		return exitUsage
 	}
 	rootArgs := positional[1:]
 	if *project != "" {
 		rootArgs = []string{*project}
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	targets, targetErr := selectProjectTargets(cfg, rootArgs, false)
 	if targetErr != nil {
-		fmt.Fprintln(os.Stderr, "curator:", targetErr)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", targetErr)
 		return exitUsage
 	}
 	root := targets[0].Root
 	if err := manifest.AddDecl(root, name, refKind, refValue, *git, *source); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	return cmdInstall([]string{root})
+	return c.cmdInstall([]string{root})
 }
 
-func cmdRemove(args []string) int {
-	flags := flag.NewFlagSet("remove", flag.ContinueOnError)
+func (c cli) cmdRemove(args []string) int {
+	flags := c.newFlagSet("remove")
 	project := flags.String("project", "", "project alias or path")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) < 1 {
-		fmt.Fprintln(os.Stderr, "curator: remove requires a skill name")
+		_, _ = fmt.Fprintln(c.stderr, "curator: remove requires a skill name")
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
@@ -468,19 +508,19 @@ func cmdRemove(args []string) int {
 	}
 	targets, targetErr := selectProjectTargets(cfg, rootArgs, false)
 	if targetErr != nil {
-		fmt.Fprintln(os.Stderr, "curator:", targetErr)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", targetErr)
 		return exitUsage
 	}
 	if err := manifest.RemoveDecl(targets[0].Root, positional[0]); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	fmt.Println("removed", positional[0])
+	_, _ = fmt.Fprintln(c.stdout, "removed", positional[0])
 	return exitOK
 }
 
-func installFlags(args []string) (install.Options, []string, bool, string, error) {
-	flags := flag.NewFlagSet("install", flag.ContinueOnError)
+func (c cli) installFlags(args []string) (install.Options, []string, bool, string, error) {
+	flags := c.newFlagSet("install")
 	all := flags.Bool("all", false, "operate on all configured projects")
 	dryRun := flags.Bool("dry-run", false, "plan work without modifying files")
 	fixGitignore := flags.Bool("fix-gitignore", false, "append missing managed gitignore entries")
@@ -508,17 +548,17 @@ func installFlags(args []string) (install.Options, []string, bool, string, error
 	}, positional, *all, auditMode.value, nil
 }
 
-func cmdInstall(args []string) int {
-	return cmdInstallMode(args, false)
+func (c cli) cmdInstall(args []string) int {
+	return c.cmdInstallMode(args, false)
 }
 
-func cmdInstallMode(args []string, fetch bool) int {
-	opts, rest, all, auditMode, err := installFlags(args)
+func (c cli) cmdInstallMode(args []string, fetch bool) int {
+	opts, rest, all, auditMode, err := c.installFlags(args)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
@@ -531,27 +571,27 @@ func cmdInstallMode(args []string, fetch bool) int {
 	}
 	authority, err := preflightCLIExecution(context.Background(), cfg)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	opts.Build.Assurance = authority
 	targets, targetErr := selectProjectTargets(cfg, rest, all)
 	if targetErr != nil {
-		fmt.Fprintln(os.Stderr, "curator:", targetErr)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", targetErr)
 		return exitUsage
 	}
 	opts.Fetch = fetch && !opts.DryRun
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
-	opts.External.BuildSSH.Resolve = operatorBuildSSHResolver(cfg, opts.DryRun)
-	opts.External.BuildHTTPS.Resolve = operatorBuildHTTPSResolver(cfg, opts.DryRun)
+	opts.External.BuildSSH.Resolve = c.operatorBuildSSHResolver(cfg, opts.DryRun)
+	opts.External.BuildHTTPS.Resolve = c.operatorBuildHTTPSResolver(cfg, opts.DryRun)
 	exitCode := exitOK
 	for _, target := range targets {
 		result := install.Project(cfg, target.Root, target.Alias, opts)
-		printResult(result)
+		c.printResult(result)
 		if !opts.DryRun {
-			printRepairNotices(result)
+			c.printRepairNotices(result)
 		}
 		if result.Status == "failed" {
 			exitCode = exitFail
@@ -560,19 +600,19 @@ func cmdInstallMode(args []string, fetch bool) int {
 	return exitCode
 }
 
-func printResult(result install.Result) {
+func (c cli) printResult(result install.Result) {
 	for _, message := range result.Messages {
-		fmt.Println(message)
+		_, _ = fmt.Fprintln(c.stdout, message)
 	}
-	printResultErrors(result)
+	c.printResultErrors(result)
 }
 
 // printResultErrors reports the failure surface of a result: the redacted
 // failure text plus, when a go-v1 trust boundary refused, the operator guidance
 // that belongs to it — which selection mechanisms exist and which release
 // families this manager tested.
-func printResultErrors(result install.Result) {
-	printFailures(result, "error:")
+func (c cli) printResultErrors(result install.Result) {
+	c.printFailures(result, "error:")
 }
 
 // printStatusRefusal is the read-only reporting form of the same surface.
@@ -580,27 +620,27 @@ func printResultErrors(result install.Result) {
 // stable vocabulary: stdout stays one report document, and the same detail is
 // a warning on standard error rather than an error, because the command did
 // produce the report it was asked for.
-func printStatusRefusal(result install.Result) {
-	printFailures(result, "warning:")
+func (c cli) printStatusRefusal(result install.Result) {
+	c.printFailures(result, "warning:")
 }
 
-func printFailures(result install.Result, prefix string) {
+func (c cli) printFailures(result install.Result, prefix string) {
 	for _, message := range result.Errors {
-		fmt.Fprintln(os.Stderr, prefix, message)
+		_, _ = fmt.Fprintln(c.stderr, prefix, message)
 	}
 	if guidance := goToolchainGuidance(result.BuildDiagnostic); guidance != "" {
-		fmt.Fprintln(os.Stderr, prefix, guidance)
+		_, _ = fmt.Fprintln(c.stderr, prefix, guidance)
 	}
 }
 
-func cmdUpdate() int {
-	cfg, code := loadConfig()
+func (c cli) cmdUpdate() int {
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	entries, err := os.ReadDir(cfg.SkillsRoot)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	failed := false
@@ -613,11 +653,11 @@ func cmdUpdate() int {
 			continue
 		}
 		if err := gitops.Fetch(repo); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: %s: %v\n", entry.Name(), err)
+			_, _ = fmt.Fprintf(c.stderr, "warning: %s: %v\n", entry.Name(), err)
 			failed = true
 			continue
 		}
-		fmt.Println("fetched", entry.Name())
+		_, _ = fmt.Fprintln(c.stdout, "fetched", entry.Name())
 	}
 	if failed {
 		return exitFail
@@ -625,8 +665,8 @@ func cmdUpdate() int {
 	return exitOK
 }
 
-func cmdStatus(args []string) int {
-	flags := flag.NewFlagSet("status", flag.ContinueOnError)
+func (c cli) cmdStatus(args []string) int {
+	flags := c.newFlagSet("status")
 	all := flags.Bool("all", false, "operate on all configured projects")
 	check := flags.Bool("check", false, "exit non-zero unless every skill is up to date")
 	jsonOut := flags.Bool("json", false, "machine-readable output")
@@ -635,24 +675,24 @@ func cmdStatus(args []string) int {
 	if err != nil {
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	authority, err := preflightCLIExecution(context.Background(), cfg)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	targets, targetErr := selectProjectTargets(cfg, positional, *all)
 	if targetErr != nil {
-		fmt.Fprintln(os.Stderr, "curator:", targetErr)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", targetErr)
 		return exitUsage
 	}
 	if *attest {
 		exitCode := exitOK
 		for _, target := range targets {
-			if code := cmdStatusAttest(cfg, target.Root, target.Alias, *jsonOut); code != exitOK {
+			if code := c.cmdStatusAttest(cfg, target.Root, target.Alias, *jsonOut); code != exitOK {
 				exitCode = code
 			}
 		}
@@ -681,14 +721,14 @@ func cmdStatus(args []string) int {
 			// reports the error and exits non-zero rather than publishing a
 			// silently partial report.
 			if !result.BuildsComplete {
-				printResult(result)
+				c.printResult(result)
 				exitCode = exitFail
 				continue
 			}
-			printStatusRefusal(result)
+			c.printStatusRefusal(result)
 		}
 		if result.Status == "skipped" {
-			printResult(result)
+			c.printResult(result)
 			if *check {
 				exitCode = exitFail
 			}
@@ -709,10 +749,10 @@ func cmdStatus(args []string) int {
 			}
 			sort.Strings(names)
 			for _, name := range names {
-				fmt.Printf("%s: %s %s\n", target.Alias, name, drift[name])
+				_, _ = fmt.Fprintf(c.stdout, "%s: %s %s\n", target.Alias, name, drift[name])
 			}
 			for _, build := range builds {
-				fmt.Printf("%s: %s\n", target.Alias, build.Describe())
+				_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", target.Alias, build.Describe())
 			}
 		}
 		if *check && checkFailed(drift, builds) {
@@ -725,7 +765,7 @@ func cmdStatus(args []string) int {
 			output = jsonResults[0]
 		}
 		payload, _ := json.MarshalIndent(output, "", "  ")
-		fmt.Println(string(payload))
+		_, _ = fmt.Fprintln(c.stdout, string(payload))
 	}
 	return exitCode
 }
@@ -936,7 +976,7 @@ func scopeStatusDrift(cfg *config.Config, manifestRoot, skillsDir string) map[st
 	return drift
 }
 
-func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool) int {
+func (c cli) cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool) int {
 	trusted := cfg.TrustedRegistries()
 	registries := make([]registry.Registry, 0, len(trusted))
 	for _, entry := range trusted {
@@ -951,7 +991,7 @@ func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool
 	results := registry.AttestRoot(alias, filepath.Join(projectRoot, ".agents", "skills"), registries, fetch)
 	if jsonOut {
 		payload, _ := json.MarshalIndent(results, "", "  ")
-		fmt.Println(string(payload))
+		_, _ = fmt.Fprintln(c.stdout, string(payload))
 	} else {
 		for _, item := range results {
 			suffix := ""
@@ -961,7 +1001,7 @@ func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool
 			if item.Detail != "" {
 				suffix += " (" + item.Detail + ")"
 			}
-			fmt.Printf("%s: %-24s %s%s\n", item.Scope, item.Skill, item.Result, suffix)
+			_, _ = fmt.Fprintf(c.stdout, "%s: %-24s %s%s\n", item.Scope, item.Skill, item.Result, suffix)
 		}
 	}
 	if registry.HasRevocation(results) {
@@ -970,8 +1010,8 @@ func cmdStatusAttest(cfg *config.Config, projectRoot, alias string, jsonOut bool
 	return exitOK
 }
 
-func cmdList() int {
-	cfg, code := loadConfig()
+func (c cli) cmdList() int {
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
@@ -982,31 +1022,31 @@ func cmdList() int {
 	sort.Strings(aliases)
 	for _, alias := range aliases {
 		project := cfg.Projects[alias]
-		fmt.Printf("%s\t%s\n", alias, project.Path)
+		_, _ = fmt.Fprintf(c.stdout, "%s\t%s\n", alias, project.Path)
 		if projectManifest, err := manifest.Load(project.Path); err == nil && projectManifest != nil {
 			for _, decl := range projectManifest.Skills {
-				fmt.Printf("  %s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
+				_, _ = fmt.Fprintf(c.stdout, "  %s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
 			}
 		}
 	}
 	return exitOK
 }
 
-func cmdProject(args []string) int {
+func (c cli) cmdProject(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "curator: project requires a subcommand: add, resolve")
+		_, _ = fmt.Fprintln(c.stderr, "curator: project requires a subcommand: add, resolve")
 		return exitUsage
 	}
 	switch args[0] {
 	case "add":
-		flags := flag.NewFlagSet("project add", flag.ContinueOnError)
+		flags := c.newFlagSet("project add")
 		agentsRaw := flags.String("agents", "", "comma-separated target agents")
 		positional, err := parseInterspersed(flags, args[1:])
 		if err != nil || len(positional) != 2 {
-			fmt.Fprintln(os.Stderr, "curator: project add requires <alias> <path>")
+			_, _ = fmt.Fprintln(c.stderr, "curator: project add requires <alias> <path>")
 			return exitUsage
 		}
-		cfg, code := loadConfig()
+		cfg, code := c.loadConfig()
 		if code != exitOK {
 			return code
 		}
@@ -1015,23 +1055,23 @@ func cmdProject(args []string) int {
 			agents = cfg.DefaultAgents
 		}
 		if err := config.AddProject(cfg.Path, positional[0], positional[1], agents); err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
 		root, _ := filepath.Abs(positional[1])
 		if _, err := manifest.EnsureEmpty(root); err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
 		entries := append(adapters.RequiredGitignoreEntries(agents), "Skillfile.dev.json")
 		if err := gitignore.Append(filepath.Join(root, ".gitignore"), entries); err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
-		fmt.Printf("added project %s: %s\n", positional[0], root)
+		_, _ = fmt.Fprintf(c.stdout, "added project %s: %s\n", positional[0], root)
 		return exitOK
 	case "resolve":
-		cfg, code := loadConfig()
+		cfg, code := c.loadConfig()
 		if code != exitOK {
 			return code
 		}
@@ -1041,25 +1081,25 @@ func cmdProject(args []string) int {
 		}
 		targets, err := selectProjectTargets(cfg, positional, false)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitUsage
 		}
 		target := targets[0]
 		if _, err := os.Stat(filepath.Join(target.Root, manifest.Name)); err != nil {
-			fmt.Fprintln(os.Stderr, "curator: Skillfile.json not found at or above", target.Root)
+			_, _ = fmt.Fprintln(c.stderr, "curator: Skillfile.json not found at or above", target.Root)
 			return exitFail
 		}
-		fmt.Printf("alias: %s\npath: %s\nskillfile: %s\n", target.Alias, target.Root, filepath.Join(target.Root, manifest.Name))
-		fmt.Printf("skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
+		_, _ = fmt.Fprintf(c.stdout, "alias: %s\npath: %s\nskillfile: %s\n", target.Alias, target.Root, filepath.Join(target.Root, manifest.Name))
+		_, _ = fmt.Fprintf(c.stdout, "skills: %s\nbin: %s\n", filepath.Join(target.Root, ".agents", "skills"), filepath.Join(target.Root, ".agents", "bin"))
 		return exitOK
 	default:
-		fmt.Fprintf(os.Stderr, "curator: unknown project subcommand %q\n", args[0])
+		_, _ = fmt.Fprintf(c.stderr, "curator: unknown project subcommand %q\n", args[0])
 		return exitUsage
 	}
 }
 
-func cmdSkillCheck(args []string) int {
-	flags := flag.NewFlagSet("skill check", flag.ContinueOnError)
+func (c cli) cmdSkillCheck(args []string) int {
+	flags := c.newFlagSet("skill check")
 	localeValue := flags.String("locale", "", "validate against a locale")
 	jsonOut := flags.Bool("json", false, "machine-readable output")
 	positional, err := parseInterspersed(flags, args)
@@ -1070,13 +1110,13 @@ func cmdSkillCheck(args []string) int {
 	issues := skillcheck.Validate(dir, *localeValue)
 	if *jsonOut {
 		payload, _ := json.MarshalIndent(issues, "", "  ")
-		fmt.Println(string(payload))
+		_, _ = fmt.Fprintln(c.stdout, string(payload))
 	} else {
 		for _, issue := range issues {
-			fmt.Println(skillcheck.Format(issue))
+			_, _ = fmt.Fprintln(c.stdout, skillcheck.Format(issue))
 		}
 		if len(issues) == 0 {
-			fmt.Println(dir + ": ok")
+			_, _ = fmt.Fprintln(c.stdout, dir+": ok")
 		}
 	}
 	if skillcheck.HasErrors(issues) {
@@ -1085,12 +1125,12 @@ func cmdSkillCheck(args []string) int {
 	return exitOK
 }
 
-func cmdGlobal(args []string) int {
+func (c cli) cmdGlobal(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, update, upgrade")
+		_, _ = fmt.Fprintln(c.stderr, "curator: global requires a subcommand: init, add, remove, list, status, install, update, upgrade")
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
@@ -1098,13 +1138,13 @@ func cmdGlobal(args []string) int {
 	case "init":
 		path, err := install.GlobalInit(cfg.Home())
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
-		fmt.Println("initialized", path)
+		_, _ = fmt.Fprintln(c.stdout, "initialized", path)
 		return exitOK
 	case "add":
-		flags := flag.NewFlagSet("global add", flag.ContinueOnError)
+		flags := c.newFlagSet("global add")
 		git := flags.String("git", "", "git clone URL")
 		tag := flags.String("tag", "", "git tag")
 		revision := flags.String("revision", "", "git revision")
@@ -1116,43 +1156,43 @@ func cmdGlobal(args []string) int {
 		}
 		refKind, refValue := pickRef(*tag, *branch, *revision)
 		if refKind == "" {
-			fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
+			_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
 			return exitUsage
 		}
 		if err := manifest.AddDecl(install.GlobalRoot(cfg.Home()), positional[0], refKind, refValue, *git, *source); err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
-		return runGlobalInstall(cfg, nil)
+		return c.runGlobalInstall(cfg, nil)
 	case "install":
-		return runGlobalInstall(cfg, args[1:])
+		return c.runGlobalInstall(cfg, args[1:])
 	case "remove":
 		if len(args) < 2 {
 			return exitUsage
 		}
 		if err := manifest.RemoveDecl(install.GlobalRoot(cfg.Home()), args[1]); err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
 		return exitOK
 	case "list":
 		globalManifest, err := manifest.Load(install.GlobalRoot(cfg.Home()))
 		if err != nil || globalManifest == nil {
-			fmt.Println("no global Skillfile; run 'curator global init'")
+			_, _ = fmt.Fprintln(c.stdout, "no global Skillfile; run 'curator global init'")
 			return exitOK
 		}
 		for _, decl := range globalManifest.Skills {
-			fmt.Printf("%s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
+			_, _ = fmt.Fprintf(c.stdout, "%s %s %s\n", decl.Name, decl.Ref.Kind, decl.Ref.Value)
 		}
 		return exitOK
 	case "status":
-		return cmdGlobalStatus(cfg, args[1:])
+		return c.cmdGlobalStatus(cfg, args[1:])
 	case "update":
-		return cmdUpdate()
+		return c.cmdUpdate()
 	case "upgrade":
-		return runGlobalInstallMode(cfg, args[1:], true)
+		return c.runGlobalInstallMode(cfg, args[1:], true)
 	}
-	fmt.Fprintf(os.Stderr, "curator: unknown global subcommand %q\n", args[0])
+	_, _ = fmt.Fprintf(c.stderr, "curator: unknown global subcommand %q\n", args[0])
 	return exitUsage
 }
 
@@ -1178,18 +1218,18 @@ func cmdGlobal(args []string) int {
 // The command is three phases — parse the request, acquire the plan once,
 // classify and render from it — so the whole reporting contract can be driven
 // from an already acquired plan without a second one being derived for it.
-func cmdGlobalStatus(cfg *config.Config, args []string) int {
-	opts, code := parseGlobalStatusOptions(args)
+func (c cli) cmdGlobalStatus(cfg *config.Config, args []string) int {
+	opts, code := c.parseGlobalStatusOptions(args)
 	if code != exitOK {
 		return code
 	}
 	authority, err := preflightCLIExecution(context.Background(), cfg)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	return reportGlobalStatus(cfg, opts, func(cfg *config.Config) (install.Result, bool) {
-		return globalStatusPlanWithAuthority(cfg, authority)
+	return c.reportGlobalStatus(cfg, opts, func(cfg *config.Config) (install.Result, bool) {
+		return c.globalStatusPlanWithAuthority(cfg, authority)
 	})
 }
 
@@ -1203,8 +1243,8 @@ type globalStatusOptions struct {
 // parseGlobalStatusOptions is the first phase. The machine-wide scope takes no
 // target: it is one scope, so a stray path is a usage error rather than
 // something silently ignored.
-func parseGlobalStatusOptions(args []string) (globalStatusOptions, int) {
-	flags := flag.NewFlagSet("global status", flag.ContinueOnError)
+func (c cli) parseGlobalStatusOptions(args []string) (globalStatusOptions, int) {
+	flags := c.newFlagSet("global status")
 	check := flags.Bool("check", false, "exit non-zero unless every skill and compiled command is current")
 	jsonOut := flags.Bool("json", false, "machine-readable output")
 	positional, err := parseInterspersed(flags, args)
@@ -1212,7 +1252,7 @@ func parseGlobalStatusOptions(args []string) (globalStatusOptions, int) {
 		return globalStatusOptions{}, exitUsage
 	}
 	if len(positional) > 0 {
-		fmt.Fprintln(os.Stderr, "curator: global status accepts flags only")
+		_, _ = fmt.Fprintln(c.stderr, "curator: global status accepts flags only")
 		return globalStatusOptions{}, exitUsage
 	}
 	return globalStatusOptions{check: *check, jsonOut: *jsonOut}, exitOK
@@ -1229,7 +1269,7 @@ type globalStatusAcquire func(*config.Config) (install.Result, bool)
 // verdict. Acquisition is a parameter so the phase can be driven from a plan
 // that was already acquired, without the classification, the rendering, or the
 // verdict differing in any way from a command run.
-func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire globalStatusAcquire) int {
+func (c cli) reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire globalStatusAcquire) int {
 	scope := globalStatusScope(cfg)
 	// Installed markers are fingerprinted before the read-only plan and again
 	// after classification, so compiled state that moved during the whole window
@@ -1240,7 +1280,7 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
 		// The declared-skill report was still produced, so the refusal is a
 		// warning on standard error rather than an error, exactly as it is for a
 		// project status that still published every compiled row.
-		printStatusRefusal(result)
+		c.printStatusRefusal(result)
 	}
 
 	drift, builds := statusReport(cfg, scope, factsList(result.Builds), before)
@@ -1254,7 +1294,7 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
 			payload["builds"] = builds
 		}
 		document, _ := json.MarshalIndent(payload, "", "  ")
-		fmt.Println(string(document))
+		_, _ = fmt.Fprintln(c.stdout, string(document))
 	} else {
 		names := make([]string, 0, len(drift))
 		for name := range drift {
@@ -1262,10 +1302,10 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			fmt.Printf("%s: %s %s\n", scope.alias, name, drift[name])
+			_, _ = fmt.Fprintf(c.stdout, "%s: %s %s\n", scope.alias, name, drift[name])
 		}
 		for _, build := range builds {
-			fmt.Printf("%s: %s\n", scope.alias, build.Describe())
+			_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", scope.alias, build.Describe())
 		}
 	}
 	if opts.check && (unprovable || checkFailed(drift, builds)) {
@@ -1282,12 +1322,12 @@ func reportGlobalStatus(cfg *config.Config, opts globalStatusOptions, acquire gl
 // has compiled state. It never suppresses the declared-skill report; it is the
 // fail-closed input of `--check`. A scope with no machine-wide Skillfile is not
 // unprovable: it declares nothing and activates nothing.
-func globalStatusPlan(cfg *config.Config) (install.Result, bool) {
-	return globalStatusPlanWithAuthority(cfg, install.NewPortableBuildAuthority())
+func (c cli) globalStatusPlan(cfg *config.Config) (install.Result, bool) {
+	return c.globalStatusPlanWithAuthority(cfg, install.NewPortableBuildAuthority())
 }
 
-func globalStatusPlanWithAuthority(cfg *config.Config, authority *install.BuildAuthority) (install.Result, bool) {
-	userHome, err := os.UserHomeDir()
+func (c cli) globalStatusPlanWithAuthority(cfg *config.Config, authority *install.BuildAuthority) (install.Result, bool) {
+	userHome, err := c.userHome()
 	if err != nil {
 		result := install.Result{Alias: "global", Path: install.GlobalRoot(cfg.Home()), Status: "failed"}
 		result.Errors = append(result.Errors, fmt.Sprintf(
@@ -1298,17 +1338,17 @@ func globalStatusPlanWithAuthority(cfg *config.Config, authority *install.BuildA
 	return result, result.Status == "failed" && !result.BuildsComplete
 }
 
-func runGlobalInstall(cfg *config.Config, args []string) int {
-	return runGlobalInstallMode(cfg, args, false)
+func (c cli) runGlobalInstall(cfg *config.Config, args []string) int {
+	return c.runGlobalInstallMode(cfg, args, false)
 }
 
-func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
-	opts, positional, all, auditMode, err := installFlags(args)
+func (c cli) runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
+	opts, positional, all, auditMode, err := c.installFlags(args)
 	if err != nil || len(positional) != 0 || all {
 		if err == nil {
 			err = fmt.Errorf("global install accepts flags only")
 		}
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
 	if auditMode != "" {
@@ -1320,7 +1360,7 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	}
 	authority, err := preflightCLIExecution(context.Background(), cfg)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	opts.Build.Assurance = authority
@@ -1328,17 +1368,17 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 	opts.FetchedRepos = map[string]bool{}
 	opts.External = productionExternalDeps(cfg, opts.DryRun)
 	opts.External.BuildSSH = install.CaptureBuildSSHSelection(cfg, opts.BuildSSH, os.Getenv)
-	opts.External.BuildSSH.Resolve = operatorBuildSSHResolver(cfg, opts.DryRun)
-	opts.External.BuildHTTPS.Resolve = operatorBuildHTTPSResolver(cfg, opts.DryRun)
-	userHome, err := os.UserHomeDir()
+	opts.External.BuildSSH.Resolve = c.operatorBuildSSHResolver(cfg, opts.DryRun)
+	opts.External.BuildHTTPS.Resolve = c.operatorBuildHTTPSResolver(cfg, opts.DryRun)
+	userHome, err := c.userHome()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	result := install.Global(cfg, userHome, opts)
-	printResult(result)
+	c.printResult(result)
 	if !opts.DryRun {
-		printRepairNotices(result)
+		c.printRepairNotices(result)
 	}
 	if result.Status == "failed" {
 		return exitFail
@@ -1354,13 +1394,14 @@ func runGlobalInstallMode(cfg *config.Config, args []string, fetch bool) int {
 // surface write. A non-interactive run never returns one either, which is the
 // fail-closed path: the precheck then names every uncovered repository and the
 // exact commands that would cover it.
-func operatorBuildSSHResolver(cfg *config.Config, dryRun bool) install.BuildSSHResolver {
-	if dryRun || !attachedToTerminal(os.Stdin) || !attachedToTerminal(os.Stderr) {
+func (c cli) operatorBuildSSHResolver(cfg *config.Config, dryRun bool) install.BuildSSHResolver {
+	stderrFile, terminalOutput := c.stderr.(*os.File)
+	if dryRun || !terminalOutput || !attachedToTerminal(os.Stdin) || !attachedToTerminal(stderrFile) {
 		return nil
 	}
 	// The prompt speaks on stderr so a caller redirecting stdout still sees
 	// the questions it is being asked.
-	return install.InteractiveBuildSSHResolver(os.Stdin, os.Stderr,
+	return install.InteractiveBuildSSHResolver(os.Stdin, c.stderr,
 		func(credential config.BuildSSHCredential) error {
 			_, err := config.SetBuildSSH(cfg.Path, credential)
 			return err
@@ -1370,13 +1411,14 @@ func operatorBuildSSHResolver(cfg *config.Config, dryRun bool) install.BuildSSHR
 // operatorBuildHTTPSResolver offers unmatched HTTPS repositories an explicit
 // operator choice. A headless run keeps this nil and therefore continues over
 // anonymous HTTPS; a dry run remains read-only even on a terminal.
-func operatorBuildHTTPSResolver(cfg *config.Config, dryRun bool) install.BuildHTTPSResolver {
-	if dryRun || !attachedToTerminal(os.Stdin) || !attachedToTerminal(os.Stderr) {
+func (c cli) operatorBuildHTTPSResolver(cfg *config.Config, dryRun bool) install.BuildHTTPSResolver {
+	stderrFile, terminalOutput := c.stderr.(*os.File)
+	if dryRun || !terminalOutput || !attachedToTerminal(os.Stdin) || !attachedToTerminal(stderrFile) {
 		return nil
 	}
 	access := gitcred.Access{}
-	return install.InteractiveBuildHTTPSResolver(os.Stdin, os.Stderr,
-		func() (string, error) { return readBuildHTTPSToken(os.Stdin, os.Stderr) },
+	return install.InteractiveBuildHTTPSResolver(os.Stdin, c.stderr,
+		func() (string, error) { return readBuildHTTPSToken(os.Stdin, c.stderr) },
 		persistPromptedBuildHTTPS(cfg, access))
 }
 
@@ -1487,18 +1529,18 @@ func admittedOperatorFile(name string) string {
 	return resolved
 }
 
-func cmdHybrid(args []string) int {
+func (c cli) cmdHybrid(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "curator: hybrid requires a subcommand: add, remove, list")
+		_, _ = fmt.Fprintln(c.stderr, "curator: hybrid requires a subcommand: add, remove, list")
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	switch args[0] {
 	case "add":
-		flags := flag.NewFlagSet("hybrid add", flag.ContinueOnError)
+		flags := c.newFlagSet("hybrid add")
 		git := flags.String("git", "", "git clone URL")
 		tag := flags.String("tag", "", "git tag")
 		revision := flags.String("revision", "", "git revision")
@@ -1507,12 +1549,12 @@ func cmdHybrid(args []string) int {
 		target := flags.String("target", "", "target alias, absolute path, or glob")
 		positional, err := parseInterspersed(flags, args[1:])
 		if err != nil || len(positional) < 1 || (*targets == "" && *target == "") {
-			fmt.Fprintln(os.Stderr, "curator: hybrid add requires a name and --target or --targets")
+			_, _ = fmt.Fprintln(c.stderr, "curator: hybrid add requires a name and --target or --targets")
 			return exitUsage
 		}
 		refKind, refValue := pickRef(*tag, *branch, *revision)
 		if refKind == "" {
-			fmt.Fprintln(os.Stderr, "curator: specify exactly one of --tag, --branch, --revision")
+			_, _ = fmt.Fprintln(c.stderr, "curator: specify exactly one of --tag, --branch, --revision")
 			return exitUsage
 		}
 		targetValues := []string{*target}
@@ -1520,7 +1562,7 @@ func cmdHybrid(args []string) int {
 			targetValues = strings.Split(*targets, ",")
 		}
 		if err := scopes.AddHybridDecl(cfg.Home(), positional[0], refKind, refValue, *git, targetValues); err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
 		return exitOK
@@ -1529,24 +1571,24 @@ func cmdHybrid(args []string) int {
 			return exitUsage
 		}
 		if err := scopes.RemoveHybridDecl(cfg.Home(), args[1]); err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
 		return exitOK
 	case "list":
 		decls, err := scopes.LoadHybridDecls(cfg.Home())
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
 		for _, decl := range decls {
-			fmt.Printf("%s %s %s targets=%s\n", decl.Decl.Name, decl.Decl.Ref.Kind, decl.Decl.Ref.Value, strings.Join(decl.Targets, ","))
+			_, _ = fmt.Fprintf(c.stdout, "%s %s %s targets=%s\n", decl.Decl.Name, decl.Decl.Ref.Kind, decl.Decl.Ref.Value, strings.Join(decl.Targets, ","))
 		}
 		return exitOK
 	case "status":
 		decls, err := scopes.LoadHybridDecls(cfg.Home())
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
 		store := scopes.HybridSkillsRoot(cfg.Home())
@@ -1561,16 +1603,16 @@ func cmdHybrid(args []string) int {
 					state = "installed"
 				}
 			}
-			fmt.Printf("%s %s targets=%s\n", entry.Decl.Name, state, strings.Join(entry.Targets, ","))
+			_, _ = fmt.Fprintf(c.stdout, "%s %s targets=%s\n", entry.Decl.Name, state, strings.Join(entry.Targets, ","))
 		}
 		return exitOK
 	}
-	fmt.Fprintf(os.Stderr, "curator: unknown hybrid subcommand %q\n", args[0])
+	_, _ = fmt.Fprintf(c.stderr, "curator: unknown hybrid subcommand %q\n", args[0])
 	return exitUsage
 }
 
-func cmdAudit(args []string) int {
-	flags := flag.NewFlagSet("audit", flag.ContinueOnError)
+func (c cli) cmdAudit(args []string) int {
+	flags := c.newFlagSet("audit")
 	all := flags.Bool("all", false, "audit all configured projects and global skills")
 	global := flags.Bool("global", false, "audit global skills")
 	jsonOut := flags.Bool("json", false, "machine-readable output")
@@ -1583,26 +1625,26 @@ func cmdAudit(args []string) int {
 	if err != nil {
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	if *allow != "" {
 		if *reason == "" {
-			fmt.Fprintln(os.Stderr, "curator: --allow requires --reason")
+			_, _ = fmt.Fprintln(c.stderr, "curator: --allow requires --reason")
 			return exitUsage
 		}
 		path, err := audit.Pin(cfg.Home(), *allow, *reason, os.Getenv("USER"))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
-		fmt.Println("pinned audit trust:", path)
+		_, _ = fmt.Fprintln(c.stdout, "pinned audit trust:", path)
 		return exitOK
 	}
 	if *publish != "" {
 		if *registryURL == "" {
-			fmt.Fprintln(os.Stderr, "curator: --publish requires --registry")
+			_, _ = fmt.Fprintln(c.stderr, "curator: --publish requires --registry")
 			return exitUsage
 		}
 		bearer := *token
@@ -1610,20 +1652,20 @@ func cmdAudit(args []string) int {
 			bearer = os.Getenv("CURATOR_REGISTRY_TOKEN")
 		}
 		if bearer == "" {
-			fmt.Fprintln(os.Stderr, "curator: --publish requires --token or CURATOR_REGISTRY_TOKEN")
+			_, _ = fmt.Fprintln(c.stderr, "curator: --publish requires --token or CURATOR_REGISTRY_TOKEN")
 			return exitUsage
 		}
 		payload, err := os.ReadFile(*publish) // #nosec G304 -- operator-supplied record path
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
 		response, err := registry.Publish(*registryURL, bearer, payload)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
 		}
-		fmt.Println(response)
+		_, _ = fmt.Fprintln(c.stdout, response)
 		return exitOK
 	}
 
@@ -1634,25 +1676,25 @@ func cmdAudit(args []string) int {
 	var targets []projectTarget
 	if *all {
 		if len(positional) > 0 || *global {
-			fmt.Fprintln(os.Stderr, "curator: --all cannot be combined with a target or --global")
+			_, _ = fmt.Fprintln(c.stderr, "curator: --all cannot be combined with a target or --global")
 			return exitUsage
 		}
 		targets, err = selectProjectTargets(cfg, nil, true)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitUsage
 		}
 		targets = append(targets, projectTarget{Alias: "global", Root: install.GlobalRoot(cfg.Home())})
 	} else if *global {
 		if len(positional) > 0 {
-			fmt.Fprintln(os.Stderr, "curator: --global cannot be combined with a project target")
+			_, _ = fmt.Fprintln(c.stderr, "curator: --global cannot be combined with a project target")
 			return exitUsage
 		}
 		targets = []projectTarget{{Alias: "global", Root: install.GlobalRoot(cfg.Home())}}
 	} else {
 		targets, err = selectProjectTargets(cfg, positional, false)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "curator:", err)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitUsage
 		}
 	}
@@ -1672,19 +1714,19 @@ func cmdAudit(args []string) int {
 		}
 		if !*jsonOut {
 			for _, warning := range warnings {
-				fmt.Printf("%s: %s\n", target.Alias, warning)
+				_, _ = fmt.Fprintf(c.stdout, "%s: %s\n", target.Alias, warning)
 			}
 			for _, message := range errors {
-				fmt.Fprintf(os.Stderr, "%s: %s\n", target.Alias, message)
+				_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", target.Alias, message)
 			}
 			if len(warnings) == 0 && len(errors) == 0 {
-				fmt.Printf("%s: audit clean\n", target.Alias)
+				_, _ = fmt.Fprintf(c.stdout, "%s: audit clean\n", target.Alias)
 			}
 		}
 	}
 	if *jsonOut {
 		payload, _ := json.MarshalIndent(outputs, "", "  ")
-		fmt.Println(string(payload))
+		_, _ = fmt.Fprintln(c.stdout, string(payload))
 	}
 	return exitCode
 }
@@ -1726,20 +1768,20 @@ func auditTarget(cfg *config.Config, target projectTarget) ([]string, []string) 
 // transactions are recovered first, and their build references are marked, so
 // an installation interrupted by a crash keeps the artifacts it will finish
 // with.
-func cmdGC() int {
-	cfg, code := loadConfig()
+func (c cli) cmdGC() int {
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	home := cfg.Home()
 	manager, err := managerlock.New(home)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	lock, err := manager.AcquireHomeOnly(context.Background(), false)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator: acquire the manager-home lock:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator: acquire the manager-home lock:", err)
 		return exitFail
 	}
 	result, err := collectUnderLock(home, lock)
@@ -1747,19 +1789,19 @@ func cmdGC() int {
 		err = fmt.Errorf("release the manager-home lock: %w", closeErr)
 	}
 	for _, warning := range result.Warnings {
-		fmt.Fprintln(os.Stderr, "curator: warning:", warning)
+		_, _ = fmt.Fprintln(c.stderr, "curator: warning:", warning)
 	}
 	for _, entry := range result.RemovedRuntime {
-		fmt.Println("removed runtime", entry)
+		_, _ = fmt.Fprintln(c.stdout, "removed runtime", entry)
 	}
 	for _, key := range result.RemovedBuilds {
-		fmt.Println("removed build", key)
+		_, _ = fmt.Fprintln(c.stdout, "removed build", key)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	fmt.Printf("gc: %d runtime entr%s removed, %d build entr%s removed\n",
+	_, _ = fmt.Fprintf(c.stdout, "gc: %d runtime entr%s removed, %d build entr%s removed\n",
 		len(result.RemovedRuntime), pluralY(len(result.RemovedRuntime)),
 		len(result.RemovedBuilds), pluralY(len(result.RemovedBuilds)))
 	return exitOK
@@ -1780,13 +1822,13 @@ func collectUnderLock(home string, lock *managerlock.HomeLock) (scopes.Maintenan
 	return scopes.Collect(scopes.MaintenanceRequest{Home: home, Lock: lock, JournalKeys: journalKeys})
 }
 
-func cmdShellInit(args []string) int {
-	flags := flag.NewFlagSet("shell-init", flag.ContinueOnError)
+func (c cli) cmdShellInit(args []string) int {
+	flags := c.newFlagSet("shell-init")
 	noGlobal := flags.Bool("no-global", false, "skip global env sourcing")
 	installHook := flags.Bool("install", false, "cache the hook and print its optional profile source command")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) > 1 {
-		fmt.Fprintln(os.Stderr, "curator: shell-init accepts at most one shell: auto, zsh, bash, powershell")
+		_, _ = fmt.Fprintln(c.stderr, "curator: shell-init accepts at most one shell: auto, zsh, bash, powershell")
 		return exitUsage
 	}
 	shellName := "auto"
@@ -1797,30 +1839,30 @@ func cmdShellInit(args []string) int {
 		shellName = shell.Detect(nil, "")
 	}
 	if shellName != "zsh" && shellName != "bash" && shellName != "powershell" {
-		fmt.Fprintln(os.Stderr, "curator: unsupported shell:", shellName)
+		_, _ = fmt.Fprintln(c.stderr, "curator: unsupported shell:", shellName)
 		return exitUsage
 	}
 	if *installHook {
-		hookPath, installErr := shell.InstallHook(shellName, filepath.Dir(config.UserPath()), !*noGlobal)
+		hookPath, installErr := shell.InstallHook(shellName, filepath.Dir(c.config.Path()), !*noGlobal)
 		if installErr != nil {
-			fmt.Fprintln(os.Stderr, "curator:", installErr)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", installErr)
 			return exitFail
 		}
 		source, sourceErr := shell.SourceCommand(shellName, hookPath)
 		if sourceErr != nil {
-			fmt.Fprintln(os.Stderr, "curator:", sourceErr)
+			_, _ = fmt.Fprintln(c.stderr, "curator:", sourceErr)
 			return exitFail
 		}
-		fmt.Println("wrote", hookPath)
-		fmt.Println("optional shell profile line:", source)
+		_, _ = fmt.Fprintln(c.stdout, "wrote", hookPath)
+		_, _ = fmt.Fprintln(c.stdout, "optional shell profile line:", source)
 		return exitOK
 	}
 	hook, err := shell.Hook(shellName, !*noGlobal)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
-	fmt.Print(hook)
+	_, _ = fmt.Fprint(c.stdout, hook)
 	return exitOK
 }
 
@@ -1871,23 +1913,23 @@ no terminal, and on a dry run, it prints those same candidates as ready-to-run
 add commands and fails with build_repository_ssh_credential_missing.
 `
 
-func cmdConfig(args []string) int {
+func (c cli) cmdConfig(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprint(os.Stderr, configUsage)
+		_, _ = fmt.Fprint(c.stderr, configUsage)
 		return exitUsage
 	}
 	switch args[0] {
 	case "show":
-		return cmdConfigShow()
+		return c.cmdConfigShow()
 	case "build-ssh":
-		return cmdConfigBuildSSH(args[1:])
+		return c.cmdConfigBuildSSH(args[1:])
 	case "build-https":
-		return cmdConfigBuildHTTPS(args[1:])
+		return c.cmdConfigBuildHTTPS(args[1:])
 	case "-h", "--help", "help":
-		fmt.Print(configUsage)
+		_, _ = fmt.Fprint(c.stdout, configUsage)
 		return exitOK
 	}
-	fmt.Fprintf(os.Stderr, "curator: unknown config subcommand %q\n\n%s", args[0], configUsage)
+	_, _ = fmt.Fprintf(c.stderr, "curator: unknown config subcommand %q\n\n%s", args[0], configUsage)
 	return exitUsage
 }
 
@@ -1933,28 +1975,28 @@ func (*buildSSHAgentValue) AcceptsOptionalValue(raw string) bool {
 	return config.ValidBuildSSHPath(raw)
 }
 
-func cmdConfigBuildSSH(args []string) int {
+func (c cli) cmdConfigBuildSSH(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprint(os.Stderr, buildSSHUsage)
+		_, _ = fmt.Fprint(c.stderr, buildSSHUsage)
 		return exitUsage
 	}
 	switch args[0] {
 	case "add":
-		return cmdConfigBuildSSHAdd(args[1:])
+		return c.cmdConfigBuildSSHAdd(args[1:])
 	case "list":
-		return cmdConfigBuildSSHList()
+		return c.cmdConfigBuildSSHList()
 	case "remove":
-		return cmdConfigBuildSSHRemove(args[1:])
+		return c.cmdConfigBuildSSHRemove(args[1:])
 	case "-h", "--help", "help":
-		fmt.Print(buildSSHUsage)
+		_, _ = fmt.Fprint(c.stdout, buildSSHUsage)
 		return exitOK
 	}
-	fmt.Fprintf(os.Stderr, "curator: unknown config build-ssh subcommand %q\n\n%s", args[0], buildSSHUsage)
+	_, _ = fmt.Fprintf(c.stderr, "curator: unknown config build-ssh subcommand %q\n\n%s", args[0], buildSSHUsage)
 	return exitUsage
 }
 
-func cmdConfigBuildSSHAdd(args []string) int {
-	flags := flag.NewFlagSet("config build-ssh add", flag.ContinueOnError)
+func (c cli) cmdConfigBuildSSHAdd(args []string) int {
+	flags := c.newFlagSet("config build-ssh add")
 	agent := &buildSSHAgentValue{}
 	flags.Var(agent, "agent", "select an SSH agent, optionally by socket path")
 	identity := flags.String("identity", "", "identity file offered to the destination")
@@ -1964,7 +2006,7 @@ func cmdConfigBuildSSHAdd(args []string) int {
 		return exitUsage
 	}
 	if len(positional) != 1 {
-		fmt.Fprintln(os.Stderr, "curator: config build-ssh add requires exactly one <scope>")
+		_, _ = fmt.Fprintln(c.stderr, "curator: config build-ssh add requires exactly one <scope>")
 		return exitUsage
 	}
 	credential := config.BuildSSHCredential{
@@ -1977,28 +2019,28 @@ func cmdConfigBuildSSHAdd(args []string) int {
 	// Checked before the config is read, so a malformed invocation is a usage
 	// error rather than a failure attributed to the config file.
 	if err := config.ValidateBuildSSH(credential); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	replaced, err := config.SetBuildSSH(cfg.Path, credential)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	verb := "added"
 	if replaced {
 		verb = "replaced"
 	}
-	fmt.Printf("%s build_ssh scope %s: %s\n", verb, credential.Scope, formatBuildSSH(credential))
+	_, _ = fmt.Fprintf(c.stdout, "%s build_ssh scope %s: %s\n", verb, credential.Scope, formatBuildSSH(credential))
 	return exitOK
 }
 
-func cmdConfigBuildSSHList() int {
-	cfg, code := loadConfig()
+func (c cli) cmdConfigBuildSSHList() int {
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
@@ -2006,29 +2048,29 @@ func cmdConfigBuildSSHList() int {
 	if len(scopes) == 0 {
 		// On stderr, so a caller parsing the listing sees an empty stdout
 		// rather than a line that names no scope.
-		fmt.Fprintln(os.Stderr, "curator: no build_ssh scopes are configured")
+		_, _ = fmt.Fprintln(c.stderr, "curator: no build_ssh scopes are configured")
 		return exitOK
 	}
 	for _, scope := range scopes {
-		fmt.Printf("%s\t%s\n", scope, formatBuildSSH(cfg.BuildSSH[scope]))
+		_, _ = fmt.Fprintf(c.stdout, "%s\t%s\n", scope, formatBuildSSH(cfg.BuildSSH[scope]))
 	}
 	return exitOK
 }
 
-func cmdConfigBuildSSHRemove(args []string) int {
+func (c cli) cmdConfigBuildSSHRemove(args []string) int {
 	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
-		fmt.Fprintln(os.Stderr, "curator: config build-ssh remove requires exactly one <scope>")
+		_, _ = fmt.Fprintln(c.stderr, "curator: config build-ssh remove requires exactly one <scope>")
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	if err := config.RemoveBuildSSH(cfg.Path, args[0]); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	fmt.Printf("removed build_ssh scope %s\n", args[0])
+	_, _ = fmt.Fprintf(c.stdout, "removed build_ssh scope %s\n", args[0])
 	return exitOK
 }
 
@@ -2098,30 +2140,30 @@ CURATOR_BUILD_HTTPS_HOST to bind it to one host, or prefer a build_https
 scope, unless every one of those hosts is meant to receive that token.
 `
 
-func cmdConfigBuildHTTPS(args []string) int {
+func (c cli) cmdConfigBuildHTTPS(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprint(os.Stderr, buildHTTPSUsage)
+		_, _ = fmt.Fprint(c.stderr, buildHTTPSUsage)
 		return exitUsage
 	}
 	switch args[0] {
 	case "add":
-		return cmdConfigBuildHTTPSAdd(args[1:])
+		return c.cmdConfigBuildHTTPSAdd(args[1:])
 	case "login":
-		return cmdConfigBuildHTTPSLogin(args[1:])
+		return c.cmdConfigBuildHTTPSLogin(args[1:])
 	case "list":
-		return cmdConfigBuildHTTPSList()
+		return c.cmdConfigBuildHTTPSList()
 	case "remove":
-		return cmdConfigBuildHTTPSRemove(args[1:])
+		return c.cmdConfigBuildHTTPSRemove(args[1:])
 	case "-h", "--help", "help":
-		fmt.Print(buildHTTPSUsage)
+		_, _ = fmt.Fprint(c.stdout, buildHTTPSUsage)
 		return exitOK
 	}
-	fmt.Fprintf(os.Stderr, "curator: unknown config build-https subcommand %q\n\n%s", args[0], buildHTTPSUsage)
+	_, _ = fmt.Fprintf(c.stderr, "curator: unknown config build-https subcommand %q\n\n%s", args[0], buildHTTPSUsage)
 	return exitUsage
 }
 
-func cmdConfigBuildHTTPSAdd(args []string) int {
-	flags := flag.NewFlagSet("config build-https add", flag.ContinueOnError)
+func (c cli) cmdConfigBuildHTTPSAdd(args []string) int {
+	flags := c.newFlagSet("config build-https add")
 	gitCredentials := flags.Bool("git-credentials", false,
 		"use the operator's own Git HTTPS credential for this scope's host")
 	keyring := flags.Bool("keyring", false, "use the token already stored for this scope (see login)")
@@ -2132,12 +2174,12 @@ func cmdConfigBuildHTTPSAdd(args []string) int {
 		return exitUsage
 	}
 	if len(positional) != 1 {
-		fmt.Fprintln(os.Stderr, "curator: config build-https add requires exactly one <scope>")
+		_, _ = fmt.Fprintln(c.stderr, "curator: config build-https add requires exactly one <scope>")
 		return exitUsage
 	}
 	token, envName, err := pickBuildHTTPSSource(*gitCredentials, *keyring, *tokenEnv)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
 	credential := config.BuildHTTPSCredential{
@@ -2146,23 +2188,23 @@ func cmdConfigBuildHTTPSAdd(args []string) int {
 	// Checked before the config is read, so a malformed invocation is a usage
 	// error rather than a failure attributed to the config file.
 	if err := config.ValidateBuildHTTPS(credential); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	replaced, err := config.SetBuildHTTPS(cfg.Path, credential)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	verb := "added"
 	if replaced {
 		verb = "replaced"
 	}
-	fmt.Printf("%s build_https scope %s: %s\n", verb, credential.Scope, formatBuildHTTPS(credential))
+	_, _ = fmt.Fprintf(c.stdout, "%s build_https scope %s: %s\n", verb, credential.Scope, formatBuildHTTPS(credential))
 	return exitOK
 }
 
@@ -2187,50 +2229,50 @@ func pickBuildHTTPSSource(gitCredentials, keyring bool, tokenEnv string) (token,
 	return token, env, nil
 }
 
-func cmdConfigBuildHTTPSLogin(args []string) int {
-	flags := flag.NewFlagSet("config build-https login", flag.ContinueOnError)
+func (c cli) cmdConfigBuildHTTPSLogin(args []string) int {
+	flags := c.newFlagSet("config build-https login")
 	username := flags.String("username", "", "username sent alongside the stored token")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil {
 		return exitUsage
 	}
 	if len(positional) != 1 {
-		fmt.Fprintln(os.Stderr, "curator: config build-https login requires exactly one <scope>")
+		_, _ = fmt.Fprintln(c.stderr, "curator: config build-https login requires exactly one <scope>")
 		return exitUsage
 	}
 	scope := positional[0]
 	if !config.ValidBuildSSHScope(scope) {
-		fmt.Fprintln(os.Stderr, "curator: scope", scope, config.BuildSSHScopeRule)
+		_, _ = fmt.Fprintln(c.stderr, "curator: scope", scope, config.BuildSSHScopeRule)
 		return exitUsage
 	}
 	// The scope is validated, and the config is loaded, before a token is
 	// read: a doomed invocation must not first make the operator type a
 	// secret into a hidden prompt for nothing.
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
-	token, err := readBuildHTTPSToken(os.Stdin, os.Stderr)
+	token, err := readBuildHTTPSToken(os.Stdin, c.stderr)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
 	access := gitcred.Access{}
 	if err := access.StoreScoped(context.Background(), scope, gitcred.ScopeHost(scope), token); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	credential := config.BuildHTTPSCredential{Scope: scope, Token: config.TokenSourceKeyring, Username: *username}
 	replaced, err := config.SetBuildHTTPS(cfg.Path, credential)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	verb := "logged in and selected"
 	if replaced {
 		verb = "replaced the login for"
 	}
-	fmt.Printf("%s build_https scope %s: %s\n", verb, scope, formatBuildHTTPS(credential))
+	_, _ = fmt.Fprintf(c.stdout, "%s build_https scope %s: %s\n", verb, scope, formatBuildHTTPS(credential))
 	return exitOK
 }
 
@@ -2238,9 +2280,10 @@ func cmdConfigBuildHTTPSLogin(args []string) int {
 // command-line argument, matching core 12.2: a hidden prompt when both ends
 // are a real terminal, otherwise one line from stdin, so a scripted login can
 // pipe a token in without echoing it to a terminal that is not there.
-func readBuildHTTPSToken(in, errOut *os.File) (string, error) {
+func readBuildHTTPSToken(in *os.File, errOut io.Writer) (string, error) {
 	var raw string
-	if attachedToTerminal(in) && attachedToTerminal(errOut) {
+	errFile, terminalOutput := errOut.(*os.File)
+	if terminalOutput && attachedToTerminal(in) && attachedToTerminal(errFile) {
 		_, _ = fmt.Fprint(errOut, "token: ")
 		read, err := term.ReadPassword(in.Fd())
 		_, _ = fmt.Fprintln(errOut)
@@ -2264,8 +2307,8 @@ func readBuildHTTPSToken(in, errOut *os.File) (string, error) {
 	return token, nil
 }
 
-func cmdConfigBuildHTTPSList() int {
-	cfg, code := loadConfig()
+func (c cli) cmdConfigBuildHTTPSList() int {
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
@@ -2273,14 +2316,14 @@ func cmdConfigBuildHTTPSList() int {
 	if len(scopes) == 0 {
 		// On stderr, so a caller parsing the listing sees an empty stdout
 		// rather than a line that names no scope.
-		fmt.Fprintln(os.Stderr, "curator: no build_https scopes are configured")
+		_, _ = fmt.Fprintln(c.stderr, "curator: no build_https scopes are configured")
 		return exitOK
 	}
 	access := gitcred.Access{}
 	for _, scope := range scopes {
 		credential := cfg.BuildHTTPS[scope]
 		present := buildHTTPSPresent(context.Background(), access, credential)
-		fmt.Printf("%s\t%s present=%t\n", scope, formatBuildHTTPS(credential), present)
+		_, _ = fmt.Fprintf(c.stdout, "%s\t%s present=%t\n", scope, formatBuildHTTPS(credential), present)
 	}
 	return exitOK
 }
@@ -2305,28 +2348,28 @@ func buildHTTPSPresent(ctx context.Context, access gitcred.Access, credential co
 	}
 }
 
-func cmdConfigBuildHTTPSRemove(args []string) int {
+func (c cli) cmdConfigBuildHTTPSRemove(args []string) int {
 	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
-		fmt.Fprintln(os.Stderr, "curator: config build-https remove requires exactly one <scope>")
+		_, _ = fmt.Fprintln(c.stderr, "curator: config build-https remove requires exactly one <scope>")
 		return exitUsage
 	}
-	cfg, code := loadConfig()
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	credential := cfg.BuildHTTPS[args[0]]
 	if err := config.RemoveBuildHTTPS(cfg.Path, args[0]); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	if credential.Token == config.TokenSourceKeyring {
 		access := gitcred.Access{}
 		if !access.DeleteScoped(context.Background(), args[0], gitcred.ScopeHost(args[0])) {
-			fmt.Fprintf(os.Stderr,
+			_, _ = fmt.Fprintf(c.stderr,
 				"curator: warning: could not confirm the stored token for %s was removed\n", args[0])
 		}
 	}
-	fmt.Printf("removed build_https scope %s\n", args[0])
+	_, _ = fmt.Fprintf(c.stdout, "removed build_https scope %s\n", args[0])
 	return exitOK
 }
 
@@ -2350,17 +2393,17 @@ func formatBuildHTTPS(credential config.BuildHTTPSCredential) string {
 	return strings.Join(parts, " ")
 }
 
-func cmdConfigShow() int {
-	cfg, code := loadConfig()
+func (c cli) cmdConfigShow() int {
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
 	payload, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	fmt.Println(string(payload))
+	_, _ = fmt.Fprintln(c.stdout, string(payload))
 	return exitOK
 }
 
@@ -2384,14 +2427,14 @@ func pluralY(n int) string {
 	return "ies"
 }
 
-func cmdUI() int {
-	cfg, code := loadConfig()
+func (c cli) cmdUI() int {
+	cfg, code := c.loadConfig()
 	if code != exitOK {
 		return code
 	}
-	program := tea.NewProgram(ui.NewModel(ui.LoadState(cfg)))
+	program := tea.NewProgram(ui.NewModel(ui.LoadState(cfg)), tea.WithOutput(c.stdout))
 	if _, err := program.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, "curator:", err)
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
 	return exitOK
