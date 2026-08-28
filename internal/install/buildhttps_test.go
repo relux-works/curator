@@ -316,7 +316,7 @@ func TestBuildHTTPSResolutionIsCarriedByTheExternalInstallPlan(t *testing.T) {
 		},
 	}
 	plan, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
-		[]*closure.Node{node}, nil, probeOnlyToolchain{}, deps, true)
+		[]*closure.Node{node}, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
 	if err == nil || !strings.Contains(err.Error(), buildrepo.CodeSourceUnavailable) {
 		t.Fatalf("plan error = %v, want the post-resolution acquisition stop", err)
 	}
@@ -363,7 +363,7 @@ func TestPromptedBuildHTTPSAbortStopsTheProductionPlanBeforeAnyFetch(t *testing.
 		},
 	}
 	_, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
-		[]*closure.Node{node}, nil, probeOnlyToolchain{}, deps, false)
+		[]*closure.Node{node}, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), false)
 	if !errors.Is(err, ErrBuildHTTPSAborted) {
 		t.Fatalf("plan error = %v, want prompt abort", err)
 	}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/protocoljson"
 	"github.com/relux-works/curator/internal/registry"
 )
@@ -255,14 +256,24 @@ func (s *DiskProtectedStore) LookupArtifact(key string, input map[string]any, mu
 	if !ok || !pathOK || len(meta) != 3 || meta["path"] != artifactPath || meta["sha256"] != "sha256:"+hex.EncodeToString(sum[:]) || !numberEquals(meta["size"], len(artifact)) {
 		return nil, s.corrupt(entry, CodeArtifactInvalid, mutate, fmt.Errorf("artifact metadata mismatch"))
 	}
+	executionReceipt, err := s.readProtectedFile(filepath.Join(entry, "execution-receipt.ccj.json"), 1<<20)
+	if err != nil {
+		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, err)
+	}
+	if _, err := closureexec.DecodeBuildSessionReceipt(executionReceipt); err != nil {
+		return nil, s.corrupt(entry, CodeReceiptInvalid, mutate, err)
+	}
 	if err := guard.validate(); err != nil {
 		return nil, s.corrupt(entry, CodeArtifactInvalid, mutate, err)
 	}
-	return &ArtifactHit{Bytes: artifact, Receipt: receipt}, nil
+	return &ArtifactHit{Bytes: artifact, Receipt: receipt, ExecutionReceipt: executionReceipt}, nil
 }
 
 // StoreArtifact atomically publishes an artifact and canonical receipt v2.
-func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ string, artifact []byte) ([]byte, error) {
+func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ string, artifact, executionReceipt []byte) ([]byte, error) {
+	if _, err := closureexec.DecodeBuildSessionReceipt(executionReceipt); err != nil {
+		return nil, fmt.Errorf("execution receipt is invalid: %w", err)
+	}
 	if err := s.prepare(); err != nil {
 		return nil, err
 	}
@@ -277,8 +288,11 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
 	final := filepath.Join(parent, name)
 	if _, err = os.Lstat(final); err == nil {
 		hit, e := s.LookupArtifact(key, input, true)
-		if e == nil && hit != nil {
+		if e == nil && hit != nil && bytes.Equal(hit.Bytes, artifact) && bytes.Equal(hit.ExecutionReceipt, executionReceipt) {
 			return hit.Receipt, nil
+		}
+		if e == nil && hit != nil {
+			_ = s.corrupt(final, CodeReceiptInvalid, true, fmt.Errorf("execution receipt or artifact differs for the same assured key"))
 		}
 	}
 	stage, err := os.MkdirTemp(parent, ".stage-")
@@ -300,6 +314,9 @@ func (s *DiskProtectedStore) StoreArtifact(key string, input map[string]any, _ s
 		return nil, err
 	}
 	if err = os.WriteFile(filepath.Join(stage, "receipt.json"), receipt, 0o600); err != nil {
+		return nil, err
+	}
+	if err = os.WriteFile(filepath.Join(stage, "execution-receipt.ccj.json"), executionReceipt, 0o600); err != nil {
 		return nil, err
 	}
 	if err = secureProtectedTree(stage); err != nil {

@@ -386,7 +386,10 @@ Write-Output ("left={0}:{1}:{2}" -f $active, $restored, $secondPrompt)
 	if err := os.WriteFile(scriptPath, []byte(script), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	command := exec.Command(powerShell, "-NoProfile", "-File", scriptPath)
+	// Bypass applies only to this child process: hosts with a Restricted
+	// machine policy would otherwise refuse the harness script itself, which
+	// proves nothing about the hook under test.
+	command := exec.Command(powerShell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath)
 	command.Env = append(os.Environ(), "HOOK_PATH="+hookPath, "NESTED="+nested, "OUTSIDE="+outside)
 	output, err := command.CombinedOutput()
 	if err != nil {

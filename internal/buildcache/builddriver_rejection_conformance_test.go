@@ -71,16 +71,6 @@ type cacheRejection struct {
 	note string
 }
 
-// decodeStoredReceipt returns the receipt the publication carries.
-func decodeStoredReceipt(t *testing.T, publication Publication) buildmeta.Receipt {
-	t.Helper()
-	receipt, err := buildmeta.DecodeReceipt(publication.ReceiptBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return receipt
-}
-
 // entryPaths names the members of one published cache entry.
 type entryPaths struct {
 	entry    string
@@ -298,10 +288,11 @@ func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
 			}
 			store := newTestStore(t)
 			publication, receiptHash := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-			if _, err := store.Publish(publication, testHomeLock{}); err != nil {
+			publishedResult, err := store.Publish(publication, testHomeLock{})
+			if err != nil {
 				t.Fatal(err)
 			}
-			hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+			hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 			if hit.Status != Hit {
 				t.Fatalf("published entry did not become a hit: %+v", hit)
 			}
@@ -320,7 +311,7 @@ func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
 				if !errors.As(err, &conflict) {
 					t.Fatalf("%s produced %v, want a stable publication conflict", name, err)
 				}
-				if conflict.Key != decodeStoredReceipt(t, publication).CacheKey {
+				if conflict.Key != publishedResult.CacheKey {
 					t.Fatalf("%s conflict names %q", name, conflict.Key)
 				}
 				return
@@ -329,7 +320,7 @@ func TestCacheRejectionClustersMapToStableCuratorOutcomes(t *testing.T) {
 			if mapping.mutate != nil {
 				mapping.mutate(t, entry, publication)
 			}
-			expected := Expectation{Input: publication.Input, ReceiptHash: receiptHash}
+			expected := Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance}
 			if mapping.expectHash != nil {
 				expected.ReceiptHash = mapping.expectHash(receiptHash)
 			}

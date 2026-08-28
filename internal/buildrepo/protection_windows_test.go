@@ -16,7 +16,8 @@ func windowsArtifactFixture(t *testing.T) (*DiskProtectedStore, string, map[stri
 	store := &DiskProtectedStore{Root: filepath.Join(t.TempDir(), "cache")}
 	key := "sha256:" + strings.Repeat("a", 64)
 	input := map[string]any{"command": "tool", "target": map[string]any{"goos": "windows"}}
-	if _, err := store.StoreArtifact(key, input, "tool", []byte("trusted artifact")); err != nil {
+	artifact := []byte("trusted artifact")
+	if _, err := store.StoreArtifact(key, input, "tool", artifact, testExecutionReceiptBytes(t, input, artifact)); err != nil {
 		t.Fatal(err)
 	}
 	entry := filepath.Join(store.Root, "artifacts", strings.TrimPrefix(key, "sha256:"))
@@ -230,7 +231,7 @@ func TestWindowsProtectedArtifactEntrySwapCannotReturnBytes(t *testing.T) {
 	if err := os.Mkdir(replacement, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"artifact", "receipt.json"} {
+	for _, name := range []string{"artifact", "receipt.json", "execution-receipt.ccj.json"} {
 		data, err := os.ReadFile(filepath.Join(entry, name))
 		if err != nil {
 			t.Fatal(err)

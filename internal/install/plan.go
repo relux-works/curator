@@ -11,6 +11,7 @@ import (
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
 	"github.com/relux-works/curator/internal/closure"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/skillspec"
 )
@@ -78,6 +79,7 @@ type PlannedBuild struct {
 	source       buildsource.Identity
 	target       buildmeta.Target
 	input        buildmeta.Input
+	logicalKey   buildmeta.CacheKey
 	key          buildmeta.CacheKey
 	outcome      BuildOutcome
 	reason       string
@@ -85,6 +87,7 @@ type PlannedBuild struct {
 	artifactPath string
 	receiptHash  buildmeta.ReceiptHash
 	artifact     buildmeta.Artifact
+	assurance    closureexec.AssuranceBinding
 }
 
 // Skill is the closure node that declared the command.
@@ -134,7 +137,7 @@ func (build PlannedBuild) Expectation() buildcache.Expectation {
 	}
 	input := build.input
 	input.Target = build.Target()
-	return buildcache.Expectation{Input: input}
+	return buildcache.Expectation{Input: input, Assurance: build.assurance}
 }
 
 // ReceiptSHA256 is the identity of the canonical receipt the protected cache
@@ -405,7 +408,7 @@ func planBuilds(ctx context.Context, request buildPlanRequest) (BuildPlan, error
 
 	var blocked []string
 	for _, item := range planned {
-		build, err := planOne(item, plan.sources[item.node.Name], target, toolchain, request.deps.Cache)
+		build, err := planOne(item, plan.sources[item.node.Name], target, toolchain, request.deps.Cache, request.deps.Assurance)
 		if err != nil {
 			return plan, err
 		}
@@ -483,6 +486,7 @@ func planOne(
 	target buildmeta.Target,
 	toolchain buildmeta.Toolchain,
 	cache CacheInspector,
+	authority *BuildAuthority,
 ) (PlannedBuild, error) {
 	buildRoot, err := buildRootFor(item.node.Spec, item.command)
 	if err != nil {
@@ -505,7 +509,11 @@ func planOne(
 	if err := input.Validate(); err != nil {
 		return PlannedBuild{}, fmt.Errorf("%s.%s: %w", item.node.Name, item.command.Name, err)
 	}
-	key, err := input.CacheKey()
+	logicalKey, err := input.CacheKey()
+	if err != nil {
+		return PlannedBuild{}, fmt.Errorf("%s.%s: %w", item.node.Name, item.command.Name, err)
+	}
+	key, err := assuredBuildKey(input, authority)
 	if err != nil {
 		return PlannedBuild{}, fmt.Errorf("%s.%s: %w", item.node.Name, item.command.Name, err)
 	}
@@ -514,7 +522,7 @@ func planOne(
 	// before and immediately after the lookup.
 	var inspection buildcache.Result
 	if err := source.Use(func(*buildsource.Token) error {
-		inspection = cache.Inspect(buildcache.Expectation{Input: input})
+		inspection = cache.Inspect(buildcache.Expectation{Input: input, Assurance: authority.Binding()})
 		return nil
 	}); err != nil {
 		return PlannedBuild{}, fmt.Errorf("%s.%s: %w", item.node.Name, item.command.Name, err)
@@ -531,7 +539,9 @@ func planOne(
 		source:        input.BuildSource,
 		target:        target,
 		input:         input,
+		logicalKey:    logicalKey,
 		key:           key,
+		assurance:     authority.Binding(),
 		outcome:       BuildOutcome(inspection.DryRunOutcome()),
 		reason:        inspection.Reason,
 	}

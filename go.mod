@@ -10,6 +10,7 @@ require (
 	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.0.0-00010101000000-000000000000
 	golang.org/x/sys v0.36.0
 	golang.org/x/text v0.3.8
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

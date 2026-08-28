@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/registry"
 )
 
@@ -88,7 +90,8 @@ type ToolchainIdentity struct {
 // receipt-v1 representation owned by go-v1.
 type GoSession interface {
 	Identity() ToolchainIdentity
-	Compile(context.Context, CompileRequest) ([]byte, error)
+	BuildInput(CompileRequest) (buildmeta.Input, error)
+	Compile(context.Context, CompileRequest) (CompileResult, error)
 }
 
 // CompileRequest is the restricted target view passed to the compiler session.
@@ -96,9 +99,16 @@ type CompileRequest struct {
 	Root, SourceDir, Command string
 }
 
+// CompileResult carries the artifact together with the exact session receipt
+// produced by the authority-gated compiler dispatch.
+type CompileResult struct {
+	Artifact         []byte
+	ExecutionReceipt closureexec.BuildSessionReceipt
+}
+
 // ArtifactHit is a protected receipt-v2 cache hit.
 type ArtifactHit struct {
-	Bytes, Receipt []byte
+	Bytes, Receipt, ExecutionReceipt []byte
 }
 
 // ProtectedStore is the fail-closed snapshot and artifact cache boundary.
@@ -106,7 +116,7 @@ type ProtectedStore interface {
 	LoadSnapshot(key string, mutate bool) (*Snapshot, error)
 	StoreSnapshot(key string, snapshot *Snapshot) error
 	LookupArtifact(key string, input map[string]any, mutate bool) (*ArtifactHit, error)
-	StoreArtifact(key string, input map[string]any, command string, artifact []byte) ([]byte, error)
+	StoreArtifact(key string, input map[string]any, command string, artifact, executionReceipt []byte) ([]byte, error)
 }
 
 // PipelineRequest contains manager-derived inputs to one external build.
@@ -132,6 +142,12 @@ type PipelineRequest struct {
 	// Closed schema-7 inputs cannot normally set it; keeping the gate here
 	// prevents future parser expansion from silently crossing the boundary.
 	PackageSigningRequested bool
+	// Assurance is the explicit operation binding selected before any cache
+	// lookup. Its zero value is never interpreted as portable.
+	Assurance closureexec.AssuranceBinding
+	// AssuranceCheck revalidates the same operation authority immediately at
+	// cache lookup/adoption, dispatch, and publication boundaries.
+	AssuranceCheck func(context.Context) error
 }
 
 // PipelineResult is the audited receipt-v2 result ready for transaction staging.
@@ -139,6 +155,7 @@ type PipelineResult struct {
 	State, Code, SnapshotKey, CacheKey string
 	BuildSource                        string
 	Artifact, Receipt                  []byte
+	ExecutionReceipt                   closureexec.BuildSessionReceipt
 	Subject                            AuditSubject
 	Warnings                           []string
 }
@@ -248,6 +265,15 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 	if request.Store == nil || request.Go == nil {
 		return result, fmt.Errorf("external pipeline requires protected store and shared Go session")
 	}
+	if err := request.Assurance.Validate(); err != nil {
+		return result, fmt.Errorf("build assurance is invalid: %w", err)
+	}
+	if request.AssuranceCheck == nil {
+		return result, fmt.Errorf("build assurance recheck is absent")
+	}
+	if err := request.AssuranceCheck(ctx); err != nil {
+		return result, err
+	}
 	if mutate {
 		if err := request.Store.StoreSnapshot(result.SnapshotKey, snapshot); err != nil {
 			return result, err
@@ -258,14 +284,38 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 	if err != nil {
 		return result, err
 	}
+	compilerRoot, sourceDir, removeCompilerRoot, err := compilerView(root, target)
+	if err != nil {
+		return result, err
+	}
+	defer removeCompilerRoot()
+	compileRequest := CompileRequest{Root: compilerRoot, SourceDir: sourceDir, Command: request.Command}
+	buildInput, err := request.Go.BuildInput(compileRequest)
+	if err != nil {
+		return result, fmt.Errorf("derive assured compiler input: %w", err)
+	}
 	request.trace("artifact-cache-lookup")
+	if err := request.AssuranceCheck(ctx); err != nil {
+		return result, err
+	}
 	hit, cacheErr := request.Store.LookupArtifact(result.CacheKey, input, mutate)
+	if err := request.AssuranceCheck(ctx); err != nil {
+		return result, err
+	}
 	if cacheErr == nil && hit != nil {
-		if err := validateMaterialized(root, snapshot); err != nil {
-			return result, err
+		execution, receiptErr := closureexec.DecodeBuildSessionReceipt(hit.ExecutionReceipt)
+		if receiptErr == nil {
+			receiptErr = execution.ValidateFor(request.Assurance, buildInput, artifactMetadata(input, hit.Bytes))
 		}
-		result.State, result.Artifact, result.Receipt = "cache-hit", hit.Bytes, hit.Receipt
-		return result, nil
+		if receiptErr == nil {
+			if err := validateMaterialized(root, snapshot); err != nil {
+				return result, err
+			}
+			result.State, result.Artifact, result.Receipt = "cache-hit", hit.Bytes, hit.Receipt
+			result.ExecutionReceipt = execution
+			return result, nil
+		}
+		cacheErr = admissionError(CodeReceiptInvalid, "execution receipt mismatch: %v", receiptErr)
 	}
 	if request.Operation == OperationDryRun {
 		result.State = "would-preflight-and-build"
@@ -274,27 +324,37 @@ func RunPipeline(ctx context.Context, request PipelineRequest) (PipelineResult, 
 		}
 		return result, nil
 	}
-	compilerRoot, sourceDir, removeCompilerRoot, err := compilerView(root, target)
-	if err != nil {
-		return result, err
-	}
-	defer removeCompilerRoot()
 	request.trace("compiler")
-	artifact, err := request.Go.Compile(ctx, CompileRequest{Root: compilerRoot, SourceDir: sourceDir, Command: request.Command})
+	if err := request.AssuranceCheck(ctx); err != nil {
+		return result, err
+	}
+	compiled, err := request.Go.Compile(ctx, compileRequest)
 	if err != nil {
 		return result, err
 	}
+	artifact := compiled.Artifact
 	if len(artifact) == 0 {
 		return result, admissionError(CodeArtifactInvalid, "compiler returned an empty artifact")
+	}
+	if err := compiled.ExecutionReceipt.ValidateFor(request.Assurance, buildInput, artifactMetadata(input, artifact)); err != nil {
+		return result, admissionError(CodeReceiptInvalid, "compiler execution receipt mismatch: %v", err)
+	}
+	executionBytes, err := compiled.ExecutionReceipt.CanonicalBytes()
+	if err != nil {
+		return result, admissionError(CodeReceiptInvalid, "encode compiler execution receipt: %v", err)
 	}
 	if err := validateMaterialized(root, snapshot); err != nil {
 		return result, err
 	}
-	receipt, err := request.Store.StoreArtifact(result.CacheKey, input, request.Command, artifact)
+	if err := request.AssuranceCheck(ctx); err != nil {
+		return result, err
+	}
+	receipt, err := request.Store.StoreArtifact(result.CacheKey, input, request.Command, artifact, executionBytes)
 	if err != nil {
 		return result, err
 	}
 	result.State, result.Artifact, result.Receipt = "would-preflight-and-build", artifact, receipt
+	result.ExecutionReceipt = compiled.ExecutionReceipt
 	if cacheErr != nil {
 		result.State, result.Code = "would-rebuild-untrusted-cache", ErrorCode(cacheErr)
 	}
@@ -414,6 +474,11 @@ func compilerView(snapshotRoot string, target Target) (string, string, func(), e
 	}
 	remove := func() { _ = os.RemoveAll(view) }
 	sourceRoot := filepath.Join(snapshotRoot, filepath.FromSlash(target.BuildRoot))
+	viewBuildRoot := filepath.Join(view, "build")
+	if err := os.Mkdir(viewBuildRoot, 0o700); err != nil {
+		remove()
+		return "", "", func() {}, err
+	}
 	err = filepath.WalkDir(sourceRoot, func(name string, _ os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -425,7 +490,7 @@ func compilerView(snapshotRoot string, target Target) (string, string, func(), e
 		if rel == "." {
 			return nil
 		}
-		destination := filepath.Join(view, rel)
+		destination := filepath.Join(viewBuildRoot, rel)
 		info, err := os.Lstat(name)
 		if err != nil {
 			return err
@@ -447,9 +512,9 @@ func compilerView(snapshotRoot string, target Target) (string, string, func(), e
 		remove()
 		return "", "", func() {}, err
 	}
-	sourceDir := "."
+	sourceDir := "build"
 	if target.SourceDir != target.BuildRoot {
-		sourceDir = strings.TrimPrefix(target.SourceDir, target.BuildRoot+"/")
+		sourceDir += "/" + strings.TrimPrefix(target.SourceDir, target.BuildRoot+"/")
 	}
 	return view, sourceDir, remove, nil
 }
@@ -473,6 +538,12 @@ func cacheKey(input map[string]any) (string, error) {
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
 
+func artifactMetadata(input map[string]any, artifact []byte) buildmeta.Artifact {
+	sum := sha256.Sum256(artifact)
+	path, _ := artifactPathFromInput(input)
+	return buildmeta.Artifact{Path: path, SHA256: "sha256:" + hex.EncodeToString(sum[:]), Size: int64(len(artifact))}
+}
+
 func receiptInput(r PipelineRequest, target Target, digest string, tool ToolchainIdentity) map[string]any {
 	declared := map[string]any{"identity": map[string]any{"kind": "network-git", "value": r.Declared.Identity}, "transport": r.Declared.Transport, "locked_commit": map[string]any{"object_format": r.Declared.ObjectFormat, "hex": r.Declared.Commit}}
 	if r.Declared.Tag != "" {
@@ -493,5 +564,8 @@ func receiptInput(r PipelineRequest, target Target, digest string, tool Toolchai
 	for k, v := range tool.Tuning {
 		tuning[k] = v
 	}
-	return map[string]any{"schema_version": 2, "driver": "go-repository-v1", "command": r.Command, "build_root": target.BuildRoot, "source_dir": target.SourceDir, "source": map[string]any{"repository": r.Declared.Repository, "declared": declared, "effective": effective, "descriptor": map[string]any{"path": DescriptorName, "target": r.Target}}, "target": map[string]any{"goos": tool.GOOS, "goarch": tool.GOARCH, "tuning": tuning}, "toolchain": map[string]any{"algorithm": "curator-go-toolchain-v1", "content_sha256": tool.ContentSHA256, "go_version": tool.GoVersion, "go_relpath": tool.GoRelpath}, "policy": map[string]any{"module_mode": "vendor", "network": "none", "workspace": false, "cgo": false, "compiler_directives": "reject-nonstandard-cgo-import-dynamic-v1", "target_mode": "native", "link_mode": "internal", "libgcc": "none", "package_assembly": false, "host_objects": false, "telemetry": "off-private", "execution_policy": "manager-worker-v1", "source_kind": "locked-external-git-v1"}}
+	input := map[string]any{"schema_version": 2, "driver": "go-repository-v1", "command": r.Command, "build_root": target.BuildRoot, "source_dir": target.SourceDir, "source": map[string]any{"repository": r.Declared.Repository, "declared": declared, "effective": effective, "descriptor": map[string]any{"path": DescriptorName, "target": r.Target}}, "target": map[string]any{"goos": tool.GOOS, "goarch": tool.GOARCH, "tuning": tuning}, "toolchain": map[string]any{"algorithm": "curator-go-toolchain-v1", "content_sha256": tool.ContentSHA256, "go_version": tool.GoVersion, "go_relpath": tool.GoRelpath}, "policy": map[string]any{"module_mode": "vendor", "network": "none", "workspace": false, "cgo": false, "compiler_directives": "reject-nonstandard-cgo-import-dynamic-v1", "target_mode": "native", "link_mode": "internal", "libgcc": "none", "package_assembly": false, "host_objects": false, "telemetry": "off-private", "execution_policy": "manager-worker-v1", "source_kind": "locked-external-git-v1"}}
+	input["assurance"] = r.Assurance.CanonicalValue()
+	input["policy"].(map[string]any)["execution_policy"] = r.Assurance.ExecutionPolicyID
+	return input
 }

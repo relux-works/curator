@@ -10,6 +10,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/marker"
 )
@@ -69,8 +70,9 @@ type StageRequest struct {
 // StagedArtifact is one verified operation-private output. The path is
 // manager-private and is never executed, published, or installed here.
 type StagedArtifact struct {
-	Path     string
-	Metadata buildmeta.Artifact
+	Path             string
+	Metadata         buildmeta.Artifact
+	ExecutionReceipt closureexec.BuildSessionReceipt
 }
 
 // Builder compiles one planned miss into operation-private staging.
@@ -91,6 +93,7 @@ type GenerationReader interface {
 // zero value resolves to the real trusted toolchain, the protected build
 // cache, the go-v1 builder, the system clock, and on-disk marker reads.
 type BuildDeps struct {
+	Assurance  *BuildAuthority
 	Toolchain  Toolchain
 	Cache      CacheInspector
 	Builder    Builder
@@ -102,6 +105,9 @@ type BuildDeps struct {
 // the operation-private root the toolchain allocates its bases inside, and
 // forbidden lists roots that must never host operation-private state.
 func (deps BuildDeps) resolve(home string, private *privateRoot, forbidden []string) (BuildDeps, error) {
+	if deps.Assurance == nil {
+		deps.Assurance = NewPortableBuildAuthority()
+	}
 	if deps.Clock == nil {
 		deps.Clock = systemClock{}
 	}
@@ -121,6 +127,16 @@ func (deps BuildDeps) resolve(home string, private *privateRoot, forbidden []str
 		}
 		deps.Cache = store
 	}
+	toolchain, err := deps.Assurance.toolchain(deps.Toolchain)
+	if err != nil {
+		return BuildDeps{}, err
+	}
+	builder, err := deps.Assurance.builder(deps.Builder)
+	if err != nil {
+		return BuildDeps{}, err
+	}
+	cache := &assuredCache{authority: deps.Assurance, inner: deps.Cache}
+	deps.Toolchain, deps.Builder, deps.Cache = toolchain, builder, cache
 	return deps, nil
 }
 
@@ -218,5 +234,19 @@ func (goBuilder) Stage(ctx context.Context, request StageRequest) (StagedArtifac
 	if err != nil {
 		return StagedArtifact{}, err
 	}
-	return StagedArtifact{Path: result.Artifact.StagedPath, Metadata: result.Artifact.Metadata}, nil
+	controls := make([]closureexec.RuntimeControlEvidence, len(result.Evidence.Controls))
+	for index, control := range result.Evidence.Controls {
+		controls[index] = closureexec.RuntimeControlEvidence{Name: control.Name, Availability: control.Availability, Status: control.Status}
+	}
+	input := buildmeta.Input{
+		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		BuildSource: request.Source.Identity(), BuildRoot: request.BuildRoot,
+		Command: request.Command, SourceDir: request.SourceDir,
+		Target: session.Target(), Toolchain: session.Toolchain(), Policy: buildmeta.FixedPolicy(),
+	}
+	receipt, err := closureexec.NewPortableBuildSessionReceipt(input, result.Artifact.Metadata, controls)
+	if err != nil {
+		return StagedArtifact{}, err
+	}
+	return StagedArtifact{Path: result.Artifact.StagedPath, Metadata: result.Artifact.Metadata, ExecutionReceipt: receipt}, nil
 }

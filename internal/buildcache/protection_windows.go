@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -55,6 +56,12 @@ func openProtectedEntry(home, entryPath, artifactRel string) (*openedEntry, erro
 		return nil, err
 	}
 	opened.receipt = receipt
+	executionReceipt, err := openWindowsProtected(filepath.Join(entryPath, ExecutionReceiptFilename), false, false)
+	if err != nil {
+		opened.close()
+		return nil, err
+	}
+	opened.executionReceipt = executionReceipt
 	binDir, err := openWindowsProtected(filepath.Join(entryPath, "bin"), true, false)
 	if err != nil {
 		opened.close()
@@ -114,6 +121,12 @@ func openProtectedEntryFrom(entry *protectedDir, artifactRel string) (*openedEnt
 		return nil, err
 	}
 	opened.receipt = receipt
+	executionReceipt, err := openWindowsProtected(filepath.Join(base, ExecutionReceiptFilename), false, false)
+	if err != nil {
+		opened.close()
+		return nil, err
+	}
+	opened.executionReceipt = executionReceipt
 	binDir, err := openWindowsProtected(filepath.Join(base, "bin"), true, false)
 	if err != nil {
 		opened.close()
@@ -185,18 +198,36 @@ func openWindowsProtected(path string, directory, executable bool) (*os.File, er
 	if directory {
 		flags |= windows.FILE_FLAG_BACKUP_SEMANTICS
 	}
-	handle, err := windows.CreateFile(
-		path16,
-		windows.GENERIC_READ|windows.READ_CONTROL,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
-		nil,
-		windows.OPEN_EXISTING,
-		flags,
-		0,
-	)
-	if err != nil {
+	var handle windows.Handle
+	for attempt := 0; ; attempt++ {
+		handle, err = windows.CreateFile(
+			path16,
+			windows.GENERIC_READ|windows.READ_CONTROL,
+			windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+			nil,
+			windows.OPEN_EXISTING,
+			flags,
+			0,
+		)
+		if err == nil {
+			break
+		}
 		if errors.Is(err, windows.ERROR_FILE_NOT_FOUND) || errors.Is(err, windows.ERROR_PATH_NOT_FOUND) {
 			return nil, fmt.Errorf("cache entry is incomplete: %w", os.ErrNotExist)
+		}
+		// A sharing violation states that a concurrent handle exists — an
+		// antivirus sweep of freshly renamed state, or an in-flight rename —
+		// and says nothing about ownership or the DACL. Treating it as an
+		// untrusted-provenance verdict once made a racing publisher withdraw
+		// a valid live winner, so it is waited out briefly instead, and a
+		// persistent holder surfaces as a plain read failure, never as a
+		// provenance judgement.
+		if errors.Is(err, windows.ERROR_SHARING_VIOLATION) {
+			if attempt < 40 {
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+			return nil, fmt.Errorf("open protected path: %w", err)
 		}
 		return nil, untrustedf("open protected path without following reparse points: %v", err)
 	}
@@ -357,15 +388,24 @@ func ownerOnlyACL(container bool) (*windows.ACL, error) {
 }
 
 func protectWindowsPath(path string, container bool) error {
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return err
+	}
 	acl, err := ownerOnlyACL(container)
 	if err != nil {
 		return err
 	}
+	// The owner is written alongside the DACL. On an administrator token the
+	// default owner policy can assign new objects to the Administrators group
+	// instead of the personal SID, and validateWindowsOwner would then refuse
+	// an entry this manager had just created correctly. Assigning one's own
+	// SID needs no special privilege on an object the caller already controls.
 	return windows.SetNamedSecurityInfo(
 		path,
 		windows.SE_FILE_OBJECT,
-		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
-		nil,
+		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
+		user.User.Sid,
 		nil,
 		acl,
 		nil,
@@ -384,6 +424,10 @@ func protectWindowsPath(path string, container bool) error {
 // window because mkdir takes the mode at creation; this gives Windows the same
 // property. It returns os.ErrExist for an existing name, like os.Mkdir.
 func createProtectedDirectory(path string) error {
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return err
+	}
 	acl, err := ownerOnlyACL(true)
 	if err != nil {
 		return err
@@ -393,6 +437,12 @@ func createProtectedDirectory(path string) error {
 		return err
 	}
 	if err := descriptor.SetDACL(acl, true, false); err != nil {
+		return err
+	}
+	// The owner is stated explicitly for the same reason protectWindowsPath
+	// writes it: an administrator token's default owner policy may otherwise
+	// hand the new directory to the Administrators group and fail validation.
+	if err := descriptor.SetOwner(user.User.Sid, false); err != nil {
 		return err
 	}
 	// Without SE_DACL_PROTECTED the DACL supplied here is merged with the
@@ -495,10 +545,36 @@ func ownedInheritingDirectory(path string) bool {
 		return false
 	}
 	if validateWindowsOwner(owner, user.User.Sid, path) != nil {
-		return false
+		// A directory made by this process through plain os calls is owned by
+		// the token's DEFAULT owner, which an administrator's owner policy may
+		// set to the Administrators group rather than the personal SID. That
+		// state is still "our own unprotected creation", so it is repairable;
+		// any other principal's directory remains refused, never seized.
+		defaultOwner, ownerErr := tokenDefaultOwner(windows.GetCurrentProcessToken())
+		if ownerErr != nil || defaultOwner == nil || !defaultOwner.IsValid() || owner == nil || !owner.Equals(defaultOwner) {
+			return false
+		}
 	}
 	control, _, err := descriptor.Control()
 	return err == nil && control&windows.SE_DACL_PROTECTED == 0
+}
+
+// tokenDefaultOwner returns the SID the token assigns as the owner of new
+// objects created without an explicit descriptor.
+func tokenDefaultOwner(token windows.Token) (*windows.SID, error) {
+	size := uint32(64)
+	for {
+		buffer := make([]byte, size)
+		err := windows.GetTokenInformation(token, windows.TokenOwner, &buffer[0], size, &size)
+		if err == nil {
+			// TOKEN_OWNER is a single PSID; the cast reads the buffer the API
+			// itself sized and filled.
+			return (*struct{ Owner *windows.SID })(unsafe.Pointer(&buffer[0])).Owner, nil // #nosec G103 -- fixed TOKEN_OWNER layout from GetTokenInformation.
+		}
+		if err != windows.ERROR_INSUFFICIENT_BUFFER || int(size) <= len(buffer) {
+			return nil, err
+		}
+	}
 }
 
 func ensureProtectedBase(home, base string) error {

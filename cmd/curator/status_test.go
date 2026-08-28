@@ -17,12 +17,14 @@ import (
 	"github.com/relux-works/curator/internal/adapters"
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // TestMain gives the test binary the same fixed hidden worker mode the
@@ -37,6 +39,15 @@ func TestMain(m *testing.M) {
 }
 
 // capture runs one CLI invocation with both standard streams redirected.
+//
+// It replaces the process-global os.Stdout and os.Stderr for the duration of
+// the call, so every case that reaches the CLI through it must stay serial: a
+// case that calls capture, or a helper that does, must never call t.Parallel().
+// The same rule covers the cases that point run() at a fixture through the
+// process-global CURATOR_CONFIG environment variable, which the testing package
+// already refuses to combine with t.Parallel(). Go releases paused parallel
+// cases only after the whole serial pass has finished, so the parallel cases in
+// this package can never observe a swapped stream.
 func capture(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	outReader, outWriter, err := os.Pipe()
@@ -87,6 +98,7 @@ func decodeStatus(t *testing.T, payload string) statusPayload {
 // declares it. It returns the project root and the manager home.
 func compiledProject(t *testing.T) (string, string) {
 	t.Helper()
+	testtoolchain.LockHostGOROOT(t)
 	return compiledProjectDeclaring(t, `{"name":"build-skill","tag":"v1"}`)
 }
 
@@ -1533,6 +1545,20 @@ func TestCompiledInstallFollowsTheNativeControlInventoryExactly(t *testing.T) {
 		}
 		if entries := publishedCacheEntries(t, home); len(entries) != 1 {
 			t.Fatalf("a covered platform published %d protected cache entries, want 1", len(entries))
+		} else {
+			payload, err := os.ReadFile(filepath.Join(entries[0], buildcache.ExecutionReceiptFilename))
+			if err != nil {
+				t.Fatalf("portable build published no execution receipt: %v", err)
+			}
+			receipt, err := closureexec.DecodeBuildSessionReceipt(payload)
+			if err != nil || receipt.Binding.AssuranceMode != closureexec.AssurancePortable || receipt.ProviderExecutionReceipt != nil {
+				t.Fatalf("portable execution receipt = %+v, %v", receipt, err)
+			}
+			for _, capability := range receipt.Binding.ActualCapabilities {
+				if strings.Contains(capability.CapabilityID, "lossless") || strings.Contains(capability.CapabilityID, "total-network") {
+					t.Fatalf("portable receipt inflated capability %q", capability.CapabilityID)
+				}
+			}
 		}
 		return
 	}

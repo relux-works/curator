@@ -1,0 +1,50 @@
+@startuml
+!theme plain
+
+title TASK-260819-2qytt1 — Operator-owned Rust Git authority
+
+actor "Request caller" as Caller
+participant "rustsource.Manager\n(package-sealed)" as Manager
+participant "Artifact policy +\nprotected intake" as Intake
+participant "closureexec.Executor\n(private causal chain)" as Executor
+participant "Pinned Cargo 0.92\nGit oracle worker" as Oracle
+participant "Cargo 1.91 vendor" as Cargo
+
+Caller -> Manager: Capture(raw lock/manifests/archives/repositories)
+note right of Caller
+  No executor, provider, runner,
+  receipt, projection, normalized
+  manifest, tool path, or config
+end note
+
+Manager -> Intake: Capture and admit every complete raw origin
+alt any raw origin denied, dirty, incomplete, or drifted
+  Intake --> Manager: stable rejection
+  Manager --> Caller: error; oracle=0, cargo=0
+else all required origins admitted
+  Intake --> Manager: protected handles + intake receipts
+  loop each Git package in canonical order
+    Manager -> Executor: Commit exact manifest permit
+    Executor -> Intake: Immediate input rechecks
+    Executor -> Oracle: Fixed hidden mode, exact mounts/output
+    Oracle --> Executor: canonical rust-git-projection-v1
+    Executor --> Manager: causal derivation receipt
+    Manager -> Manager: Verify issued receipt, origin bindings,\ncanonical output; seal private derivation
+    alt oracle/receipt/binding drift
+      Manager --> Caller: error; cargo=0
+    end
+  end
+  Manager -> Executor: Commit exact vendor permit
+  Executor -> Intake: Immediate Cargo/input/config rechecks
+  Executor -> Cargo: vendor --locked --offline --versioned-dirs
+  Cargo --> Executor: declared vendor evidence
+  Executor --> Manager: causal vendor receipt
+  Manager -> Intake: Post-vendor admission + exact transform comparison
+  alt exact match
+    Manager --> Caller: opaque Capture + detached C3b evidence
+  else output/config/cardinality drift
+    Manager --> Caller: stable rejection; metadata=0
+  end
+end
+
+@enduml

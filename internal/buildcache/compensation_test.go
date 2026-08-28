@@ -123,7 +123,7 @@ func corruptPredecessor(t *testing.T, store *Store, publication Publication) {
 		t.Fatal(err)
 	}
 	writeFile(t, first.ArtifactPath, []byte("corrupt predecessor bytes"), 0o700)
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Corrupt {
 		t.Fatalf("the fixture predecessor = %+v, want corrupt", live)
 	}
 }
@@ -165,7 +165,7 @@ func TestAFailedPublicationRestoresTheCacheItDisplaced(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			store := newTestStore(t)
 			publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-			key, err := publication.Input.CacheKey()
+			key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -190,7 +190,7 @@ func TestAFailedPublicationRestoresTheCacheItDisplaced(t *testing.T) {
 				if result.Status != Published || result.Quarantined == "" {
 					t.Fatalf("publication = %+v, want a published winner reporting its quarantine", result)
 				}
-				if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Hit {
+				if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Hit {
 					t.Fatalf("live entry = %+v, want a hit", live)
 				}
 				return
@@ -205,7 +205,7 @@ func TestAFailedPublicationRestoresTheCacheItDisplaced(t *testing.T) {
 			if result != (PublicationResult{}) {
 				t.Fatalf("a failed publication returned a usable result: %+v", result)
 			}
-			if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != testCase.wantLive {
+			if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != testCase.wantLive {
 				t.Fatalf("live verdict = %s, want the prior %s", live.Status, testCase.wantLive)
 			}
 			if after := entryFingerprint(t, store, key); after != before {
@@ -240,7 +240,7 @@ func TestAFailedPublicationRestoresTheCacheItDisplaced(t *testing.T) {
 func TestAFailedPublicationRestoresAPredecessorMovedBeforeQuarantineError(t *testing.T) {
 	store := newTestStore(t)
 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +277,7 @@ func TestAFailedPublicationRestoresAPredecessorMovedBeforeQuarantineError(t *tes
 	if result != (PublicationResult{}) {
 		t.Fatalf("a failed publication returned a usable result: %+v", result)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Corrupt {
 		t.Fatalf("live verdict = %s, want the corrupt predecessor restored", live.Status)
 	}
 	if after := entryFingerprint(t, store, key); after != before {
@@ -297,7 +297,7 @@ func TestAFailedPublicationRestoresAPredecessorMovedBeforeQuarantineError(t *tes
 func TestAQuarantineThatCannotBeMadeDurablePutsTheEntryBack(t *testing.T) {
 	store := newTestStore(t)
 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestAQuarantineThatCannotBeMadeDurablePutsTheEntryBack(t *testing.T) {
 	if moved != "" {
 		t.Fatalf("a quarantine that put the entry back reported it as moved to %q", moved)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Hit {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Hit {
 		t.Fatalf("live verdict = %s, want the entry put back", live.Status)
 	}
 	if after := entryFingerprint(t, store, key); after != before {
@@ -336,7 +336,7 @@ func TestAQuarantineThatCannotBeMadeDurablePutsTheEntryBack(t *testing.T) {
 func TestAQuarantineRollbackThatCannotBeMadeDurableReportsChangedState(t *testing.T) {
 	store := newTestStore(t)
 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func TestAQuarantineRollbackThatCannotBeMadeDurableReportsChangedState(t *testin
 	if result != (PublicationResult{}) {
 		t.Fatalf("a failed publication returned a usable result: %+v", result)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Corrupt {
 		t.Fatalf("live verdict = %s, want the recoverable corrupt predecessor", live.Status)
 	}
 	if after := entryFingerprint(t, store, key); after != before {
@@ -418,7 +418,7 @@ func TestADurabilityFaultInsideAQuarantineIsCompensatedByItsCaller(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			store := newTestStore(t)
 			publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-			key, err := publication.Input.CacheKey()
+			key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -452,7 +452,7 @@ func TestADurabilityFaultInsideAQuarantineIsCompensatedByItsCaller(t *testing.T)
 				t.Fatalf("changed-cache report = %t, want %t: %v",
 					StateChanged(faultErr), testCase.wantChanged, faultErr)
 			}
-			if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != testCase.wantLive {
+			if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != testCase.wantLive {
 				t.Fatalf("live verdict = %s, want %s", live.Status, testCase.wantLive)
 			}
 			if after := entryFingerprint(t, store, key); after != before {
@@ -487,7 +487,7 @@ func TestADurabilityFaultInsideAQuarantineIsCompensatedByItsCaller(t *testing.T)
 func TestAQuarantineThatCannotPutTheEntryBackHandsItsCallerTheRecord(t *testing.T) {
 	store := newTestStore(t)
 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,7 +524,7 @@ func TestAQuarantineThatCannotPutTheEntryBackHandsItsCallerTheRecord(t *testing.
 	if StateChanged(publishErr) {
 		t.Fatalf("a publication that put the cache back reported a changed cache: %v", publishErr)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Corrupt {
 		t.Fatalf("live verdict = %s, want the corrupt predecessor restored", live.Status)
 	}
 	if after := entryFingerprint(t, store, key); after != before {
@@ -561,7 +561,7 @@ func TestAPublicationThatCannotRestoreReportsAChangedCache(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			store := newTestStore(t)
 			publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-			key, err := publication.Input.CacheKey()
+			key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -578,7 +578,7 @@ func TestAPublicationThatCannotRestoreReportsAChangedCache(t *testing.T) {
 			if !StateChanged(publishErr) {
 				t.Fatalf("a publication that could not restore did not say so: %v", publishErr)
 			}
-			if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != testCase.wantLive {
+			if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != testCase.wantLive {
 				t.Fatalf("live verdict = %s, want %s", live.Status, testCase.wantLive)
 			}
 			// A slot a launcher already points at must never be left empty, so the
@@ -617,7 +617,7 @@ func TestAFailedReversalIsFailClosedAndReportsAChangedCache(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			store := newTestStore(t)
 			publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-			key, err := publication.Input.CacheKey()
+			key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -642,7 +642,7 @@ func TestAFailedReversalIsFailClosedAndReportsAChangedCache(t *testing.T) {
 				t.Fatalf("a reversal that did not complete did not report a changed cache: %v", revertErr)
 			}
 
-			live := store.Inspect(Expectation{Input: publication.Input})
+			live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance})
 			if live.Status != testCase.wantLive {
 				t.Fatalf("live verdict = %s, want %s", live.Status, testCase.wantLive)
 			}
@@ -671,7 +671,7 @@ func TestAFailedReversalIsFailClosedAndReportsAChangedCache(t *testing.T) {
 func TestAFailedReversalReturnsTheWinnerMovedBeforeWithdrawError(t *testing.T) {
 	store := newTestStore(t)
 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -712,7 +712,7 @@ func TestAFailedReversalReturnsTheWinnerMovedBeforeWithdrawError(t *testing.T) {
 	if !StateChanged(revertErr) {
 		t.Fatalf("a reversal that did not restore the winner did not report changed state: %v", revertErr)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Hit {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Hit {
 		t.Fatalf("live verdict = %s, want the published winner returned", live.Status)
 	}
 	if after := entryFingerprint(t, store, key); after != before {
@@ -746,7 +746,7 @@ func TestAQuarantineReportsChangedStateOnlyWhenItsRollbackIsNotDurable(t *testin
 		t.Run(name, func(t *testing.T) {
 			store := newTestStore(t)
 			publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-			key, err := publication.Input.CacheKey()
+			key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -782,7 +782,7 @@ func TestAQuarantineReportsChangedStateOnlyWhenItsRollbackIsNotDurable(t *testin
 			}
 			// The bytes are live and unchanged on both paths. Only the promise
 			// about them differs, which is the whole point of the typing.
-			if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Hit {
+			if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Hit {
 				t.Fatalf("live verdict = %s, want the entry put back", live.Status)
 			}
 			if after := entryFingerprint(t, store, key); after != before {
@@ -810,7 +810,7 @@ func TestAQuarantineReportsChangedStateOnlyWhenItsRollbackIsNotDurable(t *testin
 func TestAPublicationWhoseQuarantineRolledBackDurablyDoesNotRetainTheCache(t *testing.T) {
 	store := newTestStore(t)
 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -831,7 +831,7 @@ func TestAPublicationWhoseQuarantineRolledBackDurablyDoesNotRetainTheCache(t *te
 	if result != (PublicationResult{}) {
 		t.Fatalf("a failed publication returned a usable result: %+v", result)
 	}
-	if live := store.Inspect(Expectation{Input: publication.Input}); live.Status != Corrupt {
+	if live := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); live.Status != Corrupt {
 		t.Fatalf("live verdict = %s, want the recoverable corrupt predecessor", live.Status)
 	}
 	if after := entryFingerprint(t, store, key); after != before {

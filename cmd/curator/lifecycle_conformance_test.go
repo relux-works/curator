@@ -10,6 +10,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // The published manager-lifecycle document is the only source of expected
@@ -299,6 +300,7 @@ func (fixture upgradeFixture) declareGlobal(t *testing.T, names ...string) {
 // the published exclusion was never reached, and — where the case requires it —
 // a repository shared by two selected scopes is fetched exactly once.
 func TestAuthoritativeUpgradeCasesAreExecutable(t *testing.T) {
+	testtoolchain.LockHostGOROOT(t)
 	document := authoritativeLifecycleDocument(t)
 	if len(document.UpgradeCases) == 0 {
 		t.Fatal("the authoritative suite publishes no upgrade case to bind")

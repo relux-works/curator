@@ -109,9 +109,13 @@ func CompiledTargetFromCache(hit buildcache.Result, platform string) (CompiledTa
 	if platform == "unix" && info.Mode().Perm()&0o111 == 0 {
 		return CompiledTarget{}, fmt.Errorf("compiled artifact is not executable")
 	}
+	cacheKey := hit.CacheKey
+	if cacheKey == "" {
+		cacheKey = hit.Receipt.CacheKey
+	}
 	return CompiledTarget{
 		artifactPath: hit.ArtifactPath,
-		cacheKey:     hit.Receipt.CacheKey,
+		cacheKey:     cacheKey,
 		receiptHash:  hit.ReceiptHash,
 	}, nil
 }

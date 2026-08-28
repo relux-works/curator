@@ -82,7 +82,7 @@ func TestInvalidPublicationsLeaveCacheUnpublished(t *testing.T) {
 			if _, err := store.Publish(publication, testHomeLock{}); err == nil {
 				t.Fatal("invalid publication succeeded")
 			}
-			if result := store.Inspect(Expectation{Input: valid.Input}); result.Status != Miss {
+			if result := store.Inspect(Expectation{Input: valid.Input, Assurance: valid.Assurance}); result.Status != Miss {
 				t.Fatalf("invalid publication created cache state: %+v", result)
 			}
 		})
@@ -92,7 +92,7 @@ func TestInvalidPublicationsLeaveCacheUnpublished(t *testing.T) {
 func TestExplicitQuarantineMovesEntryAndMissingIsNoop(t *testing.T) {
 	store := newTestStore(t)
 	publication, _ := testPublication(t, store.Home(), testInput("tool"), []byte("artifact"))
-	key, err := publication.Input.CacheKey()
+	key, err := testAssuredCacheKey(publication.Input, publication.Assurance)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestExplicitQuarantineMovesEntryAndMissingIsNoop(t *testing.T) {
 	if info, err := os.Lstat(path); err != nil || !info.IsDir() {
 		t.Fatalf("quarantine path = %q, %v", path, err)
 	}
-	if result := store.Inspect(Expectation{Input: publication.Input}); result.Status != Miss {
+	if result := store.Inspect(Expectation{Input: publication.Input, Assurance: publication.Assurance}); result.Status != Miss {
 		t.Fatalf("quarantined entry remains live: %+v", result)
 	}
 }

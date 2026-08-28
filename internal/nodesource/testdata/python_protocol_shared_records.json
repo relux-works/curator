@@ -1,0 +1,721 @@
+{
+  "schema_id": "node-python-protocol-golden-v3",
+  "records": [
+    {
+      "name": "cgp05.root",
+      "label": "curator-node-v1",
+      "id": "sha256:6c9a7ebc8ae8d0302bd3c14028dab48913bd9954ecddcc9fb67e50ecd859cea3",
+      "payload": {
+        "kind": "command_product",
+        "logical_key": "product:fixture-cli",
+        "payload": {
+          "command_key": "fixture-cli",
+          "declaration_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "entry_point_contract": "native_command",
+          "profile": "fixture-source-v1",
+          "skill_key": "fixture"
+        }
+      }
+    },
+    {
+      "name": "cgp05.extra",
+      "label": "curator-node-v1",
+      "id": "sha256:48371dfff16352b496ef14ce4199a031b3b3d20489ca1f47f962a822d534bc50",
+      "payload": {
+        "kind": "package_instance",
+        "logical_key": "pkg:extra@1.0.0",
+        "payload": {
+          "artifact_manifest_id": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "ecosystem": "fixture",
+          "lock_instance_key": "extra",
+          "name": "extra",
+          "origin": "registry://fixture/extra/1.0.0",
+          "profile": "fixture-source-v1",
+          "trust_role": "dependency_input",
+          "version": "1.0.0"
+        }
+      }
+    },
+    {
+      "name": "cgp05.requires",
+      "label": "curator-edge-v1",
+      "id": "sha256:7aa6d3f1f6ab5a9146e6fb4885684dcb26edc03a925478555dbbe45e5a685b02",
+      "payload": {
+        "edge_key": "edge:fixture-cli-requires-extra",
+        "from_node_id": "sha256:6c9a7ebc8ae8d0302bd3c14028dab48913bd9954ecddcc9fb67e50ecd859cea3",
+        "kind": "requires",
+        "payload": {
+          "condition": {
+            "evaluator_id": "fixture-target-v1",
+            "expression": "target.os == linux"
+          },
+          "origin": {
+            "field": "dependencies.extra[target.os=linux]",
+            "manifest_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+          },
+          "scope": "optional"
+        },
+        "to_node_id": "sha256:48371dfff16352b496ef14ce4199a031b3b3d20489ca1f47f962a822d534bc50"
+      }
+    },
+    {
+      "name": "cgp05.capture",
+      "label": "curator-capture-graph-v1",
+      "id": "sha256:1bcd31f3b5b1e1e77da9256c4395d59f75802df7a6d3dcef2504448c2c04f5f2",
+      "payload": {
+        "artifact_manifest_ids": [
+          "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+        ],
+        "edge_ids": [
+          "sha256:7aa6d3f1f6ab5a9146e6fb4885684dcb26edc03a925478555dbbe45e5a685b02"
+        ],
+        "node_ids": [
+          "sha256:48371dfff16352b496ef14ce4199a031b3b3d20489ca1f47f962a822d534bc50",
+          "sha256:6c9a7ebc8ae8d0302bd3c14028dab48913bd9954ecddcc9fb67e50ecd859cea3"
+        ],
+        "policy_ids": [
+          "curator-artifact-policy-v1"
+        ],
+        "profile_id": "fixture-source-v1",
+        "root_node_ids": [
+          "sha256:6c9a7ebc8ae8d0302bd3c14028dab48913bd9954ecddcc9fb67e50ecd859cea3"
+        ],
+        "schema_id": "closure-capture-graph-v1"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "P01",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "A",
+            "version": "1",
+            "dependencies": [
+              "B"
+            ]
+          },
+          {
+            "name": "B",
+            "version": "1",
+            "dependencies": [
+              "C"
+            ]
+          },
+          {
+            "name": "C",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [
+          "sha256:b36ce1276a443364e60e38c193cf5783c690a7a7f1ccbe64f7782b70e6c8dcf4"
+        ],
+        "binding_ids": [
+          "sha256:eb8efb8c4432a3e1985bbeb7e4d9f146d4d01304ecd09d8e7409ec7735846f73"
+        ],
+        "capture_graph_id": "sha256:0f48f72649eb14837154aaca7e3831880adc55116f30cdc5a217728302c811d8",
+        "decision": "admit",
+        "diagnostic_code": "",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P02",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "A",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": false,
+          "graph_complete": false,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:2e2de63891aba6d4854a3e64a9feeac96ef99c507d988b916e0703de4088dd1e",
+        "decision": "reject",
+        "diagnostic_code": "closure_integrity_missing",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P03",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "wheel-source",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python-wheel",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [
+          "sha256:ba9d24501d85229fe17affd8a372718445a80a0b75304de3720f44409908b15a"
+        ],
+        "binding_ids": [
+          "sha256:5be35f91822eca807deb4ee699e119d77df395cb6be16a6d1fd4e5914901247d"
+        ],
+        "capture_graph_id": "sha256:a01ca741cc5e6a32e75d15e46f8f04eeefd18811a1385a5b6d42db8255d9f67b",
+        "decision": "admit",
+        "diagnostic_code": "",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P04",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "native-wheel",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "native.shared-library",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "py3",
+            "platform": "none",
+            "abi": "py3"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:d3113577b30edb40df0ab4bc60f7dfb402c82f55abab0bbcbf951017a81fb01c",
+        "decision": "reject",
+        "diagnostic_code": "artifact_compiled_dependency_forbidden",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P05",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "sdist",
+            "version": "1",
+            "dependencies": [
+              "backend"
+            ]
+          },
+          {
+            "name": "backend",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python-sdist",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [
+          "sha256:f8acdacba5091140671c67f48612ab875e33bd6dd3a46c092040832d2b5fd139"
+        ],
+        "binding_ids": [
+          "sha256:1966e08a1022c10cfdd663909f43558a6ae995bb1d33715c77b5ad2fe610c15a"
+        ],
+        "capture_graph_id": "sha256:b9965b11cd43a9d20c49ccf991d38cb8ce592b8a13acf080832953cb4703e97a",
+        "decision": "admit",
+        "diagnostic_code": "",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P06",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "sdist",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python-sdist",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": false,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:151fb13181a938f82ed9a82bcba8c8cf787b4d15387e46dd4c21b827c354ab75",
+        "decision": "reject",
+        "diagnostic_code": "closure_build_dependency_unlocked",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P07",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "editable",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": true
+        },
+        "artifact": {
+          "class": "source.python",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:822872fce5b655b009cc6ef5c4840d49ddc12dcabc77cb31a308bed4080e1598",
+        "decision": "reject",
+        "diagnostic_code": "closure_local_path_escape",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P08",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "backend",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": true,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:d2f4a308a7544f71dd5bc39fd17902fe993a1acb86c19dde7753048b507bd31c",
+        "decision": "reject",
+        "diagnostic_code": "closure_network_attempted",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P09",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "drift",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python-wheel",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": false,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:70dc0bf46d2efabd39b8ce1738315d37e5c9b5efd0c25596145aee0659a68750",
+        "decision": "reject",
+        "diagnostic_code": "closure_metadata_mismatch",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P10",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "portable",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp313",
+            "platform": "linux",
+            "abi": "cp313"
+          },
+          {
+            "interpreter": "cp314",
+            "platform": "darwin",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": {
+          "from_target": "cp313/linux/cp313",
+          "to_target": "cp314/darwin/cp314"
+        }
+      },
+      "expected": {
+        "active_graph_ids": [
+          "sha256:131fc831320b56e3ae37133fafc190466ec6e7e52e9b462150271a41f8a63aa1",
+          "sha256:55b8ff64dab69ea76874701f199e82f00c0443c5599ecba1024859998d7692ff"
+        ],
+        "binding_ids": [
+          "sha256:695e0a7c35ffa29b53f21cded4f085c5d9851c3c0fa15133cc1c5ba117c3da51",
+          "sha256:ede7ed7e6a8e0474933caaf3b675c228698e2e3e767c8a0d57bcaaffa9ef29d5"
+        ],
+        "capture_graph_id": "sha256:0571a66d6b951c73c487090bbbf2c13d9217456b191acb14a3bad9eac92ca387",
+        "decision": "admit",
+        "diagnostic_code": "",
+        "reuse_diagnostic_code": "closure_target_identity_changed"
+      }
+    },
+    {
+      "id": "P11",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "native-sdist",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python-sdist",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "native_build": true,
+          "network_attempted": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:c08cb6ffb71adec0e5108b0de29cc322fd0fcce2f5aba7a65482f18efd448d0f",
+        "decision": "reject",
+        "diagnostic_code": "closure_native_build_unsupported",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P12",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "bytecode-wheel",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": true,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "python.bytecode",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:09755447584ed2f72c39e692ac20a7891dfbc7dfd7f05435b1a9e82740f56dc7",
+        "decision": "reject",
+        "diagnostic_code": "artifact_compiled_dependency_forbidden",
+        "reuse_diagnostic_code": ""
+      }
+    },
+    {
+      "id": "P13",
+      "input": {
+        "schema_id": "python-protocol-fixture-v2",
+        "packages": [
+          {
+            "name": "future-lock",
+            "version": "1",
+            "dependencies": []
+          }
+        ],
+        "lock": {
+          "format_supported": false,
+          "hashes_complete": true,
+          "graph_complete": true,
+          "local_path_escape": false
+        },
+        "artifact": {
+          "class": "source.python",
+          "record_valid": true
+        },
+        "build": {
+          "dependencies_locked": true,
+          "metadata_matches": true,
+          "network_attempted": false,
+          "native_build": false
+        },
+        "targets": [
+          {
+            "interpreter": "cp314",
+            "platform": "any",
+            "abi": "cp314"
+          }
+        ],
+        "reuse_attempt": null
+      },
+      "expected": {
+        "active_graph_ids": [],
+        "binding_ids": [],
+        "capture_graph_id": "sha256:10c6f75c01ca1a189c58f4903d0cddafaf4f99f4be35ae120e366dcd4a14527b",
+        "decision": "reject",
+        "diagnostic_code": "closure_lock_format_unsupported",
+        "reuse_diagnostic_code": ""
+      }
+    }
+  ]
+}

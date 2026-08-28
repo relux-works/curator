@@ -13,7 +13,7 @@ CANDIDATE := .github/ci/candidate-suite.sh
 .PHONY: build test fmt lint vet check \
 	require-pin-root ci-test race race-full check-ci \
 	gate-selftest ledger-check no-broad-suppression \
-	candidate-verify-ref candidate-record candidate-test
+	verify-spec-pin candidate-verify-ref candidate-record candidate-test
 
 build:
 	$(GO) build -ldflags '$(LDFLAGS)' -o bin/curator ./cmd/curator
@@ -76,6 +76,11 @@ no-broad-suppression:
 # root, no network and no Go build.
 gate-selftest:
 	bash .github/ci/gate-selftest.sh
+
+verify-spec-pin: require-pin-root
+	$(GO) run ./cmd/curator-spec-pin \
+		--root "$$(cd '$(CURATOR_CONFORMANCE_ROOT)/../..' && pwd)" \
+		--revision '$(SPEC_PIN)'
 
 # Mirrors the `test` job end to end, in order, over the same paths CI checks
 # (`check` keeps its wider `.` scope, which additionally walks the skills

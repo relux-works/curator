@@ -24,6 +24,7 @@ import (
 	"github.com/relux-works/curator/internal/marker"
 	"github.com/relux-works/curator/internal/registry"
 	"github.com/relux-works/curator/internal/scopes"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // authoritativeDryRunCase is the published no-mutation contract. Only the field
@@ -260,6 +261,7 @@ func (baseline *dryRunBaseline) declareEvery(t *testing.T, root string, extra ..
 // parallel ancestor. Nothing about the assertions depends on it: the cases run
 // in sequence and each still arms, plans, and measures its own machine.
 func TestAuthoritativeDryRunCasesMutateNothingPersistent(t *testing.T) {
+	testtoolchain.LockHostGOROOT(t)
 	document := authoritativeLifecycle(t)
 	for _, published := range document.DryRunCases {
 		published := published
@@ -454,14 +456,14 @@ func (baseline *dryRunBaseline) assertCompiledCase(
 		}
 		build := result.Builds[0]
 		if !reported[string(build.Outcome())] {
-			t.Fatalf("project %d reported build outcome %q, which the published case does not admit: %v",
-				index, build.Outcome(), published.ReportedBuildOutcomes)
+			t.Fatalf("project %d reported build outcome %q (reason %q, diagnostic %q), which the published case does not admit: %v",
+				index, build.Outcome(), build.Reason(), build.DiagnosticCode(), published.ReportedBuildOutcomes)
 		}
 		// The shared protected entry is absent, and the case name says what that
 		// has to report: a miss, planned without preflighting or building.
 		if build.Outcome() != BuildWouldPreflightAndBuild {
-			t.Fatalf("project %d reported %q against an empty protected cache, want %q",
-				index, build.Outcome(), BuildWouldPreflightAndBuild)
+			t.Fatalf("project %d reported %q against an empty protected cache (reason %q, diagnostic %q), want %q",
+				index, build.Outcome(), build.Reason(), build.DiagnosticCode(), BuildWouldPreflightAndBuild)
 		}
 		if len(result.Staged) != 0 {
 			t.Fatalf("project %d staged an artifact during a dry run: %+v", index, result.Staged)

@@ -17,6 +17,7 @@ import (
 
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/marker"
 )
@@ -207,10 +208,15 @@ func (cache *fakeCache) Publish(publication buildcache.Publication, lock buildca
 	if err != nil {
 		return buildcache.PublicationResult{}, err
 	}
+	assuredID, err := (closureexec.AssuredBuildCacheInput{BuildInput: publication.Input, Binding: publication.Assurance}).ID()
+	if err != nil {
+		return buildcache.PublicationResult{}, err
+	}
+	assuredKey := buildmeta.CacheKey(assuredID)
 	if existing, present := cache.byCommand[command]; present && existing.Status == buildcache.Hit {
 		cache.published = append(cache.published, command)
 		return buildcache.PublicationResult{
-			Status: buildcache.ReusedWinner, ArtifactPath: existing.ArtifactPath, ReceiptHash: existing.ReceiptHash,
+			Status: buildcache.ReusedWinner, ArtifactPath: existing.ArtifactPath, ReceiptHash: existing.ReceiptHash, CacheKey: assuredKey,
 		}, nil
 	}
 	// An entry the manager refuses to reuse is displaced, exactly like the real
@@ -221,18 +227,18 @@ func (cache *fakeCache) Publish(publication buildcache.Publication, lock buildca
 		if cache.displaced == nil {
 			cache.displaced = map[buildmeta.CacheKey]buildcache.Result{}
 		}
-		cache.displaced[receipt.CacheKey] = existing
+		cache.displaced[assuredKey] = existing
 		quarantined = "quarantine:" + command
 	}
 	if cache.byKey == nil {
 		cache.byKey = map[buildmeta.CacheKey]string{}
 	}
-	cache.byKey[receipt.CacheKey] = command
+	cache.byKey[assuredKey] = command
 	receiptHash, err := buildmeta.HashReceiptBytes(publication.ReceiptBytes)
 	if err != nil {
 		return buildcache.PublicationResult{}, err
 	}
-	entry := filepath.Join(cache.entryRoot(), string(receipt.CacheKey)[len("sha256:"):])
+	entry := filepath.Join(cache.entryRoot(), string(assuredKey)[len("sha256:"):])
 	artifact := filepath.Join(entry, filepath.FromSlash(receipt.Artifact.Path))
 	if err := os.MkdirAll(filepath.Dir(artifact), 0o700); err != nil {
 		return buildcache.PublicationResult{}, err
@@ -251,7 +257,7 @@ func (cache *fakeCache) Publish(publication buildcache.Publication, lock buildca
 	}
 	return buildcache.PublicationResult{
 		Status: buildcache.Published, ArtifactPath: artifact, ReceiptHash: receiptHash,
-		Quarantined: quarantined,
+		CacheKey: assuredKey, Quarantined: quarantined,
 	}, nil
 }
 
@@ -329,13 +335,21 @@ func (builder *fakeBuilder) Stage(_ context.Context, request StageRequest) (Stag
 	}
 	builder.staged = append(builder.staged, path)
 	digest := sha256.Sum256(payload)
+	metadata := buildmeta.Artifact{
+		Path: relative, SHA256: "sha256:" + hex.EncodeToString(digest[:]), Size: int64(len(payload)),
+	}
+	input := buildmeta.Input{
+		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		BuildSource: request.Source.Identity(), BuildRoot: request.BuildRoot,
+		Command: request.Command, SourceDir: request.SourceDir,
+		Target: session.target, Toolchain: session.toolchain, Policy: buildmeta.FixedPolicy(),
+	}
+	executionReceipt, err := closureexec.NewPortableBuildSessionReceipt(input, metadata, nil)
+	if err != nil {
+		return StagedArtifact{}, err
+	}
 	return StagedArtifact{
-		Path: path,
-		Metadata: buildmeta.Artifact{
-			Path:   relative,
-			SHA256: "sha256:" + hex.EncodeToString(digest[:]),
-			Size:   int64(len(payload)),
-		},
+		Path: path, Metadata: metadata, ExecutionReceipt: executionReceipt,
 	}, nil
 }
 
@@ -876,8 +890,8 @@ func TestStagedOutputsStayPrivateAndAreReleased(t *testing.T) {
 		}
 	}
 	receipt := result.Staged[0].Receipt()
-	if receipt.CacheKey != result.Builds[0].CacheKey() {
-		t.Fatalf("staged receipt key %q does not match the planned key %q", receipt.CacheKey, result.Builds[0].CacheKey())
+	if receipt.CacheKey != result.Builds[0].logicalKey {
+		t.Fatalf("staged receipt key %q does not match the planned logical key %q", receipt.CacheKey, result.Builds[0].logicalKey)
 	}
 	if err := receipt.Validate(); err != nil {
 		t.Fatalf("staged receipt is invalid: %v", err)

@@ -16,6 +16,7 @@ import (
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/marker"
+	"github.com/relux-works/curator/internal/testtoolchain"
 )
 
 // globalPayload is the machine-readable document the machine-wide scope
@@ -70,6 +71,7 @@ func globalScopeDeclaring(t *testing.T, declarations string) string {
 // command, so the machine-wide scope activates a compiled command.
 func compiledGlobalScope(t *testing.T) string {
 	t.Helper()
+	testtoolchain.LockHostGOROOT(t)
 	home := globalScopeDeclaring(t, `{"name":"build-skill","tag":"v1"}`)
 	writeCompiledSkillRepo(t, filepath.Join(filepath.Dir(home), "skills", "build-skill"))
 	return home

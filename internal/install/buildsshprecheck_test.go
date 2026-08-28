@@ -278,7 +278,7 @@ func TestTheCredentialPrecheckRunsBeforeAnyFetch(t *testing.T) {
 		sshBuildNode("infra", "build-kit", "other.example.test/tools/kit"),
 	}
 	_, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
-		nodes, nil, probeOnlyToolchain{}, deps, true)
+		nodes, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
 	if err == nil {
 		t.Fatal("a plan with no selected credentials succeeded")
 	}
@@ -318,7 +318,7 @@ func TestADryRunReportsThePerRepositoryCredentialSource(t *testing.T) {
 	nodes := []*closure.Node{sshBuildNode("portals", "build-tool", "git.example.test/portals/app")}
 
 	plan, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
-		nodes, nil, probeOnlyToolchain{}, deps, true)
+		nodes, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), true)
 	if err == nil {
 		t.Fatal("the stubbed fetch was expected to fail the plan")
 	}
@@ -330,7 +330,7 @@ func TestADryRunReportsThePerRepositoryCredentialSource(t *testing.T) {
 	// An install reports through its own build rows instead; the credential
 	// report belongs to the mode whose whole output is the report.
 	installPlan, err := planExternalBuilds(context.Background(), "project", "project/id", t.TempDir(),
-		nodes, nil, probeOnlyToolchain{}, deps, false)
+		nodes, nil, probeOnlyToolchain{}, deps, NewPortableBuildAuthority(), false)
 	if err == nil {
 		t.Fatal("the stubbed fetch was expected to fail the plan")
 	}

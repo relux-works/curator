@@ -63,6 +63,9 @@ type externalPlan struct {
 	rows                   []plannedExternal
 	deps                   ExternalDeps
 	toolchain              buildrepo.ToolchainIdentity
+	targetIdentity         buildmeta.Target
+	toolchainInput         buildmeta.Toolchain
+	authority              *BuildAuthority
 	// credentials holds the operator SSH selection of every repository that
 	// is actually fetched over SSH. A repository absent from it needs none.
 	credentials map[buildSSHKey]buildrepo.OperatorSSHCredentials
@@ -107,8 +110,11 @@ func (deps ExternalDeps) resolved(home string) ExternalDeps {
 	return deps
 }
 
-func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string, nodes []*closure.Node, substitutions map[string]map[string]devsub.BuildRepositorySubstitution, toolchain Toolchain, deps ExternalDeps, dryRun bool) (externalPlan, error) {
-	plan := externalPlan{scope: scope, projectIdentity: projectIdentity, deps: deps.resolved(home)}
+func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string, nodes []*closure.Node, substitutions map[string]map[string]devsub.BuildRepositorySubstitution, toolchain Toolchain, deps ExternalDeps, authority *BuildAuthority, dryRun bool) (externalPlan, error) {
+	if authority == nil {
+		return externalPlan{}, fmt.Errorf("build assurance authority is absent")
+	}
+	plan := externalPlan{scope: scope, projectIdentity: projectIdentity, deps: deps.resolved(home), authority: authority}
 	items := externalCommands(nodes)
 	if len(items) == 0 {
 		return plan, nil
@@ -118,6 +124,7 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
 		return plan, err
 	}
 	plan.toolchain = externalToolchain(target, tool)
+	plan.targetIdentity, plan.toolchainInput = target, tool
 	store := &buildrepo.DiskProtectedStore{Root: plan.deps.StoreRoot}
 	for _, item := range items {
 		repository := item.node.Spec.BuildRepositories[item.command.Repository]
@@ -147,7 +154,7 @@ func planExternalBuilds(ctx context.Context, scope, projectIdentity, home string
 	}
 	for index, row := range plan.rows {
 		source := ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}
-		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain}, buildrepo.OperationDryRun)
+		request, err := externalPipelineRequest(plan.deps, source, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, identityOnlyExternalGo{identity: plan.toolchain, target: plan.targetIdentity, toolchain: plan.toolchainInput}, buildrepo.OperationDryRun, plan.authority)
 		if err != nil {
 			return plan, err
 		}
@@ -179,6 +186,9 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 	store := &buildrepo.DiskProtectedStore{Root: root}
 	for _, row := range plan.rows {
 		if row.result.State == "cache-hit" {
+			if err := plan.authority.revalidate(ctx); err != nil {
+				return stagedExternal{}, err
+			}
 			entryRoot := filepath.Join(plan.deps.StoreRoot, "artifacts", strings.TrimPrefix(row.result.CacheKey, "sha256:"))
 			artifactPath := filepath.Join(entryRoot, "artifact")
 			artifact, readErr := os.ReadFile(artifactPath) // #nosec G304 -- manager-derived protected cache path from a validated cache key.
@@ -196,7 +206,7 @@ func stageExternalBuilds(ctx context.Context, plan externalPlan, toolchain Toolc
 		}
 		// A verified final hit is copied into operation-private staging so the
 		// transaction and shim path are identical for hits and misses.
-		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall)
+		request, err := externalPipelineRequest(plan.deps, ExternalSource{Skill: row.node.Name, Repository: row.repository.Name, Declared: row.declared, Effective: row.effective, Substitution: row.sub}, plan.credentialsFor(row), plan.httpsCredentialsFor(row), row.command, store, adapter, buildrepo.OperationInstall, plan.authority)
 		if err != nil {
 			return stagedExternal{}, err
 		}
@@ -251,7 +261,7 @@ func (staged stagedExternal) transactionPlan(finalRoot string) staging.Plan {
 	return plan
 }
 
-func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials, command skillspec.Command, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation) (buildrepo.PipelineRequest, error) {
+func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials, command skillspec.Command, store buildrepo.ProtectedStore, goSession buildrepo.GoSession, operation buildrepo.Operation, authority *BuildAuthority) (buildrepo.PipelineRequest, error) {
 	if deps.Audit == nil && deps.AuditWarnings == nil {
 		return buildrepo.PipelineRequest{}, fmt.Errorf("build_repository_audit_blocked: independent external repository audit is not configured")
 	}
@@ -279,7 +289,10 @@ func externalPipelineRequest(deps ExternalDeps, source ExternalSource, credentia
 			return buildrepo.AcquireNetwork(ctx, buildrepo.NetworkRequest{Source: buildrepo.Source{Git: git, Transport: transport, Identity: identity}, Lock: buildrepo.LockedCommit{ObjectFormat: selected.Effective.ObjectFormat, Hex: commit}, Tag: tag, RefKind: refKind, RefValue: refValue, Tool: tool, Limits: deps.Limits})
 		}
 	}
-	return buildrepo.PipelineRequest{Operation: operation, Command: command.Name, Target: command.Target, Declared: source.Declared, Effective: source.Effective, Acquire: func(ctx context.Context) (*buildrepo.Snapshot, error) { return acquire(ctx, source) }, Audit: deps.Audit, AuditWarnings: deps.AuditWarnings, Store: store, Go: goSession, SigningPolicy: deps.SigningPolicy}, nil
+	if authority == nil {
+		return buildrepo.PipelineRequest{}, fmt.Errorf("build assurance authority is absent")
+	}
+	return buildrepo.PipelineRequest{Operation: operation, Command: command.Name, Target: command.Target, Declared: source.Declared, Effective: source.Effective, Acquire: func(ctx context.Context) (*buildrepo.Snapshot, error) { return acquire(ctx, source) }, Audit: deps.Audit, AuditWarnings: deps.AuditWarnings, Store: store, Go: goSession, SigningPolicy: deps.SigningPolicy, Assurance: authority.Binding(), AssuranceCheck: authority.revalidate}, nil
 }
 
 func externalGitTool(tool buildrepo.GitTool, source ExternalSource, sshCredentials buildrepo.OperatorSSHCredentials, httpsCredentials BuildHTTPSCredentials) buildrepo.GitTool {
@@ -291,11 +304,18 @@ func externalGitTool(tool buildrepo.GitTool, source ExternalSource, sshCredentia
 	return tool
 }
 
-type identityOnlyExternalGo struct{ identity buildrepo.ToolchainIdentity }
+type identityOnlyExternalGo struct {
+	identity  buildrepo.ToolchainIdentity
+	target    buildmeta.Target
+	toolchain buildmeta.Toolchain
+}
 
 func (g identityOnlyExternalGo) Identity() buildrepo.ToolchainIdentity { return g.identity }
-func (identityOnlyExternalGo) Compile(context.Context, buildrepo.CompileRequest) ([]byte, error) {
-	return nil, fmt.Errorf("read-only external plan attempted compilation")
+func (g identityOnlyExternalGo) BuildInput(request buildrepo.CompileRequest) (buildmeta.Input, error) {
+	return externalBuildInput(request, g.target, g.toolchain)
+}
+func (identityOnlyExternalGo) Compile(context.Context, buildrepo.CompileRequest) (buildrepo.CompileResult, error) {
+	return buildrepo.CompileResult{}, fmt.Errorf("read-only external plan attempted compilation")
 }
 
 type externalGoAdapter struct {
@@ -306,17 +326,41 @@ type externalGoAdapter struct {
 func (g externalGoAdapter) Identity() buildrepo.ToolchainIdentity {
 	return externalToolchain(g.session.Target(), g.session.Toolchain())
 }
-func (g externalGoAdapter) Compile(ctx context.Context, request buildrepo.CompileRequest) ([]byte, error) {
+func (g externalGoAdapter) BuildInput(request buildrepo.CompileRequest) (buildmeta.Input, error) {
+	return externalBuildInput(request, g.session.Target(), g.session.Toolchain())
+}
+func (g externalGoAdapter) Compile(ctx context.Context, request buildrepo.CompileRequest) (buildrepo.CompileResult, error) {
 	token, err := buildsource.Validate(request.Root)
 	if err != nil {
-		return nil, err
+		return buildrepo.CompileResult{}, err
 	}
 	defer func() { _ = token.Close() }()
-	result, err := g.builder.Stage(ctx, StageRequest{Session: g.session, Source: token, CommandObject: map[string]any{"type": "build", "driver": "go-v1", "source_dir": request.SourceDir}, BuildRoot: ".", SourceDir: request.SourceDir, Command: request.Command})
+	result, err := g.builder.Stage(ctx, StageRequest{Session: g.session, Source: token, CommandObject: map[string]any{"type": "build", "driver": "go-v1", "source_dir": request.SourceDir}, BuildRoot: "build", SourceDir: request.SourceDir, Command: request.Command})
 	if err != nil {
-		return nil, err
+		return buildrepo.CompileResult{}, err
 	}
-	return os.ReadFile(result.Path)
+	artifact, err := os.ReadFile(result.Path)
+	if err != nil {
+		return buildrepo.CompileResult{}, err
+	}
+	return buildrepo.CompileResult{Artifact: artifact, ExecutionReceipt: result.ExecutionReceipt}, nil
+}
+
+func externalBuildInput(request buildrepo.CompileRequest, target buildmeta.Target, toolchain buildmeta.Toolchain) (buildmeta.Input, error) {
+	token, err := buildsource.Validate(request.Root)
+	if err != nil {
+		return buildmeta.Input{}, err
+	}
+	defer func() { _ = token.Close() }()
+	input := buildmeta.Input{
+		SchemaVersion: buildmeta.SchemaVersion, Driver: buildmeta.DriverGoV1,
+		BuildSource: token.Identity(), BuildRoot: "build", Command: request.Command, SourceDir: request.SourceDir,
+		Target: target, Toolchain: toolchain, Policy: buildmeta.FixedPolicy(),
+	}
+	if err := input.Validate(); err != nil {
+		return buildmeta.Input{}, err
+	}
+	return input, nil
 }
 
 func externalToolchain(target buildmeta.Target, tool buildmeta.Toolchain) buildrepo.ToolchainIdentity {

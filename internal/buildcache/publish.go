@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/curator/internal/buildmeta"
+	"github.com/relux-works/curator/internal/closureexec"
 )
 
 // HomeLock is a caller-owned witness for the exclusive manager-home lock.
@@ -23,9 +24,11 @@ type HomeLock interface {
 // Publication contains one fully built private artifact and its exact receipt.
 // ArtifactSource is copied from its open file handle and is never executed.
 type Publication struct {
-	Input          buildmeta.Input
-	ReceiptBytes   []byte
-	ArtifactSource string
+	Input            buildmeta.Input
+	ReceiptBytes     []byte
+	Assurance        closureexec.AssuranceBinding
+	ExecutionReceipt closureexec.BuildSessionReceipt
+	ArtifactSource   string
 }
 
 // PublicationStatus distinguishes a newly selected directory winner from an
@@ -43,6 +46,7 @@ type PublicationResult struct {
 	Status       PublicationStatus
 	ArtifactPath string
 	ReceiptHash  buildmeta.ReceiptHash
+	CacheKey     buildmeta.CacheKey
 	// Quarantined is where an unusable predecessor was moved aside, and is
 	// empty when this publication displaced nothing. It is the other half of
 	// Revert: a caller that has to undo a publication it made cannot restore
@@ -188,13 +192,25 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 	if err != nil {
 		return PublicationResult{}, fmt.Errorf("validate publication receipt: %w", err)
 	}
-	key, err := publication.Input.CacheKey()
+	logicalKey, err := publication.Input.CacheKey()
 	if err != nil {
 		return PublicationResult{}, fmt.Errorf("derive publication key: %w", err)
 	}
-	if receipt.CacheKey != key {
+	if receipt.CacheKey != logicalKey {
 		return PublicationResult{}, fmt.Errorf("publication receipt key mismatch")
 	}
+	if err := publication.ExecutionReceipt.ValidateFor(publication.Assurance, publication.Input, receipt.Artifact); err != nil {
+		return PublicationResult{}, fmt.Errorf("validate publication execution receipt: %w", err)
+	}
+	executionReceiptBytes, err := publication.ExecutionReceipt.CanonicalBytes()
+	if err != nil {
+		return PublicationResult{}, fmt.Errorf("encode publication execution receipt: %w", err)
+	}
+	assuredID, err := (closureexec.AssuredBuildCacheInput{BuildInput: publication.Input, Binding: publication.Assurance}).ID()
+	if err != nil {
+		return PublicationResult{}, fmt.Errorf("derive assured publication key: %w", err)
+	}
+	key := buildmeta.CacheKey(assuredID)
 	receiptHash, err := buildmeta.HashReceiptBytes(publication.ReceiptBytes)
 	if err != nil {
 		return PublicationResult{}, fmt.Errorf("hash publication receipt: %w", err)
@@ -265,6 +281,9 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 	if err := writeProtectedFile(filepath.Join(stage, ReceiptFilename), 0o600, bytes.NewReader(publication.ReceiptBytes)); err != nil {
 		return PublicationResult{}, fmt.Errorf("write staged receipt: %w", err)
 	}
+	if err := writeProtectedFile(filepath.Join(stage, ExecutionReceiptFilename), 0o600, bytes.NewReader(executionReceiptBytes)); err != nil {
+		return PublicationResult{}, fmt.Errorf("write staged execution receipt: %w", err)
+	}
 	if err := syncDirectory(binDir); err != nil {
 		return PublicationResult{}, fmt.Errorf("sync staged artifact directory: %w", err)
 	}
@@ -272,9 +291,9 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 		return PublicationResult{}, fmt.Errorf("sync staged cache entry: %w", err)
 	}
 
-	expect := Expectation{Input: publication.Input, ReceiptHash: receiptHash}
-	winnerExpect := Expectation{Input: publication.Input}
-	staged := store.inspectEntry(stage, expect, key)
+	expect := Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance}
+	winnerExpect := Expectation{Input: publication.Input, Assurance: publication.Assurance}
+	staged := store.inspectEntry(stage, expect, key, logicalKey)
 	if staged.Status != Hit {
 		return PublicationResult{}, fmt.Errorf("staged cache entry failed protected validation: %s", staged.Reason)
 	}
@@ -295,7 +314,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 				winner.Receipt.Artifact.SHA256 == artifactHash && winner.Receipt.Artifact.Size == artifactSize {
 				return PublicationResult{
 					Status: ReusedWinner, ArtifactPath: winner.ArtifactPath,
-					ReceiptHash: winner.ReceiptHash, Quarantined: displaced,
+					ReceiptHash: winner.ReceiptHash, CacheKey: key, Quarantined: displaced,
 				}, nil
 			}
 			return PublicationResult{}, &ConflictError{Key: key}
@@ -342,7 +361,7 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 			}
 			return PublicationResult{
 				Status: Published, ArtifactPath: winner.ArtifactPath,
-				ReceiptHash: winner.ReceiptHash, Quarantined: displaced,
+				ReceiptHash: winner.ReceiptHash, CacheKey: key, Quarantined: displaced,
 			}, nil
 		}
 		// A racing publisher may have selected a winner. Loop to validate it;
@@ -373,6 +392,12 @@ func (store *Store) Publish(publication Publication, lock HomeLock) (result Publ
 // the run found. The caller has one correct response to either, which is to
 // stop claiming the live cache is unchanged.
 func (store *Store) Revert(key buildmeta.CacheKey, published PublicationResult, lock HomeLock) error {
+	if _, _, err := store.paths(key); err != nil {
+		return &StateChangedError{Key: key, Err: err}
+	}
+	if published.CacheKey != "" {
+		key = published.CacheKey
+	}
 	if err := requireHomeLock(lock); err != nil {
 		return &StateChangedError{Key: key, Err: err}
 	}

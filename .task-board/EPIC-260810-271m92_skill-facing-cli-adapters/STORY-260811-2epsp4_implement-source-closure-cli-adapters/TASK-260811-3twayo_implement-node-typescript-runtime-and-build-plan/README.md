@@ -1,0 +1,10 @@
+# TASK-260811-3twayo: implement-node-typescript-runtime-and-build-plan
+
+## Description
+Implement the manager-independent pure-source Node/TypeScript capture, active-selection, runtime, and declared build contract. Spec trace: .spec/skill-facing-cli-source-closure.md Current delivery scope Node/TypeScript; Source closure invariant items 2-6; Required research Node/Python policy relationship. Accepted inputs: TASK-260810-2n3sbi and revised TASK-260810-1uu9lk shared graph and pre-C5 derivation contract.
+
+## Scope
+Add the common selection-neutral Node package-instance, lock peer-instance, workspace, and conditional capture mapping plus SelectionContext, concrete platform and Node or manager binding overlay, and ActiveGraph projection; keep evaluated target, marker, peer, runtime, platform nodes, targets edges, and tool bindings out of capture identity. Fingerprint Node and the selected package manager at C0 and require permits and receipts for pre-C5 metadata. Suppress dependency lifecycle execution; model shipped generated JavaScript as immutable input and local TypeScript generation as declared C5 host actions with complete compiler, plugin, config, environment, read, write, target, tool, and output lineage; reject native addon and executable build edges; emit common checkpoints and diagnostics for manager profiles.
+
+## Acceptance Criteria
+All manager profiles emit the same canonical Node capture graph and approved runtime contract. Exact two-target, marker, feature, or peer selections over unchanged captured bytes retain one capture ID; target platform and Node or manager nodes and typed targets or tool edges resolve only in distinct bindings and produce distinct active and plan identities. Missing, duplicate, wrong-kind, or drifted bindings, unadmitted metadata inputs, implicit hooks, plugins, generated inputs, native builds, ABI or target drift, and extra outputs fail before publication. CGP05 exact target records, CGP10-CGP11, CGN09, CGN15-CGN18, N04-N10, N13, and independent Python protocol goldens pass without sharing Python code or state.

@@ -447,7 +447,7 @@ func (observed *observations) recheck(plan BuildPlan, inspect CacheInspector) *r
 		if !seen {
 			continue
 		}
-		current := BuildOutcome(inspect.Inspect(buildcache.Expectation{Input: build.input}).DryRunOutcome())
+		current := BuildOutcome(inspect.Inspect(buildcache.Expectation{Input: build.input, Assurance: build.assurance}).DryRunOutcome())
 		// A miss that became a hit is another publisher's identical winner and
 		// is safe to adopt. Any other transition invalidates the planned reuse.
 		if current == recorded || (recorded.buildable() && current == BuildCacheHit) {
@@ -743,9 +743,10 @@ func publishWinners(request commitRequest, lock HomeLock) (publishedBuilds, erro
 				"encode the receipt of %s.%s: %w", build.skill, build.command, err)
 		}
 		result, err := request.commit.Publisher.Publish(buildcache.Publication{
-			Input:          build.receipt.Input,
-			ReceiptBytes:   receiptBytes,
-			ArtifactSource: build.path,
+			Input:            build.receipt.Input,
+			ReceiptBytes:     receiptBytes,
+			ExecutionReceipt: build.executionReceipt,
+			ArtifactSource:   build.path,
 		}, lock)
 		if err != nil {
 			// A publication that failed without leaving the cache changed owes
@@ -764,7 +765,7 @@ func publishWinners(request commitRequest, lock HomeLock) (publishedBuilds, erro
 	artifacts := map[buildmeta.CacheKey]buildcache.Result{}
 	var missing []string
 	for _, build := range request.plan.builds {
-		inspection := request.commit.Publisher.Inspect(buildcache.Expectation{Input: build.input})
+		inspection := request.commit.Publisher.Inspect(buildcache.Expectation{Input: build.input, Assurance: build.assurance})
 		if inspection.Status != buildcache.Hit {
 			missing = append(missing, fmt.Sprintf("%s.%s (%s)", build.skill, build.command, inspection.Status))
 			continue

@@ -66,6 +66,12 @@ func openProtectedEntry(home, entryPath, artifactRel string) (*openedEntry, erro
 		return nil, err
 	}
 	opened.receipt = receipt
+	executionReceipt, err := openUnixProtectedFile(currentFD, ExecutionReceiptFilename, false)
+	if err != nil {
+		opened.close()
+		return nil, err
+	}
+	opened.executionReceipt = executionReceipt
 
 	binFD, err := unix.Openat(currentFD, "bin", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
 	if err != nil {
@@ -123,6 +129,12 @@ func openProtectedEntryFrom(entry *protectedDir, artifactRel string) (*openedEnt
 		return nil, err
 	}
 	opened.receipt = receipt
+	executionReceipt, err := openUnixProtectedFile(entryFD, ExecutionReceiptFilename, false)
+	if err != nil {
+		opened.close()
+		return nil, err
+	}
+	opened.executionReceipt = executionReceipt
 
 	binFD, err := unix.Openat(entryFD, "bin", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
 	if err != nil {

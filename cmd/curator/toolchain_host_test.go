@@ -27,6 +27,7 @@ import (
 // GOROOT the boundary cannot accept is diagnosed once, here, rather than seven
 // times in cases that are about status reporting.
 func TestHostGoToolchainIsSelectableOnAnInventoryPlatform(t *testing.T) {
+	t.Parallel()
 	requireNativeControlInventoryPlatform(t)
 	snapshot, err := godriver.Probe(context.Background(), godriver.ConfigFromEnvironment(t.TempDir()))
 	if err != nil {

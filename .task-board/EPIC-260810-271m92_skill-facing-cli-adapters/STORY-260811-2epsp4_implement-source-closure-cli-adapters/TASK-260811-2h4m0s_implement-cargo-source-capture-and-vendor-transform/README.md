@@ -1,0 +1,10 @@
+# TASK-260811-2h4m0s: implement-cargo-source-capture-and-vendor-transform
+
+## Description
+Implement rust-source-v1 immutable origin capture, admission ordering, permitted Cargo vendor and metadata derivation, and graph closure. Spec trace: .spec/skill-facing-cli-source-closure.md Current delivery scope Rust; Source closure invariant items 1-4 and 6; Vendored compiled artifact prohibition. Accepted inputs: TASK-260810-3urqbl Closure and build procedure steps 1-9 and revised TASK-260810-1uu9lk pre-C5 derivation contract.
+
+## Scope
+Parse supported Cargo manifests and lock format into a selection-neutral lock-superset capture graph whose target and feature conditions remain unevaluated, then derive exact native-target and feature activation against a SelectionContext and concrete platform or Cargo or rustc binding overlay; never place requested target facts, target-platform nodes, or targets edges in capture. Capture raw registry index records and crate archives plus exact Git commit, tree, submodule, workspace, and path sources; pre-admit every origin before Cargo starts; bind the physical Cargo toolchain at C0; issue exact C3a vendor and C4 metadata permits with immediate time-of-use rechecks and receipts; implement cargo-vendor-transform-v1 with exact per-leaf dispositions, normalized manifests, checksum bytes, unique lock-to-vendor mapping, containment, and post-vendor verification.
+
+## Acceptance Criteria
+Every remote and local package has immutable origin and complete artifact evidence; rejected origin bytes cause zero Cargo spawns and no vendor or target directory, and toolchain drift or a missing or widened permit causes zero affected spawns. A confined offline vendor run is accepted only when its receipt and transform manifest match exactly. Unchanged lock and source declarations retain one capture across supported feature or native-target selections, while exact platform and Cargo or rustc nodes and targets or tool bindings resolve only in the selection binding and produce distinct active identities. CGP05, CGP11, R01-R08, RV01-RV03, GV01-GV03e, VF01-VF03, PV01, RF01-RF10, and CGN17-CGN18 pass with stable diagnostics.

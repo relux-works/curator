@@ -18,6 +18,7 @@ import (
 	"github.com/relux-works/curator/internal/buildcache"
 	"github.com/relux-works/curator/internal/buildmeta"
 	"github.com/relux-works/curator/internal/buildsource"
+	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/protocoljson"
@@ -185,6 +186,7 @@ type BuildCurrentness struct {
 	RawSnapshot  func() (*buildsource.Token, error)
 	InspectCache func(command string, expectation buildcache.Expectation) buildcache.Result
 	Inputs       map[string]buildmeta.Input
+	Assurance    closureexec.AssuranceBinding
 	ContextFiles []string
 	RuntimeFiles []string
 	// InspectExternal verifies one receipt-v2 protected entry without fetching,
@@ -761,14 +763,16 @@ func currentBuilds(installedDir string, recorded *Marker, state BuildCurrentness
 				current = false
 				return nil
 			}
-			key, keyErr := input.CacheKey()
+			logicalKey, keyErr := input.CacheKey()
+			assuredID, assuranceErr := (closureexec.AssuredBuildCacheInput{BuildInput: input, Binding: state.Assurance}).ID()
+			key := buildmeta.CacheKey(assuredID)
 			artifactPath, pathErr := buildmeta.ArtifactPath(command, input.Target.GOOS)
-			if keyErr != nil || pathErr != nil || key != build.CacheKey || artifactPath != build.ArtifactPath {
+			if keyErr != nil || assuranceErr != nil || pathErr != nil || key != build.CacheKey || artifactPath != build.ArtifactPath {
 				current = false
 				return nil
 			}
-			result := state.InspectCache(command, buildcache.Expectation{Input: input, ReceiptHash: build.ReceiptSHA256})
-			if !validCacheResult(result, input, build) {
+			result := state.InspectCache(command, buildcache.Expectation{Input: input, ReceiptHash: build.ReceiptSHA256, Assurance: state.Assurance})
+			if !validCacheResult(result, input, logicalKey, build) {
 				current = false
 				return nil
 			}
@@ -805,9 +809,9 @@ func buildCurrentnessResult(current bool, useErr, closeErr error) (bool, error) 
 	return current, nil
 }
 
-func validCacheResult(result buildcache.Result, input buildmeta.Input, build Build) bool {
+func validCacheResult(result buildcache.Result, input buildmeta.Input, logicalKey buildmeta.CacheKey, build Build) bool {
 	if result.Status != buildcache.Hit || result.ArtifactPath == "" ||
-		!reflect.DeepEqual(result.Receipt.Input, input) || result.Receipt.CacheKey != build.CacheKey ||
+		!reflect.DeepEqual(result.Receipt.Input, input) || result.Receipt.CacheKey != logicalKey || result.CacheKey != build.CacheKey ||
 		result.ReceiptHash != build.ReceiptSHA256 || result.Receipt.Artifact.Path != build.ArtifactPath ||
 		result.Receipt.Artifact.SHA256 != build.ArtifactSHA256 {
 		return false

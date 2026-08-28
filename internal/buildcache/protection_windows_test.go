@@ -108,7 +108,7 @@ func TestWindowsPublicationHardensAnInheritingManagerHome(t *testing.T) {
 	if _, err := store.Publish(publication, testHomeLock{}); err != nil {
 		t.Fatalf("publish into an ordinary manager home: %v", err)
 	}
-	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash}); hit.Status != Hit {
+	if hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance}); hit.Status != Hit {
 		t.Fatalf("inspection after publishing into an ordinary home = %+v", hit)
 	}
 	dir, err := openWindowsProtected(home, true, false)
@@ -281,12 +281,12 @@ func TestWindowsProtectedStateMatrix(t *testing.T) {
 			if _, err := store.Publish(publication, testHomeLock{}); err != nil {
 				t.Fatal(err)
 			}
-			hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+			hit := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 			if hit.Status != Hit {
 				t.Fatalf("initial inspection = %+v", hit)
 			}
 			test.mutate(t, store, hit)
-			result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash})
+			result := store.Inspect(Expectation{Input: publication.Input, ReceiptHash: receiptHash, Assurance: publication.Assurance})
 			if result.Status != UntrustedProvenance {
 				t.Fatalf("protected-state violation = %+v", result)
 			}
