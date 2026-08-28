@@ -1,5 +1,5 @@
 ## Status
-blocked
+development
 
 ## Review
 required
@@ -85,6 +85,7 @@ spawn run started: [implementer] developer (codex) (run=RUN-260827-34685e)
 agent completed: [implementer] developer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260827-34685e, pid=15143, exit=0)
 No Change Request revision was published for TASK-260827-18tswm (handoff_unsatisfied): the board is not at to-review
+Stop-the-line resolved: the host-GOROOT diagnostic patch is pushed (fd5911fb) and the full matrix is running on PR #47 head 1af3bff4. Windows Test lane: the port landed as 9ee56ff1 (adapter delivery Windows port: internal/privatedir owner-only DACL primitive, closureexec platform seams for blob modes/hard-link publication/tree immutability, path portability in rustsource/swiftpmbuild/swiftpminterop, compiled swiftpm stub, platform golden digests) plus 1af3bff4 (buildcache explicit owner SID + default-owner repair gate + sharing-violation wait on hardened hosts; PowerShell hook test bypasses Restricted host policy). Full ./internal/... sweep on a real Windows 11 admin host: green except internal/runtimestore TestWindowsPostInstallWrappersForwardArgumentsPathAndExitCode, a host-locale artifact (cmd.exe parses UTF-8 batch bytes in OEM CP866 on a Russian-locale host, garbling the Unicode fixture paths); CI windows runners parse it fine and main is green there. internal/install=598s and install/atomicity exceed the default 10m go test timeout on that host; CI uses -timeout 30m. Awaiting matrix verdict for the final checklist item.
 
 ## Precondition Resources
 (none)
@@ -109,7 +110,7 @@ No Change Request revision was published for TASK-260827-18tswm (handoff_unsatis
 2026-08-27T02:58:38Z
 
 ## Last Update
-2026-08-27T05:31:54Z
+2026-08-27T22:39:29Z
 
 ## Assigned To
 [implementer] developer (codex)
