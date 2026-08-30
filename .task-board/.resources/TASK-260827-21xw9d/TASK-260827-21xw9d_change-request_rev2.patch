@@ -1,0 +1,2293 @@
+diff --git a/.gitignore b/.gitignore
+index ba3ade72..f49f23b4 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -30,3 +30,10 @@ coverage.out
+ .task-board/.resources/**/*.test
+ .task-board/.resources/**/*-go-test.json
+ .task-board/.resources/**/*-coverage.json
++# Curator
++.agents/
++.claude/skills/
++.codex/skills/
++.cursor/rules/
++.gemini/skills/
++Skillfile.dev.json
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 17dbd80f..0ff76b50 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,19 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-08-28 — Authoring CLI commands documentation refresh (TASK-260827-21xw9d)
++
++- **Documentation created**: Added `docs/authoring-cli-commands.md` detailing how skill authors ship CLI utilities with skills. Covered command placements (embedded build roots vs external build repositories), per-language admission matrix derived from `internal/godriver/` and `internal/skillspec/`, script command interpreters (`node-v1`, `python3-v1`), schema-8 enforced script policy (`script-worker-v1`), three minimal worked examples (`embedded_go`, `external_go_repo`, `script_skill`), and planned driver error handling (`commands.<name>.driver: must be 'go-v1' or 'go-repository-v1'`).
++- **README integration**: Updated `README.md` under the Skill packages bullet to link `docs/authoring-cli-commands.md`.
++- **Validation & evidence**: Verified all three worked examples with `go run ./cmd/curator skill check <dir>` (all exit code 0). Verified planned driver error handling with `go run ./cmd/curator skill check <dir>` (exit code 1, expected failure error `commands.mytool.driver: must be 'go-v1' or 'go-repository-v1'`). Ran Go tests in `internal/skillspec/` and `internal/skillcheck/` (exit code 0). Attached outcome evidence to the board as `TASK-260827-21xw9d_results.md`.
++
++## 2026-08-28 — Curator CLI reference and troubleshooting documentation refresh (TASK-260827-1nauj3)
++
++- **Documentation structure**: Added `docs/cli.md` (verbatim command reference for all Curator command and subcommand groups, verified against `./bin/curator` built via `make build`), `docs/troubleshooting.md` (symptom-cause-remedy entries for compiled-command status codes, toolchain preflight checks, and SSH/HTTPS credential errors), and updated `README.md` with a collapsible `## Commands` section.
++- **CLI Reference Rework (CR-TASK-260827-1nauj3-1 rev 1 & rev 2)**: Corrected command entries in `docs/cli.md` (`curator project add`, `global add`, `hybrid status`, `global install`, `global upgrade`, `skill check`, `list`, `ui`) to match `cmd/curator/main.go` verbatim for flag sets, value types, defaults, and positionals. Applied Rev 2 fixes (G1-G6): removed `--project` from `global add`, added `--project` to `curator add`, added `--all` to `install`, `upgrade`, `status`, updated `Shared flags` in `docs/cli.md`, and corrected `curator project add` summary in `README.md`.
++- **Troubleshooting Rework (CR-TASK-260827-1nauj3-1 rev 1 & rev 2)**: Replaced improper Git version probe mapping under Go toolchain with authentic Go toolchain preflight diagnostics (`untrusted_go_executable` at `internal/godriver/session.go:489` and `toolchain_executable_mismatch` at `internal/godriver/session.go:521` / `cmd/curator/toolchain_remedy_test.go:51`), gave Git admission failures (`trusted Git version probe failed` / `Git release family is not operator-pinned` at `internal/buildrepo/admission.go:203, 211`) a dedicated entry, noted `GOROOT/bin/%s` platform derivation, and updated SSH credential error cause prose.
++- **Test synchronization**: `cmd/curator/builds_test.go` enforces that `README.md` contains backtick references for all `currentnessCodes()` and `inputCauses()`. `README.md` retains those status codes and cause subcodes so `TestEveryCurrentnessCodeIsDocumented` and `TestInputCausesAreDistinctAndDocumented` pass without regression.
++
+ ## 2026-08-27 — macOS adapter-delivery CI residuals (TASK-260827-18tswm)
+ 
+ - The approved `aarch64-apple-darwin` Cargo descriptor and an installed pinned
+@@ -4089,3 +4102,15 @@ identifier allowlist inside a reject-by-default grammar needs the question
+   setting` subtests plus the module-import and operand-separation cases fail
+   without it; all six source controls, the pruned case, and the benign positive
+   pass either way — which is what they are for.
++
++## 2026-08-28 — TASK-260827-2232c0: readme-restructure (round 4 rework)
++
++- FINDINGS & DECISIONS:
++  Restructured `README.md` to tighten the core pitch and moved detailed reference dumps to standalone documents in `docs/`:
++  - `docs/compiled-commands.md`: holds the complete status codes, cause subcodes, logical cache key derivation, reconciliation, repair, global status, maintenance, and garbage collection grace period specifications. All 10 load-bearing facts (B1-B10) restored and verified.
++  - `docs/ci-gates.md`: holds the complete 17-row gate catalog (10 core gates + 6 language profile harnesses + 1 cross-adapter gate), protocol-suite pin verification specification, platform carve-out rules, relative repo links (`../.github/...`), exact gate callers (`suite-plan.sh`, `ledger-consistency.sh`), and suite consumption specifications.
++  - `docs/implementation-plan.md`: updated with the required two-line historical plan header (`Historical plan of record for Curator v0.1 against protocol 1.0.0-rc.8.
++The task board in .task-board/ is the live plan.`).
++  - `README.md`: condensed to 122 lines with collapsible `<details>` install blocks, accurate forwarding shim PATH claims matching `internal/globalbins`, explicit non-fallback verified execution assurance with fail-closed, no-provider, disjoint key, and receipt tracking guarantees, full adapter enumeration (including Rust), tightened protocol and development links, and no reference dumps or style guide violations.
++- VERIFICATION:
++  All commands and flags verified against `go run ./cmd/curator ... --help` and built binary `/tmp/curator-rev`.
+diff --git a/README.md b/README.md
+index db09dd6c..b0ab6d7f 100644
+--- a/README.md
++++ b/README.md
+@@ -1,31 +1,53 @@
+ # Curator
+ 
+-Curator is an agent environment manager (AEM): a single tool that manages what an AI coding agent gets in a project. Skills and their transitive dependencies, executable commands, MCP server requirements, per-agent delivery, and the security gates around all of it. Declarative, reproducible, verifiable.
++Curator is an agent environment manager (AEM). The software manages what an AI coding agent receives in a project environment: skill packages, transitive dependencies, executable command shims, MCP server requirements, per-agent delivery adapters, and security verification gates. Declarative configuration produces reproducible installations.
+ 
+-Curator is implemented in Go and follows the [Curator Specification](https://github.com/relux-works/curator-spec), an open protocol for skill packages, project manifests, installation semantics, and the audit registry; sections are cited across this repository as `Spec §N.M`.
++Curator implements the open [Curator Specification](https://github.com/relux-works/curator-spec). The specification defines skill packages, project manifests, installation semantics, and audit registry interactions; sections are cited across this repository as `Spec §N.M`.
+ 
+ ## Status
+ 
+-v0.1 development complete: all twelve phases of [docs/implementation-plan.md](docs/implementation-plan.md) are done. CI consumes the authoritative schemas and conformance vectors from `curator-spec` on ubuntu, macos, and windows, plus lint and the naming gate. Work is tracked on the in-repo task board under [.task-board/](.task-board/).
++Version v0.1 development is complete: all twelve phases in [docs/implementation-plan.md](docs/implementation-plan.md) are done. Continuous integration validates schemas and conformance vectors from `curator-spec` on macOS, Linux, and Windows. Work tracking lives in [.task-board/](.task-board/).
+ 
+ ## Install
+ 
++<details open>
++<summary>Homebrew (macOS, Linux)</summary>
++
+ ```bash
+-# Homebrew (macOS, Linux)
+ brew install relux-works/tap/curator
++```
++
++</details>
++
++<details>
++<summary>Installer script (macOS, Linux)</summary>
+ 
+-# installer script (macOS, Linux)
++```bash
+ curl -fsSL https://raw.githubusercontent.com/relux-works/curator/main/install.sh | sh
++```
++
++</details>
++
++<details>
++<summary>Scoop (Windows)</summary>
+ 
+-# Scoop (Windows)
++```bash
+ scoop bucket add relux-works https://github.com/relux-works/scoop-bucket
+ scoop install curator
++```
++
++</details>
++
++<details>
++<summary>Go toolchain</summary>
+ 
+-# Go toolchain
++```bash
+ go install github.com/relux-works/curator/cmd/curator@latest
+ ```
+ 
+-Debian and RPM packages ship with every [release](https://github.com/relux-works/curator/releases), together with SBOMs and cosign signatures. macOS binaries are Developer ID signed (Relux Works, LLC). Verify any downloaded artifact:
++</details>
++
++Debian and RPM packages ship with every release alongside SBOMs and cosign signatures. macOS binaries are Developer ID signed (Relux Works, LLC). Run the verification command to check any downloaded artifact:
+ 
+ ```bash
+ gh attestation verify <artifact> --owner relux-works
+@@ -33,626 +55,170 @@ gh attestation verify <artifact> --owner relux-works
+ 
+ ## What Curator manages
+ 
+-- **Skill packages**: `SKILL.md` plus context directories, with an implementation-neutral machine manifest (`agent-skill.json`, schemas 1 through 5) declaring commands, runtime layout, capabilities, and dependencies. The legacy `csk-skill.json` filename remains readable.
++Curator controls environment dependencies and runtime delivery:
++
++- **Skill packages**: `SKILL.md` plus context directories, with an implementation-neutral machine manifest (`agent-skill.json`, schemas 1 through 8) declaring commands, runtime layout, capabilities, and dependencies. The legacy `csk-skill.json` filename remains readable. See [Authoring CLI commands](docs/authoring-cli-commands.md) for command declarations, drivers, and worked examples.
+ - **Project manifests**: `Skillfile.json` with exact git references; non-committed development substitutions.
+-- **Resolution**: transitive dependency closures unified to one commit and one source identity per name, with activation modes.
+-- **Installation**: context and runtime separation, install markers with content hashes, a commit-keyed runtime store, command shims, managed per-agent adapters.
+-- **Scopes**: project, global, and hybrid (machine-stored, per-project activation).
+-- **MCP requirements**: read-only verification of declared MCP servers against agent configuration surfaces.
+-- **Security**: source allowlists, declared capabilities, no code execution at install time, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
+-- **Operator credentials**: per-repository SSH selection and scoped HTTPS token sources for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS can remain anonymous. See [SSH credentials](docs/build-ssh.md) and [HTTPS credentials](docs/build-https.md).
++- **Resolution**: Transitive dependency closures unified to one commit and one source identity per name, with activation modes.
++- **Installation**: Context and runtime separation, install markers with content hashes, a commit-keyed runtime store, command shims, managed per-agent adapters.
++- **Scopes**: Project, global, and hybrid (machine-stored, per-project activation).
++- **MCP requirements**: Read-only verification of declared MCP servers against agent configuration surfaces.
++- **Security**: Source allowlists, declared capability boundaries, zero code execution during install, and an audit registry client (Ed25519 signed records, deny-wins federation, snapshot verification).
++- **Operator credentials**: Per-repository SSH selection and scoped HTTPS token sources for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS can remain anonymous. See [SSH credentials](docs/build-ssh.md) and [HTTPS credentials](docs/build-https.md).
+ 
+ ## Registry client guarantees
+ 
+-Curator binds persisted rollback and equivocation state to the canonical
+-registry URL, so signing-key rotation never resets the highest accepted
+-snapshot. This durable state lives under the Curator home `state/registry`
+-directory, outside the disposable `cache/registry` responses; upgrades migrate
+-legacy state without lowering it, and corruption or write failure is
+-fail-closed. A protected catalog distinguishes first use from deletion of a
+-previously accepted registry state. Record pagination rejects repeated or oversized cursors, more than
+-10,000 records per artifact query, and responses larger than 16 MiB.
+-
+-Registry requests use bounded per-attempt and total deadlines. GET requests
+-retry network failures, `429`, and `503` at most twice after the first attempt.
+-Publication retries the exact body only with its deterministic
+-`Idempotency-Key`; other client errors and unsafe requests are never retried.
+-Redirects are rejected so a registry cannot move a request or bearer token to
+-another endpoint.
++Curator binds persisted rollback and equivocation state to the canonical registry URL, so signing-key rotation never resets the highest accepted snapshot. This durable state lives under the Curator home `state/registry` directory, outside the disposable `cache/registry` responses; upgrades migrate legacy state without lowering it, and corruption or write failure is fail-closed. A protected catalog distinguishes first use from deletion of a previously accepted registry state. Record pagination rejects repeated or oversized cursors, more than 10,000 records per artifact query, and responses larger than 16 MiB.
++
++Registry requests use bounded per-attempt and total deadlines. GET requests retry network failures, `429`, and `503` at most twice after the first attempt. Publication retries the exact body only with its deterministic `Idempotency-Key`; other client errors and unsafe requests are never retried. Redirects are rejected so a registry cannot move a request or bearer token to another endpoint.
+ 
+ ## Commands without profile setup
+ 
+-Shell profile changes are not required. After `curator install`, agents can
+-invoke project commands through `.agents/bin/<command>` on Unix and
+-`.agents\bin\<command>.cmd` on Windows. Global installation publishes
+-non-destructive forwarding shims to a safe user directory already on `PATH`
+-when one is available; otherwise Curator reports the canonical global bin
+-location. Installed launchers carry the project command directory and resolved
+-system dependency directories themselves, preserve the inherited `PATH`, and
+-return the child command status.
++Shell profile changes are not required. After `curator install`, agents can invoke project commands through `.agents/bin/<command>` on Unix and `.agents\bin\<command>.cmd` on Windows. Global installation publishes non-destructive forwarding shims to a safe user directory already on `PATH` when one is available; otherwise Curator reports the canonical global bin location. Installed launchers carry the project command directory and resolved system dependency directories themselves, preserve the inherited `PATH`, and return the child command status.
+ 
+-Repository bootstrap can remain idempotent and non-interactive:
++Run bootstrap and upgrade to set up a repository:
+ 
+ ```bash
+ curator bootstrap --if-missing --non-interactive --skills-root "$HOME/src/skills"
+ curator upgrade .
+ ```
+ 
+-`upgrade` fetches only the selected project's direct and transitive dependency
+-closure. `upgrade --dry-run` plans with temporary sources and snapshots without
+-changing source checkouts, caches, security state, runtime state, or project
+-artifacts.
++`curator upgrade` fetches dependency closures for the selected project. `curator upgrade --dry-run` plans updates without mutating disk state.
+ 
+-Interactive users who want bare command names and automatic project switching
+-can cache the optional hook once:
++To enable shell integration, cache the optional hook once:
+ 
+ ```bash
+ curator shell-init --install
+-# Add the source command printed above to .zshrc or .bashrc.
+ ```
+ 
+-Automatic detection selects zsh or bash from `SHELL`, preserves Git Bash on
+-Windows, and otherwise selects PowerShell on Windows. The cached hook does not
+-start Curator during later shell launches. Curator never edits a profile
+-automatically. Set `CURATOR_AUTO_ENV=0` to retain global activation while
+-disabling project-directory scans.
++Automatic detection selects zsh or bash from `SHELL`, preserves Git Bash on Windows, and otherwise selects PowerShell on Windows. The cached hook does not start Curator during later shell launches. Curator never edits a profile automatically. Set `CURATOR_AUTO_ENV=0` to retain global activation while disabling project-directory scans.
+ 
+ ## Execution assurance
+ 
+-Compiled builds default to `execution.mode: portable`. Portable mode uses the
+-Curator-owned authenticated manager/worker session and records only the input,
+-toolchain, runtime-control, exit, and declared-output evidence it actually
+-establishes; it does not claim lossless host read, write, process, or network
+-observation.
+-
+-`execution.mode: verified` is an explicit, non-fallback selection. It requires a
+-separately installed provider whose configured identifier, version, binary
+-SHA-256, trust evidence, health, and exact capability record all match before
+-any build-cache lookup or process start. This release ships no platform
+-provider. A missing, unhealthy, incompatible, or drifted provider therefore
+-fails closed rather than using portable execution.
+-
+-Protected local and external-repository cache identities include the complete
+-assurance binding. Portable, verified, legacy assurance-blind, cross-provider,
+-and capability-drifted entries occupy disjoint identities, and every adopted or
+-published artifact carries the exact build-session receipt used at dispatch.
+-
+-### SwiftPM source-closure profile
+-
+-The internal `swiftpm-source-v1` adapter selects one executable product and an
+-exact destination, binds Swift, SwiftPM, PackageDescription, and the acquisition
+-Git toolchain at C0, and
+-admits each complete package tree before its executable manifest is evaluated.
+-It freezes the top-level `Package.resolved`, maps every direct and transitive
+-pin to one immutable snapshot and same-kind local mirror, and emits a
+-selection-neutral package/product/target/source/condition capture. Concrete
+-platform and toolchain records live only in `SelectionBinding` before the
+-active graph is projected.
+-
+-Manifest evaluation uses the shared commit-before-start executor and the exact
+-supported SwiftPM argv; versioned-manifest selection is recorded separately
+-because SwiftPM has no `--manifest-path` option. Missing locks are generated by
+-the manager-owned brokered resolver: only the Git broker contacts source
+-origins, and each selected tree admits before its manifest process. Resolution
+-commits the actual `swiftpm-brokered-resolution-v1` algorithm, not an
+-unexecuted SwiftPM command. Every Git subprocess receives a unique causal
+-permit before launch, rechecks the exact C0 executable immediately before and
+-after use, and emits an authority-issued receipt. Those pairs and the
+-generated-lock receipt enter the C1/C3 journal.
+-
+-Offline replay rechecks every admitted tree, protected mirror byte inventory,
+-Git commit/tree/object graph, and C0 tool; repeats admitted manifest evaluation
+-with fresh private state and `network=none`; runs executor-backed
+-`swift package show-dependencies --format json` with forced resolved versions,
+-the frozen lock, and read-only kind-preserving mirrors; and reconciles that
+-observed dependency graph with the reconstructed canonical
+-package/product/target/source/condition graph without reacquiring an origin.
+-Each bare repository has its own
+-`swiftpm-git-mirror-artifact-manifest-v1`, covering every regular node and byte
+-digest plus the exact revision, Git tree, and verifier receipts; checkout
+-artifact evidence cannot substitute for mirror intake authority. Binary
+-targets are rejected even when dormant; selected plugins, macros, and unsafe
+-settings fail before their affected process. C-family header/module/interop
+-validation and the compiler/build receipt remain separate downstream adapter
+-boundaries.
+-
+-### npm source-closure profile
+-
+-The internal `npm-source-v1` adapter accepts root `package-lock.json` or
+-`npm-shrinkwrap.json` schemas 2 and 3. It reconciles the root and supported
+-workspace manifests, the v2 legacy dependency tree, install-tree instances,
+-selected and target-pruned edges, immutable registry `.tgz` locators, SHA-512
+-SRI, explicitly approved HTTPS registry origins, embedded package metadata,
+-and the shared recursive artifact manifest.
+-Mutable origins, stale locks, missing or changed integrity, bundled dependency
+-trees, lifecycle execution, implicit `binding.gyp`/`node-gyp`, native or opaque
+-payloads, and ambient cache authority fail closed.
+-
+-Raw admitted tarballs remain the authority. A task-private npm cacache content
+-store is derived from those bytes; nondeterministic local-locator index records
+-are pruned before its canonical receipt is issued. Replay copies that receipt
+-into fresh private state and runs `npm ci --offline --ignore-scripts`. Before
+-Node invocation, every materialized dependency is recursively re-admitted by
+-the shared artifact classifier, its embedded metadata is reconciled again, and
+-its complete owned file inventory must exactly match the extraction evidence
+-derived from the admitted raw tarball.
+-
+-Portable assurance remains the functional default. It binds only what the
+-shared portable executor and npm adapter actually establish: exact admitted
+-inputs, fresh private home/config/cache/output roots, offline and scripts-off
+-manager flags, unchanged lock bytes, and an installed graph equal to the
+-selected lock graph. It does not claim lossless host network, read, write, or
+-process observation; its audit envelope omits lossless-only counters entirely.
+-Verified assurance is non-fallback: selecting it requires one immutable,
+-compatible lossless-provider binding before the first npm process starts, and
+-then network/process/read/write observations are enforced against the declared
+-contract. Cache derivation, `npm ci`, and Node invocation carry exact rederived
+-common Node C0/C5 identities, a precommitted invocation permit, the selected
+-tool identity, and immediate tool/provider rechecks. C5 templates bind the
+-complete argv, working directory, environment and process policy. The shared
+-executor maps admitted inputs to logical read-only mounts and writable derived
+-state to typed work copies. npm operations launch the exact staged Node binary
+-directly with the exact fingerprinted `npm-cli.js` entry point as their first
+-argument; no shebang interpreter or `PATH` lookup participates. Private npm
+-debug logs are discarded before the retained project is admitted. Retained
+-work copies are reconciled before cache publication or materialized-tree
+-admission. The common Node profile owns runtime/toolchain binding and declared
+-TypeScript/generator actions.
+-
+-### pnpm source-closure profile
+-
+-The internal `pnpm-source-v1` adapter accepts only `pnpm-lock.yaml` schema
+-`9.0` under exact pnpm release `10.33.0`. It binds importers, workspace and contained local roots, package
+-snapshots with exact peer contexts, overrides, declared patches, platform
+-selectors, pnpm settings, manifests, `.npmrc`, and `pnpm-workspace.yaml`.
+-Registry tarballs, every local root, and every patch are captured and admitted
+-independently before the common Node capture graph is emitted. Locks and
+-workspace configuration must contain exactly one YAML document. Patch hashes
+-use the pinned pnpm normalized-LF SHA-256 algorithm, and a receipted closed
+-transform derives the expected patched inventory for every exact snapshot.
+-
+-Store construction runs one protected `pnpm store add` over only the admitted
+-tarballs, then deterministically reconciles its file-locator indexes to the
+-exact lock package identities used by pnpm 10.33.0. The derived store is checked
+-for side-effect payloads, receipted, and made read-only. Replay keeps that store
+-as immutable authority and gives pnpm a declared ephemeral writable copy because
+-10.33.0 records the current project under `v10/projects`; that registration is
+-verified and removed, and every remaining store byte must still match the frozen
+-receipt. Replay invokes `pnpm install --frozen-lockfile --offline
+---ignore-scripts` with side effects disabled, hoisting disabled, and copy-only
+-package imports. Reconciliation owns the entire root/workspace `node_modules`
+-layout, the closed manager metadata set, every virtual-store entry, exact direct,
+-dependency, and peer links, package metadata, and package bytes. The retained
+-link-free runtime tree nests exact snapshot-context dependencies so Node
+-resolution remains executable after source-only admission. Target-pruned
+-snapshots are reconciled as physical lock-superset instances without widening
+-the active graph. Pnpm 10.33.0 omits wholly unreachable snapshots, so that
+-narrower lock shape is rejected before install rather than accepted without a
+-physical instance. Lock-graph reachability is tracked independently from
+-OS/CPU/libc selection, so a target mismatch cannot mask a wholly unreachable
+-snapshot. `.pnpmfile.*`,
+-custom or unknown config, undeclared patches, escaping or uncaptured local
+-roots, lifecycle/native payloads, store drift, side-effects state, unclaimed
+-installed content, and ambient-store fallback fail closed.
+-
+-### Yarn Classic source-closure profile
+-
+-The internal `yarn-classic-source-v1` adapter accepts the root Yarn v1 lock
+-under exact Yarn `1.22.22`. It binds immutable HTTPS tarball origins, canonical
+-SHA-512 integrity, root and glob-expanded workspace manifests, target pruning,
+-peer selection, `nohoist`, modules layout, and the complete admitted
+-`.yarnrc` configuration set. Capture discovers workspace manifests and
+-Yarn/npm configuration from the immutable project tree and requires an exact
+-bijection with parsed authority before any Yarn process starts.
+-
+-Admitted source tarballs derive a task-private offline mirror and a separately
+-admitted empty ordinary cache. Replay launches the exact staged Node binary
+-and Yarn JavaScript entry point through the shared assured executor with
+-`--frozen-lockfile --offline --ignore-scripts --no-default-rc`, a private rc,
+-and an explicit minimal environment. The adapter rejects stale or subtree
+-locks, omitted workspace/config authority, checksum drift, lifecycle/native or
+-compiled payloads, missing mirror inputs, ambient cache/config fallback, and
+-installed-layout disagreement before publication. Peer ranges use a closed
+-release-only semver grammar with correct zero-major caret bounds; prerelease or
+-compound ranges outside that grammar fail closed.
+-
+-### Modern Yarn source-closure profile
+-
+-The internal `yarn-modern-source-v1` adapter accepts Yarn `4.9.2` lock schema
+-8 with one closed `.yarnrc.yml`, the exact manager-owned built-in plugin set,
+-declared patches, cache key and compression, checksums, target conditions, and
+-either the PnP or node-modules linker. Raw npm-compatible archives or exact
+-normalized Yarn ZIPs remain source authority; the adapter derives a private
+-immutable `.yarn/cache` and runs `yarn install --immutable --immutable-cache
+---mode=skip-build` with manager and OS network denial.
+-
+-Peer-bearing packages are distinct immutable instances. The adapter derives
+-each context from the lock-authoritative base locator plus the exact provider
+-instances selected from the dependent package, binds the pinned Yarn 4.9.2
+-virtualization algorithm into closure identity, and rejects missing,
+-incompatible, ambiguous, or non-well-founded provider contexts. Ordinary
+-runtime dependency cycles remain canonical SCC evidence, including cycles
+-adjacent to a stable virtual peer context; revisiting the same source through a
+-different recursively derived context fails closed. Generated `virtual:` hashes
+-and `.yarn/__virtual__` paths are accepted only as Yarn runtime aliases that
+-bijectively reconcile to those derived contexts, including Yarn's implicit
+-optional `@types/*` peers. Extra, missing, retargeted, cross-context, or
+-preseeded PnP/install state cannot become closure authority.
+-
+-### Cross-adapter source-closure conformance
+-
+-The four Node profiles above, the SwiftPM profile, and the `rust-source-v1`
+-Cargo path are integrated by one suite in `internal/crossconformance`. Go
+-remains the untouched compiled baseline and is not one of the six adapter
+-paths. The suite proves that every delivered path keeps the same
+-selection-neutral capture, the same binding-only target authority, the same
+-deterministic projection, the same causal evidence chain, and the same shared
+-artifact admission, and it drives a published rejection matrix through the
+-adapters' own seams. It also independently canonicalizes and hashes the
+-accepted 53-record CGP05/CGP10 corpus with its own CCJ-1 implementation, and
+-exports the whole contract as committed canonical JSON for an independent
+-implementation.
+-
+-Supported profiles, explicit unsupported cases, the stable diagnostic
+-vocabulary, the conformance matrix, and migration steps for an existing command
+-are in
+-[docs/source-closure-adapter-conformance.md](docs/source-closure-adapter-conformance.md).
+-Building a new language adapter — the contract, the process seams, the
+-reject-by-default source-analysis posture, and what a new path must publish —
+-is covered by
+-[docs/authoring-language-adapters.md](docs/authoring-language-adapters.md).
++Compiled builds default to portable execution mode using an authenticated manager/worker session. Verified execution mode (`execution.mode: verified`) is an explicit non-fallback selection: because this release ships no platform provider, a missing, unhealthy, incompatible, or drifted provider fails closed rather than falling back to portable execution. Portable, verified, legacy assurance-blind, cross-provider, and capability-drifted cache entries occupy disjoint cache key identities, and every adopted or published artifact carries the exact build-session receipt used at dispatch. Language source-closure adapters (Rust, SwiftPM, npm, pnpm, Yarn Classic, and Modern Yarn) bind ecosystem toolchains and resolve immutable source snapshots. See [docs/authoring-language-adapters.md](docs/authoring-language-adapters.md) for adapter authoring contracts and [docs/source-closure-adapter-conformance.md](docs/source-closure-adapter-conformance.md) for cross-adapter conformance.
+ 
+ ## Compiled-command status, diagnostics, and repair
+ 
+-`curator status` is read-only. It reports one code per declared skill and, when
+-the closure activates compiled (`go-v1`) commands, one diagnostic line per
+-active build command. `status --json` carries the same values in a `builds`
+-array; a closure without compiled commands produces the historical document
+-unchanged, with no `builds` key at all.
+-
+-The codes are stable and machine-readable. Only `up-to-date` (skills) and
+-`current` (compiled commands) mean "exactly current"; `status --check` exits
+-non-zero for every other value, including a state it does not recognize.
+-
+-Reporting and verdict are separate. Plain `status` exits zero when it produced
+-the report it was asked for — including when the plan itself refused, as long as
+-every active compiled command still got a row (any raw detail is a `warning:` on
+-standard error). A refusal that leaves some command undescribed still exits
+-non-zero, as does any failure in a scope without compiled commands. `--check` is
+-the surface that turns a non-current verdict into a non-zero exit.
+-
+-| Code | Meaning |
+-|---|---|
+-| `up-to-date` / `current` | every check passed |
+-| `not-installed` | the declaration has no installed skill |
+-| `invalid-marker` | the install marker is absent, unreadable, or invalid |
+-| `unsupported-marker` | the marker schema cannot be read by this manager |
+-| `needs-install` | the installation is behind its declaration, or its marker schema cannot describe a compiled command |
+-| `content-drift` | installed content no longer hashes to the recorded value |
+-| `unresolvable` | the declared ref cannot be resolved in the source repository |
+-| `build-context-exposed` | a build root reached agent-facing context |
+-| `build-command-drift` | the recorded and activated compiled command sets differ |
+-| `build-source-drift` | the recorded build-source identity no longer matches the raw snapshot |
+-| `build-input-drift` | the recorded logical key was derived from a different build input |
+-| `unsupported-build-driver` | a recorded or planned driver outside `go-v1` |
+-| `unusable-build-toolchain` | the trusted Go toolchain could not be resolved or verified, so nothing could be planned |
+-| `missing-build-artifact` | the protected cache holds no entry for the recorded key |
+-| `corrupt-build-receipt` | the entry's canonical receipt differs from the recorded one |
+-| `build-artifact-drift` | the entry's artifact path or hash differs from the recorded one |
+-| `corrupt-build-cache` | the protected entry cannot be interpreted |
+-| `untrusted-build-cache` | candidate bytes are outside a provable protected boundary |
+-| `unsupported-build-platform` | this host cannot prove protected build cache state |
+-| `build-state-changed` | the install marker or the protected cache evidence moved while status was classifying it |
+-| `unknown-build-state` | a planner outcome this manager does not know; it fails closed |
+-
+-A row may carry a `cause`, a stable subcode that refines the state without
+-widening the state vocabulary. `unusable-build-toolchain` carries the `go-v1`
+-boundary code that refused the operation. `build-input-drift` carries one of:
+-
+-| Cause | Meaning |
+-|---|---|
+-| `build-root` | the marker does not record the build root the closure now activates |
+-| `target` | the marker's recorded artifact path is not the one this target derives |
+-| `unattributed` | the key differs, and the marker records no prior input to attribute it |
+-
+-The logical build key is one opaque digest over the complete build input —
+-schema version, driver, build source, build root, command, source directory,
+-native target and tuning, trusted toolchain identity, and the fixed manager
+-build policy. The protected cache key wraps that logical identity with the
+-complete assurance binding and never aliases the historical assurance-blind
+-key. An install marker records no prior input, so a key mismatch is
+-reported as input drift and attributed only as far as the marker's own recorded
+-build roots and artifact path can prove. Curator does not guess which input
+-moved.
+-
+-A compiled verdict is bracketed on both sides. `status` fingerprints the
+-install markers before it plans and re-reads them afterwards, and it re-takes
+-the exact protected-cache lookup every row was classified from once
+-classification is done. Either half moving — a marker rewritten by a concurrent
+-install, or an entry removed, corrupted, replaced, or stripped of its provable
+-protection — reports `build-state-changed` instead of publishing a verdict that
+-was already stale.
+-
+-Each diagnostic reports the driver, build root, source directory, build-source
+-identity, native target and tuning, logical cache key, manager-derived artifact
+-path, and the read-only cache outcome. A command the trusted toolchain refused
+-before any logical identity existed still reports everything that was already
+-established — driver, build root, source directory, and the validated
+-build-source digest — and reports no target, key, or cache outcome, because
+-none was derived. Every path in a diagnostic is
+-protocol-relative: manager home, cache, staging, and probe locations are never
+-published. Untrusted details — cache reasons and compiler output — are
+-collapsed onto one line, stripped of anything non-printable, path-redacted, and
+-length-bounded before they are printed or serialized.
+-
+-`install --dry-run` and `upgrade --dry-run` run no compiler. Per active build
+-command they report `cache-hit`, `would-preflight-and-build`,
+-`would-rebuild-untrusted-cache`, `corrupt`, `unsupported`, or
+-`toolchain-unavailable` — a plan, never a completed compiler check.
+-
+-There is no separate repair command: `install` and `upgrade` are the
+-reconciliation path. They rebuild a missing, corrupt, drifted, or untrusted
+-entry into new protected state, and only after every manifest, closure,
+-collision, requirement, audit, registry, and moved-tag gate has passed. An
+-unusable entry is quarantined and replaced under the manager-home lock, never
+-adopted by changing permissions or rewriting a marker. A failed gate,
+-preflight, build, or commit leaves the previous installation, its consumers,
+-and the live cache unchanged, and the run says so.
+-
+-The cache is not a transaction target — a launcher can only point at an entry
+-that is already live — so a replacement is selected before the installation
+-that needs it is durable. A run that then fails puts the cache back before it
+-releases the manager-home lock: the replacement is withdrawn and the entry it
+-displaced is restored, both by renaming inside the protected cache root, so
+-nothing is deleted and the ordinary sweep collects the leftovers.
+-
+-Selecting a replacement is itself several moves — quarantine the unusable
+-predecessor, rename the new entry into the freed slot, validate it, sync the
+-cache root — and a publication that fails part way through puts back what it
+-already moved before it reports. Each of those moves holds to the same rule on
+-its own: quarantining an entry is a rename plus the sync that makes it durable,
+-and a sync that fails returns the entry to the live slot rather than reporting a
+-failure with the slot already empty. That return is synced too, because it is a
+-move like any other; only if its own sync also fails does the run report the
+-cache as changed, with the entry still live and readable. So a failed
+-publication leaves the cache exactly as it found it, and the reversal above is
+-only ever needed for a publication that fully succeeded.
+-
+-That reversal is refused in exactly one direction — when an incomplete
+-transaction still references the published entry, or when a journaled target is
+-no longer at the state the run found it. Restoring an unusable predecessor over
+-an entry a recovered commit is about to point at would turn a reported failure
+-into a broken installation, so the rebuilt entry is kept instead.
+-
+-A restoration that cannot complete is reported rather than assumed. Whenever a
+-run leaves the live cache changed — a kept entry, a publication that could not
+-undo its own moves, or a reversal that stopped part way — it says so per command
+-instead of repeating the ordinary "the live build cache is unchanged" claim, and
+-the warning names which of the three it was. The installation and its consumers
+-are unchanged either way; nothing on these paths is ever deleted, so the state
+-left behind is always one a later `install` or `upgrade` repairs.
+-
+-Two states a rebuild cannot resolve fail closed instead of being repaired: a
+-host that cannot prove protected cache state at all (`unsupported`), and a
+-trusted Go toolchain that cannot be resolved or verified
+-(`toolchain-unavailable`). Both refuse before any mutation.
+-
+-`curator global status` reports the same thing for the machine-wide scope, in
+-the same stable vocabulary: one code per declared skill and one diagnostic line
+-per active compiled command. It accepts `--check` and `--json`, and both mean
+-exactly what they mean for `curator status` — `--json` carries the same values
+-in a `builds` array, and `--check` exits non-zero for every code that is not
+-`up-to-date` or `current`.
+-
+-Deriving compiled currentness needs the current logical build input, which only
+-a plan produces, so `global status` runs the same read-only plan
+-`curator global install --dry-run` runs. That resolves the machine-wide closure
+-and passes the read-only audit and registry gates. It runs no compiler and
+-writes no installation target, cache entry, or trust state.
+-
+-Two things differ from the project scope, both deliberate:
+-
+-- The machine-readable document carries `alias`, `skills`, and — only when the
+-  closure activates compiled commands — `builds`. It carries no `path`: the
+-  scope has no operator-supplied root, and the manager home is never published.
+-- Plain `global status` keeps its historical contract of always reporting and
+-  always exiting zero. The declared-skill report is read straight from install
+-  markers and never from the plan, so a scope without compiled commands prints
+-  the lines it always printed even when the plan refuses; the refusal is a
+-  `warning:` on standard error. `--check` is the only surface that turns a
+-  verdict into a non-zero exit, and it fails closed twice over: once for every
+-  non-current code, and once when the plan refused before it could describe
+-  every compiled command, because such a run cannot prove the scope is current.
+-
+-A machine-wide scope with no `Skillfile.json` declares and activates nothing:
+-it prints nothing and passes `--check`.
+-
+-Curator selects the trusted Go installation only through `CURATOR_GO`
+-(an absolute `<GOROOT>/bin/go`, `bin/go.exe` on Windows) or `GOROOT`. It never
+-searches `PATH` and never downloads a toolchain, and it accepts only release
+-families it has tested against the `go-v1` vectors. A missing, untrusted, or
+-untested toolchain reports the failing boundary together with those
+-mechanisms and the tested families.
++`curator status` reports read-only diagnostics for project closures, reporting one status code per declared skill and one diagnostic line per active compiled command. The command accepts `--check` to fail on non-current states and `--json` for machine-readable output.
++
++Supported currentness codes include `up-to-date`, `current`, `not-installed`, `needs-install`, `content-drift`, `unresolvable`, `invalid-marker`, `unsupported-marker`, `build-command-drift`, `build-context-exposed`, `build-source-drift`, `build-input-drift`, `unsupported-build-driver`, `unusable-build-toolchain`, `missing-build-artifact`, `corrupt-build-receipt`, `build-artifact-drift`, `corrupt-build-cache`, `untrusted-build-cache`, `unsupported-build-platform`, `build-state-changed`, and `unknown-build-state`. Cause subcodes for `build-input-drift` are `build-root`, `target`, and `unattributed`.
++
++Run `curator install` or `curator upgrade` to reconcile drifted or missing build state. See [docs/compiled-commands.md](docs/compiled-commands.md) for status codes, cause subcodes, logical cache key derivation, and repair semantics. For troubleshooting procedures, see [docs/troubleshooting.md](docs/troubleshooting.md).
+ 
+ ## Maintenance and the build-cache grace period
+ 
+-`curator gc` runs one serialized maintenance pass. It acquires the exclusive
+-manager-home mutation lock, recovers any incomplete install transaction, and
+-only then marks and sweeps, so it cannot race an install, a rollback, or a
+-recovery, and cannot lose a consumer registry update. The same pass runs at the
+-end of every installation, under the lock that installation already holds.
+-
+-Marking reads the live project, global, and hybrid scopes once. Runtime store
+-entries are marked from every supported install marker schema; compiled build
+-cache entries are marked from marker v2 build state and from every in-flight
+-transaction journal.
+-
+-Anything the pass cannot prove keeps its artifacts, and keeps them across
+-passes. A consumer registry that exists but does not match the exact shape
+-Curator writes is reported and left untouched rather than rewritten; a
+-registered checkout is unregistered only once its scope is proven absent or
+-proven valid and empty. An *ambiguous* registry counts as unreadable: a document
+-that states `schema_version` or `consumers` more than once does not say what it
+-means, so it is refused by every reader and writer rather than resolved to
+-whichever value happens to come last. A skills directory or installed skill that
+-is a symbolic link or a reparse point is refused instead of followed, and any
+-marker that exists but cannot be read or validated blocks the build sweep. A
+-later pass therefore sees the same uncertainty and makes the same refusal,
+-instead of inheriting a registry the earlier pass had quietly emptied.
+-
+-The sweep removes a protected build cache entry only when all of the following
+-hold: no marker and no journal references it, the cache root and the entry are
+-still verifiable manager-protected state, the entry is structurally exact and
+-self-consistent with the logical key its directory encodes, and it was
+-published more than **24 hours** ago — Curator's documented grace period.
+-Everything else is retained and reported as a maintenance warning, including
+-corrupt receipts, untrusted roots, symlink or reparse escapes, and ownership or
+-DACL failures. Entry content is never executed, adopted, or permission-repaired,
+-and a receipt alone is never treated as proof of provenance or of a live
+-consumer. Retaining an unreferenced entry is always safe: the only cost of a
+-removal is one rebuild.
+-
+-Every decision and every removal is bound to the directory object the pass
+-proved, not to the pathname it proved it under. The decisive classification of a
+-candidate — its exact members, its receipt, its artifact bytes and size — is
+-read through the descriptor of the entry the pass resolved, and the rename that
+-retires it and the deletion behind it resolve through the proven cache root; an
+-entry whose parent is no longer that object is retained and reported. Exchanging
+-the cache-root path after validation can therefore neither redirect a removal
+-outside the Curator cache root nor let a planted replacement supply the verdict
+-for the entry that is actually being removed.
++`curator gc` executes maintenance to sweep unreferenced runtime store entries and compiled build cache artifacts. Garbage collection acquires an exclusive lock on the manager home directory and enforces a 24-hour grace period for unreferenced cache items. See [docs/compiled-commands.md](docs/compiled-commands.md) for maintenance locking and garbage collection criteria.
++
++## Commands
++
++See [docs/cli.md](docs/cli.md) for the complete CLI reference, command options, and flags.
++
++<details open>
++<summary>Project lifecycle</summary>
++
++```bash
++curator bootstrap  # create machine configuration and default directories
++curator init       # initialize Skillfile.json and managed gitignore entries
++curator add        # add or replace a skill declaration and install
++curator remove     # remove a skill declaration from the project
++curator install    # apply Skillfile.json and materialize dependencies
++curator update     # fetch source repositories under skills_root
++curator upgrade    # fetch dependency closure and install updated packages
++curator status     # report manifest, installed, and compiled command states
++curator list       # list configured projects and declared skills
++```
++
++</details>
++
++<details>
++<summary>Project subcommands</summary>
++
++```bash
++curator project add      # register a project alias and path in the machine configuration
++curator project resolve  # resolve transitive dependencies for a project closure
++```
++
++</details>
++
++<details>
++<summary>Skill package validation</summary>
++
++```bash
++curator skill check  # validate a skill package directory against schemas
++```
++
++</details>
++
++<details>
++<summary>Global scope</summary>
++
++```bash
++curator global init     # initialize global machine-wide configuration
++curator global add      # add a global skill declaration
++curator global remove   # remove a global skill declaration
++curator global list     # list installed global skills
++curator global status   # check global scope installation status
++curator global install  # materialize global skills into machine storage
++curator global update   # update global source repositories
++curator global upgrade  # upgrade global skill packages
++```
++
++</details>
++
++<details>
++<summary>Hybrid scope</summary>
++
++```bash
++curator hybrid add     # add a machine-stored hybrid skill declaration
++curator hybrid remove  # remove a hybrid skill declaration
++curator hybrid list    # list stored hybrid skills and activation targets
++curator hybrid status  # check hybrid declaration status across projects
++```
++
++</details>
++
++<details>
++<summary>Audit and security</summary>
++
++```bash
++curator audit  # run security audit, pin trust, or publish audit records
++```
++
++</details>
++
++<details>
++<summary>Maintenance and shell integration</summary>
++
++```bash
++curator gc          # sweep unreferenced runtime store entries and build cache
++curator shell-init  # print or install shell integration hooks
++curator ui          # open interactive terminal status dashboard
++```
++
++</details>
++
++<details>
++<summary>Operator configuration</summary>
++
++```bash
++curator config show         # display active configuration parameters
++curator config build-ssh    # configure SSH credentials for external build repos
++curator config build-https  # configure HTTPS credentials for external build repos
++```
++
++</details>
+ 
+ ## An open protocol
+ 
+-The specification is an open protocol, not an internal contract: any manager
+-built from it interoperates with the same skills, the same project manifests,
+-and the same audit registries. That matters when internal security policies
+-rule out adopting an external binary and require an in-house implementation
+-instead. One such independent implementation of the protocol is
+-[cocoaskills](https://github.com/ivanopcode/cocoaskills) (Python); Curator's
+-conformance against the shared wire formats is enforced directly from the
+-versioned protocol suite in CI; this repository carries no private copy of the
+-expected protocol values.
+-
+-The registry-service profile is implemented by
+-[Curator Skill Registry](https://github.com/relux-works/curator-skill-registry),
+-which serves signed audit and revocation records plus a verifiable transparency
+-log for any conforming Curator manager.
++Curator conforms to an open specification. Independent implementations include [cocoaskills](https://github.com/ivanopcode/cocoaskills). The registry protocol is implemented by [Curator Skill Registry](https://github.com/relux-works/curator-skill-registry).
+ 
+ ## Development
+ 
+-The repository uses an in-repo task board (`.task-board/`, epics, stories, and tasks as files) and the agent tooling connected under `agents/`. Go testing follows the closed-loop tooling of `skill-go-testing-tools` (including `tuitestkit` for terminal UI phases).
+-
+-### Gates and tooling
+-
+-Every gate below is a script under `.github/ci/`, called directly by
+-[.github/workflows/ci.yml](.github/workflows/ci.yml) and mirrored by a `make`
+-target for local use. CI calls the scripts rather than `make` because `make` is
+-not a guaranteed tool on the Windows runner. Each gate writes its raw stream and
+-its report under `EVIDENCE` (default `.temp/ci-evidence/`), which CI uploads per
+-runner, so any claim about a gate can be checked against the run that produced
+-it.
+-
+-| Tool | What it gates | How to run it | Where its output goes |
+-| --- | --- | --- | --- |
+-| `test-gate.sh` | plans the run from the supplied conformance root, executes it, then enforces the platform-case ledger; every status is fatal | `make ci-test` | `$EVIDENCE/test/` — `go-test*.json`, `suite-plan.txt`, `platform-cases.txt`, `skips-observed.tsv` |
+-| `test-gate.sh` (`-race`) | the same gate under the race detector | `make race` | `$EVIDENCE/race/` |
+-| `suite-plan.sh` | decides, from the root alone, which packages it serves, which it cannot, and which this platform does not qualify | called by `test-gate.sh` | `$EVIDENCE/*/suite-plan.txt`, `plan-*.txt` |
+-| `platform-case-gate.sh` | requires every case [`platform-cases.tsv`](.github/ci/platform-cases.tsv) names on this runner, and classifies every skip against [`skip-classes.tsv`](.github/ci/skip-classes.tsv) | called by `test-gate.sh` | `$EVIDENCE/*/platform-cases.txt`, `skips-observed.tsv` |
+-| `ledger-consistency.sh` | proves each ledger row against the real per-GOOS builds via `go list` — no runner needed | `make ledger-check` | `$EVIDENCE/ledger/ledger-consistency.txt` |
+-| `excluded-packages.sh` | the one resolver of "which packages does this platform not execute, and on whose authority" | called by the two gates above | stdout (TSV) |
+-| `candidate-suite.sh` | rejects a non-immutable candidate revision; records a candidate root's identity as candidate-only evidence | `make candidate-verify-ref CANDIDATE_REF=…` / `make candidate-record CANDIDATE_ROOT=…` | `$EVIDENCE/candidate/candidate-suite-identity.txt` |
+-| `toolchain-identity.sh` | asserts the resolved Go toolchain is exactly `go.mod`'s, with `GOTOOLCHAIN=local` and `GOENV=off` read back | run by every Go-consuming job | job log |
+-| `no-broad-suppression.sh` | rejects bare `//nolint`, bare `//#nosec`, production-path lint exclusions, wholesale disabling, and unrecorded `gosec` exclusions | `make no-broad-suppression` | job log |
+-| `gate-selftest.sh` | drives every gate above against synthetic inputs and asserts a real exit code for each negative case | `make gate-selftest` | job log |
+-| `python_protocol_golden.py` | independently decodes the closed Node/Python fixture schema, derives canonical package/capture/binding/active/diagnostic records, and rejects cross-target reuse | `python3 internal/nodesource/testdata/python_protocol_golden.py` | stdout; redirect task evidence under `.temp/` when needed |
+-| `npm` | exercises exact-tarball private-cache derivation, poisoned-ambient replay, direct Node-launched npm, scripts-disabled offline `npm ci`, and the real verified launch boundary for `npm-source-v1` | `go test -count=1 ./internal/npmsource -run 'Test(N01RealNPMCIUsesOnlyDerivedPrivateCache|VerifiedProviderObservesRealNodeLaunchedNPMBoundary)$' -v` | Go test output; task evidence may be stored under `.temp/<TASK-ID>/` |
+-| `pnpm` 10.33.0 profile harness | validates lock/importer/snapshot/peer/patch/target closure, full installed-layout ownership, protected private-store derivation, and real frozen offline replay without ambient pnpm state | `npm install --prefix .temp/pnpm-10.33.0 --no-save --ignore-scripts pnpm@10.33.0`; then `PATH="$PWD/.temp/pnpm-10.33.0/node_modules/.bin:$PATH" go test -count=1 ./internal/pnpmsource` | Task-local pnpm under `.temp/pnpm-10.33.0/`; Go test output may be stored under `.temp/<TASK-ID>/` |
+-| Yarn Classic 1.22.22 profile harness | validates closed lock/workspace/config authority, private source mirror derivation, empty-cache frozen replay, exact staged Node/Yarn launch, lifecycle/native rejection, and poisoned ambient config/cache isolation | `go test -count=1 ./internal/yarnclassicsource` | Go test output and task evidence may be stored under `.temp/<TASK-ID>/` |
+-| Modern Yarn 4.9.2 profile harness | validates lock v8, exact built-in plugins, `.yarnrc.yml`, patches, cache key/compression/checksums, linker/conditions, peer-context virtualization and PnP aliases, deterministic private ZIP cache, preseed-state isolation, lifecycle/native rejection, and immutable network-disabled skip-build replay | `npm install --prefix .temp/yarn-4.9.2 --no-save --ignore-scripts @yarnpkg/cli-dist@4.9.2`; then `CURATOR_TEST_YARN_MODERN_JS="$PWD/.temp/yarn-4.9.2/node_modules/@yarnpkg/cli-dist/bin/yarn.js" go test -count=1 ./internal/yarnmodernsource` | Task-local Yarn under `.temp/yarn-4.9.2/`; Go test output may be stored under `.temp/<TASK-ID>/` |
+-| Swift / SwiftPM | validates `swiftpm-source-v1` lock, exact pin, tree-intake, manifest permit, kind-preserving mirror, selection-neutral capture, exact binding, extension/binary rejection, and offline replay contracts; runs real protected `swift package dump-package` and forced-lock `show-dependencies` mirror replay when Swift is installed | `go test -count=1 ./internal/swiftpmsource` | Go test output; task evidence may be stored under `.temp/<TASK-ID>/` |
+-| Cross-adapter source-closure conformance | runs one normative semantic suite across Rust, npm, pnpm, Yarn Classic, modern Yarn, and SwiftPM/C-family; independently canonicalizes and hashes all 53 accepted CGP05/CGP10 records; drives the published rejection matrix; refuses an incomplete coverage matrix; and emits the committed protocol export for independent implementations | `go test -count=1 ./internal/crossconformance` | Go test output and `internal/crossconformance/testdata/cross-adapter-protocol-export.json`; task evidence may be stored under `.temp/<TASK-ID>/` |
+-
+-The module's immutable release pin (`internal/buildrepo/release_pin.go`,
+-verified by `curator-spec-pin`) is curator-spec `v1.0.0-rc.8`; CI's conformance
+-suite pin has since been promoted to the rc.9 release commit — see `SPEC_PIN`
+-in [.github/workflows/ci.yml](.github/workflows/ci.yml), which owns that
+-promotion. Aligning the module release pin to rc.9 is tracked with the
+-promotion task named there.
+-
+-The released suite is pinned to curator-spec `v1.0.0-rc.8` at commit
+-`f8c405aa3ad0a39d260c2ed93684e55c5a346359`. `curator-spec-pin` verifies the
+-suite manifest SHA-256
+-`d14e3a16bb4a01ff282791f08e3aefa269210234f41072beae6fe59b642595a1`
+-and release metadata SHA-256
+-`293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede`,
+-including the empty published implementation, platform, and conformance claim
+-sets. Run it locally with `make verify-spec-pin SPEC_PIN=f8c405aa3ad0a39d260c2ed93684e55c5a346359 CURATOR_CONFORMANCE_ROOT=/path/to/curator-spec/conformance/v1`.
+-
+-`make ci-test`, `make race` and `make check-ci` require `CURATOR_CONFORMANCE_ROOT`
+-to point at a materialised `<curator-spec>/conformance/v1`; they refuse to run
+-without it, because a gate that runs with the conformance suite unset is a
+-smaller gate wearing the same name.
+-
+-#### The compiled-build platform carve-out
+-
+-`rc5-native-control-inventory-v1` defines native control records for exactly
+-macOS and Windows, so the go-v1 driver refuses a compiled build on any other
+-host before a worker starts. That carve-out reaches the suite at two
+-granularities, and neither is a silent omission:
+-
+-* **whole package** — `internal/godriver` is not executed where the supplied
+-  root's own qualification vector marks the platform `excluded` (linux, with
+-  `until_task: TASK-260728-1skseh`). `test-gate.sh` still runs
+-  `TestProbeRejectsAnUncoveredPlatformBeforeTheWorker` on that very runner, so
+-  the exclusion is asserted rather than obeyed;
+-* **individual case** — the `cmd/curator` cases that need a *completed*
+-  compilation are carved out by `requireNativeControlInventoryPlatform`, which
+-  reads `godriver.InventoryPlatform` rather than a GOOS list, so it cannot drift
+-  from the inventory. Their skip reason names the inventory and is classified
+-  `platform-control` by `skip-classes.tsv`, and
+-  `TestCompiledInstallFollowsTheNativeControlInventoryExactly` runs on every
+-  runner to prove the boundary from whichever side that runner is on: a covered
+-  host installs and publishes exactly one protected cache entry, an uncovered
+-  host is refused with `build_execution_control_unavailable`, publishes nothing,
+-  and fails `status --check`.
+-
+-When the inventory gains a record for a platform, the guard stops skipping there
+-on its own; only `must_run_on` in `platform-cases.tsv` needs widening.
+-
+-#### Suite consumption, not suite presence
+-
+-A conformance root that publishes a family proves nothing about whether this
+-build reads it. The schema-8 impact analysis measured the difference: pinned
+-implementation jobs returned exit 0 against a schema-8 suite while consuming
+-none of it. Two tables answer the two halves, and a family needs both:
+-
+-* **presence** — [`root-artifacts.tsv`](.github/ci/root-artifacts.tsv) declares
+-  the root artefacts a package's conformance tests read without a guard. A root
+-  that stops publishing one defers that package, and `CI_REQUIRE_FULL_ROOT=1`
+-  makes the deferral fatal in the candidate lane;
+-* **consumption** — [`platform-cases.tsv`](.github/ci/platform-cases.tsv) names
+-  the case that actually reads it, on each runner. A rename, a deletion or a
+-  `-run` filter matching nothing then fails by name instead of shrinking the
+-  run.
+-
+-For schema 8 that is `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`,
+-`vectors/module-roots.json` and `vectors/script-host-execution-policy.json`,
+-consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`,
+-`internal/godriver` and `internal/scriptpolicy`.
+-
+-The committed protocol-suite pin is declared once, as `SPEC_PIN` in the workflow
+-`env:` block, and every job reads it from there. A candidate suite is
+-never committed and never a default: it enters only through the
+-`candidate-conformance` job, on an explicit `workflow_dispatch` that supplies a
+-full 40-character revision or a pre-materialised root. That job sets
+-`CI_REQUIRE_FULL_ROOT=1`, so a candidate must serve the whole package set, and
+-everything it emits is stamped in the artifact itself as candidate-only evidence
+-— neither a published release nor a conformance claim.
++Curator uses an in-repository task board in `.task-board/`. Automated gates run under `.github/ci/` and mirror `Makefile` targets; see [docs/ci-gates.md](docs/ci-gates.md) for gate definitions, evidence paths, platform carve-out rules, and suite consumption requirements.
+ 
+ ## Contributing
+ 
+-See [CONTRIBUTING.md](CONTRIBUTING.md) for the working agreements: board-first workflow, discrete signed commits, spec-first rule.
++See [CONTRIBUTING.md](CONTRIBUTING.md) for working agreements: board-first workflow, discrete signed commits, and spec-first rules.
+ 
+ ## License
+ 
+diff --git a/docs/authoring-cli-commands.md b/docs/authoring-cli-commands.md
+new file mode 100644
+index 00000000..08de0795
+--- /dev/null
++++ b/docs/authoring-cli-commands.md
+@@ -0,0 +1,245 @@
++# Authoring CLI Commands for Skills
++
++Skill authors can deliver CLI utilities alongside skill instructions. Curator manages the build process, source isolation, runtime storage, and executable shims in project environments.
++
++## Command placement options
++
++You can place command source code in two distinct locations based on project structure and ownership.
++
++### Embedded build roots
++
++Embedded build roots store source code directly inside the skill package repository. You declare relative directory paths under the `build_roots` array in `agent-skill.json`.
++
++Embedded placement fits single-repository skills where the CLI utility is developed and versioned together with the skill instructions.
++
++### External build repositories
++
++External build repositories store source code in a separate Git repository. You declare repository sources under the `build_repositories` map in `agent-skill.json`.
++
++External placement fits multi-repository projects where CLI tools live in upstream repositories, are shared across multiple skills, or require separate versioning and access controls.
++
++## Per-language admission matrix
++
++Curator validates and builds CLI commands against explicit language driver contracts defined in `internal/godriver/` and `internal/skillspec/`.
++
++### The `go-v1` and `go-repository-v1` compiled build drivers
++
++Curator supports compiled builds through two closed driver identities: `go-v1` (for embedded build roots) and `go-repository-v1` (for external build repositories). They are currently the only compiled build drivers implemented in Curator.
++
++```json
++{
++  "type": "build",
++  "driver": "go-v1",
++  "source_dir": "src/cmd/mytool"
++}
++```
++
++The driver enforces strict compilation constraints before and during execution:
++
++- **Vendored dependencies**: Builds enforce `-mod=vendor`. Source trees must include a valid `vendor/modules.txt` file when third-party modules exist. Network access is disabled during compilation.
++- **Closed build parameters**: Argument vectors are hardcoded in `internal/godriver/build.go`. Custom build flags, linker flags (`ldflags`), compiler flags (`gcflags`), environment overrides, or hook scripts in `agent-skill.json` are rejected with `build_execution_package_influence_forbidden`.
++- **Cgo prohibition**: Active cgo inputs are rejected with `cgo_required`. C, C++, Objective-C, Header, Fortran, and Swig source files in non-standard packages are rejected with `go_native_input_forbidden`.
++- **PGO prohibition**: Profile-guided optimization files (`default.pgo`) are rejected with `go_pgo_forbidden`.
++- **Code generator prohibition**: Source generator directives (`//go:generate`) outside third-party vendor directories are rejected with `go_generator_forbidden`. Compiler directives such as `//go:cgo_import_dynamic` are rejected with `go_forbidden_compiler_directive`.
++- **Test file prohibition**: Test packages and test source files selected during build graph analysis are rejected with `go_test_input_forbidden`.
++- **Assembly file constraints**: Non-standard assembly files (`.s`) outside third-party vendor directories or inside replaced modules are rejected with `go_assembly_forbidden`.
++- **External linking prohibition**: Builds enforce internal linking (`-ldflags=-linkmode=internal -libgcc=none`). Linker modes requiring host external linkers are rejected with `external_link_forbidden`, and host linker fallbacks are rejected with `libgcc_fallback_forbidden`.
++- **Toolchain switching prohibition**: Directives requesting another toolchain version in `go.mod` are rejected with `toolchain_switch_forbidden`.
++- **Workspace prohibition**: The presence of `go.work` files inside the build root is rejected with `workspace_dependency_forbidden`.
++- **Platform support**: Compilation is supported on macOS (`darwin`) and Windows (`windows`). On Linux (`linux`) and other unsupported platforms, Curator refuses execution before worker launch with `build_execution_control_unavailable` because native execution control records are defined only for macOS and Windows.
++
++## Script commands
++
++Script commands run interpreted source files directly without a compilation step.
++
++```json
++{
++  "type": "script",
++  "unix_path": "scripts/run.sh",
++  "win_path": "scripts/run.cmd"
++}
++```
++
++Curator resolves script commands into executable shims during installation:
++
++- **Admitted interpreters**: Schema 8 script specifications admit `node-v1` and `python3-v1` in `internal/skillspec/types.go`. Every shell identifier (such as `bash` or `sh`) is deliberately absent from `ScriptInterpreters`; admitting a shell interpreter is a specification revision, not a manager configuration option.
++- **Mutual requirement for execution policy and interpreter**: In schema 8, `execution_policy` and `interpreter` are mutually required (`internal/skillspec/parse.go`). Specifying one without the other triggers validation error `requires 'execution_policy'` or `requires 'interpreter'`.
++- **Executable shim resolution**: `curator install` generates shims in `.agents/bin/`. On POSIX systems, when project path entries are present, shims use `#!/bin/sh` with `exec` to prepend path entries to `PATH` and replace the launcher process with the target executable. When no path entries are required, `curator install` creates a relative symlink instead (`runtimestore.WriteBinShim`). On Windows systems, shims generate `.cmd` batch scripts with double-expansion escaping.
++- **Target resolution contract**: Executables sit in Curator's manager runtime store (`$HOME/.curator/runtime/<skill>/<commit>/...`) for script files, or in the local build cache (`$HOME/.curator/cache/build/<driver>/<hash>`) / build artifact store for compiled binaries.
++- **Enforced script policy**: Schema 8 manifests permit `execution_policy: "script-worker-v1"`. Curator validates manifest syntax but `scriptpolicy.Admit()` refuses installation with diagnostic `script_execution_policy_unsupported`: "this manager does not implement script-worker-v1, and the policy forbids installing the command declared-only, downgrading it, or ignoring the field". Curator currently lacks a script worker process; per specification, a manager without script-worker support rejects the command rather than installing it declared-only.
++
++## Worked examples
++
++The following minimal examples demonstrate valid configurations for each supported command path.
++
++### Example 1: Embedded `go-v1` skill
++
++An embedded Go skill includes build source code inside its repository tree.
++
++Create `agent-skill.json`:
++
++```json
++{
++  "schema_version": 6,
++  "capabilities": {},
++  "build_roots": [
++    "src"
++  ],
++  "commands": {
++    "mytool": {
++      "type": "build",
++      "driver": "go-v1",
++      "source_dir": "src/cmd/mytool"
++    }
++  }
++}
++```
++
++The manifest declares `src` as a build root and `src/cmd/mytool` as the command source directory.
++
++Directory layout:
++
++```text
++embedded_go/
++├── SKILL.md
++├── agent-skill.json
++└── src/
++    ├── go.mod
++    ├── vendor/
++    │   └── modules.txt
++    └── cmd/
++        └── mytool/
++            └── main.go
++```
++
++The directory tree separates skill metadata from Go source code.
++
++Execution target contract:
++
++`curator install` creates an executable entry point shim in `.agents/bin/mytool` pointing to the compiled binary in Curator's local build cache (`$HOME/.curator/cache/build/go-v1/<hash>`). The launcher forwards command-line arguments to the content-addressed binary.
++
++Run `curator skill check` to validate the skill package:
++
++```bash
++curator skill check ./embedded_go
++```
++
++The check verifies manifest fields, build root paths, and prompt-visible instructions.
++
++### Example 2: External `go-repository-v1` skill
++
++An external Go skill references a separate Git repository for build source code.
++
++Create `agent-skill.json`:
++
++```json
++{
++  "schema_version": 7,
++  "capabilities": {},
++  "build_repositories": {
++    "remote_tool": {
++      "git": "https://github.com/example/remote-tool.git",
++      "locked_commit": {
++        "object_format": "sha1",
++        "hex": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
++      }
++    }
++  },
++  "commands": {
++    "remote_cmd": {
++      "type": "build",
++      "driver": "go-repository-v1",
++      "repository": "remote_tool",
++      "target": "remote_cmd"
++    }
++  }
++}
++```
++
++Locked commits require exact SHA-1 or SHA-256 commit hashes. Including the `.git` suffix in HTTPS repository URLs is recommended operational advice to prevent HTTP 301 redirects, which Curator's protected fetch rejects (the parser itself trims `.git` for identity derivation in `internal/buildrepo/buildrepo.go`).
++
++> [!NOTE]
++> Operators configure credentials for private external build repositories using `curator config build-ssh` or `curator config build-https`. For details on authentication sources, transport rules, and HTTP redirect constraints, see [docs/build-ssh.md](build-ssh.md) and [docs/build-https.md](build-https.md).
++
++Directory layout:
++
++```text
++external_go_repo/
++├── SKILL.md
++└── agent-skill.json
++```
++
++The skill package contains only manifest and instruction files; source code is fetched from the external repository.
++
++Execution target contract:
++
++`curator install` creates an executable launcher in `.agents/bin/remote_cmd` pointing to the compiled binary in Curator's build repository artifact store (`$HOME/.curator/cache/build_repositories/.../artifacts/<hash>/artifact`).
++
++Run `curator skill check` to validate the skill package:
++
++```bash
++curator skill check ./external_go_repo
++```
++
++The check confirms repository syntax, locked commit formatting, and target selections.
++
++### Example 3: Script-command skill
++
++A script-command skill exposes interpreted scripts directly.
++
++Create `agent-skill.json`:
++
++```json
++{
++  "schema_version": 2,
++  "runtime_roots": [
++    "scripts"
++  ],
++  "commands": {
++    "run-script": {
++      "type": "script",
++      "unix_path": "scripts/run.sh",
++      "win_path": "scripts/run.cmd"
++    }
++  }
++}
++```
++
++The manifest lists `scripts` under `runtime_roots` and defines POSIX and Windows script entry points.
++
++Directory layout:
++
++```text
++script_skill/
++├── SKILL.md
++├── agent-skill.json
++└── scripts/
++    ├── run.sh
++    └── run.cmd
++```
++
++Script files sit inside declared runtime root directories.
++
++Execution target contract:
++
++`curator install` creates an executable launcher in `.agents/bin/run-script` pointing to the target script stored in Curator's runtime store (`$HOME/.curator/runtime/<skill>/<commit>/scripts/run.sh`).
++
++Run `curator skill check` to validate the skill package:
++
++```bash
++curator skill check ./script_skill
++```
++
++The check verifies that script paths reside within declared runtime roots.
++
++## Planned language drivers
++
++Drivers for Kotlin (`kotlin-native-v1`, `kotlin-native-repository-v1`), Swift (`swift-v1`, `swift-repository-v1`), and Rust (`rust-v1`, `rust-repository-v1`) represent reserved driver identities in specification records, but are planned board work and not currently shipped or admitted by Curator. Reservation of a driver identity is explicitly not admission.
++
++A manifest declaring any of these planned drivers today fails validation during manifest parsing in `internal/skillspec/parse.go`. For example, specifying `driver: "kotlin-native-v1"` yields:
++
++```text
++error: skill.manifest_invalid (agent-skill.json): commands.<name>.driver: must be 'go-v1' or 'go-repository-v1'
++```
++
++Curator rejects invalid driver declarations before starting build execution or fetching repository sources.
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+index 792794e0..5be12233 100644
+--- a/docs/ci-gates.md
++++ b/docs/ci-gates.md
+@@ -1,38 +1,51 @@
+ # CI Gates and Tooling
+ 
+-Every gate below is a script under `.github/ci/`, called directly by [.github/workflows/ci.yml](.github/workflows/ci.yml) and mirrored by a `make` target for local use. CI calls the scripts directly because `make` is not guaranteed on Windows runners. Each gate writes its raw stream and report under `EVIDENCE` (default `.temp/ci-evidence/`). CI uploads these artifacts per runner, allowing verification against the run that produced them.
++Every gate below is a script under `.github/ci/`, called directly by [../.github/workflows/ci.yml](../.github/workflows/ci.yml) and mirrored by a `make` target for local use. CI calls the scripts directly because `make` is not guaranteed on Windows runners. Each gate writes its raw stream and report under `EVIDENCE` (default `.temp/ci-evidence/`). CI uploads these artifacts per runner, allowing verification against the run that produced them.
+ 
+ | Tool | What it gates | How to run it | Where its output goes |
+ | --- | --- | --- | --- |
+ | `test-gate.sh` | plans the run from the supplied conformance root, executes it, then enforces the platform-case ledger; every status is fatal | `make ci-test` | `$EVIDENCE/test/` (including `go-test*.json`, `suite-plan.txt`, `platform-cases.txt`, `skips-observed.tsv`) |
+ | `test-gate.sh` (`-race`) | the same gate under the race detector | `make race` | `$EVIDENCE/race/` |
+ | `suite-plan.sh` | decides, from the root alone, which packages it serves, which it cannot, and which this platform does not qualify | called by `test-gate.sh` | `$EVIDENCE/*/suite-plan.txt`, `plan-*.txt` |
+-| `platform-case-gate.sh` | requires every case [`platform-cases.tsv`](.github/ci/platform-cases.tsv) names on this runner, and classifies every skip against [`skip-classes.tsv`](.github/ci/skip-classes.tsv) | called by `test-gate.sh` | `$EVIDENCE/*/platform-cases.txt`, `skips-observed.tsv` |
++| `platform-case-gate.sh` | requires every case [`platform-cases.tsv`](../.github/ci/platform-cases.tsv) names on this runner, and classifies every skip against [`skip-classes.tsv`](../.github/ci/skip-classes.tsv) | called by `test-gate.sh` | `$EVIDENCE/*/platform-cases.txt`, `skips-observed.tsv` |
+ | `ledger-consistency.sh` | proves each ledger row against the real per-GOOS builds via `go list` without requiring a runner | `make ledger-check` | `$EVIDENCE/ledger/ledger-consistency.txt` |
+-| `excluded-packages.sh` | resolves which packages a platform does not execute and records the authorizing task | called by `test-gate.sh` and `platform-case-gate.sh` | stdout (TSV) |
++| `excluded-packages.sh` | single implementation resolving which packages a platform does not execute and recording the authorizing task | called by `suite-plan.sh` and `ledger-consistency.sh` | stdout (TSV) |
+ | `candidate-suite.sh` | rejects non-immutable candidate revisions and records candidate root identities as candidate-only evidence | `make candidate-verify-ref CANDIDATE_REF=...` or `make candidate-record CANDIDATE_ROOT=...` | `$EVIDENCE/candidate/candidate-suite-identity.txt` |
+ | `toolchain-identity.sh` | asserts the resolved Go toolchain matches `go.mod` exactly, with `GOTOOLCHAIN=local` and `GOENV=off` read back | run by every Go-consuming job | job log |
+ | `no-broad-suppression.sh` | rejects bare `//nolint`, bare `//#nosec`, production-path lint exclusions, wholesale disabling, and unrecorded `gosec` exclusions | `make no-broad-suppression` | job log |
+ | `gate-selftest.sh` | drives every gate above against synthetic inputs and asserts real exit codes for negative cases | `make gate-selftest` | job log |
++| `python_protocol_golden.py` | independently decodes the closed Node/Python fixture schema, derives canonical package/capture/binding/active/diagnostic records, and rejects cross-target reuse | `python3 internal/nodesource/testdata/python_protocol_golden.py` | stdout; redirect task evidence under `.temp/` when needed |
++| `npm` profile harness | exercises exact-tarball private-cache derivation, poisoned-ambient replay, direct Node-launched npm, scripts-disabled offline `npm ci`, and the real verified launch boundary for `npm-source-v1` | `go test -count=1 ./internal/npmsource -run 'Test(N01RealNPMCIUsesOnlyDerivedPrivateCache|VerifiedProviderObservesRealNodeLaunchedNPMBoundary)$' -v` | Go test output; task evidence under `.temp/<TASK-ID>/` |
++| `pnpm` 10.33.0 profile harness | validates lock/importer/snapshot/peer/patch/target closure, full installed-layout ownership, protected private-store derivation, and real frozen offline replay without ambient pnpm state | `npm install --prefix .temp/pnpm-10.33.0 --no-save --ignore-scripts pnpm@10.33.0`; then `PATH="$PWD/.temp/pnpm-10.33.0/node_modules/.bin:$PATH" go test -count=1 ./internal/pnpmsource` | Task-local pnpm under `.temp/pnpm-10.33.0/`; Go test output may be stored under `.temp/<TASK-ID>/` |
++| Yarn Classic 1.22.22 profile harness | validates closed lock/workspace/config authority, private source mirror derivation, empty-cache frozen replay, exact staged Node/Yarn launch, lifecycle/native rejection, and poisoned ambient config/cache isolation | `go test -count=1 ./internal/yarnclassicsource` | Go test output and task evidence may be stored under `.temp/<TASK-ID>/` |
++| Modern Yarn 4.9.2 profile harness | validates lock v8, exact built-in plugins, `.yarnrc.yml`, patches, cache key/compression/checksums, linker/conditions, peer-context virtualization and PnP aliases, deterministic private ZIP cache, preseed-state isolation, lifecycle/native rejection, and immutable network-disabled skip-build replay | `npm install --prefix .temp/yarn-4.9.2 --no-save --ignore-scripts @yarnpkg/cli-dist@4.9.2`; then `CURATOR_TEST_YARN_MODERN_JS="$PWD/.temp/yarn-4.9.2/node_modules/@yarnpkg/cli-dist/bin/yarn.js" go test -count=1 ./internal/yarnmodernsource` | Task-local Yarn under `.temp/yarn-4.9.2/`; Go test output may be stored under `.temp/<TASK-ID>/` |
++| Swift / SwiftPM | validates `swiftpm-source-v1` lock, exact pin, tree-intake, manifest permit, kind-preserving mirror, selection-neutral capture, exact binding, extension/binary rejection, and offline replay contracts; runs real protected `swift package dump-package` and forced-lock `show-dependencies` mirror replay when Swift is installed | `go test -count=1 ./internal/swiftpmsource` | Go test output; task evidence may be stored under `.temp/<TASK-ID>/` |
++| Cross-adapter source-closure conformance | runs one normative semantic suite across Rust, npm, pnpm, Yarn Classic, modern Yarn, and SwiftPM/C-family; independently canonicalizes and hashes all 53 accepted CGP05/CGP10 records; drives the published rejection matrix; refuses an incomplete coverage matrix; and emits the committed protocol export for independent implementations | `go test -count=1 ./internal/crossconformance` | Go test output and `internal/crossconformance/testdata/cross-adapter-protocol-export.json`; task evidence may be stored under `.temp/<TASK-ID>/` |
+ 
+ Executing `make ci-test`, `make race`, and `make check-ci` requires setting `CURATOR_CONFORMANCE_ROOT` to a materialized `<curator-spec>/conformance/v1` directory. The Makefile targets refuse execution without this variable set, preventing unconfigured runs.
+ 
++## Protocol-suite pin and verification
++
++The module's immutable release pin ([`internal/buildrepo/release_pin.go`](../internal/buildrepo/release_pin.go), verified by `curator-spec-pin`) is curator-spec `v1.0.0-rc.8`; CI's conformance suite pin has since been promoted to the rc.9 release commit — see `SPEC_PIN` in [../.github/workflows/ci.yml](../.github/workflows/ci.yml), which owns that promotion. Aligning the module release pin to rc.9 is tracked with the promotion task named there.
++
++The released suite is pinned to curator-spec `v1.0.0-rc.8` at commit `f8c405aa3ad0a39d260c2ed93684e55c5a346359`. `curator-spec-pin` verifies the suite manifest SHA-256 `d14e3a16bb4a01ff282791f08e3aefa269210234f41072beae6fe59b642595a1` and release metadata SHA-256 `293f101d10665061aa049efa72141f9e3c5d608bbde300e882f6e3e095e31ede`, including the empty published implementation, platform, and conformance claim sets. Run it locally with `make verify-spec-pin SPEC_PIN=f8c405aa3ad0a39d260c2ed93684e55c5a346359 CURATOR_CONFORMANCE_ROOT=/path/to/curator-spec/conformance/v1`.
++
+ ## The compiled-build platform carve-out
+ 
+ The `rc5-native-control-inventory-v1` vector defines native control records exclusively for macOS and Windows. The `go-v1` driver refuses compiled builds on any other host before starting a worker process. This carve-out applies at two granularities:
+ 
+ - **Whole package**: `internal/godriver` is not executed where the root qualification vector marks the platform excluded (such as Linux, noted under `until_task: TASK-260728-1skseh`). `test-gate.sh` executes `TestProbeRejectsAnUncoveredPlatformBeforeTheWorker` on that runner to assert the exclusion boundary.
+-- **Individual case**: Commands in `cmd/curator` that require completed compilation use `requireNativeControlInventoryPlatform` to read `godriver.InventoryPlatform`. Skips are logged with the reason `platform-control` in `skip-classes.tsv`. `TestCompiledInstallFollowsTheNativeControlInventoryExactly` runs on every runner to verify the boundary state. Covered hosts execute and publish protected cache entries; uncovered hosts report `build_execution_control_unavailable`, publish nothing, and return non-zero exit codes for `curator status --check`.
++- **Individual case**: Commands in `cmd/curator` that require completed compilation use `requireNativeControlInventoryPlatform` to read `godriver.InventoryPlatform`. Skips log the inventory reason, classified under `platform-control` in [`skip-classes.tsv`](../.github/ci/skip-classes.tsv). `TestCompiledInstallFollowsTheNativeControlInventoryExactly` runs on every runner to verify the boundary state. Covered hosts execute and publish protected cache entries; uncovered hosts report `build_execution_control_unavailable`, publish nothing, and return non-zero exit codes for `curator status --check`.
+ 
+-When the inventory gains a record for a platform, the guard stops skipping automatically. Only `must_run_on` in `platform-cases.tsv` requires updating.
++When the inventory gains a record for a platform, the guard stops skipping automatically. Only `must_run_on` in [`platform-cases.tsv`](../.github/ci/platform-cases.tsv) requires updating.
+ 
+ ## Suite consumption, not suite presence
+ 
+ Publishing a family in a conformance root does not prove that a build reads it. Analysis showed that pinned implementation jobs returned exit 0 against a schema-8 suite while consuming none of it. Two tables resolve both aspects:
+ 
+-- **Presence**: [`root-artifacts.tsv`](.github/ci/root-artifacts.tsv) declares root artifacts read by a package conformance test without guards. If a root stops publishing an artifact, the package defers testing. Setting `CI_REQUIRE_FULL_ROOT=1` makes deferrals fatal in candidate verification lanes.
+-- **Consumption**: [`platform-cases.tsv`](.github/ci/platform-cases.tsv) specifies cases that read each artifact per runner. Renames, deletions, or unmatched `-run` filters trigger named failures rather than silent test suite reductions.
++- **Presence**: [`root-artifacts.tsv`](../.github/ci/root-artifacts.tsv) declares root artifacts read by a package conformance test without guards. If a root stops publishing an artifact, the package defers testing. Setting `CI_REQUIRE_FULL_ROOT=1` makes deferrals fatal in candidate verification lanes.
++- **Consumption**: [`platform-cases.tsv`](../.github/ci/platform-cases.tsv) specifies cases that read each artifact per runner. Renames, deletions, or unmatched `-run` filters trigger named failures rather than silent test suite reductions.
+ 
+ For schema 8, artifacts include `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`, `vectors/module-roots.json`, and `vectors/script-host-execution-policy.json`. These are consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`, `internal/godriver`, and `internal/scriptpolicy`.
+ 
+-The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:` block. Candidate suites enter via the `candidate-conformance` workflow on explicit `workflow_dispatch` calls supplying a full 40-character revision or materialized root. That job sets `CI_REQUIRE_FULL_ROOT=1` to enforce complete package coverage, and emitted artifacts are stamped as candidate-only evidence.
++The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:` block. Candidate suites enter via the `candidate-conformance` workflow on explicit `workflow_dispatch` calls supplying a full 40-character revision or materialized root. That job sets `CI_REQUIRE_FULL_ROOT=1` to enforce complete package coverage, and emitted artifacts are stamped as candidate-only evidence, proving neither a published release nor a conformance claim.
+diff --git a/docs/cli.md b/docs/cli.md
+new file mode 100644
+index 00000000..de692bc8
+--- /dev/null
++++ b/docs/cli.md
+@@ -0,0 +1,727 @@
++# Curator CLI Reference
++
++Every synopsis and flag in this reference was verified verbatim against `./bin/curator` built via `make build` from the repository tree.
++
++## Shared flags
++
++Curator flags use consistent names and behavior across command groups.
++
++- `--all`: operate on all configured projects.
++- `--audit`: run the audit gate in advisory or strict mode.
++- `--dry-run`: plan work without modifying files.
++- `--check`: exit non-zero unless every skill or compiled command is up to date.
++- `--json`: format status, audit, or validation output as machine-readable JSON.
++- `--branch string`: set git branch for skill repositories.
++- `--git string`: set git clone URL for skill repositories.
++- `--project string`: project alias or path.
++- `--revision string`: set git revision for skill repositories.
++- `--tag string`: set git tag for skill repositories.
++- `--source string`: set source directory under `skills_root`.
++
++## Environment initialization and skill lifecycle
++
++### curator bootstrap
++
++`curator bootstrap` creates machine configuration and default directories.
++
++Synopsis:
++
++```bash
++curator bootstrap [flags]
++```
++
++Flags:
++
++- `--default-agents string`: comma-separated default agents (default: `codex_cli`).
++- `--force`: overwrite an existing configuration.
++- `--if-missing`: create configuration only when absent.
++- `--non-interactive`: fail instead of prompting for missing values.
++- `--preferred-locale string`: preferred locale setting.
++- `--skills-root string`: directory containing skill repositories.
++
++Run bootstrap to create missing machine configuration:
++
++```bash
++curator bootstrap --if-missing --non-interactive
++```
++
++The command initializes `$HOME/.curator/config.json` without overwriting existing files.
++
++### curator init
++
++`curator init` initializes project declarative files in the specified directory.
++
++Synopsis:
++
++```bash
++curator init [path]
++```
++
++Run init in the current directory:
++
++```bash
++curator init .
++```
++
++The command creates `Skillfile.json` and appends managed entries to `.gitignore`.
++
++### curator add
++
++`curator add` adds or replaces a skill declaration, then installs the skill package.
++
++Synopsis:
++
++```bash
++curator add <name> [options]
++```
++
++Flags:
++
++- `--branch string`: git branch.
++- `--git string`: git clone URL.
++- `--project string`: project alias or path.
++- `--revision string`: git revision.
++- `--source string`: source directory under `skills_root`.
++- `--tag string`: git tag.
++
++Add a skill package from a git clone URL:
++
++```bash
++curator add helper --git https://github.com/example/helper.git --tag v1.0.0
++```
++
++The command updates `Skillfile.json` and installs the skill package into `.agents/skills/`.
++
++### curator remove
++
++`curator remove` removes a skill declaration from the project.
++
++Synopsis:
++
++```bash
++curator remove <name> [path]
++```
++
++Flags:
++
++- `--project string`: project alias or path.
++
++Remove a declared skill:
++
++```bash
++curator remove helper
++```
++
++The command updates `Skillfile.json` and removes the installed skill directory.
++
++### curator install
++
++`curator install` applies `Skillfile.json` and materializes project dependencies.
++
++Synopsis:
++
++```bash
++curator install [path] [flags]
++```
++
++Flags:
++
++- `--all`: operate on all configured projects.
++- `--audit`: run the audit gate in advisory or strict mode.
++- `--build-ssh-agent string`: agent socket for external SSH build repositories, or `auto` for environment agent (or `CURATOR_BUILD_SSH_AGENT`).
++- `--build-ssh-identity string`: identity file for external SSH build repositories (or `CURATOR_BUILD_SSH_IDENTITY`).
++- `--build-ssh-known-hosts string`: host keys external SSH build repositories are verified against (or `CURATOR_BUILD_SSH_KNOWN_HOSTS`).
++- `--dry-run`: plan work without modifying files.
++- `--fix-gitignore`: append missing managed gitignore entries.
++- `--strict-tags`: fail if an installed tag moved to another commit.
++- `--verbose`: print detailed progress.
++
++Run install in dry-run mode:
++
++```bash
++curator install --dry-run
++```
++
++The command prints planned installation steps without modifying disk files.
++
++### curator update
++
++`curator update` fetches all source repositories under `skills_root`.
++
++Synopsis:
++
++```bash
++curator update
++```
++
++Run update across source repositories:
++
++```bash
++curator update
++```
++
++The command refreshes git repositories stored in the manager source root.
++
++### curator upgrade
++
++`curator upgrade` fetches the selected dependency closure and installs updated skill packages.
++
++Synopsis:
++
++```bash
++curator upgrade [path] [flags]
++```
++
++Flags:
++
++- `--all`: operate on all configured projects.
++- `--audit`: run the audit gate in advisory or strict mode.
++- `--build-ssh-agent string`: agent socket for external SSH build repositories, or `auto` for environment agent (or `CURATOR_BUILD_SSH_AGENT`).
++- `--build-ssh-identity string`: identity file for external SSH build repositories (or `CURATOR_BUILD_SSH_IDENTITY`).
++- `--build-ssh-known-hosts string`: host keys external SSH build repositories are verified against (or `CURATOR_BUILD_SSH_KNOWN_HOSTS`).
++- `--dry-run`: plan work without modifying files.
++- `--fix-gitignore`: append missing managed gitignore entries.
++- `--strict-tags`: fail if an installed tag moved to another commit.
++- `--verbose`: print detailed progress.
++
++Upgrade project dependencies:
++
++```bash
++curator upgrade .
++```
++
++The command resolves updated revisions, updates `Skillfile.lock`, and materializes skill packages.
++
++### curator status
++
++`curator status` displays manifest, installed, and compiled command states.
++
++Synopsis:
++
++```bash
++curator status [path] [flags]
++```
++
++Flags:
++
++- `--all`: operate on all configured projects.
++- `--attest`: re-check installed skills against trusted registries.
++- `--check`: exit non-zero unless every skill is up to date.
++- `--json`: machine-readable output.
++
++Check project status in JSON format:
++
++```bash
++curator status --json
++```
++
++The command prints status diagnostics for declared skills and compiled commands.
++
++### curator list
++
++`curator list` lists configured projects and declared skills.
++
++Synopsis:
++
++```bash
++curator list
++```
++
++List configured projects and declared skills:
++
++```bash
++curator list
++```
++
++The command displays project skills and their configured source revisions across all configured projects.
++
++## Project subcommands
++
++### curator project add
++
++`curator project add` registers a new project alias and path in the machine configuration and initializes `Skillfile.json` and `.gitignore`.
++
++Synopsis:
++
++```bash
++curator project add <alias> <path> [flags]
++```
++
++Flags:
++
++- `--agents string`: comma-separated target agents.
++
++Add a new project mapping:
++
++```bash
++curator project add myproject ./myproject --agents codex_cli
++```
++
++The command registers the project mapping and creates the initial project manifest and `.gitignore` file.
++
++### curator project resolve
++
++`curator project resolve` resolves transitive dependencies for a project closure.
++
++Synopsis:
++
++```bash
++curator project resolve [path]
++```
++
++Resolve project dependencies:
++
++```bash
++curator project resolve .
++```
++
++The command updates `Skillfile.lock` with resolved dependency commits and content hashes.
++
++## Skill package validation
++
++### curator skill check
++
++`curator skill check` validates a skill package directory against schema specifications.
++
++Synopsis:
++
++```bash
++curator skill check <dir> [flags]
++```
++
++Flags:
++
++- `--locale string`: validate against a locale.
++- `--json`: output JSON.
++
++Validate a local skill package directory:
++
++```bash
++curator skill check ./my-skill --json
++```
++
++The command verifies manifest schema conformance and prints validation errors.
++
++## Global scope
++
++Global commands manage machine-wide skill installations shared across projects.
++
++### curator global init
++
++Synopsis:
++
++```bash
++curator global init
++```
++
++Initialize global configuration:
++
++```bash
++curator global init
++```
++
++The command creates global configuration files under the Curator home directory.
++
++### curator global add
++
++Synopsis:
++
++```bash
++curator global add <name> [options]
++```
++
++Options:
++
++- `--branch string`: git branch.
++- `--git string`: git clone URL.
++- `--revision string`: git revision.
++- `--source string`: source directory under `skills_root`.
++- `--tag string`: git tag.
++
++Add a global skill declaration:
++
++```bash
++curator global add helper --git https://github.com/example/helper.git
++```
++
++The command records the declaration in global configuration and installs the skill.
++
++### curator global remove
++
++Synopsis:
++
++```bash
++curator global remove <name>
++```
++
++Remove a global skill declaration:
++
++```bash
++curator global remove helper
++```
++
++The command removes the global skill declaration and deletes installed files.
++
++### curator global list
++
++Synopsis:
++
++```bash
++curator global list
++```
++
++List installed global skills:
++
++```bash
++curator global list
++```
++
++The command prints declared global skills and their installed revisions.
++
++### curator global status
++
++Synopsis:
++
++```bash
++curator global status [flags]
++```
++
++Flags:
++
++- `--check`: exit non-zero unless every skill is up to date.
++- `--json`: machine-readable output.
++
++Check global scope status:
++
++```bash
++curator global status --check
++```
++
++The command validates global skill installations and exits non-zero on drift.
++
++### curator global install
++
++Synopsis:
++
++```bash
++curator global install [flags]
++```
++
++Flags:
++
++- `--audit`: run the audit gate in advisory or strict mode.
++- `--build-ssh-agent string`: agent socket for external SSH build repositories, or `auto` for environment agent (or `CURATOR_BUILD_SSH_AGENT`).
++- `--build-ssh-identity string`: identity file for external SSH build repositories (or `CURATOR_BUILD_SSH_IDENTITY`).
++- `--build-ssh-known-hosts string`: host keys external SSH build repositories are verified against (or `CURATOR_BUILD_SSH_KNOWN_HOSTS`).
++- `--dry-run`: plan work without modifying files.
++- `--fix-gitignore`: append missing managed gitignore entries.
++- `--strict-tags`: fail if an installed tag moved to another commit.
++- `--verbose`: print detailed progress.
++
++Install global skills:
++
++```bash
++curator global install
++```
++
++The command materializes global skills into the machine home store.
++
++### curator global update
++
++Synopsis:
++
++```bash
++curator global update
++```
++
++Update global source repositories:
++
++```bash
++curator global update
++```
++
++The command fetches latest remote state for global skill repositories.
++
++### curator global upgrade
++
++Synopsis:
++
++```bash
++curator global upgrade [flags]
++```
++
++Flags:
++
++- `--audit`: run the audit gate in advisory or strict mode.
++- `--build-ssh-agent string`: agent socket for external SSH build repositories, or `auto` for environment agent (or `CURATOR_BUILD_SSH_AGENT`).
++- `--build-ssh-identity string`: identity file for external SSH build repositories (or `CURATOR_BUILD_SSH_IDENTITY`).
++- `--build-ssh-known-hosts string`: host keys external SSH build repositories are verified against (or `CURATOR_BUILD_SSH_KNOWN_HOSTS`).
++- `--dry-run`: plan work without modifying files.
++- `--fix-gitignore`: append missing managed gitignore entries.
++- `--strict-tags`: fail if an installed tag moved to another commit.
++- `--verbose`: print detailed progress.
++
++Upgrade global skill packages:
++
++```bash
++curator global upgrade
++```
++
++The command resolves updated revisions for global skills and installs them.
++
++## Hybrid scope
++
++Hybrid commands manage machine-stored skills activated per project.
++
++### curator hybrid add
++
++Synopsis:
++
++```bash
++curator hybrid add <name> [options]
++```
++
++Options:
++
++- `--branch string`: git branch.
++- `--git string`: git clone URL.
++- `--revision string`: git revision.
++- `--tag string`: git tag.
++- `--target string`: target alias, absolute path, or glob.
++- `--targets string`: comma-separated targets (alias, absolute path, or glob).
++
++Add a hybrid skill declaration:
++
++```bash
++curator hybrid add helper --git https://github.com/example/helper.git --target project-a
++```
++
++The command stores the skill package in machine storage for selective activation.
++
++### curator hybrid remove
++
++Synopsis:
++
++```bash
++curator hybrid remove <name>
++```
++
++Remove a hybrid skill declaration:
++
++```bash
++curator hybrid remove helper
++```
++
++The command removes the hybrid skill from machine storage.
++
++### curator hybrid list
++
++Synopsis:
++
++```bash
++curator hybrid list
++```
++
++List hybrid skills:
++
++```bash
++curator hybrid list
++```
++
++The command displays stored hybrid skills and activation targets.
++
++### curator hybrid status
++
++Synopsis:
++
++```bash
++curator hybrid status
++```
++
++Check hybrid state status:
++
++```bash
++curator hybrid status
++```
++
++The command reports status (`installed`, `content-drift`, or `not-installed`) for declared hybrid skills across project targets.
++
++## Audit and security
++
++### curator audit
++
++`curator audit` runs security audits, pins trust, or publishes signed audit records.
++
++Synopsis:
++
++```bash
++curator audit [target] [flags]
++```
++
++Flags:
++
++- `--all`: audit all configured projects and global skills.
++- `--allow string`: pin trust for a content hash.
++- `--global`: audit global skills.
++- `--json`: machine-readable output.
++- `--publish string`: signed audit record (JSON file) to submit.
++- `--reason string`: reason for `--allow`.
++- `--registry string`: registry base URL for `--publish`.
++- `--token string`: auditor token for `--publish` (or `CURATOR_REGISTRY_TOKEN`).
++
++Run audit check on current project:
++
++```bash
++curator audit --all --json
++```
++
++The command evaluates security policies and fails if unvetted code is detected.
++
++## Maintenance and shell integration
++
++### curator gc
++
++`curator gc` sweeps unreferenced runtime store entries and compiled build cache artifacts.
++
++Synopsis:
++
++```bash
++curator gc
++```
++
++Run garbage collection pass:
++
++```bash
++curator gc
++```
++
++The command acquires the manager home lock and removes unreferenced artifacts older than 24 hours.
++
++### curator shell-init
++
++`curator shell-init` prints or installs shell integration hooks.
++
++Synopsis:
++
++```bash
++curator shell-init [shell] [flags]
++```
++
++Flags:
++
++- `--install`: cache the hook and print its optional profile source command.
++- `--no-global`: skip global env sourcing.
++
++Print zsh integration hook:
++
++```bash
++curator shell-init zsh --install
++```
++
++The command outputs shell code for environment auto-switching.
++
++### curator ui
++
++`curator ui` opens an interactive terminal view over installed environment state.
++
++Synopsis:
++
++```bash
++curator ui
++```
++
++Launch terminal interface:
++
++```bash
++curator ui
++```
++
++The command displays interactive status dashboards for project skills.
++
++## Operator configuration
++
++### curator config show
++
++Synopsis:
++
++```bash
++curator config show
++```
++
++Display active configuration:
++
++```bash
++curator config show
++```
++
++The command prints current JSON configuration parameters.
++
++### curator config build-ssh
++
++`curator config build-ssh` configures SSH credentials for external build repositories.
++
++Synopsis:
++
++```bash
++curator config build-ssh add <scope> [--agent [SOCKET]] [--identity PATH] [--known-hosts PATH]
++curator config build-ssh list
++curator config build-ssh remove <scope>
++```
++
++Flags:
++
++- `--agent`: use default agent socket or specify named socket path.
++- `--identity`: set identity private key file path.
++- `--known-hosts`: set host keys verification file path.
++
++Add SSH credentials for a repository scope:
++
++```bash
++curator config build-ssh add git.example.com/portals --identity ~/.ssh/id_ed25519
++```
++
++The command binds specified SSH identity files to the matching host scope.
++
++### curator config build-https
++
++`curator config build-https` configures HTTPS credential resolution for external build repositories.
++
++Synopsis:
++
++```bash
++curator config build-https add <scope> (--git-credentials | --keyring | --token-env NAME) [--username NAME]
++curator config build-https login <scope> [--username NAME]
++curator config build-https list
++curator config build-https remove <scope>
++```
++
++Flags:
++
++- `--git-credentials`: read token via Git credential helper.
++- `--keyring`: use stored keyring token from login.
++- `--token-env`: read token from specified environment variable.
++- `--username`: username sent with token (default: `token`).
++
++Add HTTPS token source for a repository scope:
++
++```bash
++curator config build-https add git.example.com/portals --token-env GITHUB_TOKEN
++```
++
++The command binds the environment token source to the repository host scope.
++
++## Version
++
++Synopsis:
++
++```bash
++curator --version
++```
++
++Print version information:
++
++```bash
++curator --version
++```
++
++The command prints Curator version string and build details.
+diff --git a/docs/implementation-plan.md b/docs/implementation-plan.md
+index 586b1dff..d8242b76 100644
+--- a/docs/implementation-plan.md
++++ b/docs/implementation-plan.md
+@@ -1,3 +1,6 @@
++Historical plan of record for Curator v0.1 against protocol 1.0.0-rc.8.
++The task board in .task-board/ is the live plan.
++
+ # Curator implementation plan
+ 
+ This is the working plan for building Curator, an agent environment manager (AEM) in Go. Iterations consult this document and the task board; the plan is updated as decisions land. Protocol sections are cited as `Spec §N.M` against the immutable 1.0.0-rc.8 [Curator Specification](https://github.com/relux-works/curator-spec/releases/tag/v1.0.0-rc.8).
+diff --git a/docs/troubleshooting.md b/docs/troubleshooting.md
+new file mode 100644
+index 00000000..3bce45f8
+--- /dev/null
++++ b/docs/troubleshooting.md
+@@ -0,0 +1,354 @@
++# Curator Troubleshooting Guide
++
++This guide provides symptom, cause, and remedy entries for common Curator diagnostic codes and failures. Every error string and code is verified against `internal/` and `cmd/curator/` source files.
++
++## Compiled-command diagnostics and status codes
++
++`curator status` reports machine-readable state codes and cause subcodes.
++
++### unusable-build-toolchain
++
++Symptom: `curator status` reports status code `unusable-build-toolchain`.
++
++Cause: Curator cannot resolve or verify a trusted Go toolchain environment. Source location: `cmd/curator/builds.go:61`.
++
++Remedy: set `CURATOR_GO` to an absolute path pointing to `<GOROOT>/bin/go` (or `bin/go.exe` on Windows), or export `GOROOT`.
++
++Verify the Go executable path:
++
++```bash
++export CURATOR_GO="/usr/local/go/bin/go"
++curator status
++```
++
++The command re-reads toolchain configuration and checks compiled states.
++
++### build-input-drift
++
++Symptom: `curator status` reports status code `build-input-drift` with cause `build-root`, `target`, or `unattributed`.
++
++Cause: recorded logical key differs from the key derived from current build inputs. Source location: `cmd/curator/builds.go:55`.
++
++Remedy: run `curator install` or `curator upgrade` to rebuild artifacts for current inputs.
++
++Reconcile build input drift:
++
++```bash
++curator install
++```
++
++The command rebuilds affected binaries and updates install markers.
++
++### build-command-drift
++
++Symptom: `curator status` reports status code `build-command-drift`.
++
++Cause: recorded compiled command set differs from the command set activated by current closure. Source location: `cmd/curator/builds.go:45`.
++
++Remedy: run `curator install` to synchronize installed shims with current closure definitions.
++
++Reconcile command drift:
++
++```bash
++curator install
++```
++
++The command generates required executable shims in `.agents/bin/`.
++
++### build-source-drift
++
++Symptom: `curator status` reports status code `build-source-drift`.
++
++Cause: recorded build-source identity differs from the raw source snapshot. Source location: `cmd/curator/builds.go:50`.
++
++Remedy: run `curator upgrade` to fetch updated source snapshots and update dependency hashes.
++
++Upgrade project dependencies:
++
++```bash
++curator upgrade .
++```
++
++The command fetches updated source state and updates `Skillfile.lock`.
++
++### missing-build-artifact
++
++Symptom: `curator status` reports status code `missing-build-artifact`.
++
++Cause: protected build cache holds no entry corresponding to the recorded cache key. Source location: `cmd/curator/builds.go:64`.
++
++Remedy: run `curator install` to recompile missing artifacts into protected cache storage.
++
++Recompile missing artifacts:
++
++```bash
++curator install
++```
++
++The command builds binaries and populates protected cache entries.
++
++### corrupt-build-receipt
++
++Symptom: `curator status` reports status code `corrupt-build-receipt`.
++
++Cause: canonical receipt identity in protected cache differs from recorded receipt state. Source location: `cmd/curator/builds.go:67`.
++
++Remedy: run `curator install` to quarantine corrupt cache entries and generate valid receipts.
++
++Rebuild corrupt entry:
++
++```bash
++curator install
++```
++
++The command replaces corrupt receipt data with newly generated build receipts.
++
++### build-artifact-drift
++
++Symptom: `curator status` reports status code `build-artifact-drift`.
++
++Cause: stored artifact binary path or SHA-256 digest differs from recorded marker values. Source location: `cmd/curator/builds.go:70`.
++
++Remedy: run `curator install` to recompile drifted binaries into protected cache.
++
++Rebuild drifted artifact:
++
++```bash
++curator install
++```
++
++The command replaces drifted binary files with verified build output.
++
++### corrupt-build-cache
++
++Symptom: `curator status` reports status code `corrupt-build-cache`.
++
++Cause: protected build cache entry is unreadable or malformed. Source location: `cmd/curator/builds.go:72`.
++
++Remedy: run `curator install` to quarantine corrupt directories and rebuild artifacts.
++
++Recover corrupt build cache:
++
++```bash
++curator install
++```
++
++The command quarantines damaged cache folders and creates fresh build outputs.
++
++### untrusted-build-cache
++
++Symptom: `curator status` reports status code `untrusted-build-cache`.
++
++Cause: candidate cache files reside outside manager-protected boundary permissions. Source location: `cmd/curator/builds.go:75`.
++
++Remedy: run `curator install` to recompile binaries into manager-owned protected paths.
++
++Rebuild untrusted cache storage:
++
++```bash
++curator install
++```
++
++The command moves artifacts into manager-protected directories.
++
++### unsupported-build-platform
++
++Symptom: `curator status` reports status code `unsupported-build-platform`.
++
++Cause: current operating system or file system cannot enforce protected cache state. Source location: `cmd/curator/builds.go:77`.
++
++Remedy: execute Curator on a platform supporting POSIX permissions or Windows ACL protections.
++
++Inspect platform capabilities:
++
++```bash
++curator status --json
++```
++
++The output indicates whether protected store permissions are enforceable.
++
++### build-context-exposed
++
++Symptom: `curator status` reports status code `build-context-exposed`.
++
++Cause: build root directory reached agent-facing context directory. Source location: `cmd/curator/builds.go:47`.
++
++Remedy: inspect skill manifest layout and ensure build roots are excluded from runtime context paths.
++
++Recheck skill manifest layout:
++
++```bash
++curator skill check ./my-skill
++```
++
++The command validates package structure and highlights exposed build roots.
++
++### unsupported-build-driver
++
++Symptom: `curator status` reports status code `unsupported-build-driver`.
++
++Cause: skill manifest specifies a build driver outside supported `go-v1` specifications. Source location: `cmd/curator/builds.go:57`.
++
++Remedy: update skill manifest to specify supported `go-v1` driver definitions.
++
++Validate skill manifest specification:
++
++```bash
++curator skill check ./my-skill
++```
++
++The command flags invalid driver selections.
++
++### build-state-changed
++
++Symptom: `curator status` reports status code `build-state-changed`.
++
++Cause: install marker or protected cache state moved while status classification was executing. Source location: `cmd/curator/builds.go:80`.
++
++Remedy: re-run `curator status` without concurrent modification processes.
++
++Rerun status check:
++
++```bash
++curator status
++```
++
++The command evaluates static state and returns consistent verdicts.
++
++## Toolchain preflight mismatches
++
++Toolchain checks verify Go compilers and language closure adapters before compilation starts.
++
++### untrusted_go_executable
++
++Symptom: error `CURATOR_GO must name an absolute GOROOT/bin/go` (or `GOROOT/bin/go.exe` on Windows; formatted via `GOROOT/bin/%s`) (code: `unusable-build-toolchain`).
++
++Cause: `CURATOR_GO` environment variable or derived `GOROOT` points to a non-absolute or unadmitted binary path. Source location: `internal/godriver/session.go:489`.
++
++Remedy: set `CURATOR_GO` to an absolute path pointing to a regular `GOROOT/bin/go` binary.
++
++Set path to verified Go toolchain:
++
++```bash
++export CURATOR_GO="/usr/local/go/bin/go"
++curator status
++```
++
++The command validates the toolchain executable and proceeds with planning.
++
++### toolchain_executable_mismatch
++
++Symptom: error `go-v1 toolchain_executable_mismatch: selected Go executable is not the regular executable under the derived GOROOT; put the real GOROOT/bin first on PATH, e.g. PATH="$(go env GOROOT)/bin:$PATH"`.
++
++Cause: selected Go executable on `PATH` is a shim or environment wrapper (such as goenv, asdf, or mise) rather than the standard binary under `GOROOT/bin`. Source location: `internal/godriver/session.go:521` and `cmd/curator/toolchain_remedy_test.go:51`.
++
++Remedy: prepend the actual `GOROOT/bin` directory to `PATH`.
++
++Set PATH to standard Go toolchain binary:
++
++```bash
++export PATH="$(go env GOROOT)/bin:$PATH"
++curator status
++```
++
++The command verifies the regular Go binary location and resumes execution.
++
++### Untrusted or non-operator-pinned Git executable
++
++Symptom: error `trusted Git version probe failed` or `Git release family is not operator-pinned`.
++
++Cause: system Git binary fails execution probes (`git --version` error or output > 256 bytes) or its release family is not operator-pinned. Source location: `internal/buildrepo/admission.go:203` and `internal/buildrepo/admission.go:211`.
++
++Remedy: install an operator-pinned Git release family and ensure `git` on `PATH` passes admission.
++
++Verify system Git version and path:
++
++```bash
++git --version
++```
++
++The shell prints the active Git binary version string.
++
++### Language source-closure adapter preflight checks
++
++Symptom: source acquisition or resolution fails for Rust, SwiftPM, npm, pnpm, Yarn Classic, or Yarn Modern skill projects.
++
++Cause: missing system toolchain binary or missing source closure lockfiles. Source location: `internal/closureexec/acquisition.go:549`.
++
++Remedy: install required ecosystem package managers (`cargo`, `swift`, `npm`, `pnpm`, `yarn`) on host `PATH`.
++
++Verify ecosystem toolchain availability:
++
++```bash
++swift --version
++```
++
++The shell prints the version of the installed language toolchain.
++
++## External repository fetch and credential failures
++
++Fetch operations enforce strict operator-owned credential scope rules.
++
++### build_repository_ssh_credential_missing
++
++Symptom: error code `build_repository_ssh_credential_missing`.
++
++Cause: SSH external build repository has no configured operator SSH identity or agent socket. Source location: `internal/buildrepo/credentials.go:13`.
++
++Remedy: configure SSH credential scope using `curator config build-ssh add`.
++
++Configure SSH credentials for host scope:
++
++```bash
++curator config build-ssh add git.example.com/portals --identity ~/.ssh/id_ed25519
++```
++
++The command records identity path mapping for the specified repository scope.
++
++### SSH identity or host key verification failure
++
++Symptom: errors `SSH identity is unavailable`, `SSH agent socket is unavailable`, or `SSH known hosts is unavailable`.
++
++Cause: specified SSH identity file, agent socket, or known_hosts file is missing, unreadable, or not an admitted file mode. Source location: `internal/buildrepo/credentials.go:63` and `internal/buildrepo/credentials.go:73`.
++
++Remedy: verify SSH identity file path, existence, and file permissions.
++
++Check SSH key file permissions:
++
++```bash
++chmod 600 ~/.ssh/id_ed25519
++```
++
++The shell updates file permissions to ensure private key security.
++
++### HTTPS credential host mismatch
++
++Symptom: error `HTTPS credential host does not match protected source`.
++
++Cause: configured HTTPS credentials host does not match target repository canonical host identity. Source location: `internal/buildrepo/admission.go:332`.
++
++Remedy: update HTTPS credential scope to match repository host name exactly.
++
++Configure HTTPS token scope:
++
++```bash
++curator config build-https add git.example.com/portals --token-env GITHUB_TOKEN
++```
++
++The command registers token resolution for matching repository URLs.
++
++### HTTPS credential broker materialization failure
++
++Symptom: error `HTTPS requires a manager credential broker` or `cannot materialize HTTPS credential broker`.
++
++Cause: Curator cannot write or execute host-pinned askpass broker binary in temporary execution root. Source location: `internal/buildrepo/admission.go:259` and `internal/buildrepo/admission.go:337`.
++
++Remedy: ensure temporary directory permissions allow executable file creation.
++
++Check temporary execution environment:
++
++```bash
++curator install --verbose
++```
++
++The command prints detailed execution diagnostic messages.
