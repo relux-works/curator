@@ -18,7 +18,7 @@ exact refresh; this plan ports the shape and the useful documents.
 
 - docs/prose-style.md (new): the English prose rules and the
   generated-text blacklist, ported from the CocoaSkills guide
-  (/Users/iv/Developer/Wildberries/cocoaskills/docs/prose-style.md),
+  (/Users/iv/Developer/intranet/cocoaskills/docs/prose-style.md),
   Russian section dropped, examples adapted to Curator.
 - README.md (restructured): definition; what Curator manages; install
   with collapsible per-platform options (Homebrew, installer script,
@@ -51,7 +51,7 @@ exact refresh; this plan ports the shape and the useful documents.
 
 The blocked board tasks compiled-skill-authoring-guide and
 external-repository-authoring-and-driver-guide stay with their own
-dependency chains. No Russian documents. No WB mirror.
+dependency chains. No Russian documents. No intranet mirror.
 
 ## Execution
 

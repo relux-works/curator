@@ -10,7 +10,7 @@ Rules for this run:
 1. Edit repository files ONLY through shell commands (cat > file,
    python3 heredoc, perl -pi -e), never through your native
    write_to_file/artifact tool.
-2. Work directory is /Users/iv/Developer/Wildberries/cocoaskills. Verify
+2. Work directory is /Users/iv/Developer/intranet/cocoaskills. Verify
    with pwd before editing.
 3. After every file edit, verify with grep/head that the change is
    actually in the file, and include that verification output in your
