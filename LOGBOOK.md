@@ -4200,3 +4200,23 @@ The task board in .task-board/ is the live plan.`).
   current `main`, but neither `2bb54a25` (PR #47) nor `de31754e` tracks them.
   Their leftover worktree bytes matched checkpoint `defbc368` exactly and were
   excluded from the candidate to preserve the explicit 11-path scope.
+
+## 2026-08-30 — a registry snapshot judged tampered by a clock step
+
+`internal/install/TestStrictRegistryPolicyFailsUnknown` failed on the hosted
+ubuntu race lane of a board-and-config-only pull request with `every trusted
+audit registry served a tampered snapshot`, from the warning `registry test-reg
+snapshot timestamp is too far in the future`. It does not reproduce locally and
+that pull request carried no Go change, so the fault is environmental.
+
+The mechanism is an ordering the fixture makes visible. `install.go` reads
+`time.Now()` when it calls `registry.CheckSnapshotsWithPolicy`, and the
+`httptest` fake registry stamps `created_at` only when the fetch inside that
+call reaches it, so the served timestamp is always slightly later than the
+`now` it is compared against. `SnapshotClockSkewSeconds` defaults to 300, which
+absorbs any ordinary delay — but a forward clock step on the runner between the
+two reads lands `created_at` more than five minutes ahead of `now`, and the
+snapshot is refused as tampered.
+
+Either read `now` after the fetch rather than before it, or have the fixture
+stamp a timestamp slightly in the past. Evidence: run 33306632391 on PR #50.
