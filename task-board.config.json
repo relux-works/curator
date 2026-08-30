@@ -7,6 +7,43 @@
     "allow_legacy_empty_done_containers": true
   },
   "spawn": {
-    "max_parallel": 20
+    "max_parallel": 20,
+    "worktree_isolation": {
+      "validation": {
+        "commands": [
+          "git submodule update --init --recursive",
+          "go build ./...",
+          "go vet ./...",
+          "go test -count=1 -timeout 30m ./..."
+        ]
+      },
+      "integration_base_branch": "main"
+    },
+    "preferred_agentic_system": {
+      "exclusive": "codex"
+    },
+    "ceilings": {
+      "contract_version": "spawn-policy-v3",
+      "codex": {
+        "entries": [
+          {
+            "criterion": "equal",
+            "model": "gpt-5.6-sol",
+            "reasoning_effort": "medium"
+          }
+        ],
+        "adjustment_confirmation": "required",
+        "roles": {
+          "developer": {
+            "default_model": "gpt-5.6-sol",
+            "default_reasoning_effort": "medium"
+          },
+          "reviewer": {
+            "default_model": "gpt-5.6-sol",
+            "default_reasoning_effort": "medium"
+          }
+        }
+      }
+    }
   }
 }
