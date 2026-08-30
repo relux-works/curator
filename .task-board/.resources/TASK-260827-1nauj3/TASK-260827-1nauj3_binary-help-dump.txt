@@ -1,0 +1,251 @@
+##### curator bootstrap -h
+Usage of bootstrap:
+  -default-agents string
+    	comma-separated default agents (default "codex_cli")
+  -force
+    	overwrite an existing configuration
+  -if-missing
+    	create configuration only when absent
+  -non-interactive
+    	fail instead of prompting for missing values
+  -preferred-locale string
+    	preferred locale
+  -skills-root string
+    	directory containing skill repositories
+
+##### curator init -h
+initialized /Users/iv/Developer/ReluxWorks/curator/.temp/STORY-260827-3a5efk/worktree/Skillfile.json
+
+##### curator add -h
+Usage of add:
+  -branch string
+    	git branch
+  -git string
+    	git clone URL
+  -project string
+    	project alias or path
+  -revision string
+    	git revision
+  -source string
+    	source directory under skills_root
+  -tag string
+    	git tag
+
+##### curator remove -h
+Usage of remove:
+  -project string
+    	project alias or path
+curator: remove requires a skill name
+
+##### curator install -h
+Usage of install:
+  -all
+    	operate on all configured projects
+  -audit
+    	run the audit gate in advisory or strict mode
+  -build-ssh-agent string
+    	agent socket for external SSH build repositories, or "auto" for your own agent (or CURATOR_BUILD_SSH_AGENT)
+  -build-ssh-identity string
+    	identity file for external SSH build repositories (or CURATOR_BUILD_SSH_IDENTITY)
+  -build-ssh-known-hosts string
+    	host keys external SSH build repositories are verified against (or CURATOR_BUILD_SSH_KNOWN_HOSTS)
+  -dry-run
+    	plan work without modifying files
+  -fix-gitignore
+    	append missing managed gitignore entries
+  -strict-tags
+    	fail if an installed tag moved to another commit
+  -verbose
+    	print detailed progress
+curator: flag: help requested
+
+##### curator update -h
+fetched go-testing-tools
+fetched ios-app-manager
+fetched project-management
+fetched skill-go-testing-tools
+fetched skill-ios-app-manager
+fetched skill-ssh-access-setup
+fetched skill-swift-relux
+fetched swift-relux
+
+##### curator upgrade -h
+Usage of install:
+  -all
+    	operate on all configured projects
+  -audit
+    	run the audit gate in advisory or strict mode
+  -build-ssh-agent string
+    	agent socket for external SSH build repositories, or "auto" for your own agent (or CURATOR_BUILD_SSH_AGENT)
+  -build-ssh-identity string
+    	identity file for external SSH build repositories (or CURATOR_BUILD_SSH_IDENTITY)
+  -build-ssh-known-hosts string
+    	host keys external SSH build repositories are verified against (or CURATOR_BUILD_SSH_KNOWN_HOSTS)
+  -dry-run
+    	plan work without modifying files
+  -fix-gitignore
+    	append missing managed gitignore entries
+  -strict-tags
+    	fail if an installed tag moved to another commit
+  -verbose
+    	print detailed progress
+curator: flag: help requested
+
+##### curator status -h
+Usage of status:
+  -all
+    	operate on all configured projects
+  -attest
+    	re-check installed skills against trusted registries
+  -check
+    	exit non-zero unless every skill is up to date
+  -json
+    	machine-readable output
+
+##### curator list -h
+
+##### curator project -h
+curator: unknown project subcommand "-h"
+
+##### curator skill check -h
+curator: unknown command "skill check"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config <subcommand>      show | build-ssh | build-https (see config build-ssh -h, config build-https -h)
+  --version                print the curator version
+
+##### curator global -h
+curator: unknown global subcommand "-h"
+
+##### curator hybrid -h
+curator: unknown hybrid subcommand "-h"
+
+##### curator audit -h
+Usage of audit:
+  -all
+    	audit all configured projects and global skills
+  -allow string
+    	pin trust for a content hash
+  -global
+    	audit global skills
+  -json
+    	machine-readable output
+  -publish string
+    	signed audit record (JSON file) to submit
+  -reason string
+    	reason for --allow
+  -registry string
+    	registry base URL for --publish
+  -token string
+    	auditor token for --publish (or CURATOR_REGISTRY_TOKEN)
+
+##### curator gc -h
+curator: warning: ignored non-directory member .DS_Store of skill directory /Users/iv/Developer/ReluxWorks/converter/.agents/skills
+curator: warning: build cache sweep: retained unrecognized cache root member ".quarantine-1d13f5748f54c3c44e6ddd36e0729774cb3597ebc8a7fbafd6d587b6a5565e6f-839986725"; inspect it and remove it manually
+curator: warning: build cache sweep: retained unrecognized cache root member ".quarantine-477bcd3a5915f12a1c784073ce502b2f350d50a2ddcc8d9814eb477cb7ae81e2-3479458871"; inspect it and remove it manually
+curator: warning: build cache sweep: retained unrecognized cache root member ".quarantine-59e3f16e84ed4c8a3ce01d7f3c243d997f9c7b1e29bd0ea7a0d22f9ae8f2e9a2-2976183886"; inspect it and remove it manually
+gc: 0 runtime entries removed, 0 build entries removed
+
+##### curator shell-init -h
+Usage of shell-init:
+  -install
+    	cache the hook and print its optional profile source command
+  -no-global
+    	skip global env sourcing
+curator: shell-init accepts at most one shell: auto, zsh, bash, powershell
+
+##### curator ui -h
+curator: could not open a new TTY: open /dev/tty: device not configured
+
+##### curator config -h
+curator config: inspect and edit the machine configuration
+
+Usage:
+  curator config show                  print the effective configuration
+  curator config build-ssh <subcommand>
+                                       operator SSH credentials for external
+                                       build repositories (add | list | remove)
+  curator config build-https <subcommand>
+                                       operator HTTPS tokens for external
+                                       build repositories (add | login | list | remove)
+
+##### curator config build-ssh -h
+curator: unknown command "config build-ssh"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config <subcommand>      show | build-ssh | build-https (see config build-ssh -h, config build-https -h)
+  --version                print the curator version
+
+##### curator config build-https -h
+curator: unknown command "config build-https"
+
+curator: agent environment manager
+
+Usage:
+  curator <command> [arguments]
+
+Commands:
+  bootstrap [flags]         create the machine configuration
+  init [path]              create Skillfile.json and the managed gitignore block
+  add <name> ...           add or replace a skill declaration, then install
+  remove <name>            remove a skill declaration
+  install [path] [flags]   apply Skillfile.json (see install -h)
+  update                   fetch all source repositories under skills_root
+  upgrade [path]           fetch the selected dependency closure, then install
+  status [path] [flags]    manifest, installed, and compiled state (--check, --json, --attest)
+  list                     configured projects and declared skills
+  project <subcommand>     add | resolve
+  skill check <dir>        validate one skill package (--locale, --json)
+  global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  hybrid <subcommand>      add | remove | list | status
+  audit [target] [flags]   run audit, pin trust, or publish a signed record
+  gc                       remove unreferenced runtime entries
+  shell-init [shell]       print or cache an optional hook (auto, zsh, bash, powershell)
+  ui                       terminal view over installed state
+  config <subcommand>      show | build-ssh | build-https (see config build-ssh -h, config build-https -h)
+  --version                print the curator version
+

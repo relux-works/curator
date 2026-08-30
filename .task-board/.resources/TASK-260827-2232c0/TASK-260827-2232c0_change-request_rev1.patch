@@ -1,0 +1,13 @@
+diff --git a/README.md b/README.md
+index 27866d3b..544c056f 100644
+--- a/README.md
++++ b/README.md
+@@ -89,7 +89,7 @@ The command outputs the profile source command for your shell (`.zshrc` or `.bas
+ 
+ ## Compiled-command status, diagnostics, and repair
+ 
+-`curator status` reports read-only diagnostics for declared skills and compiled `go-v1` commands. The command accepts `--check` to fail on non-current states and `--json` for machine-readable output. Run `curator install` or `curator upgrade` to reconcile drifted or missing build state. See [docs/compiled-commands.md](docs/compiled-commands.md) for diagnostic status codes, logical cache key derivation, and repair semantics.
++`curator status` reports read-only diagnostics for declared skills and compiled `go-v1` commands. The command accepts `--check` to fail on non-current states and `--json` for machine-readable output. Reported status codes include `up-to-date` and `current` for clean states, and drift states (`not-installed`, `needs-install`, `content-drift`, `unresolvable`, `invalid-marker`, `unsupported-marker`, `build-command-drift`, `build-context-exposed`, `build-source-drift`, `build-input-drift`, `unsupported-build-driver`, `unusable-build-toolchain`, `missing-build-artifact`, `corrupt-build-receipt`, `build-artifact-drift`, `corrupt-build-cache`, `untrusted-build-cache`, `unsupported-build-platform`, `build-state-changed`, `unknown-build-state`), with subcodes (`build-root`, `target`, `unattributed`). Run `curator install` or `curator upgrade` to reconcile drifted or missing build state. See [docs/compiled-commands.md](docs/compiled-commands.md) for diagnostic status codes, logical cache key derivation, and repair semantics.
+ 
+ ## Maintenance and the build-cache grace period
+ 

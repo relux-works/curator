@@ -106,6 +106,8 @@ spawn queued: [reviewer] reviewer (codex) (run=RUN-260828-b41f8d, max_parallel=2
 spawn run started: [reviewer] reviewer (codex) (run=RUN-260828-b41f8d)
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260828-b41f8d, pid=39758, exit=0)
+Landing follow-up on PR #49: all three Test lanes failed at the Ledger consistency gate, not on any test. The refactor split TestCompiledProjectStatusRepairRollbackRecovery into TestCompiledProjectStatusAndUntrustedRecovery, TestCompiledProjectRepairsCorruptCompiledState and TestCompiledProjectRestoresCacheWhenCommitFails - exactly what the AC asked for - but .github/ci/platform-cases.tsv still required the old case name on darwin and windows, so the gate reported a required case not compiled into those builds. Both the producer and the reviewer missed it, and the configured worktree validation suite could not catch it because it runs only build/vet/test and not the repository CI gates. Fixed on the landing branch as commit 3e23ab8e by splitting the ledger row into the three successors with the platform requirement the original row stated; ledger-consistency now reports ok, gate-selftest 81/81, no-broad-suppression ok. Follow-up worth tracking: add the repository gate scripts to spawn.worktree_isolation.validation.commands so a ledger-visible rename cannot reach a landing branch again.
+Second landing fix on PR #49 (commit 3a16aece): macOS Test failed with acquire host GOROOT test lock: context deadline exceeded after 300s in internal/install TestAuthoritativeDryRunCasesMutateNothingPersistent. Cause is a real coupling the refactor introduced and did not finish: AcquireHostGOROOT now lets a package hold the cross-process host-toolchain lock for its ENTIRE test process, and cmd/curator takes it in TestMain and holds it to exit, but hostGOROOTLockTimeout was still the 5 minutes sized for the old per-test hold. On a hosted macOS runner cmd/curator legitimately still held the lock when the single remaining waiter gave up, so a queue wait was reported as a fault. The waiter budget is now 20 minutes: longer than a full package run, still under the per-package go test timeout so a genuine deadlock surfaces as a lock error rather than a suite timeout. internal/install passes locally with the change. Neither the producer, the reviewer, nor the worktree validation suite caught this because ./... on a fast local machine finishes cmd/curator well inside five minutes; only a slower hosted runner exposes it.
 
 ## Precondition Resources
 - [TASK-260825-1yzubs_blueprint-vs-main_rev2.patch](file://TASK-260825-1yzubs/TASK-260825-1yzubs_blueprint-vs-main_rev2.patch) — Prior injectable-seams refactor rebased against pre-merge main; reuse as the starting blueprint for the redo on merged main (2bb54a25), re-verifying every hunk against the landed adapter delivery
@@ -152,7 +154,7 @@ spawn run completed: codex (run=RUN-260828-b41f8d, pid=39758, exit=0)
 2026-08-24T23:50:43Z
 
 ## Last Update
-2026-08-28T11:36:20Z
+2026-08-28T11:55:42Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

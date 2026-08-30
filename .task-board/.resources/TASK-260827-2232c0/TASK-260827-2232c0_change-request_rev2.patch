@@ -1,0 +1,158 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 1c6a42f2..40fe1c14 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3473,3 +3473,14 @@ PR #22 merged as 1f55f1b4e: six signed commits assembled from the accepted patch
+ - GATES, each standalone, real exit codes: `golangci-lint run` 0 (0 issues); `gofmt -l cmd internal` clean; `go vet ./...` 0; `make check-ci` 0 and `make race` 0 and `make gate-selftest` 0 (81/0) against released pin `00b1688`; `make candidate-test` 0 against candidate `6001dc3` with `CI_REQUIRE_FULL_ROOT=1`; `make no-broad-suppression` 0. `internal/skillspec` *defers* against the released pin — it publishes no `schema-cases/agent-skill-v8` — so the candidate lane is the only one that exercises this change, which is why it must be run with deferral fatal rather than trusted from the default lane's green.
+ - EVIDENCE: PR [#34](https://github.com/relux-works/curator/pull/34), commit `a74f1f5`; board outcome `TASK-260823-1vleh5_rework-results.md`.
+ 
++
++### 0055 — TASK-260827-2232c0: README restructuring, compiled commands reference, and CI gates documentation
++
++- REWORK RATIONALE: Cycle 1 review requested restoring ten load-bearing facts into `docs/compiled-commands.md` (distinction of `build-input-drift` cause subcodes vs `unusable-build-toolchain` boundary codes, trusted-toolchain allowlist, double fail-closed `--check`, consumer registry rules, receipt provenance, parent-object retention security rationale, unusable entry non-adoption, changed-cache warning contract, `gc` lock guarantee and pass ordering, publication-reversal sync chain), creating a dedicated home for the deleted Gates and tooling reference (`docs/ci-gates.md`), fixing the global-shim PATH claim per `internal/globalbins/globalbins.go`, and recording accurate logbook claims. Upstream base changes added HTTPS credential docs and suite consumption rules, which were integrated into `README.md` and `docs/ci-gates.md`.
++- VERIFICATION:
++  - `README.md` line count: 116 lines (under the 220-line ceiling).
++  - All commands and flags verified against tree binary via `go run ./cmd/curator ... --help`: `status` (`--check`, `--json`), `global status` (`--check`, `--json`), `install`/`upgrade` (`--dry-run`), `global install --dry-run`, `bootstrap` (`--if-missing`, `--non-interactive`, `--skills-root`), `shell-init --install`, `gc`.
++  - `docs/compiled-commands.md` preserves all facts and commands from the moved sections without code/doc discrepancies.
++  - `docs/ci-gates.md` created with gate table, evidence paths, platform carve-out, and suite presence versus consumption rules.
++  - `docs/implementation-plan.md` carries historical two-line header, content untouched.
++  - Style guide compliance verified across all modified files.
+diff --git a/README.md b/README.md
+index 27866d3b..13e76374 100644
+--- a/README.md
++++ b/README.md
+@@ -64,7 +64,7 @@ Curator controls environment dependencies and runtime delivery:
+ - **Scopes**: Project, global, and hybrid machine declarations.
+ - **MCP requirements**: Verification of declared MCP servers against agent configuration surfaces.
+ - **Security**: Source allowlists, declared capability boundaries, zero code execution during install, and Ed25519-signed audit registry client checks.
+-- **Operator credentials**: Per-repository SSH and HTTPS credentials matched by canonical source identity. See [docs/build-ssh.md](docs/build-ssh.md).
++- **Operator credentials**: Per-repository SSH selection and scoped HTTPS token sources for external build repositories, matched by canonical source identity and never selectable by a package. Private HTTPS fetches use a manager-owned, host-pinned askpass broker; public HTTPS can remain anonymous. See [SSH credentials](docs/build-ssh.md) and [HTTPS credentials](docs/build-https.md).
+ 
+ ## Commands without profile setup
+ 
+@@ -89,7 +89,7 @@ The command outputs the profile source command for your shell (`.zshrc` or `.bas
+ 
+ ## Compiled-command status, diagnostics, and repair
+ 
+-`curator status` reports read-only diagnostics for declared skills and compiled `go-v1` commands. The command accepts `--check` to fail on non-current states and `--json` for machine-readable output. Run `curator install` or `curator upgrade` to reconcile drifted or missing build state. See [docs/compiled-commands.md](docs/compiled-commands.md) for diagnostic status codes, logical cache key derivation, and repair semantics.
++`curator status` reports read-only diagnostics for declared skills and compiled `go-v1` commands. The command accepts `--check` to fail on non-current states and `--json` for machine-readable output. Reported status codes include `up-to-date` and `current` for clean states, and drift states (`not-installed`, `needs-install`, `content-drift`, `unresolvable`, `invalid-marker`, `unsupported-marker`, `build-command-drift`, `build-context-exposed`, `build-source-drift`, `build-input-drift`, `unsupported-build-driver`, `unusable-build-toolchain`, `missing-build-artifact`, `corrupt-build-receipt`, `build-artifact-drift`, `corrupt-build-cache`, `untrusted-build-cache`, `unsupported-build-platform`, `build-state-changed`, `unknown-build-state`), with subcodes (`build-root`, `target`, `unattributed`). Run `curator install` or `curator upgrade` to reconcile drifted or missing build state. See [docs/compiled-commands.md](docs/compiled-commands.md) for diagnostic status codes, logical cache key derivation, and repair semantics.
+ 
+ ## Maintenance and the build-cache grace period
+ 
+diff --git a/docs/ci-gates.md b/docs/ci-gates.md
+new file mode 100644
+index 00000000..792794e0
+--- /dev/null
++++ b/docs/ci-gates.md
+@@ -0,0 +1,38 @@
++# CI Gates and Tooling
++
++Every gate below is a script under `.github/ci/`, called directly by [.github/workflows/ci.yml](.github/workflows/ci.yml) and mirrored by a `make` target for local use. CI calls the scripts directly because `make` is not guaranteed on Windows runners. Each gate writes its raw stream and report under `EVIDENCE` (default `.temp/ci-evidence/`). CI uploads these artifacts per runner, allowing verification against the run that produced them.
++
++| Tool | What it gates | How to run it | Where its output goes |
++| --- | --- | --- | --- |
++| `test-gate.sh` | plans the run from the supplied conformance root, executes it, then enforces the platform-case ledger; every status is fatal | `make ci-test` | `$EVIDENCE/test/` (including `go-test*.json`, `suite-plan.txt`, `platform-cases.txt`, `skips-observed.tsv`) |
++| `test-gate.sh` (`-race`) | the same gate under the race detector | `make race` | `$EVIDENCE/race/` |
++| `suite-plan.sh` | decides, from the root alone, which packages it serves, which it cannot, and which this platform does not qualify | called by `test-gate.sh` | `$EVIDENCE/*/suite-plan.txt`, `plan-*.txt` |
++| `platform-case-gate.sh` | requires every case [`platform-cases.tsv`](.github/ci/platform-cases.tsv) names on this runner, and classifies every skip against [`skip-classes.tsv`](.github/ci/skip-classes.tsv) | called by `test-gate.sh` | `$EVIDENCE/*/platform-cases.txt`, `skips-observed.tsv` |
++| `ledger-consistency.sh` | proves each ledger row against the real per-GOOS builds via `go list` without requiring a runner | `make ledger-check` | `$EVIDENCE/ledger/ledger-consistency.txt` |
++| `excluded-packages.sh` | resolves which packages a platform does not execute and records the authorizing task | called by `test-gate.sh` and `platform-case-gate.sh` | stdout (TSV) |
++| `candidate-suite.sh` | rejects non-immutable candidate revisions and records candidate root identities as candidate-only evidence | `make candidate-verify-ref CANDIDATE_REF=...` or `make candidate-record CANDIDATE_ROOT=...` | `$EVIDENCE/candidate/candidate-suite-identity.txt` |
++| `toolchain-identity.sh` | asserts the resolved Go toolchain matches `go.mod` exactly, with `GOTOOLCHAIN=local` and `GOENV=off` read back | run by every Go-consuming job | job log |
++| `no-broad-suppression.sh` | rejects bare `//nolint`, bare `//#nosec`, production-path lint exclusions, wholesale disabling, and unrecorded `gosec` exclusions | `make no-broad-suppression` | job log |
++| `gate-selftest.sh` | drives every gate above against synthetic inputs and asserts real exit codes for negative cases | `make gate-selftest` | job log |
++
++Executing `make ci-test`, `make race`, and `make check-ci` requires setting `CURATOR_CONFORMANCE_ROOT` to a materialized `<curator-spec>/conformance/v1` directory. The Makefile targets refuse execution without this variable set, preventing unconfigured runs.
++
++## The compiled-build platform carve-out
++
++The `rc5-native-control-inventory-v1` vector defines native control records exclusively for macOS and Windows. The `go-v1` driver refuses compiled builds on any other host before starting a worker process. This carve-out applies at two granularities:
++
++- **Whole package**: `internal/godriver` is not executed where the root qualification vector marks the platform excluded (such as Linux, noted under `until_task: TASK-260728-1skseh`). `test-gate.sh` executes `TestProbeRejectsAnUncoveredPlatformBeforeTheWorker` on that runner to assert the exclusion boundary.
++- **Individual case**: Commands in `cmd/curator` that require completed compilation use `requireNativeControlInventoryPlatform` to read `godriver.InventoryPlatform`. Skips are logged with the reason `platform-control` in `skip-classes.tsv`. `TestCompiledInstallFollowsTheNativeControlInventoryExactly` runs on every runner to verify the boundary state. Covered hosts execute and publish protected cache entries; uncovered hosts report `build_execution_control_unavailable`, publish nothing, and return non-zero exit codes for `curator status --check`.
++
++When the inventory gains a record for a platform, the guard stops skipping automatically. Only `must_run_on` in `platform-cases.tsv` requires updating.
++
++## Suite consumption, not suite presence
++
++Publishing a family in a conformance root does not prove that a build reads it. Analysis showed that pinned implementation jobs returned exit 0 against a schema-8 suite while consuming none of it. Two tables resolve both aspects:
++
++- **Presence**: [`root-artifacts.tsv`](.github/ci/root-artifacts.tsv) declares root artifacts read by a package conformance test without guards. If a root stops publishing an artifact, the package defers testing. Setting `CI_REQUIRE_FULL_ROOT=1` makes deferrals fatal in candidate verification lanes.
++- **Consumption**: [`platform-cases.tsv`](.github/ci/platform-cases.tsv) specifies cases that read each artifact per runner. Renames, deletions, or unmatched `-run` filters trigger named failures rather than silent test suite reductions.
++
++For schema 8, artifacts include `agent-skill-v8`, `csk-skill-v8`, `install-marker-v4`, `vectors/module-roots.json`, and `vectors/script-host-execution-policy.json`. These are consumed by `internal/skillspec`, `internal/marker`, `internal/moduleroots`, `internal/godriver`, and `internal/scriptpolicy`.
++
++The committed protocol-suite pin is declared as `SPEC_PIN` in the workflow `env:` block. Candidate suites enter via the `candidate-conformance` workflow on explicit `workflow_dispatch` calls supplying a full 40-character revision or materialized root. That job sets `CI_REQUIRE_FULL_ROOT=1` to enforce complete package coverage, and emitted artifacts are stamped as candidate-only evidence.
+diff --git a/docs/compiled-commands.md b/docs/compiled-commands.md
+index fcb04d1e..3fc10232 100644
+--- a/docs/compiled-commands.md
++++ b/docs/compiled-commands.md
+@@ -34,7 +34,9 @@ The command reports the following status codes for skills and compiled commands:
+ | `build-state-changed` | the install marker or the protected cache evidence moved while status was classifying it |
+ | `unknown-build-state` | a planner outcome this manager does not know; it fails closed |
+ 
+-A row may carry a `cause`, a stable subcode that refines the state without widening the state vocabulary. `unusable-build-toolchain` carries the `go-v1` boundary code that refused the operation. A `build-input-drift` row carries one of three cause subcodes:
++A row may carry a `cause`, a stable subcode that refines status details without widening the primary status vocabulary. A `build-input-drift` row carries one of three cause subcodes (`build-root`, `target`, `unattributed`), while `unusable-build-toolchain` carries the `go-v1` boundary code that refused the operation. Every other state leaves the `cause` field empty.
++
++The cause subcodes for `build-input-drift` are:
+ 
+ | Cause | Meaning |
+ |---|---|
+@@ -42,8 +44,6 @@ A row may carry a `cause`, a stable subcode that refines the state without widen
+ | `target` | the marker's recorded artifact path is not the one this target derives |
+ | `unattributed` | the key differs, and the marker records no prior input to attribute it |
+ 
+-Every other state leaves the `cause` field empty.
+-
+ ## Logical cache keys and diagnostics
+ 
+ Curator derives logical cache keys by hashing the complete build input: schema version, driver, build source, build root, command, source directory, native target and tuning, trusted toolchain identity, and fixed manager build policy. An install marker records no prior input, so a key mismatch reports as input drift and attributes only as far as recorded build roots and artifact paths can prove. Curator does not guess which input moved.
+diff --git a/docs/prose-style.md b/docs/prose-style.md
+index 8d795430..4ecc8e35 100644
+--- a/docs/prose-style.md
++++ b/docs/prose-style.md
+@@ -16,7 +16,7 @@ State one idea per sentence. When a second idea appears, start a second sentence
+ 
+ The first sentence of a paragraph carries its claim; everything after elaborates. A paragraph introduces at most one new concept. The shape is: claim, explanation, consequence or example.
+ 
+-Give the definition before the consequences. Name the concept, define it in one or two sentences, then use it: "A compiled command links a skill binary to an executable shim in `.agents/bin/`. `curator repair` restores broken links."
++Give the definition before the consequences. Name the concept, define it in one or two sentences, then use it: "A compiled command links a skill binary to an executable shim in `.agents/bin/`. `curator install` rebuilds a missing or drifted shim."
+ 
+ State the problem before the solution. First the drawback, then the fix.
+ 
+@@ -42,7 +42,7 @@ When a term must appear before its full treatment, give a working approximation
+ 
+ Do not use em-dashes or en-dashes in prose. Replace them with a comma, a colon, parentheses, or a new sentence.
+ 
+-Do not use guillemets. Prefer code style for identifiers; use plain double quotes only for genuine quotations and coined readings.
++Do not use Russian guillemets. Prefer code style for identifiers; use plain double quotes only for genuine quotations and coined readings.
+ 
+ Use semicolons to bind two halves of one thought; the second clause explains or completes the first. Use parentheses for one-sentence asides (a concrete example, a practical note). No exclamation points, no ellipses for drama.
+ 
+@@ -64,7 +64,7 @@ Hedge only with calibrated words that carry frequency information: "usually", "i
+ 
+ Give prescriptions directly, with the rationale attached: "Always pin a tag or revision. Branch refs drift and break reproducibility."
+ 
+-Cross-reference with a precise target: "see Security model in ARCHITECTURE.md", never "as we will see later".
++Cross-reference with a precise target: "see Reconciliation and repair in docs/compiled-commands.md", never "as we will see later".
+ 
+ ## Blacklist
+ 
+@@ -74,7 +74,7 @@ A reviewer rejects a document that contains any of the following:
+   Bad: "Curator is not just a package manager, it is a skill runner."
+   Good: "Curator installs skill packages into project repositories."
+ - Em-dashes and en-dashes used as rhetorical glue.
+-  Bad: "`curator` - a skill manager".
++  Bad: "`curator` — a skill manager".
+   Good: "`curator` is a skill manager."
+ - Russian guillemets.
+   Bad: «Skillfile».
+@@ -99,7 +99,7 @@ A reviewer rejects a document that contains any of the following:
+ 
+ Bad (slop):
+ 
+-> Curator is not just another package manager - it's a powerful, seamless solution for skill management. Let's dive into why it's a game-changer: reproducibility, flexibility, and simplicity.
++> Curator is not just another package manager — it's a powerful, seamless solution for skill management. Let's dive into why it's a game-changer: reproducibility, flexibility, and simplicity.
+ 
+ Good:
+ 
