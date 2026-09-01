@@ -41,7 +41,7 @@ type localFileProof struct {
 // admitted object inventory, re-proves every source file, and applies the same
 // raw-object boundary as network acquisition. It never invokes Git in the
 // selected source repository.
-func AdmitLocal(ctx context.Context, request LocalRequest) (*Snapshot, error) {
+func AdmitLocal(ctx context.Context, request LocalRequest) (snapshot *Snapshot, err error) {
 	if err := ValidateGitTool(ctx, request.Tool); err != nil {
 		return nil, err
 	}
@@ -89,7 +89,15 @@ func AdmitLocal(ctx context.Context, request LocalRequest) (*Snapshot, error) {
 	if err != nil {
 		return nil, admissionError(CodeLocalLayoutUnsafe, "cannot create private state")
 	}
-	defer func() { _ = os.RemoveAll(privateRoot) }()
+	defer func() {
+		// The object store is sealed read-only below, so the release has to
+		// restore write permission before it can remove the tree. A private
+		// root that survives the admission is a real defect, not a detail to
+		// discard: a successful admission is refused rather than leaking it.
+		if releaseErr := releasePrivateRoot(privateRoot); releaseErr != nil && err == nil {
+			snapshot, err = nil, admissionError(CodeLocalLayoutUnsafe, "private state could not be released")
+		}
+	}()
 	paths, err := makePrivatePaths(privateRoot)
 	if err != nil {
 		return nil, admissionError(CodeLocalLayoutUnsafe, "cannot initialize private state")
@@ -118,7 +126,7 @@ func AdmitLocal(ctx context.Context, request LocalRequest) (*Snapshot, error) {
 	if err := sealObjectStore(filepath.Join(paths.repo, "objects")); err != nil {
 		return nil, admissionError(CodeLocalLayoutUnsafe, "private object store could not be sealed")
 	}
-	snapshot, err := proveRepository(ctx, request.Tool, env, paths, format, selected, "", limits)
+	snapshot, err = proveRepository(ctx, request.Tool, env, paths, format, selected, "", limits)
 	if err != nil {
 		return nil, err
 	}
@@ -840,6 +848,27 @@ func sealObjectStore(root string) error {
 		}
 	}
 	return nil
+}
+
+// releasePrivateRoot removes an operation-private root after sealObjectStore
+// took owner write permission away from every directory beneath it. RemoveAll
+// cannot unlink an entry from a read-only directory, so the release first
+// hands owner write back to each directory and only then removes the tree.
+// A root that never existed is already released.
+func releasePrivateRoot(root string) error {
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		return os.Chmod(path, 0o700) // #nosec G302 -- owner-only permission on a private directory about to be removed.
+	})
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return os.RemoveAll(root)
 }
 
 var _ = fmt.Sprintf

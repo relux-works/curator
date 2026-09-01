@@ -32,7 +32,13 @@ func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == identityProbeMode {
 		os.Exit(runIdentityProbe(os.Stdout))
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	// The stub launcher is built once per package run into a scratch
+	// directory no test owns; the package run owns it and removes it here.
+	if stubOnce.directory != "" {
+		_ = os.RemoveAll(stubOnce.directory)
+	}
+	os.Exit(code)
 }
 
 // identityProbe is what a started process reports about itself.
@@ -97,8 +103,9 @@ type stubCall struct {
 
 var stubOnce struct {
 	sync.Once
-	path string
-	err  error
+	directory string
+	path      string
+	err       error
 }
 
 // stubGoBinary compiles testdata/stubgo once per package test run with the real
@@ -111,6 +118,7 @@ func stubGoBinary(t *testing.T) string {
 			stubOnce.err = err
 			return
 		}
+		stubOnce.directory = directory
 		output := filepath.Join(directory, "stubgo")
 		if runtime.GOOS == "windows" {
 			output += ".exe"
