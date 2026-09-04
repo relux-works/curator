@@ -1,0 +1,21 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index cff3a1be..9fbe5bc6 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,16 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-01 — Normative environments protocol draft 1 (TASK-260901-2tdoy5)
++
++- **MILESTONE**: `protocol/environments.md` draft 1 authored in curator-spec on branch `draft/environments-protocol` (signed commit `eddd509` from base `2a861e5`, signature verified against `maintainers.allowed_signers`). Covers all rev-1 surfaces of Decision 0010; not pushed — review handoff via board.
++- **DECISION**: Zero-applicable-modules root context materializes as the generation header alone — never zero bytes, never an error; distinct from a profile with no `context/` (no surface, no file).
++- **DECISION**: Chapter separator fixed as bytes `---` LF LF `## Profile: <name>` LF, emitted for every composed profile including empty chapters; parts join with exactly one additional LF.
++- **DECISION**: Referenced-form layout fixed as `.agent-context/modules/<profile>/<module-path>`; the literal `modules/` segment guards against profile-name collision with the sibling `system-prompt.md` (profile names may contain dots). opencode referenced form owns `<home>/opencode.json` `instructions`; an unmanaged pre-existing file forces monolithic fallback, never an edit.
++- **DECISION**: System-prompt output carries no header/chapters (bytes reach the model verbatim); pi's live `APPEND_SYSTEM.md`/`SYSTEM.md` gated behind machine setting `system_prompt_files: off|append|replace`, default `off`.
++- **FINDING**: Decision 0010's adapter table says opencode skills at `<home>/skills/`, but its own open question 3 recommends keeping the manager §5 native surface until a pinned release proves otherwise — draft follows the recommendation; opencode skills are therefore not profile-isolated in managed homes in rev 1. Flagged to reviewer in `environments-doc-draft-notes.md`.
++- **STATUS**: Handed off to review; manager sections, schemas/vectors, launcher spec tracked on sibling stories.
++
+ ## 2026-08-28 — Authoring CLI commands documentation refresh (TASK-260827-21xw9d)
+ 
+ - **Documentation created**: Added `docs/authoring-cli-commands.md` detailing how skill authors ship CLI utilities with skills. Covered command placements (embedded build roots vs external build repositories), per-language admission matrix derived from `internal/godriver/` and `internal/skillspec/`, script command interpreters (`node-v1`, `python3-v1`), schema-8 enforced script policy (`script-worker-v1`), three minimal worked examples (`embedded_go`, `external_go_repo`, `script_skill`), and planned driver error handling (`commands.<name>.driver: must be 'go-v1' or 'go-repository-v1'`).

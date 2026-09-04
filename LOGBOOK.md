@@ -3,6 +3,35 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-09-03 — Decision 0012 rework 1 accepted (TASK-260902-3cnbwa, cycle 2)
+
+- DECISION: Decision 0012 at `8444706` on `draft/decision-0012-context-packages` accepted; all 24 cycle-1 findings resolved per the author decisions, no deviation; attack pass yielded 7 minor + 5 nit for the normative-authoring pass, no blocking/major. `accept_cr` on `CR-TASK-260902-3cnbwa-1` rev 1; evidence `TASK-260902-3cnbwa_review-findings-0012-2.md`, `TASK-260902-3cnbwa_review-verdict.md`.
+- FINDING: Decision 0012 §6 says every MCP file lands below `<home>/.agent-context/mcp/`, but the codex channel needs `$CODEX_HOME/<name>.config.toml`, i.e. `<home>/curator-mcp.config.toml` — a tool-fixed location the general sentence must except (N1).
+- FINDING: the MCP channel descriptor in Decision 0012 omits `semantics`, which environments §7.3 makes mandatory on every descriptor and §10.2 readers reject when unknown; the grammar must make `semantics` system-prompt-only (N2).
+- FINDING: resolution step 2 in Decision 0012 §2 fails only on an "empty" effective constraint; a non-empty constraint that no tag satisfies (`^5` against a `v4.x` source) names no outcome (N5).
+- FINDING: manager §3.1 reserves env names per platform and per interpreter identifier (`NODE_` only for `node-v1`); an MCP declaration has neither, so `env_names` must be bounded by the union across all of them (N6).
+- NOTE: verified this cycle — semver 7.7.4 (every coercion in Decision 0012 §2 matches `validRange`; `maxSatisfying` on `||` matches step 2); claude 2.1.259 (`--mcp-config`, `--strict-mcp-config`); codex 0.151.0 (`-p` layer text); pi 0.84.2 (no MCP); opencode docs merge order (remote → global → `OPENCODE_CONFIG` → project → `.opencode` → `OPENCODE_CONFIG_CONTENT` → managed); `works.relux.curator.profile-pin` exists in ax spec PR #1 (`draft/curator-environment-integration`); no tag contains the commit that added `protocol/environments.md`.
+- NOTE: story STORY-260902-le61cp description still says "environments.md revision 2 impact"; the F11 author decision keeps revision 1 with only the `curator-root-context-v2` type line.
+
+## 2026-09-03 — Decision 0012 rework 1 handed off to review (TASK-260902-3cnbwa)
+
+- MILESTONE: all 24 findings of `TASK-260902-3cnbwa_review-findings-0012-1.md` applied per `producer-brief-0012-rework-1.md` author decisions, no deviations; signed commit `8444706` on `draft/decision-0012-context-packages` (base `a25dc67`), report `TASK-260902-3cnbwa_rework-report-0012-1.md`. Not pushed. Next: reviewer cycle 2.
+- FINDING: skill manifests (`schemas/v1/agent-skill-v1..v8`) carry no `version` field, so a skill pinned by `revision` or a non-version tag has no version to intersect with a range. Rule adopted in Decision 0012 §2: the highest version tag of the source that peels to that commit, else no version — and any range on that name then conflicts.
+- FINDING: the Decision 0012 file exists only in the decision worktree `~/Developer/ReluxWorks/.worktrees/curator-spec-decision-0012`, not in the story worktree `.temp/STORY-260902-le61cp/worktree` (at main `4d55698`). The producer brief names the decision worktree explicitly; the commit lives there and the story branch is untouched.
+- FINDING: node-semver 7.7.4 re-verified for the range grammar now written into Decision 0012 §2 — `>1.2`→`>=1.3.0`, `<=1.2`→`<1.3.0-0`, `^0.1`→`>=0.1.0 <0.2.0-0`, `^0`→`<1.0.0-0`, `~1`→`>=1.0.0 <2.0.0-0`, `x`→`*`, hyphen ranges accepted by npm but excluded by the decision.
+- ANOMALY: `git verify-commit` in curator-spec reports validity `U` for good SSH signatures because `gpg.ssh.allowedSignersFile` points at a stale temp path (`/private/tmp/curator-spec-rc8-verify.*/maintainers.allowed_signers`); base commit `a25dc67` shows the same. Signatures verify "Good"; only principal lookup fails.
+
+## 2026-09-02 — Decision 0012 draft review: changes requested (TASK-260902-3cnbwa)
+
+- DECISION: Decision 0012 draft (`decisions/0012-context-packages-and-semver-locks.md`, `a25dc67` on `draft/decision-0012-context-packages`) routed to `development`; 1 blocking, 12 major, 9 minor, 2 nit in board resource `TASK-260902-3cnbwa_review-findings-0012-1.md`. Model (second package kind on the closure engine, lock as identity, winner/placement primitives, launch-channel MCP) held; rules around it need one more pass.
+- FINDING: "ties are impossible" in semver-range resolution is false once build metadata is ignored for equality — `v1.2.3+a` and `v1.2.3+b` are two tags, two commits, one version. Forbid build metadata in version tags or define `context_version_ambiguous`.
+- FINDING: npm `latest` is a dist-tag, not range grammar (node-semver 7.7.4 `validRange('latest')` = null). A spec calling it a range spelling owns it as an extension.
+- FINDING: an MCP allowlist over bare executable names is defeated by `npx`/`uvx`/`sh` through `args`; the draft's own example was `npx -y figma-developer-mcp`. Allowlist (command, leading args) or state the bound honestly.
+- FINDING: range-based closures make the requirement set version-dependent; "intersection of every declared range across the closure" needs an explicit fixpoint (re-select, re-expand, monotone termination) rule. Core §7 assumes fixed commits.
+- FINDING: impact accounting undercounted — environments.md §1, §3, §4, §5 body, §7.3, §8.2, §9.6, §10.2, §12, §13 all change under 0012; only §2, §6, §9.1, §9.4 were named.
+- NOTE: Decision 0011 (execution ownership, Option A) is still unwritten; number `0011` is already used by `decisions/0011-swift-driver-pair.md` in worktree `curator-spec-draft-swift`.
+- NOTE: verified on this machine — claude 2.1.258 `--mcp-config`/`--strict-mcp-config`; codex 0.151.0 `-p` = "Layer $CODEX_HOME/<name>.config.toml on top of the base user config"; opencode `OPENCODE_CONFIG` documented, merged below project config; pi 0.84.2 has no MCP channel.
+
 ## 2026-09-01 — csk surface-naming sweep: 883 hits, one real surface rewrite (TASK-260901-1j1qrk)
 
 - FINDING: the Decision 0010 D4 csk-spelling sweep across curator-spec (712 case-insensitive hits) and curator (171) found exactly ONE surface hit not naming a frozen §1.1 identifier: `protocol/core.md:1644`'s illustrative non-portable path example `.csk-build.json` (sole occurrence in both repos). Rewritten to `.agent-build.json`; spec commit `4d55698` on `draft/csk-surface-naming` (signed, base `f8d7e7a`, not pushed). Everything else is frozen wire identifiers, schema `$id`s/titles, digest-pinned conformance bytes, functional env/CI contracts (`CSK_GLOBAL_ROOT`, `CSK_REQUIRE_FULL_CANDIDATE_ROOT`), the external implementation's own identifiers (`csk` CLI, `src/csk/*`), or historical records (LOGBOOK, `.research/`, decisions, CHANGELOG) — both repos were already D4-clean in their own prose.

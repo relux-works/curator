@@ -1,0 +1,5 @@
+# Producer brief: launcher SPEC rework 1 (stray-file probe)
+
+Read `TASK-260901-25zqel_review-findings-launcher-pi-1.md` in full (major + any minors). Worktree `~/Developer/ReluxWorks/curator-agent-launcher`, branch `draft/spec-pi-file-channels`, head `0029b36`. Edit SPEC.md only.
+
+Apply the major per the reviewer's first option: the launcher's system-prompt probe is keyed on the environment adapter's closed file-channel filename set (for pi: APPEND_SYSTEM.md, SYSTEM.md) and runs on EVERY launch into a managed home, independent of the fragment's system_prompt section — presence of any listed file triggers the full §5.2 warning set naming the file and its kind. Remove or correct the false drift-and-repair claim; do not assert Curator behavior environments.md does not provide. If a residual remains (e.g. native-home launches are out of launcher scope), state it honestly in §9. Apply all minors from the report. Bump 0.1.2-draft + revision history line. One new signed commit; republish CR revision through your tooling; handoff to-review with the disposition summary.

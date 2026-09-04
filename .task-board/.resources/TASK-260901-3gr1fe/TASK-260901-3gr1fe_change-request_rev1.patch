@@ -1,0 +1,18 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index d4372ee2..c3df3098 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,13 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-01 — Onboarding import, `path` source kind, and §9.1 ref selection (TASK-260901-3gr1fe)
++
++- MILESTONE: curator-spec `protocol/environments.md` promotes `path` to a normative revision-1 source kind (repo-shaped operand, copy-on-install snapshot, state-hash pin, core §6.2 tree discipline, root `.git` excluded / nested `.git` rejected), adds §9.6 onboarding import (closed detected-surface list, lossless/lossy classification with named loss list, per-operation consent gate, deterministic reassembly with content-preserving CRLF→LF normalization, skill migration via recovered exact declarations + `environment_import_skill_foreign`), and closes the twice-filed §9.1 gap with install-level `--tag|--branch|--revision` (exactly one, whole-snapshot, default = track remote `HEAD` default branch, resolved commit = effective pin, `profile_install_ref_conflict` on mixed refs). Branch `draft/environments-onboarding-import` at `f8d7e7a` (signed, verifies against `maintainers.allowed_signers`), base `62e592a`; not pushed.
++- DECISION: `agent-environment-marker-v1` schema 1 evolved in place (third `profile` branch: `source_path`, `state_sha256`, optional `imported_from_native: const true`) instead of a v2 — the surface postdates the rc.9 release pin, no tag/claim/reader pins its bytes, so COMPATIBILITY.md's in-place prohibition (which governs published series) does not bind; a v2 fork would be ceremony. Fragment schema and determinism vectors deliberately unchanged: the pin grammar is closed at `commit`/`state` spellings and vectors carry pins, not source kinds.
++- FINDING: `make regenerate` advances `release/1.0.0-rc.9.json` candidate manifest pins whenever the conformance suite changes — generator-owned, precedent cef93fb; commit the rc.9 delta with the vectors or `regenerate-check` fails.
++- NOTE: schema gate proven by mutation, not only positives: loosening `imported_from_native` to plain boolean → validate.py exit 1 on `invalid-path-imported-from-native-false`; deleting the path branch → exit 1 on `valid-path-profile`. Final `make validate` exit 0 (57 schemas, 773 vector files, 147 unittests, go tests); generator twice byte-identical.
++
+ ## 2026-09-01 — Agent-environments manager-profile and CLI sections (TASK-260901-2pho68)
+ 
+ - MILESTONE: curator-spec `profiles/manager.md` gained §12 "Agent-environments manager profile" (registry, modes/marker, lifecycle+onboarding, passthrough, `env resolve` verify-and-repair, always-strict profile audit, status/GC live roots) plus a §7 pointer to the `context-secret-material` class; `cli/curator.md` gained `profile`/`env` command rows, `global --profile/--all-profiles`, the `curator run`/`curator session` umbrella note, and a usage example. Branch `draft/environments-manager-profile` at `6697c1e` (signed, verifies G), base `c3b29b1`; not pushed.

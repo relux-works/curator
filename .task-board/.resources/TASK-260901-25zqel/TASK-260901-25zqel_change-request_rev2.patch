@@ -1,0 +1,31 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index d4372ee2..cab1d1b2 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,26 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-01 — Launcher SPEC 0.1.2-draft: file-kind probe rekeyed on the adapter registry (TASK-260901-25zqel rework 1)
++
++- FINDING (review RUN-260901-7354f1, MAJOR, confirmed): the 0.1.1-draft §5.1 probe keyed on the fragment's `system_prompt.channels` list, so a pi launch whose fragment carried no `system_prompt` section probed nothing while the tool still applied a stray `SYSTEM.md` full-replace — a silent bypass of the §5.2 warning contract. The paragraph asserted Curator drift-and-repair covers the stray file, but environments.md §10.1 repair leaves unmanaged files untouched and §8.4 drift covers only marker-recorded surfaces: the asserted guard never runs on that path.
++- MILESTONE: SPEC.md 0.1.2-draft, signed commit `6de42d8` (verifies G) on `draft/spec-pi-file-channels` atop `0029b36`, base `origin/main` @ `dae0c35`; not pushed. The §5.1 probe is now keyed on the environment adapter's closed file-channel filename set (revision 1: exactly `pi` — `APPEND_SYSTEM.md`, `SYSTEM.md`) and runs on every launch into a managed home, fragment `system_prompt` section or not; a present-and-readable file with no corresponding fragment descriptor is an active channel and triggers the full §5.2 warning set. build/vet exit 0.
++- DECISION: removal ownership stated honestly — a marker-recorded materialized file belongs to Curator's materialization/drift/repair (§5.5/§8.4); any other file at a registry filename is unmanaged, no automated contract removes it, and every launcher-mediated launch warns until the operator removes it. Residuals recorded in §9: hand launches bypass the probe (the launcher is never mandatory), and the pre-exec probe is point-in-time, so a file written between probe and tool startup goes undetected; neither is closable from the launcher's seat.
++
++## 2026-09-01 — Launcher SPEC 0.1.1-draft: pi file-kind channel semantics (TASK-260901-25zqel)
++
++- MILESTONE: SPEC.md §5 restructured into §5.1/§5.2 to close the carried review minor on file-kind channels (`pi` `APPEND_SYSTEM.md`/append, `SYSTEM.md`/replace). Launcher never places/removes/edits the files (Curator materialization under the `system_prompt_files` machine setting owns them); mandatory pre-exec presence probe; warning set mandatory for an active file-kind channel even without `--system-prompt`; file-kind presence orthogonal and additive to the flag-class opt-in, warning enumerates every active channel; `sysprompt_file_unreadable` added to §6; §8.1 Revision history added. Signed commit `0029b36` (verifies G) on `draft/spec-pi-file-channels`, base `origin/main` @ `dae0c35`; not pushed. build/vet exit 0.
++- DECISION: an absent file-kind file is the channel's legitimate inactive state, never a diagnostic — the fragment reproduces pi's §7.3 descriptor list unconditionally and `system_prompt_files` defaults to `off`, so treating absence as an error would fail every plain pi launch. `sysprompt_file_unreadable` fires only on a present-but-unreadable or non-regular-file probe, preserving the §6 absence-vs-read-failure invariant. The producer brief's "absent/unreadable" wording was deliberately narrowed to unreadable; rationale recorded in `TASK-260901-25zqel_launcher-pi-channels-notes.md`.
++- DECISION: a `file`-kind descriptor never satisfies the `--system-prompt` opt-in — opt-in selection considers only `flag`/`config-key`/`variable`; matching-semantics file presence does not avert `sysprompt_channel_unavailable`, and the launcher does not arbitrate tool-side precedence when both a flag and a file engage on one launch.
++
++## 2026-09-01 — curator-agent-launcher bootstrap: skeleton + spec draft (TASK-260901-32j97g)
++
++- MILESTONE: fresh local repo `~/Developer/ReluxWorks/curator-agent-launcher` on `main` (no remote, nothing pushed — orchestrator lands after review): compiling `cmd/curator-run` stub (informational flags exit 0, everything else usage-refused exit 2, tested at the `run()` production dispatch site), Apache-2.0 LICENSE byte-copied from curator, NOTICE, Makefile, `.gitignore`, and `SPEC.md` `0.1.0-draft`. Two signed commits `d3400fb`/`dae0c35`, both verify G. build/vet/test/gofmt all exit 0.
++- DECISION: `--system-prompt` takes a required `append|replace` value — the launcher never defaults to the destructive replace channel, and an opt-in with no matching fragment channel is `sysprompt_channel_unavailable`, not a silent no-op.
++- DECISION: the launcher owns the closed env-id→agentic-system mapping (claude_code→claude-code, codex_cli→codex, pi→pi; opencode `env_unsupported` in revision 1) — it is the only component speaking both vocabularies; neither curator-spec nor agents-management assigns this mapping elsewhere.
++- DECISION: no diagnostic downgrades a launch — `ax_handoff_failed` never falls back to untracked direct exec, and a malformed fragment read is `resolve_fragment_invalid`, never treated as absence. Child env merges process < plan < fragment, fragment winning on exactly its closed adapter-registry names (§10.3 boundary makes that safe).
++- NOTE: `go run` masks the child's exit code as 1; the exit-2 smoke needs the compiled binary.
++
+ ## 2026-09-01 — Agent-environments manager-profile and CLI sections (TASK-260901-2pho68)
+ 
+ - MILESTONE: curator-spec `profiles/manager.md` gained §12 "Agent-environments manager profile" (registry, modes/marker, lifecycle+onboarding, passthrough, `env resolve` verify-and-repair, always-strict profile audit, status/GC live roots) plus a §7 pointer to the `context-secret-material` class; `cli/curator.md` gained `profile`/`env` command rows, `global --profile/--all-profiles`, the `curator run`/`curator session` umbrella note, and a usage example. Branch `draft/environments-manager-profile` at `6697c1e` (signed, verifies G), base `c3b29b1`; not pushed.

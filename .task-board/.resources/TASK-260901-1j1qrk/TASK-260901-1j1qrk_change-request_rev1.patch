@@ -1,0 +1,17 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index d4372ee2..6266e0a9 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,12 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-01 — csk surface-naming sweep: 883 hits, one real surface rewrite (TASK-260901-1j1qrk)
++
++- FINDING: the Decision 0010 D4 csk-spelling sweep across curator-spec (712 case-insensitive hits) and curator (171) found exactly ONE surface hit not naming a frozen §1.1 identifier: `protocol/core.md:1644`'s illustrative non-portable path example `.csk-build.json` (sole occurrence in both repos). Rewritten to `.agent-build.json`; spec commit `4d55698` on `draft/csk-surface-naming` (signed, base `f8d7e7a`, not pushed). Everything else is frozen wire identifiers, schema `$id`s/titles, digest-pinned conformance bytes, functional env/CI contracts (`CSK_GLOBAL_ROOT`, `CSK_REQUIRE_FULL_CANDIDATE_ROOT`), the external implementation's own identifiers (`csk` CLI, `src/csk/*`), or historical records (LOGBOOK, `.research/`, decisions, CHANGELOG) — both repos were already D4-clean in their own prose.
++- NOTE: curator required zero changes, so the branch carries no curator commit for this task; gates still run green at `979fa36e` (build/vet 0, non-cmd tests 0 with 57 ok, `cmd/curator` split into `-run '^Test[A-C]'`/`[D-R]'`/`[S-Z]'` slices, all exit 0, covering all 96 tests within the ~10-minute shell bound).
++- NOTE: classification boundary worth reusing — `csk` as the cocoaskills product/CLI name and its real paths/env vars are external-system identifiers, not this repo's surface vocabulary; rewriting them in logs/research/decision records would falsify evidence. Full per-hit dispositions in board resource `csk-naming-inventory.md`.
++
+ ## 2026-09-01 — Agent-environments manager-profile and CLI sections (TASK-260901-2pho68)
+ 
+ - MILESTONE: curator-spec `profiles/manager.md` gained §12 "Agent-environments manager profile" (registry, modes/marker, lifecycle+onboarding, passthrough, `env resolve` verify-and-repair, always-strict profile audit, status/GC live roots) plus a §7 pointer to the `context-secret-material` class; `cli/curator.md` gained `profile`/`env` command rows, `global --profile/--all-profiles`, the `curator run`/`curator session` umbrella note, and a usage example. Branch `draft/environments-manager-profile` at `6697c1e` (signed, verifies G), base `c3b29b1`; not pushed.

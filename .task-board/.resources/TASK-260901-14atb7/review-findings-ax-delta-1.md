@@ -1,0 +1,30 @@
+# Review verdict: TASK-260901-14atb7 — ax curator-integration SPEC delta
+
+**Verdict: ACCEPT** (CR-TASK-260901-14atb7-1 rev 1). Also serves as `review-findings-ax-delta-1.md` per the review brief.
+
+Subject reviewed: ax worktree `/Users/iv/Developer/ReluxWorks/.temp/ax-curator-integration/worktree`, branch `draft/curator-environment-integration`, head `d7075e1a30ff11d5241e6bddef971f3dc3aff5ca`, base `28bf96d` (= merge-base with `origin/main`, verified), plus the curator-repo CR delta (LOGBOOK.md entry only, accurate). Read-only; nothing pushed.
+
+## Checks (per review-brief-ax-delta.md)
+
+1. **Additivity — PASS.** Delta is exactly `SPEC.md` (+62 lines, four prose-only paragraph insertions in §5.1, §7.5, §13.10, §14.1 — placement verified against actual heading line numbers) and `scripts/validate_spec.py` (±1 line). No heading/anchor/numbering changes, no table edits, no normative-invariant edits, no fixture changes. Every insertion carries OPTIONAL-integration framing and explicitly states ax-without-Curator behavior is unchanged (§5.1: absent keys = not Curator-launched, opaque preservation; §7.5: "no member to SpawnPlan and no obligation"; §13.10: "no drift check... never changes lease, fencing, checkpoint, or materialization semantics"; §14.1: informative, "no normative impact").
+
+2. **`validate_spec.py` ±1 line — JUSTIFIED, not scope creep.** The single changed line re-mints `FROZEN_RELEASE_DOCUMENT_SHA256["SPEC.md"]` (`562546d2…` → `6bbefa4d…`). The validator pins an LF-normalized SHA-256 of SPEC.md and its own comment mandates deliberate replacement for an intentional revision; without it the repo's single validation command is red on any SPEC.md edit by design. Gate attacked, not read: I tampered SPEC.md in a scratch copy of head — the validator refuses with exit 1 and the frozen-baseline diagnostic naming the new expected hash, proving the re-minted gate still rejects tampering (not a widened or disabled gate).
+
+3. **Extensions conformance — PASS.** Reran the repo's own gates myself at head `d7075e1`: `scripts/validate_spec.py` exit 0 (279/279 semantic checks), `./run_validation.sh` exit 0 (full suite incl. Structurizr/C4 + publication-artifact freshness), `scripts/test_expected_red.sh` exit 0, **304/304 mutations rejected** (my rerun, ~9 min, not accepted from producer evidence). Key grammar: `works.relux.curator.profile-name` / `.profile-pin` / `.fragment-digest` — every label matches §1.6 `[a-z][a-z0-9-]{0,62}`, ≥1 dot, lowercase, 3–253 chars; values are plain strings (valid ExtensionValue); no-core-semantics-influence and opacity restated in the inserted text itself; consistent with the existing `works.relux.ax.launch-hint` / `.goal-label` / `.board-scope` convention (§9.3). Pin-shape claim (commit XOR state hash, never both) matches curator-spec `environments.md` §10.2 on landed main `f8d7e7a` — see minor finding M1.
+
+4. **Resume/fork drift paragraph — PASS.** Placed at the end of §13.10 Resume, extends to §13.8 fork with fresh values recorded in the new record. Warn-and-continue default + MAY strict refusal matches Decision 0010's resume-fidelity clause verbatim in substance (record name/pin/digest at launch, re-resolve on resume, differing pin = drift, warn-and-continue, strict flag refuses). Notably it also states the negative-fact rule: a failed resolution is distinct from both drift and currency and MUST NOT be treated as proof the environment is current — correct absence-vs-read-failure discipline. Fragment-digest is well-defined: it is declared as the digest over the exact `launch-env-fragment-v1` JSON bytes consumed at launch (hash-what-you-read, no canonicalization needed), and the drift comparison operates on `profile-pin`, not the digest, so no ambiguity arises from resolve-output formatting.
+
+5. **Citations — PASS.** `relux-works/curator-spec`, `protocol/environments.md` §10 (fragment/closed set) and §11 (umbrella subcommand discovery) cited by name, no vendored copies. §11 on landed main matches the shim note exactly: `curator-NAME` PATH discovery, arguments delegated verbatim, `curator-session` already named there as an informative first provider. CLI shape `curator env resolve ENVIRONMENT --profile PROFILE --format json` matches §10.1. The `curator session` note is informative-only.
+
+6. **Signed commit / delta scope — PASS.** Single commit `d7075e1`, signature verifies (`G`, SSH key SHA256:V6JiKG7J29…), author Ivan Oparin; clean tree; delta = SPEC.md + the one justified script line, nothing else.
+
+Producer notes (`TASK-260901-14atb7_ax-integration-notes.md`) are accurate against everything I independently verified, including the honest surfacing of the hash re-mint for the PR description.
+
+## Findings (minor, non-blocking)
+
+- **M1 — pin-source enumeration slightly stale vs curator-spec main.** ax §5.1 explains the pin as "the full lowercase-hex commit of a git profile or the state hash of a **local** profile"; curator-spec landed main (`f8d7e7a`, which promoted the `path` source kind) says `state_sha256` for a `local` **or `path`** profile. The operative rule ("the profile's effective pin as resolved at launch") already covers path profiles, so this is an under-enumerated example, not a contract gap. Recommend the orchestrator's PR description (or a one-word maintainer amend) extends it to "local or path profile".
+- **M2 (nit) —** the §7.5 paragraph attributes the closed variable-name set to "the Curator environment adapter registry (…, Section 10)"; the registry itself is environments.md §7, while §10.3 is where the closed-set rule for fragments is stated. The producer brief mandated citing §10, and §10.3 does carry the rule, so this reads fine; noted only for completeness.
+
+## CR emptiness/shape note
+
+The curator-repo CR delta is intentionally just the LOGBOOK.md entry: the substantive delta lives in the external ax repo worktree (it cannot ride the curator story branch), and the orchestrator opens the ax PR from that worktree per the producer brief. The LOGBOOK entry's claims (sections, hash re-mint, gate evidence, key grammar rationale) all check out against my independent verification.

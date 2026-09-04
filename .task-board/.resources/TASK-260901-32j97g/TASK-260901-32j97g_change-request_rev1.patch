@@ -1,0 +1,19 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index d4372ee2..28b7cf97 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,14 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-01 — curator-agent-launcher bootstrap: skeleton + spec draft (TASK-260901-32j97g)
++
++- MILESTONE: fresh local repo `~/Developer/ReluxWorks/curator-agent-launcher` on `main` (no remote, nothing pushed — orchestrator lands after review): compiling `cmd/curator-run` stub (informational flags exit 0, everything else usage-refused exit 2, tested at the `run()` production dispatch site), Apache-2.0 LICENSE byte-copied from curator, NOTICE, Makefile, `.gitignore`, and `SPEC.md` `0.1.0-draft`. Two signed commits `d3400fb`/`dae0c35`, both verify G. build/vet/test/gofmt all exit 0.
++- DECISION: `--system-prompt` takes a required `append|replace` value — the launcher never defaults to the destructive replace channel, and an opt-in with no matching fragment channel is `sysprompt_channel_unavailable`, not a silent no-op.
++- DECISION: the launcher owns the closed env-id→agentic-system mapping (claude_code→claude-code, codex_cli→codex, pi→pi; opencode `env_unsupported` in revision 1) — it is the only component speaking both vocabularies; neither curator-spec nor agents-management assigns this mapping elsewhere.
++- DECISION: no diagnostic downgrades a launch — `ax_handoff_failed` never falls back to untracked direct exec, and a malformed fragment read is `resolve_fragment_invalid`, never treated as absence. Child env merges process < plan < fragment, fragment winning on exactly its closed adapter-registry names (§10.3 boundary makes that safe).
++- NOTE: `go run` masks the child's exit code as 1; the exit-2 smoke needs the compiled binary.
++
+ ## 2026-09-01 — Agent-environments manager-profile and CLI sections (TASK-260901-2pho68)
+ 
+ - MILESTONE: curator-spec `profiles/manager.md` gained §12 "Agent-environments manager profile" (registry, modes/marker, lifecycle+onboarding, passthrough, `env resolve` verify-and-repair, always-strict profile audit, status/GC live roots) plus a §7 pointer to the `context-secret-material` class; `cli/curator.md` gained `profile`/`env` command rows, `global --profile/--all-profiles`, the `curator run`/`curator session` umbrella note, and a usage example. Branch `draft/environments-manager-profile` at `6697c1e` (signed, verifies G), base `c3b29b1`; not pushed.

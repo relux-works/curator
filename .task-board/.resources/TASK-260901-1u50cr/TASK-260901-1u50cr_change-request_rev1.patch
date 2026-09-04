@@ -1,0 +1,19 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index cff3a1be..70fd4cd0 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,14 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-01
++
++### 1643 — Three spawn deaths left a complete signed commit with zero board evidence (TASK-260901-1u50cr)
++- ANOMALY: spawn runs RUN-260901-8f5870/-6623ac/-f27a3d all exited 1 with `API Error: ENOTFOUND` — transient network, not work failure. One had already authored the full deliverable (curator-spec `draft/environments-schemas` @ `cef93fb`, signed) but died before attaching any evidence, so the board showed three failures and an unverified commit.
++- FINDING: recovery cost one full independent re-verification, not a redo — `make validate` green (57 schemas, 766 vector files, 147 tests), `go test -count=1` green, generator run twice byte-identical (`a84f1c1…` tree hash) and clean against the committed bytes. Verify-then-adopt beats re-author when a dead run's commit is signed and based on current `origin/main`.
++- FINDING: curator-spec `make validate` fails on system python (`ModuleNotFoundError: jsonschema`); each worktree carries its own `.venv` with `requirements-dev.txt` pinned deps — activate it before any validate/regenerate call.
++- STATUS: TASK-260901-1u50cr verified and handed off to review; evidence in board resource `TASK-260901-1u50cr_env-schemas-notes.md`.
++
+ ## 2026-08-28 — Authoring CLI commands documentation refresh (TASK-260827-21xw9d)
+ 
+ - **Documentation created**: Added `docs/authoring-cli-commands.md` detailing how skill authors ship CLI utilities with skills. Covered command placements (embedded build roots vs external build repositories), per-language admission matrix derived from `internal/godriver/` and `internal/skillspec/`, script command interpreters (`node-v1`, `python3-v1`), schema-8 enforced script policy (`script-worker-v1`), three minimal worked examples (`embedded_go`, `external_go_repo`, `script_skill`), and planned driver error handling (`commands.<name>.driver: must be 'go-v1' or 'go-repository-v1'`).

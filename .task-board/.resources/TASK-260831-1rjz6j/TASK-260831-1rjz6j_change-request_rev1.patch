@@ -1,0 +1,45 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index cff3a1be..36291c1c 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,40 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-08-31 — Decision 0010 rework 1 applied (TASK-260831-1rjz6j)
++
++- FIX: All 13 review-findings-1 items applied to
++  `decisions/0010-agent-environment-profiles.md`, signed commit `fe21fb0` on
++  `draft/agent-environment-profiles`.
++- DECISION: Secret overclaim resolved by making profile installation
++  always-strict and authorizing a secret-detection detector class over
++  context modules as normative work — the pending item from the entry below
++  is closed by rewording plus these two new rules.
++- DECISION: Builtin `default` profile gets an explicit `local` source kind
++  keyed by the §8 content hash; context IR determinism fixed as
++  validate-and-reject (LF-only UTF-8 modules, one trailing LF, join = one
++  empty line, no transformation).
++- FINDING: curator-spec `make validate` fails on stock macOS python (no
++  `jsonschema`); the three underlying gates run green with a
++  `requirements-dev.txt` venv — validate.py (53 schemas, 691 vectors),
++  unittest (134 tests), `go test ./tools/...`, all exit 0 at `fe21fb0`.
++- STATUS: Handed off to review cycle 2.
++
++## 2026-08-31 — Audit pipeline has no secret detector (TASK-260831-1rjz6j)
++
++- FINDING: Manager §7's "static canary" is a detector self-test — it plants a
++  known-bad fixture and checks the detectors fire (`internal/audit/audit.go:376`)
++  — not a secret canary. The only deterministic detectors are
++  undeclared-network-host and undeclared-exec-name, scanned over `scripts/` and
++  the manifest only (`internal/audit/audit.go:299`).
++- FINDING: No detector scans content for credentials; advisory mode installs
++  with a warning even on verifiable findings. Any claim that "credential-like
++  material is blocked" by the existing pipeline over-claims — surfaced as a
++  major finding in the Decision 0010 draft review (review-findings-1.md on
++  TASK-260831-1rjz6j).
++- STATUS: Pending — Decision 0010 producer must reword or specify a real
++  secret-detection detector class for profile context modules.
++
+ ## 2026-08-28 — Authoring CLI commands documentation refresh (TASK-260827-21xw9d)
+ 
+ - **Documentation created**: Added `docs/authoring-cli-commands.md` detailing how skill authors ship CLI utilities with skills. Covered command placements (embedded build roots vs external build repositories), per-language admission matrix derived from `internal/godriver/` and `internal/skillspec/`, script command interpreters (`node-v1`, `python3-v1`), schema-8 enforced script policy (`script-worker-v1`), three minimal worked examples (`embedded_go`, `external_go_repo`, `script_skill`), and planned driver error handling (`commands.<name>.driver: must be 'go-v1' or 'go-repository-v1'`).

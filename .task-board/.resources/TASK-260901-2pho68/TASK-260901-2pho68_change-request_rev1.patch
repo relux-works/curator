@@ -1,0 +1,17 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index cff3a1be..a2ffebb4 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,7 +3,11 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
+-## 2026-08-28 — Authoring CLI commands documentation refresh (TASK-260827-21xw9d)
++## 2026-09-01 — Agent-environments manager-profile and CLI sections (TASK-260901-2pho68)
++
++- MILESTONE: curator-spec `profiles/manager.md` gained §12 "Agent-environments manager profile" (registry, modes/marker, lifecycle+onboarding, passthrough, `env resolve` verify-and-repair, always-strict profile audit, status/GC live roots) plus a §7 pointer to the `context-secret-material` class; `cli/curator.md` gained `profile`/`env` command rows, `global --profile/--all-profiles`, the `curator run`/`curator session` umbrella note, and a usage example. Branch `draft/environments-manager-profile` at `6697c1e` (signed, verifies G), base `c3b29b1`; not pushed.
++- FINDING: normative gap in `protocol/environments.md` — §1 requires a direct `git` profile declaration to carry exactly one of `tag`/`branch`/`revision`, but §9.1's `profile install <git-url>` never says how the operator expresses that ref at install time or what the default is. Filed in `TASK-260901-2pho68_env-manager-notes.md`; protocol prose untouched (sibling story owns it).
++- NOTE: curator-spec `make validate` Python components need `jsonschema` (`requirements-dev.txt`); system python3 lacks it — a worktree-local venv (`.temp/venv`) was used. All three validate components exit 0 (53 schemas, 691 vectors; 134 unittests; `go test ./tools/...`).
+ 
+ - **Documentation created**: Added `docs/authoring-cli-commands.md` detailing how skill authors ship CLI utilities with skills. Covered command placements (embedded build roots vs external build repositories), per-language admission matrix derived from `internal/godriver/` and `internal/skillspec/`, script command interpreters (`node-v1`, `python3-v1`), schema-8 enforced script policy (`script-worker-v1`), three minimal worked examples (`embedded_go`, `external_go_repo`, `script_skill`), and planned driver error handling (`commands.<name>.driver: must be 'go-v1' or 'go-repository-v1'`).
+ - **README integration**: Updated `README.md` under the Skill packages bullet to link `docs/authoring-cli-commands.md`.

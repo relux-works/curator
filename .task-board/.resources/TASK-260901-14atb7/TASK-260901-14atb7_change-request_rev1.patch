@@ -1,0 +1,18 @@
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index d4372ee2..ce1be040 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,13 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-01 — ax curator-integration SPEC delta (TASK-260901-14atb7)
++
++- MILESTONE: authored the D10 ax proposal delta in `agent-session-manager-spec` — §5.1 `works.relux.curator.*` Session Record extension keys (SHOULD, OPTIONAL integration), §7.5 `launch-env-fragment-v1` → `env_literals` consumption paragraph, §13.10 resume/fork drift policy (warn-and-continue default, MAY strict-refuse, failed resolve ≠ currency), §14.1 informative `curator session` shim note. Branch `draft/curator-environment-integration` at `d7075e1` (signed, verifies G), base `origin/main`=`28bf96d`; not pushed — orchestrator opens the PR.
++- FINDING: the ax repo pins an LF-normalized SHA-256 of SPEC.md (plus 4 other public docs) in `scripts/validate_spec.py` `FROZEN_RELEASE_DOCUMENT_SHA256`; any SPEC.md-touching PR must re-mint that hash or `run_validation.sh` is red by design. The delta re-minted only the SPEC.md entry; `test_expected_red.sh` proves the gate still rejects tampering (304/304 mutations rejected, exit 0).
++- FINDING: ax §1.6 extension-key labels match `[a-z][a-z0-9-]{0,62}` — underscores forbidden — so the curator keys are `works.relux.curator.profile-name`/`.profile-pin`/`.fragment-digest`, matching the existing `works.relux.ax.*` hyphenated convention (§9.3 bundles).
++- STATUS: validate_spec.py exit 0 (279/279 semantic checks), run_validation.sh exit 0, expected-red 304/304; notes attached as `TASK-260901-14atb7_ax-integration-notes.md`.
++
+ ## 2026-09-01 — Agent-environments manager-profile and CLI sections (TASK-260901-2pho68)
+ 
+ - MILESTONE: curator-spec `profiles/manager.md` gained §12 "Agent-environments manager profile" (registry, modes/marker, lifecycle+onboarding, passthrough, `env resolve` verify-and-repair, always-strict profile audit, status/GC live roots) plus a §7 pointer to the `context-secret-material` class; `cli/curator.md` gained `profile`/`env` command rows, `global --profile/--all-profiles`, the `curator run`/`curator session` umbrella note, and a usage example. Branch `draft/environments-manager-profile` at `6697c1e` (signed, verifies G), base `c3b29b1`; not pushed.
