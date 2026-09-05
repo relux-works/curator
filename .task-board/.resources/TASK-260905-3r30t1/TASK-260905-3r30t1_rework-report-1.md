@@ -101,3 +101,85 @@ logic only, not the test binaries); the hosted jobs are the proof for those.
 ## Hosted CI on PR #58 (head 5abec244)
 
 Pushed with a plain `git push origin feat/byte-exact-acquisition` (5beced46..5abec244, no force).
+Run 33966680785 at 5abec244: every job green except `Test (windows-latest)`:
+
+| Job | Result |
+| --- | --- |
+| Gate self-test (ubuntu/macos/windows) | pass |
+| Interop conformance gate, Lint, Naming gate | pass |
+| Test (ubuntu-latest), Test (macos-latest) | pass |
+| Race (ubuntu-latest), Race (macos-latest) | pass |
+| Test (windows-latest) | fail: `internal/gitops TestExtractPreservesExecutableBit` — `100755 entry lost the executable bit: -rw-rw-rw-` |
+
+On that Windows job the ledger-consistency step and the platform-case gate itself both passed
+(`platform-case gate: ok`, all four gitops rows `ok`, interop `tol root-content`); the only
+failure was the go test stream (`test-gate: go test exit=1, platform-case gate exit=0`), i.e. a
+real defect in the new test, not a gate finding. Windows synthesizes `-rw-rw-rw-` for every
+regular file, so a 100755 blob can never show an execute bit there.
+
+## Second commit: a46abc80
+
+```
+a46abc80 Assert the extraction executable bit on the unix runners only   (on top of 5abec244, no rewrite)
+Good "git" signature for oparin@me.com with ECDSA key SHA256:V6JiKG7J29mjsvikcLoSVp0bLa77VTsFy12gnLO81cM
+```
+
+Files: `internal/gitops/byteexact_test.go` (windows skip with the reason
+`Windows does not expose portable executable permission bits`, the `platform-control` pattern
+`skip-classes.tsv` already carries and `internal/artifactpolicy` already uses),
+`.github/ci/platform-cases.tsv` (new row `internal/gitops TestExtractPreservesExecutableBit
+linux,darwin | windows | platform-control`). No production code touched.
+
+Local reproduction (exact commands, real exit codes):
+
+```
+go build ./...                                                     -> exit 0
+go vet ./internal/gitops ./internal/interop                        -> exit 0
+gofmt -l internal/gitops                                           -> exit 0, no output
+bash .github/ci/ledger-consistency.sh .temp/rework1/ledger2        -> exit 0 (87 rows checked; ledger-consistency: ok)
+bash .github/ci/gate-selftest.sh                                   -> exit 0 (gate-selftest: 81 passed, 0 failed)
+CURATOR_CONFORMANCE_ROOT=<pinned root> go test -count=1 -race -timeout 30m -json ./internal/gitops ./internal/interop -> exit 0
+CI_GATE_GOOS=linux|darwin|windows bash .github/ci/platform-case-gate.sh .temp/rework1/focused2.json <evidence>
+   -> exit 1 on each (the other ledger rows are absent from a two-package stream, as before);
+      linux and darwin print `ok internal/gitops :: TestExtractPreservesExecutableBit`; windows prints
+      nothing for it (not required there).
+```
+
+Skip-tolerance proof: the same stream with the case's `pass` event rewritten to a `skip` carrying
+the Windows reason text (`.temp/rework1/skipmutant.json`):
+
+```
+CI_GATE_GOOS=windows -> skips-observed.tsv: internal/gitops  TestExtractPreservesExecutableBit  platform-control  tolerated-by-ledger  Windows does not expose portable executable permission bits
+CI_GATE_GOOS=linux   -> FAIL  ledger case skipped where the ledger does not tolerate it (linux): internal/gitops :: TestExtractPreservesExecutableBit
+                        FAIL  required case skipped on linux: internal/gitops :: TestExtractPreservesExecutableBit
+```
+
+## Hosted CI run 33968713699 at a46abc80
+
+`Test (windows-latest)`: pass. `test-gate: go test exit=0, platform-case gate exit=0`; ledger
+consistency prints `ok internal/gitops :: TestExtractPreservesExecutableBit [must=linux,darwin
+skip=windows]`; the evidence artifact's `skips-observed.tsv` records
+`internal/gitops TestExtractPreservesExecutableBit platform-control tolerated-by-ledger` and
+the interop `root-content` skip; zero `fail` events in `go-test.json`.
+
+`Race (macos-latest)`: fail on the first attempt — `internal/install
+TestStrictRegistryPolicyFailsUnknown`: `registry test-reg snapshot timestamp is too far in the
+future`. That check (`internal/registry/snapshot.go:158`, `parsed.CreatedAt.After(now.Add(clockSkew))`)
+compares a fixture stamped with `time.Now()` against the wall clock; it touches nothing this
+branch changes (the branch's non-test diff is `internal/gitops`, one call each in
+`internal/snapshot` and `internal/closure`), and the same job passed at 5abec244. Classified as
+a pre-existing timing flake; the failed job was rerun (`gh run rerun 33968713699 --failed`).
+Every other job on the run passed on the first attempt. The adapter suites (Cargo/Swift/pnpm/yarn)
+did not fail on this run.
+
+Final state of run 33968713699 (after `gh run rerun --failed`; the platform re-executed every
+job, new job ids): all twelve required jobs pass — Gate self-test ×3, Interop conformance gate,
+Lint, Naming gate, Test (ubuntu 3m9s / macos 10m18s / windows 32m7s), Race (ubuntu 9m18s /
+macos 17m55s). `Candidate suite` is `skipping` by design on a PR run. `gh pr checks 58`: no
+failing check.
+
+## Not verified
+
+- linux and windows test binaries were not run locally; the hosted jobs are the proof.
+- The `internal/install` timing flake was not root-caused beyond locating the clock-skew check;
+  it is outside this task's scope and is recorded in the board logbook entry.

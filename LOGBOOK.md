@@ -4314,3 +4314,17 @@ pause the task-board client identity changed, orphaning every managed
 workspace (`worktree_ownership_mismatch`); `worktree abort --discard --confirm`
 plus a re-spawn was the only path, so the reviewed commit travels on the draft
 branch and is cherry-picked into the fresh workspace.
+
+## 2026-09-05 — Step 4 of the execution epic is landed: revision 1.1 with schemas, vectors, manager §12 and CLI
+
+curator-spec main now carries the complete revision-1.1 surface: the protocol
+text (`a68559b`), manager §12 with the CLI rows and manager-config schema 2
+(`f61ee9a`, PR #41), and the §13 schemas, cases and vector families (`fd237ba`,
+PR #42). Two lessons from the two batches. The hosted `Implementations` lane
+runs the pinned Go manager's interop suite against the PR's conformance root,
+so a schema-2 case appended to `vectors/manager-config.json` failed
+`TestManagerConfigVectors` on every OS; the cases moved to a new
+`manager-config-v2.json` family and the pin keeps passing until stage (c)
+implements schema 2. And a rebase of a generated-vector batch conflicts in the
+manifest, the schema-cases index and the rc.9 pin — resolve by regenerating,
+never by hand, then prove identity with `git range-diff`.
