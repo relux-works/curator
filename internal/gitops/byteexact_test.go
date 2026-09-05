@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -185,6 +186,9 @@ func TestExtractIgnoresWorkingTreeConversion(t *testing.T) {
 }
 
 func TestExtractPreservesExecutableBit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose portable executable permission bits")
+	}
 	fixture := filepath.Join("testdata", "byte-exact")
 	repo, commit := commitExactTree(t, fixture, map[string]string{"lf.txt": "100755"})
 	dest := filepath.Join(t.TempDir(), "snap")
