@@ -410,7 +410,7 @@ func snapshotFor(opts Options, source, repo, commit string) (string, error) {
 	if _, err := os.Stat(target); err == nil {
 		return target, nil
 	}
-	if err := gitops.Archive(repo, commit, target); err != nil {
+	if err := gitops.Extract(repo, commit, target); err != nil {
 		return "", err
 	}
 	return target, nil
