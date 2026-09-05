@@ -18,17 +18,17 @@ const extractWatchdog = 20 * time.Second
 
 // extractBounded runs Extract under the watchdog and fails the test if it
 // does not return in time.
-func extractBounded(t *testing.T, repo, commit, dest string) (error, time.Duration) {
+func extractBounded(t *testing.T, repo, commit, dest string) (time.Duration, error) {
 	t.Helper()
 	start := time.Now()
 	done := make(chan error, 1)
 	go func() { done <- Extract(repo, commit, dest) }()
 	select {
 	case err := <-done:
-		return err, time.Since(start)
+		return time.Since(start), err
 	case <-time.After(extractWatchdog):
 		t.Fatalf("Extract did not return within %s: cat-file deadlock", extractWatchdog)
-		return nil, 0
+		return 0, nil
 	}
 }
 
@@ -86,7 +86,7 @@ func TestExtractRefusesOversizeBlobWithoutStreaming(t *testing.T) {
 	maxSnapshotFileBytes = 512 << 10
 	parent := t.TempDir()
 	dest := filepath.Join(parent, "snap")
-	err, took := extractBounded(t, repo, commit, dest)
+	took, err := extractBounded(t, repo, commit, dest)
 	if err == nil || !strings.Contains(err.Error(), "too large") {
 		t.Fatalf("err = %v, want size refusal", err)
 	}
@@ -112,7 +112,7 @@ func TestExtractRefusesDuplicatePlatformPathBeforeLargeBlob(t *testing.T) {
 	})
 	parent := t.TempDir()
 	dest := filepath.Join(parent, "snap")
-	err, took := extractBounded(t, repo, commit, dest)
+	took, err := extractBounded(t, repo, commit, dest)
 	if err == nil || !strings.Contains(err.Error(), "duplicate platform path") {
 		t.Fatalf("err = %v, want platform-path collision refusal", err)
 	}
@@ -129,7 +129,7 @@ func TestExtractRefusesEscapeBeforeLargeBlob(t *testing.T) {
 	})
 	parent := t.TempDir()
 	dest := filepath.Join(parent, "snap")
-	err, took := extractBounded(t, repo, commit, dest)
+	took, err := extractBounded(t, repo, commit, dest)
 	if err == nil || !strings.Contains(err.Error(), "unsafe path") {
 		t.Fatalf("err = %v, want escape refusal", err)
 	}
@@ -149,7 +149,7 @@ func TestExtractRefusesMissingObjectsFromListing(t *testing.T) {
 	})
 	parent := t.TempDir()
 	dest := filepath.Join(parent, "snap")
-	err, took := extractBounded(t, repo, commit, dest)
+	took, err := extractBounded(t, repo, commit, dest)
 	if err == nil || !strings.Contains(err.Error(), "missing or unreadable object") {
 		t.Fatalf("err = %v, want missing-object refusal", err)
 	}
@@ -194,7 +194,7 @@ func TestExtractRemovesWrittenFilesOnMidStreamError(t *testing.T) {
 	if err := os.WriteFile(keep, []byte("keep"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err, took := extractBounded(t, repo, commit, dest)
+	took, err := extractBounded(t, repo, commit, dest)
 	if err == nil || !strings.Contains(err.Error(), "reading blob "+big) {
 		t.Fatalf("err = %v, want a streaming failure naming the corrupt blob", err)
 	}
@@ -264,7 +264,7 @@ func TestExtractTerminatesCatFileOnMidStreamFramingError(t *testing.T) {
 	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	parent := t.TempDir()
 	dest := filepath.Join(parent, "snap")
-	err, took := extractBounded(t, repo, commit, dest)
+	took, err := extractBounded(t, repo, commit, dest)
 	if err == nil || !strings.Contains(err.Error(), "unexpected git cat-file --batch response") {
 		t.Fatalf("err = %v, want framing refusal", err)
 	}
@@ -295,7 +295,7 @@ func TestExtractTerminatesCatFileOnWriteFailure(t *testing.T) {
 		_ = probe.Close()
 		t.Skip("this process can write through a read-only directory")
 	}
-	err, took := extractBounded(t, repo, commit, dest)
+	took, err := extractBounded(t, repo, commit, dest)
 	if err == nil || !os.IsPermission(err) {
 		t.Fatalf("err = %v, want a permission failure on ro/blocked.txt", err)
 	}
