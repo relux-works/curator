@@ -1,5 +1,5 @@
 ## Status
-reviewing
+done
 
 ## Review
 required
@@ -96,6 +96,29 @@ spawn agent resolution: Agent selection: claude via explicit_override
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [reviewer] reviewer (claude) (run=RUN-260905-6cacb3, max_parallel=20)
 spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-6cacb3)
+Cycle 3 (e45c5b6): CHANGES REQUESTED. F12/F13 resolved. F11 only for managed homes: the verified 2.1.261 guard also skips a symlinked native ~/.claude/CLAUDE.md, so §8.1 linked default for claude_code root context contradicts §5.3 (F14 major, fix = copied root-context surface in every mode). Nit F15 wording. make validate green. See TASK-260905-jb6rvg_review-findings-env-3.md.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-6cacb3, pid=7250, exit=0)
+spawn autonomous recovery: run RUN-260905-6cacb3 queued successor RUN-260905-868670 (attempt 1/3, model=claude-fable-5-1): reviewer run RUN-260905-6cacb3 remains unsatisfied: reviewer run has no verdict branch while TASK-260905-jb6rvg is development
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-868670)
+Cycle 3 (recovery run RUN-260905-868670): CHANGES REQUESTED at e45c5b6. F12/F13 resolved; F11 resolved for managed homes only. F14 (major): §8.1 keeps claude_code on the linked in-place default, but the 2.1.261 loader aD skips a depth-0 symlinked or hard-linked user CLAUDE.md whenever the project entry lacks hasClaudeMdExternalIncludesApproved — re-extracted from the installed binary this run. Fix: claude_code root-context surface copied in every mode (§8.1, §8.2 surfaces, §12.1 knob note). F15 nit on the copied-mode phrase in §5.3. make validate green, signature good, one file. Story workspace stays at CR rev 2 (3ce0d5a). Findings: TASK-260905-jb6rvg_review-findings-env-3.md.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-868670, pid=37020, exit=0)
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260905-0a41d1, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-0a41d1)
+Cycle 4 (RUN-260905-0a41d1): F14 resolved by fix (a) and F15 resolved at a68559b; make validate green (57 schemas/780 vectors/152 tests/go ok); signed commit; one file. ACCEPT at to-review with minors M-4.1 (name the marker surfaces copy-reason member in §8.2/§13) and M-4.2 (nit on §8.1 linked definition). See TASK-260905-jb6rvg_review-findings-env-4.md.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-0a41d1, pid=65544, exit=0)
+spawn autonomous recovery: run RUN-260905-0a41d1 queued successor RUN-260905-69e35c (attempt 1/3, model=claude-fable-5-1): reviewer run RUN-260905-0a41d1 remains unsatisfied: reviewer run has no verdict branch while TASK-260905-jb6rvg is to-review
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-69e35c)
+Cycle 4 (a68559b): F14 resolved by fix (a) at all four anchors (§5.3, §8.1, §8.2, §12.1), F15 resolved. Attack pass found no remaining linked-CLAUDE.md assumption; two nits (§8.1 linked bullet cross-ref, §10.1 explicit copied-hash clause). make validate green, signed commit, one file. ACCEPT at to-review; CR rev 2 already accepted.
+RUN-260905-69e35c (cycle-4 recovery): re-verified independently; verdict unchanged — ACCEPT at to-review for a68559b (F14 fix (a) at §5.3/§8.1/§8.2/§12.1, F15 resolved, no residual linked-CLAUDE.md assumption, make validate green, signed commit). Findings resource TASK-260905-jb6rvg_review-findings-env-4.md updated. ORCHESTRATOR NOTE: the runner keeps respawning cycle-4 reviewers because to-review is not a recognized verdict branch for a reviewer run, and accept_cr(rev 2) is refused with change_request_state_conflict (already accepted). The brief forbids done and no new CR revision exists for a68559b; a further respawn will hit the same wall. Either publish a68559b as CR revision 3 for accept_cr, or take the to-review handoff as the accepted verdict.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-69e35c, pid=78972, exit=0)
+spawn autonomous recovery: run RUN-260905-69e35c queued successor RUN-260905-e900c0 (attempt 2/3, model=claude-fable-5-1): reviewer run RUN-260905-69e35c remains unsatisfied: reviewer run has no verdict branch while TASK-260905-jb6rvg is to-review
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-e900c0)
 
 ## Precondition Resources
 - [producer-brief-env-1-1.md](file://TASK-260905-jb6rvg/producer-brief-env-1-1.md) — Producer brief: environments.md revision 1.1 on the 0012 model, review M4-M16 and N1-N14 anchored per section
@@ -105,6 +128,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-6cacb3)
 - [env-sprint-addenda.md](file://TASK-260905-jb6rvg/env-sprint-addenda.md) — Two additive notes from the sprint review to fold into environments.md (§5.3 link skip, §5.8 strict-config); compliance observation
 - [producer-brief-env-publish-cr2.md](file://TASK-260905-jb6rvg/producer-brief-env-publish-cr2.md) — No-edit run in a fresh workspace: cherry-pick db642b1 from draft/environments-revision-1-1 and hand off to publish CR rev 2
 - [review-brief-env-3.md](file://TASK-260905-jb6rvg/review-brief-env-3.md) — Cycle 3: confirm the F11-F13 edit at e45c5b6 on the draft branch
+- [review-brief-env-4.md](file://TASK-260905-jb6rvg/review-brief-env-4.md) — Cycle 4: confirm the F14/F15 edit at a68559b
 
 ## Outcome Resources
 - [TASK-260905-jb6rvg_spawn-log_-implementer--developer--claude-_RUN-260905-e1d8dc.log](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_spawn-log_-implementer--developer--claude-_RUN-260905-e1d8dc.log) — System spawn log captured by task-board
@@ -127,12 +151,18 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-6cacb3)
 - [TASK-260905-jb6rvg_review-verdict.md](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_review-verdict.md) — Cycle-2 verdict: ACCEPT CR revision 2
 - [TASK-260905-jb6rvg_review-2-make-validate.log](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_review-2-make-validate.log) — make validate log at 3ce0d5a (cycle-2 review)
 - [TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-6cacb3.log](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-6cacb3.log) — System spawn log captured by task-board
+- [TASK-260905-jb6rvg_review-findings-env-3.md](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_review-findings-env-3.md) — Cycle-3 review findings at e45c5b6: F14 major (linked claude_code default contradicts verified skip), F15 nit; recovery-run confirmation appended
+- [TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-868670.log](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-868670.log) — System spawn log captured by task-board
+- [TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-0a41d1.log](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-0a41d1.log) — System spawn log captured by task-board
+- [TASK-260905-jb6rvg_review-findings-env-4.md](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_review-findings-env-4.md) — Cycle 4 review (RUN-260905-69e35c re-verify): F14/F15 resolved at a68559b, ACCEPT with two nits
+- [TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-69e35c.log](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-69e35c.log) — System spawn log captured by task-board
+- [TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-e900c0.log](file://TASK-260905-jb6rvg/TASK-260905-jb6rvg_spawn-log_-reviewer--reviewer--claude-_RUN-260905-e900c0.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-05T07:56:51Z
 
 ## Last Update
-2026-09-05T12:41:08Z
+2026-09-05T12:58:53Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

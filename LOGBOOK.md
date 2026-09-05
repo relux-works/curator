@@ -4287,3 +4287,30 @@ Process residual: a confirming review cycle after an already-accepted Change
 Request parks at `to-review` without a verdict branch, and task-board's
 autonomous recovery then spawns duplicate reviewer runs (attempt 1/3) — close the
 task the moment the ACCEPT lands.
+
+## 2026-09-05 — environments.md revision 1.1 lands; step 1 of the execution epic is complete
+
+The agent-environments protocol text is rewritten on the Decision 0012 model
+(curator-spec `a68559b`, PR #40) after four review cycles, and every step-1
+deliverable is landed or open: Decision 0013 (`83de1a5`), `LaunchModeInteractive`
+in skill-agents-management (`3edbde8`, PR #18), launcher SPEC `0.2.0-draft`
+(`e19eb9f`, PR #2), and the ax proposal PR #1 revised in place at `c6270a3`
+and left open for its maintainer. The verification sprint (nine probes,
+reviewer-reproduced) changed the text in five places: the Claude credential is
+a Keychain item whose service name carries the first eight hex characters of
+sha256 of `CLAUDE_CONFIG_DIR`, so isolated homes are supportable on macOS from
+2.1.261; `project_doc_max_bytes` never truncates the global codex `AGENTS.md`;
+codex and pi rewrite `auth.json` in place; `@path` includes outside the launch
+directory are dropped without the per-project `hasClaudeMdExternalIncludesApproved`
+key, and the same guard skips a linked user-level `CLAUDE.md` — which forced the
+claude_code root-context surface to be a copied regular file in every mode;
+and codex `-p` takes exactly one value and silently ignores a missing layer.
+
+Two task-board mechanics cost time and are now in memory: a Change Request
+candidate must be exactly one commit past the Story base (rework producers
+squash, never stack), and a reviewer that accepts without a verdict branch is
+judged unsatisfied and respawned up to three times. After the session-limit
+pause the task-board client identity changed, orphaning every managed
+workspace (`worktree_ownership_mismatch`); `worktree abort --discard --confirm`
+plus a re-spawn was the only path, so the reviewed commit travels on the draft
+branch and is cherry-picked into the fresh workspace.
