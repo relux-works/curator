@@ -183,6 +183,12 @@ func List(home string) ([]Info, error) {
 		if !validProfileName(name) {
 			continue
 		}
+		if _, err := os.Stat(sourcePath(home, name)); err != nil {
+			if os.IsNotExist(err) {
+				continue // reserved state (scoped/) is not a profile
+			}
+			return nil, fmt.Errorf("profile %q: %v", name, err)
+		}
 		source, err := readSource(home, name)
 		if err != nil {
 			return nil, fmt.Errorf("profile %q: %v", name, err)

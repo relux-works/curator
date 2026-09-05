@@ -214,6 +214,36 @@ func TestProfileInstallWarnsOnSystemModule(t *testing.T) {
 	}
 }
 
+// TestProfileScopedUseAndClear drives a narrowed switch and its clearing
+// through run(): the scope marker appears in list output and vanishes after
+// --clear.
+func TestProfileScopedUseAndClear(t *testing.T) {
+	source, _ := profileHome(t)
+	first, second := t.TempDir(), t.TempDir()
+	writeContextPackage(t, first, "one", "1.0.0", "one\n")
+	writeContextPackage(t, second, "two", "1.0.0", "two\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", first); code != exitOK {
+		t.Fatalf("install stderr:\n%s", stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "install", second); code != exitOK {
+		t.Fatalf("install stderr:\n%s", stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "two", "--env", "codex_cli"); code != exitOK {
+		t.Fatalf("scoped use stderr:\n%s", stderr)
+	}
+	_, stdout, _ := runProfile(t, source, "profile", "list")
+	if !strings.Contains(stdout, "env:codex_cli=two") {
+		t.Fatalf("list stdout:\n%s", stdout)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "--clear", "--env", "codex_cli"); code != exitOK {
+		t.Fatalf("clear stderr:\n%s", stderr)
+	}
+	_, stdout, _ = runProfile(t, source, "profile", "list")
+	if strings.Contains(stdout, "env:codex_cli") {
+		t.Fatalf("list after clear:\n%s", stdout)
+	}
+}
+
 // TestProfileUpdatePinnedTagIsUnchanged checks a tag-pinned git profile
 // reports unchanged through the CLI.
 func TestProfileUpdatePinnedTagIsUnchanged(t *testing.T) {

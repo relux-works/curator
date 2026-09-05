@@ -473,6 +473,76 @@ func TestUpdateDefaultIsBlocked(t *testing.T) {
 	}
 }
 
+// TestScopedUseAndClear checks narrowed switches: a scoped use records a
+// scoped current without moving the machine current, and --clear drops the
+// record and re-materializes the scope from the machine default.
+func TestScopedUseAndClear(t *testing.T) {
+	home := t.TempDir()
+	homes := pinHomes(t)
+	first, second := t.TempDir(), t.TempDir()
+	writePackage(t, first, "one", "1.0.0", "one\n")
+	writePackage(t, second, "two", "1.0.0", "two\n")
+	if _, _, _, err := Install(home, InstallOptions{Operand: first}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := Install(home, InstallOptions{Operand: second}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Use(home, "two", "codex_cli", "", false); err != nil {
+		t.Fatal(err)
+	}
+	if current, _ := Current(home); current != "one" {
+		t.Fatalf("scoped use moved the machine current to %q", current)
+	}
+	scoped, err := ScopedCurrents(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scoped["env:codex_cli"] != "two" {
+		t.Fatalf("scoped %+v", scoped)
+	}
+	marker, err := envmarker.Read(homes["codex_cli"])
+	if err != nil || marker == nil || marker.Profile.Name != "two" {
+		t.Fatalf("codex marker %+v %v", marker, err)
+	}
+	if _, err := Use(home, "", "codex_cli", "", true); err != nil {
+		t.Fatal(err)
+	}
+	scoped, err = ScopedCurrents(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scoped) != 0 {
+		t.Fatalf("clear left scoped %+v", scoped)
+	}
+	marker, err = envmarker.Read(homes["codex_cli"])
+	if err != nil || marker == nil || marker.Profile.Name != "one" {
+		t.Fatalf("codex marker after clear %+v %v", marker, err)
+	}
+}
+
+// TestListFailsOnCorruptRecord narrows the listing gate: a present but
+// unreadable install record fails the listing rather than silently dropping
+// the profile. Reserved state without a record (scoped/) is skipped.
+func TestListFailsOnCorruptRecord(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	source := t.TempDir()
+	writePackage(t, source, "acme", "1.0.0", "hello\n")
+	if _, _, _, err := Install(home, InstallOptions{Operand: source}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Use(home, "acme", "codex_cli", "", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ProfileDir(home, "acme"), "source.json"), []byte("{nope"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := List(home); err == nil {
+		t.Fatal("corrupt record must fail the listing")
+	}
+}
+
 // TestEnsureDefaultCreatesLocalProfile checks the §9.4 migration: the first
 // use of the profile surface creates the builtin local default umbrella.
 func TestEnsureDefaultCreatesLocalProfile(t *testing.T) {
