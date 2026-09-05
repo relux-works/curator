@@ -83,6 +83,7 @@ internal/gitops	TestArchiveRejectsLinks	linux,darwin,windows	-	-	extraction refu
 internal/gitops	TestExtractReproducesByteExactVector	linux,darwin,windows	-	-	object-database extraction reproduces the spec byte-exact snapshot vector under core.autocrlf=true and false (environments 1.2)
 internal/gitops	TestExtractIgnoresWorkingTreeConversion	linux,darwin,windows	-	-	extraction ignores core.autocrlf/text/export-subst conversion that git archive would apply (fails if extraction reverts to git archive)
 internal/gitops	TestExtractRefusesSubmodules	linux,darwin,windows	-	-	extraction refuses a tree containing a gitlink (mode 160000)
+internal/gitops	TestExtractPreservesExecutableBit	linux,darwin	windows	platform-control	extraction writes a 100755 blob with the executable bit and a 100644 blob without it; Windows synthesizes permission bits with no execute bit, so the mode claim is asserted on the unix runners
 
 # ===========================================================================
 # Read-only build source
