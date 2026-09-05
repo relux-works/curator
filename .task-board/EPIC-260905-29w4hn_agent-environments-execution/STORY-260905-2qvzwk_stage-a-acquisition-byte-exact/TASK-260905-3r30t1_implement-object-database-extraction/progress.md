@@ -53,6 +53,12 @@ spawn launch composition: empty; contract=agents-infra.child-launch-composition;
 spawn queued: [implementer] developer (claude) (run=RUN-260905-d3a1ca, max_parallel=20)
 spawn run started: [implementer] developer (claude) (run=RUN-260905-d3a1ca)
 Rework 1 in progress: commit 5abec244 (signed) on feat/byte-exact-acquisition restores TestArchiveRejectsLinks (mktree 120000 entry, no ln, all GOOS), gives TestConformanceSnapshotAcquisition a root-content skip text, and registers ledger rows. ledger-consistency ok, gate-selftest 81/0, focused -race green, candidate-root interop test PASS. Full test-gate.sh on pinned root running locally; push + gh pr checks 58 --watch pending.
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-d3a1ca, pid=28887, exit=0)
+No Change Request revision was published for TASK-260905-3r30t1 (handoff_unsatisfied): the board is not at to-review
+spawn autonomous recovery: run RUN-260905-d3a1ca queued successor RUN-260905-77013e (attempt 1/3, model=claude-fable-5-1): producer run RUN-260905-d3a1ca remains unsatisfied: producer run RUN-260905-d3a1ca published no Change Request and reached no handoff branch while TASK-260905-3r30t1 is development: the board is not at to-review
+spawn run started: [implementer] developer (claude) (run=RUN-260905-77013e)
+Rework 1 cont.: hosted run 33966680785 at 5abec244 passed every job except Test (windows-latest): TestExtractPreservesExecutableBit fails there (Windows synthesizes -rw-rw-rw-). Platform-case gate itself was ok on windows. Fix a46abc80: windows skip with the existing platform-control reason + ledger row (linux,darwin required; windows tolerated). Pushed; watching CI.
 
 ## Precondition Resources
 - [producer-brief-acquisition-fix.md](file://TASK-260905-3r30t1/producer-brief-acquisition-fix.md) — Producer brief: byte-exact object-database extraction replacing git archive (review M3, environments §1.2)
@@ -67,12 +73,13 @@ Rework 1 in progress: commit 5abec244 (signed) on feat/byte-exact-acquisition re
 - [TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-1fb9eb.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-1fb9eb.log) — System spawn log captured by task-board
 - [TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-d3a1ca.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-d3a1ca.log) — System spawn log captured by task-board
 - [TASK-260905-3r30t1_rework-report-1.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_rework-report-1.md) — Rework 1 report: platform-case gate fix, local gate reproduction, CI watch (updated when CI finishes)
+- [TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-77013e.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-77013e.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-05T08:20:33Z
 
 ## Last Update
-2026-09-05T12:40:09Z
+2026-09-05T13:22:59Z
 
 ## Assigned To
 [implementer] developer (claude)
