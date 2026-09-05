@@ -1,5 +1,5 @@
 ## Status
-development
+integrating
 
 ## Review
 required
@@ -90,6 +90,30 @@ spawn launch composition: empty; contract=agents-infra.child-launch-composition;
 spawn queued: [implementer] developer (claude) (run=RUN-260905-bea544, max_parallel=20)
 spawn run started: [implementer] developer (claude) (run=RUN-260905-bea544)
 Rework 2 in progress: F1 fixed (pre-pass refusals from ls-tree -l + kill/drain before Wait), O1 .git refusal, O2 closure staging rename, O3 nested exec test. Commits c9defdb8, a97265ad, bb14375a (lint fix) on feat/byte-exact-acquisition, pushed; local gates green (build/vet/gofmt/golangci-lint/race focused/all 60 packages incl cmd-curator 260s/gate-selftest/ledger). Watching PR #58 checks.
+Rework 2 delivered: F1 deadlock fixed (planWrites pre-pass from ls-tree -l; abort = close stdin, Kill, drain, Wait), O1 .git refusal, O2 closure staging rename, O3 nested exec test, O4 recorded. Commits c9defdb8, a97265ad, bb14375a on feat/byte-exact-acquisition; PR #58 all hosted checks green at bb14375a. Mutants M1-M4, M6 killed; M5 (closure staging) survives — bound stated in TASK-260905-3r30t1_rework-report-2.md. Story workspace delta empty by design.
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-bea544, pid=72095, exit=0)
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (claude) (run=RUN-260905-459669, max_parallel=20)
+spawn run started: [implementer] developer (claude) (run=RUN-260905-459669)
+Re-handoff run RUN-260905-459669: no edits. Curator branch head bb14375a == origin, signed, PR #58 all checks green (run 33983692562); story workspace clean. go build/vet/gofmt exit 0, gitops+interop tests pass. Awaiting reviewer cycle 2.
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-459669, pid=7881, exit=0)
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260905-89617c, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-89617c)
+agent completed: [reviewer] reviewer (claude) (exit=1)
+spawn limit exhausted: the retry was refused before any subscription group was subtracted (reason selection_snapshot_unavailable, attempts 1, evidence RUN-260905-89617c); provider reported: You're out of usage credits. Switch to another model, or manage usage credits at claude.ai/settings/usage?from=cc_cli_limit_message, to continue.
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260905-2d5b2b, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-2d5b2b)
+Review cycle 2 (RUN-260905-2d5b2b): ACCEPTED CR rev 5 at curator bb14375a; element routed to integrating. F1 deadlock independently reproduced as fixed (all three cycle-1 shapes refuse in ~30ms plus a live git-shim flood shape at 414ms); 5 mutants applied and reverted, 4 narrowing (abort kill+drain, .git case fold, size bound x2, mode allow-list widened to 120000) plus the git-archive revert, each killed by a named committed test. Spec vector 500ea934 reproduces with and without CURATOR_CONFORMANCE_ROOT; skip fires only on fs.ErrNotExist (chmod-000 and malformed roots FAIL). AC coverage 19 of 20 rows driven through gitops.Extract, 1 stated bound (git canonicalises 100xxx tree modes - proved). Gates rerun: build/vet/gofmt/golangci-lint 0, focused -race all ok, gate-selftest 81/0; PR #58 head equals local head, all hosted checks green; 7 signed commits, human identity, no rewrite. Finding N1 (non-blocking, follow-up): planWrites folds the full path only, so Dir/x.txt + dir/y.txt is admitted and the snapshot hash depends on the destination filesystem (proved with two hashes on one host via a case-sensitive APFS volume). Not a regression - the replaced git archive path had no collision detection at all and git checkout merges identically. Evidence: TASK-260905-3r30t1_review-verdict-rev5.md, _review-adversarial-tests-rev5.go.txt, _logbook-entry-review-2.md.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-2d5b2b, pid=64311, exit=0)
+Landed on curator main as e8038558 (PR #58, fast-forward of the reviewed head rebased with signing; range-diff proved all seven commits identical) on 2026-09-06 after two review cycles. Follow-up N1 (directory-component fold gate) is TASK-260906-2b3nar.
 
 ## Precondition Resources
 - [producer-brief-acquisition-fix.md](file://TASK-260905-3r30t1/producer-brief-acquisition-fix.md) — Producer brief: byte-exact object-database extraction replacing git archive (review M3, environments §1.2)
@@ -98,6 +122,7 @@ Rework 2 in progress: F1 fixed (pre-pass refusals from ls-tree -l + kill/drain b
 - [review-brief-acq-2.md](file://TASK-260905-3r30t1/review-brief-acq-2.md) — Reviewer brief: object-database extraction at a46abc80 with the platform-case gate changes; PR #58 green
 - [producer-brief-acq-publish-cr.md](file://TASK-260905-3r30t1/producer-brief-acq-publish-cr.md) — No-edit run in a fresh workspace: hand off to publish a fresh empty-delta Change Request
 - [producer-brief-acq-rework-2.md](file://TASK-260905-3r30t1/producer-brief-acq-rework-2.md) — Rework 2: fix the cat-file deadlock (pre-pass refusals, kill+drain before Wait), .git component refusal, closure scratch rename-into-place, nested exec test
+- [review-brief-acq-3.md](file://TASK-260905-3r30t1/review-brief-acq-3.md) — Reviewer brief cycle 2: deadlock rework at bb14375a; reproduce the hang shapes; PR #58 green
 
 ## Outcome Resources
 - [TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-269e50.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-269e50.log) — System spawn log captured by task-board
@@ -118,12 +143,22 @@ Rework 2 in progress: F1 fixed (pre-pass refusals from ls-tree -l + kill/drain b
 - [TASK-260905-3r30t1_review-verdict.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_review-verdict.md) — Review verdict cycle 1 on a46abc80: changes requested (F1 cat-file deadlock on mid-stream refusal)
 - [TASK-260905-3r30t1_logbook-entry-review.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_logbook-entry-review.md) — Logbook entry: cat-file StdoutPipe deadlock class
 - [TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-bea544.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-bea544.log) — System spawn log captured by task-board
+- [TASK-260905-3r30t1_rework-report-2.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_rework-report-2.md) — Rework 2 report: cat-file deadlock fix (pre-pass refusals + kill/drain), .git refusal, closure staging rename, nested exec test; mutants, gates, PR #58 CI green at bb14375a
+- [TASK-260905-3r30t1_change-request_rev4.patch](file://TASK-260905-3r30t1/TASK-260905-3r30t1_change-request_rev4.patch) — Change Request CR-TASK-260905-3r30t1-4 revision 4 candidate patch (repository_delta=empty, 0 changed paths)
+- [TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-459669.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-459669.log) — System spawn log captured by task-board
+- [TASK-260905-3r30t1_handoff-report-3.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_handoff-report-3.md) — Re-handoff run: state verification at bb14375a, no edits, gates rerun
+- [TASK-260905-3r30t1_change-request_rev5.patch](file://TASK-260905-3r30t1/TASK-260905-3r30t1_change-request_rev5.patch) — Change Request CR-TASK-260905-3r30t1-5 revision 5 candidate patch (repository_delta=empty, 0 changed paths)
+- [TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-89617c.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-89617c.log) — System spawn log captured by task-board
+- [TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-2d5b2b.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-2d5b2b.log) — System spawn log captured by task-board
+- [TASK-260905-3r30t1_review-verdict-rev5.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_review-verdict-rev5.md) — Reviewer cycle 2 verdict at curator bb14375a: ACCEPT, with reproduced deadlock fix, 5 mutants, and finding N1 (directory-level platform-path fold gap)
+- [TASK-260905-3r30t1_review-adversarial-tests-rev5.go.txt](file://TASK-260905-3r30t1/TASK-260905-3r30t1_review-adversarial-tests-rev5.go.txt) — Reviewer's own adversarial tests (hang shapes, unicode fold, git shim, filesystem hash divergence) reproducing every claim in the rev5 verdict
+- [TASK-260905-3r30t1_logbook-entry-review-2.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_logbook-entry-review-2.md) — Logbook entry from reviewer cycle 2: directory-fold gate gap, git mode canonicalisation, stall-vs-deadlock, closure staging race analysis
 
 ## Created
 2026-09-05T08:20:33Z
 
 ## Last Update
-2026-09-05T18:19:27Z
+2026-09-05T23:52:02Z
 
 ## Assigned To
-[implementer] developer (claude)
+[reviewer] reviewer (claude)

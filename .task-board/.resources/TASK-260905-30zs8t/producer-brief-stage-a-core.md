@@ -4,9 +4,9 @@
 
 - Repository `~/Developer/ReluxWorks/curator` (Go 1.25.5). Worktree
   `/Users/iv/Developer/ReluxWorks/.worktrees/curator-stage-a-core`, branch `feat/agent-environments-stage-a`,
-  base = curator main `__BASE__` (includes the byte-exact acquisition). First run
+  base = curator main `bb14375a (the head of feat/byte-exact-acquisition, PR #58, which lands on main by fast-forward; rebase onto main with -S once it does)` (includes the byte-exact acquisition). First run
   `git submodule update --init --recursive`.
-- Authority: curator-spec main `fd237ba` — `protocol/environments.md` revision 1.1 (§1 sources and
+- Authority: curator-spec main `f39f4a9` — `protocol/environments.md` revision 1.1 (§1 sources and
   §1.2 byte-exactness, §1.3 lock, §1.4 versions and ranges, §2 `agent-context.json`, §2.2 `agent-mcp.json`,
   §3 modules, §4 store, §5–§5.2/§5.4–§5.6 monolithic materialization and hash binding, §6 composition and
   weights, §8.1 modes, §8.2 marker, §9.1 install, §9.2 switching, §9.4 skills/migration, §12 status/GC),
@@ -71,7 +71,7 @@
 - Gates: `go build ./...`, `go vet ./...`, `gofmt -l`, `go test -count=1 -timeout 30m ./...` (cmd/curator
   ~8 min), `-race` on the new packages; reproduce the platform-case gate locally as `ci.yml` does; the
   adapter suites' hosted x86 redness is a known, separate class.
-- CLI surface exactly as `cli/curator.md` rows at `fd237ba`; README tools section updated.
+- CLI surface exactly as `cli/curator.md` rows at `f39f4a9`; README tools section updated.
 - Do not push, tag, or open a PR; attach `TASK-260905-30zs8t_drafting-report.md` (package map, vector families
   passed with counts, gate outputs, skipped items with reasons); `task-board handoff TASK-260905-30zs8t --role
   developer`. Never write LOGBOOK.md or anything into the control root.

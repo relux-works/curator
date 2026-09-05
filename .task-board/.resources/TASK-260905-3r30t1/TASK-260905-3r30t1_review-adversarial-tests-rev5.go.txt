@@ -1,0 +1,655 @@
+// Reviewer RUN-260905-2d5b2b adversarial tests for TASK-260905-3r30t1 at curator bb14375a.
+// NOT committed. Drop these three files into internal/gitops/ of a checkout at bb14375a and run:
+//   go test -count=1 -run 'TestRev' ./internal/gitops -v
+//   REV_CASE_SENSITIVE_DIR=<case-sensitive volume> go test -run TestRevSnapshotHashDiverges ./internal/gitops -v
+
+// ==================== zz_rev3_adv_test.go ====================
+package gitops
+
+import (
+	"bytes"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+const revWatchdog = 20 * time.Second
+
+// revExtract runs Extract under an independent watchdog.
+func revExtract(t *testing.T, repo, commit, dest string) (time.Duration, error, bool) {
+	t.Helper()
+	start := time.Now()
+	done := make(chan error, 1)
+	go func() { done <- Extract(repo, commit, dest) }()
+	select {
+	case err := <-done:
+		return time.Since(start), err, false
+	case <-time.After(revWatchdog):
+		return revWatchdog, nil, true
+	}
+}
+
+func revGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = gitEnv()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func revRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	revGit(t, dir, "init", "-q", "-b", "main")
+	return dir
+}
+
+func revBlob(t *testing.T, repo string, content []byte) string {
+	t.Helper()
+	cmd := exec.Command("git", "hash-object", "-w", "--no-filters", "--stdin")
+	cmd.Dir = repo
+	cmd.Env = gitEnv()
+	cmd.Stdin = bytes.NewReader(content)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("hash-object: %v\n%s", err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// revBigBlob is 8 MiB, far past any pipe buffer.
+func revBigBlob(t *testing.T, repo string) string {
+	t.Helper()
+	return revBlob(t, repo, bytes.Repeat([]byte("0123456789abcdef"), 8<<16))
+}
+
+// revCommitIndex builds a commit from explicit index entries (mode, oid, path)
+// so nested paths and exec bits are exact.
+func revCommitIndex(t *testing.T, repo string, entries [][3]string) string {
+	t.Helper()
+	index := filepath.Join(t.TempDir(), "index")
+	for _, e := range entries {
+		cmd := exec.Command("git", "update-index", "--add", "--cacheinfo", e[0], e[1], e[2])
+		cmd.Dir = repo
+		cmd.Env = append(gitEnv(), "GIT_INDEX_FILE="+index)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("update-index %v: %v\n%s", e, err, out)
+		}
+	}
+	wt := exec.Command("git", "write-tree")
+	wt.Dir = repo
+	wt.Env = append(gitEnv(), "GIT_INDEX_FILE="+index)
+	out, err := wt.CombinedOutput()
+	if err != nil {
+		t.Fatalf("write-tree: %v\n%s", err, out)
+	}
+	return revGit(t, repo, "commit-tree", strings.TrimSpace(string(out)), "-m", "t")
+}
+
+// revCommitRawTree writes a tree object byte by byte, so any mode/name can be
+// expressed (mktree refuses "..", ".git", slashes).
+func revCommitRawTree(t *testing.T, repo string, entries [][3]string) string {
+	t.Helper()
+	var body bytes.Buffer
+	for _, e := range entries {
+		raw, err := hex.DecodeString(e[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		body.WriteString(e[0] + " " + e[2] + "\x00")
+		body.Write(raw)
+	}
+	cmd := exec.Command("git", "hash-object", "-t", "tree", "-w", "--literally", "--stdin")
+	cmd.Dir = repo
+	cmd.Env = gitEnv()
+	cmd.Stdin = &body
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("hash-object tree: %v\n%s", err, out)
+	}
+	return revGit(t, repo, "commit-tree", strings.TrimSpace(string(out)), "-m", "raw")
+}
+
+func revListDest(t *testing.T, dest string) []string {
+	t.Helper()
+	var found []string
+	_ = filepath.Walk(dest, func(p string, info os.FileInfo, err error) error {
+		if err != nil || p == dest {
+			return nil
+		}
+		rel, _ := filepath.Rel(dest, p)
+		if info.IsDir() {
+			rel += "/"
+		}
+		found = append(found, rel)
+		return nil
+	})
+	return found
+}
+
+func revAssertRefused(t *testing.T, label string, d time.Duration, err error, hung bool, want string, dest string) {
+	t.Helper()
+	if hung {
+		t.Fatalf("%s: HUNG for %s (cat-file deadlock)", label, revWatchdog)
+	}
+	if err == nil {
+		t.Fatalf("%s: extraction was ADMITTED (must be refused); dest=%v", label, revListDest(t, dest))
+	}
+	if want != "" && !strings.Contains(err.Error(), want) {
+		t.Fatalf("%s: wrong error class: %v (want %q)", label, err, want)
+	}
+	if left := revListDest(t, dest); len(left) != 0 {
+		t.Errorf("%s: refused extraction left %v under %s", label, left, dest)
+	}
+	t.Logf("%s: refused in %s with %v", label, d.Round(time.Millisecond), err)
+}
+
+// ---------------------------------------------------------------- hang shapes
+
+func TestRevHangSingleOversize(t *testing.T) {
+	repo := revRepo(t)
+	oid := revBlob(t, repo, bytes.Repeat([]byte("x"), 1<<20))
+	commit := revCommitIndex(t, repo, [][3]string{{"100644", oid, "big.bin"}})
+	old := maxSnapshotFileBytes
+	maxSnapshotFileBytes = 512 << 10
+	defer func() { maxSnapshotFileBytes = old }()
+	dest := filepath.Join(t.TempDir(), "snap")
+	d, err, hung := revExtract(t, repo, commit, dest)
+	revAssertRefused(t, "single-oversize", d, err, hung, "too large", dest)
+}
+
+func TestRevHangDuplicateThenBig(t *testing.T) {
+	repo := revRepo(t)
+	small := revBlob(t, repo, []byte("s"))
+	big := revBigBlob(t, repo)
+	commit := revCommitRawTree(t, repo, [][3]string{
+		{"100644", small, "A.txt"},
+		{"100644", small, "a.txt"},
+		{"100644", big, "zz-big.bin"},
+	})
+	dest := filepath.Join(t.TempDir(), "snap")
+	if !revFoldsCase(t, filepath.Dir(dest)) {
+		t.Skip("test filesystem is case-sensitive; no collision to refuse")
+	}
+	d, err, hung := revExtract(t, repo, commit, dest)
+	revAssertRefused(t, "dup-then-8MiB", d, err, hung, "duplicate platform path", dest)
+}
+
+func TestRevHangEscapeThenBig(t *testing.T) {
+	repo := revRepo(t)
+	small := revBlob(t, repo, []byte("s"))
+	big := revBigBlob(t, repo)
+	commit := revCommitRawTree(t, repo, [][3]string{
+		{"100644", small, ".."},
+		{"100644", big, "zz-big.bin"},
+	})
+	dest := filepath.Join(t.TempDir(), "snap")
+	d, err, hung := revExtract(t, repo, commit, dest)
+	revAssertRefused(t, "escape-then-8MiB", d, err, hung, "unsafe path", dest)
+}
+
+func revFoldsCase(t *testing.T, dir string) bool {
+	t.Helper()
+	p := filepath.Join(dir, "revCaseProbe")
+	if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(p) }()
+	_, err := os.Lstat(filepath.Join(dir, "REVCASEPROBE"))
+	return err == nil
+}
+
+// ------------------------------------------------------------ typed refusals
+
+func TestRevRefusesLinkAndGitlink(t *testing.T) {
+	repo := revRepo(t)
+	small := revBlob(t, repo, []byte("target"))
+	big := revBigBlob(t, repo)
+	cases := []struct {
+		name string
+		mode string
+		oid  string
+		want string
+	}{
+		{"symlink", "120000", small, "links in git snapshots are unsupported"},
+		{"gitlink", "160000", strings.Repeat("ab", 20), "submodule"},
+		{"weird-mode", "100600", small, "unsupported entry type"},
+	}
+	for _, tc := range cases {
+		commit := revCommitRawTree(t, repo, [][3]string{
+			{tc.mode, tc.oid, "aaa"},
+			{"100644", big, "zz-big.bin"},
+		})
+		dest := filepath.Join(t.TempDir(), "snap")
+		d, err, hung := revExtract(t, repo, commit, dest)
+		revAssertRefused(t, tc.name, d, err, hung, tc.want, dest)
+	}
+}
+
+func TestRevRefusesDotGitAnyCase(t *testing.T) {
+	repo := revRepo(t)
+	small := revBlob(t, repo, []byte("s"))
+	for _, name := range []string{".git", ".GIT", ".Git/config", "sub/.git/HEAD", "sub/.GiT"} {
+		commit := revCommitRawTree(t, repo, [][3]string{{"100644", small, name}})
+		dest := filepath.Join(t.TempDir(), "snap")
+		d, err, hung := revExtract(t, repo, commit, dest)
+		revAssertRefused(t, "dotgit:"+name, d, err, hung, "unsafe path", dest)
+	}
+	// .gitattributes and a directory literally named "git" stay admitted.
+	commit := revCommitIndex(t, repo, [][3]string{
+		{"100644", small, ".gitattributes"},
+		{"100644", small, "git/keep.txt"},
+		{"100644", small, ".gitignore"},
+	})
+	dest := filepath.Join(t.TempDir(), "snap")
+	if _, err, hung := revExtract(t, repo, commit, dest); hung || err != nil {
+		t.Fatalf("legit git-prefixed names must be admitted: err=%v hung=%v", err, hung)
+	}
+	got := revListDest(t, dest)
+	t.Logf("admitted: %v", got)
+	if len(got) != 4 { // .gitattributes .gitignore git/ git/keep.txt
+		t.Fatalf("unexpected admitted set: %v", got)
+	}
+}
+
+// ------------------------------------------- novel attack: unicode folding
+
+// TestRevUnicodeNormalizationCollision commits two paths that differ only in
+// Unicode normalization. On a normalization-insensitive filesystem (APFS,
+// HFS+) they map to ONE platform path. Spec core §2 requires extraction to
+// detect that and fail BEFORE writing.
+func TestRevUnicodeNormalizationCollision(t *testing.T) {
+	nfd := "cafe\u0301.txt" // e + combining acute (NFD)
+	nfc := "caf\u00e9.txt"  // precomposed (NFC)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, nfd), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, statErr := os.Lstat(filepath.Join(dir, nfc))
+	_ = os.Remove(filepath.Join(dir, nfd))
+	if statErr != nil {
+		t.Skipf("test filesystem preserves Unicode normalization distinctly (%v); no collision to refuse", statErr)
+	}
+
+	repo := revRepo(t)
+	small := revBlob(t, repo, []byte("s"))
+	big := revBigBlob(t, repo)
+	commit := revCommitRawTree(t, repo, [][3]string{
+		{"100644", small, nfd},
+		{"100644", small, nfc},
+		{"100644", big, "zz-big.bin"},
+	})
+	dest := filepath.Join(t.TempDir(), "snap")
+	d, err, hung := revExtract(t, repo, commit, dest)
+	if hung {
+		t.Fatalf("unicode-collision: HUNG for %s", revWatchdog)
+	}
+	t.Logf("unicode-collision: %s -> err=%v dest=%v", d.Round(time.Millisecond), err, revListDest(t, dest))
+	if err == nil {
+		t.Fatalf("unicode-collision was ADMITTED; dest=%v", revListDest(t, dest))
+	}
+	if left := revListDest(t, dest); len(left) != 0 {
+		t.Errorf("unicode-collision left %v", left)
+	}
+}
+
+// TestRevDirectoryCaseCollisionMerges probes whether two tree paths whose
+// DIRECTORY components fold to one platform directory are detected. The file
+// basenames differ, so no file-level collision occurs; on a case-folding
+// filesystem both land in one directory and the extracted tree differs from
+// the committed tree (and from the same extraction on Linux).
+func TestRevDirectoryCaseCollisionMerges(t *testing.T) {
+	repo := revRepo(t)
+	a := revBlob(t, repo, []byte("a"))
+	b := revBlob(t, repo, []byte("b"))
+	commit := revCommitIndex(t, repo, [][3]string{
+		{"100644", a, "Dir/x.txt"},
+		{"100644", b, "dir/y.txt"},
+	})
+	dest := filepath.Join(t.TempDir(), "snap")
+	if !revFoldsCase(t, filepath.Dir(dest)) {
+		t.Skip("case-sensitive filesystem")
+	}
+	d, err, hung := revExtract(t, repo, commit, dest)
+	if hung {
+		t.Fatalf("dir-collision: HUNG")
+	}
+	got := revListDest(t, dest)
+	t.Logf("dir-collision: %s err=%v dest=%v", d.Round(time.Millisecond), err, got)
+	if err == nil {
+		t.Errorf("DIRECTORY platform-path collision ADMITTED: committed Dir/x.txt + dir/y.txt extracted as %v", got)
+	}
+}
+
+// ------------------------------------------------------- mid-stream framing
+
+// TestRevShimFloodsAfterGoodHeader puts a POSIX git shim on PATH that proxies
+// every subcommand to real git except "cat-file --batch", where it answers a
+// syntactically valid header for the first object and then floods stdout,
+// staying alive. A reader that stops draining before Wait deadlocks here.
+func TestRevShimFloodsAfterGoodHeader(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("the fake git shim executes a POSIX launcher")
+	}
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := revRepo(t)
+	small := revBlob(t, repo, []byte("s"))
+	big := revBigBlob(t, repo)
+	commit := revCommitIndex(t, repo, [][3]string{
+		{"100644", small, "a.txt"},
+		{"100644", big, "zz-big.bin"},
+	})
+
+	shimDir := t.TempDir()
+	shim := filepath.Join(shimDir, "git")
+	// The shim answers cat-file --batch with a header naming the WRONG oid and
+	// then writes 32 MiB, remaining alive; nothing may be written and Extract
+	// must return.
+	script := fmt.Sprintf(`#!/bin/sh
+for a in "$@"; do
+  if [ "$a" = "--batch" ]; then
+    printf '%%s blob 5\n' 0000000000000000000000000000000000000000
+    dd if=/dev/zero bs=1048576 count=32 2>/dev/null
+    sleep 60
+    exit 0
+  fi
+done
+exec %q "$@"
+`, real)
+	if err := os.WriteFile(shim, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldPath := os.Getenv("PATH")
+	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+oldPath)
+
+	dest := filepath.Join(t.TempDir(), "snap")
+	d, err2, hung := revExtract(t, repo, commit, dest)
+	revAssertRefused(t, "shim-flood", d, err2, hung, "unexpected git cat-file --batch response", dest)
+}
+
+// TestRevShimTruncatesBody answers a correct header, writes fewer body bytes
+// than declared and then blocks forever, so the failure happens with the
+// target file already open and partially written.
+func TestRevShimTruncatesBody(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("the fake git shim executes a POSIX launcher")
+	}
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := revRepo(t)
+	payload := bytes.Repeat([]byte("q"), 4<<20)
+	oid := revBlob(t, repo, payload)
+	commit := revCommitIndex(t, repo, [][3]string{{"100644", oid, "a.bin"}})
+
+	shimDir := t.TempDir()
+	shim := filepath.Join(shimDir, "git")
+	script := fmt.Sprintf(`#!/bin/sh
+for a in "$@"; do
+  if [ "$a" = "--batch" ]; then
+    read oid
+    printf '%%s blob %d\n' "$oid"
+    dd if=/dev/zero bs=1024 count=16 2>/dev/null
+    sleep 60
+    exit 0
+  fi
+done
+exec %q "$@"
+`, len(payload), real)
+	if err := os.WriteFile(shim, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	dest := filepath.Join(t.TempDir(), "snap")
+	d, err2, hung := revExtract(t, repo, commit, dest)
+	if hung {
+		t.Fatalf("shim-truncate: HUNG for %s (cat-file deadlock)", revWatchdog)
+	}
+	if err2 == nil {
+		t.Fatalf("shim-truncate: admitted a short body")
+	}
+	if left := revListDest(t, dest); len(left) != 0 {
+		t.Errorf("shim-truncate: left %v", left)
+	}
+	t.Logf("shim-truncate: refused in %s with %v", d.Round(time.Millisecond), err2)
+}
+
+// ------------------------------------------------ byte exactness / filters
+
+// TestRevIgnoresAutocrlfAndExportSubst is the negative that must fail if the
+// extraction reverts to git archive: committed CRLF/LF bytes and a literal
+// $Format:%H$ survive core.autocrlf=true with "* text=auto eol=crlf" and
+// "*.txt export-subst" committed.
+func TestRevIgnoresAutocrlfAndExportSubst(t *testing.T) {
+	repo := revRepo(t)
+	attrs := revBlob(t, repo, []byte("* text=auto eol=crlf\n*.txt export-subst\n"))
+	lf := revBlob(t, repo, []byte("alpha\nbeta\n"))
+	crlf := revBlob(t, repo, []byte("alpha\r\nbeta\r\n"))
+	subst := revBlob(t, repo, []byte("$Format:%H$\n"))
+	commit := revCommitIndex(t, repo, [][3]string{
+		{"100644", attrs, ".gitattributes"},
+		{"100644", lf, "lf.txt"},
+		{"100644", crlf, "crlf.txt"},
+		{"100644", subst, "subst.txt"},
+	})
+	for _, autocrlf := range []string{"true", "false", "input"} {
+		revGit(t, repo, "config", "core.autocrlf", autocrlf)
+		dest := filepath.Join(t.TempDir(), "snap")
+		if _, err, hung := revExtract(t, repo, commit, dest); err != nil || hung {
+			t.Fatalf("autocrlf=%s: err=%v hung=%v", autocrlf, err, hung)
+		}
+		want := map[string]string{
+			"lf.txt":    "alpha\nbeta\n",
+			"crlf.txt":  "alpha\r\nbeta\r\n",
+			"subst.txt": "$Format:%H$\n",
+		}
+		for name, expect := range want {
+			got, err := os.ReadFile(filepath.Join(dest, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != expect {
+				t.Fatalf("autocrlf=%s %s: got %q want %q (working-tree conversion leaked)", autocrlf, name, got, expect)
+			}
+		}
+	}
+}
+
+func TestRevPreservesNestedExecBit(t *testing.T) {
+	if os.PathSeparator == '\\' {
+		t.Skip("Windows synthesizes permission bits")
+	}
+	repo := revRepo(t)
+	oid := revBlob(t, repo, []byte("#!/bin/sh\n"))
+	commit := revCommitIndex(t, repo, [][3]string{
+		{"100755", oid, "sub/deep/run.sh"},
+		{"100644", oid, "sub/deep/plain.sh"},
+		{"100755", oid, "top.sh"},
+	})
+	dest := filepath.Join(t.TempDir(), "snap")
+	if _, err, hung := revExtract(t, repo, commit, dest); err != nil || hung {
+		t.Fatalf("err=%v hung=%v", err, hung)
+	}
+	for name, want := range map[string]os.FileMode{
+		"sub/deep/run.sh":   0o755,
+		"sub/deep/plain.sh": 0o644,
+		"top.sh":            0o755,
+	} {
+		info, err := os.Stat(filepath.Join(dest, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != want {
+			t.Errorf("%s: mode %v want %v", name, info.Mode().Perm(), want)
+		}
+	}
+}
+
+// --------------------------------------------------- residue on a pre-existing dest
+
+// TestRevRefusalResidueInPreexistingDest measures what a refused extraction
+// leaves behind when destination already existed (Extract's non-created
+// cleanup path removes planned FILES only).
+func TestRevRefusalResidueInPreexistingDest(t *testing.T) {
+	repo := revRepo(t)
+	small := revBlob(t, repo, []byte("s"))
+	big := revBlob(t, repo, bytes.Repeat([]byte("z"), 1<<20))
+	commit := revCommitIndex(t, repo, [][3]string{
+		{"100644", small, "sub/deep/a.txt"},
+		{"100644", big, "sub/zz-big.bin"},
+	})
+	dest := t.TempDir() // pre-existing destination
+	if err := os.WriteFile(filepath.Join(dest, "keep.txt"), []byte("k"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := maxSnapshotFileBytes
+	maxSnapshotFileBytes = 512 << 10
+	defer func() { maxSnapshotFileBytes = old }()
+	d, err, hung := revExtract(t, repo, commit, dest)
+	if hung {
+		t.Fatalf("residue: HUNG")
+	}
+	if err == nil {
+		t.Fatalf("residue: admitted")
+	}
+	t.Logf("residue: refused in %s with %v; dest now %v", d.Round(time.Millisecond), err, revListDest(t, dest))
+}
+
+// ==================== zz_rev3_stall_test.go ====================
+package gitops
+
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+// TestRevStallIsChildLifetimeBound distinguishes the F1 deadlock class (our
+// reader stops draining; git blocks forever) from a child that simply stalls
+// mid-body. The shim writes a short body then sleeps 10 s and exits; Extract
+// must return when the child exits, and not before -- there is no independent
+// I/O timeout anywhere in the package.
+func TestRevStallIsChildLifetimeBound(t *testing.T) {
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := revRepo(t)
+	payload := bytes.Repeat([]byte("q"), 4<<20)
+	oid := revBlob(t, repo, payload)
+	commit := revCommitIndex(t, repo, [][3]string{{"100644", oid, "a.bin"}})
+
+	shimDir := t.TempDir()
+	script := fmt.Sprintf(`#!/bin/sh
+for a in "$@"; do
+  if [ "$a" = "--batch" ]; then
+    read oid
+    printf '%%s blob %d\n' "$oid"
+    dd if=/dev/zero bs=1024 count=16 2>/dev/null
+    sleep 10
+    exit 0
+  fi
+done
+exec %q "$@"
+`, len(payload), real)
+	if err := os.WriteFile(filepath.Join(shimDir, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	dest := filepath.Join(t.TempDir(), "snap")
+	start := time.Now()
+	done := make(chan error, 1)
+	go func() { done <- Extract(repo, commit, dest) }()
+	select {
+	case e := <-done:
+		t.Logf("stall: returned after %s with %v; dest=%v", time.Since(start).Round(100*time.Millisecond), e, revListDest(t, dest))
+		if e == nil {
+			t.Fatal("stall: admitted a short body")
+		}
+		if left := revListDest(t, dest); len(left) != 0 {
+			t.Errorf("stall: left %v", left)
+		}
+	case <-time.After(60 * time.Second):
+		t.Fatal("stall: NOT bounded by the child's lifetime (60 s) -- true deadlock")
+	}
+}
+
+// ==================== zz_rev3_diverge_test.go ====================
+package gitops
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/relux-works/curator/internal/hashing"
+)
+
+// TestRevSnapshotHashDivergesByFilesystem extracts ONE commit into a
+// case-folding destination and into a case-sensitive destination on the same
+// host and compares the snapshot content hash. Equal hashes mean the snapshot
+// is a function of the commit alone (the package doc's claim); different
+// hashes mean it is also a function of the destination filesystem.
+func TestRevSnapshotHashDivergesByFilesystem(t *testing.T) {
+	cs := os.Getenv("REV_CASE_SENSITIVE_DIR")
+	if cs == "" {
+		t.Skip("set REV_CASE_SENSITIVE_DIR to a case-sensitive volume")
+	}
+	repo := revRepo(t)
+	a := revBlob(t, repo, []byte("a"))
+	b := revBlob(t, repo, []byte("b"))
+	commit := revCommitIndex(t, repo, [][3]string{
+		{"100644", a, "Dir/x.txt"},
+		{"100644", b, "dir/y.txt"},
+	})
+
+	folding := filepath.Join(t.TempDir(), "snap")
+	if _, err, hung := revExtract(t, repo, commit, folding); err != nil || hung {
+		t.Fatalf("case-folding dest: err=%v hung=%v", err, hung)
+	}
+	hFold, err := hashing.ContentSHA256(folding, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sensitiveRoot, err := os.MkdirTemp(cs, "rev-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(sensitiveRoot) }()
+	sensitive := filepath.Join(sensitiveRoot, "snap")
+	if _, err, hung := revExtract(t, repo, commit, sensitive); err != nil || hung {
+		t.Fatalf("case-sensitive dest: err=%v hung=%v", err, hung)
+	}
+	hSens, err := hashing.ContentSHA256(sensitive, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("commit %s", commit)
+	t.Logf("case-folding    dest %v -> %s", revListDest(t, folding), hFold)
+	t.Logf("case-sensitive  dest %v -> %s", revListDest(t, sensitive), hSens)
+	if hFold != hSens {
+		t.Errorf("SNAPSHOT HASH DEPENDS ON THE DESTINATION FILESYSTEM: %s != %s", hFold, hSens)
+	}
+}
+

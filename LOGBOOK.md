@@ -4328,3 +4328,28 @@ so a schema-2 case appended to `vectors/manager-config.json` failed
 implements schema 2. And a rebase of a generated-vector batch conflicts in the
 manifest, the schema-cases index and the rc.9 pin — resolve by regenerating,
 never by hand, then prove identity with `git range-diff`.
+
+## 2026-09-06 — byte-exact acquisition lands; the deadlock a green suite could not see
+
+`internal/gitops` now extracts a commit's tree from the object database
+(`ls-tree -r -l -z` plus `cat-file --batch`) instead of `git archive`, so a
+snapshot is a function of the commit graph alone: no autocrlf, no attributes,
+no `export-subst` (curator `e8038558`, PR #58, environments.md §1.2 and the
+`snapshot-acquisition` vector).
+
+The finding worth keeping is the first review's blocking one. The refusal gates
+(oversize blob, duplicate platform path, escaping path, pre-existing entry) all
+returned early from the write loop while `cat-file` still had output queued, and
+the deferred `cmd.Wait()` ran before anything drained the pipe — so every
+refusal deadlocked instead of erroring, and both production callers hung with
+it. The committed test used a one-byte blob, which fits in the pipe buffer, so
+the suite was green around a gate that could never fire in production. The fix
+is structural: a pre-pass over the listing decides every refusal that needs no
+blob bytes before the child starts, and the residual mid-stream paths kill and
+drain before waiting. Two reviewers reproduced the hang under a 20 s watchdog
+before and after.
+
+A second lesson from the same cycle: the platform-path fold gate keys on the
+folded *full* path, so `Dir/x.txt` and `dir/y.txt` both pass and land in one
+physical directory on APFS. Pre-existing, not a regression, filed as its own
+task.

@@ -1,11 +1,14 @@
 ## Status
-development
+backlog
 
 ## Review
 required
 
 ## Task Class
-code
+docs
+
+## Estimate
+notEstimated
 
 ## Blocked By
 - (none)
@@ -25,7 +28,7 @@ code
 (none)
 
 ## Created
-2026-09-05T06:55:16Z
+2026-09-05T23:15:30Z
 
 ## Last Update
-2026-09-05T23:51:16Z
+2026-09-05T23:15:30Z
