@@ -39,6 +39,23 @@ All notable implementation changes are recorded here.
 
 ### Fixed
 
+- Git snapshots are extracted from the object database (`git ls-tree -r -z`
+  plus `git cat-file --batch`) instead of `git archive`, so every regular file
+  carries exactly its committed blob bytes. `git archive` applied
+  `core.autocrlf`, `text`/`eol`, and `export-subst` to its output, which made
+  snapshot content hashes depend on the acquiring machine's git configuration
+  and the repository's `.gitattributes` (Protocol environments §1.2, core §6.2,
+  §6.5). The skills snapshot cache and closure scratch snapshots both use the
+  new path; symlinks, gitlinks, path escapes, `.git` components,
+  platform-path collisions, and oversize blobs are refused, and `100755`
+  keeps its executable bit. Every refusal that needs no blob bytes is decided
+  from the `ls-tree -l` listing before `cat-file` starts, so a refused
+  extraction writes nothing and never leaves `cat-file` blocked on its
+  output pipe; a failure while streaming terminates and drains the child
+  before waiting on it and removes what the call wrote. Closure scratch
+  snapshots are extracted into a sibling staging directory and renamed into
+  place only on success.
+
 - Status no longer reports a successfully installed schema-8 skill as
   `needs-install`. Every reader that decides whether a recorded compiled
   command is knowable now bands on the whole build-bearing marker schema set

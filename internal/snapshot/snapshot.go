@@ -45,7 +45,7 @@ func Get(home, source, repo, commit string) (string, error) {
 	if err := os.Chmod(tmp, 0o755); err != nil { // #nosec G302 -- published immutable snapshots intentionally preserve the historical world-readable cache-root mode.
 		return "", err
 	}
-	if err := gitops.Archive(repo, commit, tmp); err != nil {
+	if err := gitops.Extract(repo, commit, tmp); err != nil {
 		return "", err
 	}
 	// A commit-shaped directory name is not evidence that its contents came

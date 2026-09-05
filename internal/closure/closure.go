@@ -410,7 +410,22 @@ func snapshotFor(opts Options, source, repo, commit string) (string, error) {
 	if _, err := os.Stat(target); err == nil {
 		return target, nil
 	}
-	if err := gitops.Archive(repo, commit, target); err != nil {
+	// Extract into a sibling scratch directory and rename into place only
+	// after extraction succeeds, so a refused or interrupted extraction never
+	// leaves a partial tree at target that a later call would reuse.
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return "", err
+	}
+	staging, err := os.MkdirTemp(filepath.Dir(target), commit+".extract-*")
+	if err != nil {
+		return "", err
+	}
+	if err := gitops.Extract(repo, commit, staging); err != nil {
+		_ = os.RemoveAll(staging)
+		return "", err
+	}
+	if err := os.Rename(staging, target); err != nil {
+		_ = os.RemoveAll(staging)
 		return "", err
 	}
 	return target, nil

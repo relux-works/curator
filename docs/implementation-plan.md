@@ -69,7 +69,7 @@ Test strategy: table-driven cases ported from the spec text, one test per MUST. 
 ### Phase 2: sources and identity (EPIC sources-and-identity)
 
 - `internal/identity`: canonical source identity and segment-aware prefix matching (§8.2), allowlist gate semantics.
-- `internal/gitops`: clone (transport allowlist, dash-URL refusal), fetch, ref resolution (tag, revision, branch incl. origin preference), `git archive` snapshot extraction with path-escape and link rejection, submodule detection.
+- `internal/gitops`: clone (transport allowlist, dash-URL refusal), fetch, ref resolution (tag, revision, branch incl. origin preference), object-database snapshot extraction (`git ls-tree -r -l -z` + `git cat-file --batch`, exact committed blob bytes, never `git archive`) with path-escape, `.git`-component, link, gitlink, platform-path-collision, and size rejection decided from the listing before streaming, deterministic child termination on mid-stream errors, submodule detection.
 - `internal/snapshot`: commit-keyed snapshot cache (§8.2).
 - `internal/hashing`: content hash, byte-exact per §8.5.
 
