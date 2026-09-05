@@ -1,0 +1,10 @@
+# Review brief: ax PR #1 revision cycle 2
+
+Subject: worktree `/Users/iv/Developer/ReluxWorks/.temp/ax-curator-integration/worktree`, branch `draft/curator-environment-integration`, head `c6270a3` (rework commits `6144ff5`, `c6270a3` on the cycle-1 head `2c7f642`), PR https://github.com/relux-works/agent-session-manager-spec/pull/1. Rework report: `TASK-260905-30a1bz_revision-report-2.md`.
+
+1. Verify F1–F3 of `TASK-260905-30a1bz_review-findings-ax-1.md` are resolved exactly per `producer-brief-ax-rework-1.md`: `LAUNCH-PLAN-DETERMINISM-NEG` exists in the fixture with a planning/step-4 argv pair, the gate compares them (`provider_protocol_error`), required-negative entry and admitting mutation present; the extensions-bound negative canonicalizes to exactly 65,537 bytes and its positive sibling to 65,536 (recompute with the gate's own canonical function on a scratch copy and paste the numbers); boundary negatives per gate constant plus unknown-`schema`, each with a +1 narrowing that goes red (run the narrowings on a scratch copy with `PYTHONDONTWRITEBYTECODE=1`).
+2. Rerun `./scripts/validate_spec.py`, `./scripts/test_expected_red.sh`, `git diff --check`, `./run_validation.sh`; record exit codes; confirm only the SPEC digest moved if SPEC changed; `VERSION`/`CHANGELOG.md`/`RELEASE_NOTES.md`/`README.md` untouched.
+3. Delivery: commits signed with the human identity on top of `2c7f642` (no rewrite: `git log --oneline main..HEAD` still starts with `d7075e1`, `ef91985`, `2c7f642`); `gh pr view 1 --json headRefOid` equals the local head; PR OPEN, not merged; body updated.
+4. Attack pass limited to `git diff 2c7f642..c6270a3`: no regression of the cycle-1-verified Decision 7 items.
+
+Read-only; scratch under the worktree `.temp/`. Findings resource `TASK-260905-30a1bz_review-findings-ax-2.md`; blocking/major → development, else explicit ACCEPT at to-review and `accept_cr` on CR revision 2; do not mark done; `task-board handoff TASK-260905-30a1bz --role reviewer`. Never write into the control root.
