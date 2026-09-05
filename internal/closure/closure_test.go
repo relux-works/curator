@@ -621,3 +621,67 @@ func TestTransitiveManifestErrorNamesNodeRefAndChain(t *testing.T) {
 		t.Fatalf("closure error = %q, must not read as if the declaring skill were broken", message)
 	}
 }
+
+// TestScratchSnapshotRefusalLeavesNoReusablePartialTree: snapshotFor stages
+// the extraction beside the target and renames it into place only on
+// success, so a refused commit leaves neither a partial target nor a stale
+// staging directory, and a later good commit still extracts.
+func TestScratchSnapshotRefusalLeavesNoReusablePartialTree(t *testing.T) {
+	h := newHarness(t)
+	repo := t.TempDir()
+	h.git(repo, "init", "-q", "-b", "main")
+	blob := h.gitStdin(repo, "SKILL.md\n", "hash-object", "-w", "--stdin")
+	badTree := h.gitStdin(repo, "100644 blob "+blob+"\tSKILL.md\x00120000 blob "+blob+"\tlink\x00", "mktree", "-z")
+	bad := h.git(repo, "commit-tree", badTree, "-m", "bad")
+	goodTree := h.gitStdin(repo, "100644 blob "+blob+"\tSKILL.md\x00", "mktree", "-z")
+	good := h.git(repo, "commit-tree", goodTree, "-m", "good")
+
+	scratch := t.TempDir()
+	opts := Options{ScratchRoot: scratch}
+	if _, err := snapshotFor(opts, "src", repo, bad); err == nil || !strings.Contains(err.Error(), "links in git snapshots are unsupported") {
+		t.Fatalf("err = %v, want link refusal", err)
+	}
+	parent := filepath.Join(scratch, "snapshots", "src")
+	if _, err := os.Stat(filepath.Join(parent, bad)); !os.IsNotExist(err) {
+		t.Fatalf("refused extraction left a reusable target: %v", err)
+	}
+	if entries, _ := os.ReadDir(parent); len(entries) != 0 {
+		t.Fatalf("refused extraction left staging behind: %v", entries)
+	}
+	if _, err := snapshotFor(opts, "src", repo, bad); err == nil {
+		t.Fatal("a second call must not reuse a partial tree")
+	}
+	target, err := snapshotFor(opts, "src", repo, good)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target != filepath.Join(parent, good) {
+		t.Fatalf("target = %s", target)
+	}
+	if payload, _ := os.ReadFile(filepath.Join(target, "SKILL.md")); string(payload) != "SKILL.md\n" {
+		t.Fatalf("snapshot bytes %q", payload)
+	}
+	entries, _ := os.ReadDir(parent)
+	if len(entries) != 1 || entries[0].Name() != good {
+		t.Fatalf("staging directory not renamed away: %v", entries)
+	}
+	if again, err := snapshotFor(opts, "src", repo, good); err != nil || again != target {
+		t.Fatalf("existing snapshot not reused: %s %v", again, err)
+	}
+}
+
+func (h *harness) gitStdin(dir, stdin string, args ...string) string {
+	h.t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Stdin = strings.NewReader(stdin)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		h.t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
