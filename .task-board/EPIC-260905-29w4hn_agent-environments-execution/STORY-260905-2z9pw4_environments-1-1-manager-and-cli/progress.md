@@ -1,5 +1,5 @@
 ## Status
-integrating
+reviewing
 
 ## Review
 required
@@ -29,4 +29,4 @@ Landed on curator-spec main as f61ee9a (PR #41, fast-forward of the reviewed hea
 2026-09-05T13:01:43Z
 
 ## Last Update
-2026-09-05T18:15:17Z
+2026-09-05T18:33:09Z

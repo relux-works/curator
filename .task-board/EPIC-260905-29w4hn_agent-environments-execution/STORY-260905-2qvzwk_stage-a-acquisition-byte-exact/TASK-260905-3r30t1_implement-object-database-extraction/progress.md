@@ -89,6 +89,7 @@ spawn agent resolution: Agent selection: claude via explicit_override
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (claude) (run=RUN-260905-bea544, max_parallel=20)
 spawn run started: [implementer] developer (claude) (run=RUN-260905-bea544)
+Rework 2 in progress: F1 fixed (pre-pass refusals from ls-tree -l + kill/drain before Wait), O1 .git refusal, O2 closure staging rename, O3 nested exec test. Commits c9defdb8, a97265ad, bb14375a (lint fix) on feat/byte-exact-acquisition, pushed; local gates green (build/vet/gofmt/golangci-lint/race focused/all 60 packages incl cmd-curator 260s/gate-selftest/ledger). Watching PR #58 checks.
 
 ## Precondition Resources
 - [producer-brief-acquisition-fix.md](file://TASK-260905-3r30t1/producer-brief-acquisition-fix.md) — Producer brief: byte-exact object-database extraction replacing git archive (review M3, environments §1.2)
@@ -122,7 +123,7 @@ spawn run started: [implementer] developer (claude) (run=RUN-260905-bea544)
 2026-09-05T08:20:33Z
 
 ## Last Update
-2026-09-05T17:58:03Z
+2026-09-05T18:19:27Z
 
 ## Assigned To
 [implementer] developer (claude)
