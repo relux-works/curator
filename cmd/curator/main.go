@@ -70,6 +70,7 @@ Commands:
   project <subcommand>     add | resolve
   skill check <dir>        validate one skill package (--locale, --json)
   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+  profile <subcommand>     install | list | use | update | remove | sync (see profile install -h)
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
   gc                       remove unreferenced runtime entries
@@ -171,6 +172,8 @@ func (c cli) run(args []string) int {
 		}
 	case "global":
 		return c.cmdGlobal(args[1:])
+	case "profile":
+		return c.cmdProfile(args[1:])
 	case "hybrid":
 		return c.cmdHybrid(args[1:])
 	case "audit":

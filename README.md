@@ -166,6 +166,20 @@ curator global upgrade  # upgrade global skill packages
 </details>
 
 <details>
+<summary>Environment profiles (agent-environments, stage a)</summary>
+
+```bash
+curator profile install <git-url|path> [--range|--tag|--revision] [--as <name>] [--use]
+curator profile list    # installed profiles with locks and current markers
+curator profile use <name> [--env <env-id>]  # linked switch with backups and marker
+curator profile update [<name>|--all]  # re-resolve; blocking findings keep the old lock
+curator profile remove <name> [--purge]  # refuse while current in any scope
+curator profile sync    # re-materialize current profiles across adapters
+```
+
+</details>
+
+<details>
 <summary>Hybrid scope</summary>
 
 ```bash
