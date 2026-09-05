@@ -4261,3 +4261,29 @@ snapshot is refused as tampered.
 
 Either read `now` after the fetch rather than before it, or have the fixture
 stamp a timestamp slightly in the past. Evidence: run 33306632391 on PR #50.
+
+## 2026-09-05 — Decision 0013, the 0010 erratum, and the byte-exactness vector land on curator-spec
+
+The agent-environments execution epic (EPIC-260905-29w4hn, successor of
+EPIC-260831-2wpphe) opened and landed its first three spec deliveries on
+curator-spec main by fast-forward of the exact reviewed heads: the Decision 0010
+erratum (`9198c64`, PR #37), Decision 0013 "execution ownership and launch
+plans" (`83de1a5`, PR #38), and the snapshot byte-exactness rule with its
+`snapshot-acquisition.json` vector (`ec695ba`, PR #39). Each ran a fable-5.1
+producer/reviewer cycle at low effort; the decision took three cycles (two
+majors: the `ax.launch-plan-request` extension could exceed the ax §1.6 bound,
+and the permission-bypass gate was MAY).
+
+Two facts worth keeping. Decision numbering: 0011 exists only on the unlanded
+swift-driver draft branch, 0012 landed skipping it, so the execution-ownership
+decision is 0013 and says so. The byte-exactness fixture cannot be protected by a
+root `.gitattributes` rule, because the fixture's own nested `* text=auto` (which
+is the vector) outranks it for `text`; the bytes survive checkout only because the
+root policy pins `eol=lf` and the blobs were committed through plumbing —
+`make validate` fails on a normalized checkout, and the Windows CI lane proved
+the layout.
+
+Process residual: a confirming review cycle after an already-accepted Change
+Request parks at `to-review` without a verdict branch, and task-board's
+autonomous recovery then spawns duplicate reviewer runs (attempt 1/3) — close the
+task the moment the ACCEPT lands.

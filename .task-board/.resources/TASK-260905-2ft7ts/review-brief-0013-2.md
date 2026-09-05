@@ -1,0 +1,7 @@
+# Review brief: Decision 0013 cycle 2
+
+Subject: worktree `/Users/iv/Developer/ReluxWorks/.worktrees/curator-spec-decision-0013`, branch `draft/decision-0013-execution-ownership`, head `7cb24bd` (rework commit on top of 71ac9d1), base `b4f29cd`. Document `decisions/0013-execution-ownership-and-launch-plans.md`.
+
+1. Verify every one of the seven findings of `TASK-260905-2ft7ts_review-findings-0013-1.md` is resolved exactly per the author decisions in `producer-brief-0013-rework-1.md` (F1 extension shape without argv_suffix + residual bound; F2 MUST profile-flag refusal keyed on §7.7 + negative case; F3 secret_policy_violation; F4 base64url; F5 literal-wins collision rule; F6 session-name default; F7 pin 91bf945). Check the rework report's disposition table against the diff `git diff 71ac9d1..7cb24bd`.
+2. Attack pass on the amended text only: internal consistency after the edits (3.4/3.5 replay from `argv[base_argv_length:]`; 6.3/6.4 cross-references; Decision 7 items reflecting F1–F4), no new contradiction with ax §1.6/§5.1/§7.7/§15.3 (re-read those), no regression of the cycle-1 verified facts.
+3. Same read-only constraints and verdict contract as `review-brief-0013-1.md`: findings resource `TASK-260905-2ft7ts_review-findings-0013-2.md`; blocking/major → development; else explicit ACCEPT at to-review; do not mark done; `task-board handoff TASK-260905-2ft7ts --role reviewer`. Never write into the control root.

@@ -1,5 +1,5 @@
 ## Status
-development
+done
 
 ## Review
 required
@@ -24,11 +24,11 @@ estimated(fibonacci(8))
 - [x] Code written per task description and AC
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
-- [ ] Implementation matches AC
-- [ ] Solution fits project architecture
-- [ ] Tests green
-- [ ] Gate, refusal, validation, authorization, and attestation behavior attacked, not read — positive-path-only evidence is not accepted
-- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] Gate, refusal, validation, authorization, and attestation behavior attacked, not read — positive-path-only evidence is not accepted
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
 spawn agent resolution: Agent selection: claude via explicit_override
@@ -50,11 +50,37 @@ spawn agent resolution: Agent selection: claude via explicit_override
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (claude) (run=RUN-260905-5a303d, max_parallel=20)
 spawn run started: [implementer] developer (claude) (run=RUN-260905-5a303d)
+Rework 1 applied: all 7 findings of review-findings-0013-1 at signed commit 7cb24bd on draft/decision-0013-execution-ownership (parent 71ac9d1). Report: TASK-260905-2ft7ts_rework-report-0013-1.md. agents-management pin moved to 91bf945.
+Rework 1 gate evidence: text regression check .temp/TASK-260905-2ft7ts/check-0013-rework-1.sh — exit 1 on 71ac9d1 (expected red, 15/15 fail), exit 0 on 7cb24bd (15/15 pass). No build/test suite applies to a Markdown decision; the runnable gates the decision specifies are the Decision 7 conformance cases for the implementing PRs. Item 12: cycle-1 verdict resource review-findings-0013-1 routed to development, answered by rework-report-0013-1.
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-5a303d, pid=39661, exit=0)
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260905-3874c4, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-3874c4)
+Cycle 2 review: ACCEPT at 7cb24bd. All 7 cycle-1 findings resolved per rework brief; F8 minor (argv-form profile-flag refusal sequencing) and F9 nit (3.3 wording) recorded in review-findings-0013-2 for the next edit. CR rev 2 accepted with findings-2 as evidence (verdict resource pre-existed this run, so it could not serve as evidence; it is updated to the cycle-2 verdict). Empty story delta is by design: deliverable lives in the decision worktree.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-3874c4, pid=45901, exit=0)
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260905-9698f9, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-9698f9)
+Cycle 3 review: ACCEPT at 6cbe9ae (F8/F9 resolved; nit F10: residual three-class extensions wording in 3.4 and D7 item 4). CR rev 2 was already accepted in cycle 2, so acceptance is recorded by parking at to-review. Empty story-branch delta is by design; artifact is signed commit 6cbe9ae on draft/decision-0013-execution-ownership, PR #38.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-9698f9, pid=58071, exit=0)
+spawn autonomous recovery: run RUN-260905-9698f9 queued successor RUN-260905-543165 (attempt 1/3, model=claude-fable-5-1): reviewer run RUN-260905-9698f9 remains unsatisfied: reviewer run has no verdict branch while TASK-260905-2ft7ts is to-review
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-543165)
+Cycle-3 review (RUN-260905-543165): ACCEPT at 6cbe9ae. F8/F9 resolved; residual nit F10 (three-class extensions phrasing at 3.4 line 277 and D7 item 4 line 611), fix on next touch. CR rev 2 already accepted in cycle 2, accept_cr refused with change_request_state_conflict; parked at to-review as the accepted handoff. Evidence: TASK-260905-2ft7ts_review-verdict-0013-3.md, TASK-260905-2ft7ts_review-findings-0013-3.md. Orchestrator lands PR #38.
+Anomaly (RUN-260905-543165): this recovery reviewer run started with the task at to-review, set reviewing, verified 6cbe9ae (ACCEPT), then found the board had moved the task to done meanwhile (orchestrator checkpoint; PR #38 still OPEN). The run briefly reverted done→to-review (reopening STORY-260905-143tfc, escalating EPIC-260905-29w4hn) and immediately restored done; story=done, epic=backlog as before. Verdict evidence: TASK-260905-2ft7ts_review-verdict-0013-3.md (new, run-produced) plus updated TASK-260905-2ft7ts_review-verdict.md; accept_cr refused (rev 2 already accepted in cycle 2). No further reviewer action needed.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-543165, pid=62900, exit=0)
 
 ## Precondition Resources
 - [producer-brief-0013.md](file://TASK-260905-2ft7ts/producer-brief-0013.md) — Producer brief: Decision 0013 execution ownership and launch plans — settled decisions, contract items 1-8, sources, deliverables
 - [review-brief-0013-1.md](file://TASK-260905-2ft7ts/review-brief-0013-1.md) — Reviewer brief cycle 1: Decision 0013 at 71ac9d1
 - [producer-brief-0013-rework-1.md](file://TASK-260905-2ft7ts/producer-brief-0013-rework-1.md) — Rework 1: author decisions for all 7 findings of review-findings-0013-1
+- [review-brief-0013-2.md](file://TASK-260905-2ft7ts/review-brief-0013-2.md) — Cycle 2: verify all 7 findings resolved at 7cb24bd; attack the amended text
+- [review-brief-0013-3.md](file://TASK-260905-2ft7ts/review-brief-0013-3.md) — Cycle 3: confirm the F8/F9 edit at 6cbe9ae
 
 ## Outcome Resources
 - [TASK-260905-2ft7ts_spawn-log_-implementer--developer--claude-_RUN-260905-3f8966.log](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_spawn-log_-implementer--developer--claude-_RUN-260905-3f8966.log) — System spawn log captured by task-board
@@ -62,14 +88,22 @@ spawn run started: [implementer] developer (claude) (run=RUN-260905-5a303d)
 - [TASK-260905-2ft7ts_change-request_rev1.patch](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_change-request_rev1.patch) — Change Request CR-TASK-260905-2ft7ts-1 revision 1 candidate patch (repository_delta=empty, 0 changed paths)
 - [TASK-260905-2ft7ts_spawn-log_-reviewer--reviewer--claude-_RUN-260905-b0751d.log](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_spawn-log_-reviewer--reviewer--claude-_RUN-260905-b0751d.log) — System spawn log captured by task-board
 - [TASK-260905-2ft7ts_review-findings-0013-1.md](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_review-findings-0013-1.md) — Review cycle 1 findings for Decision 0013 at 71ac9d1: changes requested (2 major, 3 minor, 2 nit)
-- [TASK-260905-2ft7ts_review-verdict.md](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_review-verdict.md) — CR-TASK-260905-2ft7ts-1 rev 1 verdict: changes requested, routed to-dev
+- [TASK-260905-2ft7ts_review-verdict.md](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_review-verdict.md) — Cycle-3 review verdict: ACCEPT at 6cbe9ae (re-verified by RUN-260905-543165)
 - [TASK-260905-2ft7ts_spawn-log_-implementer--developer--claude-_RUN-260905-5a303d.log](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_spawn-log_-implementer--developer--claude-_RUN-260905-5a303d.log) — System spawn log captured by task-board
+- [TASK-260905-2ft7ts_rework-report-0013-1.md](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_rework-report-0013-1.md)
+- [TASK-260905-2ft7ts_change-request_rev2.patch](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_change-request_rev2.patch) — Change Request CR-TASK-260905-2ft7ts-2 revision 2 candidate patch (repository_delta=empty, 0 changed paths)
+- [TASK-260905-2ft7ts_spawn-log_-reviewer--reviewer--claude-_RUN-260905-3874c4.log](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_spawn-log_-reviewer--reviewer--claude-_RUN-260905-3874c4.log) — System spawn log captured by task-board
+- [TASK-260905-2ft7ts_review-findings-0013-2.md](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_review-findings-0013-2.md) — Cycle-2 review of Decision 0013 at 7cb24bd: all 7 findings resolved; F8 minor, F9 nit; ACCEPT
+- [TASK-260905-2ft7ts_spawn-log_-reviewer--reviewer--claude-_RUN-260905-9698f9.log](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_spawn-log_-reviewer--reviewer--claude-_RUN-260905-9698f9.log) — System spawn log captured by task-board
+- [TASK-260905-2ft7ts_review-findings-0013-3.md](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_review-findings-0013-3.md) — Cycle 3 review: F8/F9 edit at 6cbe9ae confirmed; ACCEPT with one nit (F10)
+- [TASK-260905-2ft7ts_spawn-log_-reviewer--reviewer--claude-_RUN-260905-543165.log](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_spawn-log_-reviewer--reviewer--claude-_RUN-260905-543165.log) — System spawn log captured by task-board
+- [TASK-260905-2ft7ts_review-verdict-0013-3.md](file://TASK-260905-2ft7ts/TASK-260905-2ft7ts_review-verdict-0013-3.md) — Cycle-3 review verdict: ACCEPT at 6cbe9ae (RUN-260905-543165)
 
 ## Created
 2026-09-05T06:55:43Z
 
 ## Last Update
-2026-09-05T07:13:06Z
+2026-09-05T07:27:39Z
 
 ## Assigned To
-[implementer] developer (claude)
+[reviewer] reviewer (claude)
