@@ -107,14 +107,14 @@ func TestCloneAndResolve(t *testing.T) {
 	}
 }
 
-func TestArchiveExtractsExactTree(t *testing.T) {
+func TestExtractProducesExactTree(t *testing.T) {
 	src := makeRepo(t)
 	v1, err := Resolve(src, "tag", "v1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	dest := filepath.Join(t.TempDir(), "snap")
-	if err := Archive(src, v1.Commit, dest); err != nil {
+	if err := Extract(src, v1.Commit, dest); err != nil {
 		t.Fatal(err)
 	}
 	content, err := os.ReadFile(filepath.Join(dest, "SKILL.md"))
@@ -129,7 +129,7 @@ func TestArchiveExtractsExactTree(t *testing.T) {
 	}
 }
 
-func TestArchiveRejectsLinks(t *testing.T) {
+func TestExtractRejectsLinks(t *testing.T) {
 	if _, err := exec.LookPath("ln"); err != nil {
 		t.Skip("no ln on this platform")
 	}
@@ -140,7 +140,7 @@ func TestArchiveRejectsLinks(t *testing.T) {
 	gitRun(t, src, "add", ".")
 	gitRun(t, src, "commit", "-qm", "with link")
 	head, _ := Resolve(src, "revision", "HEAD")
-	err := Archive(src, head.Commit, filepath.Join(t.TempDir(), "snap"))
+	err := Extract(src, head.Commit, filepath.Join(t.TempDir(), "snap"))
 	if err == nil || !strings.Contains(err.Error(), "links") {
 		t.Fatalf("err = %v, want link rejection", err)
 	}
