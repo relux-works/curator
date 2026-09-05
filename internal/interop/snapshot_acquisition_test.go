@@ -52,14 +52,16 @@ func acquisitionGit(t *testing.T, dir string, args ...string) string {
 
 // TestConformanceSnapshotAcquisition drives gitops.Extract (the production
 // acquisition path of internal/snapshot and internal/closure) against the
-// suite's byte-exact vector. A root without the vector (the pinned rc.9 suite)
-// is skipped with that reason; a root that has it must pass.
+// suite's byte-exact vector. A root that publishes no such vector (the pinned
+// rc.9 suite) records a root-content skip (.github/ci/skip-classes.tsv); a root
+// that has it must pass. The ledger row in .github/ci/platform-cases.tsv
+// requires the case on every GOOS and tolerates only that skip class.
 func TestConformanceSnapshotAcquisition(t *testing.T) {
 	root := suiteRoot(t)
 	vectorPath := filepath.Join(root, "vectors", "snapshot-acquisition.json")
 	payload, err := os.ReadFile(vectorPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		t.Skipf("conformance root %s has no vectors/snapshot-acquisition.json (pre-environments suite)", root)
+		t.Skipf("conformance root %s publishes no vectors/snapshot-acquisition.json (pre-environments suite; root-content)", root)
 	}
 	if err != nil {
 		t.Fatalf("reading %s: %v", vectorPath, err)

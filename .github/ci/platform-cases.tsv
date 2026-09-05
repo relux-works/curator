@@ -79,7 +79,10 @@ internal/buildcache	TestRetireEntryRemovesLinksWithoutFollowingThem	linux,darwin
 internal/buildcache	TestUnixRejectsEntrySymlinkAndUnprotectedCacheRoot	linux,darwin	-	-	rejects a symlinked entry and an unprotected cache root
 internal/scopes	TestCollectStaysFailSafeOnRedirectedUnixScopes	linux,darwin	-	-	GC stays fail-safe when a unix scope is redirected by a link
 internal/buildsource	TestRejectsSpecialFile	linux,darwin	-	-	build source enumeration rejects a non-regular file
-internal/gitops	TestArchiveRejectsLinks	linux,darwin	windows	host-capability	archiving refuses a tree containing links (needs `ln`, absent from the Windows job PATH)
+internal/gitops	TestArchiveRejectsLinks	linux,darwin,windows	-	-	extraction refuses a tree containing a symlink entry (mode 120000 written through mktree; needs neither `ln` nor host symlinks)
+internal/gitops	TestExtractReproducesByteExactVector	linux,darwin,windows	-	-	object-database extraction reproduces the spec byte-exact snapshot vector under core.autocrlf=true and false (environments 1.2)
+internal/gitops	TestExtractIgnoresWorkingTreeConversion	linux,darwin,windows	-	-	extraction ignores core.autocrlf/text/export-subst conversion that git archive would apply (fails if extraction reverts to git archive)
+internal/gitops	TestExtractRefusesSubmodules	linux,darwin,windows	-	-	extraction refuses a tree containing a gitlink (mode 160000)
 
 # ===========================================================================
 # Read-only build source
@@ -165,6 +168,7 @@ internal/transaction	TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken	window
 # Interop / conformance consumer
 # ===========================================================================
 internal/interop	TestGoldenContextCopy	linux,darwin,windows	-	-	the agent context copied for a skill matches the authoritative golden file list
+internal/interop	TestConformanceSnapshotAcquisition	linux,darwin,windows	linux,darwin,windows	root-content	the root's byte-exact snapshot-acquisition vector reproduces through gitops.Extract; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
 internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
 internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
 
