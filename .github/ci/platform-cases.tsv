@@ -84,6 +84,16 @@ internal/gitops	TestExtractReproducesByteExactVector	linux,darwin,windows	-	-	ob
 internal/gitops	TestExtractIgnoresWorkingTreeConversion	linux,darwin,windows	-	-	extraction ignores core.autocrlf/text/export-subst conversion that git archive would apply (fails if extraction reverts to git archive)
 internal/gitops	TestExtractRefusesSubmodules	linux,darwin,windows	-	-	extraction refuses a tree containing a gitlink (mode 160000)
 internal/gitops	TestExtractPreservesExecutableBit	linux,darwin	windows	platform-control	extraction writes a 100755 blob with the executable bit and a 100644 blob without it; Windows synthesizes permission bits with no execute bit, so the mode claim is asserted on the unix runners
+internal/gitops	TestExtractRefusesOversizeBlobWithoutStreaming	linux,darwin,windows	-	-	a 1 MiB blob over a narrowed size bound is refused from the ls-tree -l listing within a 20 s watchdog; cat-file never streams it and nothing is written
+internal/gitops	TestExtractRefusesDuplicatePlatformPathBeforeLargeBlob	darwin,windows	linux	host-capability	A.txt/a.txt ahead of an 8 MiB blob is refused before cat-file starts on a case-folding filesystem, within the watchdog; a case-sensitive host has no collision to refuse
+internal/gitops	TestPlanWritesRefusesCaseCollisionBeforeStreaming	darwin,windows	linux	host-capability	the planning pre-pass alone refuses A.txt/a.txt on a case-folding destination and removes its probe; a case-sensitive host has no collision to refuse
+internal/gitops	TestExtractRefusesEscapeBeforeLargeBlob	linux,darwin,windows	-	-	a `..` entry ahead of an 8 MiB blob is refused before cat-file starts, within the watchdog, with nothing written
+internal/gitops	TestExtractRefusesMissingObjectsFromListing	linux,darwin,windows	-	-	a blob the repository cannot read is reported BAD by ls-tree -l and refused from the listing; cat-file never starts
+internal/gitops	TestExtractTerminatesCatFileOnMidStreamFramingError	linux,darwin	windows	platform-control	a POSIX git shim answers cat-file with a wrong-object header and 8 MiB queued; the child is killed and drained before Wait, within the watchdog, with nothing written
+internal/gitops	TestExtractTerminatesCatFileOnWriteFailure	linux,darwin	windows	host-capability	the first target cannot be opened (read-only parent) while real git has 8 MiB queued; the child is killed and drained before Wait; Windows and root can write through the read-only directory
+internal/gitops	TestExtractRemovesWrittenFilesOnMidStreamError	linux,darwin,windows	-	-	a truncated loose object makes cat-file die mid-body after one written file; that file is removed and the caller's pre-existing entries stay intact
+internal/gitops	TestExtractRefusesDotGitComponents	linux,darwin,windows	-	-	a `.git` path component in any case is refused like `.`/`..` (git verify_path), while `.gitattributes` and `git/` stay admitted
+internal/gitops	TestExtractPreservesNestedExecutableBit	linux,darwin	windows	platform-control	a nested 100755 blob is written with the executable bit and a nested 100644 sibling without it; Windows synthesizes permission bits with no execute bit
 
 # ===========================================================================
 # Read-only build source

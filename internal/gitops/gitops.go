@@ -133,18 +133,22 @@ func Fetch(repo string) error {
 // object database (Spec core §6.2, §6.5; environments §1.2).
 //
 // Every regular-file entry of the commit's tree is written with exactly its
-// committed blob bytes. Entries are listed with "git ls-tree -r -z" and blob
-// bytes are read with "git cat-file --batch", which returns raw objects and
-// never applies core.autocrlf, text/eol attributes, clean/smudge filters, or
-// export-subst; the snapshot is therefore a function of the commit alone.
+// committed blob bytes. Entries are listed with "git ls-tree -r -l -z" and
+// blob bytes are read with "git cat-file --batch", which returns raw objects
+// and never applies core.autocrlf, text/eol attributes, clean/smudge filters,
+// or export-subst; the snapshot is therefore a function of the commit alone.
 // The former "git archive" path did apply those conversions and so produced
 // machine-dependent bytes.
 //
 // Refused: symbolic links (mode 120000), gitlinks/submodules (160000), any
-// non-blob entry, empty or escaping paths, two tree paths that map to one
-// platform path (case-insensitive collisions on such filesystems), and blobs
-// larger than maxSnapshotFileBytes. Mode 100755 is preserved as 0o755; every
-// other regular file is written 0o644.
+// non-blob entry, empty or escaping paths and ".git" components, two tree
+// paths that map to one platform path (case-insensitive collisions on such
+// filesystems), entries that already exist under destination, and blobs
+// larger than maxSnapshotFileBytes. Every refusal that needs no blob bytes
+// is decided from the listing before cat-file starts, so a refused
+// extraction writes nothing; a failure while streaming removes what this
+// call wrote. Mode 100755 is preserved as 0o755; every other regular file is
+// written 0o644.
 func Extract(repo, commit, destination string) error {
 	if err := EnsureRepo(repo); err != nil {
 		return err
@@ -164,25 +168,50 @@ func Extract(repo, commit, destination string) error {
 	if err != nil {
 		return err
 	}
+	created := false
+	if _, err := os.Lstat(destRoot); os.IsNotExist(err) {
+		created = true
+	}
 	if err := os.MkdirAll(destRoot, 0o755); err != nil {
 		return err
 	}
-	return writeBlobs(repo, destRoot, entries)
+	plan, err := planWrites(destRoot, entries)
+	if err != nil {
+		if created {
+			_ = os.RemoveAll(destRoot)
+		}
+		return err
+	}
+	if err := writeBlobs(repo, plan); err != nil {
+		if created {
+			_ = os.RemoveAll(destRoot)
+		} else {
+			for _, entry := range plan {
+				_ = os.Remove(entry.target)
+			}
+		}
+		return err
+	}
+	return nil
 }
 
-// treeEntry is one "git ls-tree -r -z" record.
+// treeEntry is one "git ls-tree -r -l -z" record plus its planned target.
 type treeEntry struct {
-	mode string
-	kind string
-	oid  string
-	path string
+	mode   string
+	kind   string
+	oid    string
+	size   int64
+	path   string
+	target string
 }
 
 // listTree lists the recursive contents of tree and refuses every entry that
 // is not a regular blob. Output framing (verified on git 2.50):
-// "<mode> <type> <oid>\t<path>\0" per entry, paths unquoted under -z.
+// "<mode> <type> <oid> <size>\t<path>\0" per entry under -l -z, the size
+// space-padded, "-" for non-blobs and "BAD" for an object the repository
+// cannot read; paths unquoted.
 func listTree(repo, tree string) ([]treeEntry, error) {
-	cmd := exec.Command("git", "-C", repo, "ls-tree", "-r", "-z", "--full-tree", tree) // #nosec G204 -- fixed binary and flags; tree is a resolved object id
+	cmd := exec.Command("git", "-C", repo, "ls-tree", "-r", "-l", "-z", "--full-tree", tree) // #nosec G204 -- fixed binary and flags; tree is a resolved object id
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -199,7 +228,7 @@ func listTree(repo, tree string) ([]treeEntry, error) {
 			return nil, fmt.Errorf("malformed ls-tree record in %s: %q", repo, record)
 		}
 		fields := strings.Fields(string(meta))
-		if len(fields) != 3 {
+		if len(fields) != 4 {
 			return nil, fmt.Errorf("malformed ls-tree record in %s: %q", repo, record)
 		}
 		entry := treeEntry{mode: fields[0], kind: fields[1], oid: fields[2], path: string(path)}
@@ -211,19 +240,28 @@ func listTree(repo, tree string) ([]treeEntry, error) {
 		case entry.kind != "blob" || (entry.mode != "100644" && entry.mode != "100755"):
 			return nil, fmt.Errorf("unsupported entry type in git snapshot: %s %s %q", entry.mode, entry.kind, entry.path)
 		}
+		if fields[3] == "BAD" {
+			return nil, fmt.Errorf("missing or unreadable object in git snapshot: %s %q", entry.oid, entry.path)
+		}
+		size, err := strconv.ParseInt(fields[3], 10, 64)
+		if err != nil || size < 0 {
+			return nil, fmt.Errorf("malformed ls-tree record in %s: %q", repo, record)
+		}
+		entry.size = size
 		entries = append(entries, entry)
 	}
 	return entries, nil
 }
 
 // safeTarget maps a tree path to a destination path, rejecting empty names,
-// absolute paths, and escapes.
+// absolute paths, escapes, and ".git" components (git's own verify_path
+// refuses that name, case-insensitively).
 func safeTarget(destRoot, name string) (string, error) {
 	if name == "" || strings.HasPrefix(name, "/") || strings.ContainsRune(name, '\\') {
 		return "", fmt.Errorf("unsafe path in git snapshot: %q", name)
 	}
 	for _, component := range strings.Split(name, "/") {
-		if component == "" || component == "." || component == ".." {
+		if component == "" || component == "." || component == ".." || strings.EqualFold(component, ".git") {
 			return "", fmt.Errorf("unsafe path in git snapshot: %q", name)
 		}
 	}
@@ -235,12 +273,93 @@ func safeTarget(destRoot, name string) (string, error) {
 	return target, nil
 }
 
-// writeBlobs streams every entry's blob through one "git cat-file --batch"
-// process and writes it under destRoot. Batch framing (verified on git 2.50):
-// "<oid> blob <size>\n<bytes>\n" per requested object; a missing object
-// answers "<oid> missing\n". cat-file reads raw objects: --filters and
-// --textconv are deliberately not passed.
-func writeBlobs(repo, destRoot string, entries []treeEntry) error {
+// planWrites decides every refusal that needs no blob bytes before cat-file
+// starts: path safety, the size bound from the listing, two tree paths that
+// map to one platform path, and entries already present under destRoot.
+//
+// Tree paths differing only in case map to one platform path on
+// case-insensitive filesystems. When two planned targets fold to the same
+// key the destination filesystem is probed once; on a case-sensitive
+// filesystem the distinct paths coexist, on a case-insensitive one the pair
+// is refused (Spec core §2, §6.2). Any other folding a filesystem applies is
+// caught by the existence check writeBlobs repeats before each file.
+func planWrites(destRoot string, entries []treeEntry) ([]treeEntry, error) {
+	plan := make([]treeEntry, 0, len(entries))
+	exact := map[string]bool{}
+	folded := map[string]bool{}
+	caseInsensitive, probed := false, false
+	for _, entry := range entries {
+		target, err := safeTarget(destRoot, entry.path)
+		if err != nil {
+			return nil, err
+		}
+		if entry.size > maxSnapshotFileBytes {
+			return nil, fmt.Errorf("file too large in git snapshot: %q", entry.path)
+		}
+		if exact[target] {
+			return nil, fmt.Errorf("duplicate path in git snapshot: %q", entry.path)
+		}
+		exact[target] = true
+		key := strings.ToLower(target)
+		if folded[key] {
+			if !probed {
+				caseInsensitive, err = destinationFoldsCase(destRoot)
+				if err != nil {
+					return nil, err
+				}
+				probed = true
+			}
+			if caseInsensitive {
+				return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
+			}
+		}
+		folded[key] = true
+		if _, err := os.Lstat(target); err == nil {
+			return nil, fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+		entry.target = target
+		plan = append(plan, entry)
+	}
+	return plan, nil
+}
+
+// destinationFoldsCase reports whether destRoot's filesystem maps two names
+// differing only in case to one file, by creating and removing a probe file.
+func destinationFoldsCase(destRoot string) (bool, error) {
+	probe, err := os.CreateTemp(destRoot, ".curator-case-probe-*a")
+	if err != nil {
+		return false, err
+	}
+	name := probe.Name()
+	_ = probe.Close()
+	defer func() { _ = os.Remove(name) }()
+	_, err = os.Lstat(strings.TrimSuffix(name, "a") + "A")
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+// drainBound bounds the bytes discarded from a terminated cat-file child.
+const drainBound = 64 << 20
+
+// writeBlobs streams every planned entry's blob through one
+// "git cat-file --batch" process and writes it to its target. Batch framing
+// (verified on git 2.50): "<oid> blob <size>\n<bytes>\n" per requested
+// object; a missing object answers "<oid> missing\n". cat-file reads raw
+// objects: --filters and --textconv are deliberately not passed.
+//
+// A mid-stream error (framing, I/O, a size that disagrees with the listing)
+// must not leave git blocked on a full stdout pipe: the child is terminated
+// deterministically -- stdin closed, process killed, stdout drained to
+// io.Discard within drainBound -- before Wait, and the partial target is
+// removed. No path reaches Wait with undrained stdout.
+func writeBlobs(repo string, entries []treeEntry) error {
 	if len(entries) == 0 {
 		return nil
 	}
@@ -258,10 +377,6 @@ func writeBlobs(repo, destRoot string, entries []treeEntry) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	defer func() {
-		_ = stdin.Close()
-		_ = cmd.Wait()
-	}()
 	go func() {
 		defer func() { _ = stdin.Close() }()
 		for _, entry := range entries {
@@ -271,64 +386,65 @@ func writeBlobs(repo, destRoot string, entries []treeEntry) error {
 		}
 	}()
 	reader := bufio.NewReader(stdout)
-	// Tree paths differing only in case (or other platform folding) map to
-	// one platform path on case-insensitive filesystems. Remember what this
-	// extraction wrote and refuse a second entry that lands on an existing
-	// file: on a case-sensitive filesystem the distinct paths coexist; on a
-	// case-insensitive one the second write would have silently replaced the
-	// first (Spec core §2, §6.2).
-	written := map[string]bool{}
-	for _, entry := range entries {
-		target, err := safeTarget(destRoot, entry.path)
-		if err != nil {
-			return err
+	abort := func(partial string, err error) error {
+		_ = stdin.Close()
+		_ = cmd.Process.Kill()
+		_, _ = io.Copy(io.Discard, io.LimitReader(reader, drainBound))
+		_ = cmd.Wait()
+		if partial != "" {
+			_ = os.Remove(partial)
 		}
+		return err
+	}
+	for _, entry := range entries {
 		header, err := reader.ReadString('\n')
 		if err != nil {
-			return fmt.Errorf("git cat-file --batch failed in %s: %v %s", repo, err, strings.TrimSpace(stderr.String()))
+			return abort("", fmt.Errorf("git cat-file --batch failed in %s: %v %s", repo, err, strings.TrimSpace(stderr.String())))
 		}
 		fields := strings.Fields(header)
 		if len(fields) != 3 || fields[0] != entry.oid || fields[1] != "blob" {
-			return fmt.Errorf("unexpected git cat-file --batch response for %q: %q", entry.path, strings.TrimSpace(header))
+			return abort("", fmt.Errorf("unexpected git cat-file --batch response for %q: %q", entry.path, strings.TrimSpace(header)))
 		}
 		size, err := strconv.ParseInt(fields[2], 10, 64)
-		if err != nil || size < 0 {
-			return fmt.Errorf("unexpected git cat-file --batch response for %q: %q", entry.path, strings.TrimSpace(header))
+		if err != nil || size != entry.size {
+			return abort("", fmt.Errorf("unexpected git cat-file --batch response for %q: %q (listed size %d)", entry.path, strings.TrimSpace(header), entry.size))
 		}
-		if size > maxSnapshotFileBytes {
-			return fmt.Errorf("file too large in git snapshot: %q", entry.path)
+		if err := os.MkdirAll(filepath.Dir(entry.target), 0o755); err != nil {
+			return abort("", err)
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		if written[target] {
-			return fmt.Errorf("duplicate path in git snapshot: %q", entry.path)
-		}
-		if _, err := os.Lstat(target); err == nil {
-			return fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path)
+		// The planned existence check is repeated here so a folding the
+		// plan's probe did not model still refuses rather than replaces.
+		if _, err := os.Lstat(entry.target); err == nil {
+			return abort("", fmt.Errorf("duplicate platform path in git snapshot: %q", entry.path))
 		} else if !os.IsNotExist(err) {
-			return err
+			return abort("", err)
 		}
 		mode := os.FileMode(0o644)
 		if entry.mode == "100755" {
 			mode = 0o755
 		}
-		file, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode) // #nosec G304 -- target is escape-checked above
+		file, err := os.OpenFile(entry.target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode) // #nosec G304 -- target is escape-checked by planWrites
 		if err != nil {
-			return err
+			return abort("", err)
 		}
 		if _, err := io.CopyN(file, reader, size); err != nil {
 			_ = file.Close()
-			return fmt.Errorf("reading blob %s for %q: %w", entry.oid, entry.path, err)
+			return abort(entry.target, fmt.Errorf("reading blob %s for %q: %w", entry.oid, entry.path, err))
 		}
 		if err := file.Close(); err != nil {
-			return err
+			return abort(entry.target, err)
 		}
-		written[target] = true
 		// Trailing LF after the object bytes.
 		if b, err := reader.ReadByte(); err != nil || b != '\n' {
-			return fmt.Errorf("unexpected git cat-file --batch framing after %q", entry.path)
+			return abort(entry.target, fmt.Errorf("unexpected git cat-file --batch framing after %q", entry.path))
 		}
+	}
+	_ = stdin.Close()
+	// Every requested object has been consumed; the child has nothing left
+	// to write, so Wait cannot block on the pipe.
+	_, _ = io.Copy(io.Discard, io.LimitReader(reader, drainBound))
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("git cat-file --batch failed in %s: %v %s", repo, err, strings.TrimSpace(stderr.String()))
 	}
 	return nil
 }

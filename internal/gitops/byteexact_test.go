@@ -254,17 +254,23 @@ func TestExtractRefusesSubmodules(t *testing.T) {
 	}
 }
 
+// literalEntry is one raw tree entry for commitLiteralTree.
+type literalEntry struct {
+	name string
+	oid  string
+}
+
 // commitLiteralTree writes a tree object with arbitrary entry names (git
-// mktree refuses "..", "." and slashes) via hash-object --literally.
-func commitLiteralTree(t *testing.T, repo string, names []string, blob string) string {
+// mktree refuses "..", ".", ".git" and slashes) via hash-object --literally.
+func commitLiteralTree(t *testing.T, repo string, entries []literalEntry) string {
 	t.Helper()
-	raw, err := hex.DecodeString(blob)
-	if err != nil {
-		t.Fatal(err)
-	}
 	var body bytes.Buffer
-	for _, name := range names {
-		body.WriteString("100644 " + name + "\x00")
+	for _, entry := range entries {
+		raw, err := hex.DecodeString(entry.oid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body.WriteString("100644 " + entry.name + "\x00")
 		body.Write(raw)
 	}
 	cmd := exec.Command("git", "hash-object", "-t", "tree", "-w", "--literally", "--stdin")
@@ -285,7 +291,7 @@ func TestExtractRefusesEscapingPaths(t *testing.T) {
 	parent := t.TempDir()
 	dest := filepath.Join(parent, "snap")
 	for _, name := range []string{"..", ".", "a/../../escape2", "sub/./x", "", "/abs"} {
-		commit := commitLiteralTree(t, repo, []string{name}, oid)
+		commit := commitLiteralTree(t, repo, []literalEntry{{name: name, oid: oid}})
 		err := Extract(repo, commit, dest)
 		if err == nil {
 			t.Fatalf("%q: extraction must be refused", name)
