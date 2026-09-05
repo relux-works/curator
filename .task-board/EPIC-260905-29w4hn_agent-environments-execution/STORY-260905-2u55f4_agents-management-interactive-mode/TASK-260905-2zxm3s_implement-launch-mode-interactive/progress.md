@@ -1,5 +1,5 @@
 ## Status
-reviewing
+done
 
 ## Review
 required
@@ -29,11 +29,11 @@ estimated(fibonacci(5))
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
 - [x] Logbook: control-root LOGBOOK.md is off-limits per producer brief; findings (ErrParameterNotInteractive decision, pi-in-regress anomaly, codex profile refusal) recorded in the drafting report and task notes instead
-- [ ] Implementation matches AC
-- [ ] Solution fits project architecture
-- [ ] Tests green
-- [ ] Gate, refusal, validation, authorization, and attestation behavior attacked, not read — positive-path-only evidence is not accepted
-- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] Gate, refusal, validation, authorization, and attestation behavior attacked, not read — positive-path-only evidence is not accepted
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
 spawn agent resolution: Agent selection: claude via explicit_override
@@ -47,6 +47,9 @@ spawn agent resolution: Agent selection: claude via explicit_override
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [reviewer] reviewer (claude) (run=RUN-260905-49bcf9, max_parallel=20)
 spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-49bcf9)
+Review cycle 1 (3edbde8): ACCEPT. Gates rerun green, spellings verified on claude 2.1.261 / codex 0.153.2 / pi 0.84.2, own attack test + 3 narrowing mutants on a scratch copy all killed. Empty curator-spec delta is correct: deliverable is in skill-agents-management worktree feat/launch-mode-interactive. Minor: per-plugin composition negatives test prefix+servers only; empty Model.ID admitted (pre-existing). See TASK-260905-2zxm3s_review-findings-agm-1.md.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-49bcf9, pid=52758, exit=0)
 
 ## Precondition Resources
 - [producer-brief-agm-interactive.md](file://TASK-260905-2zxm3s/producer-brief-agm-interactive.md) — Producer brief: LaunchModeInteractive per Decision 0013 D5 (curator-spec main 83de1a5)
@@ -57,12 +60,14 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-49bcf9)
 - [TASK-260905-2zxm3s_drafting-report.md](file://TASK-260905-2zxm3s/TASK-260905-2zxm3s_drafting-report.md) — Drafting report: LaunchModeInteractive commits, gates, argv table, verified binaries, deviations
 - [TASK-260905-2zxm3s_change-request_rev1.patch](file://TASK-260905-2zxm3s/TASK-260905-2zxm3s_change-request_rev1.patch) — Change Request CR-TASK-260905-2zxm3s-1 revision 1 candidate patch (repository_delta=empty, 0 changed paths)
 - [TASK-260905-2zxm3s_spawn-log_-reviewer--reviewer--claude-_RUN-260905-49bcf9.log](file://TASK-260905-2zxm3s/TASK-260905-2zxm3s_spawn-log_-reviewer--reviewer--claude-_RUN-260905-49bcf9.log) — System spawn log captured by task-board
+- [TASK-260905-2zxm3s_review-findings-agm-1.md](file://TASK-260905-2zxm3s/TASK-260905-2zxm3s_review-findings-agm-1.md) — Reviewer cycle-1 findings and evidence for LaunchModeInteractive at 3edbde8: ACCEPT
+- [TASK-260905-2zxm3s_review-verdict.md](file://TASK-260905-2zxm3s/TASK-260905-2zxm3s_review-verdict.md) — Review verdict for CR-TASK-260905-2zxm3s-1 rev 1: ACCEPT; empty repository delta is correct because the deliverable lives in skill-agents-management
 
 ## Created
 2026-09-05T07:17:01Z
 
 ## Last Update
-2026-09-05T07:47:56Z
+2026-09-05T07:54:52Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

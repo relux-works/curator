@@ -1,76 +1,76 @@
-# Review findings: launcher SPEC `0.2.0-draft` (cycle 1)
+# Review findings: launcher SPEC `0.2.0-draft` (cycle 2 — confirm the minor fixes)
 
-Subject: `curator-agent-launcher` worktree `.worktrees/curator-agent-launcher-spec-0.2`,
-branch `draft/spec-0.2`, head `ffe9b68`, base `6de42d8`. Authority: curator-spec Decision 0013
-at `83de1a5`, Decision 0012 D6/D8, environments.md, ax SPEC `28bf96d`, skill-agents-management `91bf945`.
+Reviewer run `RUN-260905-9241aa` (recovery attempt of `RUN-260905-2df817`, whose findings of the
+same name were attached but whose lifecycle did not close; this file replaces them with an
+independent re-review).
+
+Subject: `curator-agent-launcher`, head `e19eb9f` (commits `b025e3e`, `e19eb9f` on the
+cycle-1-accepted `ffe9b68`). The brief's worktree `.worktrees/curator-agent-launcher-spec-0.2`
+no longer exists — PR #2 (`draft/spec-0.2`) was merged at 07:47Z and `main` of the main checkout
+is `e19eb9f`; the review was done from that checkout read-only and gates from a `git archive`
+scratch export. Scope: exactly `git diff ffe9b68..e19eb9f` — `SPEC.md` only, +19/−8,
+`git diff --check` clean.
 
 ## Verdict: ACCEPT (no blocking or major findings)
 
-## Dimension 1: Decision 0013 D6 items
+## Cycle-1 minor findings 1–3
 
-| Item | SPEC section | Result |
+| # | Finding | Result at `e19eb9f` |
 |---|---|---|
-| D6.1 fragment-first, `LaunchRequest.Home` = home variable value, `WorkDir` = cwd, (provider, home) rationale | §4 preamble, §4.1, §4.4 | exact |
-| D5 `LaunchModeInteractive` by name, no provider flag, argv = model + effort transport, empty `Composition`, `ErrCompositionNotInteractive` | §4.4, §1 | exact |
-| D6.2 precedence flags → machine config → `Lineup` + `Effort.Recommended` / none under `EffortSupportNone`, per member, stderr print every launch, `--effort` completion, no retry | §4.3, §3 | exact; file location/schema/lock are drafting choices the decision left open |
-| D6.3 argv order (plan, sysprompt opt-in, MCP, native), MCP spellings taken from fragment descriptor, four env layers with SHOULD-warn, `env_names` = `mcp.env_names` minus `env_literals` with stderr warning (F5), stdin under D4 | §4.5 | exact; order-is-contract sentence present; disjoint-by-construction rationale carried |
-| D6.4 `ax start <name> --provider <id> --launch-plan - [--profile <ax-profile>] --workspace <cwd>`, document on ax stdin, `argv_suffix` minus element 0, `env_literals` composer-only, four extension keys with derivations, provider column, ax-profile flag as the only route for `yolo`, session name default + `--name` + §2.1 grammar + >64 = `usage`, `ax_handoff_failed` terminal with Structured Error, untracked exec | §4.6, §4.2, §3 | exact |
-| D6.5 non-goals restated | §1 | exact |
-| §5, §6 stand unless named | §5 diff = two cross-reference renumbers (§4.5→§4.6); §6 gains `defaults` family, both invariants kept | ok |
-| §7 module release requirement | §7 | ok; `91bf945` LaunchMode set verified as exec/dry-run/managed-session |
-| §8/§8.1/§9 | present; ax shape item replaced, PR #1 open, implementability per Consequences, per-tool boundary kept, open questions 2/5 noted | ok |
+| 1 | §4.3 lock sentence contradicted itself | **resolved** — single clause: a `--model`/`--effort` flag for a member the locked machine entry sets is a `usage` error naming the locked member. Matches the §6 usage row ("a flag overriding a locked default"). |
+| 2 | operator-over-machine override per entry vs per member | **resolved** — "overrides the machine file per member: an operator entry that sets only `model` leaves a machine `effort` for the same env-id in force"; consistent with the §4.3 preamble's per-member rule. |
+| 3 | "integration configured" had no source | **resolved** — §4.6 names `ax.json` beside `defaults.json` (§4.3 level-2 directories), closed schema `{ "schema": "curator-run-ax-v1", "enabled": <boolean> }`, unknown members rejected, machine file decides when present, else operator, absent in both = not configured, unreadable/unparsable = `defaults_config_invalid` never "not configured", read once before argument handling completes. `defaults.json`'s closed schema is untouched (separate file). Consistent with §3 ("usage errors resolve nothing": a config read is not resolution) and §6 invariant 1 (fallback never fires on a failed read). |
 
-Provider flags spelled by the launcher itself: none. `--mcp-config … --strict-mcp-config` and
-`-p curator-mcp` appear only as the fragment descriptor's own content (Decision 0012 D6 wording
-matches verbatim).
+Reuse of `defaults_config_invalid` for `ax.json`: acceptable, no distinct code needed. The
+condition is identical (a launcher-owned configuration file exists but is unreadable or violates
+its closed schema) and the code already sits in §6 invariant 1. A separate code buys a name only.
 
-## Dimension 2: internal consistency
-- §3 table ↔ parsing rules ↔ §6 usage row ↔ §9: consistent (`--name`, `--ax-profile`, locked default).
-- README line 24 and `specVersion` say `0.2.0-draft`; usage text lists the new flags.
-- `make check` rerun by the reviewer at `ffe9b68`: `go build`, `go vet`, `go test ./... -count=1` → `ok cmd/curator-run 0.276s`, exit 0. `gofmt -l cmd/` empty; `git diff --check` clean.
-- Negative evidence for the one gate (`TestSpecVersionPinned`): reviewer mutated a scratch copy
-  (`git archive ffe9b68`) to `0.1.0-draft` and to `0.2.0-drafT`; both runs FAIL. The gate rejects
-  what it must reject, not only a delete-mutant.
+## Attack notes (gate behaviour, not just reading)
 
-## Dimension 3: facts
-- `skill-agents-management` `91bf945`: `LaunchRequest.Home` (`pkg/agentic/system.go:386`, `plan.go:41`),
-  `vendorplugin.Lineup(models []Model) []RankedModel` (`lineup.go:52`), `Recommended` declaration
-  (`vendor.go:448`), `ErrEffortMissing`, `ErrUnsupportedLaunchMode`, `EffortSupportNone` — all present.
-- ax SPEC `28bf96d`: §2.1 grammar `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`, 1–64 (line 363); §7.1 built-in
-  ids include `codex`, `claude`, `pi`; §14.1 and §15.1 exist. `--launch-plan` itself is PR #1's,
-  correctly labelled open in §9.
-- environments.md §7.1 home variables: `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`,
-  `XDG_CONFIG_HOME=<parent>` for opencode — SPEC §4.1 matches.
+- Bypass path for `--ax-profile yolo` on an untracked machine: none — §3 makes it `usage`, and
+  the fact it depends on is now a named read that precedes argument handling.
+- Absence vs read failure for `ax.json`: distinguished explicitly; a malformed file cannot be
+  mistaken for "untracked" (the dangerous direction: silently losing tracking).
+- Version gate: `make check` exit 0 at `e19eb9f`; mutating `specVersion` to `0.2.1-draft` in the
+  scratch export makes `TestSpecVersionPinned` fail (exit 1). Rerun by this reviewer.
 
-## Dimension 4: commit
-One signed commit `ffe9b68`, `Good "git" signature` ED25519, author Ivan Oparin <ivan@relux.works>.
-Files: SPEC.md, README.md, cmd/curator-run/main.go, cmd/curator-run/main_test.go. Nothing else.
-Not pushed; no tag; no PR.
+## Residual minors (non-blocking; fold into 0.2.1 or the next touch)
 
-## Minor findings (non-blocking; fold into the next revision or 0.2.1)
+1. **minor / §4.6 `ax.json`** — `"enabled": false` is never stated to mean "not configured";
+   only absence is. Add: a present file with `enabled: false` is not configured (untracked mode).
+2. **minor / §4.6 vs §4.3** — `ax.json` precedence is machine-over-operator while
+   `defaults.json` is operator-over-machine unless locked. Defensible (tracking is machine
+   policy) but the inversion is unexplained; one clause of rationale.
+3. **minor / §6 `defaults` row** — cites only §4.3; `ax.json` (§4.6) now raises the same code
+   and should be named there.
+4. **minor / §9** — the docs-confidence bullet lists `defaults.json` as "this document's own";
+   `ax.json` is the same kind of drafting choice and belongs in it.
+5. **note** — when `ax.json` is unparsable and the command line also has a usage error, which
+   diagnostic fires first is unstated. Both are terminal; pin when the parser exists.
 
-1. **minor / §4.3 level 2, lock sentence** — quote: "the machine entry is used even against
-   `--model`/`--effort` flags for that member — the flags are then a `usage` error". These two
-   clauses contradict: if the flag is a usage error the launch fails and nothing is "used".
-   Fix: drop "is used even against … flags" and keep only "a `--model`/`--effort` flag for a
-   locked member is a `usage` error naming the locked member".
-2. **minor / §4.3 level 2** — "the operator file overrides the machine file per env-id" is
-   per-entry, while the whole precedence is per-member. Say which: an operator entry `{model}`
-   over a machine entry `{model, effort}` either keeps the machine effort (per member) or drops
-   it (per entry). Recommend per member, consistent with the rest of §4.3.
-3. **minor / §3 `--ax-profile`, §6 usage row** — `usage` on an untracked machine requires the
-   launcher to read its `ax`-integration configuration during argument handling; §3 says usage
-   errors "resolve nothing", which still holds, but the spec nowhere says how "integration
-   configured" is determined (a pre-existing 0.1.x gap now load-bearing for a usage error).
-   Suggest one sentence in §4.6 naming the source of that fact.
-4. **note / §4.2** — "a row is launchable only when both non-Curator columns are filled" is a
-   drafting addition beyond D6.4; defensible (tracked/untracked parity) and recorded here as such.
-5. **note** — docs-confidence items in the drafting report (defaults.json design, `--ax-profile`
-   untracked = usage, `--name` untracked = ignored) are accurately labelled as drafting choices.
+## Gates rerun by this reviewer (scratch export of `e19eb9f`)
+
+```text
+go build ./...
+go vet ./...
+go test ./... -count=1
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.322s
+make check exit=0
+```
+
+`specVersion = "0.2.0-draft"` (`main.go:18`), README line 24 `0.2.0-draft`, `TestSpecVersionPinned`
+pins the same string. Main checkout of the launcher left untouched (`git status` clean).
+
+## Commits
+
+`b025e3e`, `e19eb9f`: both `Good "git" signature` ED25519 for ivan@relux.works, author
+Ivan Oparin. Orchestrator-applied fixes, not producer commits. PR #2 is MERGED (landing was
+the orchestrator's step; noted, not judged here).
 
 ## On the Change Request's empty repository delta
-`CR-TASK-260905-3ewdq0-1` shows `repository_delta=empty` against the curator-spec story worktree.
-That is the correct outcome: the producer brief scoped every edit to the sibling repository
-`curator-agent-launcher` (branch `draft/spec-0.2`) and forbade writing anything into the
-control root or curator-spec. The deliverable lives at `ffe9b68` in that repository and is
-verified above; curator-spec was not meant to change.
+
+`CR-TASK-260905-3ewdq0-1` revision 1 carries `repository_delta=empty` against the curator-spec
+story worktree and is already `accepted` from cycle 1. That is the right outcome: the brief
+scoped every edit to the sibling repository `curator-agent-launcher` and forbade writing into
+curator-spec or the control root. No curator-spec file was meant to change and none did; the
+deliverable is verified at `e19eb9f` in that repository.
