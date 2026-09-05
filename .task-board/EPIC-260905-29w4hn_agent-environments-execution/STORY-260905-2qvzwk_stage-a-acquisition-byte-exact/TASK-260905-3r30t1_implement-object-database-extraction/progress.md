@@ -1,5 +1,5 @@
 ## Status
-reviewing
+development
 
 ## Review
 required
@@ -82,6 +82,13 @@ spawn agent resolution: Agent selection: claude via explicit_override
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [reviewer] reviewer (claude) (run=RUN-260905-f29486, max_parallel=20)
 spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-f29486)
+Review cycle 1 on a46abc80: CHANGES REQUESTED (to-dev), repeat-of: none. F1 blocking: gitops.writeBlobs deadlocks on any mid-stream refusal (oversize blob, duplicate platform path) once cat-file has >pipe-buffer output queued — Wait() before draining/killing. Reproduced 3 shapes with 20s watchdog. Everything else verified (vector, negative git-archive mutant, refusals, eol testdata, gates, signatures, CI). See TASK-260905-3r30t1_review-verdict.md.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260905-f29486, pid=26338, exit=0)
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [implementer] developer (claude) (run=RUN-260905-bea544, max_parallel=20)
+spawn run started: [implementer] developer (claude) (run=RUN-260905-bea544)
 
 ## Precondition Resources
 - [producer-brief-acquisition-fix.md](file://TASK-260905-3r30t1/producer-brief-acquisition-fix.md) — Producer brief: byte-exact object-database extraction replacing git archive (review M3, environments §1.2)
@@ -89,6 +96,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-f29486)
 - [producer-brief-acq-rework-1.md](file://TASK-260905-3r30t1/producer-brief-acq-rework-1.md) — Rework 1: satisfy the hosted platform-case gate (TestArchiveRejectsLinks required case, recognised skip class), reproduce the gate locally, push, watch CI
 - [review-brief-acq-2.md](file://TASK-260905-3r30t1/review-brief-acq-2.md) — Reviewer brief: object-database extraction at a46abc80 with the platform-case gate changes; PR #58 green
 - [producer-brief-acq-publish-cr.md](file://TASK-260905-3r30t1/producer-brief-acq-publish-cr.md) — No-edit run in a fresh workspace: hand off to publish a fresh empty-delta Change Request
+- [producer-brief-acq-rework-2.md](file://TASK-260905-3r30t1/producer-brief-acq-rework-2.md) — Rework 2: fix the cat-file deadlock (pre-pass refusals, kill+drain before Wait), .git component refusal, closure scratch rename-into-place, nested exec test
 
 ## Outcome Resources
 - [TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-269e50.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-269e50.log) — System spawn log captured by task-board
@@ -106,12 +114,15 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-f29486)
 - [TASK-260905-3r30t1_mutation-evidence.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_mutation-evidence.md) — Narrowing mutants, survivors with bounds, 9/9 AC coverage ratio
 - [TASK-260905-3r30t1_change-request_rev3.patch](file://TASK-260905-3r30t1/TASK-260905-3r30t1_change-request_rev3.patch) — Change Request CR-TASK-260905-3r30t1-3 revision 3 candidate patch (repository_delta=empty, 0 changed paths)
 - [TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-f29486.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-f29486.log) — System spawn log captured by task-board
+- [TASK-260905-3r30t1_review-verdict.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_review-verdict.md) — Review verdict cycle 1 on a46abc80: changes requested (F1 cat-file deadlock on mid-stream refusal)
+- [TASK-260905-3r30t1_logbook-entry-review.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_logbook-entry-review.md) — Logbook entry: cat-file StdoutPipe deadlock class
+- [TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-bea544.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-bea544.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-05T08:20:33Z
 
 ## Last Update
-2026-09-05T17:50:29Z
+2026-09-05T17:58:03Z
 
 ## Assigned To
-[reviewer] reviewer (claude)
+[implementer] developer (claude)
