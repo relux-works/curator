@@ -52,6 +52,7 @@ spawn agent resolution: Agent selection: claude via explicit_override
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (claude) (run=RUN-260905-d3a1ca, max_parallel=20)
 spawn run started: [implementer] developer (claude) (run=RUN-260905-d3a1ca)
+Rework 1 in progress: commit 5abec244 (signed) on feat/byte-exact-acquisition restores TestArchiveRejectsLinks (mktree 120000 entry, no ln, all GOOS), gives TestConformanceSnapshotAcquisition a root-content skip text, and registers ledger rows. ledger-consistency ok, gate-selftest 81/0, focused -race green, candidate-root interop test PASS. Full test-gate.sh on pinned root running locally; push + gh pr checks 58 --watch pending.
 
 ## Precondition Resources
 - [producer-brief-acquisition-fix.md](file://TASK-260905-3r30t1/producer-brief-acquisition-fix.md) — Producer brief: byte-exact object-database extraction replacing git archive (review M3, environments §1.2)
@@ -65,12 +66,13 @@ spawn run started: [implementer] developer (claude) (run=RUN-260905-d3a1ca)
 - [TASK-260905-3r30t1_change-request_rev1.patch](file://TASK-260905-3r30t1/TASK-260905-3r30t1_change-request_rev1.patch) — Change Request CR-TASK-260905-3r30t1-1 revision 1 candidate patch (repository_delta=empty, 0 changed paths)
 - [TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-1fb9eb.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-reviewer--reviewer--claude-_RUN-260905-1fb9eb.log) — System spawn log captured by task-board
 - [TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-d3a1ca.log](file://TASK-260905-3r30t1/TASK-260905-3r30t1_spawn-log_-implementer--developer--claude-_RUN-260905-d3a1ca.log) — System spawn log captured by task-board
+- [TASK-260905-3r30t1_rework-report-1.md](file://TASK-260905-3r30t1/TASK-260905-3r30t1_rework-report-1.md) — Rework 1 report: platform-case gate fix, local gate reproduction, CI watch (updated when CI finishes)
 
 ## Created
 2026-09-05T08:20:33Z
 
 ## Last Update
-2026-09-05T12:28:34Z
+2026-09-05T12:40:09Z
 
 ## Assigned To
 [implementer] developer (claude)
