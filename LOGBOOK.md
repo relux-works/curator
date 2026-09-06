@@ -4382,3 +4382,61 @@ every Unix lane and to every local run: the `insteadOf` fixtures wrote native
 Windows paths into git config, where a backslash is an escape, so
 `C:\Users\...` collapsed and twenty tests failed only on the hosted Windows
 runner.
+
+## 2026-09-06 — stage (b) lands, and the two defects it hid were both invisible to a green local run
+
+Managed homes, provisioning seeds and passthrough, read-only `env resolve` with
+the launch fragment, the MCP channel files and the `curator run` umbrella are on
+curator main (`1a936e77`, PR #60), after three cycles.
+
+Cycle 2 is the one to remember, because the rework it reviewed was genuinely
+good — it re-drove all ten prior findings with its own narrowing mutants and
+watched each kill a named test — and it still blocked, on two defects that no
+local run could have shown. The first: `ci.yml` pins the conformance root at a
+released revision predating the environments artifacts, and three new schema
+drivers read those families unguarded, so all five hosted lanes were red while
+every local run against curator-spec main was green. The second: a boundary
+fixture fed POSIX-rooted literals to a gate built on `path/filepath`, so on
+Windows the *conforming* case was rejected for not being absolute. Same class as
+the stage (a) Windows defect one revision earlier. Production was never affected
+in either case; both were the suite lying about itself.
+
+The reviewer's own summary of the pattern is the lesson: it marked the first
+blocker *repeat-of* cycle 1's finding one level out — cycle 1 attested a gate
+line the command does not print, cycle 2 attested a lane the report never read —
+and said the next step is a gate on how gate lines are produced, not a third
+revision that re-attests them. The rework-2 brief made the report's gate table
+itself reviewable: every row a standalone command with its observed exit code,
+root-sensitive gates run against both roots, and any claim about CI carrying
+`gh pr checks` output verbatim or saying plainly that CI was not consulted.
+
+One decision went against the reviewer. It proposed a tolerated `root-content`
+skip for the first blocker; that class is policy `allow` in every lane, so a
+candidate root that dropped a family would pass with the case silently skipped.
+Registering the families in `root-artifacts.tsv` instead makes the candidate lane
+fail closed, because `CI_REQUIRE_FULL_ROOT=1` makes a deferral fatal. Cycle 3 was
+asked to attack that override rather than accept it, and confirmed it: the
+candidate lane exits 1 against a root with either family removed.
+
+Because the pin predates the artifacts, those drivers assert nothing on any
+automatic lane. The candidate lane was dispatched by hand against curator-spec
+`f39f4a9` and passed on all three runners. Until the pin moves, every stage that
+adds a case reading those families does the same and records the run id.
+
+## 2026-09-06 — the board cannot land what a producer commits
+
+Spawning a producer on a task already in `integrating` routes it as an
+integration run, and the agent that got that routing refused to integrate, for a
+reason worth keeping: a Change Request snapshot is cut *after* the producer
+commits, so its base OID is the producer's own commit and its recorded delta is
+always empty. `worktree integrate` lands the accepted candidate tree, so it would
+have landed nothing while closing the board state — a 51-line deliverable
+silently not reaching trunk. Three independent checks agreed: the board JSON, a
+zero-byte patch resource, and `rev-parse` showing the candidate tree equal to its
+own base's tree.
+
+The board also refuses to move accepted work back to `development`, so there is
+no producer route out. Every spec batch this epic has landed went through the
+orchestrator's own branch → PR → comment-review → fast-forward flow, and that is
+the flow, not a fallback. `repository_delta` cannot be read as evidence that a
+producer did or did not do anything.

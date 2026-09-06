@@ -186,6 +186,21 @@ spawn launch composition: degraded_contract_unavailable; contract=agents-infra.c
 spawn queued: [implementer] developer (muse) (run=RUN-260906-edbef7, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260906-edbef7)
 Landed on curator main as 981b1eeb (PR #59, fast-forward of the reviewed head) on 2026-09-06 after six review cycles on claude-opus-5 xhigh (sixteen findings, each reproduced through production entry points) and a seventh rework for a Windows-only fixture defect the hosted lane found. Follow-ups: TASK-260906-1f2ng0, TASK-260906-2b3nar.
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run completed: muse (run=RUN-260906-edbef7, pid=87161, exit=143)
+spawn autonomous recovery: run RUN-260906-edbef7 queued successor RUN-260906-de438a (attempt 1/3, model=muse-spark-1.3-contributor): spawned agent exited with code 143
+spawn run started: [implementer] developer (muse) (run=RUN-260906-de438a)
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run completed: muse (run=RUN-260906-de438a, pid=99164, exit=143)
+spawn autonomous recovery: run RUN-260906-de438a queued successor RUN-260906-24bbb0 (attempt 2/3, model=muse-spark-1.3-contributor): spawned agent exited with code 143
+spawn run started: [implementer] developer (muse) (run=RUN-260906-24bbb0)
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run completed: muse (run=RUN-260906-24bbb0, pid=99813, exit=143)
+spawn autonomous recovery: run RUN-260906-24bbb0 queued successor RUN-260906-21481e (attempt 3/3, model=muse-spark-1.3-contributor): spawned agent exited with code 143
+spawn run started: [implementer] developer (muse) (run=RUN-260906-21481e)
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run completed: muse (run=RUN-260906-21481e, pid=116, exit=143)
+recovery parked after 3 successor attempts for chain RUN-260906-edbef7; operator action required; last failure: spawned agent exited with code 143
 
 ## Precondition Resources
 - [producer-brief-stage-a-core.md](file://TASK-260905-30zs8t/producer-brief-stage-a-core.md) — Producer brief: stage (a) core — packages, ranges, resolution+lock, store, audit, monolithic materialization, linked switching, migration (base = acquisition branch head)
@@ -242,12 +257,15 @@ Landed on curator main as 981b1eeb (PR #59, fast-forward of the reviewed head) o
 - [TASK-260905-30zs8t_review-findings-stage-a-6.md](file://TASK-260905-30zs8t/TASK-260905-30zs8t_review-findings-stage-a-6.md) — Reviewer cycle 6 (acceptance): F16 verified fixed and held under attack, cumulative cycle 1-5 regression re-run, all gates green, three follow-ups recorded
 - [TASK-260905-30zs8t_review-verdict-rev6.md](file://TASK-260905-30zs8t/TASK-260905-30zs8t_review-verdict-rev6.md) — Review verdict revision 6: ACCEPT, with the empty repository_delta judged explicitly
 - [TASK-260905-30zs8t_spawn-log_-implementer--developer--muse-_RUN-260906-edbef7.log](file://TASK-260905-30zs8t/TASK-260905-30zs8t_spawn-log_-implementer--developer--muse-_RUN-260906-edbef7.log) — System spawn log captured by task-board
+- [TASK-260905-30zs8t_spawn-log_-implementer--developer--muse-_RUN-260906-de438a.log](file://TASK-260905-30zs8t/TASK-260905-30zs8t_spawn-log_-implementer--developer--muse-_RUN-260906-de438a.log) — System spawn log captured by task-board
+- [TASK-260905-30zs8t_spawn-log_-implementer--developer--muse-_RUN-260906-24bbb0.log](file://TASK-260905-30zs8t/TASK-260905-30zs8t_spawn-log_-implementer--developer--muse-_RUN-260906-24bbb0.log) — System spawn log captured by task-board
+- [TASK-260905-30zs8t_spawn-log_-implementer--developer--muse-_RUN-260906-21481e.log](file://TASK-260905-30zs8t/TASK-260905-30zs8t_spawn-log_-implementer--developer--muse-_RUN-260906-21481e.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-05T17:54:17Z
 
 ## Last Update
-2026-09-06T06:01:12Z
+2026-09-06T06:03:33Z
 
 ## Assigned To
 [implementer] developer (muse)
