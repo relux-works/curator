@@ -300,6 +300,7 @@ func TestResolveDriftRepair(t *testing.T) {
 		}
 		marker := readManagedMarker(t, probe, tc.env)
 		homeDir := ManagedHomeDir(probe.home, "acme", tc.env)
+		rendered := 0
 		for _, surface := range marker.Surfaces {
 			for _, rel := range surface.Paths {
 				full := filepath.Join(homeDir, filepath.FromSlash(rel))
@@ -311,6 +312,7 @@ func TestResolveDriftRepair(t *testing.T) {
 				if err != nil || !strings.Contains(filepath.ToSlash(target), "/rendered/") {
 					continue
 				}
+				rendered++
 				// Write through the intact link: the link bytes are
 				// unchanged, the target bytes drift.
 				if err := os.WriteFile(full, []byte("tampered through intact link\n"), 0o644); err != nil {
@@ -335,6 +337,9 @@ func TestResolveDriftRepair(t *testing.T) {
 					t.Fatalf("%s %s %s repaired home is current: %v", tc.env, tc.form, rel, err)
 				}
 			}
+		}
+		if rendered == 0 {
+			t.Fatalf("%s %s matched no rendered symlink surface", tc.env, tc.form)
 		}
 	}
 }
