@@ -22,7 +22,8 @@
     "preferred_agentic_system": {
       "mixed": [
         "claude",
-        "codex"
+        "codex",
+        "muse"
       ]
     },
     "ceilings": {
@@ -51,35 +52,55 @@
         "entries": [
           {
             "criterion": "equal",
-            "model": "claude-fable-5-1",
-            "reasoning_effort": "low"
+            "model": "claude-opus-5",
+            "reasoning_effort": "xhigh"
           }
         ],
         "adjustment_confirmation": "required",
         "roles": {
           "developer": {
-            "default_model": "claude-fable-5-1",
-            "default_reasoning_effort": "low"
+            "default_model": "claude-opus-5",
+            "default_reasoning_effort": "xhigh"
           },
           "reviewer": {
-            "default_model": "claude-fable-5-1",
-            "default_reasoning_effort": "low"
+            "default_model": "claude-opus-5",
+            "default_reasoning_effort": "xhigh"
           },
           "solution-architect": {
-            "default_model": "claude-fable-5-1",
-            "default_reasoning_effort": "low"
+            "default_model": "claude-opus-5",
+            "default_reasoning_effort": "xhigh"
           },
           "technical-writer": {
-            "default_model": "claude-fable-5-1",
-            "default_reasoning_effort": "low"
+            "default_model": "claude-opus-5",
+            "default_reasoning_effort": "xhigh"
           },
           "researcher": {
-            "default_model": "claude-fable-5-1",
-            "default_reasoning_effort": "low"
+            "default_model": "claude-opus-5",
+            "default_reasoning_effort": "xhigh"
           },
           "tester": {
-            "default_model": "claude-fable-5-1",
-            "default_reasoning_effort": "low"
+            "default_model": "claude-opus-5",
+            "default_reasoning_effort": "xhigh"
+          }
+        }
+      },
+      "muse": {
+        "entries": [
+          {
+            "criterion": "equal",
+            "model": "muse-spark-1.3-contributor",
+            "reasoning_effort": "xhigh"
+          }
+        ],
+        "adjustment_confirmation": "required",
+        "roles": {
+          "developer": {
+            "default_model": "muse-spark-1.3-contributor",
+            "default_reasoning_effort": "xhigh"
+          },
+          "tester": {
+            "default_model": "muse-spark-1.3-contributor",
+            "default_reasoning_effort": "xhigh"
           }
         }
       }
