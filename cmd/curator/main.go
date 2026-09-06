@@ -71,8 +71,8 @@ Commands:
   project <subcommand>     add | resolve
   skill check <dir>        validate one skill package (--locale, --json)
   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
-  profile <subcommand>     install | list | use | update | remove | sync (see profile install -h)
-  env <subcommand>         resolve | status (see env resolve -h)
+  profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
+  env <subcommand>         resolve | status | config (see env resolve -h)
   run ...                  umbrella dispatch to curator-run (see §11)
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record

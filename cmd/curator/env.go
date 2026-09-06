@@ -12,7 +12,7 @@ import (
 
 func (c cli) cmdEnv(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status")
+		_, _ = fmt.Fprintln(c.stderr, "curator: env needs a subcommand: resolve | status | config")
 		return exitUsage
 	}
 	cfg, code := c.loadConfig()
@@ -24,6 +24,8 @@ func (c cli) cmdEnv(args []string) int {
 		return c.cmdEnvResolve(cfg, args[1:])
 	case "status":
 		return c.cmdEnvStatus(cfg, args[1:])
+	case "config":
+		return c.cmdEnvConfig(cfg, args[1:])
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown env subcommand %q\n", args[0])
 	return exitUsage

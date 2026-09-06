@@ -254,6 +254,9 @@ internal/scriptpolicy	TestScriptHostExecutionPolicySectionsAreAllClassified	linu
 internal/scriptpolicy	TestScriptExecutionPolicyIdentityMatchesTheSuite	linux,darwin,windows	linux,darwin,windows	root-unset	the closed policy identity and interpreter set this build hard-codes are the suite's own
 internal/scriptpolicy	TestScriptExecutionOptInCases	linux,darwin,windows	linux,darwin,windows	root-unset	every published opt-in case decides manifest acceptance and enforced/declared-only classification
 internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is refused with script_execution_policy_unsupported before any worker surface
+internal/config	TestManagerConfigV2SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published manager-config-v2 family is accepted or rejected through the config reader
+internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published system-config-v2 family merges or fails through the config loader
+internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	linux,darwin,windows	root-unset	the published manager-config-v2 vectors render the expected effective configuration
 
 # ===========================================================================
 # Stage (b): managed homes, fragment, and umbrella rows.

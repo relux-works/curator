@@ -180,13 +180,22 @@ func TestProfileSyncCoversTheMachineScope(t *testing.T) {
 	}
 }
 
-// TestProfileComposeIsRefused checks compose names its bound instead of
-// pretending to edit machine configuration.
-func TestProfileComposeIsRefused(t *testing.T) {
+// TestProfileComposeListsDeclaredOverlays checks compose list reads the
+// machine overlays.<profile> list. (Stage (c) implements the compose row of
+// cli/curator.md, replacing the earlier refusal stub; the add/remove/list
+// paths carry their own tests in envconfig_test.go.)
+func TestProfileComposeListsDeclaredOverlays(t *testing.T) {
 	source, _ := profileHome(t)
-	code, _, stderr := runProfile(t, source, "profile", "compose", "acme", "list")
-	if code != exitFail || !strings.Contains(stderr, "schema 2") {
+	code, stdout, stderr := runProfile(t, source, "profile", "compose", "acme", "list")
+	if code != exitOK {
 		t.Fatalf("compose = %d\nstderr:\n%s", code, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("empty overlay list printed %q", stdout)
+	}
+	code, _, _ = runProfile(t, source, "profile", "compose", "acme", "frobnicate")
+	if code != exitUsage {
+		t.Fatalf("unknown compose action = %d, want usage", code)
 	}
 }
 

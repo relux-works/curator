@@ -10,12 +10,10 @@ import (
 )
 
 // cmdProfile dispatches the profile family (cli/curator.md): install, list,
-// use, update, remove, sync. Composition (compose) edits machine
-// configuration of manager-config schema 2, which is out of scope for this
-// stage, so it refuses with guidance instead of a silent no-op.
+// use, update, remove, sync, compose.
 func (c cli) cmdProfile(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | list | use | update | remove | sync")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | list | use | update | remove | sync | compose")
 		return exitUsage
 	}
 	cfg, code := c.loadConfig()
@@ -36,8 +34,7 @@ func (c cli) cmdProfile(args []string) int {
 	case "sync":
 		return c.cmdProfileSync(cfg, args[1:])
 	case "compose":
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile compose edits the machine overlays.<profile> list of manager-config schema 2, which this stage does not implement; the lock moves only on profile update")
-		return exitFail
+		return c.cmdProfileCompose(cfg, args[1:])
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown profile subcommand %q\n", args[0])
 	return exitUsage
@@ -155,6 +152,15 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 	} else if len(positional) > 1 || !*clearScope || (*env == "" && *target == "") {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] | profile use --clear --env <env-id>|--target <target-id>")
 		return exitUsage
+	}
+	// A locked require_current_profile makes machine-scope use of any other
+	// profile a configuration error (environments §12.2, manager §1); a
+	// scoped switch records a scoped current and is unaffected.
+	if name != "" && *env == "" && *target == "" {
+		if err := cfg.CheckMachineUse(name); err != nil {
+			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+			return exitFail
+		}
 	}
 	results, err := envprofile.UseWithPolicy(cfg.Home(), name, *env, *target, *clearScope, envprofile.PolicyFromConfig(cfg))
 	for _, result := range results {

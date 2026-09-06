@@ -372,35 +372,43 @@ func InUseByAnyScope(home, name string) (bool, error) {
 }
 
 // Policy carries the machine gates for profile operations (environments
-// §9.1): the core §6.1 source allowlist for git members, the MCP package
-// allowlist for mcp members, and the audit revocations. An empty allowlist
-// permits every identity (core §6.1); revocation and the audit canary always
-// block regardless of any enabled flag — an advisory profile install does
-// not exist.
-//
-// In stage (a) the MCP package allowlist has no machine-config surface
-// (manager-config schema 2, environments §12.1): the CLI passes an empty
-// list (permits all) and tests inject one via Policy. The bound is stated
-// here and in the rework report, not silent.
+// §9.1, §12.1): the core §6.1 source allowlist for git members, the MCP
+// package allowlist for mcp members, the audit revocations, and the
+// overlays_allowed composition policy. An empty allowlist permits every
+// identity (core §6.1); revocation and the audit canary always block
+// regardless of any enabled flag — an advisory profile install does not
+// exist.
 type Policy struct {
 	AllowedSources []string
 	MCPAllowlist   []string
 	Revocations    []string
+	// OverlaysAllowed is the effective §12.1 composition policy: false
+	// empties every overlay list at resolution (environments §12.2).
+	OverlaysAllowed bool
 }
 
+// ForbidsOverlays reports whether the composition policy empties every
+// overlay list (environments §12.2).
+func (p Policy) ForbidsOverlays() bool { return !p.OverlaysAllowed }
+
 // PolicyFromConfig derives the profile machine gates from the loaded
-// machine configuration (environments §9.1): the core §6.1 source allowlist
-// and the audit revocations. The CLI calls this on its already-loaded cfg —
-// which carries the system overlay with its locked keys and the
-// CURATOR_CONFIG override — and threads the result into every profile
-// operation, so the builtin default migration below enforces exactly the
-// same gates as Install and Update. The migration path must never re-parse
-// configuration into a weaker copy.
+// machine configuration (environments §9.1, §12.1): the core §6.1 source
+// allowlist, the MCP package allowlist, and the audit revocations. The CLI
+// calls this on its already-loaded cfg — which carries the system overlay
+// with its locked keys and the CURATOR_CONFIG override — and threads the
+// result into every profile operation, so the builtin default migration
+// below enforces exactly the same gates as Install and Update. The
+// migration path must never re-parse configuration into a weaker copy.
 func PolicyFromConfig(cfg *config.Config) Policy {
 	if cfg == nil {
-		return Policy{}
+		return Policy{OverlaysAllowed: true}
 	}
-	return Policy{AllowedSources: cfg.AllowedSources, Revocations: cfg.Audit.Revocations}
+	return Policy{
+		AllowedSources:  cfg.AllowedSources,
+		MCPAllowlist:    cfg.Env.MCPPackageAllowlist,
+		Revocations:     cfg.Audit.Revocations,
+		OverlaysAllowed: cfg.Env.OverlaysAllowed,
+	}
 }
 
 // InstallOptions selects the source of one installation.
@@ -1114,7 +1122,7 @@ func loadMachinePolicy() (Policy, error) {
 	path := config.UserPath()
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			return Policy{}, nil
+			return Policy{OverlaysAllowed: true}, nil
 		}
 		return Policy{}, fmt.Errorf("%s: read the machine configuration: %v", DiagSourceInvalid, err)
 	}

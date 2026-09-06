@@ -165,7 +165,7 @@ func TestParseRejections(t *testing.T) {
 		text string
 		want string
 	}{
-		{"schema", `{"schema_version": 2, "skills_root": "x", "projects": {}}`, "schema_version"},
+		{"schema", `{"schema_version": 3, "skills_root": "x", "projects": {}}`, "schema_version"},
 		{"skills_root", `{"schema_version": 1, "projects": {}}`, "skills_root"},
 		{"projects", `{"schema_version": 1, "skills_root": "x"}`, "projects"},
 		{"adapter", `{"schema_version": 1, "skills_root": "x", "projects": {}, "adapter_mode": "hardlink"}`, "adapter_mode"},
@@ -283,7 +283,7 @@ func TestSystemConfigLockedButUnsetFails(t *testing.T) {
 func TestMalformedSystemConfigFailsClosed(t *testing.T) {
 	cases := []string{
 		`{"locked": []}`,
-		`{"schema_version": 2, "locked": []}`,
+		`{"schema_version": 3, "locked": []}`,
 		`{"schema_version": 1, "locked": ["projects"]}`,
 		`{"schema_version": 1, "locked": ["audit", "audit"], "audit": {}}`,
 		`{"schema_version": 1, "typo": true}`,

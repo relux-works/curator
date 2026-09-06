@@ -21,8 +21,14 @@ import (
 	"github.com/relux-works/curator/internal/verr"
 )
 
-// SchemaVersion is the only supported machine config schema.
+// SchemaVersion is the original machine config schema. SchemaVersion2 adds
+// the environments §12.1 machine-configuration object; both stay readable
+// (manager §12) and an unknown schema_version is rejected explicitly.
 const SchemaVersion = 1
+
+// SchemaVersion2 is the machine config schema carrying the environments
+// §12.1 knobs under one environments object.
+const SchemaVersion2 = 2
 
 // DefaultWorktreeAliasPattern extracts checkout aliases for git worktrees.
 const DefaultWorktreeAliasPattern = `[A-Z]+-[0-9]+`
@@ -46,10 +52,16 @@ var DefaultAgents = []string{"codex_cli"}
 // among them — are deliberately absent and never lockable: credential
 // material is operator-owned (ratified with the spec owner 2026-08-23).
 var LockableKeys = map[string]bool{
-	"audit_registries":           true,
-	"disable_builtin_registries": true,
-	"allowed_sources":            true,
-	"audit":                      true,
+	"audit_registries":                     true,
+	"disable_builtin_registries":           true,
+	"allowed_sources":                      true,
+	"audit":                                true,
+	"environments.overlays_allowed":        true,
+	"environments.precedence":              true,
+	"environments.mcp_package_allowlist":   true,
+	"environments.passable_env_names":      true,
+	"environments.require_current_profile": true,
+	"environments.isolation":               true,
 }
 
 var (
@@ -67,6 +79,7 @@ var managerKeys = map[string]bool{
 	"audit_registries": true, "disable_builtin_registries": true,
 	"execution": true,
 	"build_ssh": true, "build_https": true,
+	"environments": true,
 }
 
 // Project is a registered project entry.
@@ -127,7 +140,18 @@ type Execution struct {
 
 // Config is the effective machine configuration.
 type Config struct {
-	Path                     string
+	Path string
+	// Schema is the effective schema_version: 1 or 2.
+	Schema int
+	// Env is the effective environments §12.1 machine configuration with
+	// the §12.1 defaults applied. A schema-1 file carries every default.
+	Env Environments
+	// Locked names the manager §1 locked keys the system file enforces,
+	// including environments.<key> entries.
+	Locked map[string]bool
+	// SystemConfigPath is the enforced system file the effective
+	// configuration merged, or "" when none was present.
+	SystemConfigPath         string
 	SkillsRoot               string
 	PreferredLocale          string
 	DefaultAgents            []string
@@ -229,55 +253,92 @@ func Load(path string, warn func(string)) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if systemPath := SystemPath(); systemPath != "" {
+	locked := map[string]bool{}
+	systemPath := ""
+	if resolved := SystemPath(); resolved != "" {
+		systemPath = resolved
 		systemData, err := readObject(systemPath)
 		if err != nil {
 			return nil, err
 		}
-		userData, err = applySystem(systemData, userData, systemPath, warn)
+		merged, mergedLocked, err := applySystem(systemData, userData, systemPath, warn)
 		if err != nil {
 			return nil, err
 		}
+		userData, locked = merged, mergedLocked
 	}
-	return Parse(userData, path)
+	cfg, err := Parse(userData, path)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Locked = locked
+	cfg.SystemConfigPath = systemPath
+	return cfg, nil
 }
 
-// applySystem overlays the system config (Spec §7.2): locked keys win over
-// the user value with a warning; unlocked keys act as defaults; a locked but
-// unset key is a configuration error.
-func applySystem(systemData, userData map[string]any, systemPath string, warn func(string)) (map[string]any, error) {
-	if schema, ok := integerValue(systemData["schema_version"]); !ok || schema != SchemaVersion {
-		return nil, verr.New("schema_version", "system config %s requires schema_version 1", systemPath)
+// applySystem overlays the system config (Spec §7.2, manager §1): locked
+// keys win over the user value with a warning naming the system file;
+// unlocked keys act as defaults; a locked but unset key is a configuration
+// error. An environments.<key> lock replaces the machine file's knob whole
+// (manager §1 rule 2); an unlocked system environments knob is the default
+// the machine knob replaces whole (rule 3). It returns the merged object
+// and the locked set the caller records on the effective configuration.
+func applySystem(systemData, userData map[string]any, systemPath string, warn func(string)) (map[string]any, map[string]bool, error) {
+	systemSchema, ok := integerValue(systemData["schema_version"])
+	if !ok || (systemSchema != SchemaVersion && systemSchema != SchemaVersion2) {
+		return nil, nil, verr.New("schema_version", "system config %s requires schema_version 1 or 2", systemPath)
 	}
 	for key := range systemData {
 		if key != "locked" && !managerKeys[key] {
-			return nil, verr.New(key, "system config %s has unsupported field", systemPath)
+			return nil, nil, verr.New(key, "system config %s has unsupported field", systemPath)
 		}
 	}
 	rawLocked, _ := systemData["locked"].([]any)
 	if systemData["locked"] != nil && rawLocked == nil {
-		return nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
+		return nil, nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
 	}
 	locked := map[string]bool{}
 	for _, item := range rawLocked {
 		key, ok := item.(string)
 		if !ok {
-			return nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
+			return nil, nil, verr.New("locked", "system config %s field 'locked' must be a list of strings", systemPath)
+		}
+		if strings.HasPrefix(key, "environments.") {
+			if systemSchema != SchemaVersion2 {
+				return nil, nil, verr.New("locked", "system config %s cannot lock %q under schema_version 1", systemPath, key)
+			}
+		} else if strings.HasPrefix(key, "environments") {
+			return nil, nil, verr.New("locked", "system config %s cannot lock %q: lock the environments.<key> knob", systemPath, key)
 		}
 		if !LockableKeys[key] {
-			return nil, verr.New("locked", "system config %s cannot lock %q", systemPath, key)
+			return nil, nil, verr.New("locked", "system config %s cannot lock %q", systemPath, key)
 		}
 		if locked[key] {
-			return nil, verr.New("locked", "system config %s lists %q more than once", systemPath, key)
+			return nil, nil, verr.New("locked", "system config %s lists %q more than once", systemPath, key)
 		}
 		locked[key] = true
+	}
+	// A system file carries only the lockable environments subset with the
+	// §12.1 value grammars; isolation locks only toward shared (§12.2).
+	if rawEnv, present := systemData["environments"]; present && rawEnv != nil {
+		if systemSchema != SchemaVersion2 {
+			return nil, nil, verr.New("environments", "system config %s carries environments under schema_version 1", systemPath)
+		}
+		if _, err := parseSystemEnvironments(rawEnv); err != nil {
+			return nil, nil, fmt.Errorf("%v (system config %s)", err, systemPath)
+		}
 	}
 	merged := map[string]any{}
 	for key, value := range userData {
 		merged[key] = value
 	}
+	userSchema, _ := integerValue(userData["schema_version"])
 	for key, value := range systemData {
 		if key == "locked" || key == "schema_version" {
+			continue
+		}
+		if key == "environments" {
+			merged["environments"] = mergeSystemEnvironments(systemData, userData, locked, systemPath, warn)
 			continue
 		}
 		if locked[key] {
@@ -290,11 +351,76 @@ func applySystem(systemData, userData map[string]any, systemPath string, warn fu
 		}
 	}
 	for key := range locked {
+		if strings.HasPrefix(key, "environments.") {
+			continue
+		}
 		if _, present := systemData[key]; !present {
-			return nil, verr.New("locked", "system config %s locks %q but does not set it", systemPath, key)
+			return nil, nil, verr.New("locked", "system config %s locks %q but does not set it", systemPath, key)
 		}
 	}
-	return merged, nil
+	if err := checkLockedEnvSet(systemData, locked, systemPath); err != nil {
+		return nil, nil, err
+	}
+	// A schema-1 user file over system environments defaults carries
+	// schema-2 content in the effective configuration: the locked and
+	// defaulted knobs still apply (manager §1 rule 3) under the schema-2
+	// parse. The file on disk keeps its declared version.
+	if userSchema == SchemaVersion {
+		if _, userHas := userData["environments"]; !userHas {
+			if _, mergedHas := merged["environments"]; mergedHas {
+				merged["schema_version"] = float64(SchemaVersion2)
+			}
+		}
+	}
+	return merged, locked, nil
+}
+
+// mergeSystemEnvironments merges one environments object per manager §1
+// rules 2 and 3: a locked environments.<key> replaces the machine knob
+// whole with a warning when the machine knob differs; an unlocked system
+// knob is a default applied only when the machine file leaves it absent; a
+// machine knob never named by the system file passes through untouched.
+func mergeSystemEnvironments(systemData, userData map[string]any, locked map[string]bool, systemPath string, warn func(string)) any {
+	systemEnv, _ := systemData["environments"].(map[string]any)
+	userEnv, _ := userData["environments"].(map[string]any)
+	merged := map[string]any{}
+	for key, value := range userEnv {
+		merged[key] = value
+	}
+	if systemEnv == nil {
+		return merged
+	}
+	for knob, value := range systemEnv {
+		full := "environments." + knob
+		if locked[full] {
+			if userValue, present := userEnv[knob]; present && !jsonEqual(userValue, value) && warn != nil {
+				warn(fmt.Sprintf("config key %q is locked by %s; the user override is ignored", full, systemPath))
+			}
+			merged[knob] = value
+		} else if _, present := merged[knob]; !present {
+			merged[knob] = value
+		}
+	}
+	return merged
+}
+
+// checkLockedEnvSet enforces manager §1 rule 2 for environments knobs: a
+// locked environments.<key> must be set by the system file.
+func checkLockedEnvSet(systemData map[string]any, locked map[string]bool, systemPath string) error {
+	systemEnv, _ := systemData["environments"].(map[string]any)
+	for key := range locked {
+		if !strings.HasPrefix(key, "environments.") {
+			continue
+		}
+		knob := strings.TrimPrefix(key, "environments.")
+		if systemEnv == nil {
+			return verr.New("locked", "system config %s locks %q but does not set it", systemPath, key)
+		}
+		if _, present := systemEnv[knob]; !present {
+			return verr.New("locked", "system config %s locks %q but does not set it", systemPath, key)
+		}
+	}
+	return nil
 }
 
 // Parse validates a raw config object (Spec §7.1).
@@ -308,8 +434,20 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	if !ok {
 		return nil, verr.New("schema_version", "must be an integer")
 	}
-	if schema != SchemaVersion {
+	if schema != SchemaVersion && schema != SchemaVersion2 {
 		return nil, verr.New("schema_version", "unsupported config schema_version %d; this config requires a newer tool", schema)
+	}
+	// A schema-1 file declares no environments object (manager §12); one
+	// that carries it is rejected rather than read with its knobs ignored
+	// (manager §1 rule 4).
+	if schema == SchemaVersion {
+		if _, present := data["environments"]; present {
+			return nil, verr.New("environments", "requires schema_version 2; a schema-1 file declares no environments object")
+		}
+	}
+	env, err := parseEnvironments(data["environments"])
+	if err != nil {
+		return nil, err
 	}
 
 	skillsRoot, ok := data["skills_root"].(string)
@@ -459,6 +597,9 @@ func Parse(data map[string]any, path string) (*Config, error) {
 
 	return &Config{
 		Path:                     path,
+		Schema:                   schema,
+		Env:                      env,
+		Locked:                   map[string]bool{},
 		SkillsRoot:               expandHome(skillsRoot),
 		PreferredLocale:          preferredLocale,
 		DefaultAgents:            defaultAgents,
