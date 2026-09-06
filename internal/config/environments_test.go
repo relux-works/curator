@@ -330,10 +330,12 @@ func TestSystemV2DefaultsUnderSchema1User(t *testing.T) {
 	}
 }
 
-// TestRequireCurrentProfileGate drives the §12.2 refusal through Load and
-// CheckMachineUse, the production path profile use takes: a locked
-// require_current_profile refuses any other machine-scope profile and
-// admits the required one.
+// TestRequireCurrentProfileGate drives Load with a locked
+// require_current_profile: the knob and its lock are carried on the loaded
+// configuration, which PolicyFromConfig threads into the production refusal
+// (Policy.CheckMachineUse at the useLocked seam, driven through run() by the
+// profile-use and profile-install tests). The refusal itself lives there,
+// not here.
 func TestRequireCurrentProfileGate(t *testing.T) {
 	cfg, _, err := loadWithSystem(t,
 		`{"schema_version": 2, "skills_root": "x", "projects": {}}`,
@@ -342,23 +344,25 @@ func TestRequireCurrentProfileGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := cfg.CheckMachineUse("companyA"); err != nil {
-		t.Fatalf("required profile refused: %v", err)
+	if cfg.Env.RequireCurrent == nil || *cfg.Env.RequireCurrent != "companyA" {
+		t.Fatalf("locked knob not carried: %+v", cfg.Env.RequireCurrent)
 	}
-	if err := cfg.CheckMachineUse("personal"); err == nil ||
-		!strings.Contains(err.Error(), "environments.require_current_profile") {
-		t.Fatalf("other profile admitted: %v", err)
+	if !cfg.Locked["environments.require_current_profile"] {
+		t.Fatalf("locked knob carries no lock: %+v", cfg.Locked)
 	}
 }
 
 // TestRequireCurrentProfileUnlockedCarriesNoRefusal pins the bound: the
 // refusal is a locked-key effect, so a user-set knob without the lock
-// admits every profile.
+// carries the value with no lock for the seam to refuse on.
 func TestRequireCurrentProfileUnlockedCarriesNoRefusal(t *testing.T) {
 	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
 		"environments": {"require_current_profile": "companyA"}}`)
-	if err := cfg.CheckMachineUse("personal"); err != nil {
-		t.Fatalf("unlocked knob must carry no refusal: %v", err)
+	if cfg.Env.RequireCurrent == nil || *cfg.Env.RequireCurrent != "companyA" {
+		t.Fatalf("unlocked knob not carried: %+v", cfg.Env.RequireCurrent)
+	}
+	if cfg.Locked["environments.require_current_profile"] {
+		t.Fatalf("unlocked knob must carry no lock: %+v", cfg.Locked)
 	}
 }
 

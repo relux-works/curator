@@ -770,21 +770,6 @@ func (e Environments) EffectiveOverlays(profile string) []OverlayDeclaration {
 	return e.Overlays[profile]
 }
 
-// CheckMachineUse enforces a locked require_current_profile (environments
-// §12.2, manager §1 locked-key rules): with the key locked to a profile
-// name, profile use of any other profile in the machine scope is a
-// configuration error. An unlocked knob carries no refusal.
-func (c *Config) CheckMachineUse(name string) error {
-	if c == nil || c.Env.RequireCurrent == nil || *c.Env.RequireCurrent == name {
-		return nil
-	}
-	if !c.Locked["environments.require_current_profile"] {
-		return nil
-	}
-	return verr.New("environments.require_current_profile",
-		"profile use of %q is refused: the system configuration requires current profile %q", name, *c.Env.RequireCurrent)
-}
-
 // LockedBySystem reports whether the manager §1 locked set names key.
 func (c *Config) LockedBySystem(key string) bool {
 	return c != nil && c.Locked[key]
