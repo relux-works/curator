@@ -820,7 +820,10 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 			_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
 		}
 	}
-	for path, document := range plan.copies {
+	// Writes run in sorted path order: the fresh-home provisioning order
+	// (§8.1) is deterministic even though the plan accumulates maps.
+	for _, path := range sortedKeysBytes(plan.copies) {
+		document := plan.copies[path]
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(plan.homeDir, filepath.FromSlash(path))), 0o755); err != nil {
 			return err
 		}
@@ -828,7 +831,8 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 			return err
 		}
 	}
-	for path, target := range plan.links {
+	for _, path := range sortedKeys(plan.links) {
+		target := plan.links[path]
 		full := filepath.Join(plan.homeDir, filepath.FromSlash(path))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			return err
@@ -977,6 +981,15 @@ func shadowWarnings(req *ResolveRequest, plan *homePlan, recorded []string) []st
 }
 
 func sortedKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sortedKeysBytes(values map[string][]byte) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)
