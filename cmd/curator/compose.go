@@ -4,9 +4,43 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/relux-works/curator/internal/config"
 )
+
+// isPathSource tells a path operand from a git URL syntactically, never by
+// probing the filesystem (environments §9.1): an operand beginning with /,
+// ./, or ../ (or a platform absolute-path spelling) is a path declaration;
+// every other operand resolves as git under section 1.
+func isPathSource(operand string) bool {
+	if operand == "" {
+		return false
+	}
+	if strings.HasPrefix(operand, "/") {
+		return true
+	}
+	if strings.HasPrefix(operand, "./") || strings.HasPrefix(operand, `.\\`) {
+		return true
+	}
+	if strings.HasPrefix(operand, "../") || strings.HasPrefix(operand, `..\\`) {
+		return true
+	}
+	if operand == "." || operand == ".." {
+		return true
+	}
+	if len(operand) >= 2 && isDriveLetter(operand[0]) && operand[1] == ':' {
+		return true
+	}
+	if strings.HasPrefix(operand, `\\\\`) {
+		return true
+	}
+	return false
+}
+
+func isDriveLetter(c byte) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+}
 
 // cmdProfileCompose implements `profile compose <profile> add|remove|list`
 // (cli/curator.md): it edits the machine overlays.<profile> list of
@@ -47,7 +81,15 @@ func (c cli) cmdComposeAdd(cfg *config.Config, profile string, args []string) in
 			forms++
 		}
 	}
-	if forms != 1 {
+	// A path overlay is an operator-local directory under the section 1
+	// rules: it carries no requirement form and no directory. A git
+	// overlay carries exactly one requirement form.
+	if isPathSource(positional[0]) {
+		if forms != 0 || *directory != "" {
+			_, _ = fmt.Fprintln(c.stderr, "curator: profile compose add of a path source takes no --range, --tag, --revision, or --directory")
+			return exitUsage
+		}
+	} else if forms != 1 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile compose add takes exactly one of --range, --tag, --revision")
 		return exitUsage
 	}
@@ -170,8 +212,10 @@ func (c cli) cmdComposeList(cfg *config.Config, profile string, args []string) i
 			form = "range=" + decl.Range
 		case decl.Tag != "":
 			form = "tag=" + decl.Tag
-		default:
+		case decl.Revision != "":
 			form = "revision=" + decl.Revision
+		default:
+			form = "path"
 		}
 		weight := "(default)"
 		if decl.Weight != nil {

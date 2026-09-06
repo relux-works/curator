@@ -196,7 +196,7 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 			return nil, err
 		}
 	}
-	results, err := materializeScope(home, effective, environment)
+	results, err := materializeScope(home, effective, environment, policy)
 	if err != nil {
 		return results, err
 	}
@@ -275,7 +275,7 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 		machine = DefaultProfile
 	}
 	var results []EntryResult
-	machineResults, err := materializeScope(home, machine, "")
+	machineResults, err := materializeScope(home, machine, "", policy)
 	if err != nil {
 		return machineResults, err
 	}
@@ -291,7 +291,7 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 	sort.Strings(scopes)
 	for _, scope := range scopes {
 		environment, _ := splitScope(scope)
-		scopeResults, err := materializeScope(home, scoped[scope], environment)
+		scopeResults, err := materializeScope(home, scoped[scope], environment, policy)
 		if err != nil {
 			return append(results, scopeResults...), err
 		}
@@ -309,7 +309,7 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 // SyncWithPolicy re-materializes each skipped home from its scoped record in
 // its own pass, so every home is written exactly once and the recorded state
 // and the bytes always agree when the command returns.
-func materializeScope(home, profile, environment string) ([]EntryResult, error) {
+func materializeScope(home, profile, environment string, policy Policy) ([]EntryResult, error) {
 	lock, hash, err := readLock(home, profile)
 	if err != nil {
 		return nil, err
@@ -339,7 +339,7 @@ func materializeScope(home, profile, environment string) ([]EntryResult, error) 
 	if err != nil {
 		return nil, err
 	}
-	precedence := contextmaterialize.DefaultPrecedence
+	precedence := policy.Precedence()
 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
 	if err != nil {
 		return nil, err

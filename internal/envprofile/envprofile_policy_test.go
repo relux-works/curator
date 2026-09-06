@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/contextmaterialize"
 )
 
 // TestPolicyFromConfigCarriesEnvGates drives the production PolicyFromConfig
@@ -15,8 +16,13 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	cfg, err := config.Parse(map[string]any{
 		"schema_version": float64(2), "skills_root": "x", "projects": map[string]any{},
 		"environments": map[string]any{
-			"mcp_package_allowlist": []any{"https://example.com/m"},
-			"overlays_allowed":      false,
+			"mcp_package_allowlist":  []any{"https://example.com/m"},
+			"overlays_allowed":       false,
+			"overlay_default_weight": float64(500),
+			"precedence":             map[string]any{"winner": "lower-weight", "placement": "winner-first"},
+			"overlays": map[string]any{
+				"a": []any{map[string]any{"source": "/srv/p", "weight": float64(7)}},
+			},
 		},
 	}, "config.json")
 	if err != nil {
@@ -28,6 +34,23 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	}
 	if !policy.ForbidsOverlays() {
 		t.Fatalf("overlays_allowed=false must forbid overlays")
+	}
+	if policy.OverlayDefaultWeight != 500 {
+		t.Fatalf("overlay default weight = %d, want 500", policy.OverlayDefaultWeight)
+	}
+	if policy.Precedence() != (contextmaterialize.Precedence{Winner: "lower-weight", Placement: "winner-first"}) {
+		t.Fatalf("precedence = %+v", policy.Precedence())
+	}
+	// The declarations are carried even while the forbidding policy
+	// empties them at resolution time.
+	if len(policy.Overlays["a"]) != 1 || policy.Overlays["a"][0].Source != "/srv/p" {
+		t.Fatalf("overlays = %+v", policy.Overlays)
+	}
+	if policy.Overlays["a"][0].Weight == nil || *policy.Overlays["a"][0].Weight != 7 {
+		t.Fatalf("overlay weight = %+v", policy.Overlays["a"][0].Weight)
+	}
+	if len(policy.EffectiveOverlays("a")) != 0 {
+		t.Fatalf("forbidding policy must empty the carried list")
 	}
 
 	absent := PolicyFromConfig(nil)

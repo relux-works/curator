@@ -15,15 +15,24 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
 )
 
-// DiagSourceInvalid is the diagnostic for a state tree that violates the
-// core §6.2 archive discipline (environments §1).
-const DiagSourceInvalid = "profile_source_invalid"
+// Diagnostics for state trees (environments §1.1). A missing path operand
+// and an unreadable one are different facts (environments §8.4):
+// profile_source_path_missing never fires on a failed read, and
+// profile_source_path_unreadable never fires on absence.
+const (
+	// DiagSourceInvalid covers the snapshot-tree discipline violations of
+	// environments §1, platform path collisions included.
+	DiagSourceInvalid  = "profile_source_invalid"
+	DiagPathMissing    = "profile_source_path_missing"
+	DiagPathUnreadable = "profile_source_path_unreadable"
+)
 
 // Root is the store root below the manager home.
 func Root(home string) string { return filepath.Join(home, "contexts") }
@@ -74,11 +83,23 @@ func EnsureGit(home, kind, name, repo, commit string) (string, error) {
 // EnsureState copies the regular-file tree at source into the store as a
 // state entry of name, keyed by the tree's content hash, and returns the
 // entry path and the bare 64-hex state hash. A root-level .git entry is
-// excluded; a link, special file, or nested .git entry is
-// profile_source_invalid.
+// excluded; a link, special file, nested .git entry, or platform path
+// collision is profile_source_invalid. A source that names no existing
+// entry is profile_source_path_missing; one that cannot be read is
+// profile_source_path_unreadable (environments §1.1, §8.4).
 func EnsureState(home, kind, name, source string) (string, string, error) {
 	if !identifiers.Valid(name) {
 		return "", "", fmt.Errorf("store entry name %q is not a portable identifier", name)
+	}
+	info, err := os.Stat(source)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", "", fmt.Errorf("%s: path %q names no existing filesystem entry", DiagPathMissing, source)
+		}
+		return "", "", fmt.Errorf("%s: path %q cannot be read: %v", DiagPathUnreadable, source, err)
+	}
+	if !info.IsDir() {
+		return "", "", fmt.Errorf("%s: path %q names a non-directory", DiagSourceInvalid, source)
 	}
 	parent := filepath.Join(Root(home), kind, name)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
@@ -123,13 +144,18 @@ func publish(staging, target string) (string, error) {
 }
 
 func copyStateTree(source, destination string) error {
+	// seen folds every copied protocol path onto the platform path it
+	// would occupy: two entries folding together fail the snapshot with
+	// profile_source_invalid (environments §1), the snapshot analogue of
+	// the section 5 materialization collision rule.
+	seen := map[string]string{}
 	return filepath.WalkDir(source, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: cannot read %s: %v", DiagPathUnreadable, path, err)
 		}
 		rel, err := filepath.Rel(source, path)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s: cannot read %s: %v", DiagPathUnreadable, path, err)
 		}
 		if rel == "." {
 			return nil
@@ -143,6 +169,10 @@ func copyStateTree(source, destination string) error {
 			}
 			return fmt.Errorf("%s: %s carries a .git entry below its root", DiagSourceInvalid, rel)
 		}
+		if prior, folded := seen[strings.ToLower(rel)]; folded {
+			return fmt.Errorf("%s: %s and %s map to one platform path", DiagSourceInvalid, prior, rel)
+		}
+		seen[strings.ToLower(rel)] = rel
 		target := filepath.Join(destination, rel)
 		switch {
 		case entry.IsDir():
@@ -150,14 +180,14 @@ func copyStateTree(source, destination string) error {
 		case entry.Type().IsRegular():
 			info, err := entry.Info()
 			if err != nil {
-				return err
+				return fmt.Errorf("%s: cannot read %s: %v", DiagPathUnreadable, rel, err)
 			}
 			if info.Sys() != nil && hardLinked(info) {
 				return fmt.Errorf("%s: %s is a hard link", DiagSourceInvalid, rel)
 			}
 			payload, err := os.ReadFile(path) // #nosec G304 -- walked below the source root
 			if err != nil {
-				return err
+				return fmt.Errorf("%s: cannot read %s: %v", DiagPathUnreadable, rel, err)
 			}
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err

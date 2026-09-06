@@ -78,6 +78,10 @@ type ResolveRequest struct {
 	Machine   envregistry.MachineConfig
 	Repair    bool
 	Format    string
+	// Policy carries the machine gates (environments §12.1): the
+	// precedence primitives that drive emission order and the composition
+	// policy. The zero value resolves with the pair default.
+	Policy Policy
 	// Detect maps an adapter to its detected tool release, or "unknown".
 	// Nil means probe the machine read-only.
 	Detect func(adapter envregistry.Adapter) string
@@ -1043,7 +1047,7 @@ const (
 // surfaces as environment_repair_failed.
 func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) *verification {
 	verdict := &verification{surfaceState: map[string]string{}}
-	precedence := contextmaterialize.DefaultPrecedence
+	precedence := req.Policy.Precedence()
 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
 	if err != nil {
 		verdict.reasons = append(verdict.reasons, fmt.Sprintf("emitted order: %v", err))
@@ -1437,8 +1441,8 @@ func buildFragment(req *ResolveRequest, adapter envregistry.Adapter, verdict *ve
 		Environment: adapter.ID,
 		Profile:     req.Profile,
 		LockSHA256:  strings.TrimPrefix(verdict.hash, "sha256:"),
-		Winner:      contextmaterialize.DefaultPrecedence.Winner,
-		Placement:   contextmaterialize.DefaultPrecedence.Placement,
+		Winner:      req.Policy.Precedence().Winner,
+		Placement:   req.Policy.Precedence().Placement,
 		Env:         map[string]string{adapter.EnvVar: plan.parent},
 	}
 	if _, ok := plan.marker.Surfaces[envmarker.SurfaceSystemPrompt]; ok {
@@ -1598,7 +1602,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		}
 		return &ResolveResult{Document: document, Warnings: verdict.warnings}, nil
 	}
-	precedence := contextmaterialize.DefaultPrecedence
+	precedence := req.Policy.Precedence()
 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", DiagRepairFailed, err)

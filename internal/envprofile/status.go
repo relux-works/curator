@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 )
@@ -127,6 +126,9 @@ type StatusRequest struct {
 	Detect       func(envregistry.Adapter) string
 	NativeHomeOf func(string) (string, error)
 	OperatorXDG  string
+	// Policy carries the machine gates; the zero value reports the pair
+	// default (environments §6, §12.1).
+	Policy Policy
 	// ProbeTarget reports whether a secondary target's probe path exists.
 	// Nil means unprobed: auto participation finds nothing.
 	ProbeTarget func(envregistry.Target) bool
@@ -142,6 +144,7 @@ func (req *StatusRequest) resolve() ResolveRequest {
 		NativeHomeOf: req.NativeHomeOf,
 		OperatorXDG:  req.OperatorXDG,
 		LaunchDir:    req.LaunchDir,
+		Policy:       req.Policy,
 	}
 }
 
@@ -315,8 +318,7 @@ func ageString(duration time.Duration) string {
 
 // profileStates reports the lock's context members with weights and the
 // precedence primitives per activation (§12): one row per installed
-// profile. Precedence is the effective policy; revision 1 carries the
-// default pair until manager-config schema 2 persists the knobs.
+// profile. Precedence is the effective machine policy.
 func profileStates(req StatusRequest, infos []Info) []ProfileState {
 	var out []ProfileState
 	for _, info := range infos {
@@ -334,13 +336,14 @@ func profileStates(req StatusRequest, infos []Info) []ProfileState {
 			}
 			return members[i].Name < members[j].Name
 		})
+		precedence := req.Policy.Precedence()
 		out = append(out, ProfileState{
 			Profile:  info.Name,
 			LockHash: hash,
 			Members:  members,
 			Precedence: PrecedenceState{
-				Winner:    contextmaterialize.DefaultPrecedence.Winner,
-				Placement: contextmaterialize.DefaultPrecedence.Placement,
+				Winner:    precedence.Winner,
+				Placement: precedence.Placement,
 			},
 		})
 	}

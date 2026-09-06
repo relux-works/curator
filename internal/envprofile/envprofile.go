@@ -8,9 +8,11 @@
 // pointers) lives in switch.go; the resolution source over git caches and
 // path directories lives in gitsource.go.
 //
-// Stage bounds: overlays come from machine configuration (manager-config
-// schema 2), which is out of scope for this stage, so resolution runs with
-// no overlays and Direct is empty; the §9.4 migration freezes the global
+// Machine overlays come from the policy's per-profile declarations
+// (manager-config schema 2 via PolicyFromConfig) and join the closure
+// beside the root; Direct is empty because live direct declarations
+// (`global add`/`remove` writing into the lock) await the skill pipeline of
+// a later stage. The §9.4 migration freezes the global
 // skill set at migration time into the default lock instead — git tag and
 // revision declarations only, since a skill member pins a commit with its
 // source and branch-pinned or local skills have no representable pin here;
@@ -34,6 +36,7 @@ import (
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/contextaudit"
 	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
@@ -45,11 +48,13 @@ import (
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
-// Diagnostics (environments §2.1, §9.7, manager profile §12.3).
+// Diagnostics (environments §1.1, §2.1, §9.7, manager profile §12.3).
 const (
 	DiagNameTaken       = "profile_name_taken"
 	DiagRefConflict     = "profile_install_ref_conflict"
 	DiagSourceInvalid   = "profile_source_invalid"
+	DiagPathMissing     = "profile_source_path_missing"
+	DiagPathUnreadable  = "profile_source_path_unreadable"
 	DiagUpdateBlocked   = "profile_update_blocked"
 	DiagInUse           = "profile_in_use"
 	DiagNotFound        = "profile_not_found"
@@ -373,8 +378,9 @@ func InUseByAnyScope(home, name string) (bool, error) {
 
 // Policy carries the machine gates for profile operations (environments
 // §9.1, §12.1): the core §6.1 source allowlist for git members, the MCP
-// package allowlist for mcp members, the audit revocations, and the
-// overlays_allowed composition policy. An empty allowlist permits every
+// package allowlist for mcp members, the audit revocations, the
+// overlays_allowed composition policy, the per-profile overlay declarations,
+// and the precedence primitives. An empty allowlist permits every
 // identity (core §6.1); revocation and the audit canary always block
 // regardless of any enabled flag — an advisory profile install does not
 // exist.
@@ -385,11 +391,59 @@ type Policy struct {
 	// OverlaysAllowed is the effective §12.1 composition policy: false
 	// empties every overlay list at resolution (environments §12.2).
 	OverlaysAllowed bool
+	// Overlays are the machine overlay declarations per installed profile
+	// (environments §6); they join the closure beside the root. A nil map
+	// declares none.
+	Overlays map[string][]OverlaySpec
+	// OverlayDefaultWeight is the machine overlay_default_weight knob
+	// (environments §12.1, default 1000).
+	OverlayDefaultWeight int64
+	// PrecedenceWinner and PrecedencePlacement are the section 6 pair of
+	// independent primitives; empty means the pair default
+	// (higher-weight, winner-last).
+	PrecedenceWinner    string
+	PrecedencePlacement string
+}
+
+// OverlaySpec is one machine overlay declaration for a profile
+// (environments §6, §12.1): a git source with a range or exact form, or a
+// path source with no form, an optional directory within a git snapshot,
+// and an optional machine-assigned weight (nil takes the default).
+type OverlaySpec struct {
+	Source    string
+	Range     string
+	Tag       string
+	Revision  string
+	Directory string
+	Weight    *int64
 }
 
 // ForbidsOverlays reports whether the composition policy empties every
 // overlay list (environments §12.2).
 func (p Policy) ForbidsOverlays() bool { return !p.OverlaysAllowed }
+
+// EffectiveOverlays returns the overlay declarations for profile after the
+// §12.2 composition policy: a forbidding policy empties every list, so
+// resolution joins the root alone.
+func (p Policy) EffectiveOverlays(profile string) []OverlaySpec {
+	if p.ForbidsOverlays() {
+		return nil
+	}
+	return p.Overlays[profile]
+}
+
+// Precedence returns the effective section 6 precedence pair, defaulting
+// each primitive independently to the §12.1 default.
+func (p Policy) Precedence() contextmaterialize.Precedence {
+	precedence := contextmaterialize.DefaultPrecedence
+	if p.PrecedenceWinner != "" {
+		precedence.Winner = p.PrecedenceWinner
+	}
+	if p.PrecedencePlacement != "" {
+		precedence.Placement = p.PrecedencePlacement
+	}
+	return precedence
+}
 
 // PolicyFromConfig derives the profile machine gates from the loaded
 // machine configuration (environments §9.1, §12.1): the core §6.1 source
@@ -401,14 +455,36 @@ func (p Policy) ForbidsOverlays() bool { return !p.OverlaysAllowed }
 // migration path must never re-parse configuration into a weaker copy.
 func PolicyFromConfig(cfg *config.Config) Policy {
 	if cfg == nil {
-		return Policy{OverlaysAllowed: true}
+		return Policy{OverlaysAllowed: true, OverlayDefaultWeight: config.DefaultOverlayWeight}
 	}
-	return Policy{
-		AllowedSources:  cfg.AllowedSources,
-		MCPAllowlist:    cfg.Env.MCPPackageAllowlist,
-		Revocations:     cfg.Audit.Revocations,
-		OverlaysAllowed: cfg.Env.OverlaysAllowed,
+	policy := Policy{
+		AllowedSources:       cfg.AllowedSources,
+		MCPAllowlist:         cfg.Env.MCPPackageAllowlist,
+		Revocations:          cfg.Audit.Revocations,
+		OverlaysAllowed:      cfg.Env.OverlaysAllowed,
+		OverlayDefaultWeight: int64(cfg.Env.OverlayDefaultWeight),
+		PrecedenceWinner:     cfg.Env.Precedence.Winner,
+		PrecedencePlacement:  cfg.Env.Precedence.Placement,
 	}
+	if len(cfg.Env.Overlays) > 0 {
+		policy.Overlays = map[string][]OverlaySpec{}
+		for profile, list := range cfg.Env.Overlays {
+			specs := make([]OverlaySpec, 0, len(list))
+			for _, decl := range list {
+				spec := OverlaySpec{
+					Source: decl.Source, Range: decl.Range, Tag: decl.Tag,
+					Revision: decl.Revision, Directory: decl.Directory,
+				}
+				if decl.Weight != nil {
+					weight := int64(*decl.Weight)
+					spec.Weight = &weight
+				}
+				specs = append(specs, spec)
+			}
+			policy.Overlays[profile] = specs
+		}
+	}
+	return policy
 }
 
 // InstallOptions selects the source of one installation.
@@ -473,7 +549,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if isPath {
 		manifest, err := contextpkg.LoadManifest(options.Operand)
 		if err != nil {
-			return Info{}, false, false, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+			return Info{}, false, false, pathManifestDiag(options.Operand, err)
 		}
 		name = options.As
 		if name == "" {
@@ -529,15 +605,26 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if manager == nil {
 		manager = newGitManager(home).withPolicy(options.Policy)
 	}
+	// Machine overlays join the closure beside the root and resolve jointly
+	// with it (environments §6); a forbidding composition policy resolves
+	// the root alone.
+	overlays, err := resolveOverlays(home, manager, name, options.Policy)
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	input.Overlays = overlays
 	input.MCPAllowlist = options.Policy.MCPAllowlist
+	overlayInputDefaults(&input, options.Policy)
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
 		return Info{}, false, false, err
 	}
-	warnings, err := auditAndStore(home, manager, result, options.Policy)
+	warnings := resolutionWarnings(result)
+	auditWarnings, err := auditAndStore(home, manager, result, options.Policy)
 	if err != nil {
 		return Info{}, false, false, err
 	}
+	warnings = append(warnings, auditWarnings...)
 	sourcePayload, err := marshalSource(source)
 	if err != nil {
 		return Info{}, false, false, err
@@ -637,7 +724,7 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 	case KindPath:
 		manifest, err := contextpkg.LoadManifest(source.Path)
 		if err != nil {
-			return Info{}, false, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+			return Info{}, false, pathManifestDiag(source.Path, err)
 		}
 		state, err := stateForPath(home, manifest.Name, source.Path)
 		if err != nil {
@@ -650,7 +737,13 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 	default:
 		return Info{}, false, fmt.Errorf("%s: profile %q is the builtin local profile and does not move", DiagUpdateBlocked, name)
 	}
+	overlays, err := resolveOverlays(home, manager, name, policy)
+	if err != nil {
+		return Info{}, false, err
+	}
+	input.Overlays = overlays
 	input.MCPAllowlist = policy.MCPAllowlist
+	overlayInputDefaults(&input, policy)
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
 		return Info{}, false, err
@@ -682,10 +775,12 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 		machine, _ := Current(home)
 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name}, false, nil
 	}
-	warnings, err := auditAndStore(home, manager, result, policy)
+	warnings := resolutionWarnings(result)
+	auditWarnings, err := auditAndStore(home, manager, result, policy)
 	if err != nil {
 		return Info{}, false, err
 	}
+	warnings = append(warnings, auditWarnings...)
 	canonical, err := result.Lock.Canonical()
 	if err != nil {
 		return Info{}, false, err
@@ -730,12 +825,56 @@ func Remove(home, name string, purge bool) error {
 	if inUse {
 		return fmt.Errorf("%s: profile %q is current in a scope", DiagInUse, name)
 	}
+	// A profile that is an overlay member of another installed profile's
+	// lock stays until that profile stops declaring it (environments
+	// §9.2): removal would strand the overlay declaration.
+	if owner, ok := overlayOwner(home, name); ok {
+		return fmt.Errorf("%s: profile %q is named as an overlay of installed profile %q", DiagInUse, name, owner)
+	}
 	if purge {
 		if err := purgeHomes(home, name); err != nil {
 			return err
 		}
 	}
 	return os.RemoveAll(ProfileDir(home, name))
+}
+
+// overlayOwner reports whether the root package of profile name is an
+// overlay member of another installed profile's lock (environments §9.2).
+// Locks are ground truth: a machine overlay declaration resolves into an
+// overlay-flagged lock member, so a lock scan sees exactly what resolution
+// joined.
+func overlayOwner(home, name string) (string, bool) {
+	rootLock, _, err := readLock(home, name)
+	if err != nil || rootLock == nil {
+		return "", false
+	}
+	entries, err := os.ReadDir(ProfilesDir(home))
+	if err != nil {
+		return "", false
+	}
+	owners := []string{}
+	for _, entry := range entries {
+		other := entry.Name()
+		if !entry.IsDir() || other == name || !validProfileName(other) {
+			continue
+		}
+		otherLock, _, err := readLock(home, other)
+		if err != nil || otherLock == nil {
+			continue
+		}
+		for _, member := range otherLock.Members {
+			if member.Overlay && member.Name == rootLock.Root {
+				owners = append(owners, other)
+				break
+			}
+		}
+	}
+	sort.Strings(owners)
+	if len(owners) == 0 {
+		return "", false
+	}
+	return owners[0], true
 }
 
 // auditAndStore audits every resolved member always-strict and installs its
@@ -854,6 +993,19 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 		return warnings, fmt.Errorf("audit blocked: %s", strings.Join(errs, "; "))
 	}
 	return warnings, nil
+}
+
+// pathManifestDiag maps a manifest-load failure on a path operand onto the
+// section 1.1 diagnostic: an operand naming no existing filesystem entry
+// is profile_source_path_missing; every other failure is
+// profile_source_invalid. A failed read of an existing tree surfaces from
+// the snapshot copy as profile_source_path_unreadable, never as absence
+// (environments §8.4).
+func pathManifestDiag(operand string, err error) error {
+	if _, statErr := os.Stat(operand); statErr != nil && os.IsNotExist(statErr) {
+		return fmt.Errorf("%s: path %q names no existing filesystem entry", DiagPathMissing, operand)
+	}
+	return fmt.Errorf("%s: %v", DiagSourceInvalid, err)
 }
 
 // stateForPath installs the path root into the store and returns its state
