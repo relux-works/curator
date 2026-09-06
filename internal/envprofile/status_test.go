@@ -131,6 +131,56 @@ func TestStatusShadowAcknowledgment(t *testing.T) {
 	}
 }
 
+// TestStatusProfileMembersAndUnregistered narrows the §12 rows: the
+// matrix carries the lock's context members with weights and the
+// precedence primitives per activation, and unregistered env-ids named in
+// machine configuration.
+func TestStatusProfileMembersAndUnregistered(t *testing.T) {
+	fx := writeManagedFixture(t, "acme")
+	provision(t, fx, "claude_code", envregistry.DefaultMachineConfig())
+	req := statusRequest(fx)
+	req.Machine.Forms = map[string]string{"cursor": "monolithic", "claude_code": "monolithic"}
+	req.Machine.Isolation = map[string]map[string]string{"acme": {"cursor": "shared"}}
+	status, err := StatusOf(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var profile *ProfileState
+	for i := range status.Profiles {
+		if status.Profiles[i].Profile == "acme" {
+			profile = &status.Profiles[i]
+		}
+	}
+	if profile == nil {
+		t.Fatalf("profiles %+v name no acme", status.Profiles)
+	}
+	if len(profile.Members) == 0 {
+		t.Fatal("the profile row carries no lock members")
+	}
+	found := false
+	for _, member := range profile.Members {
+		if member.Name == "acme" && member.Kind == contextlock.KindContext && member.Weight == 100 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("members %+v name no acme context weight 100", profile.Members)
+	}
+	if profile.Precedence.Winner == "" || profile.Precedence.Placement == "" {
+		t.Fatalf("precedence %+v", profile.Precedence)
+	}
+	if len(status.UnregisteredEnvironments) != 1 || status.UnregisteredEnvironments[0] != "cursor" {
+		t.Fatalf("unregistered %+v", status.UnregisteredEnvironments)
+	}
+	row := findHome(status, "acme", "claude_code")
+	if row == nil || row.Mode == "" || row.Form == "" {
+		t.Fatalf("home row %+v carries no mode/form", row)
+	}
+	if len(row.SeededProjects) == 0 {
+		t.Fatal("the claude_code row carries no seeded-projects")
+	}
+}
+
 func findHome(status *Status, profile, env string) *HomeState {
 	for i := range status.Homes {
 		if status.Homes[i].Profile == profile && status.Homes[i].Environment == env {

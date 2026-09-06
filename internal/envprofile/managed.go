@@ -58,9 +58,6 @@ func EnvRoot(home string) string { return filepath.Join(home, EnvRootName) }
 // names the managed XDG parent and the tool reads the opencode child
 // (environments §7.1).
 func ManagedParent(home, profile, envID string) string {
-	if envID == envregistry.OpenCode {
-		return filepath.Join(EnvRoot(home), profile, envID)
-	}
 	return filepath.Join(EnvRoot(home), profile, envID)
 }
 

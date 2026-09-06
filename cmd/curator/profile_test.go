@@ -207,7 +207,9 @@ func TestProfileUseUnknownEnvironmentIsAFailure(t *testing.T) {
 }
 
 // TestProfileUseTargetIsStageB checks scoped target switches name their
-// bound instead of touching fixed homes.
+// bound instead of touching fixed homes: an undeclared target is
+// environment_target_unknown, while a declared target names the deferred
+// writes instead of misreporting unknown.
 func TestProfileUseTargetIsStageB(t *testing.T) {
 	source, _ := profileHome(t)
 	pkg := t.TempDir()
@@ -218,6 +220,13 @@ func TestProfileUseTargetIsStageB(t *testing.T) {
 	code, _, stderr := runProfile(t, source, "profile", "use", "acme", "--target", "xcode")
 	if code != exitFail || !strings.Contains(stderr, "environment_target_unknown") {
 		t.Fatalf("use = %d\nstderr:\n%s", code, stderr)
+	}
+	code, _, stderr = runProfile(t, source, "profile", "use", "acme", "--target", "xcode-coding-assistant")
+	if code != exitFail || strings.Contains(stderr, "environment_target_unknown") {
+		t.Fatalf("a declared target must not report unknown: %d\n%s", code, stderr)
+	}
+	if !strings.Contains(stderr, "writes are deferred") {
+		t.Fatalf("a declared target names the deferred writes: %d\n%s", code, stderr)
 	}
 }
 

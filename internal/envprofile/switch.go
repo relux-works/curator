@@ -47,6 +47,7 @@ import (
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 )
 
@@ -167,7 +168,10 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 		}
 	}
 	if target != "" {
-		return nil, fmt.Errorf("environment_target_unknown: secondary fixed-home targets are stage (b)")
+		if _, err := envregistry.TargetByID(target); err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("secondary fixed-home target %q writes are deferred: participation, consent, and status are implemented, surface writes are not", target)
 	}
 	scope := ""
 	if environment != "" {

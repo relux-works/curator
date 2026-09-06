@@ -275,6 +275,11 @@ internal/envprofile	TestResolveLockContention	linux,darwin,windows	-	-	a contend
 internal/envprofile	TestStatusOrphanRetention	linux,darwin,windows	-	-	removal without purge retains managed homes and status reports each orphan by path
 internal/envprofile	TestOpencodeXDGSeeds	linux,darwin,windows	-	-	allowlisted XDG entries seed as recorded parent links and shadows warn without being touched
 internal/envprofile	TestSeedUnreadableStopsBeforeFirstWrite	linux,darwin,windows	-	-	an unreadable seed fails provisioning before the first write
+internal/envprofile	TestClaudeRootAlwaysCopied	linux,darwin,windows	-	-	the claude_code root context is a copied regular file with its reason under both forms
+internal/envprofile	TestCodexUnreadableConfigFails	linux,darwin,windows	-	-	an unreadable native codex config fails instead of defaulting to the file store
+internal/envprofile	TestStatusProfileMembersAndUnregistered	linux,darwin,windows	-	-	status carries lock members with weights, precedence primitives, and unregistered env-ids
+internal/envregistry	TestSecondaryTargetsBoundToAdapters	linux,darwin,windows	-	-	revision 1 declares two secondary-target rows bound one per adapter and never for other adapters
+internal/envfragment	TestFragmentEnvCarriesOnlyEnvObject	linux,darwin,windows	-	-	--format env|shell render exactly the fragment env object, never a channel value
 internal/envmarker	TestParseAuthoritativeEnvMarkerSchemaCases	linux,darwin,windows	-	-	the published environment marker family parses under the managed-home rules and every invalid case is rejected
 internal/envfragment	TestFragmentAuthoritativeSchemaCases	linux,darwin,windows	-	-	the published fragment family validates against the closed adapter registry and the profile-influence boundary
 internal/envfragment	TestFragmentEmissionMatchesReference	linux,darwin,windows	-	-	the emitted canonical fragment re-encodes the published reference bytes exactly

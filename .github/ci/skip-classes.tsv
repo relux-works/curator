@@ -102,9 +102,6 @@ opt-in	set CURATOR_TEST_YARN_MODERN_JS to the @yarnpkg/cli-dist 4[.]9[.]2 bin/ya
 opt-in	cross-check env not set	allow	enabled by an explicit developer environment variable
 opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
 
-# --- deferred delivery stages -------------------------------------------------
-stage-deferred	deferred to stage \(b\)	allow	the surface belongs to a later delivery stage and is asserted there, never as a pass here
-
 # --- go test plumbing -------------------------------------------------------
 helper-process	helper process	allow	the go test helper-process re-exec pattern
 helper-process	is not reachable from this test binary	allow	the go test helper-process re-exec pattern

@@ -52,6 +52,42 @@ func TestUnknownTarget(t *testing.T) {
 	}
 }
 
+// TestSecondaryTargetsBoundToAdapters narrows the §7.6 gate: revision 1
+// declares exactly two rows, one per adapter, and the target never
+// resolves for an adapter without a row. A mutant that keeps one global
+// row must fail this test.
+func TestSecondaryTargetsBoundToAdapters(t *testing.T) {
+	if len(Targets) != 2 {
+		t.Fatalf("revision 1 declares exactly two secondary targets, got %d", len(Targets))
+	}
+	seen := map[string]int{}
+	for _, target := range Targets {
+		if target.ID != "xcode-coding-assistant" {
+			t.Fatalf("unexpected target %q", target.ID)
+		}
+		seen[target.Adapter]++
+	}
+	if seen[ClaudeCode] != 1 || seen[CodexCLI] != 1 {
+		t.Fatalf("targets bind one row each to claude_code and codex_cli, got %+v", seen)
+	}
+	for _, id := range []string{ClaudeCode, CodexCLI} {
+		if got := TargetsFor(id); len(got) != 1 {
+			t.Fatalf("%s reports %d targets, want 1", id, len(got))
+		}
+		if _, err := TargetFor(id, "xcode-coding-assistant"); err != nil {
+			t.Fatalf("%s xcode-coding-assistant must resolve: %v", id, err)
+		}
+	}
+	for _, id := range []string{OpenCode, Pi} {
+		if got := TargetsFor(id); len(got) != 0 {
+			t.Fatalf("%s reports %d targets, want none", id, len(got))
+		}
+		if _, err := TargetFor(id, "xcode-coding-assistant"); err == nil || !strings.Contains(err.Error(), DiagTargetUnknown) {
+			t.Fatalf("%s xcode-coding-assistant must fail with %s, got %v", id, DiagTargetUnknown, err)
+		}
+	}
+}
+
 func TestFormDefaults(t *testing.T) {
 	for id, want := range map[string]string{ClaudeCode: FormMonolithic, CodexCLI: FormMonolithic, OpenCode: FormMonolithic, Pi: FormMonolithic} {
 		form, err := mustAdapter(t, id).ResolveForm("")

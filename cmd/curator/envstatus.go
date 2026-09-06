@@ -19,7 +19,7 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		if home.Provisioned {
 			provisioned = "provisioned"
 		}
-		_, _ = fmt.Fprintf(stdout, "%s %s: %s, %s, lock %s\n", home.Profile, home.Environment, state, provisioned, shortHash(home.LockHash))
+		_, _ = fmt.Fprintf(stdout, "%s %s: %s, %s, mode %s, form %s, lock %s\n", home.Profile, home.Environment, state, provisioned, home.Mode, home.Form, shortHash(home.LockHash))
 		for _, surface := range home.Surfaces {
 			_, _ = fmt.Fprintf(stdout, "  surface %s: %s\n", surface.Key, surface.State)
 		}
@@ -38,6 +38,9 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		if len(home.SeedLinks) > 0 {
 			_, _ = fmt.Fprintf(stdout, "  seed-links: %s\n", joinComma(home.SeedLinks))
 		}
+		if len(home.SeededProjects) > 0 {
+			_, _ = fmt.Fprintf(stdout, "  seeded-projects: %s\n", joinComma(home.SeededProjects))
+		}
 		if home.Backups > 0 {
 			_, _ = fmt.Fprintf(stdout, "  backups: %d generations, oldest %s, newest %s\n", home.Backups, home.BackupsOldest, home.BackupsNewest)
 		}
@@ -54,7 +57,17 @@ func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
 		_, _ = fmt.Fprintf(stdout, "tool %s: recorded %s detected %s\n", adapter.ID, adapter.Recorded, adapter.Detected)
 	}
 	for _, target := range status.Targets {
-		_, _ = fmt.Fprintf(stdout, "target %s: participating=%v (%s); %s\n", target.ID, target.Participating, target.Detail, target.Ungoverned)
+		_, _ = fmt.Fprintf(stdout, "target %s (%s): participating=%v (%s); %s\n", target.ID, target.Adapter, target.Participating, target.Detail, target.Ungoverned)
+	}
+	for _, profile := range status.Profiles {
+		_, _ = fmt.Fprintf(stdout, "profile %s: lock %s, precedence winner=%s placement=%s\n",
+			profile.Profile, shortHash(profile.LockHash), profile.Precedence.Winner, profile.Precedence.Placement)
+		for _, member := range profile.Members {
+			_, _ = fmt.Fprintf(stdout, "  member %s %s weight %d\n", member.Kind, member.Name, member.Weight)
+		}
+	}
+	for _, id := range status.UnregisteredEnvironments {
+		_, _ = fmt.Fprintf(stdout, "unregistered environment in machine configuration: %s\n", id)
 	}
 	for _, orphan := range status.Orphans {
 		_, _ = fmt.Fprintf(stdout, "orphan: %s\n", orphan)

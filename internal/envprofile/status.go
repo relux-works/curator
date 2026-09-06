@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/relux-works/curator/internal/contextmaterialize"
 	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 )
@@ -76,21 +77,46 @@ type AdapterState struct {
 // TargetState carries one secondary-target row (§7.6, §12).
 type TargetState struct {
 	ID            string
+	Adapter       string
 	Participating bool
 	Consented     bool
 	Detail        string
 	Ungoverned    string
 }
 
+// MemberState is one lock context member with its weight (§12).
+type MemberState struct {
+	Kind   string
+	Name   string
+	Weight int64
+}
+
+// PrecedenceState carries the precedence primitives per activation (§12).
+type PrecedenceState struct {
+	Winner    string
+	Placement string
+}
+
+// ProfileState carries the lock's context members with weights and the
+// precedence primitives per activation (§12).
+type ProfileState struct {
+	Profile    string
+	LockHash   string
+	Members    []MemberState
+	Precedence PrecedenceState
+}
+
 // Status is the whole matrix.
 type Status struct {
-	Homes      []HomeState
-	Scopes     []ScopeHome
-	Adapters   []AdapterState
-	Targets    []TargetState
-	Orphans    []string
-	Notes      []string
-	NonCurrent bool
+	Homes                    []HomeState
+	Scopes                   []ScopeHome
+	Adapters                 []AdapterState
+	Targets                  []TargetState
+	Profiles                 []ProfileState
+	UnregisteredEnvironments []string
+	Orphans                  []string
+	Notes                    []string
+	NonCurrent               bool
 }
 
 // StatusRequest scopes one status computation. The seams mirror
@@ -142,6 +168,8 @@ func StatusOf(req StatusRequest) (*Status, error) {
 	status.Scopes = scopeHomes(req, installed)
 	status.Adapters = adapterStates(req)
 	status.Targets = targetStates(req)
+	status.Profiles = profileStates(req, infos)
+	status.UnregisteredEnvironments = unregisteredEnvironments(req.Machine)
 	status.Orphans = orphanHomes(req.Home, installed)
 	if len(status.Orphans) > 0 {
 		status.NonCurrent = true
@@ -285,6 +313,78 @@ func ageString(duration time.Duration) string {
 	return fmt.Sprintf("%dd", int(duration.Hours()/24))
 }
 
+// profileStates reports the lock's context members with weights and the
+// precedence primitives per activation (§12): one row per installed
+// profile. Precedence is the effective policy; revision 1 carries the
+// default pair until manager-config schema 2 persists the knobs.
+func profileStates(req StatusRequest, infos []Info) []ProfileState {
+	var out []ProfileState
+	for _, info := range infos {
+		_, lock, hash, err := loadResolveInputs(req.Home, info.Name)
+		if err != nil || lock == nil {
+			continue
+		}
+		members := make([]MemberState, 0, len(lock.Members))
+		for _, member := range lock.Members {
+			members = append(members, MemberState{Kind: member.Kind, Name: member.Name, Weight: member.Weight})
+		}
+		sort.Slice(members, func(i, j int) bool {
+			if members[i].Kind != members[j].Kind {
+				return members[i].Kind < members[j].Kind
+			}
+			return members[i].Name < members[j].Name
+		})
+		out = append(out, ProfileState{
+			Profile:  info.Name,
+			LockHash: hash,
+			Members:  members,
+			Precedence: PrecedenceState{
+				Winner:    contextmaterialize.DefaultPrecedence.Winner,
+				Placement: contextmaterialize.DefaultPrecedence.Placement,
+			},
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Profile < out[j].Profile })
+	return out
+}
+
+// unregisteredEnvironments reports env-ids named in machine configuration
+// that the closed registry does not declare (§12).
+func unregisteredEnvironments(machine envregistry.MachineConfig) []string {
+	seen := map[string]bool{}
+	var ids []string
+	consider := func(id string) {
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	for id := range machine.Forms {
+		consider(id)
+	}
+	for _, perProfile := range machine.Isolation {
+		for id := range perProfile {
+			consider(id)
+		}
+	}
+	for id := range machine.InPlaceMode {
+		consider(id)
+	}
+	registered := map[string]bool{}
+	for _, adapter := range envregistry.Registry {
+		registered[adapter.ID] = true
+	}
+	var out []string
+	for _, id := range ids {
+		if !registered[id] {
+			out = append(out, id)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // scopeHomes reports both homes of the current profile per scope.
 func scopeHomes(req StatusRequest, installed map[string]bool) []ScopeHome {
 	var out []ScopeHome
@@ -373,7 +473,7 @@ func targetStates(req StatusRequest) []TargetState {
 			detail = "off"
 		}
 		out = append(out, TargetState{
-			ID: target.ID, Participating: participating,
+			ID: target.ID, Adapter: target.Adapter, Participating: participating,
 			Consented: req.Machine.TargetConsented[target.ID] || req.Machine.TargetParticipation[target.ID] == "enabled",
 			Detail:    detail, Ungoverned: target.Ungoverned,
 		})

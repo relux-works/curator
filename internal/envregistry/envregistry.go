@@ -109,11 +109,18 @@ type Shadow struct {
 	Surface string
 }
 
-// Target is one secondary fixed-home target (environments §7.6).
+// Target is one secondary fixed-home target (environments §7.6). The
+// table holds one row per adapter: revision 1 declares two rows sharing
+// the xcode-coding-assistant identifier, one for claude_code (home as
+// CLAUDE_CONFIG_DIR) and one for codex_cli (the same directory as
+// CODEX_HOME).
 type Target struct {
-	ID    string
-	Probe string
-	Home  string
+	ID string
+	// Adapter is the environment the target applies to; a target never
+	// applies to any other adapter.
+	Adapter string
+	Probe   string
+	Home    string
 	// Surfaces honored by the embedded host.
 	Surfaces []string
 	// Ungoverned names what the embedded host owns that the manager never
@@ -274,8 +281,17 @@ var Registry = []Adapter{
 var Targets = []Target{
 	{
 		ID:         "xcode-coding-assistant",
+		Adapter:    ClaudeCode,
 		Probe:      "Xcode-internal agentic home directory (IDEChatOverrideAgenticHomeDirectory when set, otherwise Xcode's default)",
-		Home:       "Xcode-internal agentic home directory",
+		Home:       "that directory as CLAUDE_CONFIG_DIR",
+		Surfaces:   []string{"root-context", "skills"},
+		Ungoverned: "the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability",
+	},
+	{
+		ID:         "xcode-coding-assistant",
+		Adapter:    CodexCLI,
+		Probe:      "the same directory",
+		Home:       "that directory as CODEX_HOME",
 		Surfaces:   []string{"root-context", "skills"},
 		Ungoverned: "the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability",
 	},
@@ -294,7 +310,8 @@ func ByID(id string) (Adapter, error) {
 }
 
 // TargetByID resolves a declared secondary target or reports
-// environment_target_unknown (§7.6, §7.7).
+// environment_target_unknown (§7.6, §7.7). The identifier alone is
+// global; use TargetFor to resolve it for one adapter.
 func TargetByID(id string) (Target, error) {
 	for _, target := range Targets {
 		if target.ID == id {
@@ -302,6 +319,29 @@ func TargetByID(id string) (Target, error) {
 		}
 	}
 	return Target{}, fmt.Errorf("%s: undeclared target %q", DiagTargetUnknown, id)
+}
+
+// TargetsFor reports the declared secondary targets of one adapter.
+// Adapters without a §7.6 row (opencode, pi) report none.
+func TargetsFor(adapterID string) []Target {
+	var out []Target
+	for _, target := range Targets {
+		if target.Adapter == adapterID {
+			out = append(out, target)
+		}
+	}
+	return out
+}
+
+// TargetFor resolves a declared secondary target for one adapter or
+// reports environment_target_unknown (§7.6, §7.7).
+func TargetFor(adapterID, id string) (Target, error) {
+	for _, target := range Targets {
+		if target.Adapter == adapterID && target.ID == id {
+			return target, nil
+		}
+	}
+	return Target{}, fmt.Errorf("%s: undeclared target %q for %s", DiagTargetUnknown, id, adapterID)
 }
 
 // PassthroughFor returns the adapter's passthrough entries for the runtime

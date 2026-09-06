@@ -124,6 +124,11 @@ func TestEnvStatusMatrix(t *testing.T) {
 	if !strings.Contains(stdout, "tool codex_cli: recorded") {
 		t.Fatalf("tool rows:\n%s", stdout)
 	}
+	for _, want := range []string{"mode managed-home", "form monolithic", "seeded-projects:", "profile acme:", "member context acme weight"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("status rows miss %q:\n%s", want, stdout)
+		}
+	}
 	code, jsonOut, _ := runProfile(t, source, "env", "status", "--json")
 	if code != exitOK {
 		t.Fatalf("status --json = %d", code)
