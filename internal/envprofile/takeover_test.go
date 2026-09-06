@@ -204,7 +204,7 @@ func TestTakeoverWarnsDotfileHeuristic(t *testing.T) {
 		t.Fatal(err)
 	}
 	operator := t.TempDir()
-	t.Setenv("HOME", operator)
+	pinOperatorHome(t, operator)
 	if err := os.MkdirAll(filepath.Join(operator, ".local", "share", "chezmoi"), 0o755); err != nil {
 		t.Fatal(err)
 	}

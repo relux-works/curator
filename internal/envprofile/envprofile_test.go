@@ -51,6 +51,16 @@ func pinHomes(t *testing.T) map[string]string {
 	return homes
 }
 
+// pinOperatorHome points the operator home at dir on every platform.
+// os.UserHomeDir reads $HOME on unix and %USERPROFILE% on Windows, so a
+// fixture that sets only one of them leaves the production lookup pointed
+// at the real operator home on the other platform.
+func pinOperatorHome(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
+}
+
 // TestInstallPathAndList drives the production Install for a path operand:
 // the profile resolves, audits, locks, stores, and lists with its hash.
 func TestInstallPathAndList(t *testing.T) {
