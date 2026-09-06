@@ -811,23 +811,25 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 	for seed := range seeds.files {
 		want[seed] = true
 	}
-	if backup := !provisioned; backup {
-		// Versioned generations preserve replaced file bytes (§8.3).
-		// Symlinks are skipped: they are manager-derived and re-derive
-		// from the lock and the immutable store, while openBackup
-		// follows links and fails on directory links (skills trees).
-		replacing := map[string]bool{}
-		for path := range want {
-			info, err := os.Lstat(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
-			if err != nil || info.Mode()&os.ModeSymlink != 0 {
-				continue
-			}
-			replacing[path] = true
+	// Versioned generations preserve replaced file bytes (§8.3, §9.5):
+	// every file the operation replaces is copied into the next backup
+	// generation before the first write — on provisioning as on repair,
+	// whether or not any import was requested. Symlinks are skipped: they
+	// are manager-derived and re-derive from the lock and the immutable
+	// store, while openBackup follows links and fails on directory links
+	// (skills trees). A next generation that already exists fails with
+	// environment_backup_exists.
+	replacing := map[string]bool{}
+	for path := range want {
+		info, err := os.Lstat(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
+		if err != nil || info.Mode()&os.ModeSymlink != 0 {
+			continue
 		}
-		if len(replacing) > 0 {
-			if _, err := openBackup(plan.homeDir, replacing); err != nil {
-				return err
-			}
+		replacing[path] = true
+	}
+	if len(replacing) > 0 {
+		if _, err := openBackup(plan.homeDir, replacing); err != nil {
+			return err
 		}
 	}
 	// Remove recorded files the plan no longer wants.
@@ -1629,8 +1631,18 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 		for path := range plan.links {
 			want[path] = true
 		}
+		// Section 9.5 onboarding inventory: unmanaged files stop the
+		// repair unless the carrying operation passes --takeover, which
+		// backs every replaced file up before the first write (applyPlan
+		// below, subject to environment_backup_exists) and reports the
+		// replace notice.
 		if err := inventoryUnmanaged(plan.homeDir, want, contextstore.Root(req.Home)); err != nil {
-			return nil, err
+			if !req.Policy.Takeover {
+				return nil, err
+			}
+			plan.warnings = append(plan.warnings, "taking over unmanaged files for "+adapter.ID+
+				": native global context files are being replaced by managed ones; backups land in "+
+				filepath.Join(plan.homeDir, ".agent-environment-backup")+"/")
 		}
 		if hint := foreignManagerHint(); hint != "" {
 			plan.warnings = append(plan.warnings, fmt.Sprintf("%s: %s appears to manage this machine and will overwrite managed surfaces on its next apply", DiagForeignSuspect, hint))

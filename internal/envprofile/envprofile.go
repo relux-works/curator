@@ -403,6 +403,13 @@ type Policy struct {
 	// (higher-weight, winner-last).
 	PrecedenceWinner    string
 	PrecedencePlacement string
+	// Takeover is the explicit section 9.5 takeover flag carried by a
+	// mutating operation (profile install, use, update, sync, env resolve
+	// --repair): with it the operation backs up and takes over the
+	// unmanaged files it would write, with the replace notice; without it
+	// the operation fails rather than overwrite. It is operation-scoped
+	// and never set from machine configuration.
+	Takeover bool
 }
 
 // OverlaySpec is one machine overlay declaration for a profile

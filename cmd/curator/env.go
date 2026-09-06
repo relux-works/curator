@@ -35,10 +35,17 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 	flags := c.newFlagSet("env resolve")
 	profile := flags.String("profile", "", "profile name (default: the current profile)")
 	repair := flags.Bool("repair", false, "provision or repair the managed home under the mutation lock")
+	takeover := flags.Bool("takeover", false, "take over the unmanaged files the repair would write (only with --repair)")
 	format := flags.String("format", "json", "fragment format: json | env | shell")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) != 1 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair] [--format json|env|shell]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair] [--takeover] [--format json|env|shell]")
+		return exitUsage
+	}
+	// --takeover applies only with --repair (cli/curator.md): without a
+	// repair there is no write to take over.
+	if *takeover && !*repair {
+		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve --takeover applies only with --repair")
 		return exitUsage
 	}
 	launchDir, err := os.Getwd()
@@ -46,6 +53,8 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
+	policy := envprofile.PolicyFromConfig(cfg)
+	policy.Takeover = *takeover
 	result, err := envprofile.Resolve(envprofile.ResolveRequest{
 		Home:      cfg.Home(),
 		Profile:   *profile,
@@ -54,6 +63,7 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 		Machine:   envregistry.DefaultMachineConfig(),
 		Repair:    *repair,
 		Format:    *format,
+		Policy:    policy,
 	})
 	if result != nil {
 		for _, warning := range result.Warnings {
@@ -85,6 +95,7 @@ func (c cli) cmdEnvStatus(cfg *config.Config, args []string) int {
 		Home:      cfg.Home(),
 		Machine:   envregistry.DefaultMachineConfig(),
 		LaunchDir: launchDir,
+		Policy:    envprofile.PolicyFromConfig(cfg),
 	})
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)

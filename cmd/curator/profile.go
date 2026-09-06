@@ -48,25 +48,24 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 	revision := flags.String("revision", "", "exact commit")
 	as := flags.String("as", "", "profile name (default: the root package name)")
 	use := flags.Bool("use", false, "activate the installed profile")
+	takeover := flags.Bool("takeover", false, "take over the unmanaged files the install would write")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) != 1 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile install <git-url|path> [--directory <dir>] [--range <range>|--tag <tag>|--revision <commit>] [--as <name>] [--use]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile install <git-url|path> [--directory <dir>] [--range <range>|--tag <tag>|--revision <commit>] [--as <name>] [--use] [--takeover]")
 		return exitUsage
 	}
+	policy := envprofile.PolicyFromConfig(cfg)
+	policy.Takeover = *takeover
 	info, activated, updated, err := envprofile.Install(cfg.Home(), envprofile.InstallOptions{
 		Operand: positional[0], Directory: *directory,
 		Range: *rng, Tag: *tag, Revision: *revision, As: *as, Use: *use,
-		Policy: envprofile.PolicyFromConfig(cfg),
+		Policy: policy,
 	})
 	for _, warning := range info.Warnings {
 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
 	}
 	for _, result := range info.Activation {
-		if result.OK {
-			_, _ = fmt.Fprintf(c.stdout, "%s: switched (%s)\n", result.Adapter, result.Home)
-		} else {
-			_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", result.Adapter, result.Detail)
-		}
+		printEntryResult(c, result)
 	}
 	if err != nil {
 		// An install activation that could not materialize the whole
@@ -141,16 +140,17 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 	env := flags.String("env", "", "narrow the switch to one environment")
 	target := flags.String("target", "", "narrow the switch to one target")
 	clearScope := flags.Bool("clear", false, "drop the scoped current profile")
+	takeover := flags.Bool("takeover", false, "take over the unmanaged files the switch would write")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] | profile use --clear --env <env-id>|--target <target-id>")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
 		return exitUsage
 	}
 	name := ""
 	if len(positional) == 1 {
 		name = positional[0]
 	} else if len(positional) > 1 || !*clearScope || (*env == "" && *target == "") {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] | profile use --clear --env <env-id>|--target <target-id>")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
 		return exitUsage
 	}
 	// A locked require_current_profile makes machine-scope use of any other
@@ -162,13 +162,11 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 			return exitFail
 		}
 	}
-	results, err := envprofile.UseWithPolicy(cfg.Home(), name, *env, *target, *clearScope, envprofile.PolicyFromConfig(cfg))
+	policy := envprofile.PolicyFromConfig(cfg)
+	policy.Takeover = *takeover
+	results, err := envprofile.UseWithPolicy(cfg.Home(), name, *env, *target, *clearScope, policy)
 	for _, result := range results {
-		if result.OK {
-			_, _ = fmt.Fprintf(c.stdout, "%s: switched (%s)\n", result.Adapter, result.Home)
-		} else {
-			_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", result.Adapter, result.Detail)
-		}
+		printEntryResult(c, result)
 	}
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
@@ -177,15 +175,34 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 	return exitOK
 }
 
+// printEntryResult reports one per-adapter switch outcome with its section
+// 9.5 takeover notice and onboarding warnings.
+func printEntryResult(c cli, result envprofile.EntryResult) {
+	if result.OK {
+		_, _ = fmt.Fprintf(c.stdout, "%s: switched (%s)\n", result.Adapter, result.Home)
+	} else {
+		_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", result.Adapter, result.Detail)
+		return
+	}
+	if result.Notice != "" {
+		_, _ = fmt.Fprintln(c.stderr, "notice:", result.Notice)
+	}
+	for _, warning := range result.Warnings {
+		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
+	}
+}
+
 func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 	flags := c.newFlagSet("profile update")
 	all := flags.Bool("all", false, "update every installed profile")
+	takeover := flags.Bool("takeover", false, "take over the unmanaged files the update would write")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || (*all && len(positional) != 0) || (!*all && len(positional) > 1) {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all] [--takeover]")
 		return exitUsage
 	}
 	policy := envprofile.PolicyFromConfig(cfg)
+	policy.Takeover = *takeover
 	var names []string
 	if *all {
 		profiles, err := envprofile.ListWithPolicy(cfg.Home(), policy)
@@ -253,16 +270,28 @@ func (c cli) cmdProfileRemove(cfg *config.Config, args []string) int {
 }
 
 func (c cli) cmdProfileSync(cfg *config.Config, args []string) int {
-	if len(args) != 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile sync takes no arguments")
+	flags := c.newFlagSet("profile sync")
+	takeover := flags.Bool("takeover", false, "take over the unmanaged files the sync would write")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil || len(positional) != 0 {
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile sync [--takeover]")
 		return exitUsage
 	}
-	results, err := envprofile.SyncWithPolicy(cfg.Home(), envprofile.PolicyFromConfig(cfg))
+	policy := envprofile.PolicyFromConfig(cfg)
+	policy.Takeover = *takeover
+	results, err := envprofile.SyncWithPolicy(cfg.Home(), policy)
 	for _, result := range results {
 		if result.OK {
 			_, _ = fmt.Fprintf(c.stdout, "%s: synced (%s)\n", result.Adapter, result.Home)
 		} else {
 			_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", result.Adapter, result.Detail)
+			continue
+		}
+		if result.Notice != "" {
+			_, _ = fmt.Fprintln(c.stderr, "notice:", result.Notice)
+		}
+		for _, warning := range result.Warnings {
+			_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
 		}
 	}
 	if err != nil {

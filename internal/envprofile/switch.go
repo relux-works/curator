@@ -117,12 +117,16 @@ func NativeHome(adapter Adapter) (string, error) {
 	return filepath.Join(home, adapter.DefaultDir), nil
 }
 
-// EntryResult is the per-adapter outcome of a switch.
+// EntryResult is the per-adapter outcome of a switch. Notice carries the
+// section 9.5 takeover notice for the entry; Warnings carries the
+// non-blocking onboarding findings (the dotfile-manager heuristic).
 type EntryResult struct {
-	Adapter string
-	Home    string
-	OK      bool
-	Detail  string
+	Adapter  string
+	Home     string
+	OK       bool
+	Detail   string
+	Notice   string
+	Warnings []string
 }
 
 // Use switches the machine scope (environment and target both empty) or one
@@ -346,7 +350,7 @@ func materializeScope(home, profile, environment string, policy Policy) ([]Entry
 	}
 	var results []EntryResult
 	for _, adapter := range adapters {
-		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, adapter))
+		results = append(results, materializeOne(home, source, profile, lock, hash, precedence, order, packages, adapter, policy.Takeover))
 	}
 	return results, nil
 }
@@ -382,7 +386,13 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 // marker. The claude_code root-context surface is always a copied regular
 // file (environments §8.1); every other surface links into the store with
 // copy fallback.
-func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, adapter Adapter) EntryResult {
+// takeover carries the explicit section 9.5 takeover flag: with it the
+// entry backs up and takes over the unmanaged files the switch would
+// write, with the replace notice; without it the entry fails with
+// environment_surface_unmanaged_conflict (or
+// environment_foreign_manager_detected for a foreign-manager symlink)
+// rather than overwrite.
+func materializeOne(home string, source Source, profile string, lock *contextlock.Lock, hash string, precedence contextmaterialize.Precedence, order []contextlock.Member, packages map[string]contextmaterialize.Package, adapter Adapter, takeover bool) EntryResult {
 	native, err := NativeHome(adapter)
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, OK: false, Detail: err.Error()}
@@ -411,17 +421,52 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if written {
 		want[adapter.Target] = true
 	}
-	// A write that would touch a file no marker records fails the entry and
-	// never overwrites (manager profile §12.2): without the takeover flag
-	// the ledger discipline fails the operation rather than overwrite.
-	// Takeover and onboarding import are a later stage.
+	// Section 9.5 onboarding inventory for this entry: a managed-surface
+	// path that is already a symlink pointing outside the manager's store
+	// is evidence of another manager and stops the entry with
+	// environment_foreign_manager_detected and the explicit abort-or-take-
+	// over choice, never a silent absorption. Any other unmanaged file the
+	// entry would write fails with environment_surface_unmanaged_conflict
+	// — unless the carrying operation passes --takeover, which backs the
+	// file up before the first write (below) and reports the replace
+	// notice. The flag covers only the files this entry writes.
+	result := EntryResult{Adapter: adapter.ID, Home: native}
+	var taken []string
 	for path := range want {
-		if !recorded[path] {
-			if _, err := os.Lstat(filepath.Join(native, path)); err == nil {
-				return EntryResult{Adapter: adapter.ID, Home: native, OK: false,
-					Detail: DiagUnmanagedConflict + ": " + path + " exists and no marker records it"}
+		if recorded[path] {
+			continue
+		}
+		full := filepath.Join(native, path)
+		info, err := os.Lstat(full)
+		if err != nil {
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			if linkTarget, readErr := os.Readlink(full); readErr == nil && !sameStoreTree(linkTarget, contextstore.Root(home)) {
+				if !takeover {
+					result.OK = false
+					result.Detail = DiagForeignManager + ": " + path + " is a symlink outside the manager store; abort, or take over with backup"
+					return result
+				}
+				taken = append(taken, path+" (foreign-manager symlink)")
+				continue
 			}
 		}
+		if !takeover {
+			result.OK = false
+			result.Detail = DiagUnmanagedConflict + ": " + path + " exists and no marker records it"
+			return result
+		}
+		taken = append(taken, path)
+	}
+	if len(taken) > 0 {
+		sort.Strings(taken)
+		result.Notice = "taking over unmanaged " + strings.Join(taken, ", ") + " for " + adapter.ID +
+			": native global context files are being replaced by managed ones; backups land in " +
+			filepath.Join(native, ".agent-environment-backup") + "/"
+	}
+	if hint := foreignManagerHint(); hint != "" && len(taken) > 0 {
+		result.Warnings = append(result.Warnings, DiagForeignSuspect+": "+hint+" appears to manage this machine and will overwrite managed surfaces on its next apply")
 	}
 	generation := 0
 	if len(want) > 0 {
@@ -503,7 +548,12 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
 	_ = generation
-	return EntryResult{Adapter: adapter.ID, Home: native, OK: true}
+	// Every file the entry replaced was copied into the next backup
+	// generation before the first write above (openBackup fails with
+	// environment_backup_exists when that generation already exists), so
+	// a takeover that reaches this line always has its backup.
+	result.OK = true
+	return result
 }
 
 // openBackup copies every file the operation will replace into the next
