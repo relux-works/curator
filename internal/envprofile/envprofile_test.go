@@ -329,9 +329,13 @@ func TestRemovePurgeCleansHomes(t *testing.T) {
 	}
 }
 
-// TestUpdatePathMovesLock checks a path profile re-resolves against its
-// directory: edited modules move the lock.
-func TestUpdatePathMovesLock(t *testing.T) {
+// TestUpdatePathLeavesLockInPlace checks a path profile resolves its update
+// from the immutable install snapshot, never from the source directory
+// (environments §1): edited modules move nothing until the operator
+// reinstalls. (This row previously asserted the re-read that C3-B2
+// removed; TestPathSnapshotImmutableAcrossUpdateSyncUse extends it to sync,
+// use, reinstall, and the imported-profile update-all shape.)
+func TestUpdatePathLeavesLockInPlace(t *testing.T) {
 	home := t.TempDir()
 	pinHomes(t)
 	source := t.TempDir()
@@ -347,8 +351,8 @@ func TestUpdatePathMovesLock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !moved || after.LockHash == before.LockHash {
-		t.Fatalf("update must move the lock: %q -> %q", before.LockHash, after.LockHash)
+	if moved || after.LockHash != before.LockHash {
+		t.Fatalf("update must leave the lock in place: %q -> %q", before.LockHash, after.LockHash)
 	}
 }
 

@@ -468,9 +468,10 @@ func (p Policy) Precedence() contextmaterialize.Precedence {
 // key locked to a profile name, a machine-scope switch to any other
 // profile is a configuration error. A scoped switch, an unlocked knob,
 // and the required profile itself carry no refusal. Every path that
-// reaches the machine-scope switch — profile use, profile install --use,
-// first-install auto-activation, and import --use — funnels through
-// useLocked, so one gate covers them all.
+// reaches the machine-scope switch — profile use (clear or not), profile
+// install --use, first-install auto-activation, import --use, and resync —
+// funnels through the single gate in useLocked, so one gate covers them
+// all.
 func (p Policy) CheckMachineUse(name string) error {
 	if p.RequireCurrent == nil || *p.RequireCurrent == name {
 		return nil
@@ -706,8 +707,11 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 // from the declared requirement, fetching new candidates. A blocking
 // finding on a member new to the lock leaves the old lock in place with
 // profile_update_blocked. A root pinned by tag or revision is reported as
-// pinned and does not move. A path root re-resolves against its directory.
-// The machine gates come from the process configuration (see
+// pinned and does not move. A path root resolves from the immutable
+// snapshot the store already holds under the old lock's state pin and never
+// reads the source directory again (environments §1); overlays still
+// re-resolve below, so a path root with git overlays is a legitimate
+// update. The machine gates come from the process configuration (see
 // loadMachinePolicy); callers operating on any other manager home must use
 // UpdateWithPolicy.
 func Update(home, name string) (Info, bool, error) {
@@ -764,17 +768,30 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 			return Info{}, false, err
 		}
 	case KindPath:
-		manifest, err := contextpkg.LoadManifest(source.Path)
-		if err != nil {
-			return Info{}, false, pathManifestDiag(source.Path, err)
+		// Environments §1: installation copies the directory tree into
+		// the profile store as an immutable snapshot and never reads
+		// the source directory again. Update resolves the root from
+		// the snapshot the store already holds under the old lock's
+		// state_sha256 pin — never from source.Path, which may have
+		// been edited or deleted (the §9.6 import deletes its staging
+		// directory, so every imported profile's source.Path names no
+		// existing entry). Overlays re-resolve below the switch, so a
+		// path root with git overlays still moves on update.
+		rootMember, ok := oldLock.RootMember()
+		if !ok || rootMember.StateHash == "" {
+			return Info{}, false, fmt.Errorf("%s: profile %q lock carries no state pin for its path root", DiagSourceInvalid, name)
 		}
-		state, err := stateForPath(home, manifest.Name, source.Path)
+		entry := contextstore.EntryDir(home, contextlock.KindContext, oldLock.Root, rootMember.StateHash)
+		manifest, err := contextpkg.LoadManifest(entry)
 		if err != nil {
-			return Info{}, false, err
+			return Info{}, false, fmt.Errorf("%s: profile %q path snapshot cannot be read: %v", DiagSourceInvalid, name, err)
+		}
+		if manifest.Name != oldLock.Root {
+			return Info{}, false, fmt.Errorf("%s: profile %q snapshot names %q, want lock root %q", DiagSourceInvalid, name, manifest.Name, oldLock.Root)
 		}
 		input = contextresolve.Input{
-			Root:      contextresolve.Requirement{Kind: contextlock.KindContext, Name: manifest.Name},
-			RootState: state,
+			Root:      contextresolve.Requirement{Kind: contextlock.KindContext, Name: oldLock.Root},
+			RootState: &contextresolve.StatePackage{StateHash: rootMember.StateHash, Manifest: packageOf(manifest)},
 		}
 	default:
 		return Info{}, false, fmt.Errorf("%s: profile %q is the builtin local profile and does not move", DiagUpdateBlocked, name)

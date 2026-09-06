@@ -204,6 +204,111 @@ func TestUnreadablePathIsUnreadable(t *testing.T) {
 	}
 }
 
+// TestPathSnapshotImmutableAcrossUpdateSyncUse drives Install, edits the
+// source directory afterwards, and asserts the state pin does not move
+// across Update, Sync and Use (environments §1: installation copies the
+// tree as an immutable snapshot and never reads the source directory
+// again until the operator reinstalls). Production entry points: Install,
+// UpdateWithPolicy, SyncWithPolicy, UseWithPolicy — the same calls the CLI
+// rows reach. A mutant that re-reads source.Path in updateLocked moves the
+// pin on Update and must fail this test.
+func TestPathSnapshotImmutableAcrossUpdateSyncUse(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	source := filepath.Join(t.TempDir(), "source")
+	writeManifestPackage(t, source,
+		`{"schema_version": 1, "name": "pk", "version": "1.0.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "original\n"})
+	info, _, _, err := Install(home, InstallOptions{Operand: source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, ok := lockMember(info.Lock, "pk")
+	if !ok || before.StateHash == "" {
+		t.Fatalf("lock members %+v carry no state pin", info.Lock.Members)
+	}
+	if err := os.WriteFile(filepath.Join(source, "context", "a.md"), []byte("EDITED AFTER INSTALL\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	updated, moved, err := UpdateWithPolicy(home, "pk", Policy{})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if moved {
+		t.Fatal("update of a path root must not move the lock: the snapshot is immutable")
+	}
+	afterUpdate, ok := lockMember(updated.Lock, "pk")
+	if !ok || afterUpdate.StateHash != before.StateHash {
+		t.Fatalf("update moved the pin %q -> %q", before.StateHash, afterUpdate.StateHash)
+	}
+	if _, err := SyncWithPolicy(home, Policy{}); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if _, err := UseWithPolicy(home, "pk", "", "", false, Policy{}); err != nil {
+		t.Fatalf("use: %v", err)
+	}
+	lock, _, err := readLock(home, "pk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterAll, ok := lockMember(lock, "pk")
+	if !ok || afterAll.StateHash != before.StateHash {
+		t.Fatalf("pin moved across update/sync/use: %q -> %q", before.StateHash, afterAll.StateHash)
+	}
+	// The edit is real: a fresh install of the edited tree under another
+	// name pins a different hash, so this test is not vacuous.
+	second, _, _, err := Install(home, InstallOptions{Operand: source, As: "pk2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, ok := lockMember(second.Lock, "pk")
+	if !ok || fresh.StateHash == "" {
+		t.Fatalf("second lock members %+v carry no state pin", second.Lock.Members)
+	}
+	if fresh.StateHash == before.StateHash {
+		t.Fatal("reinstall of the edited tree pinned the same hash: the edit left no trace")
+	}
+}
+
+// TestPathUpdateAllSucceedsWithImportedProfile drives Import (which deletes
+// its §9.6 staging directory, so the recorded source.Path names no existing
+// entry) followed by the per-profile update loop the `profile update --all`
+// row runs: ListWithPolicy skipping default, UpdateWithPolicy each.
+// Production entry points: Import, ListWithPolicy, UpdateWithPolicy. Before
+// the §1 fix, the update re-read source.Path and failed the whole machine
+// with profile_source_path_missing.
+func TestPathUpdateAllSucceedsWithImportedProfile(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	seams := pinImportSeams(t)
+	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "native\n")
+	seedCurrentDefault(t, home)
+	info, _, _, err := Import(home, seams.options(Policy{}))
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	source, err := readSource(home, info.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(source.Path); !os.IsNotExist(err) {
+		t.Fatalf("import staging %q still exists: the test does not exercise the deleted-source shape", source.Path)
+	}
+	profiles, err := ListWithPolicy(home, Policy{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, profile := range profiles {
+		if profile.Name == DefaultProfile {
+			continue
+		}
+		if _, _, err := UpdateWithPolicy(home, profile.Name, Policy{}); err != nil {
+			t.Fatalf("update %s: %v", profile.Name, err)
+		}
+	}
+}
+
 // TestUnreadablePathRootLeadsUnreadable drives Install with a path root
 // that itself cannot be read: the canonical §1.1 condition reports
 // profile_source_path_unreadable leading, never profile_source_invalid.
