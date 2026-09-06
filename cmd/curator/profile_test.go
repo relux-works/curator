@@ -301,40 +301,139 @@ func TestProfileInstallFileOperandIsRefused(t *testing.T) {
 	}
 }
 
-// TestProfileListMigrationHonoursSystemPolicy checks F10 through run(): the
-// CLI threads its already-loaded machine configuration into the builtin
-// default migration, so a global skill outside the system-locked
-// allowed_sources refuses `profile list` instead of migrating. The refusal
-// precedes any clone, so no git fixture is needed.
+// TestProfileListMigrationHonoursSystemPolicy checks F10/F15 through run():
+// the CLI threads its already-loaded machine configuration into the builtin
+// default migration on every command that reaches it, so a global skill
+// outside the system-locked allowed_sources refuses `profile list`, `use`,
+// `sync` and `update` instead of migrating. The refusal precedes any clone,
+// so no git fixture is needed. A mutant that drops PolicyFromConfig from
+// the use or sync call sites (M-D) admits the migration there and must fail
+// the corresponding subtest.
 func TestProfileListMigrationHonoursSystemPolicy(t *testing.T) {
-	home := t.TempDir()
-	writeTestProfileConfig(t, filepath.Join(home, "config.json"),
-		`{"schema_version":1,"skills_root":"skills","projects":{}}`)
-	if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
+	for _, command := range [][]string{
+		{"profile", "list"},
+		{"profile", "use", "default"},
+		{"profile", "sync"},
+		{"profile", "update", "default"},
+	} {
+		command := command
+		t.Run(strings.Join(command[1:], "-"), func(t *testing.T) {
+			home := t.TempDir()
+			writeTestProfileConfig(t, filepath.Join(home, "config.json"),
+				`{"schema_version":1,"skills_root":"skills","projects":{}}`)
+			if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			skillfile := `{"schema_version": 1, "skills": [{"name": "hello", ` +
+				`"git": "https://example.com/skills/hello", "tag": "v1.0.0"}]}` + "\n"
+			if err := os.WriteFile(filepath.Join(home, "global", "Skillfile.json"), []byte(skillfile), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			system := filepath.Join(t.TempDir(), "system.json")
+			writeTestProfileConfig(t, system,
+				`{"schema_version":1,"locked":["allowed_sources"],"allowed_sources":["github.com/relux-works"]}`)
+			t.Setenv("CURATOR_SYSTEM_CONFIG", system)
+			base := t.TempDir()
+			t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(base, "claude"))
+			t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
+			t.Setenv("XDG_CONFIG_HOME", filepath.Join(base, "xdg"))
+			t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(base, "pi"))
+			var stdout, stderr strings.Builder
+			code := run(command, fileConfigSource(filepath.Join(home, "config.json")), &stdout, &stderr)
+			if code != exitFail {
+				t.Fatalf("%v = %d, want %d\nstdout:\n%s\nstderr:\n%s", command, code, exitFail, stdout.String(), stderr.String())
+			}
+			if !strings.Contains(stderr.String(), "profile_source_invalid") ||
+				!strings.Contains(stderr.String(), "allowed sources") {
+				t.Fatalf("%v stderr:\n%s", command, stderr.String())
+			}
+		})
+	}
+}
+
+// TestProfileInstallUseActivatesThroughSwitch checks F13 through run():
+// installing a second profile with --use on a machine current on another
+// profile leaves the marker and the materialized bytes in agreement with
+// the recorded current. A pointer-only activation (the pre-fix shape) or a
+// mutant that drops materialization for one adapter leaves them on the
+// previous profile and must fail this test.
+func TestProfileInstallUseActivatesThroughSwitch(t *testing.T) {
+	source, _ := profileHome(t)
+	first, second := t.TempDir(), t.TempDir()
+	writeContextPackage(t, first, "alpha", "1.0.0", "alpha\n")
+	writeContextPackage(t, second, "beta", "1.0.0", "beta\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", first); code != exitOK {
+		t.Fatalf("install alpha stderr:\n%s", stderr)
+	}
+	code, stdout, stderr := runProfile(t, source, "profile", "install", second, "--use")
+	if code != exitOK {
+		t.Fatalf("install beta --use = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "installed and activated profile beta") {
+		t.Fatalf("stdout:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "claude_code: switched") {
+		t.Fatalf("install --use must report the switch, stdout:\n%s", stdout)
+	}
+	code, stdout, _ = runProfile(t, source, "profile", "list")
+	if code != exitOK || !strings.Contains(stdout, "beta") || !strings.Contains(stdout, "current") {
+		t.Fatalf("list stdout:\n%s", stdout)
+	}
+	claude := filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "CLAUDE.md")
+	payload, err := os.ReadFile(claude) // #nosec G304 -- test home
+	if err != nil {
 		t.Fatal(err)
 	}
-	skillfile := `{"schema_version": 1, "skills": [{"name": "hello", ` +
-		`"git": "https://example.com/skills/hello", "tag": "v1.0.0"}]}` + "\n"
-	if err := os.WriteFile(filepath.Join(home, "global", "Skillfile.json"), []byte(skillfile), 0o644); err != nil {
+	if !strings.Contains(string(payload), "## Context: beta 1.0.0") {
+		t.Fatalf("CLAUDE.md does not carry beta:\n%s", payload)
+	}
+	marker, err := envmarker.Read(os.Getenv("CLAUDE_CONFIG_DIR"))
+	if err != nil || marker == nil || marker.Profile.Name != "beta" {
+		t.Fatalf("marker %+v %v", marker, err)
+	}
+}
+
+// TestProfileInstallUsePartialLeavesCurrent checks F13 through run(): a
+// forced per-adapter failure during install --use leaves the previous
+// current and reports the partial result. A pointer-only activation moves
+// current and reports success, and must fail this test.
+func TestProfileInstallUsePartialLeavesCurrent(t *testing.T) {
+	source, _ := profileHome(t)
+	first, second := t.TempDir(), t.TempDir()
+	writeContextPackage(t, first, "alpha", "1.0.0", "alpha\n")
+	writeContextPackage(t, second, "beta", "1.0.0", "beta\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", first); code != exitOK {
+		t.Fatalf("install alpha stderr:\n%s", stderr)
+	}
+	claude := os.Getenv("CLAUDE_CONFIG_DIR")
+	if err := os.RemoveAll(claude); err != nil {
 		t.Fatal(err)
 	}
-	system := filepath.Join(t.TempDir(), "system.json")
-	writeTestProfileConfig(t, system,
-		`{"schema_version":1,"locked":["allowed_sources"],"allowed_sources":["github.com/relux-works"]}`)
-	t.Setenv("CURATOR_SYSTEM_CONFIG", system)
-	base := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(base, "claude"))
-	t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(base, "xdg"))
-	t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(base, "pi"))
-	var stdout, stderr strings.Builder
-	code := run([]string{"profile", "list"}, fileConfigSource(filepath.Join(home, "config.json")), &stdout, &stderr)
+	if err := os.WriteFile(claude, []byte("blocker"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr := runProfile(t, source, "profile", "install", second, "--use")
 	if code != exitFail {
-		t.Fatalf("list = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout.String(), stderr.String())
+		t.Fatalf("install beta --use = %d, want %d\nstderr:\n%s", code, exitFail, stderr)
 	}
-	if !strings.Contains(stderr.String(), "profile_source_invalid") ||
-		!strings.Contains(stderr.String(), "allowed sources") {
-		t.Fatalf("stderr:\n%s", stderr.String())
+	if !strings.Contains(stderr, "profile_use_partial") {
+		t.Fatalf("stderr:\n%s", stderr)
+	}
+	_, stdout, _ := runProfile(t, source, "profile", "list")
+	alphaCurrent, betaCurrent := false, false
+	for _, line := range strings.Split(stdout, "\n") {
+		if strings.HasPrefix(line, "alpha\t") && strings.Contains(line, "current") {
+			alphaCurrent = true
+		}
+		if strings.HasPrefix(line, "beta\t") && strings.Contains(line, "current") {
+			betaCurrent = true
+		}
+	}
+	if !alphaCurrent {
+		t.Fatalf("current must stay alpha, list stdout:\n%s", stdout)
+	}
+	if betaCurrent {
+		t.Fatalf("beta must not be current, list stdout:\n%s", stdout)
 	}
 }
 

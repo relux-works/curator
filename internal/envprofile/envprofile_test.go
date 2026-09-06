@@ -55,6 +55,7 @@ func pinHomes(t *testing.T) map[string]string {
 // the profile resolves, audits, locks, stores, and lists with its hash.
 func TestInstallPathAndList(t *testing.T) {
 	home := t.TempDir()
+	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "acme", "1.0.0", "hello\n")
 	info, activated, updated, err := Install(home, InstallOptions{Operand: source})
@@ -91,6 +92,7 @@ func TestInstallPathAndList(t *testing.T) {
 // audit must fail this test.
 func TestInstallRejectsSecretMember(t *testing.T) {
 	home := t.TempDir()
+	pinHomes(t)
 	source := t.TempDir()
 	writePackage(t, source, "evil", "1.0.0", "key AKIA1234567890ABCDEF here\n")
 	if _, _, _, err := Install(home, InstallOptions{Operand: source}); err == nil {
@@ -129,6 +131,7 @@ func TestReinstallSameSourceIsAnUpdate(t *testing.T) {
 // installed name fails with profile_name_taken.
 func TestNameTaken(t *testing.T) {
 	home := t.TempDir()
+	pinHomes(t)
 	first, second := t.TempDir(), t.TempDir()
 	writePackage(t, first, "acme", "1.0.0", "hello\n")
 	writePackage(t, second, "acme", "1.0.0", "hello\n")
@@ -345,6 +348,7 @@ func TestUpdatePathMovesLock(t *testing.T) {
 // commit under the canonical source identity. A file:// operand is rejected
 // (see TestFileOperandIsRefused) and must never reach this path.
 func TestInstallGitResolvesNetworkIdentity(t *testing.T) {
+	pinHomes(t)
 	repo := gitRepo(t, map[string]string{
 		"agent-context.json": `{"schema_version": 1, "name": "groot", "version": "1.0.0",` +
 			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",

@@ -61,12 +61,25 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 		Range: *rng, Tag: *tag, Revision: *revision, As: *as, Use: *use,
 		Policy: envprofile.PolicyFromConfig(cfg),
 	})
-	if err != nil {
-		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
-		return exitFail
-	}
 	for _, warning := range info.Warnings {
 		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
+	}
+	for _, result := range info.Activation {
+		if result.OK {
+			_, _ = fmt.Fprintf(c.stdout, "%s: switched (%s)\n", result.Adapter, result.Home)
+		} else {
+			_, _ = fmt.Fprintf(c.stderr, "%s: %s\n", result.Adapter, result.Detail)
+		}
+	}
+	if err != nil {
+		// An install activation that could not materialize the whole
+		// scope leaves the lock installed but the current unchanged;
+		// report the partial switch like profile use does.
+		if len(info.Activation) > 0 && info.Name != "" {
+			_, _ = fmt.Fprintf(c.stdout, "installed profile %s (lock %s)\n", info.Name, info.LockHash)
+		}
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
 	}
 	root, _ := info.Lock.RootMember()
 	switch {

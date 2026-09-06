@@ -117,15 +117,17 @@ func lockPath(home, name string) string { return filepath.Join(ProfileDir(home, 
 // Info is one installed or listed profile. Warnings carries the
 // non-blocking audit findings of the install or update that produced it:
 // context-system-module-present, mcp_command_unresolved, and unmatched
-// waivers.
+// waivers. Activation carries the per-adapter results of the §9.2 switch
+// an install activation performed, if any.
 type Info struct {
-	Name      string
-	Source    Source
-	Lock      *contextlock.Lock
-	LockHash  string
-	Current   bool
-	ScopedFor []string
-	Warnings  []string
+	Name       string
+	Source     Source
+	Lock       *contextlock.Lock
+	LockHash   string
+	Current    bool
+	ScopedFor  []string
+	Warnings   []string
+	Activation []EntryResult
 }
 
 // validProfileName reports whether name may be installed.
@@ -370,6 +372,13 @@ type InstallOptions struct {
 // every member's store entry. A git operand takes at most one requirement
 // flag (default range latest); a path operand takes none and no directory.
 //
+// Activation on install performs the §9.2 switch: when the machine has no
+// current profile (first install) or the operator passes Use, Install
+// attempts every entry, reports per-adapter results in Info.Activation,
+// records the new current only when the whole scope materialized, and
+// reports profile_use_partial when it did not (the lock is still written;
+// only the activation is partial).
+//
 // Install holds the manager-home mutation lock and publishes its records
 // through the operation journal (see lock.go).
 func Install(home string, options InstallOptions) (Info, bool, bool, error) {
@@ -490,15 +499,22 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if err != nil {
 		return Info{}, false, false, err
 	}
-	activated := false
-	if machine == "" || options.Use {
-		if err := op.publish(map[string][]byte{CurrentFile(home): []byte(name + "\n")}); err != nil {
-			return Info{}, false, false, err
-		}
-		activated = true
+	if machine != "" && !options.Use {
+		info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings}
+		return info, false, false, nil
 	}
-	info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: activated || machine == name, Warnings: warnings}
-	return info, activated, false, nil
+	// Activation performs the §9.2 switch under the same held operation:
+	// every entry is attempted, per-adapter results are collected, and the
+	// new current is recorded only when the whole scope materialized.
+	// useLocked publishes the current through the journal on success and
+	// leaves it unchanged with profile_use_partial on failure.
+	results, switchErr := useLocked(op, home, name, "", "", false, options.Policy)
+	machine, _ = Current(home)
+	info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings, Activation: results}
+	if switchErr != nil {
+		return info, false, false, switchErr
+	}
+	return info, true, false, nil
 }
 
 // Update re-resolves the root (and overlays, when the machine declares any)
@@ -808,10 +824,41 @@ func checkMCPCommand(entry string) (string, bool) {
 }
 
 // isPathOperand tells a path operand from a git URL syntactically, never by
-// probing the network: an existing local directory is a path.
+// probing the filesystem (environments §9.1): an operand beginning with /,
+// ./, or ../ (or a platform absolute-path spelling) is a path declaration;
+// every other operand resolves as git under section 1. A directory in the
+// operator's working directory must never shadow a git identity: path
+// sources bypass the core §6.1 network allowlist by design, so a
+// filesystem probe here would silently remove the F9 allowlist gate.
 func isPathOperand(operand string) bool {
-	info, err := os.Stat(operand)
-	return err == nil && info.IsDir()
+	if operand == "" {
+		return false
+	}
+	if strings.HasPrefix(operand, "/") {
+		return true
+	}
+	if strings.HasPrefix(operand, "./") || strings.HasPrefix(operand, `.\`) {
+		return true
+	}
+	if strings.HasPrefix(operand, "../") || strings.HasPrefix(operand, `..\`) {
+		return true
+	}
+	if operand == "." || operand == ".." {
+		return true
+	}
+	// Windows absolute spellings: drive-letter (C:/, C:\) and UNC (\\host).
+	if len(operand) >= 2 && isASCIIDriveLetter(operand[0]) && operand[1] == ':' {
+		return true
+	}
+	if strings.HasPrefix(operand, `\\`) {
+		return true
+	}
+	return false
+}
+
+// isASCIIDriveLetter reports a Windows drive letter.
+func isASCIIDriveLetter(c byte) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
 }
 
 // canonicalGit normalizes a git operand onto its core §6.1 canonical source
