@@ -346,6 +346,9 @@ internal/envprofile	TestImportRecordsImportedFromNative	linux,darwin,windows	-	-
 internal/envprofile	TestImportSkipsManagedRootContext	linux,darwin,windows	-	-	managed root-context files are skipped as native input, never detected nor losses
 internal/envprofile	TestImportDivergentSkillsAreLoss	linux,darwin,windows	-	-	divergent same-named skills keep the first declaration and list each drop as a loss
 internal/envprofile	TestImportLedgerFailureIsLoss	linux,darwin,windows	-	-	an unreadable adapter ledger contributes no skills and is itself the loss
+internal/envprofile	TestImportAbsentMarkerDetectsNative	linux,darwin,windows	-	-	a native home with no marker file is absence, so its root file is detected
+internal/envprofile	TestImportCorruptMarkerIsLoss	linux,darwin,windows	-	-	a marker that does not decode is a failed read: the marker file is the loss and the managed root is never native input
+internal/envprofile	TestImportUnreadableMarkerIsLoss	linux,darwin	windows	host-capability	an unreadable marker file is always a loss, never an absence
 cmd/curator	TestProfileImportRow	linux,darwin,windows	-	-	profile import installs and activates the imported profile
 cmd/curator	TestProfileImportLossyRow	linux,darwin,windows	-	-	profile import stops lossy and proceeds only under --allow-lossy
 cmd/curator	TestProfileImportNameTakenRow	linux,darwin,windows	-	-	profile import with a taken name stops with profile_import_name_taken
