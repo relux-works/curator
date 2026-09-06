@@ -350,13 +350,21 @@ func (a Adapter) resolveIsolation(goos, configured string, atOrAbovePinned bool)
 		return "", fmt.Errorf("%s: isolated is a no-op for opencode: auth lives outside the swapped config home", DiagIsolatedUnsupported)
 	}
 	if a.ID == ClaudeCode && goos == "darwin" {
-		if configured == "" || configured == IsolationIsolated {
-			if !atOrAbovePinned {
+		if atOrAbovePinned {
+			if configured == "" || configured == IsolationIsolated {
+				return IsolationIsolated, nil
+			}
+			if configured == IsolationShared {
+				return "", fmt.Errorf("%s: shared is unsupported for claude_code on macOS at or above %s: there is no Keychain item a manager could link", DiagSharedUnsupported, a.VerifiedRelease)
+			}
+		} else {
+			if configured == IsolationIsolated {
 				return "", fmt.Errorf("%s: isolated is unsupported for claude_code on macOS below %s", DiagIsolatedUnsupported, a.VerifiedRelease)
 			}
-			return IsolationIsolated, nil
+			if configured == "" || configured == IsolationShared {
+				return IsolationShared, nil
+			}
 		}
-		return "", fmt.Errorf("%s: shared is unsupported for claude_code on macOS at or above %s: there is no Keychain item a manager could link", DiagSharedUnsupported, a.VerifiedRelease)
 	}
 	if configured == "" {
 		return IsolationShared, nil

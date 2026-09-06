@@ -101,6 +101,12 @@ func TestIsolationMatrix(t *testing.T) {
 	if _, err := claude.resolveIsolation("darwin", IsolationIsolated, false); err == nil || !strings.Contains(err.Error(), DiagIsolatedUnsupported) {
 		t.Fatalf("claude macOS isolated below pinned must fail with %s, got %v", DiagIsolatedUnsupported, err)
 	}
+	if mode, err := claude.resolveIsolation("darwin", "", false); err != nil || mode != IsolationShared {
+		t.Fatalf("claude macOS default below pinned is shared, got %q (%v)", mode, err)
+	}
+	if mode, err := claude.resolveIsolation("darwin", IsolationShared, false); err != nil || mode != IsolationShared {
+		t.Fatalf("claude macOS shared below pinned is shared, got %q (%v)", mode, err)
+	}
 	for _, goos := range []string{"linux", "windows"} {
 		mode, err := claude.resolveIsolation(goos, "", true)
 		if err != nil || mode != IsolationShared {
