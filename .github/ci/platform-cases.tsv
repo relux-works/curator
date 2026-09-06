@@ -183,8 +183,7 @@ internal/interop	TestConformanceSnapshotAcquisition	linux,darwin,windows	linux,d
 internal/interop	TestConformanceContextVersions	linux,darwin,windows	linux,darwin,windows	root-content	the environments version/range vector drives pkgversion; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
 internal/interop	TestConformanceContextResolution	linux,darwin,windows	linux,darwin,windows	root-content	the environments resolution/lock vector drives contextresolve and contextlock; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
 internal/interop	TestConformanceEnvironmentsHeader	linux,darwin,windows	linux,darwin,windows	root-content	the environments header vector drives contextmaterialize; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
-internal/interop	TestConformanceEnvironmentsMonolithic	linux,darwin,windows	linux,darwin,windows	root-content	every monolithic-form root-context case matches byte for byte; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
-internal/interop	TestConformanceEnvironmentsMonolithic/*	linux,darwin,windows	linux,darwin,windows	stage-deferred	referenced-form and mcp cases are deferred to stage (b): the referenced form and MCP channel files land in stage (b)
+internal/interop	TestConformanceEnvironmentsMonolithic	linux,darwin,windows	linux,darwin,windows	root-content	every root-context, system-prompt, referenced-form, and MCP materialization case matches byte for byte with its surface hash, resolved set, and env_names union; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
 internal/interop	TestConformanceContextDetectors	linux,darwin,windows	linux,darwin,windows	root-content	the environments detector vector drives contextaudit; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
 internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
 internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
@@ -257,6 +256,31 @@ internal/scriptpolicy	TestScriptExecutionOptInCases	linux,darwin,windows	linux,d
 internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is refused with script_execution_policy_unsupported before any worker surface
 
 # ===========================================================================
+# Stage (b): managed homes, fragment, and umbrella rows.
+# Every row is required on all three runners except the POSIX launcher
+# fixtures, which tolerate the registered host-capability skip on Windows.
+internal/contextmaterialize	TestReferencedRejectsCodex	linux,darwin,windows	-	-	the referenced form for an adapter without it fails with environment_form_unsupported, never a silent fallback
+internal/contextmaterialize	TestCodexTOMLExactness	linux,darwin,windows	-	-	the codex MCP layer renders the fixed TOML bytes with sorted tables and the reserved layer name
+internal/contextmaterialize	TestMCPEnvNamesUnion	linux,darwin,windows	-	-	the fragment env_names union is sorted over every member server
+internal/envregistry	TestIsolationMatrix	linux,darwin,windows	-	-	the credential isolation matrix refuses isolated for opencode and shared for claude_code on macOS at the pin
+internal/envregistry	TestFormUnsupported	linux,darwin,windows	-	-	a configured form the adapter does not support fails, never falls back
+internal/envfragment	TestFragmentJSONCanonical	linux,darwin,windows	-	-	the launch fragment renders byte-exact CCJ-1 plus one LF
+internal/envfragment	TestCheckBoundary	linux,darwin,windows	-	-	the profile-influence boundary refuses undeclared names, relative values, traversal, and out-of-root paths
+internal/envprofile	TestResolveProvisionRepair	linux,darwin,windows	-	-	resolve --repair provisions the managed home with marker records and the first-resolve notice, and a bare resolve emits identical bytes
+internal/envprofile	TestResolveStaleUnprovisioned	linux,darwin,windows	-	-	a stale home without --repair reports environment_home_stale with reasons and emits no fragment
+internal/envprofile	TestResolveDriftRepair	linux,darwin,windows	-	-	drifted copies and replaced links go stale and repair restores managed bytes without adopting candidate bytes
+internal/envprofile	TestResolvePassthroughLiveness	linux,darwin,windows	-	-	a detached passthrough entry goes stale and --repair re-links it
+internal/envprofile	TestResolveClaudeProjectEntry	linux,darwin,windows	-	-	a launch directory without its project entry is stale under the referenced form and repair adds it
+internal/envprofile	TestResolveLockContention	linux,darwin,windows	-	-	a contended --repair fails with the distinct lock-acquisition diagnostic within the bounded wait
+internal/envprofile	TestStatusOrphanRetention	linux,darwin,windows	-	-	removal without purge retains managed homes and status reports each orphan by path
+internal/envprofile	TestOpencodeXDGSeeds	linux,darwin,windows	-	-	allowlisted XDG entries seed as recorded parent links and shadows warn without being touched
+internal/envprofile	TestSeedUnreadableStopsBeforeFirstWrite	linux,darwin,windows	-	-	an unreadable seed fails provisioning before the first write
+cmd/curator	TestEnvResolveRepairEmitsFragment	linux,darwin,windows	-	-	env resolve --repair provisions through the CLI and emits the launch fragment with the managed home
+cmd/curator	TestEnvStatusMatrix	linux,darwin,windows	-	-	env status reports the profile by environment by surface matrix with --check and --json
+cmd/curator	TestUmbrellaMissingProvider	linux,darwin,windows	-	-	an unknown subcommand with no provider names the executable and the installation guidance
+cmd/curator	TestUmbrellaDispatchesToProvider	linux,darwin	windows	host-capability	the provider receives the remaining arguments verbatim over a POSIX launcher fixture
+cmd/curator	TestUmbrellaPropagatesExitCode	linux,darwin	windows	host-capability	the provider exit code is the command exit code over a POSIX launcher fixture
+
 # Opt-in developer probe -- never required, always tolerated.
 # ===========================================================================
 internal/hashing	TestCrossCheckTree	-	linux,darwin,windows	opt-in	cross-implementation tree digest probe, enabled by an explicit developer env var

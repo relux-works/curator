@@ -345,6 +345,53 @@ func TestResolveClaudeProjectEntry(t *testing.T) {
 	}
 }
 
+// TestCodexKeyringAmbient drives the keyring-preferred strategy through
+// Resolve: a keyring store keeps the credential ambient with no link, any
+// other store links auth.json, and an absent config means the default file
+// store. The file-store subtest is the narrowing killer for a mutant that
+// keeps searching the cli_auth_credentials_store token but treats any
+// value as keyring.
+func TestCodexKeyringAmbient(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		config string
+		linked bool
+	}{
+		{"absent", "", true},
+		{"file", "cli_auth_credentials_store = \"file\"\n", true},
+		{"auto", "cli_auth_credentials_store = \"auto\"\n", true},
+		{"keyring", "cli_auth_credentials_store = \"keyring\"\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fx := writeManagedFixture(t, "acme")
+			if tc.config != "" {
+				if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte(tc.config), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			req := fx.request("codex_cli")
+			req.Repair = true
+			if _, err := Resolve(req); err != nil {
+				t.Fatal(err)
+			}
+			marker := readManagedMarker(t, fx, "codex_cli")
+			links := 0
+			if marker.Passthrough != nil {
+				links = len(*marker.Passthrough)
+			}
+			if tc.linked && links != 1 {
+				t.Fatalf("a %s store links auth.json, records %d", tc.name, links)
+			}
+			if !tc.linked && links != 0 {
+				t.Fatalf("a keyring store is ambient, records %d", links)
+			}
+			if _, err := Resolve(fx.request("codex_cli")); err != nil {
+				t.Fatalf("the home is current: %v", err)
+			}
+		})
+	}
+}
+
 // TestResolveIsolatedOpencode narrows the isolation gate through Resolve:
 // configuring isolated for opencode fails, never silently shares.
 func TestResolveIsolatedOpencode(t *testing.T) {
