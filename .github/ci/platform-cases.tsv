@@ -304,6 +304,7 @@ internal/envprofile	TestPathOverlayJoinsClosure	linux,darwin,windows	-	-	a machi
 internal/envprofile	TestPathOverlayFormIsSourceInvalid	linux,darwin,windows	-	-	a form on a path overlay is reader grammar but resolution-invalid under section 1
 internal/envprofile	TestOverlayExplicitWeightOverridesDefault	linux,darwin,windows	-	-	a declared overlay weight outranks the manifest weight and the default
 internal/envprofile	TestGitOverlayJoinsClosure	linux,darwin,windows	-	-	a machine-declared git overlay resolves jointly with the root and pins its commit
+internal/envprofile	TestOverlayRepeatedNameIsCompositionInvalid	linux,darwin,windows	-	-	two overlays carrying one package name fail with environment_composition_invalid
 internal/envprofile	TestOverlayDuplicateNameIsCompositionInvalid	linux,darwin,windows	-	-	an overlay repeating a closure name fails with environment_composition_invalid
 internal/envprofile	TestForbiddenOverlaysResolveAlone	linux,darwin,windows	-	-	a forbidding composition policy empties every overlay list and resolves the root alone
 internal/envprofile	TestRemoveRefusesOverlayOfAnotherProfile	linux,darwin,windows	-	-	removal of a profile named as another profile's overlay fails with profile_in_use

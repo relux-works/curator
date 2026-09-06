@@ -349,6 +349,38 @@ func TestPathOverlayFormIsSourceInvalid(t *testing.T) {
 	}
 }
 
+// TestOverlayRepeatedNameIsCompositionInvalid drives Install with two
+// overlays carrying one package name: the repeated declaration is
+// environment_composition_invalid.
+func TestOverlayRepeatedNameIsCompositionInvalid(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	root := filepath.Join(t.TempDir(), "root")
+	writeManifestPackage(t, root,
+		`{"schema_version": 1, "name": "acme", "version": "1.0.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "root\n"})
+	first := filepath.Join(t.TempDir(), "first")
+	writeManifestPackage(t, first,
+		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "first\n"})
+	second := filepath.Join(t.TempDir(), "second")
+	writeManifestPackage(t, second,
+		`{"schema_version": 1, "name": "personal", "version": "0.4.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "second\n"})
+	policy := Policy{
+		OverlaysAllowed:      true,
+		OverlayDefaultWeight: 1000,
+		Overlays:             map[string][]OverlaySpec{"acme": {{Source: first}, {Source: second}}},
+	}
+	_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
+	if err == nil || !strings.Contains(err.Error(), contextresolve.DiagCompositionInvalid) {
+		t.Fatalf("err = %v, want %s", err, contextresolve.DiagCompositionInvalid)
+	}
+}
+
 // TestOverlayDuplicateNameIsCompositionInvalid drives Install with an
 // overlay whose package name repeats the root: the declaration is
 // environment_composition_invalid.
