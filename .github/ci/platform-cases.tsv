@@ -257,7 +257,7 @@ internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,window
 internal/config	TestManagerConfigV2SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published manager-config-v2 family is accepted or rejected through the config reader
 internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published system-config-v2 family merges or fails through the config loader
 internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	linux,darwin,windows	root-unset	the published manager-config-v2 vectors render the expected effective configuration
-internal/config	TestSystemV2LockableSubsetIsClassWide	linux,darwin,windows	-	-	every lockable key is carriable by the system file and every representative non-lockable key is refused
+internal/config	TestSystemV2LockableSubsetIsClassWide	linux,darwin,windows	-	-	the system file carries exactly the transcribed section 12.2 set class-wide: every lockable key is carriable and every non-lockable key is refused
 
 # ===========================================================================
 # Stage (b): managed homes, fragment, and umbrella rows.
@@ -314,6 +314,7 @@ internal/envprofile	TestWeightDuplicateRefused	linux,darwin,windows	-	-	a packag
 internal/envprofile	TestWeightUnknownRefused	linux,darwin,windows	-	-	a weights entry outside the closure fails with context_weight_unknown
 internal/envprofile	TestNonRootWeightsMapRefused	linux,darwin,windows	-	-	a non-root weights map fails with context_weights_not_root at resolution time
 internal/envprofile	TestWeightConflictErrorAndWarning	linux,darwin,windows	-	-	edge disagreement is context_weight_conflict, or the same diagnostic as a warning under the root's final word
+internal/envprofile	TestWeightRulesAllFourDisagree	linux,darwin,windows	-	-	all four section 6 weight rules disagreeing at once resolve to the machine overlay weight with the overlay flag
 internal/envprofile	TestPrecedencePrimitivesDriveEmission	linux,darwin,windows	-	-	winner and placement each flip the emitted chapter order independently
 internal/envprofile	TestPrecedenceTieKeepsTopologicalOrder	linux,darwin,windows	-	-	placement never inverts an equal-weight tie
 internal/envprofile	TestMissingPathOperandIsPathMissing	linux,darwin,windows	-	-	an absent path operand reports profile_source_path_missing, never unreadable
@@ -325,10 +326,13 @@ internal/envprofile	TestFoldedPathsAreSourceInvalid	linux	darwin,windows	host-ca
 internal/envprofile	TestRootGitExcluded	linux,darwin,windows	-	-	a root-level .git entry is excluded from the immutable snapshot
 internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin	windows	host-capability	an unreadable source reports profile_source_path_unreadable leading, never absence and never wrapped invalid
 internal/envprofile	TestUnreadablePathRootLeadsUnreadable	linux,darwin	windows	host-capability	an unreadable path root reports profile_source_path_unreadable leading
+internal/envprofile	TestPathSnapshotImmutableAcrossUpdateSyncUse	linux,darwin,windows	-	-	edits to a path source after install move nothing across update, sync and use until reinstall
+internal/envprofile	TestPathUpdateAllSucceedsWithImportedProfile	linux,darwin,windows	-	-	updating every profile succeeds with an imported profile whose staging directory is gone
 internal/envprofile	TestUseWithoutTakeoverRefusesUnmanaged	linux,darwin,windows	-	-	a switch over unmanaged files fails with environment_surface_unmanaged_conflict and writes nothing
 internal/envprofile	TestUseTakeoverBacksUpAndNotifies	linux,darwin,windows	-	-	takeover backs every replaced file up before the first write and reports the notice
 internal/envprofile	TestForeignSymlinkStopsSwitch	linux,darwin	windows	host-capability	a foreign-manager symlink stops with environment_foreign_manager_detected and the take-over choice
 internal/envprofile	TestTakeoverWarnsDotfileHeuristic	linux,darwin,windows	-	-	takeover warns the dotfile-manager heuristic without blocking the switch
+internal/envprofile	TestMachineClearReachesSeamGate	linux,darwin,windows	-	-	the machine-clear combination reaches the single structural require_current_profile gate while a scoped clear is unaffected
 internal/envprofile	TestReadOnlyCommandsNeverOnboard	linux,darwin,windows	-	-	read-only commands never write a backup, a marker, or a prompt
 internal/envprofile	TestRepairTakeoverProvisionsManagedHome	linux,darwin,windows	-	-	takeover repair provisions over unmanaged files with backup
 internal/envprofile	TestImportLosslessInstallsThroughPathPipeline	linux,darwin,windows	-	-	a lossless import installs through the path pipeline and writes nothing native
@@ -358,4 +362,9 @@ cmd/curator	TestResolveTakeoverRequiresRepair	linux,darwin,windows	-	-	env resol
 cmd/curator	TestSyncTakeoverFlagParses	linux,darwin,windows	-	-	profile sync accepts --takeover
 cmd/curator	TestProfileInstallUseLockedRequireRefuses	linux,darwin,windows	-	-	install --use of another profile under a locked require_current_profile is refused at the seam
 cmd/curator	TestProfileInstallFirstActivationLockedRequireRefuses	linux,darwin,windows	-	-	first-install auto-activation of another profile under a locked require is refused
+cmd/curator	TestProfileUseClearOperandIsUsage	linux,darwin,windows	-	-	profile use with an operand beside --clear is a usage error that moves no current
+cmd/curator	TestProfileScopedUseUnaffectedByLockedRequire	linux,darwin,windows	-	-	a scoped switch and its clearing succeed under a locked require_current_profile while the machine switch is refused
+cmd/curator	TestProfileImportUseLockedRequireRefuses	linux,darwin,windows	-	-	import --use of another profile under a locked require_current_profile is refused at the seam
+cmd/curator	TestProfileUpdateResyncPassesLockedRequire	linux,darwin,windows	-	-	an update that moves the lock re-switches the required profile through the same seam gate
+cmd/curator	TestProfileComposeAddWarnsWhenOverlaysForbidden	linux,darwin,windows	-	-	profile compose add under a forbidding overlays policy warns that the declaration is inert
 cmd/curator	TestEnvStatusReportsLockedRequire	linux,darwin,windows	-	-	env status reports the locked require_current_profile in JSON and text

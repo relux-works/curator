@@ -186,6 +186,46 @@ func TestProfileComposeAddListRemove(t *testing.T) {
 	}
 }
 
+// TestProfileComposeAddWarnsWhenOverlaysForbidden drives `profile compose
+// add` through run() with overlays_allowed locked false: the declaration is
+// stored but inert at resolution, so the write row warns like the list row
+// does (C3-m1: the list warned while the add stayed silent).
+func TestProfileComposeAddWarnsWhenOverlaysForbidden(t *testing.T) {
+	source, home := profileHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.overlays_allowed"],
+		"environments": {"overlays_allowed": false}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	code, _, stderr := runProfile(t, source, "profile", "compose", "acme", "add",
+		"https://example.com/personal", "--range", "^1")
+	if code != exitOK {
+		t.Fatalf("add = %d\nstderr:\n%s", code, stderr)
+	}
+	if !strings.Contains(stderr, "overlays_allowed is false") {
+		t.Fatalf("add under a forbidding policy must warn that the declaration is inert:\n%s", stderr)
+	}
+	source = reloadSource(t, source)
+	code, _, stderr = runProfile(t, source, "profile", "compose", "acme", "list")
+	if code != exitOK {
+		t.Fatalf("list = %d\nstderr:\n%s", code, stderr)
+	}
+	if !strings.Contains(stderr, "inert") {
+		t.Fatalf("list under a forbidding policy must warn:\n%s", stderr)
+	}
+}
+
 func TestProfileComposeRefusals(t *testing.T) {
 	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
 	if code, _, _ := runProfile(t, source, "profile", "compose", "a", "add", "s", "--range", "^1", "--tag", "v1"); code != exitUsage {

@@ -101,6 +101,13 @@ func (c cli) cmdComposeAdd(cfg *config.Config, profile string, args []string) in
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
+	// A locked overlays_allowed:false empties every overlay list at
+	// resolution with the manager §1 warning, so a declaration added here
+	// is inert until the policy changes. The list row already warns; the
+	// write row must not stay silent about the same fact.
+	if !cfg.Env.OverlaysAllowed {
+		_, _ = fmt.Fprintln(c.stderr, "warning: overlays_allowed is false: the added declaration is inert; resolution joins the root alone")
+	}
 	_, _ = fmt.Fprintf(c.stdout, "added overlay %s to profile %s; the lock moves on profile update\n", positional[0], profile)
 	return exitOK
 }

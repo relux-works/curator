@@ -545,6 +545,63 @@ func TestWeightRulesApplyInOrder(t *testing.T) {
 	}
 }
 
+// TestWeightRulesAllFourDisagree drives Install where all four §6 weight
+// rules name different winners for one leaf: manifest weight 5 (rule 1),
+// two agreeing non-root requirers at 20 (rule 2), the root weights map at
+// 30 (rule 3), and a machine overlay at 40 (rule 4). The lock records
+// weight 40 with the overlay flag and required_by [mid1, mid2]. The rules
+// apply in order with each overriding the previous; without rule 4 the
+// same closure would pin 30, without rule 3 it would pin 20, and without
+// rule 2 it would pin 5.
+func TestWeightRulesAllFourDisagree(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	ids := newGitIdentities(t)
+	leafOperand := gitContextRepo(t, ids, "https://example.com/leaf",
+		leafManifest(`"weight": 5,`), map[string]string{"a.md": "leaf\n"})
+	midOperand := func(name, identity string) string {
+		manifest := `{"schema_version": 1, "name": "` + name + `", "version": "1.0.0",` +
+			`"requires": {"contexts": {"leaf": {"git": "` + leafOperand + `", "range": "*", "weight": 20}}},` +
+			`"context": {"modules": [{"path": "a.md"}]}}`
+		return gitContextRepo(t, ids, identity, manifest, map[string]string{"a.md": name + "\n"})
+	}
+	mid := midOperand("mid1", "https://example.com/mid1")
+	mid2 := midOperand("mid2", "https://example.com/mid2")
+	rootManifest := `{"schema_version": 1, "name": "root", "version": "1.0.0",` +
+		`"weights": {"leaf": 30},` +
+		`"requires": {"contexts": {` +
+		`"mid1": {"git": "` + mid + `", "range": "*"}, ` +
+		`"mid2": {"git": "` + mid2 + `", "range": "*"}}},` +
+		`"context": {"modules": [{"path": "a.md"}]}}`
+	rootOperand := gitContextRepo(t, ids, "https://example.com/root",
+		rootManifest, map[string]string{"a.md": "root\n"})
+	overlay := int64(40)
+	policy := Policy{
+		OverlaysAllowed:      true,
+		OverlayDefaultWeight: 1000,
+		Overlays: map[string][]OverlaySpec{
+			"root": {{Source: leafOperand, Range: "*", Weight: &overlay}},
+		},
+	}
+	info, _, _, err := Install(home, InstallOptions{Operand: rootOperand, Policy: policy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, ok := lockMember(info.Lock, "leaf")
+	if !ok {
+		t.Fatalf("lock members %+v carry no leaf", info.Lock.Members)
+	}
+	if member.Weight != 40 {
+		t.Fatalf("leaf weight %d, want 40 (rule 4 over rules 3, 2, 1)", member.Weight)
+	}
+	if !member.Overlay {
+		t.Fatalf("leaf member %+v is not flagged overlay", member)
+	}
+	if len(member.RequiredBy) != 2 || member.RequiredBy[0] != "mid1" || member.RequiredBy[1] != "mid2" {
+		t.Fatalf("leaf required_by %+v, want [mid1 mid2]", member.RequiredBy)
+	}
+}
+
 // TestWeightDuplicateRefused drives Install where the root names a package
 // both on a requirement edge with a weight and in the weights map: the
 // lock fails with context_weights_duplicate.
