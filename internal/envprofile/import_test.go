@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -227,6 +228,53 @@ func TestImportLossyProceedsWithConsent(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("warnings %+v re-report no loss list", info.Warnings)
+	}
+}
+
+// TestImportUnreadableRootIsLoss drives Import over a native root-context
+// file that cannot be read: the failed read is always a loss, never an
+// absence.
+func TestImportUnreadableRootIsLoss(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-bit unreadability does not apply on Windows")
+	}
+	home := t.TempDir()
+	pinHomes(t)
+	seams := pinImportSeams(t)
+	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
+	root := filepath.Join(seams.native["claude_code"], "CLAUDE.md")
+	if err := os.Chmod(root, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(root, 0o644) }()
+	if _, err := os.ReadFile(root); err == nil {
+		t.Skip("process reads through permission bits (superuser); unreadability is untestable here")
+	}
+	seedCurrentDefault(t, home)
+	_, _, _, err := Import(home, seams.options(Policy{}))
+	if err == nil || !strings.Contains(err.Error(), DiagImportLossy) {
+		t.Fatalf("err = %v, want %s", err, DiagImportLossy)
+	}
+	if strings.Contains(err.Error(), "never") {
+		t.Fatalf("err = %v, a failed read must never report absence", err)
+	}
+}
+
+// TestImportInvalidUTF8IsLoss drives Import over a native root-context
+// file that is not valid UTF-8: normalization is content-preserving, so
+// the file is a loss.
+func TestImportInvalidUTF8IsLoss(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	seams := pinImportSeams(t)
+	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\xff\n")
+	seedCurrentDefault(t, home)
+	_, _, _, err := Import(home, seams.options(Policy{}))
+	if err == nil || !strings.Contains(err.Error(), DiagImportLossy) {
+		t.Fatalf("err = %v, want %s", err, DiagImportLossy)
+	}
+	if !strings.Contains(err.Error(), "UTF-8") {
+		t.Fatalf("err = %v, want the UTF-8 reason", err)
 	}
 }
 

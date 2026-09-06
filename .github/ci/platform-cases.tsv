@@ -326,6 +326,7 @@ internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin,windows	-	-	an u
 internal/envprofile	TestUseWithoutTakeoverRefusesUnmanaged	linux,darwin,windows	-	-	a switch over unmanaged files fails with environment_surface_unmanaged_conflict and writes nothing
 internal/envprofile	TestUseTakeoverBacksUpAndNotifies	linux,darwin,windows	-	-	takeover backs every replaced file up before the first write and reports the notice
 internal/envprofile	TestForeignSymlinkStopsSwitch	linux,darwin,windows	-	-	a foreign-manager symlink stops with environment_foreign_manager_detected and the take-over choice
+internal/envprofile	TestTakeoverWarnsDotfileHeuristic	linux,darwin,windows	-	-	takeover warns the dotfile-manager heuristic without blocking the switch
 internal/envprofile	TestReadOnlyCommandsNeverOnboard	linux,darwin,windows	-	-	read-only commands never write a backup, a marker, or a prompt
 internal/envprofile	TestRepairTakeoverProvisionsManagedHome	linux,darwin,windows	-	-	takeover repair provisions over unmanaged files with backup
 internal/envprofile	TestImportLosslessInstallsThroughPathPipeline	linux,darwin,windows	-	-	a lossless import installs through the path pipeline and writes nothing native
@@ -333,6 +334,8 @@ internal/envprofile	TestImportNormalizesOrdersAndPins	linux,darwin,windows	-	-	r
 internal/envprofile	TestNormalizeImportText	linux,darwin,windows	-	-	CRLF and CR become LF with exactly one trailing LF
 internal/envprofile	TestImportLossyStopsWithoutConsent	linux,darwin,windows	-	-	a lossy import stops with environment_import_lossy and installs nothing
 internal/envprofile	TestImportLossyProceedsWithConsent	linux,darwin,windows	-	-	consent re-reports the loss list as warnings under the same diagnostic
+internal/envprofile	TestImportUnreadableRootIsLoss	linux,darwin,windows	-	-	an unreadable native root file is always a loss, never an absence
+internal/envprofile	TestImportInvalidUTF8IsLoss	linux,darwin,windows	-	-	a non-UTF-8 native root file is a loss
 internal/envprofile	TestImportNameTakenBeforeAnyWrite	linux,darwin,windows	-	-	a taken import name stops with profile_import_name_taken before any write
 internal/envprofile	TestImportSkillForeignPinnedByRevision	linux,darwin,windows	-	-	a checkout skill maps onto a revision-pinned entry with environment_import_skill_foreign
 internal/envprofile	TestImportSkillMarkerRecovery	linux,darwin,windows	-	-	a marker skill recovers its exact declaration from its own records
@@ -341,5 +344,6 @@ cmd/curator	TestProfileImportRow	linux,darwin,windows	-	-	profile import install
 cmd/curator	TestProfileImportLossyRow	linux,darwin,windows	-	-	profile import stops lossy and proceeds only under --allow-lossy
 cmd/curator	TestProfileImportNameTakenRow	linux,darwin,windows	-	-	profile import with a taken name stops with profile_import_name_taken
 cmd/curator	TestProfileComposeAddPathRow	linux,darwin,windows	-	-	profile compose add of a path source requires exactly one form and lists it
+cmd/curator	TestProfileUseTakeoverRow	linux,darwin,windows	-	-	profile use over unmanaged files fails, and --takeover converges with notice and backup
 cmd/curator	TestResolveTakeoverRequiresRepair	linux,darwin,windows	-	-	env resolve --takeover without --repair is a usage error
 cmd/curator	TestSyncTakeoverFlagParses	linux,darwin,windows	-	-	profile sync accepts --takeover

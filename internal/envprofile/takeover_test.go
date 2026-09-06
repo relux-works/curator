@@ -169,6 +169,46 @@ func TestForeignSymlinkStopsSwitch(t *testing.T) {
 	}
 }
 
+// TestTakeoverWarnsDotfileHeuristic drives the production switch with a
+// takeover while a dotfile manager's closed-list state location exists:
+// the non-blocking environment_foreign_manager_suspected warning names
+// the manager, and the switch still converges.
+func TestTakeoverWarnsDotfileHeuristic(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	installIdleProfile(t, home, "acme")
+	native := claudeHome(t)
+	if err := os.MkdirAll(native, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(native, "CLAUDE.md"), []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	operator := t.TempDir()
+	t.Setenv("HOME", operator)
+	if err := os.MkdirAll(filepath.Join(operator, ".local", "share", "chezmoi"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	results, err := UseWithPolicy(home, "acme", "", "", false, Policy{Takeover: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, result := range results {
+		if !result.OK {
+			t.Fatalf("%s: %s", result.Adapter, result.Detail)
+		}
+		for _, warning := range result.Warnings {
+			if strings.Contains(warning, DiagForeignSuspect) && strings.Contains(warning, "chezmoi") {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("results %+v carry no %s naming chezmoi", results, DiagForeignSuspect)
+	}
+}
+
 // TestReadOnlyCommandsNeverOnboard drives the read-only surface over
 // unmanaged state: list, status, and bare resolve report without writing
 // a backup, a marker, or a prompt.

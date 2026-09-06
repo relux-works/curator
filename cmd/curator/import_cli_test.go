@@ -108,6 +108,39 @@ func TestProfileComposeAddPathRow(t *testing.T) {
 	}
 }
 
+// TestProfileUseTakeoverRow drives `profile use` over an unmanaged native
+// file: without the flag the row fails rather than overwrite; with
+// --takeover it converges with the replace notice and a backup.
+func TestProfileUseTakeoverRow(t *testing.T) {
+	source, _ := profileHome(t)
+	pinOperatorHome(t)
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "acme", "1.0.0", "managed\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
+	}
+	fresh := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", fresh)
+	if err := os.WriteFile(filepath.Join(fresh, "CLAUDE.md"), []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "acme"); code != exitFail {
+		t.Fatalf("use = %d, want %d\nstderr:\n%s", code, exitFail, stderr)
+	} else if !strings.Contains(stderr, "environment_surface_unmanaged_conflict") {
+		t.Fatalf("stderr:\n%s", stderr)
+	}
+	code, stdout, stderr := runProfile(t, source, "profile", "use", "acme", "--takeover")
+	if code != exitOK {
+		t.Fatalf("use --takeover = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	} else if !strings.Contains(stderr, "notice:") || !strings.Contains(stderr, ".agent-environment-backup") {
+		t.Fatalf("takeover must report the replace notice:\n%s", stderr)
+	}
+	backup, err := os.ReadFile(filepath.Join(fresh, ".agent-environment-backup", "1", "CLAUDE.md"))
+	if err != nil || string(backup) != "mine\n" {
+		t.Fatalf("backup = %q, err = %v", backup, err)
+	}
+}
+
 // TestResolveTakeoverRequiresRepair drives `env resolve --takeover`
 // without --repair: the flag applies only with --repair, so the row is a
 // usage error.
