@@ -187,6 +187,13 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 	}
 	effective := name
 	if clearScope {
+		// The CLI admits no operand beside --clear (see cmdProfileUse):
+		// a positional here is an undefined form, and silently ignoring
+		// it once switched the machine scope to another profile. Fail
+		// rather than guess which profile the operator meant.
+		if name != "" {
+			return nil, fmt.Errorf("profile use --clear takes no profile operand")
+		}
 		machine, err := Current(home)
 		if err != nil {
 			return nil, err
@@ -195,19 +202,25 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 			machine = DefaultProfile
 		}
 		effective = machine
-	} else {
-		// The §12.2 fleet-policy gate precedes the installed check: a
-		// machine-scope switch to another profile is a configuration
-		// error even when that profile is not installed. Every
-		// machine-scope switch — profile use, install --use,
-		// first-install auto-activation, import --use, and resync —
-		// funnels through this seam, not through any one CLI row. A
-		// scoped switch records a scoped current and is unaffected.
-		if scope == "" {
-			if err := policy.CheckMachineUse(name); err != nil {
-				return nil, err
-			}
+	}
+	// The §12.2 fleet-policy gate is the single construction point of a
+	// machine-scope switch: every path that will publish the machine
+	// current below — profile use (clear or not; the CLI rejects the
+	// combination but the seam does not rely on it), install --use,
+	// first-install auto-activation, import --use, and resync — funnels
+	// through this one gate before any write, not through any one CLI
+	// row. It precedes the installed check, so a machine-scope switch to
+	// another profile is a configuration error even when that profile is
+	// not installed. A scoped switch records a scoped current and is
+	// unaffected. CurrentFile has exactly one production writer, the
+	// publish below, so no caller reaches the seam in machine scope
+	// without passing here.
+	if scope == "" {
+		if err := policy.CheckMachineUse(effective); err != nil {
+			return nil, err
 		}
+	}
+	if !clearScope {
 		if _, err := readSource(home, name); err != nil {
 			return nil, err
 		}

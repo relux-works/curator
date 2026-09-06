@@ -198,12 +198,22 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
 		return exitUsage
 	}
+	// cli/curator.md defines exactly two profile-use forms: a named
+	// switch, and a scope clear with no operand. A positional beside
+	// --clear is neither: it once reached the seam and switched the
+	// machine scope while ignoring the operand, so it is a usage error
+	// here and a refused operand at the seam.
 	name := ""
-	if len(positional) == 1 {
-		name = positional[0]
-	} else if len(positional) > 1 || !*clearScope || (*env == "" && *target == "") {
+	if *clearScope {
+		if len(positional) != 0 || (*env == "" && *target == "") {
+			_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
+			return exitUsage
+		}
+	} else if len(positional) != 1 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
 		return exitUsage
+	} else {
+		name = positional[0]
 	}
 	// The locked require_current_profile gate lives at the §9.2
 	// machine-scope switch itself (useLocked via UseWithPolicy), not at

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -299,6 +300,206 @@ func TestProfileInstallFirstActivationLockedRequireRefuses(t *testing.T) {
 	code, _, stderr := runProfile(t, source, "profile", "install", other, "--as", "other")
 	if code != exitFail || !strings.Contains(stderr, "environments.require_current_profile") {
 		t.Fatalf("first install of another profile = %d\nstderr:\n%s", code, stderr)
+	}
+}
+
+// TestProfileUseClearOperandIsUsage drives the undefined
+// `profile use <name> --clear` form through run(): cli/curator.md defines
+// exactly two profile-use forms and this is neither, so the row is a usage
+// error that moves no current. The seam refuses an operand beside --clear
+// as well, so the C3-B1 bypass is closed at both layers.
+func TestProfileUseClearOperandIsUsage(t *testing.T) {
+	source, home := profileHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.require_current_profile"],
+		"environments": {"require_current_profile": "acme"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	required := t.TempDir()
+	writeContextPackage(t, required, "acme", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", required, "--as", "acme", "--use"); code != exitOK {
+		t.Fatalf("install --use of the required profile = %d\nstderr:\n%s", code, stderr)
+	}
+	code, _, stderr := runProfile(t, source, "profile", "use", "bogus", "--clear")
+	if code != exitUsage {
+		t.Fatalf("use <name> --clear = %d, want usage %d\nstderr:\n%s", code, exitUsage, stderr)
+	}
+	if strings.Contains(stderr, "environments.require_current_profile") {
+		t.Fatalf("undefined form must fail as usage, not at the gate:\n%s", stderr)
+	}
+	payload, err := os.ReadFile(filepath.Join(home, "profiles", "current"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(payload)) != "acme" {
+		t.Fatalf("refused form moved the machine current to %q", payload)
+	}
+	code, _, stderr = runProfile(t, source, "profile", "use", "acme", "--clear", "--env", "codex_cli")
+	if code != exitUsage {
+		t.Fatalf("use <name> --clear --env = %d, want usage %d\nstderr:\n%s", code, exitUsage, stderr)
+	}
+}
+
+// TestProfileScopedUseUnaffectedByLockedRequire drives the narrowed switch
+// and its clearing through run() under the lock: a scoped switch records a
+// scoped current without consulting the machine-scope gate, so both rows
+// succeed while a machine-scope use of the same profile is refused.
+func TestProfileScopedUseUnaffectedByLockedRequire(t *testing.T) {
+	source, home := profileHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.require_current_profile"],
+		"environments": {"require_current_profile": "acme"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	required := t.TempDir()
+	writeContextPackage(t, required, "acme", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", required, "--as", "acme", "--use"); code != exitOK {
+		t.Fatalf("install --use of the required profile = %d\nstderr:\n%s", code, stderr)
+	}
+	other := t.TempDir()
+	writeContextPackage(t, other, "other", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", other, "--as", "other"); code != exitOK {
+		t.Fatalf("install without activation = %d\nstderr:\n%s", code, stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "other", "--env", "codex_cli"); code != exitOK {
+		t.Fatalf("scoped use under the lock = %d\nstderr:\n%s", code, stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "--clear", "--env", "codex_cli"); code != exitOK {
+		t.Fatalf("scoped clear under the lock = %d\nstderr:\n%s", code, stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "other"); code != exitFail || !strings.Contains(stderr, "environments.require_current_profile") {
+		t.Fatalf("machine use of another profile = %d\nstderr:\n%s", code, stderr)
+	}
+}
+
+// TestProfileImportUseLockedRequireRefuses drives the import activation
+// seam through run(): on a fresh machine with the key locked to acme,
+// `profile import --as other --use` installs the reassembled profile
+// through the path pipeline and is refused at the §9.2 switch naming the
+// locked knob, moving no current. The same seam covers the first-install
+// auto-activation, which fires on this fresh machine with or without
+// --use.
+func TestProfileImportUseLockedRequireRefuses(t *testing.T) {
+	source, home := profileHome(t)
+	pinOperatorHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.require_current_profile"],
+		"environments": {"require_current_profile": "acme"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	native := os.Getenv("CLAUDE_CONFIG_DIR")
+	if err := os.MkdirAll(native, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(native, "CLAUDE.md"), []byte("native\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr := runProfile(t, source, "profile", "import", "--as", "other", "--use")
+	if code != exitFail || !strings.Contains(stderr, "environments.require_current_profile") {
+		t.Fatalf("import --use of another profile = %d\nstderr:\n%s", code, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(home, "profiles", "current")); !os.IsNotExist(err) {
+		t.Fatalf("refused import activation moved the machine current, stat err %v", err)
+	}
+}
+
+// TestProfileUpdateResyncPassesLockedRequire drives the resync caller of
+// the seam through run(): with the key locked to the installed git root, a
+// `profile update` that moves the lock re-switches the machine scope to
+// the required profile through the same single gate, so the update
+// succeeds. A mutant that breaks the gate for the resync path fails the
+// other tests in this file; this row proves the gate does not break the
+// allowed path.
+func TestProfileUpdateResyncPassesLockedRequire(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git on PATH")
+	}
+	source, home := profileHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.require_current_profile"],
+		"environments": {"require_current_profile": "groot"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	repo := t.TempDir()
+	writeContextPackage(t, repo, "groot", "1.0.0", "git module\n")
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repo
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init")
+	git("add", ".")
+	git("commit", "-m", "one")
+	git("tag", "v1.0.0")
+	gitconfig := filepath.Join(t.TempDir(), "gitconfig")
+	rewrite := "[url \"" + gitFileURL(repo) + "\"]\n\tinsteadOf = https://example.com/groot\n"
+	if err := os.WriteFile(gitconfig, []byte(rewrite), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	if code, _, stderr := runProfile(t, source, "profile", "install", "https://example.com/groot"); code != exitOK {
+		t.Fatalf("install = %d\nstderr:\n%s", code, stderr)
+	}
+	writeContextPackage(t, repo, "groot", "1.0.1", "git module two\n")
+	git("add", ".")
+	git("commit", "-m", "two")
+	git("tag", "v1.0.1")
+	code, stdout, stderr := runProfile(t, source, "profile", "update", "groot")
+	if code != exitOK {
+		t.Fatalf("update = %d\nstderr:\n%s", code, stderr)
+	}
+	if !strings.Contains(stdout, "updated") {
+		t.Fatalf("update stdout:\n%s\nstderr:\n%s", stdout, stderr)
 	}
 }
 

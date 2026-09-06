@@ -81,3 +81,46 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 		t.Fatalf("schema-1 file must keep the defaults: %+v", defaults)
 	}
 }
+
+// TestMachineClearReachesSeamGate drives the machine-clear combination
+// (clearScope with no scope, which the CLI rejects as usage) through the
+// production UseWithPolicy seam: the single structural gate refuses when
+// the recorded current is not the locked requirement. An operand beside
+// --clear is refused without reaching the gate, a scoped clear is
+// unaffected, and the required profile passes the gate (failing later only
+// on the installed check). A mutant that exempts the clear path from the
+// gate (`scope == "" && !clearScope`) succeeds on the machine clear and
+// must fail this test.
+func TestMachineClearReachesSeamGate(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	first := t.TempDir()
+	writePackage(t, first, "one", "1.0.0", "one\n")
+	second := t.TempDir()
+	writePackage(t, second, "two", "1.0.0", "two\n")
+	if _, _, _, err := Install(home, InstallOptions{Operand: first}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := Install(home, InstallOptions{Operand: second}); err != nil {
+		t.Fatal(err)
+	}
+	required := "acme"
+	locked := Policy{OverlaysAllowed: true, RequireCurrent: &required, RequireCurrentLocked: true}
+	if _, err := UseWithPolicy(home, "bogus", "", "", true, locked); err == nil || !strings.Contains(err.Error(), "takes no profile operand") {
+		t.Fatalf("operand beside --clear = %v, want the operand refusal", err)
+	}
+	if _, err := UseWithPolicy(home, "", "", "", true, locked); err == nil || !strings.Contains(err.Error(), "environments.require_current_profile") {
+		t.Fatalf("machine clear under the lock = %v, want the §12.2 refusal", err)
+	}
+	if current, _ := Current(home); current != "one" {
+		t.Fatalf("refused switch moved the machine current to %q", current)
+	}
+	if _, err := UseWithPolicy(home, "", "codex_cli", "", true, locked); err != nil {
+		t.Fatalf("scoped clear under the lock: %v", err)
+	}
+	if _, err := UseWithPolicy(home, "acme", "", "", false, locked); err == nil || strings.Contains(err.Error(), "environments.require_current_profile") {
+		t.Fatalf("required profile must pass the gate: %v", err)
+	} else if !strings.Contains(err.Error(), DiagNotFound) {
+		t.Fatalf("required profile must fail only on the installed check: %v", err)
+	}
+}
