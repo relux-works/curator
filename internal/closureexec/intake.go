@@ -1,6 +1,7 @@
 package closureexec
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -200,7 +201,11 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = os.RemoveAll(tmp) }()
+	defer func() {
+		if tmp != "" {
+			_ = removeOwnedTree(tmp)
+		}
+	}()
 	files := []SnapshotFile{}
 	var total int64
 	err = filepath.WalkDir(abs, func(current string, entry fs.DirEntry, walkErr error) error {
@@ -274,12 +279,26 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
 		return nil, err
 	}
 	target := filepath.Join(s.trees, strings.TrimPrefix(string(idValue), "sha256:"))
-	if err = os.Rename(tmp, target); err != nil {
-		// A digest-named tree that already exists is a reuse, and VerifyAtUse
-		// below re-proves its exact content either way. Windows reports the
-		// occupied target as access-denied rather than fs.ErrExist, so the
-		// reuse condition is read from the target itself, not the error kind.
-		if info, statErr := os.Lstat(target); statErr != nil || !info.IsDir() {
+	// Darwin refuses to rename the staging directory while its own write bits
+	// are removed. Thaw only that owned root for the rename; descendants remain
+	// immutable. renameTreeNoReplace makes the target collision decision at the
+	// syscall, so an existing digest target is never overwritten after a racy
+	// precheck.
+	if err = restoreTreeDirMutable(tmp); err != nil {
+		return nil, err
+	}
+	if err = renameTreeNoReplace(tmp, target); err != nil {
+		// A digest-named directory that already exists is a possible reuse.
+		// VerifyAtUse below re-proves its complete immutable identity; other
+		// target shapes retain the publication error.
+		targetInfo, statErr := os.Lstat(target)
+		if statErr != nil || !targetInfo.IsDir() || targetInfo.Mode()&os.ModeSymlink != 0 {
+			return nil, err
+		}
+	} else {
+		tmp = ""
+		if err = markTreeDirImmutable(target); err != nil {
+			_ = removeOwnedTree(target)
 			return nil, err
 		}
 	}
@@ -288,6 +307,25 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
 		return nil, err
 	}
 	return handle, nil
+}
+
+// removeOwnedTree restores traversal/write permission on an operation-owned
+// immutable tree before removing it. It must only be used for fresh staging or
+// a target just published by this operation, never for a pre-existing digest
+// target.
+func removeOwnedTree(root string) error {
+	if err := filepath.WalkDir(root, func(current string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.Type()&fs.ModeSymlink == 0 && entry.IsDir() {
+			return restoreTreeDirMutable(current)
+		}
+		return nil
+	}); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return os.RemoveAll(root)
 }
 
 // AdmitTree binds classifier evidence to an immutable source snapshot tree.

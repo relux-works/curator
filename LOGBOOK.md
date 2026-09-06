@@ -3,6 +3,32 @@
 > Institutional memory. Concise, factual, high-signal.
 > Newest entries first. One block per insight.
 
+## 2026-09-06 — release channels lag completed main; rc.2/rc.3 never executed release automation (TASK-260906-1xitqi)
+
+- FINDING: completed main `7320bc2` is 180 commits ahead of stable `v0.13.0` and 152 ahead of the only published `v0.14.0` prerelease, rc.1. Homebrew and Scoop point at rc.1; the installer follows GitHub latest and therefore installs v0.13.0. Rc.2 and rc.3 exist as tags but have neither a GitHub Release nor any Release workflow execution, so there is no failed GoReleaser job to rerun and those tags must not be moved or reused.
+- REGRESSION: every released source module through rc.1 carries a local `replace` for the test-only `tuitestkit` submodule. The advertised `go install github.com/relux-works/curator/cmd/curator@latest` reproducibly exits 1 before compilation. Main now uses published `tuitestkit v0.1.1`; a release-source gate in both CI and Release rejects `replace`, `exclude`, and unreadable module input, and the tag path additionally refuses a candidate not contained in freshly fetched public main. Negative self-tests cover every refusal.
+- DECISION: recommend stable `v0.14.0` after review and green CI on the exact integrated SHA. The public rc lineage already reserves 0.14 and prereleases do not promise compatibility; main's schema-8, source-closure, credential, and environment-profile deliveries should become the stable 0.14 capability set. Publication and the signed annotated tag remain parent-owned.
+- NOTE: GoReleaser v2.18.1 validates the config and a non-publishing snapshot builds all six archives, four deb/rpm packages, checksums, Homebrew cask, and Scoop manifest. Full inventory, command exit codes, and the post-publication channel plan are attached as `TASK-260906-1xitqi_release-evidence.md`.
+- ANOMALY: the broad local suite's capture-store rename failures reproduce on a pristine archive of main `7320bc2` on Intel macOS under both Go 1.26.0 and the hosted Go 1.25.5 toolchain; both fail to rename into and clean up deliberately read-only temporary trees. The exact same source passes hosted macOS CI, so this is an evidence-bounded local host/filesystem behavior, not a release-fix regression or Go-version difference.
+
+## 2026-09-06 — release readiness exposed a Darwin immutable-tree publication defect
+
+The packaging candidate made the configured full suite exercise source-tree
+capture on darwin/amd64 and exposed a shipped blocker: `CaptureTree` removed
+write bits from its owned staging root before `os.Rename`, which Darwin rejects,
+then deferred `os.RemoveAll` against the same frozen tree. Publication now thaws
+only the owned staging root for the atomic rename, freezes the published root
+again before verification or handle return, and thaws owned scratch for failure
+cleanup. A pre-existing digest target is never deliberately replaced and must
+pass the full at-use identity check before reuse.
+
+The release workflow self-test had a parallel evidence gap: it proved only
+fresh-main fetch before the named gate, not that normal CI called the module
+gate or that every publisher followed the ancestry gate. One structural checker
+now derives all GoReleaser action lines and rejects missing CI/release calls and
+an additional earlier publisher; these were the exact reviewer mutants that
+previously left 91/91 green.
+
 ## 2026-09-03 — Decision 0012 rework 1 accepted (TASK-260902-3cnbwa, cycle 2)
 
 - DECISION: Decision 0012 at `8444706` on `draft/decision-0012-context-packages` accepted; all 24 cycle-1 findings resolved per the author decisions, no deviation; attack pass yielded 7 minor + 5 nit for the normative-authoring pass, no blocking/major. `accept_cr` on `CR-TASK-260902-3cnbwa-1` rev 1; evidence `TASK-260902-3cnbwa_review-findings-0012-2.md`, `TASK-260902-3cnbwa_review-verdict.md`.

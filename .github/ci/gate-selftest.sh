@@ -57,7 +57,58 @@ assert 'candidate inputs reject revision plus root' 1 bash "$CS" verify-inputs '
 assert 'candidate inputs accept revision only'     0 bash "$CS" verify-inputs '1234567890abcdef1234567890abcdef12345678' ''
 assert 'candidate inputs accept root only'         0 bash "$CS" verify-inputs '' '/candidate/root'
 
+echo ''
+echo '=== release-source-gate.sh: versioned Go installs stay publishable ==='
+RSG="$HERE/release-source-gate.sh"
+printf 'module example.test/clean\n\ngo 1.25.5\n\nrequire example.test/helper v1.0.0\n' >"$WORK/go-clean.mod"
+printf 'module example.test/replaced\n\ngo 1.25.5\n\nreplace example.test/helper => ./helper\n' >"$WORK/go-replace.mod"
+printf 'module example.test/excluded\n\ngo 1.25.5\n\nexclude example.test/helper v1.0.0\n' >"$WORK/go-exclude.mod"
+assert 'a release module without local interpretation directives passes' 0 bash "$RSG" "$WORK/go-clean.mod"
+assert 'a replace directive that breaks versioned go install is rejected' 1 bash "$RSG" "$WORK/go-replace.mod"
+assert 'an exclude directive that changes versioned resolution is rejected' 1 bash "$RSG" "$WORK/go-exclude.mod"
+assert 'a missing module file is a read failure, not a clean module' 1 bash "$RSG" "$WORK/go-missing.mod"
+assert 'the repository module passes the release-source gate' 0 bash "$RSG" go.mod
+
+ANCESTRY_REPO="$WORK/release-ancestry"
+git init -q -b main "$ANCESTRY_REPO"
+printf 'main\n' >"$ANCESTRY_REPO/content.txt"
+git -C "$ANCESTRY_REPO" add content.txt
+git -C "$ANCESTRY_REPO" -c user.name='Gate Fixture' -c user.email='gate@example.invalid' commit -q -m main
+MAIN_COMMIT="$(git -C "$ANCESTRY_REPO" rev-parse HEAD)"
+git -C "$ANCESTRY_REPO" switch -q -c topic
+printf 'topic\n' >"$ANCESTRY_REPO/content.txt"
+git -C "$ANCESTRY_REPO" add content.txt
+git -C "$ANCESTRY_REPO" -c user.name='Gate Fixture' -c user.email='gate@example.invalid' commit -q -m topic
+TOPIC_COMMIT="$(git -C "$ANCESTRY_REPO" rev-parse HEAD)"
+assert 'a candidate commit contained in main is accepted' 0 bash -c 'cd "$1" && "$2" "$3" "$4" main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
+assert 'an unmerged branch candidate is rejected' 1 bash -c 'cd "$1" && "$2" "$3" "$4" main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$TOPIC_COMMIT"
+assert 'missing ancestry evidence is rejected, not treated as absent' 1 bash -c 'cd "$1" && "$2" "$3" "$4" missing-main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
+assert 'a half-specified ancestry check is rejected' 1 bash "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
+
 WORKFLOW='.github/workflows/ci.yml'
+RELEASE_WORKFLOW='.github/workflows/release.yml'
+RWG="$HERE/release-workflow-gate.sh"
+assert 'production workflows invoke the source gates before every publisher' 0 bash "$RWG" "$WORKFLOW" "$RELEASE_WORKFLOW"
+
+cp "$WORKFLOW" "$WORK/ci-without-release-source-gate.yml"
+sed -i.bak '/run: bash \.github\/ci\/release-source-gate\.sh$/d' "$WORK/ci-without-release-source-gate.yml"
+assert 'workflow checker rejects a missing normal-CI source gate' 1 bash "$RWG" "$WORK/ci-without-release-source-gate.yml" "$RELEASE_WORKFLOW"
+
+cp "$RELEASE_WORKFLOW" "$WORK/release-without-source-gate.yml"
+sed -i.bak '/run: bash \.github\/ci\/release-source-gate\.sh go\.mod/d' "$WORK/release-without-source-gate.yml"
+assert 'workflow checker rejects a missing release ancestry gate' 1 bash "$RWG" "$WORKFLOW" "$WORK/release-without-source-gate.yml"
+
+awk '
+	!inserted && /^[[:space:]]*steps:/ {
+		print
+		print "      - uses: goreleaser/goreleaser-action@v6"
+		inserted = 1
+		next
+	}
+	{ print }
+' "$RELEASE_WORKFLOW" >"$WORK/release-with-early-publisher.yml"
+assert 'workflow checker rejects an additional publisher before the gate' 1 bash "$RWG" "$WORKFLOW" "$WORK/release-with-early-publisher.yml"
+
 validation_line="$(grep -nF 'Reject ambiguous candidate inputs' "$WORKFLOW" | cut -d: -f1)"
 checkout_line="$(grep -nF 'Check out the candidate suite' "$WORKFLOW" | cut -d: -f1)"
 record_line="$(grep -nF 'Resolve and record the candidate suite identity' "$WORKFLOW" | cut -d: -f1)"

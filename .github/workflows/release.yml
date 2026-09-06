@@ -23,6 +23,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Fetch public main for release ancestry
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: Verify versioned Go install compatibility
+        run: bash .github/ci/release-source-gate.sh go.mod "$GITHUB_SHA" refs/remotes/origin/main
+
       - uses: sigstore/cosign-installer@v3
 
       - uses: anchore/sbom-action/download-syft@v0

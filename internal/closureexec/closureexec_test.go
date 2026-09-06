@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -490,6 +491,181 @@ func admittedTreeFixture(t *testing.T) (AdmittedInput, closuregraph.ID, string) 
 		t.Fatal(err)
 	}
 	return AdmittedInput{Receipt: receipt, Tree: tree}, id, source
+}
+
+func TestCaptureTreePublishesImmutableReusesAndCleansFailedStaging(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	if err := os.MkdirAll(filepath.Join(source, "nested"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "nested", "leaf.txt"), []byte("leaf"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewCaptureStore(filepath.Join(root, "captures"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = removeOwnedTree(store.root) })
+
+	first, err := store.CaptureTree("fixture://publication", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = filepath.WalkDir(first.path, func(_ string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			info, infoErr := entry.Info()
+			if infoErr != nil {
+				return infoErr
+			}
+			if !treeDirIsImmutable(info) {
+				t.Fatalf("published directory %s remained writable", entry.Name())
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	reused, err := store.CaptureTree("fixture://publication", source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reused.path != first.path {
+		t.Fatalf("reuse path = %q, want %q", reused.path, first.path)
+	}
+
+	if err = restoreTreeDirMutable(first.path); err != nil {
+		t.Fatal(err)
+	}
+	poison := filepath.Join(first.path, "poison.txt")
+	if err = os.WriteFile(poison, []byte("do not replace"), 0o400); err != nil {
+		t.Fatal(err)
+	}
+	if err = markTreeDirImmutable(first.path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.CaptureTree("fixture://publication", source); err == nil {
+		t.Fatal("capture reused a mismatched existing digest target")
+	}
+	if payload, readErr := os.ReadFile(poison); readErr != nil || string(payload) != "do not replace" {
+		t.Fatalf("existing digest target was replaced: payload=%q err=%v", payload, readErr)
+	}
+	entries, err := os.ReadDir(store.trees)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".tree-") && strings.HasSuffix(entry.Name(), ".tmp") {
+			t.Fatalf("failed capture retained immutable staging directory %q", entry.Name())
+		}
+	}
+}
+
+func TestCaptureTreePreservesInvalidExistingTargets(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	if err := os.Mkdir(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "leaf.txt"), []byte("leaf"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewCaptureStore(filepath.Join(root, "captures"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = removeOwnedTree(store.root) })
+
+	tests := []struct {
+		name   string
+		create func(*testing.T, string)
+		check  func(*testing.T, string)
+	}{
+		{
+			name: "regular file",
+			create: func(t *testing.T, target string) {
+				t.Helper()
+				if err := os.WriteFile(target, []byte("existing"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			},
+			check: func(t *testing.T, target string) {
+				t.Helper()
+				payload, err := os.ReadFile(target)
+				if err != nil || string(payload) != "existing" {
+					t.Fatalf("regular target changed: payload=%q err=%v", payload, err)
+				}
+			},
+		},
+		{
+			name: "empty directory",
+			create: func(t *testing.T, target string) {
+				t.Helper()
+				if err := os.Mkdir(target, 0o500); err != nil {
+					t.Fatal(err)
+				}
+			},
+			check: func(t *testing.T, target string) {
+				t.Helper()
+				entries, err := os.ReadDir(target)
+				if err != nil || len(entries) != 0 {
+					t.Fatalf("empty directory target changed: entries=%v err=%v", entries, err)
+				}
+			},
+		},
+		{
+			name: "linked directory",
+			create: func(t *testing.T, target string) {
+				t.Helper()
+				destination := filepath.Join(root, "link-destination")
+				if err := os.Mkdir(destination, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(destination, target); err != nil {
+					t.Skipf("directory symlink unavailable: %v", err)
+				}
+			},
+			check: func(t *testing.T, target string) {
+				t.Helper()
+				info, err := os.Lstat(target)
+				if err != nil || info.Mode()&os.ModeSymlink == 0 {
+					t.Fatalf("linked target changed: info=%v err=%v", info, err)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			origin := "fixture://collision/" + test.name
+			published, err := store.CaptureTree(origin, source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := published.path
+			if err = removeOwnedTree(target); err != nil {
+				t.Fatal(err)
+			}
+			test.create(t, target)
+			if _, err = store.CaptureTree(origin, source); err == nil {
+				t.Fatal("capture accepted an invalid existing digest target")
+			}
+			test.check(t, target)
+			entries, err := os.ReadDir(store.trees)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range entries {
+				if strings.HasPrefix(entry.Name(), ".tree-") && strings.HasSuffix(entry.Name(), ".tmp") {
+					t.Fatalf("failed collision retained staging directory %q", entry.Name())
+				}
+			}
+		})
+	}
 }
 
 func TestDerivationRequiresCommittedPermitAndImmediateToolchainMatch(t *testing.T) {

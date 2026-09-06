@@ -89,6 +89,10 @@ jobs:
         shell: bash
         run: bash .github/ci/toolchain-identity.sh
 
+      - name: Verify versioned Go install compatibility
+        shell: bash
+        run: bash .github/ci/release-source-gate.sh
+
       - name: gofmt check
         if: runner.os != 'Windows'
         shell: bash
