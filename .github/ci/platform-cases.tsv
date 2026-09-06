@@ -257,6 +257,7 @@ internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,window
 internal/config	TestManagerConfigV2SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published manager-config-v2 family is accepted or rejected through the config reader
 internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published system-config-v2 family merges or fails through the config loader
 internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	linux,darwin,windows	root-unset	the published manager-config-v2 vectors render the expected effective configuration
+internal/config	TestSystemV2LockableSubsetIsClassWide	linux,darwin,windows	-	-	every lockable key is carriable by the system file and every representative non-lockable key is refused
 
 # ===========================================================================
 # Stage (b): managed homes, fragment, and umbrella rows.
@@ -322,7 +323,8 @@ internal/envprofile	TestNestedGitIsSourceInvalid	linux,darwin,windows	-	-	a .git
 internal/envprofile	TestSymlinkInPathIsSourceInvalid	linux,darwin	windows	host-capability	a link in the source tree is profile_source_invalid
 internal/envprofile	TestFoldedPathsAreSourceInvalid	linux	darwin,windows	host-capability	two entries folding to one platform path are profile_source_invalid; case-folding hosts skip under the classified host-capability reason
 internal/envprofile	TestRootGitExcluded	linux,darwin,windows	-	-	a root-level .git entry is excluded from the immutable snapshot
-internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin	windows	host-capability	an unreadable source reports profile_source_path_unreadable, never absence
+internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin	windows	host-capability	an unreadable source reports profile_source_path_unreadable leading, never absence and never wrapped invalid
+internal/envprofile	TestUnreadablePathRootLeadsUnreadable	linux,darwin	windows	host-capability	an unreadable path root reports profile_source_path_unreadable leading
 internal/envprofile	TestUseWithoutTakeoverRefusesUnmanaged	linux,darwin,windows	-	-	a switch over unmanaged files fails with environment_surface_unmanaged_conflict and writes nothing
 internal/envprofile	TestUseTakeoverBacksUpAndNotifies	linux,darwin,windows	-	-	takeover backs every replaced file up before the first write and reports the notice
 internal/envprofile	TestForeignSymlinkStopsSwitch	linux,darwin	windows	host-capability	a foreign-manager symlink stops with environment_foreign_manager_detected and the take-over choice
@@ -341,6 +343,9 @@ internal/envprofile	TestImportNameTakenBeforeAnyWrite	linux,darwin,windows	-	-	a
 internal/envprofile	TestImportSkillForeignPinnedByRevision	linux,darwin,windows	-	-	a checkout skill maps onto a revision-pinned entry with environment_import_skill_foreign
 internal/envprofile	TestImportSkillMarkerRecovery	linux,darwin,windows	-	-	a marker skill recovers its exact declaration from its own records
 internal/envprofile	TestImportRecordsImportedFromNative	linux,darwin,windows	-	-	markers and the list record imported_from_native
+internal/envprofile	TestImportSkipsManagedRootContext	linux,darwin,windows	-	-	managed root-context files are skipped as native input, never detected nor losses
+internal/envprofile	TestImportDivergentSkillsAreLoss	linux,darwin,windows	-	-	divergent same-named skills keep the first declaration and list each drop as a loss
+internal/envprofile	TestImportLedgerFailureIsLoss	linux,darwin,windows	-	-	an unreadable adapter ledger contributes no skills and is itself the loss
 cmd/curator	TestProfileImportRow	linux,darwin,windows	-	-	profile import installs and activates the imported profile
 cmd/curator	TestProfileImportLossyRow	linux,darwin,windows	-	-	profile import stops lossy and proceeds only under --allow-lossy
 cmd/curator	TestProfileImportNameTakenRow	linux,darwin,windows	-	-	profile import with a taken name stops with profile_import_name_taken
@@ -348,3 +353,6 @@ cmd/curator	TestProfileComposeAddPathRow	linux,darwin,windows	-	-	profile compos
 cmd/curator	TestProfileUseTakeoverRow	linux,darwin,windows	-	-	profile use over unmanaged files fails, and --takeover converges with notice and backup
 cmd/curator	TestResolveTakeoverRequiresRepair	linux,darwin,windows	-	-	env resolve --takeover without --repair is a usage error
 cmd/curator	TestSyncTakeoverFlagParses	linux,darwin,windows	-	-	profile sync accepts --takeover
+cmd/curator	TestProfileInstallUseLockedRequireRefuses	linux,darwin,windows	-	-	install --use of another profile under a locked require_current_profile is refused at the seam
+cmd/curator	TestProfileInstallFirstActivationLockedRequireRefuses	linux,darwin,windows	-	-	first-install auto-activation of another profile under a locked require is refused
+cmd/curator	TestEnvStatusReportsLockedRequire	linux,darwin,windows	-	-	env status reports the locked require_current_profile in JSON and text
