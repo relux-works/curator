@@ -17,10 +17,11 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	cfg, err := config.Parse(map[string]any{
 		"schema_version": float64(2), "skills_root": "x", "projects": map[string]any{},
 		"environments": map[string]any{
-			"mcp_package_allowlist":  []any{"https://example.com/m"},
-			"overlays_allowed":       false,
-			"overlay_default_weight": float64(500),
-			"precedence":             map[string]any{"winner": "lower-weight", "placement": "winner-first"},
+			"mcp_package_allowlist":   []any{"https://example.com/m"},
+			"overlays_allowed":        false,
+			"overlay_default_weight":  float64(500),
+			"precedence":              map[string]any{"winner": "lower-weight", "placement": "winner-first"},
+			"require_current_profile": "acme",
 			"overlays": map[string]any{
 				"a": []any{map[string]any{"source": "/srv/p", "revision": strings.Repeat("ab", 20), "weight": float64(7)}},
 			},
@@ -29,6 +30,7 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cfg.Locked["environments.require_current_profile"] = true
 	policy := PolicyFromConfig(cfg)
 	if len(policy.MCPAllowlist) != 1 || policy.MCPAllowlist[0] != "https://example.com/m" {
 		t.Fatalf("MCP allowlist = %v", policy.MCPAllowlist)
@@ -52,6 +54,15 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	}
 	if len(policy.EffectiveOverlays("a")) != 0 {
 		t.Fatalf("forbidding policy must empty the carried list")
+	}
+	if policy.RequireCurrent == nil || *policy.RequireCurrent != "acme" || !policy.RequireCurrentLocked {
+		t.Fatalf("require_current not carried: %+v locked=%v", policy.RequireCurrent, policy.RequireCurrentLocked)
+	}
+	if err := policy.CheckMachineUse("other"); err == nil || !strings.Contains(err.Error(), "environments.require_current_profile") {
+		t.Fatalf("locked require must refuse another profile: %v", err)
+	}
+	if err := policy.CheckMachineUse("acme"); err != nil {
+		t.Fatalf("required profile refused: %v", err)
 	}
 
 	absent := PolicyFromConfig(nil)

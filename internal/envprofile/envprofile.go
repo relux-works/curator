@@ -25,7 +25,9 @@ package envprofile
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -406,6 +408,12 @@ type Policy struct {
 	// (higher-weight, winner-last).
 	PrecedenceWinner    string
 	PrecedencePlacement string
+	// RequireCurrent is the effective §12.1 require_current_profile knob:
+	// nil means no requirement. RequireCurrentLocked reports whether the
+	// system file locks the key (manager §1); only a locked requirement
+	// refuses a machine-scope switch (environments §12.2).
+	RequireCurrent       *string
+	RequireCurrentLocked bool
 	// Takeover is the explicit section 9.5 takeover flag carried by a
 	// mutating operation (profile install, use, update, sync, env resolve
 	// --repair): with it the operation backs up and takes over the
@@ -455,6 +463,24 @@ func (p Policy) Precedence() contextmaterialize.Precedence {
 	return precedence
 }
 
+// CheckMachineUse enforces a locked require_current_profile at the §9.2
+// machine-scope switch itself (environments §12.2, manager §1): with the
+// key locked to a profile name, a machine-scope switch to any other
+// profile is a configuration error. A scoped switch, an unlocked knob,
+// and the required profile itself carry no refusal. Every path that
+// reaches the machine-scope switch — profile use, profile install --use,
+// first-install auto-activation, and import --use — funnels through
+// useLocked, so one gate covers them all.
+func (p Policy) CheckMachineUse(name string) error {
+	if p.RequireCurrent == nil || *p.RequireCurrent == name {
+		return nil
+	}
+	if !p.RequireCurrentLocked {
+		return nil
+	}
+	return fmt.Errorf("environments.require_current_profile: profile use of %q is refused: the system configuration requires current profile %q", name, *p.RequireCurrent)
+}
+
 // PolicyFromConfig derives the profile machine gates from the loaded
 // machine configuration (environments §9.1, §12.1): the core §6.1 source
 // allowlist, the MCP package allowlist, and the audit revocations. The CLI
@@ -475,6 +501,8 @@ func PolicyFromConfig(cfg *config.Config) Policy {
 		OverlayDefaultWeight: int64(cfg.Env.OverlayDefaultWeight),
 		PrecedenceWinner:     cfg.Env.Precedence.Winner,
 		PrecedencePlacement:  cfg.Env.Precedence.Placement,
+		RequireCurrent:       cfg.Env.RequireCurrent,
+		RequireCurrentLocked: cfg.Locked["environments.require_current_profile"],
 	}
 	if len(cfg.Env.Overlays) > 0 {
 		policy.Overlays = map[string][]OverlaySpec{}
@@ -1011,29 +1039,56 @@ func strictAuditMember(home string, manager *gitManager, resolved contextresolve
 
 // pathManifestDiag maps a manifest-load failure on a path operand onto the
 // section 1.1 diagnostic: an operand naming no existing filesystem entry
-// is profile_source_path_missing; every other failure is
-// profile_source_invalid. A failed read of an existing tree surfaces from
-// the snapshot copy as profile_source_path_unreadable, never as absence
-// (environments §8.4).
+// is profile_source_path_missing; an operand that exists but cannot be
+// read is profile_source_path_unreadable (§8.4: a failed read is never
+// absence and never invalid); every other failure is
+// profile_source_invalid. A failed read below an existing tree surfaces
+// from the snapshot copy as profile_source_path_unreadable.
 func pathManifestDiag(operand string, err error) error {
-	if _, statErr := os.Stat(operand); statErr != nil && os.IsNotExist(statErr) {
-		return fmt.Errorf("%s: path %q names no existing filesystem entry", DiagPathMissing, operand)
+	if _, statErr := os.Stat(operand); statErr != nil {
+		if os.IsNotExist(statErr) {
+			return fmt.Errorf("%s: path %q names no existing filesystem entry", DiagPathMissing, operand)
+		}
+		if errors.Is(statErr, fs.ErrPermission) || os.IsPermission(statErr) {
+			return fmt.Errorf("%s: path %q cannot be read: %v", DiagPathUnreadable, operand, statErr)
+		}
+	}
+	if errors.Is(err, fs.ErrPermission) || os.IsPermission(err) {
+		return fmt.Errorf("%s: path %q cannot be read: %v", DiagPathUnreadable, operand, err)
 	}
 	return fmt.Errorf("%s: %v", DiagSourceInvalid, err)
 }
 
 // stateForPath installs the path root into the store and returns its state
-// package for resolution.
+// package for resolution. The store already reports the §1.1 diagnostic
+// that leads — missing, unreadable, or invalid — so a store error keeps
+// its leading diagnostic and is never wrapped in a second
+// profile_source_invalid (§8.4: unreadable evidence is reported as
+// unreadable, never as something else).
 func stateForPath(home, name, dir string) (*contextresolve.StatePackage, error) {
 	entry, hash, err := contextstore.EnsureState(home, contextlock.KindContext, name, dir)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+		return nil, preservePathDiag(err)
 	}
 	manifest, err := contextpkg.LoadManifest(entry)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
 	}
 	return &contextresolve.StatePackage{StateHash: hash, Manifest: packageOf(manifest)}, nil
+}
+
+// preservePathDiag keeps a store error's leading §1.1 diagnostic: an
+// error the store already classified (missing, unreadable, invalid) is
+// returned as-is so the specific diagnostic leads; any other failure is
+// an invalid source tree.
+func preservePathDiag(err error) error {
+	message := err.Error()
+	for _, leading := range []string{DiagPathMissing, DiagPathUnreadable, DiagSourceInvalid} {
+		if message == leading || strings.HasPrefix(message, leading+":") {
+			return err
+		}
+	}
+	return fmt.Errorf("%s: %v", DiagSourceInvalid, err)
 }
 
 // checkMCPCommand warns mcp_command_unresolved when a stdio server's command

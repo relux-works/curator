@@ -196,6 +196,18 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 		}
 		effective = machine
 	} else {
+		// The §12.2 fleet-policy gate precedes the installed check: a
+		// machine-scope switch to another profile is a configuration
+		// error even when that profile is not installed. Every
+		// machine-scope switch — profile use, install --use,
+		// first-install auto-activation, import --use, and resync —
+		// funnels through this seam, not through any one CLI row. A
+		// scoped switch records a scoped current and is unaffected.
+		if scope == "" {
+			if err := policy.CheckMachineUse(name); err != nil {
+				return nil, err
+			}
+		}
 		if _, err := readSource(home, name); err != nil {
 			return nil, err
 		}
@@ -495,6 +507,13 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	copies := []envmarker.Copy{}
 	if written {
 		if adapter.ID == "claude_code" {
+			// A copied surface never follows a link: remove first,
+			// exactly as replaceLink does for the linked adapters.
+			// os.WriteFile follows a symlink, so without this a
+			// --takeover of a foreign-manager symlink would write
+			// through the link into a file outside every managed
+			// home (§9.5 never absorbs in the wrong direction).
+			_ = os.Remove(target)
 			if err := os.WriteFile(target, document, 0o644); err != nil {
 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 			}
@@ -505,7 +524,11 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 				return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 			}
 			if err := replaceLink(target, storeFile); err != nil {
-				// Copy fallback (manager §5): record the copy with its reason.
+				// Copy fallback (manager §5): the link is already
+				// removed by replaceLink, so this write cannot
+				// follow it; remove again defensively before the
+				// copy and record the reason.
+				_ = os.Remove(target)
 				if writeErr := os.WriteFile(target, document, 0o644); writeErr != nil {
 					return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: writeErr.Error()}
 				}
@@ -545,6 +568,8 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 	if err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}
+	// The marker is curator-owned state: never follow a link to it either.
+	_ = os.Remove(filepath.Join(native, envmarker.Name))
 	if err := os.WriteFile(filepath.Join(native, envmarker.Name), payload, 0o644); err != nil {
 		return EntryResult{Adapter: adapter.ID, Home: native, OK: false, Detail: err.Error()}
 	}

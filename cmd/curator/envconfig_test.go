@@ -233,3 +233,110 @@ func TestProfileUseLockedRequireRefuses(t *testing.T) {
 		t.Fatalf("use of the required profile must pass the gate: code = %d\nstderr:\n%s", code, stderr)
 	}
 }
+
+// TestProfileInstallUseLockedRequireRefuses drives the same §12.2 gate
+// through the install activation seam (run()): with the key locked to
+// acme, profile install --use of another profile fails naming the locked
+// knob and moves no current, while installing without --use succeeds
+// (no switch) and a scoped switch stays unaffected.
+func TestProfileInstallUseLockedRequireRefuses(t *testing.T) {
+	source, home := profileHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.require_current_profile"],
+		"environments": {"require_current_profile": "acme"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	other := t.TempDir()
+	writeContextPackage(t, other, "other", "1.0.0", "hello\n")
+	code, _, stderr := runProfile(t, source, "profile", "install", other, "--as", "other", "--use")
+	if code != exitFail || !strings.Contains(stderr, "environments.require_current_profile") {
+		t.Fatalf("install --use of another profile = %d\nstderr:\n%s", code, stderr)
+	}
+	// The required profile passes the gate through the same seam.
+	required := t.TempDir()
+	writeContextPackage(t, required, "acme", "1.0.0", "hello\n")
+	code, _, stderr = runProfile(t, source, "profile", "install", required, "--as", "acme", "--use")
+	if code != exitOK {
+		t.Fatalf("install --use of the required profile = %d\nstderr:\n%s", code, stderr)
+	}
+}
+
+// TestProfileInstallFirstActivationLockedRequireRefuses drives the
+// first-install auto-activation through the same seam: on a fresh machine
+// with the key locked to acme, installing another profile without --use
+// still attempts the §9.2 switch and is refused.
+func TestProfileInstallFirstActivationLockedRequireRefuses(t *testing.T) {
+	source, home := profileHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.require_current_profile"],
+		"environments": {"require_current_profile": "acme"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	other := t.TempDir()
+	writeContextPackage(t, other, "other", "1.0.0", "hello\n")
+	code, _, stderr := runProfile(t, source, "profile", "install", other, "--as", "other")
+	if code != exitFail || !strings.Contains(stderr, "environments.require_current_profile") {
+		t.Fatalf("first install of another profile = %d\nstderr:\n%s", code, stderr)
+	}
+}
+
+// TestEnvStatusReportsLockedRequire drives env status through run() with
+// the key locked to acme: the JSON carries require_current_profile and
+// the text names the requirement (§12.2). Without the lock the key is
+// absent.
+func TestEnvStatusReportsLockedRequire(t *testing.T) {
+	source, home := profileHome(t)
+	userPath := filepath.Join(home, "machine.json")
+	if err := os.WriteFile(userPath, []byte(`{"schema_version": 2, "skills_root": "x", "projects": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	systemPath := filepath.Join(home, "system.json")
+	if err := os.WriteFile(systemPath, []byte(`{"schema_version": 2, "locked": ["environments.require_current_profile"],
+		"environments": {"require_current_profile": "acme"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CURATOR_SYSTEM_CONFIG", systemPath)
+	cfg, err := config.Load(userPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source.path = userPath
+	source.cfg = cfg
+	code, stdout, stderr := runProfile(t, source, "env", "status", "--json")
+	if code != exitOK {
+		t.Fatalf("status = %d\nstderr:\n%s", code, stderr)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("status JSON does not decode: %v\n%s", err, stdout)
+	}
+	if payload["require_current_profile"] != "acme" {
+		t.Fatalf("JSON carries no requirement: %v", payload["require_current_profile"])
+	}
+	code, stdout, stderr = runProfile(t, source, "env", "status")
+	if code != exitOK || !strings.Contains(stdout, "require_current_profile") || !strings.Contains(stdout, "acme") {
+		t.Fatalf("text status names no requirement: code=%d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+}

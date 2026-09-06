@@ -205,15 +205,10 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
 		return exitUsage
 	}
-	// A locked require_current_profile makes machine-scope use of any other
-	// profile a configuration error (environments §12.2, manager §1); a
-	// scoped switch records a scoped current and is unaffected.
-	if name != "" && *env == "" && *target == "" {
-		if err := cfg.CheckMachineUse(name); err != nil {
-			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
-			return exitFail
-		}
-	}
+	// The locked require_current_profile gate lives at the §9.2
+	// machine-scope switch itself (useLocked via UseWithPolicy), not at
+	// this row: install --use, first-install auto-activation, and import
+	// --use reach the same seam. A scoped switch is unaffected.
 	policy := envprofile.PolicyFromConfig(cfg)
 	policy.Takeover = *takeover
 	results, err := envprofile.UseWithPolicy(cfg.Home(), name, *env, *target, *clearScope, policy)
