@@ -137,11 +137,15 @@ func validHex(value string, width int) bool {
 }
 
 // checkPath enforces absolute, ..-free paths for the evident test root.
+// The published vectors carry POSIX evident paths under
+// "/manager/environments", so this check uses slash semantics on every
+// platform; the host-path boundary itself is covered by CheckBoundary and
+// TestCheckBoundary with platform-absolute fixtures.
 func checkPath(value, root string) error {
 	if value == "" {
 		return &caseError{"empty path"}
 	}
-	if !filepath.IsAbs(value) {
+	if !strings.HasPrefix(value, "/") {
 		return &caseError{"relative path"}
 	}
 	for _, segment := range strings.Split(filepath.ToSlash(value), "/") {

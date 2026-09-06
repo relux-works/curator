@@ -1,6 +1,7 @@
 package envfragment
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -132,39 +133,45 @@ func TestCheckBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := "/manager/environments"
-	good := testFragment()
-	good.Env = map[string]string{"CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code"}
+	// Platform-absolute fixture root: CheckBoundary is built on
+	// path/filepath, so POSIX-rooted literals are not absolute on Windows.
+	// Every value below is derived from this root with filepath.Join.
+	base := t.TempDir()
+	root := filepath.Join(base, "environments")
+	newFragment := func(envValue string) *Fragment {
+		fragment := testFragment()
+		fragment.Env = map[string]string{"CLAUDE_CONFIG_DIR": envValue}
+		fragment.SystemPrompt.Path = filepath.Join(root, "companyA", "claude_code", ".agent-context", "system-prompt.md")
+		fragment.MCP.Path = filepath.Join(root, "companyA", "claude_code", ".agent-context", "mcp", "claude_code.json")
+		return fragment
+	}
+	good := newFragment(filepath.Join(root, "companyA", "claude_code"))
 	if err := CheckBoundary(adapter, root, good); err != nil {
 		t.Fatalf("a conforming fragment must pass the boundary: %v", err)
 	}
-	badName := testFragment()
-	badName.Env = map[string]string{"CLAUDE_CONFIG_DIR": "/manager/environments/companyA/claude_code", "EVIL": "/manager/environments/x"}
+	badName := newFragment(filepath.Join(root, "companyA", "claude_code"))
+	badName.Env["EVIL"] = filepath.Join(root, "x")
 	if err := CheckBoundary(adapter, root, badName); err == nil {
 		t.Fatal("a profile-derived variable name must fail the boundary")
 	}
-	relative := testFragment()
-	relative.Env = map[string]string{"CLAUDE_CONFIG_DIR": "environments/companyA/claude_code"}
+	relative := newFragment(filepath.Join("environments", "companyA", "claude_code"))
 	if err := CheckBoundary(adapter, root, relative); err == nil {
 		t.Fatal("a relative value must fail the boundary")
 	}
-	traversal := testFragment()
-	traversal.Env = map[string]string{"CLAUDE_CONFIG_DIR": "/manager/environments/../escape"}
+	traversal := newFragment(root + string(filepath.Separator) + ".." + string(filepath.Separator) + "escape")
 	if err := CheckBoundary(adapter, root, traversal); err == nil {
 		t.Fatal("a .. traversal must fail the boundary even when it resolves inside")
 	}
-	outside := testFragment()
-	outside.Env = map[string]string{"CLAUDE_CONFIG_DIR": "/tmp/evil"}
+	outside := newFragment(filepath.Join(base, "evil"))
 	if err := CheckBoundary(adapter, root, outside); err == nil {
 		t.Fatal("a value outside the environments root must fail the boundary")
 	}
-	sibling := testFragment()
-	sibling.Env = map[string]string{"CLAUDE_CONFIG_DIR": "/manager/profiles/acme/rendered/claude_code/AGENTS.md"}
+	sibling := newFragment(filepath.Join(base, "profiles", "acme", "rendered", "claude_code", "AGENTS.md"))
 	if err := CheckBoundary(adapter, root, sibling); err == nil {
 		t.Fatal("a value below the environments root parent but outside the root must fail the boundary")
 	}
-	outsideMCP := testFragment()
-	outsideMCP.MCP.Path = "/tmp/evil.json"
+	outsideMCP := newFragment(filepath.Join(root, "companyA", "claude_code"))
+	outsideMCP.MCP.Path = filepath.Join(base, "evil.json")
 	if err := CheckBoundary(adapter, root, outsideMCP); err == nil {
 		t.Fatal("an mcp path outside the environments root must fail the boundary")
 	}
