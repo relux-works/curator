@@ -287,6 +287,19 @@ func (m *gitManager) contextManifestAt(dir, commit, directory string) (*contextp
 	return manifest, nil
 }
 
+// packageRoot joins a store entry with a member directory requirement to
+// the package root every consumer of a resolved member must use: the audit
+// scope, the manifest load, and the materialization load all read below the
+// directory when one is declared. A third call site must reuse this helper
+// rather than re-spelling the join, so directory-addressed packages cannot
+// drift out of any consumer's scope (environments §9.1).
+func packageRoot(entry, directory string) string {
+	if directory != "" {
+		return filepath.Join(entry, filepath.FromSlash(directory))
+	}
+	return entry
+}
+
 // entryPath returns the store entry path of a resolved member without
 // creating it.
 func (m *gitManager) entryPath(home string, resolved contextresolve.Resolved) string {

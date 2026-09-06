@@ -10,11 +10,15 @@
 //
 // Stage bounds: overlays come from machine configuration (manager-config
 // schema 2), which is out of scope for this stage, so resolution runs with
-// no overlays; direct machine skill declarations (§9.4) are not yet wired,
-// so Direct is empty; scoped secret-material waivers
-// (secret_material_waivers) have no machine-config surface yet, so the
-// audit runs with no waivers; precedence is the default pair
-// (higher-weight, winner-last).
+// no overlays and Direct is empty; the §9.4 migration freezes the global
+// skill set at migration time into the default lock instead — git tag and
+// revision declarations only, since a skill member pins a commit with its
+// source and branch-pinned or local skills have no representable pin here;
+// live direct declarations (`global add`/`remove` writing into the lock)
+// await the machine-config surface and skill pipeline of a later stage;
+// scoped secret-material waivers (secret_material_waivers) have no
+// machine-config surface yet, so the audit runs with no waivers; precedence
+// is the default pair (higher-weight, winner-last).
 package envprofile
 
 import (
@@ -31,8 +35,8 @@ import (
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/gitops"
-	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
 
@@ -45,6 +49,9 @@ const (
 	DiagInUse           = "profile_in_use"
 	DiagNotFound        = "profile_not_found"
 	DiagImportNameTaken = "profile_import_name_taken"
+	// DiagLockUnavailable reports that the manager-home mutation lock
+	// could not be acquired within the bounded wait (manager §2.5).
+	DiagLockUnavailable = "environment_lock_unavailable"
 )
 
 // Source kinds (environments §1).
@@ -139,17 +146,15 @@ func readSource(home, name string) (Source, error) {
 	return source, nil
 }
 
-// writeSource stores a profile's install record.
-func writeSource(home, name string, source Source) error {
+// marshalSource renders a profile's install record. Records reach the
+// manager home only through the operation journal (op.publish), never by
+// direct write.
+func marshalSource(source Source) ([]byte, error) {
 	payload, err := json.MarshalIndent(source, "", "  ")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	payload = append(payload, '\n')
-	if err := os.MkdirAll(ProfileDir(home, name), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(sourcePath(home, name), payload, 0o644)
+	return append(payload, '\n'), nil
 }
 
 // readLock loads a profile's lock and hash.
@@ -159,7 +164,17 @@ func readLock(home, name string) (*contextlock.Lock, string, error) {
 
 // List returns every installed profile with its lock and currency.
 func List(home string) ([]Info, error) {
-	if err := EnsureDefault(home); err != nil {
+	op, err := beginOperation(home)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = op.close() }()
+	return listLocked(op, home)
+}
+
+// listLocked lists under the held operation lock.
+func listLocked(op *operation, home string) ([]Info, error) {
+	if err := ensureDefault(op, home); err != nil {
 		return nil, err
 	}
 	entries, err := os.ReadDir(ProfilesDir(home))
@@ -304,8 +319,21 @@ type InstallOptions struct {
 // closure, audits every member always-strict, writes the lock, and installs
 // every member's store entry. A git operand takes at most one requirement
 // flag (default range latest); a path operand takes none and no directory.
+//
+// Install holds the manager-home mutation lock and publishes its records
+// through the operation journal (see lock.go).
 func Install(home string, options InstallOptions) (Info, bool, bool, error) {
-	if err := EnsureDefault(home); err != nil {
+	op, err := beginOperation(home)
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	defer func() { _ = op.close() }()
+	return installLocked(op, home, options)
+}
+
+// installLocked installs under the held operation lock.
+func installLocked(op *operation, home string, options InstallOptions) (Info, bool, bool, error) {
+	if err := ensureDefault(op, home); err != nil {
 		return Info{}, false, false, err
 	}
 	isPath := isPathOperand(options.Operand)
@@ -370,7 +398,7 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
 		// re-resolves exactly as profile update does and is reported as an
 		// update; a different source under the same name is taken.
 		if prior == source {
-			info, moved, err := Update(home, name)
+			info, moved, err := updateLocked(op, home, name)
 			if err != nil {
 				return Info{}, false, false, err
 			}
@@ -390,20 +418,26 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
 	if err != nil {
 		return Info{}, false, false, err
 	}
-	if err := writeSource(home, name, source); err != nil {
-		return Info{}, false, false, err
-	}
-	hash, err := contextlock.Write(lockPath(home, name), result.Lock)
+	sourcePayload, err := marshalSource(source)
 	if err != nil {
 		return Info{}, false, false, err
 	}
+	canonical, err := result.Lock.Canonical()
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	records := map[string][]byte{sourcePath(home, name): sourcePayload, lockPath(home, name): canonical}
+	if err := op.publish(records); err != nil {
+		return Info{}, false, false, err
+	}
+	hash := contextlock.HashBytes(canonical)
 	machine, err := Current(home)
 	if err != nil {
 		return Info{}, false, false, err
 	}
 	activated := false
 	if machine == "" || options.Use {
-		if err := SetCurrent(home, name); err != nil {
+		if err := op.publish(map[string][]byte{CurrentFile(home): []byte(name + "\n")}); err != nil {
 			return Info{}, false, false, err
 		}
 		activated = true
@@ -418,7 +452,17 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
 // profile_update_blocked. A root pinned by tag or revision is reported as
 // pinned and does not move. A path root re-resolves against its directory.
 func Update(home, name string) (Info, bool, error) {
-	if err := EnsureDefault(home); err != nil {
+	op, err := beginOperation(home)
+	if err != nil {
+		return Info{}, false, err
+	}
+	defer func() { _ = op.close() }()
+	return updateLocked(op, home, name)
+}
+
+// updateLocked re-resolves under the held operation lock.
+func updateLocked(op *operation, home, name string) (Info, bool, error) {
+	if err := ensureDefault(op, home); err != nil {
 		return Info{}, false, err
 	}
 	source, err := readSource(home, name)
@@ -476,8 +520,11 @@ func Update(home, name string) (Info, bool, error) {
 		if oldMembers[key] {
 			continue
 		}
-		entry := manager.entryPath(home, resolved)
-		report, err := contextaudit.Detect(entry, pinOf(resolved), nil)
+		entry, err := manager.ensureEntry(home, resolved)
+		if err != nil {
+			return Info{}, false, err
+		}
+		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
 		if err != nil {
 			return Info{}, false, err
 		}
@@ -493,11 +540,15 @@ func Update(home, name string) (Info, bool, error) {
 	if err != nil {
 		return Info{}, false, err
 	}
-	hash, err := contextlock.Write(lockPath(home, name), result.Lock)
+	canonical, err := result.Lock.Canonical()
 	if err != nil {
 		return Info{}, false, err
 	}
-	if err := resyncCurrentScopes(home, name); err != nil {
+	if err := op.publish(map[string][]byte{lockPath(home, name): canonical}); err != nil {
+		return Info{}, false, err
+	}
+	hash := contextlock.HashBytes(canonical)
+	if err := resyncCurrentScopes(op, home, name); err != nil {
 		return Info{}, false, err
 	}
 	machine, _ := Current(home)
@@ -506,8 +557,16 @@ func Update(home, name string) (Info, bool, error) {
 
 // Remove deletes a profile that is current in no scope and an overlay of
 // none. With purge, in-place surfaces recorded by its markers, the markers,
-// and the backup generations are removed too.
+// and the backup generations are removed too. Remove holds the
+// manager-home mutation lock; the profile directory goes with one RemoveAll
+// under it, which is already atomic at the granularity the manager
+// observes, so no journal is needed for the removal itself.
 func Remove(home, name string, purge bool) error {
+	op, err := beginOperation(home)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = op.close() }()
 	if _, err := readSource(home, name); err != nil {
 		return err
 	}
@@ -542,7 +601,7 @@ func auditAndStore(home string, manager *gitManager, result *contextresolve.Resu
 		if err != nil {
 			return nil, err
 		}
-		report, err := contextaudit.Detect(entry, pinOf(resolved), nil)
+		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -555,10 +614,7 @@ func auditAndStore(home string, manager *gitManager, result *contextresolve.Resu
 			}
 		}
 		if resolved.Kind == contextlock.KindContext {
-			root := entry
-			if resolved.Directory != "" {
-				root = filepath.Join(entry, filepath.FromSlash(resolved.Directory))
-			}
+			root := packageRoot(entry, resolved.Directory)
 			if manifest, err := contextpkg.LoadManifest(root); err == nil {
 				for _, system := range contextaudit.SystemModules(resolved.Name, manifest) {
 					warnings = append(warnings, contextaudit.ClassSystemModulePresent+": "+system.Package+"/"+system.Path)
@@ -566,7 +622,7 @@ func auditAndStore(home string, manager *gitManager, result *contextresolve.Resu
 			}
 		}
 		if resolved.Kind == contextlock.KindMCP {
-			if warning, ok := checkMCPCommand(entry); ok {
+			if warning, ok := checkMCPCommand(packageRoot(entry, resolved.Directory)); ok {
 				warnings = append(warnings, warning)
 			}
 		}
@@ -624,44 +680,128 @@ func canonicalGit(operand string) string {
 	return strings.TrimSuffix(strings.TrimSpace(operand), "/")
 }
 
+// defaultManifest is the synthesized local root of the builtin default
+// profile (environments §9.4): name default, version 0.0.0, no context
+// member, so it declares no root-context surface and materializes skills
+// alone. Its store key and pin are the state hash of this exact tree.
+const defaultManifest = `{"schema_version": 1, "name": "default", "version": "0.0.0"}` + "\n"
+
 // EnsureDefault creates the builtin local default profile on first use of
-// the profile surface (environments §9.4): an umbrella root with no context
-// and no skills. A machine that never installs another profile observes no
-// behavior change.
+// the profile surface (environments §9.4): it materializes the synthesized
+// local root into the store under its state hash, pins that hash in the
+// lock, and carries the machine's global skill set at migration time as
+// skill lock members. A machine that never installs another profile observes
+// no behavior change: default simply is the current profile.
+//
+// The lock is written before the install record so a failed migration
+// retries on the next call instead of stranding a sourceless profile.
+// EnsureDefault is the locked entry point; ensureDefault runs under the
+// held operation lock.
 func EnsureDefault(home string) error {
+	op, err := beginOperation(home)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = op.close() }()
+	return ensureDefault(op, home)
+}
+
+func ensureDefault(op *operation, home string) error {
 	if _, err := readSource(home, DefaultProfile); err == nil {
 		return nil
 	}
-	empty, err := os.MkdirTemp("", "curator-default-root-*")
+	staging, err := os.MkdirTemp("", "curator-default-root-*")
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(empty) }()
-	hash, err := hashing.ContentSHA256(empty, map[string]bool{})
+	defer func() { _ = os.RemoveAll(staging) }()
+	if err := os.WriteFile(filepath.Join(staging, contextpkg.ManifestName), []byte(defaultManifest), 0o644); err != nil {
+		return err
+	}
+	_, key, err := contextstore.EnsureState(home, contextlock.KindContext, DefaultProfile, staging)
 	if err != nil {
 		return err
 	}
-	key := hashing.Normalize(hash)
-	lock := &contextlock.Lock{Root: DefaultProfile, Members: []contextlock.Member{
-		{Kind: contextlock.KindContext, Name: DefaultProfile, StateHash: key, Version: "0.0.0", Weight: 0},
-	}}
+	members := []contextlock.Member{
+		{Kind: contextlock.KindContext, Name: DefaultProfile, StateHash: key, Version: "0.0.0"},
+	}
+	skills, err := migrateGlobalSkills(home)
+	if err != nil {
+		return err
+	}
+	members = append(members, skills...)
+	lock := &contextlock.Lock{Root: DefaultProfile, Members: members}
 	lock.Sort()
-	if err := writeSource(home, DefaultProfile, Source{Kind: KindLocal}); err != nil {
+	canonical, err := lock.Canonical()
+	if err != nil {
 		return err
 	}
-	_, err = contextlock.Write(lockPath(home, DefaultProfile), lock)
-	return err
+	sourcePayload, err := marshalSource(Source{Kind: KindLocal})
+	if err != nil {
+		return err
+	}
+	return op.publish(map[string][]byte{
+		lockPath(home, DefaultProfile):   canonical,
+		sourcePath(home, DefaultProfile): sourcePayload,
+	})
+}
+
+// migrateGlobalSkills snapshots the machine's global skill set at migration
+// time (environments §9.4) as skill lock members: every global declaration
+// that names a commit — a git tag or revision — is fetched, pinned, stored,
+// and audited exactly like an installed member. A declaration the lock
+// cannot represent — a branch pin, or a local skill with no source identity,
+// since a skill member pins a commit with its source and a state pin admits
+// only a context member — is left for the skill-pipeline stage that owns
+// live direct declarations (see the stage bounds in the package doc).
+func migrateGlobalSkills(home string) ([]contextlock.Member, error) {
+	global, err := manifest.Load(filepath.Join(home, "global"))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+	}
+	if global == nil {
+		return nil, nil
+	}
+	manager := newGitManager(home)
+	var members []contextlock.Member
+	for _, decl := range global.Skills {
+		if decl.Git == "" || (decl.Ref.Kind != "tag" && decl.Ref.Kind != "revision") {
+			continue
+		}
+		identity := canonicalGit(decl.Git)
+		if err := manager.fetch(identity); err != nil {
+			return nil, fmt.Errorf("%s: migrate global skill %q: %v", DiagSourceInvalid, decl.Name, err)
+		}
+		dir := manager.repoDir(identity)
+		resolved, err := gitops.Resolve(dir, decl.Ref.Kind, decl.Ref.Value)
+		if err != nil {
+			return nil, fmt.Errorf("%s: migrate global skill %q: %v", DiagSourceInvalid, decl.Name, err)
+		}
+		entry, err := contextstore.EnsureGit(home, contextlock.KindSkill, decl.Name, dir, resolved.Commit)
+		if err != nil {
+			return nil, err
+		}
+		if report, err := contextaudit.Detect(entry, "commit "+resolved.Commit, nil); err != nil {
+			return nil, err
+		} else if report.Blocking() {
+			return nil, fmt.Errorf("%s: migrated global skill %q carries a blocking %s finding", DiagSourceInvalid, decl.Name, contextaudit.ClassSecretMaterial)
+		}
+		members = append(members, contextlock.Member{
+			Kind: contextlock.KindSkill, Name: decl.Name, Source: identity, Commit: resolved.Commit,
+		})
+	}
+	return members, nil
 }
 
 // resyncCurrentScopes re-materializes every scope whose current profile is
-// name after its lock moved.
-func resyncCurrentScopes(home, name string) error {
+// name after its lock moved, under the held operation lock.
+func resyncCurrentScopes(op *operation, home, name string) error {
 	machine, err := Current(home)
 	if err != nil {
 		return err
 	}
 	if machine == name {
-		if _, err := Use(home, name, "", "", false); err != nil {
+		if _, err := useLocked(op, home, name, "", "", false); err != nil {
 			return err
 		}
 	}
@@ -674,12 +814,9 @@ func resyncCurrentScopes(home, name string) error {
 			continue
 		}
 		environment, target := splitScope(scope)
-		if _, err := Use(home, name, environment, target, false); err != nil {
+		if _, err := useLocked(op, home, name, environment, target, false); err != nil {
 			return err
 		}
 	}
 	return nil
 }
-
-// _ keeps gitops referenced for the fetch path used by Update.
-var _ = gitops.Fetch

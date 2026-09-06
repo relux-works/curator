@@ -5,8 +5,19 @@
 // profile's store entries: it attempts every entry, reports per-adapter
 // results, and records the new current only when the whole scope
 // materialized — the M11 transactional shape. A partial scope is reported
-// as profile_use_partial and the recorded current is unchanged. Every
-// replaced file is backed up into a versioned generation
+// as profile_use_partial and the recorded current is unchanged.
+//
+// Serialization and durability (see lock.go): every switch holds the
+// manager-home mutation lock, and the manager-home records it moves — the
+// current and scope pointers — commit through the internal/transaction
+// journal. The per-entry agent-home payloads are not transaction targets in
+// this stage: one Plan commits all-or-nothing with rollback, while §9.2
+// requires partial success persisted, and the engine's sidecar backups
+// cannot produce the specified §8.3 versioned generations. Entries stay
+// direct writes under the held lock; re-running profile use converges the
+// scope from the lock, which is the specified recovery path.
+//
+// Every replaced file is backed up into a versioned generation
 // .agent-environment-backup/<n>/ beside the marker (environments §8.3),
 // pruned to the retention default of 5 (0 keeps every generation only via
 // env backups scrub, which is out of scope for this stage). A write that
@@ -114,8 +125,21 @@ type EntryResult struct {
 // scope re-materializes from the machine default. It returns the per-entry
 // results; when any entry failed the recorded current is unchanged and the
 // error carries profile_use_partial.
+// Use holds the manager-home mutation lock (see lock.go) and records the
+// new current through the operation journal only when the whole scope
+// materialized.
 func Use(home, name, environment, target string, clearScope bool) ([]EntryResult, error) {
-	if err := EnsureDefault(home); err != nil {
+	op, err := beginOperation(home)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = op.close() }()
+	return useLocked(op, home, name, environment, target, clearScope)
+}
+
+// useLocked switches under the held operation lock.
+func useLocked(op *operation, home, name, environment, target string, clearScope bool) ([]EntryResult, error) {
+	if err := ensureDefault(op, home); err != nil {
 		return nil, err
 	}
 	if environment != "" {
@@ -158,9 +182,15 @@ func Use(home, name, environment, target string, clearScope bool) ([]EntryResult
 	if failed {
 		return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
 	}
+	// The recorded current moves only after the whole scope materialized,
+	// and it moves through the operation journal, so a crash here recovers
+	// to either the old current (journal resumes) or the new one — never a
+	// half-written pointer. A journal failure after switched entries is
+	// itself a partial switch: the entries no longer match the recorded
+	// current.
 	if scope == "" {
-		if err := SetCurrent(home, effective); err != nil {
-			return results, err
+		if err := op.publish(map[string][]byte{CurrentFile(home): []byte(effective + "\n")}); err != nil {
+			return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
 		}
 	} else {
 		machine, err := Current(home)
@@ -168,11 +198,14 @@ func Use(home, name, environment, target string, clearScope bool) ([]EntryResult
 			return results, err
 		}
 		if clearScope || effective == machine {
+			// A scope-clear is one unlink under the held lock: crash
+			// before it retries the clear, crash after it has converged.
+			// It is not journaled as an absence target in this stage.
 			if err := SetScoped(home, scope, "", true); err != nil {
 				return results, err
 			}
-		} else if err := SetScoped(home, scope, effective, false); err != nil {
-			return results, err
+		} else if err := op.publish(map[string][]byte{filepath.Join(ScopedDir(home), scope): []byte(effective + "\n")}); err != nil {
+			return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
 		}
 	}
 	return results, nil
@@ -180,9 +213,16 @@ func Use(home, name, environment, target string, clearScope bool) ([]EntryResult
 
 // Sync re-materializes the machine scope and every scoped current from
 // their profiles' locks: the stage-(a) actualization path. Managed homes
-// are stage (b) and are not provisioned here.
+// are stage (b) and are not provisioned here. Sync holds the manager-home
+// mutation lock; it moves no current pointer, so there is nothing to
+// journal beyond the recovery the lock entry already performed.
 func Sync(home string) ([]EntryResult, error) {
-	if err := EnsureDefault(home); err != nil {
+	op, err := beginOperation(home)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = op.close() }()
+	if err := ensureDefault(op, home); err != nil {
 		return nil, err
 	}
 	machine, err := Current(home)
@@ -262,10 +302,7 @@ func loadMaterial(home string, manager *gitManager, lock *contextlock.Lock) (map
 			continue
 		}
 		entry := manager.entryPath(home, resolvedOf(member))
-		root := entry
-		if member.Directory != "" {
-			root = filepath.Join(entry, filepath.FromSlash(member.Directory))
-		}
+		root := packageRoot(entry, member.Directory)
 		manifest, err := contextpkg.LoadManifest(root)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", DiagSourceInvalid, err)

@@ -1,14 +1,20 @@
 package envprofile
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/relux-works/curator/internal/contextaudit"
+	"github.com/relux-works/curator/internal/contextlock"
+	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/managerlock"
+	"github.com/relux-works/curator/internal/transaction"
 )
 
 // Production entry points under test: Install, List, Update, Remove, Use,
@@ -543,6 +549,57 @@ func TestListFailsOnCorruptRecord(t *testing.T) {
 	}
 }
 
+// directorySecret is a secret-shaped module payload assembled at runtime so
+// no secret-shaped literal appears in the source; the detector still sees
+// the joined bytes.
+func directorySecret() string { return "key " + "AK" + "IA1234567890ABCDEF" + " here\n" }
+
+// TestInstallDirectoryRejectsSecretUnderSubdirectory narrows the audit-scope
+// gate (review F1): a --directory install scans the package root below the
+// directory, not the snapshot root. Production entry point: Install with
+// Directory set. A mutant that restores the snapshot-root audit path must
+// fail this test while TestInstallRejectsSecretMember still passes.
+func TestInstallDirectoryRejectsSecretUnderSubdirectory(t *testing.T) {
+	repo := gitRepo(t, map[string]string{
+		"sub/agent-context.json": `{"schema_version": 1, "name": "acme", "version": "1.0.0",` +
+			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",
+		"sub/context/a.md": directorySecret(),
+	}, "v1.0.0")
+	home := t.TempDir()
+	if _, _, _, err := Install(home, InstallOptions{Operand: "file://" + repo, Directory: "sub"}); err == nil {
+		t.Fatal("directory-addressed secret member must fail installation")
+	} else if !strings.Contains(err.Error(), DiagSourceInvalid) {
+		t.Fatalf("error %v carries no %s", err, DiagSourceInvalid)
+	}
+	if _, err := readSource(home, "acme"); err == nil {
+		t.Fatal("failed install must leave no profile record")
+	}
+}
+
+// TestInstallTransitiveDirectoryRejectsSecret narrows the same gate for the
+// transitive shape (review F1): a requires.contexts[].directory member with
+// a secret fails installation. Production entry point: Install of a clean
+// root whose dependency is directory-addressed.
+func TestInstallTransitiveDirectoryRejectsSecret(t *testing.T) {
+	dep := gitRepo(t, map[string]string{
+		"sub/agent-context.json": `{"schema_version": 1, "name": "dep", "version": "1.0.0",` +
+			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",
+		"sub/context/a.md": directorySecret(),
+	}, "v1.0.0")
+	root := gitRepo(t, map[string]string{
+		"agent-context.json": `{"schema_version": 1, "name": "clean", "version": "1.0.0",` +
+			`"context": {"modules": [{"path": "a.md"}]},` +
+			`"requires": {"contexts": {"dep": {"git": "file://` + dep + `", "range": "*", "directory": "sub"}}}}` + "\n",
+		"context/a.md": "clean\n",
+	}, "v1.0.0")
+	home := t.TempDir()
+	if _, _, _, err := Install(home, InstallOptions{Operand: "file://" + root}); err == nil {
+		t.Fatal("transitive directory-addressed secret member must fail installation")
+	} else if !strings.Contains(err.Error(), DiagSourceInvalid) {
+		t.Fatalf("error %v carries no %s", err, DiagSourceInvalid)
+	}
+}
+
 // TestEnsureDefaultCreatesLocalProfile checks the §9.4 migration: the first
 // use of the profile surface creates the builtin local default umbrella.
 func TestEnsureDefaultCreatesLocalProfile(t *testing.T) {
@@ -563,5 +620,232 @@ func TestEnsureDefaultCreatesLocalProfile(t *testing.T) {
 	}
 	if err := lock.Validate(); err != nil {
 		t.Fatalf("default lock invalid: %v", err)
+	}
+}
+
+// TestDefaultProfileMaterializesOnFreshHome drives the four reviewer-named
+// production paths on an isolated home (review F2): profile list,
+// profile use default, profile sync, and profile use --clear --env <id>.
+// All four must work on a fresh manager home: the default lock pins a real
+// store entry, and the contextless root materializes markers alone.
+func TestDefaultProfileMaterializesOnFreshHome(t *testing.T) {
+	home := t.TempDir()
+	homes := pinHomes(t)
+	profiles, err := List(home)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(profiles) != 1 || profiles[0].Name != DefaultProfile || profiles[0].Source.Kind != KindLocal {
+		t.Fatalf("profiles %+v", profiles)
+	}
+	if results, err := Use(home, DefaultProfile, "", "", false); err != nil {
+		t.Fatalf("use default: %v (%+v)", err, results)
+	}
+	if results, err := Sync(home); err != nil {
+		t.Fatalf("sync: %v (%+v)", err, results)
+	}
+	if results, err := Use(home, "", "claude_code", "", true); err != nil {
+		t.Fatalf("use --clear --env claude_code: %v (%+v)", err, results)
+	}
+	for id, dir := range homes {
+		marker, err := envmarker.Read(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if marker == nil || marker.Profile.Name != DefaultProfile || marker.Mode != envmarker.ModeLinked {
+			t.Fatalf("%s marker %+v", id, marker)
+		}
+	}
+	// The contextless default root declares no root-context surface: no
+	// adapter home gains a root-context file.
+	if _, err := os.Stat(filepath.Join(homes["claude_code"], "CLAUDE.md")); !os.IsNotExist(err) {
+		t.Fatalf("default must write no root-context file, stat err %v", err)
+	}
+	// Migration is idempotent: the lock stands where the first call left it.
+	before, beforeHash, err := readLock(home, DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureDefault(home); err != nil {
+		t.Fatal(err)
+	}
+	after, afterHash, err := readLock(home, DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if beforeHash != afterHash || len(before.Members) != len(after.Members) {
+		t.Fatalf("second migration moved the lock: %s -> %s", beforeHash, afterHash)
+	}
+}
+
+// TestEnsureDefaultMigratesGlobalSkills checks the §9.4 migration carries
+// the machine's global git-pinned skills into the default lock as skill
+// lock members with stored, audited pins. Production entry point:
+// EnsureDefault over a home whose global scope declares one tag-pinned
+// skill served from a local git remote.
+func TestEnsureDefaultMigratesGlobalSkills(t *testing.T) {
+	skill := gitRepo(t, map[string]string{"README.md": "skill\n"}, "v1.0.0")
+	home := t.TempDir()
+	pinHomes(t)
+	if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillfile := `{"schema_version": 1, "skills": [{"name": "sk", "git": "file://` + skill + `", "tag": "v1.0.0"}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(home, "global", "Skillfile.json"), []byte(skillfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureDefault(home); err != nil {
+		t.Fatal(err)
+	}
+	lock, _, err := readLock(home, DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.Validate(); err != nil {
+		t.Fatalf("migrated lock invalid: %v", err)
+	}
+	if len(lock.Members) != 2 {
+		t.Fatalf("migrated lock %+v", lock.Members)
+	}
+	var member *contextlock.Member
+	for index := range lock.Members {
+		if lock.Members[index].Kind == contextlock.KindSkill {
+			member = &lock.Members[index]
+		}
+	}
+	if member == nil || member.Name != "sk" || member.Commit == "" || member.Source != "file://"+skill {
+		t.Fatalf("migrated skill member %+v", lock.Members)
+	}
+	if !contextstore.Exists(home, contextlock.KindSkill, "sk", member.Commit) {
+		t.Fatal("migrated skill pins a store entry that does not exist")
+	}
+	root, ok := lock.RootMember()
+	if !ok || !contextstore.Exists(home, root.Kind, root.Name, root.StateHash) {
+		t.Fatalf("default root pins a store entry that does not exist: %+v", lock.Members)
+	}
+}
+
+// TestMutationLockContention narrows the serialization gate (review F3): a
+// profile mutation that cannot acquire the manager-home mutation lock fails
+// with environment_lock_unavailable instead of racing the holder.
+// Production entry point: Install.
+func TestMutationLockContention(t *testing.T) {
+	home := t.TempDir()
+	old := lockTimeout
+	lockTimeout = 50 * time.Millisecond
+	defer func() { lockTimeout = old }()
+	manager, err := managerlock.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := manager.AcquireHomeOnly(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = held.Close() }()
+	source := t.TempDir()
+	writePackage(t, source, "acme", "1.0.0", "hello\n")
+	if _, _, _, err := Install(home, InstallOptions{Operand: source}); err == nil {
+		t.Fatal("a mutation under a held lock must not proceed")
+	} else if !strings.Contains(err.Error(), DiagLockUnavailable) {
+		t.Fatalf("error %v carries no %s", err, DiagLockUnavailable)
+	}
+}
+
+// TestIncompleteJournalRecoversOnEntry checks the recovery gate (review
+// F3): a prepared-but-uncommitted record journal left by a crashed
+// operation completes when the next operation begins. Production entry
+// point: List, which recovers journals on lock entry. A mutant that drops
+// the recovery must fail this test.
+func TestIncompleteJournalRecoversOnEntry(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	if err := os.MkdirAll(ProfilesDir(home), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	staged, err := os.CreateTemp("", "curator-profile-recover-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Remove(staged.Name()) }()
+	if _, err := staged.WriteString(DefaultProfile + "\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := staged.Close(); err != nil {
+		t.Fatal(err)
+	}
+	manager, err := managerlock.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := manager.AcquireHomeOnly(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := transaction.New(home)
+	if err != nil {
+		_ = held.Close()
+		t.Fatal(err)
+	}
+	preimage, err := transaction.DigestTarget(transaction.KindBytes, CurrentFile(home))
+	if err != nil {
+		_ = held.Close()
+		t.Fatal(err)
+	}
+	plan := transaction.Plan{
+		TransactionID:   newTransactionID(),
+		ProjectIdentity: "profiles",
+		Targets: []transaction.Target{{
+			Class: "profile", Identifier: CurrentFile(home), Kind: transaction.KindBytes,
+			LivePath: CurrentFile(home), StagedSource: staged.Name(), PreimageDigest: preimage,
+		}},
+	}
+	if _, err := engine.Prepare(held, plan); err != nil {
+		_ = held.Close()
+		t.Fatal(err)
+	}
+	// Crash before commit: the journal stands, the pointer is unwritten.
+	if err := held.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := List(home); err != nil {
+		t.Fatalf("list after a crashed journal: %v", err)
+	}
+	if current, err := Current(home); err != nil || current != DefaultProfile {
+		t.Fatalf("recovered current %q, err %v", current, err)
+	}
+}
+
+// TestOperationsLeaveNoJournalResidue checks the journal gate (review F3):
+// successful profile operations commit and clean their journals, and the
+// published records carry the exact bytes the operation resolved.
+// Production entry points: Install, Use.
+func TestOperationsLeaveNoJournalResidue(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	source := t.TempDir()
+	writePackage(t, source, "acme", "1.0.0", "hello\n")
+	info, _, _, err := Install(home, InstallOptions{Operand: source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Use(home, "acme", "", "", false); err != nil {
+		t.Fatal(err)
+	}
+	journals := filepath.Join(home, "state", "transactions", "v1")
+	if entries, err := os.ReadDir(journals); err == nil && len(entries) != 0 {
+		t.Fatalf("journal residue %+v", entries)
+	} else if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	_, hash, err := readLock(home, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hash != info.LockHash {
+		t.Fatalf("lock hash %s, want %s", hash, info.LockHash)
+	}
+	if current, err := Current(home); err != nil || current != "acme" {
+		t.Fatalf("current %q, err %v", current, err)
 	}
 }
