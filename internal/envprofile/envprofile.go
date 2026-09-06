@@ -29,13 +29,18 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/relux-works/curator/internal/audit"
+	"github.com/relux-works/curator/internal/capabilities"
+	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/contextaudit"
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/hashing"
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/manifest"
 	"github.com/relux-works/curator/internal/protocoljson"
 )
@@ -304,6 +309,23 @@ func InUseByAnyScope(home, name string) (bool, error) {
 	return false, nil
 }
 
+// Policy carries the machine gates for profile operations (environments
+// §9.1): the core §6.1 source allowlist for git members, the MCP package
+// allowlist for mcp members, and the audit revocations. An empty allowlist
+// permits every identity (core §6.1); revocation and the audit canary always
+// block regardless of any enabled flag — an advisory profile install does
+// not exist.
+//
+// In stage (a) the MCP package allowlist has no machine-config surface
+// (manager-config schema 2, environments §12.1): the CLI passes an empty
+// list (permits all) and tests inject one via Policy. The bound is stated
+// here and in the rework report, not silent.
+type Policy struct {
+	AllowedSources []string
+	MCPAllowlist   []string
+	Revocations    []string
+}
+
 // InstallOptions selects the source of one installation.
 type InstallOptions struct {
 	Operand   string
@@ -313,6 +335,7 @@ type InstallOptions struct {
 	Revision  string
 	As        string
 	Use       bool
+	Policy    Policy
 }
 
 // Install installs one root context package as a profile: it resolves the
@@ -374,12 +397,16 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 			RootState: state,
 		}
 	} else {
-		manager = newGitManager(home)
+		manager = newGitManager(home).withPolicy(options.Policy)
 		requirement := Requirement{Range: options.Range, Tag: options.Tag, Revision: options.Revision}
 		if requirement.Range == "" && requirement.Tag == "" && requirement.Revision == "" {
 			requirement.Range = "latest"
 		}
-		source = Source{Kind: KindGit, Git: canonicalGit(options.Operand), Directory: options.Directory, Req: requirement}
+		canonicalOperand, err := canonicalGit(options.Operand)
+		if err != nil {
+			return Info{}, false, false, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+		}
+		source = Source{Kind: KindGit, Git: canonicalOperand, Directory: options.Directory, Req: requirement}
 		resolved, rootName, err := manager.rootInput(options.Operand, options.Directory, requirement)
 		if err != nil {
 			return Info{}, false, false, err
@@ -398,7 +425,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 		// re-resolves exactly as profile update does and is reported as an
 		// update; a different source under the same name is taken.
 		if prior == source {
-			info, moved, err := updateLocked(op, home, name)
+			info, moved, err := updateLocked(op, home, name, options.Policy)
 			if err != nil {
 				return Info{}, false, false, err
 			}
@@ -408,13 +435,14 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 		return Info{}, false, false, fmt.Errorf("%s: profile %q is already installed", DiagNameTaken, name)
 	}
 	if manager == nil {
-		manager = newGitManager(home)
+		manager = newGitManager(home).withPolicy(options.Policy)
 	}
+	input.MCPAllowlist = options.Policy.MCPAllowlist
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
 		return Info{}, false, false, err
 	}
-	warnings, err := auditAndStore(home, manager, result)
+	warnings, err := auditAndStore(home, manager, result, options.Policy)
 	if err != nil {
 		return Info{}, false, false, err
 	}
@@ -452,16 +480,24 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 // profile_update_blocked. A root pinned by tag or revision is reported as
 // pinned and does not move. A path root re-resolves against its directory.
 func Update(home, name string) (Info, bool, error) {
+	return UpdateWithPolicy(home, name, Policy{})
+}
+
+// UpdateWithPolicy re-resolves under the machine gates of policy
+// (environments §9.1): the source allowlist, the MCP package allowlist, and
+// the always-strict audit with revocation and the canary. The CLI passes the
+// machine configuration; tests inject narrowing policies directly.
+func UpdateWithPolicy(home, name string, policy Policy) (Info, bool, error) {
 	op, err := beginOperation(home)
 	if err != nil {
 		return Info{}, false, err
 	}
 	defer func() { _ = op.close() }()
-	return updateLocked(op, home, name)
+	return updateLocked(op, home, name, policy)
 }
 
 // updateLocked re-resolves under the held operation lock.
-func updateLocked(op *operation, home, name string) (Info, bool, error) {
+func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, error) {
 	if err := ensureDefault(op, home); err != nil {
 		return Info{}, false, err
 	}
@@ -473,7 +509,7 @@ func updateLocked(op *operation, home, name string) (Info, bool, error) {
 	if err != nil {
 		return Info{}, false, err
 	}
-	manager := newGitManager(home)
+	manager := newGitManager(home).withPolicy(policy)
 	var input contextresolve.Input
 	switch source.Kind {
 	case KindGit:
@@ -508,6 +544,7 @@ func updateLocked(op *operation, home, name string) (Info, bool, error) {
 	default:
 		return Info{}, false, fmt.Errorf("%s: profile %q is the builtin local profile and does not move", DiagUpdateBlocked, name)
 	}
+	input.MCPAllowlist = policy.MCPAllowlist
 	result, err := contextresolve.Resolve(manager, input)
 	if err != nil {
 		return Info{}, false, err
@@ -531,12 +568,15 @@ func updateLocked(op *operation, home, name string) (Info, bool, error) {
 		if report.Blocking() {
 			return Info{}, false, fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
 		}
+		if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
+			return Info{}, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
+		}
 	}
 	if result.LockHash == oldHash {
 		machine, _ := Current(home)
 		return Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name}, false, nil
 	}
-	warnings, err := auditAndStore(home, manager, result)
+	warnings, err := auditAndStore(home, manager, result, policy)
 	if err != nil {
 		return Info{}, false, err
 	}
@@ -588,7 +628,12 @@ func Remove(home, name string, purge bool) error {
 // auditAndStore audits every resolved member always-strict and installs its
 // store entry. A blocking finding fails the operation; system modules and
 // unresolved MCP commands are reported as warnings.
-func auditAndStore(home string, manager *gitManager, result *contextresolve.Result) ([]string, error) {
+//
+// Every member passes the manager §7 source audit in strict mode
+// (environments §9.1) via strictAuditMember: the static canary (always
+// blocking), revocation, and the deterministic detectors — regardless of any
+// enabled flag. An advisory profile install does not exist.
+func auditAndStore(home string, manager *gitManager, result *contextresolve.Result, policy Policy) ([]string, error) {
 	var warnings []string
 	keys := make([]string, 0, len(result.Members))
 	for key := range result.Members {
@@ -608,6 +653,11 @@ func auditAndStore(home string, manager *gitManager, result *contextresolve.Resu
 		if report.Blocking() {
 			return nil, fmt.Errorf("%s: member %s carries a blocking %s finding", DiagSourceInvalid, key, contextaudit.ClassSecretMaterial)
 		}
+		gateWarnings, err := strictAuditMember(home, manager, resolved, entry, policy)
+		if err != nil {
+			return nil, fmt.Errorf("%s: member %s %v", DiagSourceInvalid, key, err)
+		}
+		warnings = append(warnings, gateWarnings...)
 		for _, unmatched := range report.Waivers {
 			if unmatched.Diagnostic == contextaudit.DiagWaiverUnmatched {
 				warnings = append(warnings, unmatched.Diagnostic)
@@ -636,6 +686,56 @@ func pinOf(resolved contextresolve.Resolved) string {
 		return "commit " + resolved.Commit
 	}
 	return "state sha256:" + resolved.StateHash
+}
+
+// strictAuditMember runs the manager §7 source audit in strict mode over one
+// member (environments §9.1): raw-tree hashing, the static canary whose
+// failure always blocks, the deterministic detectors, and revocation.
+// Revocation and the canary apply regardless of any enabled flag: an
+// advisory profile install does not exist. A path package has no network
+// identity: its revocation identity is its state hash, and the core §6.1
+// network allowlist does not apply (local sources bypass it).
+func strictAuditMember(home string, manager *gitManager, resolved contextresolve.Resolved, entry string, policy Policy) ([]string, error) {
+	snapshot := packageRoot(entry, resolved.Directory)
+	if !audit.CanaryPasses() {
+		return nil, fmt.Errorf("audit blocked: audit canary failed: detectors are not producing expected findings")
+	}
+	contentHash, err := hashing.ContentSHA256(snapshot, nil)
+	if err != nil {
+		return nil, fmt.Errorf("audit blocked: %v", err)
+	}
+	sourceForRevocation := resolved.Source
+	gitForRevocation := resolved.Source
+	if raw, ok := manager.fetchRaw[resolved.Source]; ok {
+		gitForRevocation = raw
+	}
+	if resolved.StateHash != "" {
+		sourceForRevocation = resolved.StateHash
+	}
+	if reason := audit.RevocationFor(policy.Revocations, contentHash, sourceForRevocation, gitForRevocation); reason != "" {
+		return nil, fmt.Errorf("audit blocked: %s is revoked", reason)
+	}
+	cfg := &config.Config{
+		Path: filepath.Join(home, "config.json"),
+		Audit: config.Audit{
+			Enabled: true, Mode: "strict", FailOn: "high", Backend: "null",
+			Revocations: policy.Revocations,
+		},
+	}
+	subject := audit.Subject{
+		Name:          resolved.Name,
+		Source:        sourceForRevocation,
+		Git:           gitForRevocation,
+		Commit:        resolved.Commit,
+		Snapshot:      snapshot,
+		SchemaVersion: 3,
+		Capabilities:  capabilities.ImplicitNone(),
+	}
+	warnings, errs := audit.Gate(cfg, []audit.Subject{subject})
+	if len(errs) > 0 {
+		return warnings, fmt.Errorf("audit blocked: %s", strings.Join(errs, "; "))
+	}
+	return warnings, nil
 }
 
 // stateForPath installs the path root into the store and returns its state
@@ -675,9 +775,27 @@ func isPathOperand(operand string) bool {
 	return err == nil && info.IsDir()
 }
 
-// canonicalGit normalizes a git operand onto its canonical source identity.
-func canonicalGit(operand string) string {
-	return strings.TrimSuffix(strings.TrimSpace(operand), "/")
+// canonicalGit normalizes a git operand onto its core §6.1 canonical source
+// identity (environments §1) through identity.Parse: SSH and HTTPS spellings
+// of one repository yield one identity, a trailing .git is stripped, the
+// host is lowercased. A malformed network source is rejected. A file://
+// remote carries no network identity and passes through as its trimmed raw
+// URL: it is the hermetic test shim, bypasses the network allowlist like any
+// local source, and keys its own cache entry. An already-canonical host/path
+// passes through unchanged.
+func canonicalGit(operand string) (string, error) {
+	trimmed := strings.TrimSpace(operand)
+	if trimmed == "" || identity.ValidCanonical(trimmed) {
+		return trimmed, nil
+	}
+	canonical, err := identity.Parse(trimmed)
+	if err != nil {
+		return "", err
+	}
+	if canonical == "" {
+		return trimmed, nil
+	}
+	return canonical, nil
 }
 
 // defaultManifest is the synthesized local root of the builtin default
@@ -762,13 +880,18 @@ func migrateGlobalSkills(home string) ([]contextlock.Member, error) {
 	if global == nil {
 		return nil, nil
 	}
-	manager := newGitManager(home)
+	policy := loadPolicyForHome(home)
+	manager := newGitManager(home).withPolicy(policy)
 	var members []contextlock.Member
 	for _, decl := range global.Skills {
 		if decl.Git == "" || (decl.Ref.Kind != "tag" && decl.Ref.Kind != "revision") {
 			continue
 		}
-		identity := canonicalGit(decl.Git)
+		identity, err := canonicalGit(decl.Git)
+		if err != nil {
+			return nil, fmt.Errorf("%s: migrate global skill %q: %v", DiagSourceInvalid, decl.Name, err)
+		}
+		manager.recordRaw(identity, decl.Git)
 		if err := manager.fetch(identity); err != nil {
 			return nil, fmt.Errorf("%s: migrate global skill %q: %v", DiagSourceInvalid, decl.Name, err)
 		}
@@ -786,11 +909,48 @@ func migrateGlobalSkills(home string) ([]contextlock.Member, error) {
 		} else if report.Blocking() {
 			return nil, fmt.Errorf("%s: migrated global skill %q carries a blocking %s finding", DiagSourceInvalid, decl.Name, contextaudit.ClassSecretMaterial)
 		}
+		migrated := contextresolve.Resolved{
+			Kind: contextlock.KindSkill, Name: decl.Name, Source: identity,
+			Commit: resolved.Commit,
+		}
+		if _, err := strictAuditMember(home, manager, migrated, entry, policy); err != nil {
+			return nil, fmt.Errorf("%s: migrated global skill %q %v", DiagSourceInvalid, decl.Name, err)
+		}
 		members = append(members, contextlock.Member{
 			Kind: contextlock.KindSkill, Name: decl.Name, Source: identity, Commit: resolved.Commit,
 		})
 	}
 	return members, nil
+}
+
+// loadPolicyForHome reads the machine gates for operations that carry no
+// explicit Policy (the builtin default migration): allowed_sources and
+// audit.revocations from the manager-home config file when present. A
+// missing or unreadable file yields an empty policy (permits all, no
+// revocations); a malformed file fails the migration rather than silently
+// bypassing the gates. Callers with an explicit Policy (Install, Update)
+// use it directly; the CLI derives it from the loaded configuration, which
+// originates from the same file.
+func loadPolicyForHome(home string) Policy {
+	payload, err := os.ReadFile(filepath.Join(home, "config.json")) // #nosec G304 -- manager home path
+	if err != nil {
+		return Policy{}
+	}
+	var raw struct {
+		AllowedSources []string `json:"allowed_sources"`
+		Audit          *struct {
+			Revocations []string `json:"revocations"`
+		} `json:"audit"`
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(payload)))
+	if err := decoder.Decode(&raw); err != nil {
+		return Policy{}
+	}
+	policy := Policy{AllowedSources: raw.AllowedSources}
+	if raw.Audit != nil {
+		policy.Revocations = raw.Audit.Revocations
+	}
+	return policy
 }
 
 // resyncCurrentScopes re-materializes every scope whose current profile is

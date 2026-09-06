@@ -59,6 +59,10 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 	info, activated, updated, err := envprofile.Install(cfg.Home(), envprofile.InstallOptions{
 		Operand: positional[0], Directory: *directory,
 		Range: *rng, Tag: *tag, Revision: *revision, As: *as, Use: *use,
+		Policy: envprofile.Policy{
+			AllowedSources: cfg.AllowedSources,
+			Revocations:    cfg.Audit.Revocations,
+		},
 	})
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
@@ -192,9 +196,13 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 		}
 		names = []string{machine}
 	}
+	policy := envprofile.Policy{
+		AllowedSources: cfg.AllowedSources,
+		Revocations:    cfg.Audit.Revocations,
+	}
 	failed := false
 	for _, name := range names {
-		info, moved, err := envprofile.Update(cfg.Home(), name)
+		info, moved, err := envprofile.UpdateWithPolicy(cfg.Home(), name, policy)
 		if err != nil {
 			_, _ = fmt.Fprintf(c.stderr, "%s: %v\n", name, err)
 			failed = true

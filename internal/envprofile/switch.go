@@ -595,12 +595,23 @@ func markerKind(source Source) string {
 	}
 }
 
-// markerSource renders the canonical source identity for git roots.
+// markerSource renders the core §6.1 canonical source identity for git
+// roots (environments §1.3, §8.2). New install records already carry the
+// canonical identity; old records carrying a raw URL canonicalize on the
+// fly so the next switch heals the marker. File:// remotes (the hermetic
+// test shim) pass through as written.
 func markerSource(source Source) string {
-	if source.Kind == KindGit {
+	if source.Kind != KindGit {
+		return ""
+	}
+	if source.Git == "" {
+		return ""
+	}
+	canonical, err := canonicalGit(source.Git)
+	if err != nil || canonical == "" {
 		return source.Git
 	}
-	return ""
+	return canonical
 }
 
 // markerRequirement renders the declared requirement as written.

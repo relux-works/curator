@@ -193,8 +193,17 @@ func decideWithPins(cfg *config.Config, subject Subject, contentHash string, fin
 // source:<glob> patterns over the source, the git URL, and the identity-ish
 // normalized form (Spec §12.2).
 func revocationReason(cfg *config.Config, contentHash, source, git string) string {
+	return RevocationFor(cfg.Audit.Revocations, contentHash, source, git)
+}
+
+// RevocationFor matches a revocation list against a content hash and source
+// identities. The profile path (environments §9.1) calls this regardless of
+// cfg.Audit.Enabled: revocation always blocks, even when the skill pipeline
+// runs advisory. Candidates are the canonical identity, the raw clone URL,
+// and (for path packages) the state hash carried as source.
+func RevocationFor(revocations []string, contentHash, source, git string) string {
 	normalized := hashing.Normalize(contentHash)
-	for _, item := range cfg.Audit.Revocations {
+	for _, item := range revocations {
 		if strings.HasPrefix(item, "source:") {
 			pattern := strings.TrimPrefix(item, "source:")
 			for _, candidate := range []string{source, git} {
@@ -213,6 +222,11 @@ func revocationReason(cfg *config.Config, contentHash, source, git string) strin
 	}
 	return ""
 }
+
+// CanaryPasses reports whether the static detector canary fires. The profile
+// path calls this regardless of cfg.Audit.Enabled: a failing canary always
+// blocks profile installation (environments §9.1).
+func CanaryPasses() bool { return runStaticCanary() }
 
 // Pin records operator trust for a content hash with a reason (Spec §12.2).
 func Pin(home, contentHash, reason, pinnedBy string) (string, error) {

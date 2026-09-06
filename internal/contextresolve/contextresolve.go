@@ -216,6 +216,23 @@ type Resolved struct {
 // Key joins kind and name.
 func Key(kind, name string) string { return kind + ":" + name }
 
+// canonicalForAgreement maps a declared source onto its comparison key: the
+// core §6.1 canonical identity for network URLs, the trimmed raw URL for
+// file:// remotes (which carry no network identity) and for malformed
+// inputs (which the Identity boundary rejects with profile_source_invalid).
+// An already-canonical host/path passes through unchanged.
+func canonicalForAgreement(declared string) string {
+	trimmed := strings.TrimSpace(declared)
+	if trimmed == "" || identity.ValidCanonical(trimmed) {
+		return trimmed
+	}
+	canonical, err := identity.Parse(trimmed)
+	if err != nil || canonical == "" {
+		return trimmed
+	}
+	return canonical
+}
+
 type constraint struct {
 	requirement Requirement
 	requirer    string // "machine" or "<name>@<version>"
@@ -415,14 +432,22 @@ func (r *resolver) selectName(name string) error {
 	current := r.selected[name]
 
 	// Source identity and directory must agree across every requirer.
+	// Comparison is over the core §6.1 canonical identity (environments
+	// §1.4): two spellings of one repository are one identity and never a
+	// spurious context_source_mismatch. File:// remotes (no network
+	// identity) compare as their raw URLs so distinct test remotes stay
+	// distinct.
 	declaredSource, directory := "", ""
+	declaredCanonical := ""
 	for _, c := range constraints {
 		if c.requirement.Source != "" {
-			if declaredSource != "" && declaredSource != c.requirement.Source {
+			canonical := canonicalForAgreement(c.requirement.Source)
+			if declaredSource != "" && declaredCanonical != canonical {
 				return &Error{Diagnostic: DiagSourceMismatch, Name: name,
 					Detail: fmt.Sprintf("requirers disagree on the source identity (%s vs %s)", declaredSource, c.requirement.Source)}
 			}
 			declaredSource = c.requirement.Source
+			declaredCanonical = canonical
 		}
 		if c.requirement.Directory != "" {
 			if directory != "" && directory != c.requirement.Directory {

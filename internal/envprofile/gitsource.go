@@ -13,6 +13,7 @@ import (
 	"github.com/relux-works/curator/internal/contextresolve"
 	"github.com/relux-works/curator/internal/contextstore"
 	"github.com/relux-works/curator/internal/gitops"
+	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/pkgversion"
 )
 
@@ -21,11 +22,31 @@ import (
 // and fetched on install and update; manifests are read from object-database
 // extractions, so their bytes are a function of the commit alone
 // (environments §1.2).
+//
+// The cache is keyed by the core §6.1 canonical source identity
+// (environments §1): SSH and HTTPS spellings of one repository share one
+// clone. fetchRaw remembers the raw clone URL each canonical identity was
+// first seen under so ensureRepo can clone through the operator's transport
+// (including git insteadOf rewrites); a canonical identity with no recorded
+// raw clones through https://canonical. File:// remotes are a hermetic test
+// shim with no network identity: they pass through as their raw URL and key
+// their own cache entry.
 type gitManager struct {
-	home string
+	home           string
+	fetchRaw       map[string]string
+	allowedSources []string
 }
 
-func newGitManager(home string) *gitManager { return &gitManager{home: home} }
+func newGitManager(home string) *gitManager {
+	return &gitManager{home: home, fetchRaw: map[string]string{}}
+}
+
+// withPolicy attaches the machine source allowlist for the operation.
+// An empty allowlist permits every source (core §6.1).
+func (m *gitManager) withPolicy(policy Policy) *gitManager {
+	m.allowedSources = policy.AllowedSources
+	return m
+}
 
 // reposDir holds one clone per canonical git identity.
 func (m *gitManager) reposDir() string { return filepath.Join(m.home, "profile-repos") }
@@ -47,39 +68,106 @@ func (m *gitManager) repoDir(identity string) string {
 	return filepath.Join(m.reposDir(), name)
 }
 
-// ensureRepo clones the identity when absent.
-func (m *gitManager) ensureRepo(identity string) (string, error) {
-	dir := m.repoDir(identity)
+// ensureRepo clones the identity when absent. Network canonical identities
+// clone through their recorded raw URL when one exists, else through
+// https://canonical; file:// and other raw URLs clone as written.
+//
+// The core §6.1 source allowlist is enforced before any network clone
+// (environments §9.1, reusing closure.gateSource's shape): a git member
+// whose canonical identity is outside the machine's allowed_sources is
+// refused with profile_source_invalid. File:// remotes and empty identities
+// (local sources) bypass the allowlist; an empty allowlist permits all.
+func (m *gitManager) ensureRepo(canonical string) (string, error) {
+	if err := m.gateSource(canonical); err != nil {
+		return "", err
+	}
+	dir := m.repoDir(canonical)
 	if info, err := os.Stat(dir); err == nil && info.IsDir() {
 		return dir, nil
 	}
 	if err := os.MkdirAll(m.reposDir(), 0o755); err != nil {
 		return "", err
 	}
-	if err := gitops.Clone(identity, dir); err != nil {
-		return "", fmt.Errorf("%s: clone %s: %v", DiagSourceInvalid, identity, err)
+	cloneURL := canonical
+	if raw, ok := m.fetchRaw[canonical]; ok {
+		cloneURL = raw
+	} else if identity.ValidCanonical(canonical) {
+		cloneURL = "https://" + canonical
+	}
+	if err := gitops.Clone(cloneURL, dir); err != nil {
+		return "", fmt.Errorf("%s: clone %s: %v", DiagSourceInvalid, canonical, err)
 	}
 	return dir, nil
 }
 
+// gateSource applies the machine allowlist before any network clone.
+func (m *gitManager) gateSource(canonical string) error {
+	if len(m.allowedSources) == 0 {
+		return nil
+	}
+	trimmed := strings.TrimSpace(canonical)
+	if trimmed == "" || strings.HasPrefix(trimmed, "file://") {
+		return nil
+	}
+	if !identity.ValidCanonical(trimmed) {
+		parsed, err := identity.Parse(trimmed)
+		if err != nil || parsed == "" {
+			return nil
+		}
+		trimmed = parsed
+	}
+	if identity.Allowed(trimmed, m.allowedSources) {
+		return nil
+	}
+	return fmt.Errorf("%s: source %s is outside the machine's allowed sources", DiagSourceInvalid, canonical)
+}
+
+// recordRaw remembers the raw clone URL for a canonical identity so later
+// clones of the same identity reuse the operator's transport. First spelling
+// wins; every spelling of one repository resolves to the same bytes.
+func (m *gitManager) recordRaw(canonical, raw string) {
+	if m.fetchRaw == nil {
+		m.fetchRaw = map[string]string{}
+	}
+	trimmed := strings.TrimSpace(raw)
+	if canonical == "" || trimmed == "" || trimmed == canonical {
+		return
+	}
+	if identity.ValidCanonical(trimmed) {
+		return
+	}
+	if _, exists := m.fetchRaw[canonical]; !exists {
+		m.fetchRaw[canonical] = trimmed
+	}
+}
+
 // fetch updates the cached clone.
-func (m *gitManager) fetch(identity string) error {
-	dir, err := m.ensureRepo(identity)
+func (m *gitManager) fetch(canonical string) error {
+	dir, err := m.ensureRepo(canonical)
 	if err != nil {
 		return err
 	}
 	if err := gitops.Fetch(dir); err != nil {
-		return fmt.Errorf("fetch %s: %v", identity, err)
+		return fmt.Errorf("fetch %s: %v", canonical, err)
 	}
 	return nil
 }
 
-// Identity returns the canonical source identity.
+// Identity returns the core §6.1 canonical source identity for a declared
+// git URL. A malformed network source is rejected; a file:// remote (the
+// hermetic test shim with no network identity) passes through as its raw
+// URL. Every successful call records the raw-to-canonical mapping so later
+// clones reuse the operator's transport.
 func (m *gitManager) Identity(_, _ string, declared string) (string, error) {
-	if declared == "" {
+	if strings.TrimSpace(declared) == "" {
 		return "", nil
 	}
-	return canonicalGit(declared), nil
+	canonical, err := canonicalGit(declared)
+	if err != nil {
+		return "", fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+	}
+	m.recordRaw(canonical, declared)
+	return canonical, nil
 }
 
 // Candidates lists every version tag of the source peeled to its commit.
@@ -172,9 +260,14 @@ func (m *gitManager) Manifest(kind, name, source, directory, commit string) (*co
 
 // rootInput builds the resolution input for a fresh git install: it fetches
 // the source, reads the root manifest at the required ref, and declares the
-// root requirement as written.
+// root requirement under its canonical source identity. A malformed network
+// source is rejected with profile_source_invalid.
 func (m *gitManager) rootInput(gitURL, directory string, requirement Requirement) (contextresolve.Input, string, error) {
-	identity := canonicalGit(gitURL)
+	identity, err := canonicalGit(gitURL)
+	if err != nil {
+		return contextresolve.Input{}, "", fmt.Errorf("%s: %v", DiagSourceInvalid, err)
+	}
+	m.recordRaw(identity, gitURL)
 	if err := m.fetch(identity); err != nil {
 		return contextresolve.Input{}, "", err
 	}
@@ -321,12 +414,17 @@ func (m *gitManager) ensureEntry(home string, resolved contextresolve.Resolved) 
 }
 
 // packageOf maps a validated context manifest onto the resolution package.
+// Every requirement source is canonicalized through identity.Parse at this
+// boundary (environments §1): two spellings of one repository enter
+// resolution as one identity, so they never produce a spurious
+// context_source_mismatch. A malformed network source is rejected; a file://
+// remote (the hermetic test shim) passes through as its raw URL.
 func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	pkg := &contextresolve.Package{Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
 		requirement := manifest.Contexts[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindContext, Name: name, Source: requirement.Git,
+			Kind: contextlock.KindContext, Name: name, Source: canonicalRequirementSource(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory, Weight: requirement.Weight,
 		})
@@ -334,14 +432,14 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	for _, name := range contextpkg.SortedNames(manifest.Skills) {
 		requirement := manifest.Skills[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindSkill, Name: name, Source: requirement.Git,
+			Kind: contextlock.KindSkill, Name: name, Source: canonicalRequirementSource(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 		})
 	}
 	for _, name := range contextpkg.SortedNames(manifest.MCP) {
 		requirement := manifest.MCP[name]
 		pkg.Requires = append(pkg.Requires, contextresolve.Requirement{
-			Kind: contextlock.KindMCP, Name: name, Source: requirement.Git,
+			Kind: contextlock.KindMCP, Name: name, Source: canonicalRequirementSource(requirement.Git),
 			Range: requirement.Range, Tag: requirement.Tag, Revision: requirement.Revision,
 			Directory: requirement.Directory,
 		})
@@ -353,6 +451,23 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 		return pkg.Requires[i].Kind < pkg.Requires[j].Kind
 	})
 	return pkg
+}
+
+// canonicalRequirementSource canonicalizes one manifest requirement source
+// for resolution. Network URLs become their core §6.1 identity; file://
+// remotes (no network identity) pass through as written so hermetic tests
+// keep distinct cache entries; a malformed network source passes through
+// here and is rejected at the Identity boundary with profile_source_invalid.
+func canonicalRequirementSource(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || identity.ValidCanonical(trimmed) {
+		return trimmed
+	}
+	canonical, err := identity.Parse(trimmed)
+	if err != nil || canonical == "" {
+		return trimmed
+	}
+	return canonical
 }
 
 // lookPath resolves an executable on PATH.

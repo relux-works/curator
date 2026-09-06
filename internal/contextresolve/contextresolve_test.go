@@ -236,3 +236,45 @@ func TestDuplicateOverlayIsCompositionInvalid(t *testing.T) {
 		t.Fatalf("diagnostic %q, want %s", resolutionErr.Diagnostic, DiagCompositionInvalid)
 	}
 }
+
+// TestCanonicalSourceAgreementUnifiesSpellings narrows the F8 agreement gate
+// through the production Resolve: two requirers naming one repository under
+// an https spelling and an scp-style spelling are one canonical identity and
+// resolve; two different canonical identities stay a context_source_mismatch.
+// A mutant that compares raw declared strings must fail this test.
+func TestCanonicalSourceAgreementUnifiesSpellings(t *testing.T) {
+	source := &stubSource{
+		commits: map[string]string{
+			"root@v1.0.0": strings.Repeat("1", 40),
+			"lib@v1.0.0":  strings.Repeat("2", 40),
+		},
+		manifests: map[string]*Package{
+			strings.Repeat("1", 40): {Version: "1.0.0", Requires: []Requirement{
+				{Kind: contextlock.KindContext, Name: "lib", Source: "https://example.com/lib.git", Range: "^1.0.0"},
+			}},
+			strings.Repeat("2", 40): {Version: "1.0.0"},
+		},
+	}
+	// Same repository under two spellings: https (with .git) on the root
+	// edge, scp-style on the overlay edge. Both canonicalize to
+	// example.com/lib and must not mismatch.
+	_, err := Resolve(source, Input{
+		Root:     Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
+		Overlays: []Overlay{{Name: "lib", Source: "git@example.com:lib.git", Range: "^1.0.0"}},
+	})
+	if err != nil {
+		t.Fatalf("spellings of one identity must agree: %v", err)
+	}
+	// Different canonical identities must still mismatch: the root edge
+	// names example.com/lib while the overlay edge names other.example/lib.
+	_, err = Resolve(source, Input{
+		Root:     Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
+		Overlays: []Overlay{{Name: "lib", Source: "https://other.example/lib", Range: "^1.0.0"}},
+	})
+	if err == nil {
+		t.Fatal("different canonical identities must mismatch")
+	}
+	if resolutionErr := resolveError(t, err); resolutionErr.Diagnostic != DiagSourceMismatch {
+		t.Fatalf("diagnostic %q, want %s", resolutionErr.Diagnostic, DiagSourceMismatch)
+	}
+}
