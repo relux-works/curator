@@ -30,16 +30,16 @@ func TestCanonicalIdentityUnifiesSpellings(t *testing.T) {
 			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",
 		"context/a.md": "hello\n",
 	}, "v1.0.0")
-	config := "[url \"file://" + repo + "\"]\n" +
-		"\tinsteadOf = https://EXAMPLE.com/acme.git\n" +
-		"\tinsteadOf = git@example.com:acme.git\n" +
-		"\tinsteadOf = ssh://git@example.com/acme\n"
-	configFile := filepath.Join(t.TempDir(), "gitconfig")
-	if err := os.WriteFile(configFile, []byte(config), 0o644); err != nil {
-		t.Fatal(err)
+	// Every spelling routes through the shared insteadOf helper, so the
+	// fixture remote always takes the git-safe file URL form.
+	ids := newGitIdentities(t)
+	for _, operand := range []string{
+		"https://EXAMPLE.com/acme.git",
+		"git@example.com:acme.git",
+		"ssh://git@example.com/acme",
+	} {
+		ids.serve(repo, operand)
 	}
-	t.Setenv("GIT_CONFIG_GLOBAL", configFile)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 
 	operands := []string{
 		"https://EXAMPLE.com/acme.git",

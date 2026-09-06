@@ -109,6 +109,25 @@ func CurrentFile(home string) string { return filepath.Join(ProfilesDir(home), "
 // ScopedDir records per-scope current profiles.
 func ScopedDir(home string) string { return filepath.Join(ProfilesDir(home), "scoped") }
 
+// scopeFileName encodes a scope key (environments §9.3, e.g.
+// "env:codex_cli") into a scope-record filename. The colon the key
+// vocabulary mandates is a reserved filename character on Windows, so a
+// literal scope key cannot name a file there and every scoped switch fails
+// with profile_use_partial; the encoding keeps the key intact for every
+// reader. Percent escapes first, so the mapping is one-to-one in both
+// directions.
+func scopeFileName(scope string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(scope, "%", "%25"), ":", "%3A")
+}
+
+// scopeKeyName decodes a scope-record filename back to its scope key.
+// Filenames written before the encoding (a literal "env:<id>") carry no
+// escape and decode to themselves, so manager homes created where a colon
+// is a legal filename keep reading.
+func scopeKeyName(name string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(name, "%3A", ":"), "%25", "%")
+}
+
 func sourcePath(home, name string) string {
 	return filepath.Join(ProfileDir(home, name), "source.json")
 }
@@ -265,6 +284,9 @@ func SetCurrent(home, name string) error {
 }
 
 // ScopedCurrents returns the per-scope current map (scope key to profile).
+// Record filenames decode through scopeKeyName; when a pre-encoding
+// literal record and its encoded successor both exist, the encoded record
+// wins — a new write always supersedes the stale spelling.
 func ScopedCurrents(home string) (map[string]string, error) {
 	out := map[string]string{}
 	entries, err := os.ReadDir(ScopedDir(home))
@@ -282,24 +304,44 @@ func ScopedCurrents(home string) (map[string]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		out[entry.Name()] = strings.TrimSpace(string(payload))
+		key := scopeKeyName(entry.Name())
+		if _, seen := out[key]; seen && entry.Name() != scopeFileName(key) {
+			continue
+		}
+		out[key] = strings.TrimSpace(string(payload))
 	}
 	return out, nil
 }
 
 // SetScoped records (or with clear=true, drops) a scope's current profile.
 func SetScoped(home, scope, name string, clearScope bool) error {
+	file := filepath.Join(ScopedDir(home), scopeFileName(scope))
 	if clearScope {
-		err := os.Remove(filepath.Join(ScopedDir(home), scope))
+		err := os.Remove(file)
 		if err != nil && !os.IsNotExist(err) {
 			return err
+		}
+		// A pre-encoding literal record superseded by the encoded one
+		// must not resurrect the scope: drop it best-effort. It can only
+		// exist where a colon is a legal filename, so any error here is
+		// not the record's absence on this platform — but the encoded
+		// record above is authoritative, and a stale scratch-home file
+		// must never fail a clear.
+		if legacy := filepath.Join(ScopedDir(home), scope); legacy != file {
+			_ = os.Remove(legacy)
 		}
 		return nil
 	}
 	if err := os.MkdirAll(ScopedDir(home), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(ScopedDir(home), scope), []byte(name+"\n"), 0o644)
+	if err := os.WriteFile(file, []byte(name+"\n"), 0o644); err != nil {
+		return err
+	}
+	if legacy := filepath.Join(ScopedDir(home), scope); legacy != file {
+		_ = os.Remove(legacy)
+	}
+	return nil
 }
 
 // InUseByAnyScope reports whether name is current in any scope.

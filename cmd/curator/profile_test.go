@@ -50,6 +50,38 @@ func runProfile(t *testing.T, source stubConfigSource, args ...string) (int, str
 	return code, stdout.String(), stderr.String()
 }
 
+// gitFileURL renders a local fixture repository path as the file:// remote
+// a git [url ...] section matches. The value is written into git
+// configuration, where a backslash is an escape: a raw Windows temporary
+// path collapses and the clone fails with "does not appear to be a git
+// repository". Forward slashes parse identically on every platform, and the
+// three-slash form keeps a Windows volume out of the host position —
+// never interpolate a raw t.TempDir() into a git config value.
+func gitFileURL(path string) string {
+	slashed := filepath.ToSlash(path)
+	if filepath.VolumeName(path) != "" {
+		return "file:///" + slashed
+	}
+	return "file://" + slashed
+}
+
+// TestGitFileURLHasNoBackslash pins the fixture wiring: the insteadOf
+// remote must reach git configuration without a backslash, which git
+// parses as an escape. A mutant that restores the raw interpolation fails
+// this test on Windows, where the temporary directory carries separators
+// git would consume; the volume-branch grammar itself is proven by the
+// envprofile mapping test on every platform.
+func TestGitFileURLHasNoBackslash(t *testing.T) {
+	repo := t.TempDir()
+	url := gitFileURL(repo)
+	if url != "file://"+filepath.ToSlash(repo) && url != "file:///"+filepath.ToSlash(repo) {
+		t.Fatalf("remote %q, want the file URL of %q", url, repo)
+	}
+	if strings.Contains(url, "\\") {
+		t.Fatalf("remote %q carries a backslash git parses as an escape", url)
+	}
+}
+
 // TestProfileInstallListUse drives install, list, and use through run():
 // install activates the first profile, list reports it, and use writes the
 // linked homes with markers.
@@ -270,7 +302,7 @@ func TestProfileUpdatePinnedTagIsUnchanged(t *testing.T) {
 	git("commit", "-m", "one")
 	git("tag", "v1.0.0")
 	gitconfig := filepath.Join(t.TempDir(), "gitconfig")
-	rewrite := "[url \"file://" + repo + "\"]\n\tinsteadOf = https://example.com/groot\n"
+	rewrite := "[url \"" + gitFileURL(repo) + "\"]\n\tinsteadOf = https://example.com/groot\n"
 	if err := os.WriteFile(gitconfig, []byte(rewrite), 0o644); err != nil {
 		t.Fatal(err)
 	}

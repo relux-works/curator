@@ -265,3 +265,77 @@ func TestSyncWritesScopedHomeOnce(t *testing.T) {
 		t.Fatalf("codex marker names %q after sync, want beta", marker.Profile.Name)
 	}
 }
+
+// TestScopedRecordFilenameIsPortable narrows the scope-record gate
+// (environments §9.3): the scope record file must name no character Windows
+// reserves, while ScopedCurrents keeps reporting the scope key with its
+// colon. A mutant that records the raw scope key as the filename writes
+// "env:codex_cli" and must fail this test on every platform; on Windows it
+// additionally fails the switch itself with profile_use_partial.
+func TestScopedRecordFilenameIsPortable(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	first, second := t.TempDir(), t.TempDir()
+	writePackage(t, first, "one", "1.0.0", "one\n")
+	writePackage(t, second, "two", "1.0.0", "two\n")
+	if _, _, _, err := Install(home, InstallOptions{Operand: first}); err != nil {
+		t.Fatalf("install one: %v", err)
+	}
+	if _, _, _, err := Install(home, InstallOptions{Operand: second}); err != nil {
+		t.Fatalf("install two: %v", err)
+	}
+	if _, err := Use(home, "two", "codex_cli", "", false); err != nil {
+		t.Fatalf("scoped use two: %v", err)
+	}
+	entries, err := os.ReadDir(ScopedDir(home))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("scope records %+v, want exactly one", entries)
+	}
+	if name := entries[0].Name(); strings.ContainsAny(name, `<>:"/\|?*`) {
+		t.Fatalf("scope record %q names a Windows-reserved character", name)
+	}
+	if name := entries[0].Name(); name != scopeFileName("env:codex_cli") {
+		t.Fatalf("scope record %q, want the encoded scope key", name)
+	}
+	scoped, err := ScopedCurrents(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scoped["env:codex_cli"] != "two" {
+		t.Fatalf("scoped %+v, want env:codex_cli=two", scoped)
+	}
+	// The mapping round-trips, and a pre-encoding literal record decodes to
+	// itself, so manager homes created where a colon is legal keep reading.
+	if scopeKeyName(scopeFileName("env:codex_cli")) != "env:codex_cli" {
+		t.Fatal("scope filename mapping does not round-trip")
+	}
+	if scopeKeyName("env:codex_cli") != "env:codex_cli" {
+		t.Fatal("pre-encoding literal record does not decode to itself")
+	}
+	// A stale pre-encoding spelling never shadows its encoded successor:
+	// both filenames below are free of reserved characters on every
+	// platform, yet decode to one key the encoded record must win.
+	stale, fresh := "stale%key", scopeFileName("stale%key")
+	if stale == fresh {
+		t.Fatalf("want distinct stale and encoded spellings, got %q", stale)
+	}
+	if err := os.MkdirAll(ScopedDir(home), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ScopedDir(home), stale), []byte("stale\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ScopedDir(home), fresh), []byte("fresh\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scoped, err = ScopedCurrents(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scoped["stale%key"] != "fresh" {
+		t.Fatalf("scoped %+v, want the encoded record to win", scoped)
+	}
+}

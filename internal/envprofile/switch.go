@@ -223,7 +223,7 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 			if err := SetScoped(home, scope, "", true); err != nil {
 				return results, err
 			}
-		} else if err := op.publish(map[string][]byte{filepath.Join(ScopedDir(home), scope): []byte(effective + "\n")}); err != nil {
+		} else if err := op.publish(map[string][]byte{filepath.Join(ScopedDir(home), scopeFileName(scope)): []byte(effective + "\n")}); err != nil {
 			return results, fmt.Errorf("%s: the scope is partially switched; the recorded current is unchanged", DiagUsePartial)
 		}
 	}
