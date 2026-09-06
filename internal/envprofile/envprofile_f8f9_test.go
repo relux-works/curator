@@ -140,19 +140,17 @@ func TestSourceAllowlistRefusesBeforeClone(t *testing.T) {
 }
 
 // TestRevokedSourceIsRefused checks F9 through Install: a member whose
-// source matches audit.revocations is refused.
+// canonical source matches audit.revocations is refused.
 func TestRevokedSourceIsRefused(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git on PATH")
-	}
 	repo := gitRepo(t, map[string]string{
 		"agent-context.json": `{"schema_version": 1, "name": "pwned", "version": "1.0.0",` +
 			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",
 		"context/a.md": "hello\n",
 	}, "v1.0.0")
+	ids := newGitIdentities(t)
+	operand := ids.serve(repo, "https://example.com/evil/pkg")
 	home := t.TempDir()
-	operand := "file://" + repo
-	policy := Policy{Revocations: []string{"source:" + operand}}
+	policy := Policy{Revocations: []string{"source:example.com/evil/pkg"}}
 	_, _, _, err := Install(home, InstallOptions{Operand: operand, Policy: policy})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
 		t.Fatalf("revocation err = %v, want %s", err, DiagSourceInvalid)
@@ -166,20 +164,19 @@ func TestRevokedSourceIsRefused(t *testing.T) {
 // resolution production path: an mcp member outside the MCP package
 // allowlist is refused with mcp_package_not_allowed.
 func TestMCPAllowlistRefusesOutsidePackage(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git on PATH")
-	}
+	ids := newGitIdentities(t)
 	mcp := gitRepo(t, map[string]string{
 		"agent-mcp.json": `{"schema_version": 1, "name": "tool", "version": "1.0.0",` +
 			`"server": {"transport": "stdio", "command": "sh", "args": []}}` + "\n",
 	}, "v1.0.0")
+	mcpOperand := ids.serve(mcp, "https://example.com/evil-tool")
 	root := gitRepo(t, map[string]string{
 		"agent-context.json": `{"schema_version": 1, "name": "withmcp", "version": "1.0.0",` +
-			`"requires": {"mcp": {"tool": {"git": "file://` + mcp + `", "range": "*"}}}}` + "\n",
+			`"requires": {"mcp": {"tool": {"git": "` + mcpOperand + `", "range": "*"}}}}` + "\n",
 	}, "v1.0.0")
 	home := t.TempDir()
 	policy := Policy{MCPAllowlist: []string{"example.com/allowed"}}
-	_, _, _, err := Install(home, InstallOptions{Operand: "file://" + root, Policy: policy})
+	_, _, _, err := Install(home, InstallOptions{Operand: ids.serve(root, "https://example.com/withmcp"), Policy: policy})
 	if err == nil || !strings.Contains(err.Error(), "mcp_package_not_allowed") {
 		t.Fatalf("mcp allowlist err = %v, want mcp_package_not_allowed", err)
 	}
@@ -196,22 +193,25 @@ func TestStrictAuditCanaryPasses(t *testing.T) {
 }
 
 // TestMigratedSkillSourceIsCanonical checks F8 at the migration boundary:
-// a tag-pinned global skill migrates with its canonical source identity.
+// a tag-pinned global skill migrates with its canonical source identity,
+// never the raw declared URL — the old trim-space/trim-slash normalizer
+// passes this test only by accident of the assertion, so the assertion is
+// on the canonical identity and the lock validates against
+// context-lock-v1.
 func TestMigratedSkillSourceIsCanonical(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git on PATH")
-	}
 	skill := gitRepo(t, map[string]string{"README.md": "skill\n"}, "v1.0.0")
+	ids := newGitIdentities(t)
+	operand := ids.serve(skill, "https://EXAMPLE.com/skills/hello.git")
 	home := t.TempDir()
 	pinHomes(t)
 	if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	skillfile := `{"schema_version": 1, "skills": [{"name": "sk", "git": "file://` + skill + `", "tag": "v1.0.0"}]}` + "\n"
+	skillfile := `{"schema_version": 1, "skills": [{"name": "sk", "git": "` + operand + `", "tag": "v1.0.0"}]}` + "\n"
 	if err := os.WriteFile(filepath.Join(home, "global", "Skillfile.json"), []byte(skillfile), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureDefault(home); err != nil {
+	if err := EnsureDefaultWithPolicy(home, Policy{}); err != nil {
 		t.Fatal(err)
 	}
 	lock, _, err := readLock(home, DefaultProfile)
@@ -227,7 +227,13 @@ func TestMigratedSkillSourceIsCanonical(t *testing.T) {
 	if member == nil {
 		t.Fatalf("migrated lock %+v", lock.Members)
 	}
-	if member.Source != "file://"+skill {
-		t.Fatalf("migrated skill source %q", member.Source)
+	if member.Source != "example.com/skills/hello" {
+		t.Fatalf("migrated skill source %q, want the canonical identity", member.Source)
+	}
+	if !identity.ValidCanonical(member.Source) {
+		t.Fatalf("migrated skill source %q is not a canonical identity", member.Source)
+	}
+	if err := lock.Validate(); err != nil {
+		t.Fatalf("migrated lock invalid: %v", err)
 	}
 }

@@ -27,10 +27,13 @@ import (
 // (environments §1): SSH and HTTPS spellings of one repository share one
 // clone. fetchRaw remembers the raw clone URL each canonical identity was
 // first seen under so ensureRepo can clone through the operator's transport
-// (including git insteadOf rewrites); a canonical identity with no recorded
-// raw clones through https://canonical. File:// remotes are a hermetic test
-// shim with no network identity: they pass through as their raw URL and key
-// their own cache entry.
+// (including git insteadOf rewrites, which hermetic tests use to serve fake
+// network identities from local repositories); a canonical identity with no
+// recorded raw clones through https://canonical. A transitive requirement
+// declared git@host:org/dep is canonicalized before any raw is recorded and
+// therefore clones over https://, which can surprise an SSH-only operator.
+// File:// remotes are rejected at the identity boundary (see canonicalGit)
+// and never reach this cache.
 type gitManager struct {
 	home           string
 	fetchRaw       map[string]string
@@ -70,13 +73,13 @@ func (m *gitManager) repoDir(identity string) string {
 
 // ensureRepo clones the identity when absent. Network canonical identities
 // clone through their recorded raw URL when one exists, else through
-// https://canonical; file:// and other raw URLs clone as written.
+// https://canonical.
 //
 // The core §6.1 source allowlist is enforced before any network clone
 // (environments §9.1, reusing closure.gateSource's shape): a git member
 // whose canonical identity is outside the machine's allowed_sources is
-// refused with profile_source_invalid. File:// remotes and empty identities
-// (local sources) bypass the allowlist; an empty allowlist permits all.
+// refused with profile_source_invalid. Empty identities (local sources)
+// bypass the allowlist; an empty allowlist permits all.
 func (m *gitManager) ensureRepo(canonical string) (string, error) {
 	if err := m.gateSource(canonical); err != nil {
 		return "", err
@@ -100,13 +103,18 @@ func (m *gitManager) ensureRepo(canonical string) (string, error) {
 	return dir, nil
 }
 
-// gateSource applies the machine allowlist before any network clone.
+// gateSource applies the machine allowlist before any network clone. A
+// file:// source is rejected here as well: it carries no network identity
+// and must never reach a clone.
 func (m *gitManager) gateSource(canonical string) error {
-	if len(m.allowedSources) == 0 {
+	trimmed := strings.TrimSpace(canonical)
+	if trimmed == "" {
 		return nil
 	}
-	trimmed := strings.TrimSpace(canonical)
-	if trimmed == "" || strings.HasPrefix(trimmed, "file://") {
+	if isFileRemote(trimmed) {
+		return fmt.Errorf("%s: file:// git sources carry no network identity and are not accepted", DiagSourceInvalid)
+	}
+	if len(m.allowedSources) == 0 {
 		return nil
 	}
 	if !identity.ValidCanonical(trimmed) {
@@ -154,10 +162,10 @@ func (m *gitManager) fetch(canonical string) error {
 }
 
 // Identity returns the core §6.1 canonical source identity for a declared
-// git URL. A malformed network source is rejected; a file:// remote (the
-// hermetic test shim with no network identity) passes through as its raw
-// URL. Every successful call records the raw-to-canonical mapping so later
-// clones reuse the operator's transport.
+// git URL. A malformed network source — and a file:// remote, which carries
+// no network identity — is rejected with profile_source_invalid. Every
+// successful call records the raw-to-canonical mapping so later clones reuse
+// the operator's transport.
 func (m *gitManager) Identity(_, _ string, declared string) (string, error) {
 	if strings.TrimSpace(declared) == "" {
 		return "", nil
@@ -417,8 +425,9 @@ func (m *gitManager) ensureEntry(home string, resolved contextresolve.Resolved) 
 // Every requirement source is canonicalized through identity.Parse at this
 // boundary (environments §1): two spellings of one repository enter
 // resolution as one identity, so they never produce a spurious
-// context_source_mismatch. A malformed network source is rejected; a file://
-// remote (the hermetic test shim) passes through as its raw URL.
+// context_source_mismatch. A malformed network source passes through here
+// and is rejected at the Identity boundary with profile_source_invalid, as
+// is a file:// requirement source, which carries no network identity.
 func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 	pkg := &contextresolve.Package{Version: manifest.Version, Weight: manifest.Weight, Weights: manifest.Weights}
 	for _, name := range contextpkg.SortedNames(manifest.Contexts) {
@@ -454,10 +463,9 @@ func packageOf(manifest *contextpkg.Manifest) *contextresolve.Package {
 }
 
 // canonicalRequirementSource canonicalizes one manifest requirement source
-// for resolution. Network URLs become their core §6.1 identity; file://
-// remotes (no network identity) pass through as written so hermetic tests
-// keep distinct cache entries; a malformed network source passes through
-// here and is rejected at the Identity boundary with profile_source_invalid.
+// for resolution. Network URLs become their core §6.1 identity; a file://
+// remote or a malformed network source passes through here and is rejected
+// at the Identity boundary with profile_source_invalid.
 func canonicalRequirementSource(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" || identity.ValidCanonical(trimmed) {

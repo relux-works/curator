@@ -167,19 +167,31 @@ func readLock(home, name string) (*contextlock.Lock, string, error) {
 	return contextlock.Read(lockPath(home, name))
 }
 
-// List returns every installed profile with its lock and currency.
+// List returns every installed profile with its lock and currency. The
+// machine gates come from the process configuration (see loadMachinePolicy);
+// callers operating on any other manager home must use ListWithPolicy.
 func List(home string) ([]Info, error) {
+	policy, err := loadMachinePolicy()
+	if err != nil {
+		return nil, err
+	}
+	return ListWithPolicy(home, policy)
+}
+
+// ListWithPolicy lists under the machine gates of policy (environments
+// §9.1). The CLI passes the gates of its already-loaded configuration.
+func ListWithPolicy(home string, policy Policy) ([]Info, error) {
 	op, err := beginOperation(home)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
-	return listLocked(op, home)
+	return listLocked(op, home, policy)
 }
 
 // listLocked lists under the held operation lock.
-func listLocked(op *operation, home string) ([]Info, error) {
-	if err := ensureDefault(op, home); err != nil {
+func listLocked(op *operation, home string, policy Policy) ([]Info, error) {
+	if err := ensureDefault(op, home, policy); err != nil {
 		return nil, err
 	}
 	entries, err := os.ReadDir(ProfilesDir(home))
@@ -326,6 +338,21 @@ type Policy struct {
 	Revocations    []string
 }
 
+// PolicyFromConfig derives the profile machine gates from the loaded
+// machine configuration (environments §9.1): the core §6.1 source allowlist
+// and the audit revocations. The CLI calls this on its already-loaded cfg —
+// which carries the system overlay with its locked keys and the
+// CURATOR_CONFIG override — and threads the result into every profile
+// operation, so the builtin default migration below enforces exactly the
+// same gates as Install and Update. The migration path must never re-parse
+// configuration into a weaker copy.
+func PolicyFromConfig(cfg *config.Config) Policy {
+	if cfg == nil {
+		return Policy{}
+	}
+	return Policy{AllowedSources: cfg.AllowedSources, Revocations: cfg.Audit.Revocations}
+}
+
 // InstallOptions selects the source of one installation.
 type InstallOptions struct {
 	Operand   string
@@ -356,7 +383,7 @@ func Install(home string, options InstallOptions) (Info, bool, bool, error) {
 
 // installLocked installs under the held operation lock.
 func installLocked(op *operation, home string, options InstallOptions) (Info, bool, bool, error) {
-	if err := ensureDefault(op, home); err != nil {
+	if err := ensureDefault(op, home, options.Policy); err != nil {
 		return Info{}, false, false, err
 	}
 	isPath := isPathOperand(options.Operand)
@@ -479,8 +506,15 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 // finding on a member new to the lock leaves the old lock in place with
 // profile_update_blocked. A root pinned by tag or revision is reported as
 // pinned and does not move. A path root re-resolves against its directory.
+// The machine gates come from the process configuration (see
+// loadMachinePolicy); callers operating on any other manager home must use
+// UpdateWithPolicy.
 func Update(home, name string) (Info, bool, error) {
-	return UpdateWithPolicy(home, name, Policy{})
+	policy, err := loadMachinePolicy()
+	if err != nil {
+		return Info{}, false, err
+	}
+	return UpdateWithPolicy(home, name, policy)
 }
 
 // UpdateWithPolicy re-resolves under the machine gates of policy
@@ -498,7 +532,7 @@ func UpdateWithPolicy(home, name string, policy Policy) (Info, bool, error) {
 
 // updateLocked re-resolves under the held operation lock.
 func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, error) {
-	if err := ensureDefault(op, home); err != nil {
+	if err := ensureDefault(op, home, policy); err != nil {
 		return Info{}, false, err
 	}
 	source, err := readSource(home, name)
@@ -588,7 +622,7 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 		return Info{}, false, err
 	}
 	hash := contextlock.HashBytes(canonical)
-	if err := resyncCurrentScopes(op, home, name); err != nil {
+	if err := resyncCurrentScopes(op, home, name, policy); err != nil {
 		return Info{}, false, err
 	}
 	machine, _ := Current(home)
@@ -695,9 +729,14 @@ func pinOf(resolved contextresolve.Resolved) string {
 // advisory profile install does not exist. A path package has no network
 // identity: its revocation identity is its state hash, and the core §6.1
 // network allowlist does not apply (local sources bypass it).
+//
+// canaryPasses is a seam for the narrowing test that proves the canary's
+// blocking role on this path: forcing it to fail must refuse the member.
+var canaryPasses = audit.CanaryPasses
+
 func strictAuditMember(home string, manager *gitManager, resolved contextresolve.Resolved, entry string, policy Policy) ([]string, error) {
 	snapshot := packageRoot(entry, resolved.Directory)
-	if !audit.CanaryPasses() {
+	if !canaryPasses() {
 		return nil, fmt.Errorf("audit blocked: audit canary failed: detectors are not producing expected findings")
 	}
 	contentHash, err := hashing.ContentSHA256(snapshot, nil)
@@ -779,14 +818,19 @@ func isPathOperand(operand string) bool {
 // identity (environments §1) through identity.Parse: SSH and HTTPS spellings
 // of one repository yield one identity, a trailing .git is stripped, the
 // host is lowercased. A malformed network source is rejected. A file://
-// remote carries no network identity and passes through as its trimmed raw
-// URL: it is the hermetic test shim, bypasses the network allowlist like any
-// local source, and keys its own cache entry. An already-canonical host/path
-// passes through unchanged.
+// remote carries no network identity, has no valid lock or marker shape
+// (context-lock-v1 admits no file member), and is rejected here — the same
+// boundary that rejects a malformed network source — with
+// profile_source_invalid. Hermetic tests use git insteadOf rewrites onto
+// fake network identities instead. An already-canonical host/path passes
+// through unchanged.
 func canonicalGit(operand string) (string, error) {
 	trimmed := strings.TrimSpace(operand)
 	if trimmed == "" || identity.ValidCanonical(trimmed) {
 		return trimmed, nil
+	}
+	if isFileRemote(trimmed) {
+		return "", fmt.Errorf("file:// git sources carry no network identity and are not accepted")
 	}
 	canonical, err := identity.Parse(trimmed)
 	if err != nil {
@@ -796,6 +840,13 @@ func canonicalGit(operand string) (string, error) {
 		return trimmed, nil
 	}
 	return canonical, nil
+}
+
+// isFileRemote reports the file: URL prefix (any case), mirroring the local
+// classification in identity.Parse so no spelling of it can pass as a local
+// source. A bare local path never carries a scheme and is unaffected.
+func isFileRemote(raw string) bool {
+	return strings.HasPrefix(strings.ToLower(raw), "file:")
 }
 
 // defaultManifest is the synthesized local root of the builtin default
@@ -815,16 +866,31 @@ const defaultManifest = `{"schema_version": 1, "name": "default", "version": "0.
 // retries on the next call instead of stranding a sourceless profile.
 // EnsureDefault is the locked entry point; ensureDefault runs under the
 // held operation lock.
+//
+// The machine gates come from the process configuration (see
+// loadMachinePolicy); callers operating on any other manager home must use
+// EnsureDefaultWithPolicy.
 func EnsureDefault(home string) error {
+	policy, err := loadMachinePolicy()
+	if err != nil {
+		return err
+	}
+	return EnsureDefaultWithPolicy(home, policy)
+}
+
+// EnsureDefaultWithPolicy creates the builtin default profile under the
+// machine gates of policy (environments §9.1). The CLI passes the gates of
+// its already-loaded configuration.
+func EnsureDefaultWithPolicy(home string, policy Policy) error {
 	op, err := beginOperation(home)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = op.close() }()
-	return ensureDefault(op, home)
+	return ensureDefault(op, home, policy)
 }
 
-func ensureDefault(op *operation, home string) error {
+func ensureDefault(op *operation, home string, policy Policy) error {
 	if _, err := readSource(home, DefaultProfile); err == nil {
 		return nil
 	}
@@ -843,7 +909,7 @@ func ensureDefault(op *operation, home string) error {
 	members := []contextlock.Member{
 		{Kind: contextlock.KindContext, Name: DefaultProfile, StateHash: key, Version: "0.0.0"},
 	}
-	skills, err := migrateGlobalSkills(home)
+	skills, err := migrateGlobalSkills(home, policy)
 	if err != nil {
 		return err
 	}
@@ -867,12 +933,14 @@ func ensureDefault(op *operation, home string) error {
 // migrateGlobalSkills snapshots the machine's global skill set at migration
 // time (environments §9.4) as skill lock members: every global declaration
 // that names a commit — a git tag or revision — is fetched, pinned, stored,
-// and audited exactly like an installed member. A declaration the lock
-// cannot represent — a branch pin, or a local skill with no source identity,
-// since a skill member pins a commit with its source and a state pin admits
-// only a context member — is left for the skill-pipeline stage that owns
-// live direct declarations (see the stage bounds in the package doc).
-func migrateGlobalSkills(home string) ([]contextlock.Member, error) {
+// and audited exactly like an installed member, under the machine gates of
+// policy (environments §9.1: the source allowlist, revocation, and the
+// always-strict audit). A declaration the lock cannot represent — a branch
+// pin, or a local skill with no source identity, since a skill member pins a
+// commit with its source and a state pin admits only a context member — is
+// left for the skill-pipeline stage that owns live direct declarations (see
+// the stage bounds in the package doc).
+func migrateGlobalSkills(home string, policy Policy) ([]contextlock.Member, error) {
 	global, err := manifest.Load(filepath.Join(home, "global"))
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
@@ -880,7 +948,6 @@ func migrateGlobalSkills(home string) ([]contextlock.Member, error) {
 	if global == nil {
 		return nil, nil
 	}
-	policy := loadPolicyForHome(home)
 	manager := newGitManager(home).withPolicy(policy)
 	var members []contextlock.Member
 	for _, decl := range global.Skills {
@@ -923,45 +990,48 @@ func migrateGlobalSkills(home string) ([]contextlock.Member, error) {
 	return members, nil
 }
 
-// loadPolicyForHome reads the machine gates for operations that carry no
-// explicit Policy (the builtin default migration): allowed_sources and
-// audit.revocations from the manager-home config file when present. A
-// missing or unreadable file yields an empty policy (permits all, no
-// revocations); a malformed file fails the migration rather than silently
-// bypassing the gates. Callers with an explicit Policy (Install, Update)
-// use it directly; the CLI derives it from the loaded configuration, which
-// originates from the same file.
-func loadPolicyForHome(home string) Policy {
-	payload, err := os.ReadFile(filepath.Join(home, "config.json")) // #nosec G304 -- manager home path
+// loadMachinePolicy resolves the machine gates for profile operations that
+// carry no explicit Policy (the bare List, Use, Sync, Update, and
+// EnsureDefault entry points, whose migration runs before any caller-held
+// policy exists): allowed_sources and audit.revocations from the effective
+// machine configuration. It goes through config.Load on the process
+// configuration path, so the system overlay with its locked keys and the
+// CURATOR_CONFIG override apply exactly as they do for the CLI's
+// already-loaded Policy — the migration never re-parses configuration into
+// a weaker copy. Callers that already hold a Policy (Install,
+// UpdateWithPolicy, and every WithPolicy entry point) never consult it.
+//
+// Production always calls with home == cfg.Home(), so the loaded path is the
+// home's own configuration; library callers operating on any other manager
+// home must use the WithPolicy entry points.
+//
+// A missing configuration file yields an empty policy (permits all, no
+// revocations): absence is legitimate. Any other read or parse failure fails
+// the caller — a failed read is never an empty policy.
+func loadMachinePolicy() (Policy, error) {
+	path := config.UserPath()
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return Policy{}, nil
+		}
+		return Policy{}, fmt.Errorf("%s: read the machine configuration: %v", DiagSourceInvalid, err)
+	}
+	cfg, err := config.Load(path, nil)
 	if err != nil {
-		return Policy{}
+		return Policy{}, fmt.Errorf("%s: read the machine configuration: %v", DiagSourceInvalid, err)
 	}
-	var raw struct {
-		AllowedSources []string `json:"allowed_sources"`
-		Audit          *struct {
-			Revocations []string `json:"revocations"`
-		} `json:"audit"`
-	}
-	decoder := json.NewDecoder(strings.NewReader(string(payload)))
-	if err := decoder.Decode(&raw); err != nil {
-		return Policy{}
-	}
-	policy := Policy{AllowedSources: raw.AllowedSources}
-	if raw.Audit != nil {
-		policy.Revocations = raw.Audit.Revocations
-	}
-	return policy
+	return PolicyFromConfig(cfg), nil
 }
 
 // resyncCurrentScopes re-materializes every scope whose current profile is
 // name after its lock moved, under the held operation lock.
-func resyncCurrentScopes(op *operation, home, name string) error {
+func resyncCurrentScopes(op *operation, home, name string, policy Policy) error {
 	machine, err := Current(home)
 	if err != nil {
 		return err
 	}
 	if machine == name {
-		if _, err := useLocked(op, home, name, "", "", false); err != nil {
+		if _, err := useLocked(op, home, name, "", "", false, policy); err != nil {
 			return err
 		}
 	}
@@ -974,7 +1044,7 @@ func resyncCurrentScopes(op *operation, home, name string) error {
 			continue
 		}
 		environment, target := splitScope(scope)
-		if _, err := useLocked(op, home, name, environment, target, false); err != nil {
+		if _, err := useLocked(op, home, name, environment, target, false, policy); err != nil {
 			return err
 		}
 	}

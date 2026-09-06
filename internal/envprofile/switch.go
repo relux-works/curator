@@ -128,18 +128,31 @@ type EntryResult struct {
 // Use holds the manager-home mutation lock (see lock.go) and records the
 // new current through the operation journal only when the whole scope
 // materialized.
+// The machine gates come from the process configuration (see
+// loadMachinePolicy); callers operating on any other manager home must use
+// UseWithPolicy.
 func Use(home, name, environment, target string, clearScope bool) ([]EntryResult, error) {
+	policy, err := loadMachinePolicy()
+	if err != nil {
+		return nil, err
+	}
+	return UseWithPolicy(home, name, environment, target, clearScope, policy)
+}
+
+// UseWithPolicy switches under the machine gates of policy (environments
+// §9.1). The CLI passes the gates of its already-loaded configuration.
+func UseWithPolicy(home, name, environment, target string, clearScope bool, policy Policy) ([]EntryResult, error) {
 	op, err := beginOperation(home)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
-	return useLocked(op, home, name, environment, target, clearScope)
+	return useLocked(op, home, name, environment, target, clearScope, policy)
 }
 
 // useLocked switches under the held operation lock.
-func useLocked(op *operation, home, name, environment, target string, clearScope bool) ([]EntryResult, error) {
-	if err := ensureDefault(op, home); err != nil {
+func useLocked(op *operation, home, name, environment, target string, clearScope bool, policy Policy) ([]EntryResult, error) {
+	if err := ensureDefault(op, home, policy); err != nil {
 		return nil, err
 	}
 	if environment != "" {
@@ -216,13 +229,26 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 // are stage (b) and are not provisioned here. Sync holds the manager-home
 // mutation lock; it moves no current pointer, so there is nothing to
 // journal beyond the recovery the lock entry already performed.
+// The machine gates come from the process configuration (see
+// loadMachinePolicy); callers operating on any other manager home must use
+// SyncWithPolicy.
 func Sync(home string) ([]EntryResult, error) {
+	policy, err := loadMachinePolicy()
+	if err != nil {
+		return nil, err
+	}
+	return SyncWithPolicy(home, policy)
+}
+
+// SyncWithPolicy syncs under the machine gates of policy (environments
+// §9.1). The CLI passes the gates of its already-loaded configuration.
+func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 	op, err := beginOperation(home)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = op.close() }()
-	if err := ensureDefault(op, home); err != nil {
+	if err := ensureDefault(op, home, policy); err != nil {
 		return nil, err
 	}
 	machine, err := Current(home)
@@ -598,8 +624,10 @@ func markerKind(source Source) string {
 // markerSource renders the core §6.1 canonical source identity for git
 // roots (environments §1.3, §8.2). New install records already carry the
 // canonical identity; old records carrying a raw URL canonicalize on the
-// fly so the next switch heals the marker. File:// remotes (the hermetic
-// test shim) pass through as written.
+// fly so the next switch heals the marker. A record no boundary accepts
+// anymore (such as a pre-rejection file:// remote) passes through as
+// written: no valid marker shape exists for it, and such records can only
+// predate the rejection.
 func markerSource(source Source) string {
 	if source.Kind != KindGit {
 		return ""

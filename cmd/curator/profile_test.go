@@ -245,7 +245,9 @@ func TestProfileScopedUseAndClear(t *testing.T) {
 }
 
 // TestProfileUpdatePinnedTagIsUnchanged checks a tag-pinned git profile
-// reports unchanged through the CLI.
+// reports unchanged through the CLI. The repository is served under a fake
+// network identity (git insteadOf): a file:// operand is rejected (see
+// TestProfileInstallFileOperandIsRefused) and must never reach this path.
 func TestProfileUpdatePinnedTagIsUnchanged(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("no git on PATH")
@@ -267,7 +269,14 @@ func TestProfileUpdatePinnedTagIsUnchanged(t *testing.T) {
 	git("add", ".")
 	git("commit", "-m", "one")
 	git("tag", "v1.0.0")
-	if code, _, stderr := runProfile(t, source, "profile", "install", "file://"+repo, "--tag", "v1.0.0"); code != exitOK {
+	gitconfig := filepath.Join(t.TempDir(), "gitconfig")
+	rewrite := "[url \"file://" + repo + "\"]\n\tinsteadOf = https://example.com/groot\n"
+	if err := os.WriteFile(gitconfig, []byte(rewrite), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	if code, _, stderr := runProfile(t, source, "profile", "install", "https://example.com/groot", "--tag", "v1.0.0"); code != exitOK {
 		t.Fatalf("install stderr:\n%s", stderr)
 	}
 	code, stdout, stderr := runProfile(t, source, "profile", "update", "groot")
@@ -276,5 +285,65 @@ func TestProfileUpdatePinnedTagIsUnchanged(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "unchanged") {
 		t.Fatalf("update stdout:\n%s", stdout)
+	}
+}
+
+// TestProfileInstallFileOperandIsRefused checks F12 through run(): a file://
+// git operand is rejected with profile_source_invalid, never installed.
+func TestProfileInstallFileOperandIsRefused(t *testing.T) {
+	source, _ := profileHome(t)
+	code, _, stderr := runProfile(t, source, "profile", "install", "file:///tmp/never-there-pkg")
+	if code != exitFail {
+		t.Fatalf("install file:// = %d, want %d\nstderr:\n%s", code, exitFail, stderr)
+	}
+	if !strings.Contains(stderr, "profile_source_invalid") || !strings.Contains(stderr, "no network identity") {
+		t.Fatalf("stderr:\n%s", stderr)
+	}
+}
+
+// TestProfileListMigrationHonoursSystemPolicy checks F10 through run(): the
+// CLI threads its already-loaded machine configuration into the builtin
+// default migration, so a global skill outside the system-locked
+// allowed_sources refuses `profile list` instead of migrating. The refusal
+// precedes any clone, so no git fixture is needed.
+func TestProfileListMigrationHonoursSystemPolicy(t *testing.T) {
+	home := t.TempDir()
+	writeTestProfileConfig(t, filepath.Join(home, "config.json"),
+		`{"schema_version":1,"skills_root":"skills","projects":{}}`)
+	if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	skillfile := `{"schema_version": 1, "skills": [{"name": "hello", ` +
+		`"git": "https://example.com/skills/hello", "tag": "v1.0.0"}]}` + "\n"
+	if err := os.WriteFile(filepath.Join(home, "global", "Skillfile.json"), []byte(skillfile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	system := filepath.Join(t.TempDir(), "system.json")
+	writeTestProfileConfig(t, system,
+		`{"schema_version":1,"locked":["allowed_sources"],"allowed_sources":["github.com/relux-works"]}`)
+	t.Setenv("CURATOR_SYSTEM_CONFIG", system)
+	base := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(base, "claude"))
+	t.Setenv("CODEX_HOME", filepath.Join(base, "codex"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(base, "xdg"))
+	t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(base, "pi"))
+	var stdout, stderr strings.Builder
+	code := run([]string{"profile", "list"}, fileConfigSource(filepath.Join(home, "config.json")), &stdout, &stderr)
+	if code != exitFail {
+		t.Fatalf("list = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitFail, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "profile_source_invalid") ||
+		!strings.Contains(stderr.String(), "allowed sources") {
+		t.Fatalf("stderr:\n%s", stderr.String())
+	}
+}
+
+func writeTestProfileConfig(t *testing.T, path, payload string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

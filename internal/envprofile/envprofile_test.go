@@ -339,31 +339,21 @@ func TestUpdatePathMovesLock(t *testing.T) {
 	}
 }
 
-// TestInstallGitFromFileRemote checks the git pipeline hermetically: a
-// local repository installed through a file:// URL resolves its tags,
-// extracts from the object database, and locks the commit.
-func TestInstallGitFromFileRemote(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("no git on PATH")
-	}
-	repo := t.TempDir()
-	writePackage(t, repo, "groot", "1.0.0", "git module\n")
-	run := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = repo
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
-			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	run("init")
-	run("add", ".")
-	run("commit", "-m", "one")
-	run("tag", "v1.0.0")
+// TestInstallGitResolvesNetworkIdentity checks the git pipeline hermetically:
+// a local repository served under a fake network identity (git insteadOf)
+// resolves its tags, extracts from the object database, and locks the
+// commit under the canonical source identity. A file:// operand is rejected
+// (see TestFileOperandIsRefused) and must never reach this path.
+func TestInstallGitResolvesNetworkIdentity(t *testing.T) {
+	repo := gitRepo(t, map[string]string{
+		"agent-context.json": `{"schema_version": 1, "name": "groot", "version": "1.0.0",` +
+			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",
+		"context/a.md": "git module\n",
+	}, "v1.0.0")
+	ids := newGitIdentities(t)
+	operand := ids.serve(repo, "https://example.com/groot")
 	home := t.TempDir()
-	info, _, _, err := Install(home, InstallOptions{Operand: "file://" + repo})
+	info, _, _, err := Install(home, InstallOptions{Operand: operand})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,6 +363,12 @@ func TestInstallGitFromFileRemote(t *testing.T) {
 	member, ok := info.Lock.RootMember()
 	if !ok || member.Commit == "" {
 		t.Fatalf("lock %+v", info.Lock)
+	}
+	if member.Source != "example.com/groot" {
+		t.Fatalf("lock source %q, want the canonical identity", member.Source)
+	}
+	if err := info.Lock.Validate(); err != nil {
+		t.Fatalf("lock invalid: %v", err)
 	}
 }
 
@@ -446,15 +442,17 @@ func gitRepo(t *testing.T, files map[string]string, tag string) string {
 func TestInstallSurfacesUnresolvedMCPCommand(t *testing.T) {
 	home := t.TempDir()
 	pinHomes(t)
-	mcp := gitRepo(t, map[string]string{
+	ids := newGitIdentities(t)
+	mcpRepo := gitRepo(t, map[string]string{
 		"agent-mcp.json": `{"schema_version": 1, "name": "tool", "version": "1.0.0",` +
 			`"server": {"transport": "stdio", "command": "definitely-absent-command-xyz", "args": []}}` + "\n",
 	}, "v1.0.0")
+	mcpOperand := ids.serve(mcpRepo, "https://example.com/mcp-tool")
 	root := gitRepo(t, map[string]string{
 		"agent-context.json": `{"schema_version": 1, "name": "withmcp", "version": "1.0.0",` +
-			`"requires": {"mcp": {"tool": {"git": "file://` + mcp + `", "range": "*"}}}}` + "\n",
+			`"requires": {"mcp": {"tool": {"git": "` + mcpOperand + `", "range": "*"}}}}` + "\n",
 	}, "v1.0.0")
-	info, _, _, err := Install(home, InstallOptions{Operand: "file://" + root})
+	info, _, _, err := Install(home, InstallOptions{Operand: ids.serve(root, "https://example.com/withmcp")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -565,8 +563,9 @@ func TestInstallDirectoryRejectsSecretUnderSubdirectory(t *testing.T) {
 			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",
 		"sub/context/a.md": directorySecret(),
 	}, "v1.0.0")
+	ids := newGitIdentities(t)
 	home := t.TempDir()
-	if _, _, _, err := Install(home, InstallOptions{Operand: "file://" + repo, Directory: "sub"}); err == nil {
+	if _, _, _, err := Install(home, InstallOptions{Operand: ids.serve(repo, "https://example.com/acme"), Directory: "sub"}); err == nil {
 		t.Fatal("directory-addressed secret member must fail installation")
 	} else if !strings.Contains(err.Error(), DiagSourceInvalid) {
 		t.Fatalf("error %v carries no %s", err, DiagSourceInvalid)
@@ -586,14 +585,16 @@ func TestInstallTransitiveDirectoryRejectsSecret(t *testing.T) {
 			`"context": {"modules": [{"path": "a.md"}]}}` + "\n",
 		"sub/context/a.md": directorySecret(),
 	}, "v1.0.0")
+	ids := newGitIdentities(t)
+	depOperand := ids.serve(dep, "https://example.com/dep")
 	root := gitRepo(t, map[string]string{
 		"agent-context.json": `{"schema_version": 1, "name": "clean", "version": "1.0.0",` +
 			`"context": {"modules": [{"path": "a.md"}]},` +
-			`"requires": {"contexts": {"dep": {"git": "file://` + dep + `", "range": "*", "directory": "sub"}}}}` + "\n",
+			`"requires": {"contexts": {"dep": {"git": "` + depOperand + `", "range": "*", "directory": "sub"}}}}` + "\n",
 		"context/a.md": "clean\n",
 	}, "v1.0.0")
 	home := t.TempDir()
-	if _, _, _, err := Install(home, InstallOptions{Operand: "file://" + root}); err == nil {
+	if _, _, _, err := Install(home, InstallOptions{Operand: ids.serve(root, "https://example.com/clean")}); err == nil {
 		t.Fatal("transitive directory-addressed secret member must fail installation")
 	} else if !strings.Contains(err.Error(), DiagSourceInvalid) {
 		t.Fatalf("error %v carries no %s", err, DiagSourceInvalid)
@@ -685,16 +686,20 @@ func TestDefaultProfileMaterializesOnFreshHome(t *testing.T) {
 // skill served from a local git remote.
 func TestEnsureDefaultMigratesGlobalSkills(t *testing.T) {
 	skill := gitRepo(t, map[string]string{"README.md": "skill\n"}, "v1.0.0")
+	ids := newGitIdentities(t)
+	skillOperand := ids.serve(skill, "https://example.com/skills/hello")
 	home := t.TempDir()
 	pinHomes(t)
 	if err := os.MkdirAll(filepath.Join(home, "global"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	skillfile := `{"schema_version": 1, "skills": [{"name": "sk", "git": "file://` + skill + `", "tag": "v1.0.0"}]}` + "\n"
+	skillfile := `{"schema_version": 1, "skills": [{"name": "sk", "git": "` + skillOperand + `", "tag": "v1.0.0"}]}` + "\n"
 	if err := os.WriteFile(filepath.Join(home, "global", "Skillfile.json"), []byte(skillfile), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := EnsureDefault(home); err != nil {
+	// Explicit empty policy: this test covers the migration mechanics, not
+	// the machine-policy loader (see the F10 loader tests for that).
+	if err := EnsureDefaultWithPolicy(home, Policy{}); err != nil {
 		t.Fatal(err)
 	}
 	lock, _, err := readLock(home, DefaultProfile)
@@ -713,7 +718,7 @@ func TestEnsureDefaultMigratesGlobalSkills(t *testing.T) {
 			member = &lock.Members[index]
 		}
 	}
-	if member == nil || member.Name != "sk" || member.Commit == "" || member.Source != "file://"+skill {
+	if member == nil || member.Name != "sk" || member.Commit == "" || member.Source != "example.com/skills/hello" {
 		t.Fatalf("migrated skill member %+v", lock.Members)
 	}
 	if !contextstore.Exists(home, contextlock.KindSkill, "sk", member.Commit) {

@@ -59,10 +59,7 @@ func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
 	info, activated, updated, err := envprofile.Install(cfg.Home(), envprofile.InstallOptions{
 		Operand: positional[0], Directory: *directory,
 		Range: *rng, Tag: *tag, Revision: *revision, As: *as, Use: *use,
-		Policy: envprofile.Policy{
-			AllowedSources: cfg.AllowedSources,
-			Revocations:    cfg.Audit.Revocations,
-		},
+		Policy: envprofile.PolicyFromConfig(cfg),
 	})
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
@@ -88,7 +85,7 @@ func (c cli) cmdProfileList(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile list takes no arguments")
 		return exitUsage
 	}
-	profiles, err := envprofile.List(cfg.Home())
+	profiles, err := envprofile.ListWithPolicy(cfg.Home(), envprofile.PolicyFromConfig(cfg))
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
@@ -146,7 +143,7 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] | profile use --clear --env <env-id>|--target <target-id>")
 		return exitUsage
 	}
-	results, err := envprofile.Use(cfg.Home(), name, *env, *target, *clearScope)
+	results, err := envprofile.UseWithPolicy(cfg.Home(), name, *env, *target, *clearScope, envprofile.PolicyFromConfig(cfg))
 	for _, result := range results {
 		if result.OK {
 			_, _ = fmt.Fprintf(c.stdout, "%s: switched (%s)\n", result.Adapter, result.Home)
@@ -169,9 +166,10 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile update [<name>|--all]")
 		return exitUsage
 	}
+	policy := envprofile.PolicyFromConfig(cfg)
 	var names []string
 	if *all {
-		profiles, err := envprofile.List(cfg.Home())
+		profiles, err := envprofile.ListWithPolicy(cfg.Home(), policy)
 		if err != nil {
 			_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 			return exitFail
@@ -195,10 +193,6 @@ func (c cli) cmdProfileUpdate(cfg *config.Config, args []string) int {
 			return exitFail
 		}
 		names = []string{machine}
-	}
-	policy := envprofile.Policy{
-		AllowedSources: cfg.AllowedSources,
-		Revocations:    cfg.Audit.Revocations,
 	}
 	failed := false
 	for _, name := range names {
@@ -244,7 +238,7 @@ func (c cli) cmdProfileSync(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile sync takes no arguments")
 		return exitUsage
 	}
-	results, err := envprofile.Sync(cfg.Home())
+	results, err := envprofile.SyncWithPolicy(cfg.Home(), envprofile.PolicyFromConfig(cfg))
 	for _, result := range results {
 		if result.OK {
 			_, _ = fmt.Fprintf(c.stdout, "%s: synced (%s)\n", result.Adapter, result.Home)

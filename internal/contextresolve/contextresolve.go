@@ -218,8 +218,8 @@ func Key(kind, name string) string { return kind + ":" + name }
 
 // canonicalForAgreement maps a declared source onto its comparison key: the
 // core §6.1 canonical identity for network URLs, the trimmed raw URL for
-// file:// remotes (which carry no network identity) and for malformed
-// inputs (which the Identity boundary rejects with profile_source_invalid).
+// malformed inputs and file:// remotes (both of which the Identity boundary
+// rejects with profile_source_invalid).
 // An already-canonical host/path passes through unchanged.
 func canonicalForAgreement(declared string) string {
 	trimmed := strings.TrimSpace(declared)
