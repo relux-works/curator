@@ -67,6 +67,9 @@ type Profile struct {
 	Directory          string       `json:"directory,omitempty"`
 	SourcePath         string       `json:"source_path,omitempty"`
 	ImportedFromNative bool         `json:"imported_from_native,omitempty"`
+	// importedSet records whether imported_from_native was present: the
+	// member is valid exactly as true on a path profile (§8.2).
+	importedSet bool
 }
 
 // Member is one context member in emitted order.
@@ -116,6 +119,9 @@ type Marker struct {
 	Seeds          *[]string          `json:"seeds,omitempty"`
 	SeededProjects []string           `json:"seeded_projects,omitempty"`
 	SeedLinks      []string           `json:"seed_links,omitempty"`
+	// surfaceOrder is the source order of the surfaces keys, captured at
+	// parse: surface keys are sorted (§8.2).
+	surfaceOrder []string
 }
 
 // Passthrough is one recorded credential passthrough entry of a managed home.
@@ -155,16 +161,19 @@ func (m *Marker) Validate() error {
 		if forms != 1 {
 			return fmt.Errorf("a git profile requirement carries exactly one form")
 		}
-		if m.Profile.SourcePath != "" || m.Profile.ImportedFromNative {
+		if m.Profile.SourcePath != "" || m.Profile.ImportedFromNative || m.Profile.importedSet {
 			return fmt.Errorf("a git profile carries no source_path or imported_from_native")
 		}
 	case "local":
-		if m.Profile.Source != "" || m.Profile.Requirement != nil || m.Profile.Directory != "" || m.Profile.SourcePath != "" || m.Profile.ImportedFromNative {
+		if m.Profile.Source != "" || m.Profile.Requirement != nil || m.Profile.Directory != "" || m.Profile.SourcePath != "" || m.Profile.ImportedFromNative || m.Profile.importedSet {
 			return fmt.Errorf("a local profile carries only name, root, kind, and lock_sha256")
 		}
 	case "path":
 		if m.Profile.SourcePath == "" || m.Profile.Source != "" || m.Profile.Requirement != nil || m.Profile.Directory != "" {
 			return fmt.Errorf("a path profile records source_path and no git members")
+		}
+		if m.Profile.importedSet && !m.Profile.ImportedFromNative {
+			return fmt.Errorf("imported_from_native is valid exactly as true")
 		}
 	default:
 		return fmt.Errorf("profile kind %q is not git, local, or path", m.Profile.Kind)
@@ -172,9 +181,18 @@ func (m *Marker) Validate() error {
 	if len(m.Members) == 0 {
 		return fmt.Errorf("members is empty")
 	}
+	names := map[string]bool{}
+	rooted := false
 	for _, member := range m.Members {
 		if !identifiers.Valid(member.Name) {
 			return fmt.Errorf("member %q is not a portable identifier", member.Name)
+		}
+		if names[member.Name] {
+			return fmt.Errorf("member %q is recorded twice", member.Name)
+		}
+		names[member.Name] = true
+		if member.Name == m.Profile.Root {
+			rooted = true
 		}
 		switch {
 		case member.Commit != "" && member.StateSHA256 == "" && member.SourcePath == "":
@@ -189,6 +207,9 @@ func (m *Marker) Validate() error {
 			return fmt.Errorf("member %s carries exactly one pin", member.Name)
 		}
 	}
+	if !rooted {
+		return fmt.Errorf("members do not record the root %q", m.Profile.Root)
+	}
 	if (m.Precedence.Winner != "higher-weight" && m.Precedence.Winner != "lower-weight") ||
 		(m.Precedence.Placement != "winner-last" && m.Precedence.Placement != "winner-first") {
 		return fmt.Errorf("precedence primitives are invalid")
@@ -197,6 +218,19 @@ func (m *Marker) Validate() error {
 	case ModeManagedHome:
 		if m.Passthrough == nil || m.Seeds == nil {
 			return fmt.Errorf("a managed-home marker records passthrough and seeds")
+		}
+		if !sort.StringsAreSorted(m.SeededProjects) {
+			return fmt.Errorf("seeded project paths are sorted")
+		}
+		if !sort.StringsAreSorted(m.surfaceOrder) {
+			return fmt.Errorf("surface keys are sorted")
+		}
+		for _, entry := range *m.Passthrough {
+			switch entry.Strategy {
+			case "per-home-keychain", "ambient", "keyring-preferred", "file-link":
+			default:
+				return fmt.Errorf("passthrough strategy %q is unknown", entry.Strategy)
+			}
 		}
 	case ModeLinked, ModeCopied:
 		if m.Passthrough != nil || m.Seeds != nil || m.SeededProjects != nil || m.SeedLinks != nil {
@@ -278,10 +312,240 @@ func Parse(payload []byte) (*Marker, error) {
 	if err := decoder.Decode(&marker); err != nil {
 		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
 	}
+	var shadow struct {
+		Profile struct {
+			ImportedFromNative *bool `json:"imported_from_native"`
+		} `json:"profile"`
+		Surfaces json.RawMessage `json:"surfaces"`
+	}
+	if err := json.Unmarshal(payload, &shadow); err != nil {
+		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
+	}
+	marker.Profile.importedSet = shadow.Profile.ImportedFromNative != nil
+	order, err := objectKeys(shadow.Surfaces)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
+	}
+	marker.surfaceOrder = order
 	if err := marker.Validate(); err != nil {
 		return nil, fmt.Errorf("%s: %w", DiagMarkerInvalid, err)
 	}
 	return &marker, nil
+}
+
+// objectKeys returns the source order of an object's keys.
+func objectKeys(raw json.RawMessage) ([]string, error) {
+	scanner := &keyScanner{input: string(raw)}
+	return scanner.keys()
+}
+
+// keyScanner is a minimal JSON object-key scanner: it walks one object,
+// skipping nested values without interpreting them.
+type keyScanner struct {
+	input string
+	pos   int
+}
+
+func (s *keyScanner) keys() ([]string, error) {
+	s.skipSpace()
+	if !s.consume('{') {
+		return nil, fmt.Errorf("not an object")
+	}
+	var keys []string
+	s.skipSpace()
+	if s.consume('}') {
+		return keys, nil
+	}
+	for {
+		s.skipSpace()
+		key, err := s.string()
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+		s.skipSpace()
+		if !s.consume(':') {
+			return nil, fmt.Errorf("missing colon")
+		}
+		if err := s.skipValue(); err != nil {
+			return nil, err
+		}
+		s.skipSpace()
+		if s.consume(',') {
+			continue
+		}
+		if s.consume('}') {
+			return keys, nil
+		}
+		return nil, fmt.Errorf("missing comma or brace")
+	}
+}
+
+func (s *keyScanner) skipSpace() {
+	for s.pos < len(s.input) {
+		switch s.input[s.pos] {
+		case ' ', '\t', '\n', '\r':
+			s.pos++
+		default:
+			return
+		}
+	}
+}
+
+func (s *keyScanner) consume(want byte) bool {
+	if s.pos < len(s.input) && s.input[s.pos] == want {
+		s.pos++
+		return true
+	}
+	return false
+}
+
+func (s *keyScanner) string() (string, error) {
+	if !s.consume('"') {
+		return "", fmt.Errorf("missing string")
+	}
+	var out []byte
+	for s.pos < len(s.input) {
+		char := s.input[s.pos]
+		switch char {
+		case '"':
+			s.pos++
+			return string(out), nil
+		case '\\':
+			s.pos++
+			if s.pos >= len(s.input) {
+				return "", fmt.Errorf("bad escape")
+			}
+			escaped := s.input[s.pos]
+			s.pos++
+			switch escaped {
+			case '"', '\\', '/':
+				out = append(out, escaped)
+			case 'b':
+				out = append(out, '\b')
+			case 'f':
+				out = append(out, '\f')
+			case 'n':
+				out = append(out, '\n')
+			case 'r':
+				out = append(out, '\r')
+			case 't':
+				out = append(out, '\t')
+			case 'u':
+				if s.pos+4 > len(s.input) {
+					return "", fmt.Errorf("bad unicode escape")
+				}
+				var value rune
+				for _, digit := range s.input[s.pos : s.pos+4] {
+					value *= 16
+					switch {
+					case digit >= '0' && digit <= '9':
+						value += rune(digit - '0')
+					case digit >= 'a' && digit <= 'f':
+						value += rune(digit-'a') + 10
+					case digit >= 'A' && digit <= 'F':
+						value += rune(digit-'A') + 10
+					default:
+						return "", fmt.Errorf("bad unicode escape")
+					}
+				}
+				s.pos += 4
+				out = append(out, string(value)...)
+			default:
+				return "", fmt.Errorf("bad escape")
+			}
+		default:
+			if char < 0x20 {
+				return "", fmt.Errorf("control character in string")
+			}
+			out = append(out, char)
+			s.pos++
+		}
+	}
+	return "", fmt.Errorf("unterminated string")
+}
+
+func (s *keyScanner) skipValue() error {
+	s.skipSpace()
+	if s.pos >= len(s.input) {
+		return fmt.Errorf("missing value")
+	}
+	switch s.input[s.pos] {
+	case '"':
+		_, err := s.string()
+		return err
+	case '{':
+		depth := 0
+		inString := false
+		for s.pos < len(s.input) {
+			char := s.input[s.pos]
+			if inString {
+				if char == '\\' {
+					s.pos += 2
+					continue
+				}
+				if char == '"' {
+					inString = false
+				}
+				s.pos++
+				continue
+			}
+			switch char {
+			case '"':
+				inString = true
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					s.pos++
+					return nil
+				}
+			}
+			s.pos++
+		}
+		return fmt.Errorf("unterminated object")
+	case '[':
+		depth := 0
+		inString := false
+		for s.pos < len(s.input) {
+			char := s.input[s.pos]
+			if inString {
+				if char == '\\' {
+					s.pos += 2
+					continue
+				}
+				if char == '"' {
+					inString = false
+				}
+				s.pos++
+				continue
+			}
+			switch char {
+			case '"':
+				inString = true
+			case '[':
+				depth++
+			case ']':
+				depth--
+				if depth == 0 {
+					s.pos++
+					return nil
+				}
+			}
+			s.pos++
+		}
+		return fmt.Errorf("unterminated array")
+	default:
+		for s.pos < len(s.input) {
+			switch s.input[s.pos] {
+			case ',', '}', ']', ' ', '\t', '\n', '\r':
+				return nil
+			}
+			s.pos++
+		}
+		return nil
+	}
 }
 
 // Read loads the marker of a home. It distinguishes absence (nil, nil) from a

@@ -275,6 +275,9 @@ internal/envprofile	TestResolveLockContention	linux,darwin,windows	-	-	a contend
 internal/envprofile	TestStatusOrphanRetention	linux,darwin,windows	-	-	removal without purge retains managed homes and status reports each orphan by path
 internal/envprofile	TestOpencodeXDGSeeds	linux,darwin,windows	-	-	allowlisted XDG entries seed as recorded parent links and shadows warn without being touched
 internal/envprofile	TestSeedUnreadableStopsBeforeFirstWrite	linux,darwin,windows	-	-	an unreadable seed fails provisioning before the first write
+internal/envmarker	TestParseAuthoritativeEnvMarkerSchemaCases	linux,darwin,windows	-	-	the published environment marker family parses under the managed-home rules and every invalid case is rejected
+internal/envfragment	TestFragmentAuthoritativeSchemaCases	linux,darwin,windows	-	-	the published fragment family validates against the closed adapter registry and the profile-influence boundary
+internal/envfragment	TestFragmentEmissionMatchesReference	linux,darwin,windows	-	-	the emitted canonical fragment re-encodes the published reference bytes exactly
 cmd/curator	TestEnvResolveRepairEmitsFragment	linux,darwin,windows	-	-	env resolve --repair provisions through the CLI and emits the launch fragment with the managed home
 cmd/curator	TestEnvStatusMatrix	linux,darwin,windows	-	-	env status reports the profile by environment by surface matrix with --check and --json
 cmd/curator	TestUmbrellaMissingProvider	linux,darwin,windows	-	-	an unknown subcommand with no provider names the executable and the installation guidance
