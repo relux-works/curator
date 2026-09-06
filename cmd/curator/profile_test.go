@@ -288,6 +288,82 @@ func TestProfileUpdatePinnedTagIsUnchanged(t *testing.T) {
 	}
 }
 
+// TestProfileMachineUseSkipsScopedAdapter drives F16 through run(): with
+// env:codex_cli scoped to two, a machine-scope use of three leaves the codex
+// home on two (bytes and marker) while the other homes move to three, the
+// listing keeps reporting env:codex_cli=two, and the same holds through
+// install --use. A mutant that restores the unconditional machine pass
+// overwrites the codex home and must fail this test.
+func TestProfileMachineUseSkipsScopedAdapter(t *testing.T) {
+	source, _ := profileHome(t)
+	one, two, three, four := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
+	writeContextPackage(t, one, "one", "1.0.0", "one\n")
+	writeContextPackage(t, two, "two", "1.0.0", "two\n")
+	writeContextPackage(t, three, "three", "1.0.0", "three\n")
+	writeContextPackage(t, four, "four", "1.0.0", "four\n")
+	for _, pkg := range []string{one, two} {
+		if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+			t.Fatalf("install stderr:\n%s", stderr)
+		}
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "use", "two", "--env", "codex_cli"); code != exitOK {
+		t.Fatalf("scoped use stderr:\n%s", stderr)
+	}
+	if code, _, stderr := runProfile(t, source, "profile", "install", three); code != exitOK {
+		t.Fatalf("install three stderr:\n%s", stderr)
+	}
+	code, stdout, stderr := runProfile(t, source, "profile", "use", "three")
+	if code != exitOK {
+		t.Fatalf("use three = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, "codex_cli") {
+		t.Fatalf("machine use must skip the scoped adapter, stdout:\n%s", stdout)
+	}
+	codexDoc, err := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "AGENTS.md")) // #nosec G304 -- test home
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(codexDoc), "## Context: two 1.0.0") {
+		t.Fatalf("codex home does not carry two:\n%s", codexDoc)
+	}
+	codexMarker, err := envmarker.Read(os.Getenv("CODEX_HOME"))
+	if err != nil || codexMarker == nil || codexMarker.Profile.Name != "two" {
+		t.Fatalf("codex marker %+v %v", codexMarker, err)
+	}
+	claudeDoc, err := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "CLAUDE.md")) // #nosec G304 -- test home
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(claudeDoc), "## Context: three 1.0.0") {
+		t.Fatalf("claude home does not carry three:\n%s", claudeDoc)
+	}
+	_, stdout, _ = runProfile(t, source, "profile", "list")
+	if !strings.Contains(stdout, "env:codex_cli=two") {
+		t.Fatalf("list stdout:\n%s", stdout)
+	}
+	code, stdout, stderr = runProfile(t, source, "profile", "install", four, "--use")
+	if code != exitOK {
+		t.Fatalf("install four --use = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, "codex_cli") {
+		t.Fatalf("install --use must skip the scoped adapter, stdout:\n%s", stdout)
+	}
+	codexDoc, err = os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "AGENTS.md")) // #nosec G304 -- test home
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(codexDoc), "## Context: two 1.0.0") {
+		t.Fatalf("codex home does not carry two after install --use:\n%s", codexDoc)
+	}
+	claudeDoc, err = os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "CLAUDE.md")) // #nosec G304 -- test home
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(claudeDoc), "## Context: four 1.0.0") {
+		t.Fatalf("claude home does not carry four:\n%s", claudeDoc)
+	}
+}
+
 // TestProfileInstallFileOperandIsRefused checks F12 through run(): a file://
 // git operand is rejected with profile_source_invalid, never installed.
 func TestProfileInstallFileOperandIsRefused(t *testing.T) {

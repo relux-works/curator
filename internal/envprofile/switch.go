@@ -5,7 +5,11 @@
 // profile's store entries: it attempts every entry, reports per-adapter
 // results, and records the new current only when the whole scope
 // materialized — the M11 transactional shape. A partial scope is reported
-// as profile_use_partial and the recorded current is unchanged.
+// as profile_use_partial and the recorded current is unchanged. A
+// machine-scope switch skips adapters that carry a scope record
+// (environments §9.3): those homes follow their scoped profiles, not the
+// machine current, so the manager never reports env:<id>=<profile> for a
+// home it has just overwritten with a different profile.
 //
 // Serialization and durability (see lock.go): every switch holds the
 // manager-home mutation lock, and the manager-home records it moves — the
@@ -121,10 +125,12 @@ type EntryResult struct {
 }
 
 // Use switches the machine scope (environment and target both empty) or one
-// narrowed scope to name. With clear, the scope record is dropped and the
-// scope re-materializes from the machine default. It returns the per-entry
-// results; when any entry failed the recorded current is unchanged and the
-// error carries profile_use_partial.
+// narrowed scope to name. A machine-scope switch skips adapters that carry
+// a scope record: those homes stay on their scoped profiles. With clear,
+// the scope record is dropped and the scope re-materializes from the
+// machine default. It returns the per-entry results; when any entry failed
+// the recorded current is unchanged and the error carries
+// profile_use_partial.
 // Use holds the manager-home mutation lock (see lock.go) and records the
 // new current through the operation journal only when the whole scope
 // materialized.
@@ -225,10 +231,12 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 }
 
 // Sync re-materializes the machine scope and every scoped current from
-// their profiles' locks: the stage-(a) actualization path. Managed homes
-// are stage (b) and are not provisioned here. Sync holds the manager-home
-// mutation lock; it moves no current pointer, so there is nothing to
-// journal beyond the recovery the lock entry already performed.
+// their profiles' locks: the stage-(a) actualization path. The machine pass
+// skips adapters that carry a scope record and the scoped pass writes each
+// of those homes once from its record, so no home is written twice. Managed
+// homes are stage (b) and are not provisioned here. Sync holds the
+// manager-home mutation lock; it moves no current pointer, so there is
+// nothing to journal beyond the recovery the lock entry already performed.
 // The machine gates come from the process configuration (see
 // loadMachinePolicy); callers operating on any other manager home must use
 // SyncWithPolicy.
@@ -286,6 +294,13 @@ func SyncWithPolicy(home string, policy Policy) ([]EntryResult, error) {
 
 // materializeScope materializes profile name into every adapter home of the
 // scope (one adapter when environment names it), attempting every entry.
+//
+// A machine-scope switch (environment empty) skips adapters that carry a
+// scope record (environments §9.3): such a home follows its scoped profile,
+// not the machine current, so the machine pass has no business writing it.
+// SyncWithPolicy re-materializes each skipped home from its scoped record in
+// its own pass, so every home is written exactly once and the recorded state
+// and the bytes always agree when the command returns.
 func materializeScope(home, profile, environment string) ([]EntryResult, error) {
 	lock, hash, err := readLock(home, profile)
 	if err != nil {
@@ -300,7 +315,16 @@ func materializeScope(home, profile, environment string) ([]EntryResult, error) 
 		adapter, _ := adapterByID(environment)
 		adapters = []Adapter{adapter}
 	} else {
-		adapters = Adapters
+		scoped, err := ScopedCurrents(home)
+		if err != nil {
+			return nil, err
+		}
+		for _, adapter := range Adapters {
+			if _, ok := scoped["env:"+adapter.ID]; ok {
+				continue
+			}
+			adapters = append(adapters, adapter)
+		}
 	}
 	manager := newGitManager(home)
 	packages, err := loadMaterial(home, manager, lock)
