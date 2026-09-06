@@ -44,6 +44,16 @@ type environmentsVector struct {
 				Content      string   `json:"content"`
 			} `json:"modules"`
 		} `json:"packages"`
+		MCPServers map[string]struct {
+			Transport    string   `json:"transport"`
+			Command      string   `json:"command"`
+			Args         []string `json:"args"`
+			URL          string   `json:"url"`
+			EnvNames     []string `json:"env_names"`
+			Environments []string `json:"environments"`
+		} `json:"mcp_servers"`
+		MCPSet        []string `json:"mcp_set"`
+		EnvNames      []string `json:"env_names"`
 		EmittedOrder  []string `json:"emitted_order"`
 		FileWritten   bool     `json:"file_written"`
 		SurfaceSHA256 string   `json:"surface_sha256"`
@@ -128,12 +138,13 @@ func TestConformanceEnvironmentsHeader(t *testing.T) {
 	}
 }
 
-// TestConformanceEnvironmentsMonolithic drives contextmaterialize.Monolithic
-// and SystemPrompt — the production assemblers behind `profile use` — against
-// every root-context case in the monolithic form and every system-prompt case
-// of vectors/environments.json, byte for byte against the expected files, and
-// checks the §5.6 surface hash. Referenced-form and MCP cases belong to a
-// later stage and are recorded as skipped subtests, never as passes.
+// TestConformanceEnvironmentsMonolithic drives the production assemblers
+// behind `profile use` and managed-home provisioning —
+// contextmaterialize.Monolithic, Referenced, SystemPrompt, and MCPFile —
+// against every materialization case of vectors/environments.json, byte for
+// byte against the expected files, and checks the §5.6 surface hash, the
+// resolved MCP set, and the env_names union. No case in this family is
+// skipped: the referenced form and MCP channel files landed in stage (b).
 func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 	root, vector := loadEnvironmentsVector(t)
 	if len(vector.MaterializationCases) == 0 {
@@ -141,9 +152,6 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 	}
 	for _, tc := range vector.MaterializationCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			if tc.Surface == "mcp" || tc.Form == contextmaterialize.FormReferenced {
-				t.Skipf("surface %s form %s deferred to stage (b): the referenced form and MCP channel files land in stage (b)", tc.Surface, tc.Form)
-			}
 			lock := vectorLockToLock(t, tc.Lock)
 			hash, err := lock.Hash()
 			if err != nil {
@@ -171,13 +179,82 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 			if got := memberNames(order); !reflect.DeepEqual(got, tc.EmittedOrder) {
 				t.Fatalf("emitted order %v, want %v", got, tc.EmittedOrder)
 			}
-			var document []byte
+			files := map[string][]byte{}
 			var written bool
 			switch tc.Surface {
 			case "root-context":
-				document, written, err = contextmaterialize.Monolithic(lock, hash, precedence, tc.Environment, packages)
+				switch tc.Form {
+				case contextmaterialize.FormMonolithic:
+					var document []byte
+					document, written, err = contextmaterialize.Monolithic(lock, hash, precedence, tc.Environment, packages)
+					if err == nil && written {
+						if len(tc.Files) != 1 {
+							t.Fatalf("expected exactly one file for a monolithic surface, vector lists %d", len(tc.Files))
+						}
+						files[tc.Files[0].Path] = document
+					}
+				case contextmaterialize.FormReferenced:
+					files, written, err = contextmaterialize.Referenced(lock, hash, precedence, tc.Environment, packages)
+				default:
+					t.Fatalf("unknown form %q", tc.Form)
+				}
 			case "system-prompt":
+				var document []byte
 				document, written, err = contextmaterialize.SystemPrompt(lock, precedence, tc.Environment, packages)
+				if err == nil && written {
+					if len(tc.Files) != 1 {
+						t.Fatalf("expected exactly one file for a system-prompt surface, vector lists %d", len(tc.Files))
+					}
+					files[tc.Files[0].Path] = document
+				}
+			case "mcp":
+				var servers []contextmaterialize.MCPServer
+				for name, server := range tc.MCPServers {
+					servers = append(servers, contextmaterialize.MCPServer{
+						Name:         name,
+						Transport:    server.Transport,
+						Command:      server.Command,
+						Args:         server.Args,
+						URL:          server.URL,
+						EnvNames:     server.EnvNames,
+						Environments: server.Environments,
+					})
+				}
+				set, err := contextmaterialize.MCPSet(servers, tc.Environment)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var names []string
+				for _, server := range set {
+					names = append(names, server.Name)
+				}
+				if names == nil {
+					names = []string{}
+				}
+				wantSet := tc.MCPSet
+				if wantSet == nil {
+					wantSet = []string{}
+				}
+				if !reflect.DeepEqual(names, wantSet) {
+					t.Fatalf("mcp set %v, want %v", names, wantSet)
+				}
+				gotNames := contextmaterialize.MCPEnvNames(set)
+				if gotNames == nil {
+					gotNames = []string{}
+				}
+				wantNames := tc.EnvNames
+				if wantNames == nil {
+					wantNames = []string{}
+				}
+				if !reflect.DeepEqual(gotNames, wantNames) {
+					t.Fatalf("env_names %v, want %v", gotNames, wantNames)
+				}
+				var path string
+				var document []byte
+				path, document, written, err = contextmaterialize.MCPFile(tc.Environment, servers)
+				if err == nil && written {
+					files[path] = document
+				}
 			default:
 				t.Fatalf("unknown surface %q", tc.Surface)
 			}
@@ -193,21 +270,26 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 				}
 				return
 			}
-			if len(tc.Files) != 1 {
-				t.Fatalf("expected exactly one file for a %s %s surface, vector lists %d", tc.Form, tc.Surface, len(tc.Files))
+			if len(files) != len(tc.Files) {
+				t.Fatalf("produced %d files, vector lists %d", len(files), len(tc.Files))
 			}
-			file := tc.Files[0]
-			want, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file.Expected)))
-			if err != nil {
-				t.Fatal(err)
+			for _, file := range tc.Files {
+				document, ok := files[file.Path]
+				if !ok {
+					t.Fatalf("produced no file for vector path %s", file.Path)
+				}
+				want, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file.Expected)))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(document, want) {
+					t.Fatalf("%s bytes differ from %s:\n got %q\nwant %q", file.Path, file.Expected, document, want)
+				}
+				if len(document) != file.Bytes || contextmaterialize.FileHash(document) != file.SHA256 {
+					t.Fatalf("%s: %d bytes %s, want %d bytes %s", file.Path, len(document), contextmaterialize.FileHash(document), file.Bytes, file.SHA256)
+				}
 			}
-			if !bytes.Equal(document, want) {
-				t.Fatalf("%s bytes differ from %s:\n got %q\nwant %q", file.Path, file.Expected, document, want)
-			}
-			if len(document) != file.Bytes || contextmaterialize.FileHash(document) != file.SHA256 {
-				t.Fatalf("%s: %d bytes %s, want %d bytes %s", file.Path, len(document), contextmaterialize.FileHash(document), file.Bytes, file.SHA256)
-			}
-			if got := contextmaterialize.SurfaceHash(map[string][]byte{file.Path: document}); got != tc.SurfaceSHA256 {
+			if got := contextmaterialize.SurfaceHash(files); got != tc.SurfaceSHA256 {
 				t.Fatalf("surface hash %s, want %s", got, tc.SurfaceSHA256)
 			}
 		})
