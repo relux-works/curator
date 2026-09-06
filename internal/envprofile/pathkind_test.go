@@ -8,6 +8,7 @@ import (
 
 	"github.com/relux-works/curator/internal/contextlock"
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/hashing"
 )
 
 // Production entry point under test: Install. Every fixture builds paths
@@ -355,7 +356,7 @@ func TestUnreadablePathRootLeadsUnreadable(t *testing.T) {
 			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
 		map[string]string{"a.md": "root\n"})
 	if err := os.Chmod(source, 0o000); err != nil {
-		t.Skipf("chmod refused: %v", err)
+		t.Skipf("this environment can read a mode-000 directory: chmod refused: %v", err)
 	}
 	defer func() { _ = os.Chmod(source, 0o755) }()
 	if _, err := os.ReadDir(source); err == nil {
@@ -480,5 +481,267 @@ func TestUpdatePathSnapshotNameMismatchIsSourceInvalid(t *testing.T) {
 	_, _, err = UpdateWithPolicy(home, "pk", Policy{})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) || !strings.Contains(err.Error(), "snapshot names") {
 		t.Fatalf("err = %v, want %s naming the snapshot mismatch", err, DiagSourceInvalid)
+	}
+}
+
+// TestPathReinstallBareAndNonCurrentMovesPin drives the §1 reinstall in the
+// two addressing modes the immutable-snapshot test does not take: the bare
+// `profile install <same path>` form with no --as (the CLI row's default
+// form), and a reinstall of a profile that is not current. Production entry
+// point: Install. A mutant restricting the reinstall arm to
+// `options.As != ""` restores the dead reinstall through the default form,
+// and a mutant restricting it to the current profile restores it for every
+// non-current profile; both must fail this test.
+func TestPathReinstallBareAndNonCurrentMovesPin(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	bare := filepath.Join(t.TempDir(), "source")
+	writeManifestPackage(t, bare,
+		`{"schema_version": 1, "name": "bare", "version": "1.0.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "original\n"})
+	info, _, _, err := Install(home, InstallOptions{Operand: bare})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Name != "bare" {
+		t.Fatalf("profile %q, want the manifest name", info.Name)
+	}
+	before, ok := lockMember(info.Lock, "bare")
+	if !ok || before.StateHash == "" {
+		t.Fatalf("lock members %+v carry no state pin", info.Lock.Members)
+	}
+	// A second profile installs without --use, so the machine stays on
+	// bare and second is not current.
+	other := filepath.Join(t.TempDir(), "other")
+	writeManifestPackage(t, other,
+		`{"schema_version": 1, "name": "second", "version": "1.0.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "second\n"})
+	secondInfo, _, _, err := Install(home, InstallOptions{Operand: other, As: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondBefore, ok := lockMember(secondInfo.Lock, "second")
+	if !ok || secondBefore.StateHash == "" {
+		t.Fatalf("lock members %+v carry no state pin", secondInfo.Lock.Members)
+	}
+	if machine, _ := Current(home); machine != "bare" {
+		t.Fatalf("current=%q, want bare", machine)
+	}
+	if err := os.WriteFile(filepath.Join(bare, "context", "a.md"), []byte("EDITED BARE\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(other, "context", "a.md"), []byte("EDITED SECOND\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The bare form with no --as must move the pin.
+	reinstalled, activated, isUpdated, err := Install(home, InstallOptions{Operand: bare})
+	if err != nil {
+		t.Fatalf("bare reinstall: %v", err)
+	}
+	if !isUpdated || activated {
+		t.Fatalf("bare reinstall flags activated=%v updated=%v, want false true", activated, isUpdated)
+	}
+	afterBare, ok := lockMember(reinstalled.Lock, "bare")
+	if !ok || afterBare.StateHash == "" {
+		t.Fatalf("reinstalled lock members %+v carry no state pin", reinstalled.Lock.Members)
+	}
+	if afterBare.StateHash == before.StateHash {
+		t.Fatal("bare reinstall of the edited tree pinned the same hash: the §1 reinstall is dead through the default form")
+	}
+	// A reinstall of the non-current profile must move its pin without
+	// switching the machine.
+	reinstalledSecond, activated, isUpdated, err := Install(home, InstallOptions{Operand: other, As: "second"})
+	if err != nil {
+		t.Fatalf("non-current reinstall: %v", err)
+	}
+	if !isUpdated || activated {
+		t.Fatalf("non-current reinstall flags activated=%v updated=%v, want false true", activated, isUpdated)
+	}
+	afterSecond, ok := lockMember(reinstalledSecond.Lock, "second")
+	if !ok || afterSecond.StateHash == "" {
+		t.Fatalf("reinstalled lock members %+v carry no state pin", reinstalledSecond.Lock.Members)
+	}
+	if afterSecond.StateHash == secondBefore.StateHash {
+		t.Fatal("non-current reinstall of the edited tree pinned the same hash: the §1 reinstall is dead for a non-current profile")
+	}
+	if machine, _ := Current(home); machine != "bare" {
+		t.Fatalf("reinstall without --use switched current=%q, want bare", machine)
+	}
+}
+
+// installBlockingOverlayRoot installs a clean path root and returns the
+// manager home, the root source directory, and the lock hash before any
+// overlay joins the closure.
+func installBlockingOverlayRoot(t *testing.T) (home, root string, oldHash string) {
+	t.Helper()
+	home = t.TempDir()
+	pinHomes(t)
+	root = filepath.Join(t.TempDir(), "root")
+	writeManifestPackage(t, root,
+		`{"schema_version": 1, "name": "acme", "version": "1.0.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "root\n"})
+	if _, _, _, err := Install(home, InstallOptions{Operand: root}); err != nil {
+		t.Fatal(err)
+	}
+	_, oldHash, err := readLock(home, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return home, root, oldHash
+}
+
+// TestUpdateBlocksSecretOverlayMember drives UpdateWithPolicy onto a path
+// profile whose machine overlay carries secret material: the deterministic
+// detector reports a blocking finding on the new member, updateLocked
+// refuses with profile_update_blocked, and the old lock stands. Production
+// entry point: UpdateWithPolicy. A mutant admitting exactly a blocking
+// context member (report.Blocking() but not for KindContext) must fail
+// this test.
+func TestUpdateBlocksSecretOverlayMember(t *testing.T) {
+	home, _, oldHash := installBlockingOverlayRoot(t)
+	overlay := filepath.Join(t.TempDir(), "overlay")
+	writeManifestPackage(t, overlay,
+		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": directorySecret()})
+	policy := Policy{
+		OverlaysAllowed:      true,
+		OverlayDefaultWeight: 1000,
+		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
+	}
+	_, _, err := UpdateWithPolicy(home, "acme", policy)
+	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) {
+		t.Fatalf("err = %v, want %s", err, DiagUpdateBlocked)
+	}
+	if !strings.Contains(err.Error(), "blocking finding") {
+		t.Fatalf("err = %v, want the blocking-finding reason", err)
+	}
+	_, afterHash, err := readLock(home, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterHash != oldHash {
+		t.Fatal("a blocked update moved the lock: the old lock must stand")
+	}
+}
+
+// TestReinstallBlocksSecretOverlayMember drives Install of the same path
+// source with a secret-carrying machine overlay: the reinstall's new-member
+// gate refuses with profile_update_blocked exactly as the update twin does.
+// Production entry point: Install. It kills the reinstall copy of the
+// mutant TestUpdateBlocksSecretOverlayMember kills for updateLocked.
+func TestReinstallBlocksSecretOverlayMember(t *testing.T) {
+	home, root, oldHash := installBlockingOverlayRoot(t)
+	overlay := filepath.Join(t.TempDir(), "overlay")
+	writeManifestPackage(t, overlay,
+		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": directorySecret()})
+	policy := Policy{
+		OverlaysAllowed:      true,
+		OverlayDefaultWeight: 1000,
+		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
+	}
+	_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
+	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) {
+		t.Fatalf("err = %v, want %s", err, DiagUpdateBlocked)
+	}
+	if !strings.Contains(err.Error(), "blocking finding") {
+		t.Fatalf("err = %v, want the blocking-finding reason", err)
+	}
+	_, afterHash, err := readLock(home, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterHash != oldHash {
+		t.Fatal("a blocked reinstall moved the lock: the old lock must stand")
+	}
+}
+
+// TestUpdateBlocksRevokedOverlayMember drives UpdateWithPolicy onto a path
+// profile whose machine overlay is clean but revoked by source: the
+// deterministic detector passes, and the strict member audit refuses with
+// profile_update_blocked. This is a blocking-but-not-strict finding —
+// reachable in production through machine revocations — so the second gate
+// in the new-member loop is load-bearing, not decoration. Production entry
+// point: UpdateWithPolicy. A mutant ignoring the strict-audit error for a
+// context member must fail this test.
+func TestUpdateBlocksRevokedOverlayMember(t *testing.T) {
+	home, _, oldHash := installBlockingOverlayRoot(t)
+	overlay := filepath.Join(t.TempDir(), "overlay")
+	writeManifestPackage(t, overlay,
+		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "overlay\n"})
+	// A path member carries no network identity (its lock source is
+	// empty), so the revocation names the snapshot's content hash — the
+	// production mechanism for pinning local sources (§9.1).
+	contentHash, err := hashing.ContentSHA256(overlay, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := Policy{
+		OverlaysAllowed:      true,
+		OverlayDefaultWeight: 1000,
+		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
+		Revocations:          []string{contentHash},
+	}
+	_, _, err = UpdateWithPolicy(home, "acme", policy)
+	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) {
+		t.Fatalf("err = %v, want %s", err, DiagUpdateBlocked)
+	}
+	if !strings.Contains(err.Error(), "revoked") {
+		t.Fatalf("err = %v, want the revocation reason", err)
+	}
+	_, afterHash, err := readLock(home, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterHash != oldHash {
+		t.Fatal("a blocked update moved the lock: the old lock must stand")
+	}
+}
+
+// TestReinstallBlocksRevokedOverlayMember drives Install of the same path
+// source with a clean but revoked machine overlay: the reinstall's strict
+// member audit refuses with profile_update_blocked exactly as the update
+// twin does. Production entry point: Install. It kills the reinstall copy
+// of the mutant TestUpdateBlocksRevokedOverlayMember kills for updateLocked.
+func TestReinstallBlocksRevokedOverlayMember(t *testing.T) {
+	home, root, oldHash := installBlockingOverlayRoot(t)
+	overlay := filepath.Join(t.TempDir(), "overlay")
+	writeManifestPackage(t, overlay,
+		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "overlay\n"})
+	// A path member carries no network identity (its lock source is
+	// empty), so the revocation names the snapshot's content hash — the
+	// production mechanism for pinning local sources (§9.1).
+	contentHash, err := hashing.ContentSHA256(overlay, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := Policy{
+		OverlaysAllowed:      true,
+		OverlayDefaultWeight: 1000,
+		Overlays:             map[string][]OverlaySpec{"acme": {{Source: overlay}}},
+		Revocations:          []string{contentHash},
+	}
+	_, _, _, err = Install(home, InstallOptions{Operand: root, Policy: policy})
+	if err == nil || !strings.Contains(err.Error(), DiagUpdateBlocked) {
+		t.Fatalf("err = %v, want %s", err, DiagUpdateBlocked)
+	}
+	if !strings.Contains(err.Error(), "revoked") {
+		t.Fatalf("err = %v, want the revocation reason", err)
+	}
+	_, afterHash, err := readLock(home, "acme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterHash != oldHash {
+		t.Fatal("a blocked reinstall moved the lock: the old lock must stand")
 	}
 }

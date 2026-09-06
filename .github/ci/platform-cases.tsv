@@ -330,6 +330,11 @@ internal/envprofile	TestPathSnapshotImmutableAcrossUpdateSyncUse	linux,darwin,wi
 internal/envprofile	TestUpdatePathWithoutStatePinIsSourceInvalid	linux,darwin,windows	-	-	an update whose lock carries no state pin for its path root fails with profile_source_invalid
 internal/envprofile	TestUpdatePathMissingSnapshotIsSourceInvalid	linux,darwin,windows	-	-	an update whose path snapshot cannot be read fails with profile_source_invalid, never a silent unchanged
 internal/envprofile	TestUpdatePathSnapshotNameMismatchIsSourceInvalid	linux,darwin,windows	-	-	an update whose path snapshot names another root fails with profile_source_invalid
+internal/envprofile	TestPathReinstallBareAndNonCurrentMovesPin	linux,darwin,windows	-	-	a bare same-path reinstall and a non-current reinstall both move the state pin without switching
+internal/envprofile	TestUpdateBlocksSecretOverlayMember	linux,darwin,windows	-	-	an update adding a secret-carrying overlay is refused with profile_update_blocked and the old lock stands
+internal/envprofile	TestReinstallBlocksSecretOverlayMember	linux,darwin,windows	-	-	a reinstall adding a secret-carrying overlay is refused with profile_update_blocked and the old lock stands
+internal/envprofile	TestUpdateBlocksRevokedOverlayMember	linux,darwin,windows	-	-	an update adding a revoked overlay is refused with profile_update_blocked and the old lock stands
+internal/envprofile	TestReinstallBlocksRevokedOverlayMember	linux,darwin,windows	-	-	a reinstall adding a revoked overlay is refused with profile_update_blocked and the old lock stands
 internal/envprofile	TestPathUpdateAllSucceedsWithImportedProfile	linux,darwin,windows	-	-	updating every profile succeeds with an imported profile whose staging directory is gone
 internal/envprofile	TestUseWithoutTakeoverRefusesUnmanaged	linux,darwin,windows	-	-	a switch over unmanaged files fails with environment_surface_unmanaged_conflict and writes nothing
 internal/envprofile	TestUseTakeoverBacksUpAndNotifies	linux,darwin,windows	-	-	takeover backs every replaced file up before the first write and reports the notice
