@@ -167,6 +167,25 @@ func TestForeignSymlinkStopsSwitch(t *testing.T) {
 			t.Fatalf("%s: %s", result.Adapter, result.Detail)
 		}
 	}
+	// The takeover must replace the link with a regular file, never write
+	// through it: the surface stops being a symlink and the foreign file's
+	// bytes are unchanged (environments §9.5 takes over with backup, never
+	// absorbs in the wrong direction).
+	if info, err := os.Lstat(link); err != nil {
+		t.Fatalf("takeover removed the surface: %v", err)
+	} else if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("takeover left %q a symlink; a copied surface must never follow a link", link)
+	}
+	if payload, err := os.ReadFile(foreign); err != nil {
+		t.Fatalf("foreign file unreadable after takeover: %v", err)
+	} else if string(payload) != "foreign\n" {
+		t.Fatalf("takeover overwrote the foreign file: %q", payload)
+	}
+	// The backup preserves the foreign bytes before the first write.
+	backups, err := os.ReadDir(filepath.Join(native, ".agent-environment-backup"))
+	if err != nil || len(backups) == 0 {
+		t.Fatalf("takeover wrote no backup: %v %v", backups, err)
+	}
 }
 
 // TestTakeoverWarnsDotfileHeuristic drives the production switch with a

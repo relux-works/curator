@@ -841,11 +841,15 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 	}
 	// Writes run in sorted path order: the fresh-home provisioning order
 	// (§8.1) is deterministic even though the plan accumulates maps.
+	// Copied surfaces never follow a link: remove first, as the switch
+	// path does, so a stray symlink in a managed home cannot redirect a
+	// write outside the manager's tree.
 	for _, path := range sortedKeysBytes(plan.copies) {
 		document := plan.copies[path]
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(plan.homeDir, filepath.FromSlash(path))), 0o755); err != nil {
 			return err
 		}
+		_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(path)))
 		if err := os.WriteFile(filepath.Join(plan.homeDir, filepath.FromSlash(path)), document, 0o644); err != nil {
 			return err
 		}
