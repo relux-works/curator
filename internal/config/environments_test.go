@@ -88,6 +88,10 @@ func TestSchema1WithEnvironmentsRejected(t *testing.T) {
 	loadFails(t, `{"schema_version": 1, "skills_root": "x", "projects": {}, "environments": {}}`, "environments")
 }
 
+func TestSchema2NullEnvironmentsRejected(t *testing.T) {
+	loadFails(t, `{"schema_version": 2, "skills_root": "x", "projects": {}, "environments": null}`, "environments")
+}
+
 func TestUnknownSchemaVersionsRejected(t *testing.T) {
 	for _, version := range []string{"0", "3", "99"} {
 		loadFails(t, `{"schema_version": `+version+`, "skills_root": "x", "projects": {}}`, "schema_version")

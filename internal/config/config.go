@@ -439,11 +439,15 @@ func Parse(data map[string]any, path string) (*Config, error) {
 	}
 	// A schema-1 file declares no environments object (manager §12); one
 	// that carries it is rejected rather than read with its knobs ignored
-	// (manager §1 rule 4).
+	// (manager §1 rule 4). Under schema 2 an explicit null is rejected the
+	// same way: the schema type is object, so null is a malformed knob
+	// block, never an empty one.
 	if schema == SchemaVersion {
 		if _, present := data["environments"]; present {
 			return nil, verr.New("environments", "requires schema_version 2; a schema-1 file declares no environments object")
 		}
+	} else if rawEnv, present := data["environments"]; present && rawEnv == nil {
+		return nil, verr.New("environments", "must be an object")
 	}
 	env, err := parseEnvironments(data["environments"])
 	if err != nil {
