@@ -3,7 +3,6 @@ package envprofile
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -99,7 +98,7 @@ func TestSymlinkInPathIsSourceInvalid(t *testing.T) {
 		map[string]string{"a.md": "root\n"})
 	link := filepath.Join(source, "context", "link.md")
 	if err := os.Symlink(filepath.Join(source, "context", "a.md"), link); err != nil {
-		t.Skipf("no symlink on this platform: %v", err)
+		t.Skipf("this host cannot create symlinks: %v", err)
 	}
 	_, _, _, err := Install(home, InstallOptions{Operand: source})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
@@ -125,7 +124,7 @@ func TestFoldedPathsAreSourceInvalid(t *testing.T) {
 	// lands on the first file and no snapshot can observe two entries;
 	// the Linux lanes run case-sensitively and exercise the gate there.
 	if payload, err := os.ReadFile(filepath.Join(source, "context", "a.md")); err == nil && string(payload) == "fold\n" {
-		t.Skip("filesystem folds case; the collision gate runs on case-sensitive lanes")
+		t.Skip("per-directory case sensitivity folds entries on this host; the collision gate runs on case-sensitive lanes")
 	}
 	_, _, _, err := Install(home, InstallOptions{Operand: source})
 	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
@@ -168,9 +167,6 @@ func TestRootGitExcluded(t *testing.T) {
 // module directory cannot be read: the failure is
 // profile_source_path_unreadable, never absence.
 func TestUnreadablePathIsUnreadable(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("permission-bit unreadability does not apply on Windows")
-	}
 	home := t.TempDir()
 	pinHomes(t)
 	source := filepath.Join(t.TempDir(), "source")
@@ -179,13 +175,16 @@ func TestUnreadablePathIsUnreadable(t *testing.T) {
 			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
 		map[string]string{"a.md": "root\n"})
 	contextDir := filepath.Join(source, "context")
+	// The probe below decides: a host that reads through mode 000
+	// (superuser, or Windows ACL semantics) skips under the classified
+	// host-capability reason instead of asserting untestable behaviour.
 	if err := os.Chmod(contextDir, 0o000); err != nil {
-		t.Fatal(err)
+		t.Skipf("this environment can read a mode-000 directory: chmod refused: %v", err)
 	}
 	defer func() { _ = os.Chmod(contextDir, 0o755) }()
 	if payload, err := os.ReadFile(filepath.Join(contextDir, "a.md")); err == nil {
 		_ = payload
-		t.Skip("process reads through permission bits (superuser); unreadability is untestable here")
+		t.Skip("this environment can read a mode-000 directory; unreadability is untestable here")
 	}
 	_, _, _, err := Install(home, InstallOptions{Operand: source})
 	if err == nil || !strings.Contains(err.Error(), DiagPathUnreadable) {

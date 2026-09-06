@@ -319,13 +319,13 @@ internal/envprofile	TestMissingPathOperandIsPathMissing	linux,darwin,windows	-	-
 internal/envprofile	TestMissingOverlayPathIsPathMissing	linux,darwin,windows	-	-	an absent overlay source fails with the absence diagnostic
 internal/envprofile	TestNonDirectoryPathIsSourceInvalid	linux,darwin,windows	-	-	a path operand naming a non-directory is profile_source_invalid
 internal/envprofile	TestNestedGitIsSourceInvalid	linux,darwin,windows	-	-	a .git entry below the source root is profile_source_invalid
-internal/envprofile	TestSymlinkInPathIsSourceInvalid	linux,darwin,windows	-	-	a link in the source tree is profile_source_invalid
-internal/envprofile	TestFoldedPathsAreSourceInvalid	linux,darwin,windows	-	-	two entries folding to one platform path are profile_source_invalid
+internal/envprofile	TestSymlinkInPathIsSourceInvalid	linux,darwin	windows	host-capability	a link in the source tree is profile_source_invalid
+internal/envprofile	TestFoldedPathsAreSourceInvalid	linux	darwin,windows	host-capability	two entries folding to one platform path are profile_source_invalid; case-folding hosts skip under the classified host-capability reason
 internal/envprofile	TestRootGitExcluded	linux,darwin,windows	-	-	a root-level .git entry is excluded from the immutable snapshot
-internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin,windows	-	-	an unreadable source reports profile_source_path_unreadable, never absence
+internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin	windows	host-capability	an unreadable source reports profile_source_path_unreadable, never absence
 internal/envprofile	TestUseWithoutTakeoverRefusesUnmanaged	linux,darwin,windows	-	-	a switch over unmanaged files fails with environment_surface_unmanaged_conflict and writes nothing
 internal/envprofile	TestUseTakeoverBacksUpAndNotifies	linux,darwin,windows	-	-	takeover backs every replaced file up before the first write and reports the notice
-internal/envprofile	TestForeignSymlinkStopsSwitch	linux,darwin,windows	-	-	a foreign-manager symlink stops with environment_foreign_manager_detected and the take-over choice
+internal/envprofile	TestForeignSymlinkStopsSwitch	linux,darwin	windows	host-capability	a foreign-manager symlink stops with environment_foreign_manager_detected and the take-over choice
 internal/envprofile	TestTakeoverWarnsDotfileHeuristic	linux,darwin,windows	-	-	takeover warns the dotfile-manager heuristic without blocking the switch
 internal/envprofile	TestReadOnlyCommandsNeverOnboard	linux,darwin,windows	-	-	read-only commands never write a backup, a marker, or a prompt
 internal/envprofile	TestRepairTakeoverProvisionsManagedHome	linux,darwin,windows	-	-	takeover repair provisions over unmanaged files with backup
@@ -334,7 +334,7 @@ internal/envprofile	TestImportNormalizesOrdersAndPins	linux,darwin,windows	-	-	r
 internal/envprofile	TestNormalizeImportText	linux,darwin,windows	-	-	CRLF and CR become LF with exactly one trailing LF
 internal/envprofile	TestImportLossyStopsWithoutConsent	linux,darwin,windows	-	-	a lossy import stops with environment_import_lossy and installs nothing
 internal/envprofile	TestImportLossyProceedsWithConsent	linux,darwin,windows	-	-	consent re-reports the loss list as warnings under the same diagnostic
-internal/envprofile	TestImportUnreadableRootIsLoss	linux,darwin,windows	-	-	an unreadable native root file is always a loss, never an absence
+internal/envprofile	TestImportUnreadableRootIsLoss	linux,darwin	windows	host-capability	an unreadable native root file is always a loss, never an absence
 internal/envprofile	TestImportInvalidUTF8IsLoss	linux,darwin,windows	-	-	a non-UTF-8 native root file is a loss
 internal/envprofile	TestImportPartialActivationKeepsLock	linux,darwin,windows	-	-	import activation stops partial on unmanaged files while the installed lock stands
 internal/envprofile	TestImportNameTakenBeforeAnyWrite	linux,darwin,windows	-	-	a taken import name stops with profile_import_name_taken before any write

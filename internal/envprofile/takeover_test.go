@@ -142,7 +142,7 @@ func TestForeignSymlinkStopsSwitch(t *testing.T) {
 	}
 	link := filepath.Join(native, "CLAUDE.md")
 	if err := os.Symlink(foreign, link); err != nil {
-		t.Skipf("no symlink on this platform: %v", err)
+		t.Skipf("this host cannot create symlinks: %v", err)
 	}
 	results, err := UseWithPolicy(home, "acme", "", "", false, Policy{})
 	if err == nil {
