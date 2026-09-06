@@ -1,0 +1,201 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index f243503..2b31cf8 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -57,7 +57,47 @@ assert 'candidate inputs reject revision plus root' 1 bash "$CS" verify-inputs '
+ assert 'candidate inputs accept revision only'     0 bash "$CS" verify-inputs '1234567890abcdef1234567890abcdef12345678' ''
+ assert 'candidate inputs accept root only'         0 bash "$CS" verify-inputs '' '/candidate/root'
+ 
++echo ''
++echo '=== release-source-gate.sh: versioned Go installs stay publishable ==='
++RSG="$HERE/release-source-gate.sh"
++printf 'module example.test/clean\n\ngo 1.25.5\n\nrequire example.test/helper v1.0.0\n' >"$WORK/go-clean.mod"
++printf 'module example.test/replaced\n\ngo 1.25.5\n\nreplace example.test/helper => ./helper\n' >"$WORK/go-replace.mod"
++printf 'module example.test/excluded\n\ngo 1.25.5\n\nexclude example.test/helper v1.0.0\n' >"$WORK/go-exclude.mod"
++assert 'a release module without local interpretation directives passes' 0 bash "$RSG" "$WORK/go-clean.mod"
++assert 'a replace directive that breaks versioned go install is rejected' 1 bash "$RSG" "$WORK/go-replace.mod"
++assert 'an exclude directive that changes versioned resolution is rejected' 1 bash "$RSG" "$WORK/go-exclude.mod"
++assert 'a missing module file is a read failure, not a clean module' 1 bash "$RSG" "$WORK/go-missing.mod"
++assert 'the repository module passes the release-source gate' 0 bash "$RSG" go.mod
++
++ANCESTRY_REPO="$WORK/release-ancestry"
++git init -q -b main "$ANCESTRY_REPO"
++printf 'main\n' >"$ANCESTRY_REPO/content.txt"
++git -C "$ANCESTRY_REPO" add content.txt
++git -C "$ANCESTRY_REPO" -c user.name='Gate Fixture' -c user.email='gate@example.invalid' commit -q -m main
++MAIN_COMMIT="$(git -C "$ANCESTRY_REPO" rev-parse HEAD)"
++git -C "$ANCESTRY_REPO" switch -q -c topic
++printf 'topic\n' >"$ANCESTRY_REPO/content.txt"
++git -C "$ANCESTRY_REPO" add content.txt
++git -C "$ANCESTRY_REPO" -c user.name='Gate Fixture' -c user.email='gate@example.invalid' commit -q -m topic
++TOPIC_COMMIT="$(git -C "$ANCESTRY_REPO" rev-parse HEAD)"
++assert 'a candidate commit contained in main is accepted' 0 bash -c 'cd "$1" && "$2" "$3" "$4" main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
++assert 'an unmerged branch candidate is rejected' 1 bash -c 'cd "$1" && "$2" "$3" "$4" main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$TOPIC_COMMIT"
++assert 'missing ancestry evidence is rejected, not treated as absent' 1 bash -c 'cd "$1" && "$2" "$3" "$4" missing-main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
++assert 'a half-specified ancestry check is rejected' 1 bash "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
++
+ WORKFLOW='.github/workflows/ci.yml'
++RELEASE_WORKFLOW='.github/workflows/release.yml'
++release_fetch_line="$(grep -nF 'git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main' "$RELEASE_WORKFLOW" | cut -d: -f1)"
++release_gate_line="$(grep -nF 'bash .github/ci/release-source-gate.sh go.mod "$GITHUB_SHA" refs/remotes/origin/main' "$RELEASE_WORKFLOW" | cut -d: -f1)"
++if [ -n "$release_fetch_line" ] &&
++   [ -n "$release_gate_line" ] &&
++   [ "$release_fetch_line" -lt "$release_gate_line" ]; then
++	ok 'release workflow fetches public main and gates the pushed tag before GoReleaser'
++else
++	bad 'release workflow fetches public main and gates the pushed tag before GoReleaser' \
++		"fetch=$release_fetch_line gate=$release_gate_line"
++fi
++
+ validation_line="$(grep -nF 'Reject ambiguous candidate inputs' "$WORKFLOW" | cut -d: -f1)"
+ checkout_line="$(grep -nF 'Check out the candidate suite' "$WORKFLOW" | cut -d: -f1)"
+ record_line="$(grep -nF 'Resolve and record the candidate suite identity' "$WORKFLOW" | cut -d: -f1)"
+diff --git a/.github/ci/release-source-gate.sh b/.github/ci/release-source-gate.sh
+new file mode 100755
+index 0000000..6168e50
+--- /dev/null
++++ b/.github/ci/release-source-gate.sh
+@@ -0,0 +1,52 @@
++#!/usr/bin/env bash
++# A module installed with an explicit version must not depend on main-module
++# replace or exclude directives. Go rejects such modules before compilation.
++# For tag releases, also prove the peeled tag commit belongs to the freshly
++# fetched public main history, so an unmerged branch cannot publish artifacts.
++
++set -u
++
++module_file="${1:-go.mod}"
++candidate_ref="${2:-}"
++main_ref="${3:-}"
++
++if [ ! -f "$module_file" ]; then
++	echo "release-source-gate: module file not found: $module_file" >&2
++	exit 1
++fi
++
++if ! awk '
++	$1 == "replace" || $1 == "exclude" {
++		printf "%s:%d: release-incompatible %s directive\n", FILENAME, NR, $1 > "/dev/stderr"
++		bad = 1
++	}
++	END { exit bad }
++' "$module_file"; then
++	exit 1
++fi
++
++if { [ -n "$candidate_ref" ] && [ -z "$main_ref" ]; } ||
++   { [ -z "$candidate_ref" ] && [ -n "$main_ref" ]; }; then
++	echo 'release-source-gate: candidate and main refs must be supplied together' >&2
++	exit 1
++fi
++
++if [ -n "$candidate_ref" ]; then
++	candidate_commit=$(git rev-parse --verify "$candidate_ref^{commit}") || {
++		echo "release-source-gate: cannot peel candidate ref: $candidate_ref" >&2
++		exit 1
++	}
++	main_commit=$(git rev-parse --verify "$main_ref^{commit}") || {
++		echo "release-source-gate: cannot resolve main ref: $main_ref" >&2
++		exit 1
++	}
++	if ! git merge-base --is-ancestor "$candidate_commit" "$main_commit"; then
++		echo "release-source-gate: candidate $candidate_commit is not contained in $main_ref ($main_commit)" >&2
++		exit 1
++	fi
++fi
++
++echo "release-source-gate: $module_file is compatible with versioned go install"
++if [ -n "$candidate_ref" ]; then
++	echo "release-source-gate: candidate $candidate_commit is contained in $main_ref ($main_commit)"
++fi
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d412f76..16241b2 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -89,6 +89,10 @@ jobs:
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+ 
++      - name: Verify versioned Go install compatibility
++        shell: bash
++        run: bash .github/ci/release-source-gate.sh
++
+       - name: gofmt check
+         if: runner.os != 'Windows'
+         shell: bash
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index bd84a91..ddd19b1 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -23,6 +23,12 @@ jobs:
+         with:
+           go-version-file: go.mod
+ 
++      - name: Fetch public main for release ancestry
++        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
++
++      - name: Verify versioned Go install compatibility
++        run: bash .github/ci/release-source-gate.sh go.mod "$GITHUB_SHA" refs/remotes/origin/main
++
+       - uses: sigstore/cosign-installer@v3
+ 
+       - uses: anchore/sbom-action/download-syft@v0
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 5bb8b8f..40094fd 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,14 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-06 — release channels lag completed main; rc.2/rc.3 never executed release automation (TASK-260906-1xitqi)
++
++- FINDING: completed main `7320bc2` is 180 commits ahead of stable `v0.13.0` and 152 ahead of the only published `v0.14.0` prerelease, rc.1. Homebrew and Scoop point at rc.1; the installer follows GitHub latest and therefore installs v0.13.0. Rc.2 and rc.3 exist as tags but have neither a GitHub Release nor any Release workflow execution, so there is no failed GoReleaser job to rerun and those tags must not be moved or reused.
++- REGRESSION: every released source module through rc.1 carries a local `replace` for the test-only `tuitestkit` submodule. The advertised `go install github.com/relux-works/curator/cmd/curator@latest` reproducibly exits 1 before compilation. Main now uses published `tuitestkit v0.1.1`; a release-source gate in both CI and Release rejects `replace`, `exclude`, and unreadable module input, and the tag path additionally refuses a candidate not contained in freshly fetched public main. Negative self-tests cover every refusal.
++- DECISION: recommend stable `v0.14.0` after review and green CI on the exact integrated SHA. The public rc lineage already reserves 0.14 and prereleases do not promise compatibility; main's schema-8, source-closure, credential, and environment-profile deliveries should become the stable 0.14 capability set. Publication and the signed annotated tag remain parent-owned.
++- NOTE: GoReleaser v2.18.1 validates the config and a non-publishing snapshot builds all six archives, four deb/rpm packages, checksums, Homebrew cask, and Scoop manifest. Full inventory, command exit codes, and the post-publication channel plan are attached as `TASK-260906-1xitqi_release-evidence.md`.
++- ANOMALY: the broad local suite's capture-store rename failures reproduce on a pristine archive of main `7320bc2` on Intel macOS under both Go 1.26.0 and the hosted Go 1.25.5 toolchain; both fail to rename into and clean up deliberately read-only temporary trees. The exact same source passes hosted macOS CI, so this is an evidence-bounded local host/filesystem behavior, not a release-fix regression or Go-version difference.
++
+ ## 2026-09-03 — Decision 0012 rework 1 accepted (TASK-260902-3cnbwa, cycle 2)
+ 
+ - DECISION: Decision 0012 at `8444706` on `draft/decision-0012-context-packages` accepted; all 24 cycle-1 findings resolved per the author decisions, no deviation; attack pass yielded 7 minor + 5 nit for the normative-authoring pass, no blocking/major. `accept_cr` on `CR-TASK-260902-3cnbwa-1` rev 1; evidence `TASK-260902-3cnbwa_review-findings-0012-2.md`, `TASK-260902-3cnbwa_review-verdict.md`.
+diff --git a/go.mod b/go.mod
+index 7ddc9ba..d76d6cb 100644
+--- a/go.mod
++++ b/go.mod
+@@ -7,7 +7,7 @@ require (
+ 	github.com/charmbracelet/bubbletea v1.3.10
+ 	github.com/charmbracelet/lipgloss v1.1.0
+ 	github.com/charmbracelet/x/term v0.2.1
+-	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.0.0-00010101000000-000000000000
++	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1
+ 	golang.org/x/sys v0.36.0
+ 	golang.org/x/text v0.3.8
+ 	gopkg.in/yaml.v3 v3.0.1
+@@ -29,5 +29,3 @@ require (
+ 	github.com/rivo/uniseg v0.4.7 // indirect
+ 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+ )
+-
+-replace github.com/relux-works/skill-go-testing-tools/tuitestkit => ./agents/skills/skill-go-testing-tools/tuitestkit
+diff --git a/go.sum b/go.sum
+index b78b4e7..f3eb2f9 100644
+--- a/go.sum
++++ b/go.sum
+@@ -30,6 +30,8 @@ github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELU
+ github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
+ github.com/muesli/termenv v0.16.0 h1:S5AlUN9dENB57rsbnkPyfdGuWIlkmzJjbFf0Tf5FWUc=
+ github.com/muesli/termenv v0.16.0/go.mod h1:ZRfOIKPFDYQoDFF4Olj7/QJbW60Ol/kL1pU3VfY/Cnk=
++github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1 h1:T3iD+MHLRxHp9Oj2BJfuBudZFVzbVgxh8Cv1P6xUw1U=
++github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1/go.mod h1:eskmRagIK80UL3welr4n8HITS/BAZz4lyT4LoBESN+8=
+ github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
+ github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
+ github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
+@@ -43,5 +45,7 @@ golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
+ golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+ golang.org/x/text v0.3.8 h1:nAL+RVCQ9uMn3vJZbV+MRnydTJFPf8qqY42YiA6MrqY=
+ golang.org/x/text v0.3.8/go.mod h1:E6s5w1FMmriuDzIBO73fBruAKo1PCIq6d2Q6DHfQ8WQ=
++gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
++gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+ gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+ gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=

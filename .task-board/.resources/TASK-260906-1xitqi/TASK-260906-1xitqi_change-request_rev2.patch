@@ -1,0 +1,646 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index f243503..a48eb93 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -57,7 +57,58 @@ assert 'candidate inputs reject revision plus root' 1 bash "$CS" verify-inputs '
+ assert 'candidate inputs accept revision only'     0 bash "$CS" verify-inputs '1234567890abcdef1234567890abcdef12345678' ''
+ assert 'candidate inputs accept root only'         0 bash "$CS" verify-inputs '' '/candidate/root'
+ 
++echo ''
++echo '=== release-source-gate.sh: versioned Go installs stay publishable ==='
++RSG="$HERE/release-source-gate.sh"
++printf 'module example.test/clean\n\ngo 1.25.5\n\nrequire example.test/helper v1.0.0\n' >"$WORK/go-clean.mod"
++printf 'module example.test/replaced\n\ngo 1.25.5\n\nreplace example.test/helper => ./helper\n' >"$WORK/go-replace.mod"
++printf 'module example.test/excluded\n\ngo 1.25.5\n\nexclude example.test/helper v1.0.0\n' >"$WORK/go-exclude.mod"
++assert 'a release module without local interpretation directives passes' 0 bash "$RSG" "$WORK/go-clean.mod"
++assert 'a replace directive that breaks versioned go install is rejected' 1 bash "$RSG" "$WORK/go-replace.mod"
++assert 'an exclude directive that changes versioned resolution is rejected' 1 bash "$RSG" "$WORK/go-exclude.mod"
++assert 'a missing module file is a read failure, not a clean module' 1 bash "$RSG" "$WORK/go-missing.mod"
++assert 'the repository module passes the release-source gate' 0 bash "$RSG" go.mod
++
++ANCESTRY_REPO="$WORK/release-ancestry"
++git init -q -b main "$ANCESTRY_REPO"
++printf 'main\n' >"$ANCESTRY_REPO/content.txt"
++git -C "$ANCESTRY_REPO" add content.txt
++git -C "$ANCESTRY_REPO" -c user.name='Gate Fixture' -c user.email='gate@example.invalid' commit -q -m main
++MAIN_COMMIT="$(git -C "$ANCESTRY_REPO" rev-parse HEAD)"
++git -C "$ANCESTRY_REPO" switch -q -c topic
++printf 'topic\n' >"$ANCESTRY_REPO/content.txt"
++git -C "$ANCESTRY_REPO" add content.txt
++git -C "$ANCESTRY_REPO" -c user.name='Gate Fixture' -c user.email='gate@example.invalid' commit -q -m topic
++TOPIC_COMMIT="$(git -C "$ANCESTRY_REPO" rev-parse HEAD)"
++assert 'a candidate commit contained in main is accepted' 0 bash -c 'cd "$1" && "$2" "$3" "$4" main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
++assert 'an unmerged branch candidate is rejected' 1 bash -c 'cd "$1" && "$2" "$3" "$4" main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$TOPIC_COMMIT"
++assert 'missing ancestry evidence is rejected, not treated as absent' 1 bash -c 'cd "$1" && "$2" "$3" "$4" missing-main' _ "$ANCESTRY_REPO" "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
++assert 'a half-specified ancestry check is rejected' 1 bash "$RSG" "$WORK/go-clean.mod" "$MAIN_COMMIT"
++
+ WORKFLOW='.github/workflows/ci.yml'
++RELEASE_WORKFLOW='.github/workflows/release.yml'
++RWG="$HERE/release-workflow-gate.sh"
++assert 'production workflows invoke the source gates before every publisher' 0 bash "$RWG" "$WORKFLOW" "$RELEASE_WORKFLOW"
++
++cp "$WORKFLOW" "$WORK/ci-without-release-source-gate.yml"
++sed -i.bak '/run: bash \.github\/ci\/release-source-gate\.sh$/d' "$WORK/ci-without-release-source-gate.yml"
++assert 'workflow checker rejects a missing normal-CI source gate' 1 bash "$RWG" "$WORK/ci-without-release-source-gate.yml" "$RELEASE_WORKFLOW"
++
++cp "$RELEASE_WORKFLOW" "$WORK/release-without-source-gate.yml"
++sed -i.bak '/run: bash \.github\/ci\/release-source-gate\.sh go\.mod/d' "$WORK/release-without-source-gate.yml"
++assert 'workflow checker rejects a missing release ancestry gate' 1 bash "$RWG" "$WORKFLOW" "$WORK/release-without-source-gate.yml"
++
++awk '
++	!inserted && /^[[:space:]]*steps:/ {
++		print
++		print "      - uses: goreleaser/goreleaser-action@v6"
++		inserted = 1
++		next
++	}
++	{ print }
++' "$RELEASE_WORKFLOW" >"$WORK/release-with-early-publisher.yml"
++assert 'workflow checker rejects an additional publisher before the gate' 1 bash "$RWG" "$WORKFLOW" "$WORK/release-with-early-publisher.yml"
++
+ validation_line="$(grep -nF 'Reject ambiguous candidate inputs' "$WORKFLOW" | cut -d: -f1)"
+ checkout_line="$(grep -nF 'Check out the candidate suite' "$WORKFLOW" | cut -d: -f1)"
+ record_line="$(grep -nF 'Resolve and record the candidate suite identity' "$WORKFLOW" | cut -d: -f1)"
+diff --git a/.github/ci/release-source-gate.sh b/.github/ci/release-source-gate.sh
+new file mode 100755
+index 0000000..6168e50
+--- /dev/null
++++ b/.github/ci/release-source-gate.sh
+@@ -0,0 +1,52 @@
++#!/usr/bin/env bash
++# A module installed with an explicit version must not depend on main-module
++# replace or exclude directives. Go rejects such modules before compilation.
++# For tag releases, also prove the peeled tag commit belongs to the freshly
++# fetched public main history, so an unmerged branch cannot publish artifacts.
++
++set -u
++
++module_file="${1:-go.mod}"
++candidate_ref="${2:-}"
++main_ref="${3:-}"
++
++if [ ! -f "$module_file" ]; then
++	echo "release-source-gate: module file not found: $module_file" >&2
++	exit 1
++fi
++
++if ! awk '
++	$1 == "replace" || $1 == "exclude" {
++		printf "%s:%d: release-incompatible %s directive\n", FILENAME, NR, $1 > "/dev/stderr"
++		bad = 1
++	}
++	END { exit bad }
++' "$module_file"; then
++	exit 1
++fi
++
++if { [ -n "$candidate_ref" ] && [ -z "$main_ref" ]; } ||
++   { [ -z "$candidate_ref" ] && [ -n "$main_ref" ]; }; then
++	echo 'release-source-gate: candidate and main refs must be supplied together' >&2
++	exit 1
++fi
++
++if [ -n "$candidate_ref" ]; then
++	candidate_commit=$(git rev-parse --verify "$candidate_ref^{commit}") || {
++		echo "release-source-gate: cannot peel candidate ref: $candidate_ref" >&2
++		exit 1
++	}
++	main_commit=$(git rev-parse --verify "$main_ref^{commit}") || {
++		echo "release-source-gate: cannot resolve main ref: $main_ref" >&2
++		exit 1
++	}
++	if ! git merge-base --is-ancestor "$candidate_commit" "$main_commit"; then
++		echo "release-source-gate: candidate $candidate_commit is not contained in $main_ref ($main_commit)" >&2
++		exit 1
++	fi
++fi
++
++echo "release-source-gate: $module_file is compatible with versioned go install"
++if [ -n "$candidate_ref" ]; then
++	echo "release-source-gate: candidate $candidate_commit is contained in $main_ref ($main_commit)"
++fi
+diff --git a/.github/ci/release-workflow-gate.sh b/.github/ci/release-workflow-gate.sh
+new file mode 100755
+index 0000000..478f761
+--- /dev/null
++++ b/.github/ci/release-workflow-gate.sh
+@@ -0,0 +1,54 @@
++#!/usr/bin/env bash
++
++# Validate the complete workflow path protected by release-source-gate.sh.
++# Optional arguments allow gate-selftest.sh to exercise narrowed workflow
++# mutants without changing the production workflows.
++
++set -u
++
++CI_WORKFLOW="${1:-.github/workflows/ci.yml}"
++RELEASE_WORKFLOW="${2:-.github/workflows/release.yml}"
++
++fail() {
++	printf 'release workflow gate: %s\n' "$1" >&2
++	exit 1
++}
++
++[ -r "$CI_WORKFLOW" ] || fail "cannot read CI workflow: $CI_WORKFLOW"
++[ -r "$RELEASE_WORKFLOW" ] || fail "cannot read release workflow: $RELEASE_WORKFLOW"
++
++exact_run_lines() {
++	awk -v command="$2" '
++		{
++			line = $0
++			sub(/^[ \t]*run:[ \t]*/, "", line)
++			sub(/[ \t]*$/, "", line)
++			if (line == command) print NR
++		}
++	' "$1"
++}
++
++ci_gate_lines="$(exact_run_lines "$CI_WORKFLOW" 'bash .github/ci/release-source-gate.sh')"
++[ "$(printf '%s\n' "$ci_gate_lines" | awk 'NF { count++ } END { print count + 0 }')" -eq 1 ] ||
++	fail "normal CI must invoke the module release-source gate exactly once"
++
++fetch_lines="$(grep -nF 'git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main' "$RELEASE_WORKFLOW" | cut -d: -f1)"
++release_gate_lines="$(exact_run_lines "$RELEASE_WORKFLOW" 'bash .github/ci/release-source-gate.sh go.mod "$GITHUB_SHA" refs/remotes/origin/main')"
++publisher_lines="$(grep -nF 'uses: goreleaser/goreleaser-action@' "$RELEASE_WORKFLOW" | cut -d: -f1)"
++
++[ "$(printf '%s\n' "$fetch_lines" | awk 'NF { count++ } END { print count + 0 }')" -eq 1 ] ||
++	fail "release workflow must fetch public main exactly once"
++[ "$(printf '%s\n' "$release_gate_lines" | awk 'NF { count++ } END { print count + 0 }')" -eq 1 ] ||
++	fail "release workflow must invoke the ancestry gate exactly once"
++[ -n "$publisher_lines" ] || fail "release workflow has no GoReleaser publication action"
++
++fetch_line="$fetch_lines"
++release_gate_line="$release_gate_lines"
++[ "$fetch_line" -lt "$release_gate_line" ] ||
++	fail "fresh public-main fetch must precede the release ancestry gate"
++for publisher_line in $publisher_lines; do
++	[ "$release_gate_line" -lt "$publisher_line" ] ||
++		fail "release ancestry gate must precede every GoReleaser publication action"
++done
++
++printf 'release workflow gate: protected CI and publication paths verified\n'
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index d412f76..16241b2 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -89,6 +89,10 @@ jobs:
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+ 
++      - name: Verify versioned Go install compatibility
++        shell: bash
++        run: bash .github/ci/release-source-gate.sh
++
+       - name: gofmt check
+         if: runner.os != 'Windows'
+         shell: bash
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index bd84a91..ddd19b1 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -23,6 +23,12 @@ jobs:
+         with:
+           go-version-file: go.mod
+ 
++      - name: Fetch public main for release ancestry
++        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
++
++      - name: Verify versioned Go install compatibility
++        run: bash .github/ci/release-source-gate.sh go.mod "$GITHUB_SHA" refs/remotes/origin/main
++
+       - uses: sigstore/cosign-installer@v3
+ 
+       - uses: anchore/sbom-action/download-syft@v0
+diff --git a/LOGBOOK.md b/LOGBOOK.md
+index 5bb8b8f..04c9acf 100644
+--- a/LOGBOOK.md
++++ b/LOGBOOK.md
+@@ -3,6 +3,32 @@
+ > Institutional memory. Concise, factual, high-signal.
+ > Newest entries first. One block per insight.
+ 
++## 2026-09-06 — release channels lag completed main; rc.2/rc.3 never executed release automation (TASK-260906-1xitqi)
++
++- FINDING: completed main `7320bc2` is 180 commits ahead of stable `v0.13.0` and 152 ahead of the only published `v0.14.0` prerelease, rc.1. Homebrew and Scoop point at rc.1; the installer follows GitHub latest and therefore installs v0.13.0. Rc.2 and rc.3 exist as tags but have neither a GitHub Release nor any Release workflow execution, so there is no failed GoReleaser job to rerun and those tags must not be moved or reused.
++- REGRESSION: every released source module through rc.1 carries a local `replace` for the test-only `tuitestkit` submodule. The advertised `go install github.com/relux-works/curator/cmd/curator@latest` reproducibly exits 1 before compilation. Main now uses published `tuitestkit v0.1.1`; a release-source gate in both CI and Release rejects `replace`, `exclude`, and unreadable module input, and the tag path additionally refuses a candidate not contained in freshly fetched public main. Negative self-tests cover every refusal.
++- DECISION: recommend stable `v0.14.0` after review and green CI on the exact integrated SHA. The public rc lineage already reserves 0.14 and prereleases do not promise compatibility; main's schema-8, source-closure, credential, and environment-profile deliveries should become the stable 0.14 capability set. Publication and the signed annotated tag remain parent-owned.
++- NOTE: GoReleaser v2.18.1 validates the config and a non-publishing snapshot builds all six archives, four deb/rpm packages, checksums, Homebrew cask, and Scoop manifest. Full inventory, command exit codes, and the post-publication channel plan are attached as `TASK-260906-1xitqi_release-evidence.md`.
++- ANOMALY: the broad local suite's capture-store rename failures reproduce on a pristine archive of main `7320bc2` on Intel macOS under both Go 1.26.0 and the hosted Go 1.25.5 toolchain; both fail to rename into and clean up deliberately read-only temporary trees. The exact same source passes hosted macOS CI, so this is an evidence-bounded local host/filesystem behavior, not a release-fix regression or Go-version difference.
++
++## 2026-09-06 — release readiness exposed a Darwin immutable-tree publication defect
++
++The packaging candidate made the configured full suite exercise source-tree
++capture on darwin/amd64 and exposed a shipped blocker: `CaptureTree` removed
++write bits from its owned staging root before `os.Rename`, which Darwin rejects,
++then deferred `os.RemoveAll` against the same frozen tree. Publication now thaws
++only the owned staging root for the atomic rename, freezes the published root
++again before verification or handle return, and thaws owned scratch for failure
++cleanup. A pre-existing digest target is never deliberately replaced and must
++pass the full at-use identity check before reuse.
++
++The release workflow self-test had a parallel evidence gap: it proved only
++fresh-main fetch before the named gate, not that normal CI called the module
++gate or that every publisher followed the ancestry gate. One structural checker
++now derives all GoReleaser action lines and rejects missing CI/release calls and
++an additional earlier publisher; these were the exact reviewer mutants that
++previously left 91/91 green.
++
+ ## 2026-09-03 — Decision 0012 rework 1 accepted (TASK-260902-3cnbwa, cycle 2)
+ 
+ - DECISION: Decision 0012 at `8444706` on `draft/decision-0012-context-packages` accepted; all 24 cycle-1 findings resolved per the author decisions, no deviation; attack pass yielded 7 minor + 5 nit for the normative-authoring pass, no blocking/major. `accept_cr` on `CR-TASK-260902-3cnbwa-1` rev 1; evidence `TASK-260902-3cnbwa_review-findings-0012-2.md`, `TASK-260902-3cnbwa_review-verdict.md`.
+diff --git a/go.mod b/go.mod
+index 7ddc9ba..d76d6cb 100644
+--- a/go.mod
++++ b/go.mod
+@@ -7,7 +7,7 @@ require (
+ 	github.com/charmbracelet/bubbletea v1.3.10
+ 	github.com/charmbracelet/lipgloss v1.1.0
+ 	github.com/charmbracelet/x/term v0.2.1
+-	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.0.0-00010101000000-000000000000
++	github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1
+ 	golang.org/x/sys v0.36.0
+ 	golang.org/x/text v0.3.8
+ 	gopkg.in/yaml.v3 v3.0.1
+@@ -29,5 +29,3 @@ require (
+ 	github.com/rivo/uniseg v0.4.7 // indirect
+ 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+ )
+-
+-replace github.com/relux-works/skill-go-testing-tools/tuitestkit => ./agents/skills/skill-go-testing-tools/tuitestkit
+diff --git a/go.sum b/go.sum
+index b78b4e7..f3eb2f9 100644
+--- a/go.sum
++++ b/go.sum
+@@ -30,6 +30,8 @@ github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELU
+ github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
+ github.com/muesli/termenv v0.16.0 h1:S5AlUN9dENB57rsbnkPyfdGuWIlkmzJjbFf0Tf5FWUc=
+ github.com/muesli/termenv v0.16.0/go.mod h1:ZRfOIKPFDYQoDFF4Olj7/QJbW60Ol/kL1pU3VfY/Cnk=
++github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1 h1:T3iD+MHLRxHp9Oj2BJfuBudZFVzbVgxh8Cv1P6xUw1U=
++github.com/relux-works/skill-go-testing-tools/tuitestkit v0.1.1/go.mod h1:eskmRagIK80UL3welr4n8HITS/BAZz4lyT4LoBESN+8=
+ github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
+ github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
+ github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
+@@ -43,5 +45,7 @@ golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
+ golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+ golang.org/x/text v0.3.8 h1:nAL+RVCQ9uMn3vJZbV+MRnydTJFPf8qqY42YiA6MrqY=
+ golang.org/x/text v0.3.8/go.mod h1:E6s5w1FMmriuDzIBO73fBruAKo1PCIq6d2Q6DHfQ8WQ=
++gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
++gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+ gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+ gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+diff --git a/internal/closureexec/closureexec_test.go b/internal/closureexec/closureexec_test.go
+index aca49be..472acc5 100644
+--- a/internal/closureexec/closureexec_test.go
++++ b/internal/closureexec/closureexec_test.go
+@@ -4,6 +4,7 @@ import (
+ 	"bytes"
+ 	"context"
+ 	"errors"
++	"io/fs"
+ 	"os"
+ 	"path/filepath"
+ 	"reflect"
+@@ -492,6 +493,181 @@ func admittedTreeFixture(t *testing.T) (AdmittedInput, closuregraph.ID, string)
+ 	return AdmittedInput{Receipt: receipt, Tree: tree}, id, source
+ }
+ 
++func TestCaptureTreePublishesImmutableReusesAndCleansFailedStaging(t *testing.T) {
++	root := t.TempDir()
++	source := filepath.Join(root, "source")
++	if err := os.MkdirAll(filepath.Join(source, "nested"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(source, "nested", "leaf.txt"), []byte("leaf"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	store, err := NewCaptureStore(filepath.Join(root, "captures"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = removeOwnedTree(store.root) })
++
++	first, err := store.CaptureTree("fixture://publication", source)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err = filepath.WalkDir(first.path, func(_ string, entry os.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return walkErr
++		}
++		if entry.IsDir() {
++			info, infoErr := entry.Info()
++			if infoErr != nil {
++				return infoErr
++			}
++			if !treeDirIsImmutable(info) {
++				t.Fatalf("published directory %s remained writable", entry.Name())
++			}
++		}
++		return nil
++	}); err != nil {
++		t.Fatal(err)
++	}
++
++	reused, err := store.CaptureTree("fixture://publication", source)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if reused.path != first.path {
++		t.Fatalf("reuse path = %q, want %q", reused.path, first.path)
++	}
++
++	if err = restoreTreeDirMutable(first.path); err != nil {
++		t.Fatal(err)
++	}
++	poison := filepath.Join(first.path, "poison.txt")
++	if err = os.WriteFile(poison, []byte("do not replace"), 0o400); err != nil {
++		t.Fatal(err)
++	}
++	if err = markTreeDirImmutable(first.path); err != nil {
++		t.Fatal(err)
++	}
++	if _, err = store.CaptureTree("fixture://publication", source); err == nil {
++		t.Fatal("capture reused a mismatched existing digest target")
++	}
++	if payload, readErr := os.ReadFile(poison); readErr != nil || string(payload) != "do not replace" {
++		t.Fatalf("existing digest target was replaced: payload=%q err=%v", payload, readErr)
++	}
++	entries, err := os.ReadDir(store.trees)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, entry := range entries {
++		if strings.HasPrefix(entry.Name(), ".tree-") && strings.HasSuffix(entry.Name(), ".tmp") {
++			t.Fatalf("failed capture retained immutable staging directory %q", entry.Name())
++		}
++	}
++}
++
++func TestCaptureTreePreservesInvalidExistingTargets(t *testing.T) {
++	root := t.TempDir()
++	source := filepath.Join(root, "source")
++	if err := os.Mkdir(source, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(source, "leaf.txt"), []byte("leaf"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	store, err := NewCaptureStore(filepath.Join(root, "captures"))
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = removeOwnedTree(store.root) })
++
++	tests := []struct {
++		name   string
++		create func(*testing.T, string)
++		check  func(*testing.T, string)
++	}{
++		{
++			name: "regular file",
++			create: func(t *testing.T, target string) {
++				t.Helper()
++				if err := os.WriteFile(target, []byte("existing"), 0o600); err != nil {
++					t.Fatal(err)
++				}
++			},
++			check: func(t *testing.T, target string) {
++				t.Helper()
++				payload, err := os.ReadFile(target)
++				if err != nil || string(payload) != "existing" {
++					t.Fatalf("regular target changed: payload=%q err=%v", payload, err)
++				}
++			},
++		},
++		{
++			name: "empty directory",
++			create: func(t *testing.T, target string) {
++				t.Helper()
++				if err := os.Mkdir(target, 0o500); err != nil {
++					t.Fatal(err)
++				}
++			},
++			check: func(t *testing.T, target string) {
++				t.Helper()
++				entries, err := os.ReadDir(target)
++				if err != nil || len(entries) != 0 {
++					t.Fatalf("empty directory target changed: entries=%v err=%v", entries, err)
++				}
++			},
++		},
++		{
++			name: "linked directory",
++			create: func(t *testing.T, target string) {
++				t.Helper()
++				destination := filepath.Join(root, "link-destination")
++				if err := os.Mkdir(destination, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
++					t.Fatal(err)
++				}
++				if err := os.Symlink(destination, target); err != nil {
++					t.Skipf("directory symlink unavailable: %v", err)
++				}
++			},
++			check: func(t *testing.T, target string) {
++				t.Helper()
++				info, err := os.Lstat(target)
++				if err != nil || info.Mode()&os.ModeSymlink == 0 {
++					t.Fatalf("linked target changed: info=%v err=%v", info, err)
++				}
++			},
++		},
++	}
++
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			origin := "fixture://collision/" + test.name
++			published, err := store.CaptureTree(origin, source)
++			if err != nil {
++				t.Fatal(err)
++			}
++			target := published.path
++			if err = removeOwnedTree(target); err != nil {
++				t.Fatal(err)
++			}
++			test.create(t, target)
++			if _, err = store.CaptureTree(origin, source); err == nil {
++				t.Fatal("capture accepted an invalid existing digest target")
++			}
++			test.check(t, target)
++			entries, err := os.ReadDir(store.trees)
++			if err != nil {
++				t.Fatal(err)
++			}
++			for _, entry := range entries {
++				if strings.HasPrefix(entry.Name(), ".tree-") && strings.HasSuffix(entry.Name(), ".tmp") {
++					t.Fatalf("failed collision retained staging directory %q", entry.Name())
++				}
++			}
++		})
++	}
++}
++
+ func TestDerivationRequiresCommittedPermitAndImmediateToolchainMatch(t *testing.T) {
+ 	_, input, receiptID := admittedFixture(t)
+ 	boundary := &fakeBoundary{audit: auditFixture(), lossless: true}
+diff --git a/internal/closureexec/intake.go b/internal/closureexec/intake.go
+index 147af0b..82a8cca 100644
+--- a/internal/closureexec/intake.go
++++ b/internal/closureexec/intake.go
+@@ -1,6 +1,7 @@
+ package closureexec
+ 
+ import (
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"io/fs"
+@@ -200,7 +201,11 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	defer func() { _ = os.RemoveAll(tmp) }()
++	defer func() {
++		if tmp != "" {
++			_ = removeOwnedTree(tmp)
++		}
++	}()
+ 	files := []SnapshotFile{}
+ 	var total int64
+ 	err = filepath.WalkDir(abs, func(current string, entry fs.DirEntry, walkErr error) error {
+@@ -274,12 +279,26 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
+ 		return nil, err
+ 	}
+ 	target := filepath.Join(s.trees, strings.TrimPrefix(string(idValue), "sha256:"))
+-	if err = os.Rename(tmp, target); err != nil {
+-		// A digest-named tree that already exists is a reuse, and VerifyAtUse
+-		// below re-proves its exact content either way. Windows reports the
+-		// occupied target as access-denied rather than fs.ErrExist, so the
+-		// reuse condition is read from the target itself, not the error kind.
+-		if info, statErr := os.Lstat(target); statErr != nil || !info.IsDir() {
++	// Darwin refuses to rename the staging directory while its own write bits
++	// are removed. Thaw only that owned root for the rename; descendants remain
++	// immutable. renameTreeNoReplace makes the target collision decision at the
++	// syscall, so an existing digest target is never overwritten after a racy
++	// precheck.
++	if err = restoreTreeDirMutable(tmp); err != nil {
++		return nil, err
++	}
++	if err = renameTreeNoReplace(tmp, target); err != nil {
++		// A digest-named directory that already exists is a possible reuse.
++		// VerifyAtUse below re-proves its complete immutable identity; other
++		// target shapes retain the publication error.
++		targetInfo, statErr := os.Lstat(target)
++		if statErr != nil || !targetInfo.IsDir() || targetInfo.Mode()&os.ModeSymlink != 0 {
++			return nil, err
++		}
++	} else {
++		tmp = ""
++		if err = markTreeDirImmutable(target); err != nil {
++			_ = removeOwnedTree(target)
+ 			return nil, err
+ 		}
+ 	}
+@@ -290,6 +309,25 @@ func (s *CaptureStore) CaptureTree(origin, source string) (*SourceTreeHandle, er
+ 	return handle, nil
+ }
+ 
++// removeOwnedTree restores traversal/write permission on an operation-owned
++// immutable tree before removing it. It must only be used for fresh staging or
++// a target just published by this operation, never for a pre-existing digest
++// target.
++func removeOwnedTree(root string) error {
++	if err := filepath.WalkDir(root, func(current string, entry fs.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return walkErr
++		}
++		if entry.Type()&fs.ModeSymlink == 0 && entry.IsDir() {
++			return restoreTreeDirMutable(current)
++		}
++		return nil
++	}); err != nil && !errors.Is(err, fs.ErrNotExist) {
++		return err
++	}
++	return os.RemoveAll(root)
++}
++
+ // AdmitTree binds classifier evidence to an immutable source snapshot tree.
+ func (s *CaptureStore) AdmitTree(handle *SourceTreeHandle, originID string, evidence AdmissionEvidence) (IntakeAdmissionReceipt, error) {
+ 	if s == nil || handle == nil || handle.store != s {
+diff --git a/internal/closureexec/rename_noreplace_darwin.go b/internal/closureexec/rename_noreplace_darwin.go
+new file mode 100644
+index 0000000..c6d3331
+--- /dev/null
++++ b/internal/closureexec/rename_noreplace_darwin.go
+@@ -0,0 +1,9 @@
++//go:build darwin
++
++package closureexec
++
++import "golang.org/x/sys/unix"
++
++func renameTreeNoReplace(source, target string) error {
++	return unix.RenameatxNp(unix.AT_FDCWD, source, unix.AT_FDCWD, target, unix.RENAME_EXCL)
++}
+diff --git a/internal/closureexec/rename_noreplace_linux.go b/internal/closureexec/rename_noreplace_linux.go
+new file mode 100644
+index 0000000..6a8fdc5
+--- /dev/null
++++ b/internal/closureexec/rename_noreplace_linux.go
+@@ -0,0 +1,9 @@
++//go:build linux
++
++package closureexec
++
++import "golang.org/x/sys/unix"
++
++func renameTreeNoReplace(source, target string) error {
++	return unix.Renameat2(unix.AT_FDCWD, source, unix.AT_FDCWD, target, unix.RENAME_NOREPLACE)
++}
+diff --git a/internal/closureexec/rename_noreplace_other.go b/internal/closureexec/rename_noreplace_other.go
+new file mode 100644
+index 0000000..5c1288e
+--- /dev/null
++++ b/internal/closureexec/rename_noreplace_other.go
+@@ -0,0 +1,19 @@
++//go:build !darwin && !linux && !windows
++
++package closureexec
++
++import (
++	"io/fs"
++	"os"
++)
++
++// Supported release targets provide an atomic no-replace primitive above.
++// Keep other ports fail-closed when a target is already observable.
++func renameTreeNoReplace(source, target string) error {
++	if _, err := os.Lstat(target); err == nil {
++		return fs.ErrExist
++	} else if !os.IsNotExist(err) {
++		return err
++	}
++	return os.Rename(source, target)
++}
+diff --git a/internal/closureexec/rename_noreplace_windows.go b/internal/closureexec/rename_noreplace_windows.go
+new file mode 100644
+index 0000000..154ff09
+--- /dev/null
++++ b/internal/closureexec/rename_noreplace_windows.go
+@@ -0,0 +1,17 @@
++//go:build windows
++
++package closureexec
++
++import "golang.org/x/sys/windows"
++
++func renameTreeNoReplace(source, target string) error {
++	sourcePtr, err := windows.UTF16PtrFromString(source)
++	if err != nil {
++		return err
++	}
++	targetPtr, err := windows.UTF16PtrFromString(target)
++	if err != nil {
++		return err
++	}
++	return windows.MoveFile(sourcePtr, targetPtr)
++}
