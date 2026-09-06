@@ -970,12 +970,23 @@ type verification struct {
 	current  bool
 	reasons  []string
 	warnings []string
-	plan     *homePlan
-	marker   *envmarker.Marker
-	hash     string
-	order    []contextlock.Member
-	servers  []contextmaterialize.MCPServer
+	// surfaceState carries the per-surface outcome for status rows: ""
+	// (current), environment_surface_drift, environment_surface_missing,
+	// or environment_surface_unreadable.
+	surfaceState map[string]string
+	plan         *homePlan
+	marker       *envmarker.Marker
+	hash         string
+	order        []contextlock.Member
+	servers      []contextmaterialize.MCPServer
 }
+
+// SurfaceDiagnostics for status rows (environments §8.5).
+const (
+	DiagSurfaceDrift      = "environment_surface_drift"
+	DiagSurfaceMissing    = "environment_surface_missing"
+	DiagSurfaceUnreadable = "environment_surface_unreadable"
+)
 
 // verifyHome verifies the managed home lock-free: it reads the marker and
 // covers exactly the surfaces the marker records — no more. For a symlinked
@@ -985,7 +996,7 @@ type verification struct {
 // here (fail-closed, no fragment); the same error under the repair lock
 // surfaces as environment_repair_failed.
 func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source, lock *contextlock.Lock, hash string) *verification {
-	verdict := &verification{}
+	verdict := &verification{surfaceState: map[string]string{}}
 	precedence := contextmaterialize.DefaultPrecedence
 	order, err := contextmaterialize.EmittedOrder(lock, precedence)
 	if err != nil {
@@ -1064,14 +1075,17 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 		expected, ok := want[key]
 		if !ok {
 			v.reasons = append(v.reasons, fmt.Sprintf("surface %s is no longer materialized", key))
+			v.mark(key, DiagSurfaceMissing)
 			continue
 		}
 		if !equalStrings(recorded.Paths, expected.Paths) || recorded.ContentSHA256 != expected.ContentSHA256 {
 			v.reasons = append(v.reasons, fmt.Sprintf("surface %s record does not match", key))
+			v.mark(key, DiagSurfaceDrift)
 			continue
 		}
 		if key == envmarker.SurfaceRootContext && recorded.Form != plan.form {
 			v.reasons = append(v.reasons, fmt.Sprintf("root-context form %s is not the effective %s", recorded.Form, plan.form))
+			v.mark(key, DiagSurfaceDrift)
 		}
 		copiedPaths := map[string]bool{}
 		if recorded.Copies != nil {
@@ -1087,18 +1101,22 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 				if err != nil {
 					if os.IsNotExist(err) {
 						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
+						v.mark(key, DiagSurfaceMissing)
 					} else {
 						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
+						v.mark(key, DiagSurfaceUnreadable)
 					}
 					continue
 				}
 				if info.Mode()&os.ModeSymlink == 0 {
 					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: expected a store link", path))
+					v.mark(key, DiagSurfaceDrift)
 					continue
 				}
 				got, err := os.Readlink(full)
 				if err != nil || got != target {
 					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: link target changed", path))
+					v.mark(key, DiagSurfaceDrift)
 				}
 				continue
 			}
@@ -1107,70 +1125,85 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 			// by the content hash (§10.1), read against the plan bytes
 			// or, for a fallback copy, against the store source.
 			if document, ok := plan.copies[path]; ok {
-				v.checkCopy(path, full, document)
+				v.mark(key, v.checkCopy(path, full, document))
 				continue
 			}
 			if linked {
-				v.checkFallbackCopy(path, full, target)
+				v.mark(key, v.checkFallbackCopy(path, full, target))
 				continue
 			}
 			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is not in the plan", path))
+			v.mark(key, DiagSurfaceDrift)
 		}
 	}
 	for key := range want {
 		if _, ok := marker.Surfaces[key]; !ok {
 			v.reasons = append(v.reasons, fmt.Sprintf("surface %s is missing", key))
+			v.mark(key, DiagSurfaceMissing)
 		}
 	}
 }
 
 // checkCopy verifies one copied file by its content hash (§10.1). A
-// missing file and an unreadable file are different facts (§8.4).
-func (v *verification) checkCopy(path, full string, document []byte) {
+// missing file and an unreadable file are different facts (§8.4). It
+// returns the surface state for the status row.
+func (v *verification) checkCopy(path, full string, document []byte) string {
 	payload, err := os.ReadFile(full) // #nosec G304 -- home path from the verified plan
 	if err != nil {
 		if os.IsNotExist(err) {
 			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is missing", path))
-		} else {
-			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
+			return DiagSurfaceMissing
 		}
-		return
+		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
+		return DiagSurfaceUnreadable
 	}
 	if contextmaterialize.FileHash(payload) != contextmaterialize.FileHash(document) {
 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: content hash differs", path))
+		return DiagSurfaceDrift
 	}
+	return ""
 }
 
 // checkFallbackCopy verifies a recorded symlink-fallback copy against its
 // store source: file bytes for files, the store content hash for trees.
-func (v *verification) checkFallbackCopy(path, full, source string) {
+func (v *verification) checkFallbackCopy(path, full, source string) string {
 	info, err := os.Stat(source)
 	if err != nil {
 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s store source is unreadable: %v", path, err))
-		return
+		return DiagSurfaceUnreadable
 	}
 	if info.IsDir() {
 		want, err := contextstore.ContentHash(source)
 		if err != nil {
 			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s store source is unreadable: %v", path, err))
-			return
+			return DiagSurfaceUnreadable
 		}
 		got, err := contextstore.ContentHash(full)
 		if err != nil {
 			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is unreadable: %v", path, err))
-			return
+			return DiagSurfaceUnreadable
 		}
 		if got != want {
 			v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: content hash differs", path))
+			return DiagSurfaceDrift
 		}
-		return
+		return ""
 	}
 	payload, err := os.ReadFile(source) // #nosec G304 -- store source from the verified plan
 	if err != nil {
 		v.reasons = append(v.reasons, fmt.Sprintf("surface file %s store source is unreadable: %v", path, err))
-		return
+		return DiagSurfaceUnreadable
 	}
-	v.checkCopy(path, full, payload)
+	return v.checkCopy(path, full, payload)
+}
+
+// mark records the per-surface outcome, keeping the worst state: missing
+// beats unreadable beats drifted beats current.
+func (v *verification) mark(key, state string) {
+	rank := map[string]int{"": 0, DiagSurfaceDrift: 1, DiagSurfaceUnreadable: 2, DiagSurfaceMissing: 3}
+	if rank[state] > rank[v.surfaceState[key]] {
+		v.surfaceState[key] = state
+	}
 }
 
 func equalStrings(a, b []string) bool {

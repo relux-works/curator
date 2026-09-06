@@ -31,6 +31,7 @@ import (
 	"github.com/relux-works/curator/internal/gitops"
 	"github.com/relux-works/curator/internal/godriver"
 	"github.com/relux-works/curator/internal/hashing"
+	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/install"
 	"github.com/relux-works/curator/internal/managerlock"
 	"github.com/relux-works/curator/internal/manifest"
@@ -71,6 +72,8 @@ Commands:
   skill check <dir>        validate one skill package (--locale, --json)
   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
   profile <subcommand>     install | list | use | update | remove | sync (see profile install -h)
+  env <subcommand>         resolve | status (see env resolve -h)
+  run ...                  umbrella dispatch to curator-run (see §11)
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
   gc                       remove unreferenced runtime entries
@@ -174,6 +177,8 @@ func (c cli) run(args []string) int {
 		return c.cmdGlobal(args[1:])
 	case "profile":
 		return c.cmdProfile(args[1:])
+	case "env":
+		return c.cmdEnv(args[1:])
 	case "hybrid":
 		return c.cmdHybrid(args[1:])
 	case "audit":
@@ -189,6 +194,17 @@ func (c cli) run(args []string) int {
 	case "-h", "--help", "help":
 		_, _ = fmt.Fprint(c.stdout, usage)
 		return exitOK
+	}
+	// Umbrella subcommand discovery (environments §11): an implemented
+	// subcommand always wins and discovery runs only for unknown names.
+	// The name must match the identifier grammar; anything else is a
+	// usage error, not a lookup.
+	if identifiers.Valid(args[0]) {
+		cfg, code := c.loadConfig()
+		if code != exitOK {
+			return code
+		}
+		return c.cmdUmbrella(cfg, args)
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown command %q\n\n%s", args[0], usage)
 	return exitUsage
