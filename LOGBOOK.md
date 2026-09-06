@@ -4499,3 +4499,42 @@ Two of the five were mine, and both had the same cause: running the gates and th
 with `git add -A`, which sweeps up what the gate run just produced. It put `tools/__pycache__`
 on main once and a compiled `generate-vectors` into a reviewed commit once. No lane inspects
 the tracked file set, which is why nine checks passed with 5.4 MB of Mach-O in the tree.
+
+## 2026-09-06 — stage (c) lands after six cycles, and the pattern behind twenty-two findings
+
+Machine configuration schema 2 with the §12.2 lockable subset, composition through
+machine-declared overlays with the four effective-weight rules and both precedence
+primitives, the `path` source kind, and onboarding with the §9.6 import are on curator
+main (`7c74a492`, PR #61).
+
+Six cycles, twenty-two findings, and one sentence covers almost all of them: **the defect
+lived in an addressing mode nobody had tested.** The §12.2 fleet-policy gate was wired into
+one CLI row, so `install --use` walked around it — and when that was fixed in one branch,
+`use --clear` walked around it again, which is why the third fix moved the gate to the single
+point where a machine-scope switch is constructed. `profile update` re-read a `path` source,
+so the immutable snapshot was not immutable; fixing that broke §1's *other* half, and the
+reinstall the specification names as the only refresh went dead while still reporting success.
+Two of the six blocking findings were regressions introduced by the previous cycle's fix.
+
+The worst was not subtle at all. `--takeover` of a foreign-manager symlink wrote *through*
+the link, because `os.WriteFile` follows symlinks and nothing removed the target first. After
+a "take over with backup" the surface was still a symlink and curator had overwritten a file
+it never inventoried, outside every managed home — in the field, the dotfile manager's own
+source of truth. §9.5 offers "abort, or take over with backup — never a silent absorption";
+this absorbed in the wrong direction. The test over that hole asserted `result.OK` and
+nothing else.
+
+Two lessons about evidence rather than code. First, a skip whose *class* is registered but
+whose *reason text* is not turns a lane red, and `Test (windows-latest)` was red for two
+whole cycles on one word — "file" where the registry said "directory" — while both cycles
+reviewed a head nobody had checked. That was mine: I pushed and spawned the review without
+reading the lane. Second, when the Windows candidate job died with "the hosted runner lost
+communication with the server", the reviewer re-ran the single job rather than infer a pass
+or a failure from a non-result. An absent result is not a result, and that discipline is
+worth more than the job it saved.
+
+What did not land with it: the candidate lane against curator-spec main is red on thirty
+`internal/config` subcases, every one added by the `path`-overlay reconciliation that landed
+*after* this stage's authority was frozen — a gap I created by landing that spec fix
+mid-flight. It is filed, and stage (c) is not reported complete against curator-spec main
+until it closes.

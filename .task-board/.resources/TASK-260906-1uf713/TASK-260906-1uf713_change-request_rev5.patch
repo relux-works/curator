@@ -1,0 +1,5775 @@
+diff --git a/.gitignore b/.gitignore
+index 0dc8f88..63a232e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -7,3 +7,6 @@
+ # Python bytecode from tools/
+ __pycache__/
+ *.py[cod]
++
++# Compiled tool binaries built at the repository root
++/generate-vectors
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a4f2dec..fc9c4bc 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,36 @@ Versioning for the complete specification set.
+ 
+ ### Changed
+ 
++- Made the section 6 `path` overlay declarable: the environments section
++  12.1 `overlays.<profile>` row now requires the `range | tag | revision`
++  form only for a `git` source and states `{ source, weight? }` for a
++  `path` source, and `manager-config-v2` `$defs/overlay` enforces the same
++  split (a network-spelled source requires exactly one requirement form; a
++  path-spelled source admits none of `range`, `tag`, `revision`, or
++  `directory`, with `branch` rejected by the closed object as before).
++  The git spelling follows the core section 6.1 canonical identity (the
++  four schemes in any letter case, SCP `[user@]host:path` with the section
++  6.1 host grammar, and no backslash immediately after the SCP colon), so a
++  Windows absolute path such as `C:\Users\operator\context` classifies as a
++  `path` source. A `://` URL whose scheme is two or more characters and is
++  outside the `ssh`/`git`/`http`/`https` set is refused outright — a
++  one-character prefix before `://` is a drive path, so `C://Users/…` stays
++  a `path` — and so
++  is an SCP-shaped spelling whose host is not a section 6.1 host, because
++  core section 6.1 requires an invalid network form to be rejected rather
++  than treated as local. A `file:` URL is neither section 1 kind — core
++  section 6.1 gives it no network identity and the section 1 path operand
++  names a directory, not a URL — so it is refused too.
++  Sections 1 and 6 are unchanged, and the manager profile states the same
++  shape as a manager-side obligation citing section 12.1. The published
++  `manager-config-v2` cases and vectors stop giving the
++  `/Users/operator/context` overlay a `revision` and gain positives and
++  negatives pinning every classification arm: Windows spellings
++  (`C:\…`, `C:/…`, `C://…`), project-relative paths, a colon in a later
++  path segment, SCP forms with and without a user, a single-character host,
++  each scheme in uppercase, and the refused shapes: an unknown scheme, a
++  `file:` URL, an SCP host outside the grammar, and a backslash after the
++  SCP colon. `vectors/manager-config.json` is untouched.
+ - `agent-environment-marker-v1`: `surfaces` is closed to the four keys
+   `mcp`, `root-context`, `skills`, and `system-prompt`; `form` is required
+   on `root-context` and admitted nowhere else; `tools/validate.py`
+diff --git a/conformance/v1/manifest.json b/conformance/v1/manifest.json
+index e0e43ca..88cd89d 100644
+--- a/conformance/v1/manifest.json
++++ b/conformance/v1/manifest.json
+@@ -2938,7 +2938,7 @@
+     },
+     {
+       "path": "schema-cases/index.json",
+-      "sha256": "sha256:675699a09e7f8c6a95d794fa9d1bfa80e0bae438778cd48e68d6daaca7e029b8"
++      "sha256": "sha256:ddcdaf600ac1796a66116b799ef736627697294fbb7b12a64bcae04656f1ff16"
+     },
+     {
+       "path": "schema-cases/install-marker-v1/invalid.json",
+@@ -3486,31 +3486,35 @@
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-backup-retention-negative.json",
+-      "sha256": "sha256:917f6410f89de325239f2dd317de16619fe874e2341cd66c0a37c4112736c597"
++      "sha256": "sha256:0e9bc16683797f6b84c8e11b84fcff2ca5b5bf44eb92e123c3319f7d1281d490"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-current-profile-grammar.json",
+-      "sha256": "sha256:8483357fa9e9f7083bab5994e446780133491092644633fac55617af5c26d64e"
++      "sha256": "sha256:3c8f4a2840e43c2ea44fedd818be535b673a549f30f345bce8c206930eeba289"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-form-value.json",
+-      "sha256": "sha256:65fa7097d81dfc988da48f1e985305d50a5bf8d7143b25ada3a624a5b5e9b756"
++      "sha256": "sha256:cb0613dd346436703555f7652e0f0f368d5714842d600fa5305d69129b4fc1d7"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-in-place-mode-value.json",
+-      "sha256": "sha256:5c67287972cd0909e49373b85bedc99ea763e15279a81e4fa154b6a2778e16eb"
++      "sha256": "sha256:fe5a413397ca01d5f97cf845fce1b486ddf4a2fba033cc6fbfe41e67242ceead"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-isolation-value.json",
+-      "sha256": "sha256:435cb1a6e39970dd3e7a0e2528889ea0073010efe74b4435b04b130eec69f597"
++      "sha256": "sha256:8c0715887b5d8d2cb6a30ae91ca664e576182056d3ca05c9c07731d5a0fd1760"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-mcp-package-allowlist-duplicate.json",
+-      "sha256": "sha256:703c4019a69b9a8b6397515ff73b0af26d86bbb60298dce65160829feb2da08d"
++      "sha256": "sha256:b4eb3169f4d651b76143fddd9c9c5f3eb65b3def27802fb6d367532ba836426e"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-bare-drive-letter.json",
++      "sha256": "sha256:5d6284494406382ecdb31ea4286a0512f2039aef0560d329cb72cd12854b955a"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-overlay-default-weight-negative.json",
+-      "sha256": "sha256:cb02cc19fa08542592d547dfa4c6a21ad42d184db50952b5e5e478a4ebd4eadf"
++      "sha256": "sha256:105e343803579d875d6b1363581717b1295c54280d75b4750c5eae8062ff41e5"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-overlay-directory-traversal.json",
+@@ -3520,6 +3524,22 @@
+       "path": "schema-cases/manager-config-v2/invalid-overlay-empty-source.json",
+       "sha256": "sha256:26126254298ad1ba917377fb8d42bcc24d8eed9276688ca6d4754aa4d9196378"
+     },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-file-url-with-form.json",
++      "sha256": "sha256:9128b39ccb9a59e3771f0b42763a2b715ecec24004954229e020566b3aad8119"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-file-url.json",
++      "sha256": "sha256:0caf5d98c23f930edbba8ab6f93615f9dd5f94089681a6be4d3ccee8cbe96247"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-git-scp-no-requirement-form.json",
++      "sha256": "sha256:31c5197e4eed3b216f9dc8d5afabe00d211bcc5cac37f8a691cf7fb24c5e2f0d"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-git-uppercase-no-requirement-form.json",
++      "sha256": "sha256:ce6808e5dc86914ea40ca2a099c104174fa8d22873dc2db0d4781b13097bbdd9"
++    },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-overlay-negative-weight.json",
+       "sha256": "sha256:bab61293409edb57cee71690c94041dd512e2a5383210d7f3156c63057d3ef5b"
+@@ -3528,6 +3548,26 @@
+       "path": "schema-cases/manager-config-v2/invalid-overlay-no-requirement-form.json",
+       "sha256": "sha256:f73f4e66734881ce688915b17f0dff841b390c6ebcb871d132423fba1d5181fd"
+     },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-path-directory.json",
++      "sha256": "sha256:ace0cab3eac3c06a8b85ad78c217f8ae52a7d22b38e6423f3998263998015f3a"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-path-relative-requirement-form.json",
++      "sha256": "sha256:fed72fb99c4752cba562b45b8e1bb4ef8d2b6a2159f298f9a54584d41d636f4d"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-path-requirement-form.json",
++      "sha256": "sha256:3e8e51637300ab8724d7a3c4dd17e751652e95c3127f1542e0631b6039812c11"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-path-windows-requirement-form.json",
++      "sha256": "sha256:2cd612796277835e7f83907aacecbb87d3d6636026f0cb0d30060a2eabcae339"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-path-windows-slash-requirement-form.json",
++      "sha256": "sha256:c325073113bc940a5668e7ec83f58e5c709df40f9d2759c5e5ed4d9c5e4b7bca"
++    },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-overlay-range-grammar.json",
+       "sha256": "sha256:797d401abe9fc8d9bbb297f5798b2fbdd2214c35c4c26127e3d63687b93e0c79"
+@@ -3536,6 +3576,22 @@
+       "path": "schema-cases/manager-config-v2/invalid-overlay-revision-grammar.json",
+       "sha256": "sha256:9193ed1d9ad8fdf65be51889f31a33227435320f7c7b6f1faff402dc3c88230f"
+     },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-scp-backslash-path.json",
++      "sha256": "sha256:1ac368e4b9eecb23adef1a0f70002d288e93bcca6791fcce18fe1b5e5d106a1f"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar-no-user.json",
++      "sha256": "sha256:fb272b0539c8f25b938b2c401b1c8334b9e61d49a6a939df476ef71c221febfb"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar-with-form.json",
++      "sha256": "sha256:efbc6274bd57c7d3a7c84c33c37c02bdbff8b980f6e1b3d60c76b255eec9b208"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar.json",
++      "sha256": "sha256:865c7a378867869590e5cf8a645c500919e798409da64ebdb7394518e6627596"
++    },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-overlay-tag-grammar.json",
+       "sha256": "sha256:ad642f707ba0732da07a5be733783ad879e31c541b37ea5b47f5ab13d115c09e"
+@@ -3544,53 +3600,61 @@
+       "path": "schema-cases/manager-config-v2/invalid-overlay-two-requirement-forms.json",
+       "sha256": "sha256:014da2ef1d64958599284c58b58e352a9a6d54216eae63253161632729dedd69"
+     },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-unknown-scheme-with-form.json",
++      "sha256": "sha256:df1889b4aeff5c0c26a5da1a504c3851675a2b1fc54eddcb8187c84a4f9318ff"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/invalid-overlay-unknown-scheme.json",
++      "sha256": "sha256:e3fe57b1742c2b9a7f3c53518180c90d3859a03f60a40286304dc5866989da2d"
++    },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-overlays-allowed-type.json",
+-      "sha256": "sha256:2272acb0f8cca24061f20daaae5a679a8141abafc42b0ee3feac031e8470a1dc"
++      "sha256": "sha256:d6df459b1e4287376bd61783a2dc57787892f41604c231a1f12434b13a5938d8"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-passable-env-name-grammar.json",
+-      "sha256": "sha256:1412ea464fc22fee3ec38e7113a2d3f6ee5015eb43b030952b86cc844e9af02c"
++      "sha256": "sha256:032ea19cfdc59751de8b7a2c3d2a2d1e2d862b57479f702a5cc99793a681259b"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-precedence-placement.json",
+-      "sha256": "sha256:6a566968dc81d7e950d786b3bb3d58533ecfd5123590a75ec4d17fa9ea68eb46"
++      "sha256": "sha256:d3875d61f6c33274987b65b0380ee68d5d78128124aaa408c09461aeb46540aa"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-precedence-winner.json",
+-      "sha256": "sha256:b5c2a0b1e8cb641314d8d4dd96dc22728b196ef62542ef242d24c6da2cef2fc0"
++      "sha256": "sha256:40ef72eff9614b3fce49c7f901647e2c1cd06952f737661b605192eb7a92bfa3"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-require-current-profile-grammar.json",
+-      "sha256": "sha256:c32408b5858f6d521201a427c6e5c9ece09ea129beb6ca06216ebd8ab50d5cac"
++      "sha256": "sha256:d69901c6ae3635336dfd72d68c7ba2e67ba766ec555b2953495364014e7a1ebd"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-schema-version-1.json",
+-      "sha256": "sha256:dd17905f4884eb5a1dc3730ea56f4864d532eeff391ea63abaaf7e54157add6b"
++      "sha256": "sha256:0982186c1b2779fbed0b00cd4e56b325ca99fd6e01e4f888e8503f270fee8f1f"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-scoped-current-value.json",
+-      "sha256": "sha256:ea76c121694a01d6e2841ca20a0bfc72ec198262c6596c05df9dd1416655f224"
++      "sha256": "sha256:342e77e2f32a7dac86e7d7ef4af5b79b49d47d1a937c4d58c03e5e271f6a1fcb"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-shadow-acknowledged-missing-path.json",
+-      "sha256": "sha256:bc77e8ed24bb6a9a9bb9275bd60d306e5b6a3eff5fe930bee11afb4f91588e28"
++      "sha256": "sha256:019e0d729edef0a1fd0197bd56ecf24bea4e62330b6b0657c083873aed3f61a3"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-system-prompt-files-value.json",
+-      "sha256": "sha256:353881dbb235f1cadd5d05bd244380c27296228463b7b1a79bdfe42681b5aed1"
++      "sha256": "sha256:9fe0863a25a36cbead9fa65f11d78174f386d41ca3ce5546efa4a6bffe400607"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-target-consented-type.json",
+-      "sha256": "sha256:5da0dcad9ac3078b98f13046584c930cd3d76c87945f23745b57fc6c057452c3"
++      "sha256": "sha256:cb2c334d2b055f52ad6a9ded14979cdfe92d7b00d2a7e55f36d6b97d44bd5cbd"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-target-participation.json",
+-      "sha256": "sha256:c27745a934dbefe7aa7103bc107a33cef49ce5c84590504e0fc69c6b8d9c6d6a"
++      "sha256": "sha256:6ce289700558d1b105c0ae331fce27340038d693791517e9450f5726455c1eb8"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-unknown-environments-field.json",
+-      "sha256": "sha256:207c5b64a634e9ab27997eb41e58acdfe3a9ba1e75558c796cc242ec13b9c8aa"
++      "sha256": "sha256:ba9fe1b9d058eb4cc7dbce7c2e38dcea5c06fa4ec5b91ae3127236020974e895"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-unknown-overlay-field.json",
+@@ -3598,39 +3662,39 @@
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-unknown-precedence-field.json",
+-      "sha256": "sha256:5c182ade51636ff93534093fd2cce73801c650598a69a29f4fd4d58efc2afb44"
++      "sha256": "sha256:0813dc430f486ec4ee7b9a83e1799c1d4f38728296de718ce0346d986ba025a9"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-unknown-shadow-field.json",
+-      "sha256": "sha256:2e27a147b20905fab1979d264b0d7cdd1c22603b38821cd86a6e271604fa40bb"
++      "sha256": "sha256:2439299f20c3c30b6d0383a6b35abadfb33c6cb6a1f55eb22a1742a49a3b41cb"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-unknown-system-prompt-environment.json",
+-      "sha256": "sha256:6a1afb900d9ceda44e9008136276b17615dfb2be4b5b57a478074fd7221ce2ea"
++      "sha256": "sha256:75698cd67b7e7a8df52bedcb3b55ec353f9c3d4c8b57af23d66c6d6a378f3b5c"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-unknown-target-field.json",
+-      "sha256": "sha256:2ee3bea5ae45a5bcfd7cc8595e1ee6c4d953cbb41e4999195eb242739453cbcb"
++      "sha256": "sha256:fb74d039b655dc6ee72189636cecd06af7e2c2ef3e72e2280eb0308904cb6aad"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-unknown-waiver-field.json",
+-      "sha256": "sha256:cf790f586515ffc00b2120bd30e7708994c61b0346adcd2f6e38e7792290e9df"
++      "sha256": "sha256:4cad7b9467ea89b0a1905e178b0fb31ef3b762848c3c37c5ce0a6bf6ca55a170"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-waiver-pin-grammar.json",
+-      "sha256": "sha256:36b393af1e5d167cc29574c97cc70a8088397f81a0772f7018f5c266070a8571"
++      "sha256": "sha256:e00656cfe422103891d2f25f08a0d14105e9b485c9075fd9427ef59972918107"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-waiver-span-arity.json",
+-      "sha256": "sha256:7fb74e0ab7266de3eecb4eb168b452f57f5ef8c10248d4e805139949635242b2"
++      "sha256": "sha256:4c5404dfd6574df86ee723c25fa1ebd323205648c6fa1cbeb6700fd6a0d22317"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-xdg-seed-entry-opencode.json",
+-      "sha256": "sha256:eed9c246235d735c11e78cac6074cba67ea24bc16c2809c396e39cb8511d5f34"
++      "sha256": "sha256:b4a5863d18c9be299596210858bb975498191b974fdf235886ad37787326b8d4"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid-xdg-seed-entry-path.json",
+-      "sha256": "sha256:3b6c7aef2f3babdf327809390b0e527763ce0834b06ee1e9a33fd0630831e551"
++      "sha256": "sha256:c5f509d314dc676eaab75df0942683a1d750493ce5de8345d0b40f8642f730ac"
+     },
+     {
+       "path": "schema-cases/manager-config-v2/invalid.json",
+@@ -3644,9 +3708,65 @@
+       "path": "schema-cases/manager-config-v2/valid-minimal.json",
+       "sha256": "sha256:3276756ca5b8f8e824c9facf3d75f42bf81c4f87f097772e9ff78ac9cc9a0f67"
+     },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-git-git-uppercase.json",
++      "sha256": "sha256:cfc0b09a1aaaf2e62096eb6d48e954ec1da6ee0d697964c367de7a537c7a2a40"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-git-http-uppercase.json",
++      "sha256": "sha256:a6d56822df2e58c8ca481b0fb401e1d4bf8312e51754c3b2a8887e48caaa3e7b"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-git-https-uppercase.json",
++      "sha256": "sha256:abd13de675f21129befc257b712dbf168deaaec9709a9efb5c358c524a5ef2c9"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-git-scp-no-user.json",
++      "sha256": "sha256:03884bf375e6314a367f2fffd8ed4af9532712e69bd7a9e2ce4bba7fdd1f7b1d"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-git-scp.json",
++      "sha256": "sha256:b7852330a1903f06044878ad7ab436d37a7026120b0746fcaece606c5d351379"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-git-single-letter-host.json",
++      "sha256": "sha256:9e8bbfc05b7eec8b433be58b304942f7d8248914ec45b0fad568b835040a7557"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-git-ssh-uppercase.json",
++      "sha256": "sha256:48f18a8d8137f20a2349925dd45d4d18799e94fe084d6268198e594b27028929"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-path-colon-later-segment.json",
++      "sha256": "sha256:a9942870188a4d15535449c918a0a02480410f915220c82aba62b75ee8d2765b"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-path-relative.json",
++      "sha256": "sha256:fe612c1101cfa03acbab01c3081f74c74a5311978e4bae5283a25e8562753b83"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-path-source.json",
++      "sha256": "sha256:4bf9a8700e32b1643ec1bd498728249180d7e1ca56415f7ebac280f8ebb784c1"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-path-windows-backslash.json",
++      "sha256": "sha256:9f9f07b98edb9dad409424527151cec6c39c117f51b701c8ac88851078279557"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-path-windows-double-slash.json",
++      "sha256": "sha256:779e06fd0b3558b7fd989d660a3a16110c671724b07e6af4b11bc57ab2e260ca"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-path-windows-lowercase-drive.json",
++      "sha256": "sha256:60723e28ca5923c3abd850cf99f517a3ebabdf540010a906f1eaa7cf52dfa4d2"
++    },
++    {
++      "path": "schema-cases/manager-config-v2/valid-overlay-path-windows-slash.json",
++      "sha256": "sha256:8e543189cbb45d204d9f9c61ce321f372e6722abdc088e6f2ff42985ce92bdee"
++    },
+     {
+       "path": "schema-cases/manager-config-v2/valid.json",
+-      "sha256": "sha256:e95b4b2fb64c3f15d519cce7d9ab38bec488b2a88f7ba08dd1606ba0034e7fbe"
++      "sha256": "sha256:7f8b645b5e32763466d025bbf0933beb47cb8f9a030b3417c817a1559c6e2a98"
+     },
+     {
+       "path": "schema-cases/provider-capability-receipt-v1/invalid-observed-not-before-expires.json",
+@@ -4018,7 +4138,7 @@
+     },
+     {
+       "path": "vectors/manager-config-v2.json",
+-      "sha256": "sha256:851131d9d5306833e7cc6187b576e5a2b5fcfb049bc595fb0fff1c47ee467655"
++      "sha256": "sha256:c3eb7e6e685bcb37277c27f6a575e7c03ef4890af91a109f5cc4c98e66ea55f0"
+     },
+     {
+       "path": "vectors/manager-config.json",
+diff --git a/conformance/v1/schema-cases/index.json b/conformance/v1/schema-cases/index.json
+index 356589e..eb5dee8 100644
+--- a/conformance/v1/schema-cases/index.json
++++ b/conformance/v1/schema-cases/index.json
+@@ -3829,6 +3829,76 @@
+     "schema": "manager-config-v2.schema.json",
+     "valid": true
+   },
++  {
++    "instance": "manager-config-v2/valid-overlay-path-source.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-path-windows-backslash.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-path-windows-slash.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-path-windows-lowercase-drive.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-path-relative.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-path-colon-later-segment.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-path-windows-double-slash.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-git-single-letter-host.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-git-scp.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-git-scp-no-user.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-git-ssh-uppercase.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-git-git-uppercase.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-git-http-uppercase.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
++  {
++    "instance": "manager-config-v2/valid-overlay-git-https-uppercase.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": true
++  },
+   {
+     "instance": "manager-config-v2/invalid-schema-version-1.json",
+     "schema": "manager-config-v2.schema.json",
+@@ -3889,6 +3959,86 @@
+     "schema": "manager-config-v2.schema.json",
+     "valid": false
+   },
++  {
++    "instance": "manager-config-v2/invalid-overlay-path-requirement-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-path-windows-requirement-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-path-windows-slash-requirement-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-path-relative-requirement-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-file-url-with-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-git-scp-no-requirement-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-git-uppercase-no-requirement-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-unknown-scheme.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-file-url.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-scp-host-grammar.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-scp-backslash-path.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-bare-drive-letter.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-scp-host-grammar-no-user.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-scp-host-grammar-with-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-path-directory.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
++  {
++    "instance": "manager-config-v2/invalid-overlay-unknown-scheme-with-form.json",
++    "schema": "manager-config-v2.schema.json",
++    "valid": false
++  },
+   {
+     "instance": "manager-config-v2/invalid-overlay-revision-grammar.json",
+     "schema": "manager-config-v2.schema.json",
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-backup-retention-negative.json b/conformance/v1/schema-cases/manager-config-v2/invalid-backup-retention-negative.json
+index 64d34ae..8287ede 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-backup-retention-negative.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-backup-retention-negative.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-current-profile-grammar.json b/conformance/v1/schema-cases/manager-config-v2/invalid-current-profile-grammar.json
+index afd74c5..87ef665 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-current-profile-grammar.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-current-profile-grammar.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-form-value.json b/conformance/v1/schema-cases/manager-config-v2/invalid-form-value.json
+index 8c44dd0..74227ff 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-form-value.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-form-value.json
+@@ -41,7 +41,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-in-place-mode-value.json b/conformance/v1/schema-cases/manager-config-v2/invalid-in-place-mode-value.json
+index d540ec2..f045e2f 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-in-place-mode-value.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-in-place-mode-value.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-isolation-value.json b/conformance/v1/schema-cases/manager-config-v2/invalid-isolation-value.json
+index dd392f9..9c03cfe 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-isolation-value.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-isolation-value.json
+@@ -41,7 +41,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-mcp-package-allowlist-duplicate.json b/conformance/v1/schema-cases/manager-config-v2/invalid-mcp-package-allowlist-duplicate.json
+index cf5d9d5..7f5b0fb 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-mcp-package-allowlist-duplicate.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-mcp-package-allowlist-duplicate.json
+@@ -43,7 +43,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-bare-drive-letter.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-bare-drive-letter.json
+new file mode 100644
+index 0000000..d3d962e
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-bare-drive-letter.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "C:"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-default-weight-negative.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-default-weight-negative.json
+index 67508ad..8a400f3 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-default-weight-negative.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-default-weight-negative.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-file-url-with-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-file-url-with-form.json
+new file mode 100644
+index 0000000..24f2cce
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-file-url-with-form.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "revision": "abababababababababababababababababababab",
++          "source": "file:///Users/operator/context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-file-url.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-file-url.json
+new file mode 100644
+index 0000000..3505479
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-file-url.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "file:///Users/operator/context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-git-scp-no-requirement-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-git-scp-no-requirement-form.json
+new file mode 100644
+index 0000000..8ce58aa
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-git-scp-no-requirement-form.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "git@github.com:example/team-context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-git-uppercase-no-requirement-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-git-uppercase-no-requirement-form.json
+new file mode 100644
+index 0000000..13f4bf6
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-git-uppercase-no-requirement-form.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "HTTPS://github.com/example/x"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-directory.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-directory.json
+new file mode 100644
+index 0000000..8738da1
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-directory.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "directory": "packages/team",
++          "source": "/Users/operator/context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-relative-requirement-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-relative-requirement-form.json
+new file mode 100644
+index 0000000..e981af7
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-relative-requirement-form.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "packages/team-context",
++          "tag": "v2.0.0"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-requirement-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-requirement-form.json
+new file mode 100644
+index 0000000..7d9deab
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-requirement-form.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "revision": "abababababababababababababababababababab",
++          "source": "/Users/operator/context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-windows-requirement-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-windows-requirement-form.json
+new file mode 100644
+index 0000000..56836a8
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-windows-requirement-form.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "revision": "abababababababababababababababababababab",
++          "source": "C:\\Users\\operator\\context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-windows-slash-requirement-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-windows-slash-requirement-form.json
+new file mode 100644
+index 0000000..41a3e5b
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-path-windows-slash-requirement-form.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "range": "^1.2",
++          "source": "C:/Users/operator/context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-backslash-path.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-backslash-path.json
+new file mode 100644
+index 0000000..7468f8f
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-backslash-path.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "github.com:\\example\\x"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar-no-user.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar-no-user.json
+new file mode 100644
+index 0000000..3e6ef90
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar-no-user.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "my_host:example/x"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar-with-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar-with-form.json
+new file mode 100644
+index 0000000..6e8c663
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar-with-form.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "range": "^1.2",
++          "source": "git@my_host:example/x"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar.json
+new file mode 100644
+index 0000000..7cca955
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-scp-host-grammar.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "git@my_host:example/x"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-unknown-scheme-with-form.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-unknown-scheme-with-form.json
+new file mode 100644
+index 0000000..c0401b4
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-unknown-scheme-with-form.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "revision": "abababababababababababababababababababab",
++          "source": "svn://github.com/example/x"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-unknown-scheme.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-unknown-scheme.json
+new file mode 100644
+index 0000000..5b45a8c
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlay-unknown-scheme.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "svn://github.com/example/x"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-overlays-allowed-type.json b/conformance/v1/schema-cases/manager-config-v2/invalid-overlays-allowed-type.json
+index 7b92a69..f07e13a 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-overlays-allowed-type.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-overlays-allowed-type.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-passable-env-name-grammar.json b/conformance/v1/schema-cases/manager-config-v2/invalid-passable-env-name-grammar.json
+index 55faf78..8c3be18 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-passable-env-name-grammar.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-passable-env-name-grammar.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-precedence-placement.json b/conformance/v1/schema-cases/manager-config-v2/invalid-precedence-placement.json
+index 292bc16..e0137ba 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-precedence-placement.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-precedence-placement.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-precedence-winner.json b/conformance/v1/schema-cases/manager-config-v2/invalid-precedence-winner.json
+index 7ba7c89..0dfa455 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-precedence-winner.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-precedence-winner.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-require-current-profile-grammar.json b/conformance/v1/schema-cases/manager-config-v2/invalid-require-current-profile-grammar.json
+index e894101..0796e99 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-require-current-profile-grammar.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-require-current-profile-grammar.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-schema-version-1.json b/conformance/v1/schema-cases/manager-config-v2/invalid-schema-version-1.json
+index b063e06..f45e559 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-schema-version-1.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-schema-version-1.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-scoped-current-value.json b/conformance/v1/schema-cases/manager-config-v2/invalid-scoped-current-value.json
+index 2ed5efb..9ae5b2d 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-scoped-current-value.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-scoped-current-value.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-shadow-acknowledged-missing-path.json b/conformance/v1/schema-cases/manager-config-v2/invalid-shadow-acknowledged-missing-path.json
+index 3718860..3a63ee6 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-shadow-acknowledged-missing-path.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-shadow-acknowledged-missing-path.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-system-prompt-files-value.json b/conformance/v1/schema-cases/manager-config-v2/invalid-system-prompt-files-value.json
+index 02d2591..e1b071a 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-system-prompt-files-value.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-system-prompt-files-value.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-target-consented-type.json b/conformance/v1/schema-cases/manager-config-v2/invalid-target-consented-type.json
+index fd04d9c..4e7b9e7 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-target-consented-type.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-target-consented-type.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-target-participation.json b/conformance/v1/schema-cases/manager-config-v2/invalid-target-participation.json
+index 995dd4c..433b863 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-target-participation.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-target-participation.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-environments-field.json b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-environments-field.json
+index 35037e5..704306f 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-environments-field.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-environments-field.json
+@@ -43,7 +43,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-precedence-field.json b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-precedence-field.json
+index 29c2132..0bbd6f9 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-precedence-field.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-precedence-field.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-shadow-field.json b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-shadow-field.json
+index b9bb0e6..36333fe 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-shadow-field.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-shadow-field.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-system-prompt-environment.json b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-system-prompt-environment.json
+index 9e5d861..654fbd3 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-system-prompt-environment.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-system-prompt-environment.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-target-field.json b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-target-field.json
+index ca7e26a..a3b7928 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-target-field.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-target-field.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-waiver-field.json b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-waiver-field.json
+index 1149543..71499f0 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-waiver-field.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-unknown-waiver-field.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-waiver-pin-grammar.json b/conformance/v1/schema-cases/manager-config-v2/invalid-waiver-pin-grammar.json
+index 326f115..a5bd2db 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-waiver-pin-grammar.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-waiver-pin-grammar.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-waiver-span-arity.json b/conformance/v1/schema-cases/manager-config-v2/invalid-waiver-span-arity.json
+index 5faba70..fbd11be 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-waiver-span-arity.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-waiver-span-arity.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-xdg-seed-entry-opencode.json b/conformance/v1/schema-cases/manager-config-v2/invalid-xdg-seed-entry-opencode.json
+index 5d241b4..b79d2f3 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-xdg-seed-entry-opencode.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-xdg-seed-entry-opencode.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/invalid-xdg-seed-entry-path.json b/conformance/v1/schema-cases/manager-config-v2/invalid-xdg-seed-entry-path.json
+index 15eed45..d566c3d 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/invalid-xdg-seed-entry-path.json
++++ b/conformance/v1/schema-cases/manager-config-v2/invalid-xdg-seed-entry-path.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-git-uppercase.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-git-uppercase.json
+new file mode 100644
+index 0000000..632d314
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-git-uppercase.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "GIT://github.com/example/team-context",
++          "tag": "v2.0.0"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-http-uppercase.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-http-uppercase.json
+new file mode 100644
+index 0000000..b29b6c5
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-http-uppercase.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "range": "^2.0",
++          "source": "HTTP://github.com/example/extra-context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-https-uppercase.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-https-uppercase.json
+new file mode 100644
+index 0000000..dc11117
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-https-uppercase.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "revision": "abababababababababababababababababababab",
++          "source": "HTTPS://github.com/example/x"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-scp-no-user.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-scp-no-user.json
+new file mode 100644
+index 0000000..6b34cca
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-scp-no-user.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "github.com:example/team-context",
++          "tag": "v2.0.0"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-scp.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-scp.json
+new file mode 100644
+index 0000000..61ab4fb
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-scp.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "range": "^1.2",
++          "source": "git@github.com:example/team-context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-single-letter-host.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-single-letter-host.json
+new file mode 100644
+index 0000000..24cc9e0
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-single-letter-host.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "range": "^1.2",
++          "source": "c:example/team-context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-ssh-uppercase.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-ssh-uppercase.json
+new file mode 100644
+index 0000000..1324dec
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-git-ssh-uppercase.json
+@@ -0,0 +1,96 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "range": "^1.2",
++          "source": "SSH://github.com/example/personal-context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-colon-later-segment.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-colon-later-segment.json
+new file mode 100644
+index 0000000..b7ef5e5
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-colon-later-segment.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "packages/team:context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-relative.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-relative.json
+new file mode 100644
+index 0000000..08aadbe
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-relative.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "packages/team-context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-source.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-source.json
+new file mode 100644
+index 0000000..dad61b8
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-source.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "/Users/operator/context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-backslash.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-backslash.json
+new file mode 100644
+index 0000000..9395906
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-backslash.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "C:\\Users\\operator\\context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-double-slash.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-double-slash.json
+new file mode 100644
+index 0000000..89ee92f
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-double-slash.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "C://Users/operator/context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-lowercase-drive.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-lowercase-drive.json
+new file mode 100644
+index 0000000..3c293ca
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-lowercase-drive.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "c:\\users\\operator\\context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-slash.json b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-slash.json
+new file mode 100644
+index 0000000..7468035
+--- /dev/null
++++ b/conformance/v1/schema-cases/manager-config-v2/valid-overlay-path-windows-slash.json
+@@ -0,0 +1,95 @@
++{
++  "audit": {
++    "cache_ttl_seconds": 0,
++    "offline_grace_seconds": 0
++  },
++  "audit_registries": [
++    {
++      "name": "primary",
++      "url": "HTTPS://registry.example"
++    }
++  ],
++  "environments": {
++    "backup_retention": 0,
++    "current_profile": "companyA",
++    "forms": {
++      "claude_code": "referenced",
++      "opencode": "monolithic"
++    },
++    "in_place_mode": {
++      "codex_cli": "copied"
++    },
++    "isolation": {
++      "companyA": {
++        "codex_cli": "isolated",
++        "pi": "shared"
++      }
++    },
++    "mcp_package_allowlist": [
++      "https://github.com/example/figma-devmode-mcp"
++    ],
++    "overlay_default_weight": 500,
++    "overlays": {
++      "companyA": [
++        {
++          "source": "C:/Users/operator/context"
++        }
++      ]
++    },
++    "overlays_allowed": false,
++    "passable_env_names": [
++      "FIGMA_API_KEY",
++      "GITHUB_TOKEN"
++    ],
++    "precedence": {
++      "placement": "winner-first",
++      "winner": "lower-weight"
++    },
++    "require_current_profile": "companyA",
++    "scoped_current": {
++      "pi": "personal",
++      "xcode-coding-assistant": "companyA"
++    },
++    "secret_material_waivers": [
++      {
++        "file": "context/root.md",
++        "pin": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
++        "reason": "documented placeholder token in the onboarding example",
++        "span": [
++          120,
++          164
++        ]
++      }
++    ],
++    "shadow_acknowledged": [
++      {
++        "env": "pi",
++        "path": "AGENTS.override.md"
++      }
++    ],
++    "system_prompt_files": {
++      "companyA": {
++        "pi": "append"
++      }
++    },
++    "targets": {
++      "xcode-coding-assistant": {
++        "consented": true,
++        "participation": "enabled"
++      }
++    },
++    "xdg_seed_allowlist": [
++      "git",
++      "gh"
++    ]
++  },
++  "preferred_locale": null,
++  "projects": {
++    "app": {
++      "path": "/tmp/app",
++      "project_alias": null
++    }
++  },
++  "schema_version": 2,
++  "skills_root": "/tmp/skills"
++}
+diff --git a/conformance/v1/schema-cases/manager-config-v2/valid.json b/conformance/v1/schema-cases/manager-config-v2/valid.json
+index a82ba20..fcdf5ca 100644
+--- a/conformance/v1/schema-cases/manager-config-v2/valid.json
++++ b/conformance/v1/schema-cases/manager-config-v2/valid.json
+@@ -42,7 +42,6 @@
+           "tag": "v2.0.0"
+         },
+         {
+-          "revision": "abababababababababababababababababababab",
+           "source": "/Users/operator/context"
+         }
+       ]
+diff --git a/conformance/v1/vectors/manager-config-v2.json b/conformance/v1/vectors/manager-config-v2.json
+index 82fbfea..c6a35eb 100644
+--- a/conformance/v1/vectors/manager-config-v2.json
++++ b/conformance/v1/vectors/manager-config-v2.json
+@@ -165,7 +165,6 @@
+               "tag": "v2.0.0"
+             },
+             {
+-              "revision": "abababababababababababababababababababab",
+               "source": "/Users/operator/context"
+             }
+           ]
+@@ -252,7 +251,6 @@
+               "tag": "v2.0.0"
+             },
+             {
+-              "revision": "abababababababababababababababababababab",
+               "source": "/Users/operator/context"
+             }
+           ]
+@@ -355,6 +353,1040 @@
+     "name": "schema2-overlay-two-requirement-forms",
+     "valid": false
+   },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "/Users/operator/context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "/Users/operator/context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-source",
++    "valid": true
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "revision": "abababababababababababababababababababab",
++              "source": "/Users/operator/context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-requirement-form",
++    "valid": false
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "C:\\Users\\operator\\context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "C:\\Users\\operator\\context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-windows-backslash",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "C:/Users/operator/context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "C:/Users/operator/context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-windows-slash",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "packages/team-context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "packages/team-context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-relative",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "packages/team:context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "packages/team:context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-colon-later-segment",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "c:\\users\\operator\\context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "c:\\users\\operator\\context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-windows-lowercase-drive",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "C://Users/operator/context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "C://Users/operator/context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-windows-double-slash",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^1.2",
++              "source": "c:example/team-context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^1.2",
++              "source": "c:example/team-context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-single-letter-host",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^1.2",
++              "source": "git@github.com:example/team-context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^1.2",
++              "source": "git@github.com:example/team-context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-scp",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "github.com:example/team-context",
++              "tag": "v2.0.0"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "github.com:example/team-context",
++              "tag": "v2.0.0"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-scp-no-user",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^1.2",
++              "source": "SSH://github.com/example/personal-context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^1.2",
++              "source": "SSH://github.com/example/personal-context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-ssh-uppercase",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "source": "GIT://github.com/example/team-context",
++              "tag": "v2.0.0"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "GIT://github.com/example/team-context",
++              "tag": "v2.0.0"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-git-uppercase",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^2.0",
++              "source": "HTTP://github.com/example/extra-context"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^2.0",
++              "source": "HTTP://github.com/example/extra-context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-http-uppercase",
++    "valid": true
++  },
++  {
++    "expected": {
++      "environments": {
++        "backup_retention": 5,
++        "current_profile": null,
++        "forms": {},
++        "in_place_mode": {},
++        "isolation": {},
++        "mcp_package_allowlist": [],
++        "overlay_default_weight": 1000,
++        "overlays": {
++          "companyA": [
++            {
++              "revision": "abababababababababababababababababababab",
++              "source": "HTTPS://github.com/example/x"
++            }
++          ]
++        },
++        "overlays_allowed": true,
++        "passable_env_names": null,
++        "precedence": {
++          "placement": "winner-last",
++          "winner": "higher-weight"
++        },
++        "require_current_profile": null,
++        "scoped_current": {},
++        "secret_material_waivers": [],
++        "shadow_acknowledged": [],
++        "system_prompt_files": {},
++        "targets": {},
++        "xdg_seed_allowlist": [
++          "git",
++          "gh",
++          "ssh"
++        ]
++      }
++    },
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "revision": "abababababababababababababababababababab",
++              "source": "HTTPS://github.com/example/x"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-https-uppercase",
++    "valid": true
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "file:///Users/operator/context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-file-url",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "github.com:\\example\\x"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-scp-backslash-path",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "C:"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-bare-drive-letter",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "git@my_host:example/x"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-scp-host-grammar",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^1.2",
++              "source": "git@my_host:example/x"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-scp-host-grammar-with-form",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "directory": "packages/team",
++              "source": "/Users/operator/context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-directory",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "revision": "abababababababababababababababababababab",
++              "source": "C:\\Users\\operator\\context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-windows-requirement-form",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "range": "^1.2",
++              "source": "C:/Users/operator/context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-windows-slash-requirement-form",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "packages/team-context",
++              "tag": "v2.0.0"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-path-relative-requirement-form",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "revision": "abababababababababababababababababababab",
++              "source": "file:///Users/operator/context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-file-url-with-form",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "git@github.com:example/team-context"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-scp-no-requirement-form",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "HTTPS://github.com/example/x"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-git-uppercase-no-requirement-form",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "source": "svn://github.com/example/x"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-unknown-scheme",
++    "valid": false
++  },
++  {
++    "input": {
++      "environments": {
++        "overlays": {
++          "companyA": [
++            {
++              "revision": "abababababababababababababababababababab",
++              "source": "svn://github.com/example/x"
++            }
++          ]
++        }
++      },
++      "projects": {},
++      "schema_version": 2,
++      "skills_root": "./skills"
++    },
++    "name": "schema2-overlay-unknown-scheme-with-form",
++    "valid": false
++  },
+   {
+     "input": {
+       "environments": {
+diff --git a/profiles/manager.md b/profiles/manager.md
+index 82d5335..da60d07 100644
+--- a/profiles/manager.md
++++ b/profiles/manager.md
+@@ -2187,17 +2187,20 @@ Re-installing an installed source with the same requirement re-resolves
+ exactly as `profile update` does and is reported as an update.
+ 
+ Overlays are machine configuration only. `overlays.<profile>` is an ordered
+-list of `{ source, range | tag | revision, directory?, weight? }`; each
+-entry joins the closure with the weight it declares, else the
+-`overlay_default_weight` knob (default `1000`), and machine configuration
+-outranks repository content for a package that is both an overlay and a
+-requirement. A declaration repeating a name already in the closure is
+-`environment_composition_invalid`. `overlays_allowed: false` empties every
+-overlay list, with the section 1 warning when the key is locked. The
+-precedence policy is the pair `precedence.winner` and
+-`precedence.placement`, each independently changeable; the manager records
+-both primitives in every lock, marker, generation header, and fragment and
+-never resolves precedence silently.
++list in the environments §12.1 shape — the manager requires the
++`range | tag | revision` form (with optional `directory?`) on a `git`
++source and no requirement form on a `path` source, which carries only
++`source` and optional `weight?`, refusing a `path` overlay that carries a
++form under the section 1 rules; each entry joins the closure with the
++weight it declares, else the `overlay_default_weight` knob (default
++`1000`), and machine configuration outranks repository content for a
++package that is both an overlay and a requirement. A declaration repeating
++a name already in the closure is `environment_composition_invalid`.
++`overlays_allowed: false` empties every overlay list, with the section 1
++warning when the key is locked. The precedence policy is the pair
++`precedence.winner` and `precedence.placement`, each independently
++changeable; the manager records both primitives in every lock, marker,
++generation header, and fragment and never resolves precedence silently.
+ 
+ **`profile use <name>`** re-materializes every in-place surface of every
+ registered adapter — native default homes and every participating secondary
+diff --git a/protocol/environments.md b/protocol/environments.md
+index 5dc69f4..3edea3d 100644
+--- a/protocol/environments.md
++++ b/protocol/environments.md
+@@ -2220,7 +2220,7 @@ knob is absent.
+ |---|---|---|---|
+ | `current_profile` | profile name or `null` | `null` | 9.2 |
+ | `scoped_current` | map env-id or target-id → profile name | empty | 9.3 |
+-| `overlays.<profile>` | ordered list of `{ source, range \| tag \| revision, directory?, weight? }` | empty | 6 |
++| `overlays.<profile>` | ordered list of `{ source, range \| tag \| revision, directory?, weight? }` for a `git` source, `{ source, weight? }` for a `path` source | empty | 6 |
+ | `overlay_default_weight` | non-negative integer | `1000` | 6 |
+ | `overlays_allowed` | boolean | `true` | 6, 12.2 |
+ | `precedence.winner` | `higher-weight`, `lower-weight` | `higher-weight` | 6 |
+diff --git a/release/1.0.0-rc.9.json b/release/1.0.0-rc.9.json
+index bbeb75b..63c1f20 100644
+--- a/release/1.0.0-rc.9.json
++++ b/release/1.0.0-rc.9.json
+@@ -12,7 +12,7 @@
+     "verified_provider_contract": "host-execution-provider-v1"
+   },
+   "candidate_protocol_pin": {
+-    "manifest_sha256": "sha256:70a213deaca7bf22b90cecac5b20fe51e1f7f5378ac2b72ee3a9e42db06c9553",
++    "manifest_sha256": "sha256:0e195ecd26af2fcb5e5afb5c3fef0ebe60981888b057e8efc60c0b48cf584529",
+     "suite_root": "conformance/v1"
+   },
+   "claim_v5": {
+@@ -24,7 +24,7 @@
+   "downstream_consumption": {
+     "committed_release_pin_advanced": false,
+     "environment": "CURATOR_CONFORMANCE_ROOT",
+-    "required_manifest_sha256": "sha256:70a213deaca7bf22b90cecac5b20fe51e1f7f5378ac2b72ee3a9e42db06c9553"
++    "required_manifest_sha256": "sha256:0e195ecd26af2fcb5e5afb5c3fef0ebe60981888b057e8efc60c0b48cf584529"
+   },
+   "historical_release": {
+     "immutable": true,
+diff --git a/schemas/v1/manager-config-v2.schema.json b/schemas/v1/manager-config-v2.schema.json
+index 1cf5c93..569ca2c 100644
+--- a/schemas/v1/manager-config-v2.schema.json
++++ b/schemas/v1/manager-config-v2.schema.json
+@@ -4,27 +4,59 @@
+   "title": "Curator manager logical configuration schema 2",
+   "description": "Schema 1 plus one closed `environments` object carrying exactly the environments protocol section 12.1 machine-configuration knobs. Every schema-1 member keeps its schema-1 shape and default; `environments` is optional and every knob inside it defaults when absent.",
+   "type": "object",
+-  "required": ["schema_version", "skills_root", "projects"],
++  "required": [
++    "schema_version",
++    "skills_root",
++    "projects"
++  ],
+   "properties": {
+-    "schema_version": {"const": 2},
+-    "skills_root": {"$ref": "manager-config-v1.schema.json#/properties/skills_root"},
+-    "default_agents": {"$ref": "manager-config-v1.schema.json#/properties/default_agents"},
+-    "preferred_locale": {"$ref": "manager-config-v1.schema.json#/properties/preferred_locale"},
+-    "adapter_mode": {"$ref": "manager-config-v1.schema.json#/properties/adapter_mode"},
+-    "worktree_alias_pattern": {"$ref": "manager-config-v1.schema.json#/properties/worktree_alias_pattern"},
+-    "projects": {"$ref": "manager-config-v1.schema.json#/properties/projects"},
+-    "allowed_sources": {"$ref": "manager-config-v1.schema.json#/properties/allowed_sources"},
+-    "audit": {"$ref": "manager-config-v1.schema.json#/properties/audit"},
+-    "audit_registries": {"$ref": "manager-config-v1.schema.json#/properties/audit_registries"},
+-    "disable_builtin_registries": {"$ref": "manager-config-v1.schema.json#/properties/disable_builtin_registries"},
+-    "environments": {"$ref": "#/$defs/environments"}
++    "schema_version": {
++      "const": 2
++    },
++    "skills_root": {
++      "$ref": "manager-config-v1.schema.json#/properties/skills_root"
++    },
++    "default_agents": {
++      "$ref": "manager-config-v1.schema.json#/properties/default_agents"
++    },
++    "preferred_locale": {
++      "$ref": "manager-config-v1.schema.json#/properties/preferred_locale"
++    },
++    "adapter_mode": {
++      "$ref": "manager-config-v1.schema.json#/properties/adapter_mode"
++    },
++    "worktree_alias_pattern": {
++      "$ref": "manager-config-v1.schema.json#/properties/worktree_alias_pattern"
++    },
++    "projects": {
++      "$ref": "manager-config-v1.schema.json#/properties/projects"
++    },
++    "allowed_sources": {
++      "$ref": "manager-config-v1.schema.json#/properties/allowed_sources"
++    },
++    "audit": {
++      "$ref": "manager-config-v1.schema.json#/properties/audit"
++    },
++    "audit_registries": {
++      "$ref": "manager-config-v1.schema.json#/properties/audit_registries"
++    },
++    "disable_builtin_registries": {
++      "$ref": "manager-config-v1.schema.json#/properties/disable_builtin_registries"
++    },
++    "environments": {
++      "$ref": "#/$defs/environments"
++    }
+   },
+   "additionalProperties": false,
+   "$defs": {
+     "profileNameOrNull": {
+       "oneOf": [
+-        {"$ref": "common.schema.json#/$defs/identifier"},
+-        {"type": "null"}
++        {
++          "$ref": "common.schema.json#/$defs/identifier"
++        },
++        {
++          "type": "null"
++        }
+       ]
+     },
+     "versionRange": {
+@@ -35,42 +67,211 @@
+     },
+     "overlay": {
+       "type": "object",
+-      "required": ["source"],
++      "required": [
++        "source"
++      ],
+       "properties": {
+-        "source": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
+-        "range": {"$ref": "#/$defs/versionRange"},
+-        "tag": {"$ref": "common.schema.json#/$defs/gitRefName"},
+-        "revision": {"$ref": "common.schema.json#/$defs/commit"},
+-        "directory": {"$ref": "common.schema.json#/$defs/portablePath"},
+-        "weight": {"$ref": "common.schema.json#/$defs/nonNegativeSafeInteger"}
++        "source": {
++          "$ref": "common.schema.json#/$defs/nonEmptyString"
++        },
++        "range": {
++          "$ref": "#/$defs/versionRange"
++        },
++        "tag": {
++          "$ref": "common.schema.json#/$defs/gitRefName"
++        },
++        "revision": {
++          "$ref": "common.schema.json#/$defs/commit"
++        },
++        "directory": {
++          "$ref": "common.schema.json#/$defs/portablePath"
++        },
++        "weight": {
++          "$ref": "common.schema.json#/$defs/nonNegativeSafeInteger"
++        }
+       },
+-      "oneOf": [
+-        {"required": ["range"]},
+-        {"required": ["tag"]},
+-        {"required": ["revision"]}
++      "allOf": [
++        {
++          "if": {
++            "allOf": [
++              {
++                "properties": {
++                  "source": {
++                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]+://"
++                  }
++                }
++              },
++              {
++                "not": {
++                  "properties": {
++                    "source": {
++                      "pattern": "^([Ss][Ss][Hh]|[Gg][Ii][Tt]|[Hh][Tt][Tt][Pp][Ss]?)://"
++                    }
++                  }
++                }
++              }
++            ]
++          },
++          "then": false
++        },
++        {
++          "if": {
++            "allOf": [
++              {
++                "properties": {
++                  "source": {
++                    "pattern": "^[^/\\s]*:"
++                  }
++                }
++              },
++              {
++                "not": {
++                  "properties": {
++                    "source": {
++                      "pattern": "^[A-Za-z][A-Za-z0-9+.-]+://"
++                    }
++                  }
++                }
++              },
++              {
++                "not": {
++                  "properties": {
++                    "source": {
++                      "pattern": "^[A-Za-z]:[\\\\/]"
++                    }
++                  }
++                }
++              },
++              {
++                "not": {
++                  "properties": {
++                    "source": {
++                      "pattern": "^(?:[^/:\\s@]+@)?[A-Za-z0-9][A-Za-z0-9.-]*:[^/\\s\\\\]"
++                    }
++                  }
++                }
++              }
++            ]
++          },
++          "then": false
++        },
++        {
++          "if": {
++            "anyOf": [
++              {
++                "properties": {
++                  "source": {
++                    "pattern": "^([Ss][Ss][Hh]|[Gg][Ii][Tt]|[Hh][Tt][Tt][Pp][Ss]?)://"
++                  }
++                }
++              },
++              {
++                "properties": {
++                  "source": {
++                    "pattern": "^(?:[^/:\\s@]+@)?[A-Za-z0-9][A-Za-z0-9.-]*:[^/\\s\\\\]"
++                  }
++                }
++              }
++            ]
++          },
++          "then": {
++            "oneOf": [
++              {
++                "required": [
++                  "range"
++                ]
++              },
++              {
++                "required": [
++                  "tag"
++                ]
++              },
++              {
++                "required": [
++                  "revision"
++                ]
++              }
++            ]
++          },
++          "else": {
++            "not": {
++              "anyOf": [
++                {
++                  "required": [
++                    "range"
++                  ]
++                },
++                {
++                  "required": [
++                    "tag"
++                  ]
++                },
++                {
++                  "required": [
++                    "revision"
++                  ]
++                },
++                {
++                  "required": [
++                    "directory"
++                  ]
++                }
++              ]
++            }
++          }
++        }
+       ],
+       "additionalProperties": false
+     },
+     "precedence": {
+       "type": "object",
+       "properties": {
+-        "winner": {"enum": ["higher-weight", "lower-weight"], "default": "higher-weight"},
+-        "placement": {"enum": ["winner-last", "winner-first"], "default": "winner-last"}
++        "winner": {
++          "enum": [
++            "higher-weight",
++            "lower-weight"
++          ],
++          "default": "higher-weight"
++        },
++        "placement": {
++          "enum": [
++            "winner-last",
++            "winner-first"
++          ],
++          "default": "winner-last"
++        }
+       },
+       "additionalProperties": false
+     },
+     "systemPromptFiles": {
+       "type": "object",
+       "properties": {
+-        "pi": {"enum": ["off", "append", "replace"], "default": "off"}
++        "pi": {
++          "enum": [
++            "off",
++            "append",
++            "replace"
++          ],
++          "default": "off"
++        }
+       },
+       "additionalProperties": false
+     },
+     "target": {
+       "type": "object",
+       "properties": {
+-        "participation": {"enum": ["auto", "off", "enabled"], "default": "auto"},
+-        "consented": {"type": "boolean", "default": false}
++        "participation": {
++          "enum": [
++            "auto",
++            "off",
++            "enabled"
++          ],
++          "default": "auto"
++        },
++        "consented": {
++          "type": "boolean",
++          "default": false
++        }
+       },
+       "additionalProperties": false
+     },
+@@ -79,115 +280,222 @@
+       "minLength": 1,
+       "maxLength": 255,
+       "pattern": "^[^/\\\\\\u0000-\\u001f\\u007f]+$",
+-      "not": {"enum": [".", "..", "opencode"]}
++      "not": {
++        "enum": [
++          ".",
++          "..",
++          "opencode"
++        ]
++      }
+     },
+     "shadowAcknowledgement": {
+       "type": "object",
+-      "required": ["env", "path"],
++      "required": [
++        "env",
++        "path"
++      ],
+       "properties": {
+-        "env": {"$ref": "common.schema.json#/$defs/identifier"},
+-        "path": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++        "env": {
++          "$ref": "common.schema.json#/$defs/identifier"
++        },
++        "path": {
++          "$ref": "common.schema.json#/$defs/nonEmptyString"
++        }
+       },
+       "additionalProperties": false
+     },
+     "secretMaterialWaiver": {
+       "type": "object",
+-      "required": ["pin", "file", "span", "reason"],
++      "required": [
++        "pin",
++        "file",
++        "span",
++        "reason"
++      ],
+       "properties": {
+-        "pin": {"$ref": "common.schema.json#/$defs/commit"},
+-        "file": {"$ref": "common.schema.json#/$defs/portablePath"},
++        "pin": {
++          "$ref": "common.schema.json#/$defs/commit"
++        },
++        "file": {
++          "$ref": "common.schema.json#/$defs/portablePath"
++        },
+         "span": {
+           "type": "array",
+           "minItems": 2,
+           "maxItems": 2,
+-          "items": {"$ref": "common.schema.json#/$defs/nonNegativeSafeInteger"}
++          "items": {
++            "$ref": "common.schema.json#/$defs/nonNegativeSafeInteger"
++          }
+         },
+-        "reason": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++        "reason": {
++          "$ref": "common.schema.json#/$defs/nonEmptyString"
++        }
+       },
+       "additionalProperties": false
+     },
+     "environments": {
+       "type": "object",
+       "properties": {
+-        "current_profile": {"$ref": "#/$defs/profileNameOrNull", "default": null},
++        "current_profile": {
++          "$ref": "#/$defs/profileNameOrNull",
++          "default": null
++        },
+         "scoped_current": {
+           "type": "object",
+-          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
+-          "additionalProperties": {"$ref": "common.schema.json#/$defs/identifier"},
++          "propertyNames": {
++            "$ref": "common.schema.json#/$defs/identifier"
++          },
++          "additionalProperties": {
++            "$ref": "common.schema.json#/$defs/identifier"
++          },
+           "default": {}
+         },
+         "overlays": {
+           "type": "object",
+-          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
+-          "additionalProperties": {"type": "array", "items": {"$ref": "#/$defs/overlay"}},
++          "propertyNames": {
++            "$ref": "common.schema.json#/$defs/identifier"
++          },
++          "additionalProperties": {
++            "type": "array",
++            "items": {
++              "$ref": "#/$defs/overlay"
++            }
++          },
+           "default": {}
+         },
+-        "overlay_default_weight": {"$ref": "common.schema.json#/$defs/nonNegativeSafeInteger", "default": 1000},
+-        "overlays_allowed": {"type": "boolean", "default": true},
+-        "precedence": {"$ref": "#/$defs/precedence", "default": {"winner": "higher-weight", "placement": "winner-last"}},
++        "overlay_default_weight": {
++          "$ref": "common.schema.json#/$defs/nonNegativeSafeInteger",
++          "default": 1000
++        },
++        "overlays_allowed": {
++          "type": "boolean",
++          "default": true
++        },
++        "precedence": {
++          "$ref": "#/$defs/precedence",
++          "default": {
++            "winner": "higher-weight",
++            "placement": "winner-last"
++          }
++        },
+         "forms": {
+           "type": "object",
+-          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
+-          "additionalProperties": {"enum": ["monolithic", "referenced"]},
++          "propertyNames": {
++            "$ref": "common.schema.json#/$defs/identifier"
++          },
++          "additionalProperties": {
++            "enum": [
++              "monolithic",
++              "referenced"
++            ]
++          },
+           "default": {}
+         },
+         "system_prompt_files": {
+           "type": "object",
+-          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
+-          "additionalProperties": {"$ref": "#/$defs/systemPromptFiles"},
++          "propertyNames": {
++            "$ref": "common.schema.json#/$defs/identifier"
++          },
++          "additionalProperties": {
++            "$ref": "#/$defs/systemPromptFiles"
++          },
+           "default": {}
+         },
+         "targets": {
+           "type": "object",
+-          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
+-          "additionalProperties": {"$ref": "#/$defs/target"},
++          "propertyNames": {
++            "$ref": "common.schema.json#/$defs/identifier"
++          },
++          "additionalProperties": {
++            "$ref": "#/$defs/target"
++          },
+           "default": {}
+         },
+         "isolation": {
+           "type": "object",
+-          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
++          "propertyNames": {
++            "$ref": "common.schema.json#/$defs/identifier"
++          },
+           "additionalProperties": {
+             "type": "object",
+-            "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
+-            "additionalProperties": {"enum": ["shared", "isolated"]}
++            "propertyNames": {
++              "$ref": "common.schema.json#/$defs/identifier"
++            },
++            "additionalProperties": {
++              "enum": [
++                "shared",
++                "isolated"
++              ]
++            }
+           },
+           "default": {}
+         },
+         "xdg_seed_allowlist": {
+           "type": "array",
+-          "items": {"$ref": "#/$defs/xdgEntryName"},
++          "items": {
++            "$ref": "#/$defs/xdgEntryName"
++          },
+           "uniqueItems": true,
+-          "default": ["git", "gh", "ssh"]
++          "default": [
++            "git",
++            "gh",
++            "ssh"
++          ]
+         },
+         "passable_env_names": {
+           "oneOf": [
+-            {"$ref": "common.schema.json#/$defs/identifierSet"},
+-            {"type": "null"}
++            {
++              "$ref": "common.schema.json#/$defs/identifierSet"
++            },
++            {
++              "type": "null"
++            }
+           ],
+           "default": null
+         },
+         "mcp_package_allowlist": {
+           "type": "array",
+-          "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++          "items": {
++            "$ref": "common.schema.json#/$defs/nonEmptyString"
++          },
+           "uniqueItems": true,
+           "default": []
+         },
+         "shadow_acknowledged": {
+           "type": "array",
+-          "items": {"$ref": "#/$defs/shadowAcknowledgement"},
++          "items": {
++            "$ref": "#/$defs/shadowAcknowledgement"
++          },
+           "default": []
+         },
+         "secret_material_waivers": {
+           "type": "array",
+-          "items": {"$ref": "#/$defs/secretMaterialWaiver"},
++          "items": {
++            "$ref": "#/$defs/secretMaterialWaiver"
++          },
+           "default": []
+         },
+-        "backup_retention": {"type": "integer", "minimum": 0, "maximum": 9007199254740991, "default": 5},
+-        "require_current_profile": {"$ref": "#/$defs/profileNameOrNull", "default": null},
++        "backup_retention": {
++          "type": "integer",
++          "minimum": 0,
++          "maximum": 9007199254740991,
++          "default": 5
++        },
++        "require_current_profile": {
++          "$ref": "#/$defs/profileNameOrNull",
++          "default": null
++        },
+         "in_place_mode": {
+           "type": "object",
+-          "propertyNames": {"$ref": "common.schema.json#/$defs/identifier"},
+-          "additionalProperties": {"enum": ["linked", "copied"]},
++          "propertyNames": {
++            "$ref": "common.schema.json#/$defs/identifier"
++          },
++          "additionalProperties": {
++            "enum": [
++              "linked",
++              "copied"
++            ]
++          },
+           "default": {}
+         }
+       },
+diff --git a/tools/generate-vectors/manager_config.go b/tools/generate-vectors/manager_config.go
+index 5d1c31f..53c7f89 100644
+--- a/tools/generate-vectors/manager_config.go
++++ b/tools/generate-vectors/manager_config.go
+@@ -39,7 +39,7 @@ func managerConfigV2EveryKnob() map[string]any {
+ 			"companyA": []any{
+ 				map[string]any{"source": "https://github.com/example/personal-context", "range": "^1.2", "weight": 2000},
+ 				map[string]any{"source": "https://github.com/example/team-context", "tag": "v2.0.0", "directory": "packages/team"},
+-				map[string]any{"source": "/Users/operator/context", "revision": strings.Repeat("ab", 20)},
++				map[string]any{"source": "/Users/operator/context"},
+ 			},
+ 		},
+ 		"overlay_default_weight": 500,
+@@ -101,6 +101,20 @@ func managerConfigV2SchemaExamples(valid map[string]any) []schemaExample {
+ 	return []schemaExample{
+ 		{name: "valid-minimal", valid: true, instance: minimal},
+ 		{name: "valid-empty-environments", valid: true, instance: emptyEnvironments},
++		{name: "valid-overlay-path-source", valid: true, instance: withOverlay(map[string]any{"source": "/Users/operator/context"})},
++		{name: "valid-overlay-path-windows-backslash", valid: true, instance: withOverlay(map[string]any{"source": "C:\\Users\\operator\\context"})},
++		{name: "valid-overlay-path-windows-slash", valid: true, instance: withOverlay(map[string]any{"source": "C:/Users/operator/context"})},
++		{name: "valid-overlay-path-windows-lowercase-drive", valid: true, instance: withOverlay(map[string]any{"source": "c:\\users\\operator\\context"})},
++		{name: "valid-overlay-path-relative", valid: true, instance: withOverlay(map[string]any{"source": "packages/team-context"})},
++		{name: "valid-overlay-path-colon-later-segment", valid: true, instance: withOverlay(map[string]any{"source": "packages/team:context"})},
++		{name: "valid-overlay-path-windows-double-slash", valid: true, instance: withOverlay(map[string]any{"source": "C://Users/operator/context"})},
++		{name: "valid-overlay-git-single-letter-host", valid: true, instance: withOverlay(map[string]any{"source": "c:example/team-context", "range": "^1.2"})},
++		{name: "valid-overlay-git-scp", valid: true, instance: withOverlay(map[string]any{"source": "git@github.com:example/team-context", "range": "^1.2"})},
++		{name: "valid-overlay-git-scp-no-user", valid: true, instance: withOverlay(map[string]any{"source": "github.com:example/team-context", "tag": "v2.0.0"})},
++		{name: "valid-overlay-git-ssh-uppercase", valid: true, instance: withOverlay(map[string]any{"source": "SSH://github.com/example/personal-context", "range": "^1.2"})},
++		{name: "valid-overlay-git-git-uppercase", valid: true, instance: withOverlay(map[string]any{"source": "GIT://github.com/example/team-context", "tag": "v2.0.0"})},
++		{name: "valid-overlay-git-http-uppercase", valid: true, instance: withOverlay(map[string]any{"source": "HTTP://github.com/example/extra-context", "range": "^2.0"})},
++		{name: "valid-overlay-git-https-uppercase", valid: true, instance: withOverlay(map[string]any{"source": "HTTPS://github.com/example/x", "revision": strings.Repeat("ab", 20)})},
+ 		{name: "invalid-schema-version-1", instance: schemaOne},
+ 		// closed-object rules
+ 		{name: "invalid-unknown-environments-field", instance: withKnob("overlay_weight", 1)},
+@@ -115,6 +129,22 @@ func managerConfigV2SchemaExamples(valid map[string]any) []schemaExample {
+ 		{name: "invalid-scoped-current-value", instance: withKnob("scoped_current", map[string]any{"pi": "-personal"})},
+ 		{name: "invalid-overlay-two-requirement-forms", instance: withOverlay(map[string]any{"source": "https://github.com/example/x", "range": "^1", "tag": "v1.0.0"})},
+ 		{name: "invalid-overlay-no-requirement-form", instance: withOverlay(map[string]any{"source": "https://github.com/example/x"})},
++		{name: "invalid-overlay-path-requirement-form", instance: withOverlay(map[string]any{"source": "/Users/operator/context", "revision": strings.Repeat("ab", 20)})},
++		{name: "invalid-overlay-path-windows-requirement-form", instance: withOverlay(map[string]any{"source": "C:\\Users\\operator\\context", "revision": strings.Repeat("ab", 20)})},
++		{name: "invalid-overlay-path-windows-slash-requirement-form", instance: withOverlay(map[string]any{"source": "C:/Users/operator/context", "range": "^1.2"})},
++		{name: "invalid-overlay-path-relative-requirement-form", instance: withOverlay(map[string]any{"source": "packages/team-context", "tag": "v2.0.0"})},
++		{name: "invalid-overlay-file-url-with-form", instance: withOverlay(map[string]any{"source": "file:///Users/operator/context", "revision": strings.Repeat("ab", 20)})},
++		{name: "invalid-overlay-git-scp-no-requirement-form", instance: withOverlay(map[string]any{"source": "git@github.com:example/team-context"})},
++		{name: "invalid-overlay-git-uppercase-no-requirement-form", instance: withOverlay(map[string]any{"source": "HTTPS://github.com/example/x"})},
++		{name: "invalid-overlay-unknown-scheme", instance: withOverlay(map[string]any{"source": "svn://github.com/example/x"})},
++		{name: "invalid-overlay-file-url", instance: withOverlay(map[string]any{"source": "file:///Users/operator/context"})},
++		{name: "invalid-overlay-scp-host-grammar", instance: withOverlay(map[string]any{"source": "git@my_host:example/x"})},
++		{name: "invalid-overlay-scp-backslash-path", instance: withOverlay(map[string]any{"source": "github.com:\\example\\x"})},
++		{name: "invalid-overlay-bare-drive-letter", instance: withOverlay(map[string]any{"source": "C:"})},
++		{name: "invalid-overlay-scp-host-grammar-no-user", instance: withOverlay(map[string]any{"source": "my_host:example/x"})},
++		{name: "invalid-overlay-scp-host-grammar-with-form", instance: withOverlay(map[string]any{"source": "git@my_host:example/x", "range": "^1.2"})},
++		{name: "invalid-overlay-path-directory", instance: withOverlay(map[string]any{"source": "/Users/operator/context", "directory": "packages/team"})},
++		{name: "invalid-overlay-unknown-scheme-with-form", instance: withOverlay(map[string]any{"source": "svn://github.com/example/x", "revision": strings.Repeat("ab", 20)})},
+ 		{name: "invalid-overlay-revision-grammar", instance: withOverlay(map[string]any{"source": "https://github.com/example/x", "revision": "HEAD"})},
+ 		{name: "invalid-overlay-range-grammar", instance: withOverlay(map[string]any{"source": "https://github.com/example/x", "range": "^1.0.0 (latest)"})},
+ 		{name: "invalid-overlay-tag-grammar", instance: withOverlay(map[string]any{"source": "https://github.com/example/x", "tag": "v1..0"})},
+@@ -203,6 +233,77 @@ func managerConfigV2Vectors() []any {
+ 		map[string]any{"name": "schema1-rejects-environments", "input": schemaOneWithEnvironments, "valid": false},
+ 		map[string]any{"name": "schema2-unknown-environments-field", "input": withEnvironments(map[string]any{"overlay_weight": 1}), "valid": false},
+ 		map[string]any{"name": "schema2-overlay-two-requirement-forms", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "https://github.com/example/x", "range": "^1", "tag": "v1.0.0"}}}}), "valid": false},
++		map[string]any{
++			"name": "schema2-overlay-path-source", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "/Users/operator/context"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "/Users/operator/context"}}}})},
++		},
++		map[string]any{"name": "schema2-overlay-path-requirement-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "/Users/operator/context", "revision": strings.Repeat("ab", 20)}}}}), "valid": false},
++		map[string]any{
++			"name": "schema2-overlay-path-windows-backslash", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C:\\Users\\operator\\context"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C:\\Users\\operator\\context"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-path-windows-slash", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C:/Users/operator/context"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C:/Users/operator/context"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-path-relative", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "packages/team-context"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "packages/team-context"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-path-colon-later-segment", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "packages/team:context"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "packages/team:context"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-path-windows-lowercase-drive", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "c:\\users\\operator\\context"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "c:\\users\\operator\\context"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-path-windows-double-slash", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C://Users/operator/context"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C://Users/operator/context"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-git-single-letter-host", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "c:example/team-context", "range": "^1.2"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "c:example/team-context", "range": "^1.2"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-git-scp", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "git@github.com:example/team-context", "range": "^1.2"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "git@github.com:example/team-context", "range": "^1.2"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-git-scp-no-user", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "github.com:example/team-context", "tag": "v2.0.0"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "github.com:example/team-context", "tag": "v2.0.0"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-git-ssh-uppercase", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "SSH://github.com/example/personal-context", "range": "^1.2"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "SSH://github.com/example/personal-context", "range": "^1.2"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-git-git-uppercase", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "GIT://github.com/example/team-context", "tag": "v2.0.0"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "GIT://github.com/example/team-context", "tag": "v2.0.0"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-git-http-uppercase", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "HTTP://github.com/example/extra-context", "range": "^2.0"}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "HTTP://github.com/example/extra-context", "range": "^2.0"}}}})},
++		},
++		map[string]any{
++			"name": "schema2-overlay-git-https-uppercase", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "HTTPS://github.com/example/x", "revision": strings.Repeat("ab", 20)}}}}), "valid": true,
++			"expected": map[string]any{"environments": expectedWith(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "HTTPS://github.com/example/x", "revision": strings.Repeat("ab", 20)}}}})},
++		},
++		map[string]any{"name": "schema2-overlay-file-url", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "file:///Users/operator/context"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-scp-backslash-path", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "github.com:\\example\\x"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-bare-drive-letter", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C:"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-scp-host-grammar", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "git@my_host:example/x"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-scp-host-grammar-with-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "git@my_host:example/x", "range": "^1.2"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-path-directory", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "/Users/operator/context", "directory": "packages/team"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-path-windows-requirement-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C:\\Users\\operator\\context", "revision": strings.Repeat("ab", 20)}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-path-windows-slash-requirement-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "C:/Users/operator/context", "range": "^1.2"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-path-relative-requirement-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "packages/team-context", "tag": "v2.0.0"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-file-url-with-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "file:///Users/operator/context", "revision": strings.Repeat("ab", 20)}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-git-scp-no-requirement-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "git@github.com:example/team-context"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-git-uppercase-no-requirement-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "HTTPS://github.com/example/x"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-unknown-scheme", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "svn://github.com/example/x"}}}}), "valid": false},
++		map[string]any{"name": "schema2-overlay-unknown-scheme-with-form", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "svn://github.com/example/x", "revision": strings.Repeat("ab", 20)}}}}), "valid": false},
+ 		map[string]any{"name": "schema2-overlay-range-grammar", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "https://github.com/example/x", "range": "^1.0.0 (latest)"}}}}), "valid": false},
+ 		map[string]any{"name": "schema2-overlay-tag-grammar", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "https://github.com/example/x", "tag": "v1..0"}}}}), "valid": false},
+ 		map[string]any{"name": "schema2-overlay-empty-source", "input": withEnvironments(map[string]any{"overlays": map[string]any{"companyA": []any{map[string]any{"source": "", "range": "^1"}}}}), "valid": false},

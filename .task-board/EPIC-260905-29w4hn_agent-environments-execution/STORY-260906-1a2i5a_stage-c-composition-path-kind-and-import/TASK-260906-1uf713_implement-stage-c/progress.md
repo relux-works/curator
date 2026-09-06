@@ -1,5 +1,5 @@
 ## Status
-development
+integrating
 
 ## Review
 required
@@ -172,6 +172,45 @@ spawn agent resolution: Agent selection: muse via explicit_override
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [implementer] developer (muse) (run=RUN-260906-fe879d, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260906-fe879d)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260906-fe879d, pid=18262, exit=0)
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260906-e116a0, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260906-e116a0)
+Review cycle 5 (RUN-260906-e116a0, head 71e6baec): CHANGES REQUESTED. repeat-of: cycle-1 M1 / cycle-2 C2-m2 (a doc comment claiming a production path the code does not have), cycle-4 C4-B1 (a command reporting success for work it did not do), cycle-4 C4-B2 (an unregistered skip reason).
+
+ALL FOUR CYCLE-4 FINDINGS FIXED AND VERIFIED. C4-B1: both halves of section 1 driven -- update/sync/use leave the pin at ff6c35c7, a same-name reinstall moves it to 43d9f269 and the re-materialized CLAUDE.md carries the edit, and the reinstall pin equals the fresh-install pin; the producer mutant (if false && isPath) is killed. C4-M1: all three refusals reachable from the CLI and mutants P2/P3/P4 all KILLED, including the section 8.4 one. C4-B2: skip-classes.tsv widened (not narrowed, no skip text changed), reproduced locally against platform-case-gate.sh classify(). C4-m1: profile use default under a lock exits 1 naming the knob and the DefaultProfile mutant is KILLED. C4-m2 documented.
+
+ALL ELEVEN HOSTED LANES GREEN on 71e6baec (run 34050303111), Windows included -- first fully green head of this stage. Candidate dispatch 34052590291 against curator-spec 87a0d00: all three Candidate suite jobs RED, only internal/config, only the 30 bd39adb/2f2dfa4 path-overlay-reconciliation subcases; reproduced locally (authority root 550579d exit 0, main exit 1).
+
+C5-M1 (major): profile install <same path> --as <same name> --use --takeover silently drops BOTH flags and exits 0 saying updated profile <name>. That is the exact retry the new section 9.5 stop invites: after install --use fails with environment_surface_unmanaged_conflict (or environment_foreign_manager_detected) the profile is already installed, so the retry lands in installLocked prior==source -> reinstallPathLocked, which never reads options.Use or policy.Takeover and returns before resyncCurrentScopes. No takeover, no backup, no activation, machine still has no current. Only profile use <name> --takeover recovers. reinstallPathLocked doc comment (envprofile.go:715-726) asserts a --use switch of a non-current profile takes the fresh-install path -- false.
+
+C5-m1: the C4-B1 regression test pins only the --as addressing mode; mutant isPath && options.As != "" restores C4-B1 for the CLI default form, driven end to end, suite green. C5-m2: two stage-c skip reasons (chmod refused, import_test.go:781 and pathkind_test.go:358) still unregistered while their two siblings carry the classifying prefix -- latent, cannot redden a lane today. C5-m3: the AC clause against curator-spec main with CI_REQUIRE_FULL_ROOT=1 is unmet at 87a0d00, met at authority 550579d; the M1 path-overlay bound is half stale (spec contradiction gone, implementation gap remains) and needs retiring/reissuing -- orchestrator call. C5-m4: reinstallPathLocked copied blocking-audit gate has no test (mutant survives); exploitability reported UNKNOWN because strictAuditMember still stands.
+
+Observations: --directory on a path operand is unpinned and its mutant admits it at exit 0 (stage (a) code, out of delta); purgeHomes (switch.go:706, on origin/main) is a fourth section 8.4 site with no pin; SetCurrent and CURATOR_SYSTEM_CONFIG carried from cycle 4. CR revision 5 repository_delta is another element WORK: candidate tree 2e6ca472 is the five curator-spec commits 550579d..87a0d00 (TASK-260906-3x0w4y), not this leaf -- not accepted, flagged for the orchestrator.
+
+Artifacts: TASK-260906-1uf713_review-findings-stage-c-5.md, TASK-260906-1uf713_review-probes-stage-c-5.tgz. No -race suite and no test-gate.sh lane ran during this review.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260906-e116a0, pid=28753, exit=0)
+spawn autonomous recovery: run RUN-260906-e116a0 queued successor RUN-260906-3405f9 (attempt 1/3, model=claude-opus-5): reviewer run RUN-260906-e116a0 remains unsatisfied: reviewer run has no verdict branch while TASK-260906-1uf713 is development
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260906-3405f9)
+agent completed: [reviewer] reviewer (claude) (exit=143)
+spawn run RUN-260906-3405f9 cancelled by operator; operator action required; reason: no operator reason supplied
+spawn run completed: claude (run=RUN-260906-3405f9, pid=44778, exit=143)
+spawn agent resolution: Agent selection: muse via explicit_override
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260906-ebf9c4, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260906-ebf9c4)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260906-ebf9c4, pid=48574, exit=0)
+spawn agent resolution: Agent selection: claude via explicit_override
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (claude) (run=RUN-260906-a1742f, max_parallel=20)
+spawn run started: [reviewer] reviewer (claude) (run=RUN-260906-a1742f)
+Cycle 6 review (RUN-260906-a1742f): ACCEPT on CR revision 6. Two minors, no blocking, no major. C6-m1 (repeat-of C5-M1): profile install <git-url> --use --takeover after the 9.5 stop is a silent no-op reporting success -- driven, but reproduced identically on origin/main db444157, so a pre-existing trunk defect; the rework-5 brief scoped the fix to path roots and the flag works on a git first install. The leaf owes one corrected clause in its bound ("undrivable hermetically here" is false; it drives in ~30 lines with the repo insteadOf fixture) plus a trunk follow-up. C6-m2 (repeat-of C5-m1): reinstallActivation first-install clause unpinned, mutant survives, production correct and driven. 20 mutants applied by the reviewer, 17 killed; all three cycle-5 survivors now dead; 12.2 pin dies both ways. All 11 hosted lanes green on 8b8aa041; candidate dispatch 34058365116 against the task authority 550579d green on all three runners with deferred=0 (Windows after re-running a job that had died on The hosted runner lost communication with the server, no test result). Candidate vs curator-spec main stays red on the 30 path-overlay subcases -- the filed TASK-260906-19gjyw gap. Stage (c) is safe to land.
+agent completed: [reviewer] reviewer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260906-a1742f, pid=71638, exit=0)
 
 ## Precondition Resources
 - [producer-brief-stage-c.md](file://TASK-260906-1uf713/producer-brief-stage-c.md) — Producer brief: stage (c) composition, path kind, onboarding import, config schema 2
@@ -184,6 +223,9 @@ spawn run started: [implementer] developer (muse) (run=RUN-260906-fe879d)
 - [producer-brief-stage-c-rework-3.md](file://TASK-260906-1uf713/producer-brief-stage-c-rework-3.md) — Stage (c) rework 3: path-update immutability, the second seam bypass, the transcribed lockable pin
 - [review-brief-stage-c-4.md](file://TASK-260906-1uf713/review-brief-stage-c-4.md) — Review brief cycle 4: rework 3 and the landing decision
 - [producer-brief-stage-c-rework-4.md](file://TASK-260906-1uf713/producer-brief-stage-c-rework-4.md) — Stage (c) rework 4: the dead reinstall, the red Windows lane, three undriven refusals
+- [review-brief-stage-c-5.md](file://TASK-260906-1uf713/review-brief-stage-c-5.md) — Review brief cycle 5: rework 4, the candidate lane, and the landing decision
+- [producer-brief-stage-c-rework-5.md](file://TASK-260906-1uf713/producer-brief-stage-c-rework-5.md) — Stage (c) rework 5: the silent reinstall retry, the reissued bound, three coverage minors
+- [review-brief-stage-c-6.md](file://TASK-260906-1uf713/review-brief-stage-c-6.md) — Review brief cycle 6: rework 5, the authority candidate lane, and the landing decision
 
 ## Outcome Resources
 - [TASK-260906-1uf713_spawn-log_-implementer--developer--muse-_RUN-260906-99c774.log](file://TASK-260906-1uf713/TASK-260906-1uf713_spawn-log_-implementer--developer--muse-_RUN-260906-99c774.log) — System spawn log captured by task-board
@@ -217,12 +259,25 @@ spawn run started: [implementer] developer (muse) (run=RUN-260906-fe879d)
 - [TASK-260906-1uf713_review-probes-stage-c-4.tgz](file://TASK-260906-1uf713/TASK-260906-1uf713_review-probes-stage-c-4.tgz) — Cycle-4 reproducers: probes-c4.sh driving C4-B1 and the cycle-3 fixes through the production CLI, its observed output at 4a8a1d42, the full mutant table with exact edits and kill/survive results, and the Windows lane evidence for C4-B2
 - [TASK-260906-1uf713_spawn-log_-reviewer--reviewer--claude-_RUN-260906-fe38bd.log](file://TASK-260906-1uf713/TASK-260906-1uf713_spawn-log_-reviewer--reviewer--claude-_RUN-260906-fe38bd.log) — System spawn log captured by task-board
 - [TASK-260906-1uf713_spawn-log_-implementer--developer--muse-_RUN-260906-fe879d.log](file://TASK-260906-1uf713/TASK-260906-1uf713_spawn-log_-implementer--developer--muse-_RUN-260906-fe879d.log) — System spawn log captured by task-board
+- [TASK-260906-1uf713_rework-report-4.md](file://TASK-260906-1uf713/TASK-260906-1uf713_rework-report-4.md) — Stage (c) rework 4: the dead reinstall, the red Windows lane, three undriven refusals
+- [TASK-260906-1uf713_change-request_rev5.patch](file://TASK-260906-1uf713/TASK-260906-1uf713_change-request_rev5.patch) — Change Request CR-TASK-260906-1uf713-5 revision 5 candidate patch (repository_delta=present, 69 changed paths)
+- [TASK-260906-1uf713_spawn-log_-reviewer--reviewer--claude-_RUN-260906-e116a0.log](file://TASK-260906-1uf713/TASK-260906-1uf713_spawn-log_-reviewer--reviewer--claude-_RUN-260906-e116a0.log) — System spawn log captured by task-board
+- [TASK-260906-1uf713_review-findings-stage-c-5.md](file://TASK-260906-1uf713/TASK-260906-1uf713_review-findings-stage-c-5.md) — Review cycle 5 (rework 4) findings: CHANGES REQUESTED, 1 major + 4 minor; repeat-of cycle-1 M1 / cycle-2 C2-m2 / cycle-4 C4-B1 and C4-B2; all 11 PR lanes green on 71e6baec, all 3 candidate-suite jobs red on curator-spec main
+- [TASK-260906-1uf713_review-probes-stage-c-5.tgz](file://TASK-260906-1uf713/TASK-260906-1uf713_review-probes-stage-c-5.tgz) — Cycle-5 reproducer: CLI probe scripts (C5-M1 stop-and-retry, C4-B1 both halves, C4-M1 refusals, env config/isolation/schema locks), 9 mutators with a run-mut harness, and a local reimplementation of platform-case-gate.sh's skip classifier
+- [TASK-260906-1uf713_spawn-log_-reviewer--reviewer--claude-_RUN-260906-3405f9.log](file://TASK-260906-1uf713/TASK-260906-1uf713_spawn-log_-reviewer--reviewer--claude-_RUN-260906-3405f9.log) — System spawn log captured by task-board
+- [TASK-260906-1uf713_spawn-log_-implementer--developer--muse-_RUN-260906-ebf9c4.log](file://TASK-260906-1uf713/TASK-260906-1uf713_spawn-log_-implementer--developer--muse-_RUN-260906-ebf9c4.log) — System spawn log captured by task-board
+- [TASK-260906-1uf713_rework-report-5.md](file://TASK-260906-1uf713/TASK-260906-1uf713_rework-report-5.md) — Stage (c) rework 5: silent reinstall retry fixed, bound reissued, three coverage minors
+- [TASK-260906-1uf713_change-request_rev6.patch](file://TASK-260906-1uf713/TASK-260906-1uf713_change-request_rev6.patch) — Change Request CR-TASK-260906-1uf713-6 revision 6 candidate patch (repository_delta=empty, 0 changed paths)
+- [TASK-260906-1uf713_spawn-log_-reviewer--reviewer--claude-_RUN-260906-a1742f.log](file://TASK-260906-1uf713/TASK-260906-1uf713_spawn-log_-reviewer--reviewer--claude-_RUN-260906-a1742f.log) — System spawn log captured by task-board
+- [TASK-260906-1uf713_review-findings-stage-c-6.md](file://TASK-260906-1uf713/TASK-260906-1uf713_review-findings-stage-c-6.md) — Review cycle 6 findings (rework 5): ACCEPT with two minors; 20 mutants applied, 17 killed; 11/11 hosted lanes green on 8b8aa041 and the candidate lane green on all three runners against curator-spec 550579d
+- [TASK-260906-1uf713_review-probes-stage-c-6.tgz](file://TASK-260906-1uf713/TASK-260906-1uf713_review-probes-stage-c-6.tgz) — Cycle 6 probes: 20 mutants, CLI probes for the git retry, path refusals, B2 write path, import, precedence bytes, read-only rule, POSIX sweep, skip classifier
+- [TASK-260906-1uf713_review-verdict-rev6.md](file://TASK-260906-1uf713/TASK-260906-1uf713_review-verdict-rev6.md) — Cycle 6 ACCEPT verdict for CR revision 6: empty delta justified, two minors, all hosted lanes and all three candidate runners green
 
 ## Created
 2026-09-06T09:25:02Z
 
 ## Last Update
-2026-09-06T17:00:06Z
+2026-09-06T22:06:59Z
 
 ## Assigned To
-[implementer] developer (muse)
+[reviewer] reviewer (claude)
