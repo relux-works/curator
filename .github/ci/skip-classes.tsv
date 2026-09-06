@@ -33,6 +33,9 @@
 #   root-unset        the package ran with CURATOR_CONFORMANCE_ROOT unset.
 #   opt-in            an explicit developer environment variable or a probe
 #                     that hashes the host toolchain.
+#   stage-deferred    the skipped surface belongs to a later delivery stage
+#                     and is asserted by that stage's suite, never as a pass
+#                     here.
 #   helper-process    the `go test` helper-process re-exec pattern.
 #
 # Columns are TAB separated. `regex` is an extended regular expression matched
@@ -98,6 +101,9 @@ opt-in	set CURATOR_[A-Z_]+=1	allow	enabled by an explicit developer environment 
 opt-in	set CURATOR_TEST_YARN_MODERN_JS to the @yarnpkg/cli-dist 4[.]9[.]2 bin/yarn[.]js integration tool	allow	enabled by an explicit path to the exact modern Yarn integration entry point
 opt-in	cross-check env not set	allow	enabled by an explicit developer environment variable
 opt-in	hashes the whole host GOROOT	allow	a whole-GOROOT probe, not part of the gate
+
+# --- deferred delivery stages -------------------------------------------------
+stage-deferred	deferred to stage \(b\)	allow	the surface belongs to a later delivery stage and is asserted there, never as a pass here
 
 # --- go test plumbing -------------------------------------------------------
 helper-process	helper process	allow	the go test helper-process re-exec pattern

@@ -142,7 +142,7 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 	for _, tc := range vector.MaterializationCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			if tc.Surface == "mcp" || tc.Form == contextmaterialize.FormReferenced {
-				t.Skipf("surface %s form %s deferred to stage (b); set CURATOR_STAGE_B=1 when it lands", tc.Surface, tc.Form)
+				t.Skipf("surface %s form %s deferred to stage (b): the referenced form and MCP channel files land in stage (b)", tc.Surface, tc.Form)
 			}
 			lock := vectorLockToLock(t, tc.Lock)
 			hash, err := lock.Hash()
