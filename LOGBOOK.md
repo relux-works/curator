@@ -4466,3 +4466,36 @@ no producer route out. Every spec batch this epic has landed went through the
 orchestrator's own branch → PR → comment-review → fast-forward flow, and that is
 the flow, not a fallback. `repository_delta` cannot be read as evidence that a
 producer did or did not do anything.
+
+## 2026-09-06 — five cycles on one schema fragment, and every finding invisible to a green suite
+
+The `path` overlay §6 promises could not be declared: §1 makes a requirement form on a
+`path` declaration invalid, while §12.1 and `manager-config-v2` demanded a form on every
+overlay, and the published cases gave a path-shaped source a `revision`. Reading the spec
+never surfaced it. Stage (c)'s implementation review did, by driving all three production
+surfaces in curator and finding each refused the declaration for a different reason — and
+noting that the only passing test built a state the config reader cannot produce.
+
+The fix is one conditional, and it took five review cycles to get right. Cycle 1: the
+discriminator classified a Windows absolute path as `git`, so `C:\Users\…` was undeclarable
+while the same path with a `revision` was accepted — failing in both directions on a
+platform CI runs a lane for. Cycle 2: the repair for the unknown-scheme gap opened three
+more, including a `file:` URL admitted as a form-free path *and pinned there by a published
+positive case*, and `git@my_host:x` silently accepted as local, against core §6.1's "invalid
+network forms MUST be rejected, not treated as local". Cycle 3: a 5.4 MB compiled binary
+tracked at the repository root, which nine green lanes had not noticed. Cycle 4: the
+repository's own changelog still telling implementers `file:` was accepted, after the schema
+and the pull request had both been corrected. Cycle 5: a lowercase drive letter unpinned —
+all three Windows positives spelled the drive `C`, so narrowing the carve-out to uppercase
+landed green and re-created cycle 1's defect.
+
+The through-line is one sentence: **a green suite is not evidence.** Cycle 1's real finding
+was not the Windows path, it was that the corpus published four `source` spellings, so no
+case could fail a wrong pattern — the reviewer's own alternative pattern was equally green.
+Everything after that was consequence. The corpus is forty-one overlay cases now, and each
+one exists because a mutant survived without it.
+
+Two of the five were mine, and both had the same cause: running the gates and then staging
+with `git add -A`, which sweeps up what the gate run just produced. It put `tools/__pycache__`
+on main once and a compiled `generate-vectors` into a reviewed commit once. No lane inspects
+the tracked file set, which is why nine checks passed with 5.4 MB of Mach-O in the tree.
