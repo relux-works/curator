@@ -272,6 +272,71 @@ func TestResolveDriftRepair(t *testing.T) {
 	if _, err := Resolve(fx.request("codex_cli")); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
 		t.Fatalf("a replaced link must be stale, got %v", err)
 	}
+	// A write through an intact link into a manager-authored rendered
+	// document is the same §8.4 class ("a target whose bytes fail the
+	// recorded hash"): the link is unchanged, the bytes are not. Cover
+	// every adapter and every rendered surface in both supported forms;
+	// links into the immutable store (skills trees, referenced module
+	// files) keep the link-identity fast path and are excluded here.
+	for _, tc := range []struct {
+		env  string
+		form string
+	}{
+		{"claude_code", ""},
+		{"claude_code", "referenced"},
+		{"codex_cli", ""},
+		{"opencode", ""},
+		{"opencode", "referenced"},
+		{"pi", ""},
+	} {
+		probe := writeManagedFixture(t, "acme")
+		provision := probe.request(tc.env)
+		if tc.form != "" {
+			provision.Machine.Forms = map[string]string{tc.env: tc.form}
+		}
+		provision.Repair = true
+		if _, err := Resolve(provision); err != nil {
+			t.Fatalf("%s %s provision: %v", tc.env, tc.form, err)
+		}
+		marker := readManagedMarker(t, probe, tc.env)
+		homeDir := ManagedHomeDir(probe.home, "acme", tc.env)
+		for _, surface := range marker.Surfaces {
+			for _, rel := range surface.Paths {
+				full := filepath.Join(homeDir, filepath.FromSlash(rel))
+				info, err := os.Lstat(full)
+				if err != nil || info.Mode()&os.ModeSymlink == 0 {
+					continue
+				}
+				target, err := os.Readlink(full)
+				if err != nil || !strings.Contains(filepath.ToSlash(target), "/rendered/") {
+					continue
+				}
+				// Write through the intact link: the link bytes are
+				// unchanged, the target bytes drift.
+				if err := os.WriteFile(full, []byte("tampered through intact link\n"), 0o644); err != nil {
+					t.Fatalf("%s %s %s write through link: %v", tc.env, tc.form, rel, err)
+				}
+				check := probe.request(tc.env)
+				if tc.form != "" {
+					check.Machine.Forms = map[string]string{tc.env: tc.form}
+				}
+				if _, err := Resolve(check); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
+					t.Fatalf("%s %s %s byte drift through an intact link must be stale, got %v", tc.env, tc.form, rel, err)
+				}
+				repair := probe.request(tc.env)
+				if tc.form != "" {
+					repair.Machine.Forms = map[string]string{tc.env: tc.form}
+				}
+				repair.Repair = true
+				if _, err := Resolve(repair); err != nil {
+					t.Fatalf("%s %s %s repair restores: %v", tc.env, tc.form, rel, err)
+				}
+				if _, err := Resolve(check); err != nil {
+					t.Fatalf("%s %s %s repaired home is current: %v", tc.env, tc.form, rel, err)
+				}
+			}
+		}
+	}
 }
 
 // TestResolvePassthroughLiveness severs a file-link passthrough entry and
@@ -302,6 +367,50 @@ func TestResolvePassthroughLiveness(t *testing.T) {
 	}
 	if target, err := os.Readlink(link); err != nil || target != filepath.Join(fx.native["codex_cli"], "auth.json") {
 		t.Fatalf("repair left %q (%v)", target, err)
+	}
+}
+
+// TestClaudeRootAlwaysCopied narrows the §8.1 gate: the claude_code
+// root-context surface is a copied regular file whatever the form. A
+// mutant that links CLAUDE.md under the referenced form must fail this
+// test.
+func TestClaudeRootAlwaysCopied(t *testing.T) {
+	for _, form := range []string{"", "referenced"} {
+		label := form
+		if label == "" {
+			label = "monolithic"
+		}
+		fx := writeManagedFixture(t, "acme")
+		req := fx.request("claude_code")
+		if form != "" {
+			req.Machine.Forms = map[string]string{"claude_code": form}
+		}
+		req.Repair = true
+		if _, err := Resolve(req); err != nil {
+			t.Fatalf("%s provision: %v", label, err)
+		}
+		homeDir := ManagedHomeDir(fx.home, "acme", "claude_code")
+		info, err := os.Lstat(filepath.Join(homeDir, "CLAUDE.md"))
+		if err != nil {
+			t.Fatalf("%s CLAUDE.md missing: %v", label, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			t.Fatalf("%s CLAUDE.md is a symlink, want a copied regular file", label)
+		}
+		marker := readManagedMarker(t, fx, "claude_code")
+		surface := marker.Surfaces["root-context"]
+		if surface.Copies == nil {
+			t.Fatalf("%s root-context records no copies", label)
+		}
+		found := false
+		for _, copy := range *surface.Copies {
+			if copy.Path == "CLAUDE.md" && copy.Reason == envmarker.ReasonClaudeCodeRootContext {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%s root-context records no claude-code-root-context copy for CLAUDE.md: %+v", label, surface.Copies)
+		}
 	}
 }
 
@@ -342,6 +451,42 @@ func TestResolveClaudeProjectEntry(t *testing.T) {
 	entries, err := claudeProjects(ManagedHomeDir(fx.home, "acme", "claude_code"))
 	if err != nil || !entries[other.LaunchDir] {
 		t.Fatal("the repaired entry is missing")
+	}
+	// The tool owns .claude.json after provisioning (§7.4): dropping only
+	// the approval key while keeping the project entry must still go
+	// stale, otherwise every @-include is silently discarded (§5.3).
+	homeDir := ManagedHomeDir(fx.home, "acme", "claude_code")
+	payload, err := os.ReadFile(filepath.Join(homeDir, ".claude.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var object map[string]any
+	if err := json.Unmarshal(payload, &object); err != nil {
+		t.Fatal(err)
+	}
+	projects, ok := object["projects"].(map[string]any)
+	if !ok {
+		t.Fatal("managed .claude.json carries no projects")
+	}
+	entry, ok := projects[fx.launch].(map[string]any)
+	if !ok {
+		t.Fatal("the launch directory entry is missing")
+	}
+	delete(entry, "hasClaudeMdExternalIncludesApproved")
+	projects[fx.launch] = entry
+	object["projects"] = projects
+	rewritten, err := json.Marshal(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewritten = append(rewritten, '\n')
+	if err := os.WriteFile(filepath.Join(homeDir, ".claude.json"), rewritten, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dropped := fx.request("claude_code")
+	dropped.Machine.Forms = map[string]string{"claude_code": "referenced"}
+	if _, err := Resolve(dropped); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
+		t.Fatalf("a referenced home whose approval key the tool dropped must be stale, got %v", err)
 	}
 }
 
@@ -389,6 +534,42 @@ func TestCodexKeyringAmbient(t *testing.T) {
 				t.Fatalf("the home is current: %v", err)
 			}
 		})
+	}
+}
+
+// TestCodexUnreadableConfigFails proves an unreadable native config.toml
+// is never treated as the file credential store (§8.4): provisioning
+// fails instead of linking, and an existing home goes stale. A directory
+// at the config path fails the read deterministically, even as root.
+func TestCodexUnreadableConfigFails(t *testing.T) {
+	fx := writeManagedFixture(t, "acme")
+	if err := os.Mkdir(filepath.Join(fx.native["codex_cli"], "config.toml"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	req := fx.request("codex_cli")
+	req.Repair = true
+	if _, err := Resolve(req); err == nil {
+		t.Fatal("an unreadable native config.toml must fail provisioning, not default to file")
+	}
+	if _, err := os.Stat(ManagedHomeDir(fx.home, "acme", "codex_cli")); !os.IsNotExist(err) {
+		t.Fatal("a failed provisioning must not leave a managed home behind")
+	}
+	// An existing home whose native config becomes unreadable goes stale
+	// through the same gate.
+	fy := writeManagedFixture(t, "acme")
+	provision := fy.request("codex_cli")
+	provision.Repair = true
+	if _, err := Resolve(provision); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(fy.native["codex_cli"], "config.toml")); err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(fy.native["codex_cli"], "config.toml"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Resolve(fy.request("codex_cli")); err == nil || !strings.Contains(err.Error(), DiagHomeStale) {
+		t.Fatalf("an unreadable native config must be stale, got %v", err)
 	}
 }
 

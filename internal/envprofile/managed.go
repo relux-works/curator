@@ -490,8 +490,8 @@ func (p *homePlan) publishDocs() error {
 // (§7.4). isolated homes link nothing; keyring-backed codex homes are
 // ambient and link nothing; every file-shaped strategy is watched by the
 // liveness row. The native config.toml read is read-only: an absent file
-// means the default file store, and an unreadable one is treated as file
-// with no warning — the liveness row still watches the link.
+// means the default file store, while an unreadable one fails instead of
+// defaulting — absence and a failed read are different facts (§8.4).
 func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, isolation string) (map[string]string, map[string]string, error) {
 	links := map[string]string{}
 	strategies := map[string]string{}
@@ -507,7 +507,11 @@ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, iso
 		case envregistry.StrategyPerHomeKeychain, envregistry.StrategyAmbient:
 			continue
 		case envregistry.StrategyKeyringPreferred:
-			if codexKeyring(native) {
+			keyring, err := codexKeyring(native)
+			if err != nil {
+				return nil, nil, err
+			}
+			if keyring {
 				continue
 			}
 			links[entry.Path] = filepath.Join(native, entry.FileLinkTarget)
@@ -522,14 +526,18 @@ func (req *ResolveRequest) effectivePassthrough(adapter envregistry.Adapter, iso
 
 // codexKeyring reports whether the operator's native config.toml selects
 // the keyring credential store, in which case the credential is ambient
-// and no entry is linked (§7.4).
-func codexKeyring(native string) bool {
+// and no entry is linked (§7.4). An absent file means the default file
+// store; an unreadable file is an error, never absence.
+func codexKeyring(native string) (bool, error) {
 	payload, err := os.ReadFile(filepath.Join(native, "config.toml")) // #nosec G304 -- native home resolved from the registry
 	if err != nil {
-		return false
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("codex native config.toml is unreadable: %v", err)
 	}
 	matches := keyringSetting.FindSubmatch(payload)
-	return len(matches) == 2 && string(matches[1]) == "keyring"
+	return len(matches) == 2 && string(matches[1]) == "keyring", nil
 }
 
 var keyringSetting = regexp.MustCompile(`(?m)^\s*cli_auth_credentials_store\s*=\s*"([^"]*)"`)
@@ -680,8 +688,11 @@ func protocoljsonMarshal(object map[string]any) ([]byte, error) {
 }
 
 // claudeProjects reads the managed .claude.json project entries for
-// verification. A missing file means no entry; an unreadable or invalid
-// file is reported, never treated as absence (§8.4).
+// verification. It reports the external-includes approval flag per
+// launch directory (§5.3): true only when the entry carries
+// hasClaudeMdExternalIncludesApproved. A missing file means no entry;
+// an unreadable or invalid file is reported, never treated as absence
+// (§8.4).
 func claudeProjects(homeDir string) (map[string]bool, error) {
 	payload, err := os.ReadFile(filepath.Join(homeDir, ".claude.json")) // #nosec G304 -- managed .claude.json below the resolved home
 	if err != nil {
@@ -696,8 +707,12 @@ func claudeProjects(homeDir string) (map[string]bool, error) {
 	}
 	entries := map[string]bool{}
 	if projects, ok := parsed["projects"].(map[string]any); ok {
-		for name := range projects {
-			entries[name] = true
+		for name, entry := range projects {
+			approved := false
+			if object, ok := entry.(map[string]any); ok {
+				approved, _ = object["hasClaudeMdExternalIncludesApproved"].(bool)
+			}
+			entries[name] = approved
 		}
 	}
 	return entries, nil
@@ -1103,7 +1118,6 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
 
 // checkSurfaces covers exactly the recorded surfaces.
 func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker *envmarker.Marker) {
-	_ = req
 	want := plan.marker.Surfaces
 	for key, recorded := range marker.Surfaces {
 		expected, ok := want[key]
@@ -1150,6 +1164,41 @@ func (v *verification) checkSurfaces(req *ResolveRequest, plan *homePlan, marker
 				got, err := os.Readlink(full)
 				if err != nil || got != target {
 					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: link target changed", path))
+					v.mark(key, DiagSurfaceDrift)
+					continue
+				}
+				// A link into the immutable profile store is verified by
+				// target identity alone (the store entry's integrity is
+				// the store's own invariant, §10.1). Every other link
+				// targets a manager-authored rendered document published
+				// through p.docs, so its bytes must still match the
+				// recorded hash (§8.4): a write through the intact link
+				// is drift even though the link is unchanged.
+				if sameStoreTree(target, contextstore.Root(req.Home)) {
+					continue
+				}
+				expected, ok := plan.fileHashes[path]
+				if !ok {
+					expected, ok = plan.docs[target]
+				}
+				if !ok {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: no recorded bytes for link target", path))
+					v.mark(key, DiagSurfaceDrift)
+					continue
+				}
+				payload, err := os.ReadFile(target) // #nosec G304 -- link target recomputed from the verified plan
+				if err != nil {
+					if os.IsNotExist(err) {
+						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is missing", path))
+						v.mark(key, DiagSurfaceMissing)
+					} else {
+						v.reasons = append(v.reasons, fmt.Sprintf("surface file %s link target is unreadable: %v", path, err))
+						v.mark(key, DiagSurfaceUnreadable)
+					}
+					continue
+				}
+				if contextmaterialize.FileHash(payload) != contextmaterialize.FileHash(expected) {
+					v.reasons = append(v.reasons, fmt.Sprintf("surface file %s is drifted: link target bytes differ", path))
 					v.mark(key, DiagSurfaceDrift)
 				}
 				continue
@@ -1299,7 +1348,7 @@ func (v *verification) checkClaudeProject(req *ResolveRequest, plan *homePlan) {
 		return
 	}
 	if plan.form == envregistry.FormReferenced && !entries[req.LaunchDir] {
-		v.reasons = append(v.reasons, fmt.Sprintf("launch directory %s has no project entry", req.LaunchDir))
+		v.reasons = append(v.reasons, fmt.Sprintf("launch directory %s has no external-includes approval", req.LaunchDir))
 	}
 }
 
