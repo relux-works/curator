@@ -430,10 +430,19 @@ func TestRunNoArgsPrintsUsage(t *testing.T) {
 }
 
 func TestRunUnknownCommand(t *testing.T) {
-	t.Parallel()
+	// Stage (b) umbrella discovery (environments §11) owns identifier-like
+	// unknown names: with no provider on PATH the refusal names the
+	// executable and the installation guidance. The unknown-command usage
+	// error remains for names outside the identifier grammar, which
+	// discovery never looks up.
+	t.Setenv("PATH", t.TempDir())
 	code, _, stderr := capture(t, filepath.Join(t.TempDir(), "config.json"), "frobnicate")
-	if code != 2 || !strings.Contains(stderr, `curator: unknown command "frobnicate"`) {
-		t.Fatalf("run(frobnicate) = %d, want 2", code)
+	if code != 1 || !strings.Contains(stderr, "subcommand_provider_missing") || !strings.Contains(stderr, "curator-frobnicate") {
+		t.Fatalf("run(frobnicate) = %d, want 1 with the provider refusal\nstderr:\n%s", code, stderr)
+	}
+	code, _, stderr = capture(t, filepath.Join(t.TempDir(), "config.json"), "not a command!")
+	if code != 2 || !strings.Contains(stderr, `curator: unknown command "not a command!"`) {
+		t.Fatalf("run(not a command!) = %d, want 2\nstderr:\n%s", code, stderr)
 	}
 }
 

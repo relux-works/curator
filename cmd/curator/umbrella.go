@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/globalbins"
 )
 
@@ -79,8 +78,8 @@ func underDir(path, root string) bool {
 
 // cmdUmbrella executes the resolved provider with the remaining arguments
 // verbatim and propagates its exit code.
-func (c cli) cmdUmbrella(cfg *config.Config, args []string) int {
-	path, err := findProvider(cfg.Home(), args[0])
+func (c cli) cmdUmbrella(home string, args []string) int {
+	path, err := findProvider(home, args[0])
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail

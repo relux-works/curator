@@ -198,13 +198,15 @@ func (c cli) run(args []string) int {
 	// Umbrella subcommand discovery (environments §11): an implemented
 	// subcommand always wins and discovery runs only for unknown names.
 	// The name must match the identifier grammar; anything else is a
-	// usage error, not a lookup.
+	// usage error, not a lookup. Discovery works without a loadable
+	// config: the trust check then assumes the source path's home, which
+	// is the root a future config there would own.
 	if identifiers.Valid(args[0]) {
-		cfg, code := c.loadConfig()
-		if code != exitOK {
-			return code
+		home := filepath.Dir(c.config.Path())
+		if cfg, code := c.loadConfig(); code == exitOK {
+			home = cfg.Home()
 		}
-		return c.cmdUmbrella(cfg, args)
+		return c.cmdUmbrella(home, args)
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown command %q\n\n%s", args[0], usage)
 	return exitUsage
