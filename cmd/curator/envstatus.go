@@ -10,6 +10,15 @@ import (
 // printEnvStatus renders the profile × environment × surface matrix as
 // human-readable rows. Machine-readable consumers use --json.
 func printEnvStatus(stdout io.Writer, status *envprofile.Status) {
+	// §12.2: env status reports the locked require_current_profile
+	// requirement.
+	if status.RequireCurrentProfile != nil {
+		locked := "unlocked"
+		if status.RequireCurrentLocked {
+			locked = "locked"
+		}
+		_, _ = fmt.Fprintf(stdout, "require_current_profile: %s (%s)\n", *status.RequireCurrentProfile, locked)
+	}
 	for _, home := range status.Homes {
 		state := "current"
 		if !home.Current {

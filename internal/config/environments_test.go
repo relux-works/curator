@@ -362,6 +362,51 @@ func TestRequireCurrentProfileUnlockedCarriesNoRefusal(t *testing.T) {
 	}
 }
 
+// TestSystemV2LockableSubsetIsClassWide proves the system-file allowed-knob
+// gate is class-wide, not per-knob-name: every §12.2 lockable key is
+// carriable by the system file, and every representative non-lockable key
+// is refused. A narrowing mutant that admits exactly one non-lockable knob
+// (for example environments.forms) must fail this test.
+func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
+	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
+	lockable := []struct {
+		name   string
+		system string
+	}{
+		{"overlays_allowed", `{"schema_version": 2, "locked": [], "environments": {"overlays_allowed": false}}`},
+		{"precedence", `{"schema_version": 2, "locked": [], "environments": {"precedence": {"winner": "lower-weight"}}}`},
+		{"mcp_package_allowlist", `{"schema_version": 2, "locked": [], "environments": {"mcp_package_allowlist": []}}`},
+		{"passable_env_names", `{"schema_version": 2, "locked": [], "environments": {"passable_env_names": []}}`},
+		{"require_current_profile", `{"schema_version": 2, "locked": [], "environments": {"require_current_profile": "acme"}}`},
+		{"isolation", `{"schema_version": 2, "locked": [], "environments": {"isolation": {"a": {"pi": "shared"}}}}`},
+	}
+	for _, tc := range lockable {
+		t.Run("lockable/"+tc.name, func(t *testing.T) {
+			if _, _, err := loadWithSystem(t, user, tc.system); err != nil {
+				t.Fatalf("lockable knob %q refused: %v", tc.name, err)
+			}
+		})
+	}
+	nonLockable := []struct {
+		name   string
+		system string
+	}{
+		{"forms", `{"schema_version": 2, "locked": [], "environments": {"forms": {"claude_code": "monolithic"}}}`},
+		{"current_profile", `{"schema_version": 2, "locked": [], "environments": {"current_profile": "a"}}`},
+		{"overlays", `{"schema_version": 2, "locked": [], "environments": {"overlays": {}}}`},
+		{"overlay_default_weight", `{"schema_version": 2, "locked": [], "environments": {"overlay_default_weight": 5}}`},
+		{"backup_retention", `{"schema_version": 2, "locked": [], "environments": {"backup_retention": 1}}`},
+	}
+	for _, tc := range nonLockable {
+		t.Run("non-lockable/"+tc.name, func(t *testing.T) {
+			_, _, err := loadWithSystem(t, user, tc.system)
+			if err == nil || !strings.Contains(err.Error(), "not lockable") {
+				t.Fatalf("non-lockable knob %q admitted: err = %v", tc.name, err)
+			}
+		})
+	}
+}
+
 func TestEffectiveJSONShape(t *testing.T) {
 	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
 	payload, err := json.Marshal(cfg.EffectiveJSON())

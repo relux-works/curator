@@ -193,4 +193,37 @@ func TestUnreadablePathIsUnreadable(t *testing.T) {
 	if strings.Contains(err.Error(), DiagPathMissing) {
 		t.Fatalf("err = %v, a failed read must never report absence", err)
 	}
+	// §1.1 requires the specific diagnostic to lead (§8.4: unreadable
+	// evidence is reported as unreadable, never as something else). A
+	// wrapper that prefixes profile_source_invalid shadows it.
+	if !strings.HasPrefix(err.Error(), DiagPathUnreadable+":") {
+		t.Fatalf("err = %q, want the leading diagnostic %s", err, DiagPathUnreadable)
+	}
+	if strings.Contains(err.Error(), DiagSourceInvalid+": "+DiagPathUnreadable) {
+		t.Fatalf("err = %q carries the doubled wrapper prefix", err)
+	}
+}
+
+// TestUnreadablePathRootLeadsUnreadable drives Install with a path root
+// that itself cannot be read: the canonical §1.1 condition reports
+// profile_source_path_unreadable leading, never profile_source_invalid.
+func TestUnreadablePathRootLeadsUnreadable(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	source := filepath.Join(t.TempDir(), "source")
+	writeManifestPackage(t, source,
+		`{"schema_version": 1, "name": "acme", "version": "1.0.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "root\n"})
+	if err := os.Chmod(source, 0o000); err != nil {
+		t.Skipf("chmod refused: %v", err)
+	}
+	defer func() { _ = os.Chmod(source, 0o755) }()
+	if _, err := os.ReadDir(source); err == nil {
+		t.Skip("this environment can read a mode-000 directory; unreadability is untestable here")
+	}
+	_, _, _, err := Install(home, InstallOptions{Operand: source})
+	if err == nil || !strings.HasPrefix(err.Error(), DiagPathUnreadable+":") {
+		t.Fatalf("err = %v, want leading %s", err, DiagPathUnreadable)
+	}
 }

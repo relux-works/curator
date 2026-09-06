@@ -116,6 +116,13 @@ type Status struct {
 	Orphans                  []string       `json:"orphans"`
 	Notes                    []string       `json:"notes"`
 	NonCurrent               bool           `json:"non_current"`
+	// RequireCurrentProfile reports the locked require_current_profile
+	// requirement (environments §12.2): when the system file locks the
+	// key to a profile name, env status reports it. Nil means no
+	// requirement.
+	RequireCurrentProfile *string `json:"require_current_profile,omitempty"`
+	// RequireCurrentLocked reports whether the requirement is locked.
+	RequireCurrentLocked bool `json:"require_current_profile_locked,omitempty"`
 }
 
 // StatusRequest scopes one status computation. The seams mirror
@@ -152,6 +159,14 @@ func (req *StatusRequest) resolve() ResolveRequest {
 func StatusOf(req StatusRequest) (*Status, error) {
 	status := &Status{}
 	status.Notes = append(status.Notes, "opencode skills come from the machine-current profile, split-brain by construction (§7.1)")
+	// §12.2: env status reports the locked require_current_profile
+	// requirement. The policy already carries the effective knob and its
+	// locked bit from the loaded configuration.
+	if req.Policy.RequireCurrent != nil {
+		value := *req.Policy.RequireCurrent
+		status.RequireCurrentProfile = &value
+		status.RequireCurrentLocked = req.Policy.RequireCurrentLocked
+	}
 	infos, err := List(req.Home)
 	if err != nil {
 		return nil, err

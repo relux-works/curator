@@ -156,6 +156,14 @@ func (c cli) cmdComposeList(cfg *config.Config, profile string, args []string) i
 		_, _ = fmt.Fprintln(c.stderr, "curator: profile compose <profile> list takes no arguments")
 		return exitUsage
 	}
+	// A locked overlays_allowed:false empties every overlay list at
+	// resolution with the manager §1 warning, so a declaration the file
+	// still carries is inert. The list prints the file's contents verbatim
+	// (it edits the file, not the effective state) but says so, or the
+	// informative row would mislead.
+	if !cfg.Env.OverlaysAllowed && len(cfg.Env.Overlays[profile]) > 0 {
+		_, _ = fmt.Fprintln(c.stderr, "warning: overlays_allowed is false: the listed declarations are inert; resolution joins the root alone")
+	}
 	decls := cfg.Env.Overlays[profile]
 	names := make([]string, 0, len(decls))
 	byKey := map[string]config.OverlayDeclaration{}
