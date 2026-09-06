@@ -778,7 +778,7 @@ func TestImportUnreadableMarkerIsLoss(t *testing.T) {
 	installIdleProfile(t, home, "acme")
 	marker := filepath.Join(homes["claude_code"], envmarker.Name)
 	if err := os.Chmod(marker, 0o000); err != nil {
-		t.Skipf("chmod refused: %v", err)
+		t.Skipf("this environment can read a mode-000 file: chmod refused: %v", err)
 	}
 	defer func() { _ = os.Chmod(marker, 0o644) }()
 	if _, err := os.ReadFile(marker); err == nil {
