@@ -548,26 +548,32 @@ type seedBundle struct {
 // gatherSeeds reads every seed upfront so that an unreadable seed stops
 // provisioning before the first write. A seed absent in the native home
 // is simply not seeded; absence and unreadability stay different facts
-// (§8.4).
-func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter) (*seedBundle, error) {
+// (§8.4). Copy seeds are gathered at provisioning only: repair never
+// refreshes them, so an unreadable native copy must not fail a repair
+// that would never read it.
+func (req *ResolveRequest) gatherSeeds(adapter envregistry.Adapter, provision bool) (*seedBundle, error) {
 	bundle := &seedBundle{files: map[string][]byte{}, xdg: map[string]string{}}
 	native, err := req.nativeHome(adapter.ID)
 	if err != nil {
 		return nil, err
 	}
-	for _, seed := range adapter.Seeds {
-		if adapter.SeedWritten[seed] {
-			bundle.claudeInit = true
-			continue
-		}
-		payload, err := os.ReadFile(filepath.Join(native, filepath.FromSlash(seed))) // #nosec G304 -- seed names are registry data
-		if err != nil {
-			if os.IsNotExist(err) {
+	if provision {
+		for _, seed := range adapter.Seeds {
+			if adapter.SeedWritten[seed] {
+				bundle.claudeInit = true
 				continue
 			}
-			return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
+			payload, err := os.ReadFile(filepath.Join(native, filepath.FromSlash(seed))) // #nosec G304 -- seed names are registry data
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
+				return nil, fmt.Errorf("%s: seed %s: %v", envregistry.DiagSeedUnreadable, seed, err)
+			}
+			bundle.files[seed] = payload
 		}
-		bundle.files[seed] = payload
+	} else if adapter.ID == envregistry.ClaudeCode {
+		bundle.claudeInit = true
 	}
 	if adapter.ID == envregistry.OpenCode {
 		xdg := req.operatorXDG()
@@ -764,7 +770,7 @@ func sameStoreTree(target, storeRoot string) bool {
 // store documents, copies, links (with copy fallback for files), seed
 // files, and the marker. Managed paths the plan no longer wants are
 // removed; files the marker does not record are never touched.
-func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, backup bool) error {
+func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded map[string]bool, prior *envmarker.Marker, provisioned bool) error {
 	if err := os.MkdirAll(plan.homeDir, 0o755); err != nil {
 		return err
 	}
@@ -789,7 +795,7 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 	for seed := range seeds.files {
 		want[seed] = true
 	}
-	if backup {
+	if backup := !provisioned; backup {
 		// Versioned generations preserve replaced file bytes (§8.3).
 		// Symlinks are skipped: they are manager-derived and re-derive
 		// from the lock and the immutable store, while openBackup
@@ -836,9 +842,13 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 			}
 		}
 	}
-	for seed, payload := range seeds.files {
-		if err := os.WriteFile(filepath.Join(plan.homeDir, filepath.FromSlash(seed)), payload, 0o644); err != nil {
-			return err
+	// Copy seeds are written at provisioning only: after that the tool
+	// owns them, so repair never refreshes them (§7.4).
+	if provisioned {
+		for seed, payload := range seeds.files {
+			if err := os.WriteFile(filepath.Join(plan.homeDir, filepath.FromSlash(seed)), payload, 0o644); err != nil {
+				return err
+			}
 		}
 	}
 	marker, err := finalizeMarker(req, plan, seeds, prior)
@@ -888,9 +898,23 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 		passthrough = append(passthrough, envmarker.Passthrough{Path: path, Strategy: strategies[path]})
 	}
 	marker.Passthrough = &passthrough
+	// Copy-seed records survive repair: the tool owns the files, and
+	// repair never refreshes them, so the record unions prior with new.
 	recordedSeeds := []string{}
+	seenSeeds := map[string]bool{}
+	if prior != nil && prior.Seeds != nil {
+		for _, seed := range *prior.Seeds {
+			if !seenSeeds[seed] {
+				seenSeeds[seed] = true
+				recordedSeeds = append(recordedSeeds, seed)
+			}
+		}
+	}
 	for seed := range seeds.files {
-		recordedSeeds = append(recordedSeeds, seed)
+		if !seenSeeds[seed] {
+			seenSeeds[seed] = true
+			recordedSeeds = append(recordedSeeds, seed)
+		}
 	}
 	if seeds.claudeInit || plan.adapter.ID == envregistry.ClaudeCode {
 		seeded, err := claudeSeed(plan.homeDir, req.LaunchDir, plan.form)
@@ -1530,7 +1554,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 	if err != nil {
 		return nil, err
 	}
-	seeds, err := req.gatherSeeds(adapter)
+	seeds, err := req.gatherSeeds(adapter, provisioned)
 	if err != nil {
 		return nil, err
 	}
@@ -1557,7 +1581,7 @@ func repairUnderLock(req *ResolveRequest, adapter envregistry.Adapter, source So
 			}
 		}
 	}
-	if err := applyPlan(req, plan, seeds, recorded, verdict.marker, !provisioned); err != nil {
+	if err := applyPlan(req, plan, seeds, recorded, verdict.marker, provisioned); err != nil {
 		if provisioned {
 			return nil, err
 		}

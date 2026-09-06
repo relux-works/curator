@@ -392,6 +392,37 @@ func TestCodexKeyringAmbient(t *testing.T) {
 	}
 }
 
+// TestRepairNeverRefreshesSeeds proves tool-owned seed state survives
+// repair byte for byte: the managed copy keeps its bytes and its record
+// even when the native source changed.
+func TestRepairNeverRefreshesSeeds(t *testing.T) {
+	fx := writeManagedFixture(t, "acme")
+	nativeSeed := []byte("operator = true\n")
+	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), nativeSeed, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	req := fx.request("codex_cli")
+	req.Repair = true
+	if _, err := Resolve(req); err != nil {
+		t.Fatal(err)
+	}
+	homeDir := ManagedHomeDir(fx.home, "acme", "codex_cli")
+	if err := os.WriteFile(filepath.Join(fx.native["codex_cli"], "config.toml"), []byte("changed = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Remove(filepath.Join(homeDir, "AGENTS.md"))
+	if _, err := Resolve(req); err != nil {
+		t.Fatalf("repair restores: %v", err)
+	}
+	if payload, _ := os.ReadFile(filepath.Join(homeDir, "config.toml")); string(payload) != string(nativeSeed) {
+		t.Fatal("repair refreshed a tool-owned seed")
+	}
+	marker := readManagedMarker(t, fx, "codex_cli")
+	if marker.Seeds == nil || len(*marker.Seeds) != 1 || (*marker.Seeds)[0] != "config.toml" {
+		t.Fatalf("seed record %v", marker.Seeds)
+	}
+}
+
 // TestResolveIsolatedOpencode narrows the isolation gate through Resolve:
 // configuring isolated for opencode fails, never silently shares.
 func TestResolveIsolatedOpencode(t *testing.T) {
