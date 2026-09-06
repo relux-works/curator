@@ -367,16 +367,18 @@ func TestRequireCurrentProfileUnlockedCarriesNoRefusal(t *testing.T) {
 }
 
 // TestSystemV2LockableSubsetIsClassWide proves the system-file allowed-knob
-// gate is class-wide, not per-knob-name. Both sides derive from the same
-// sources the code does: the knob list is EnvKnobNames (the §12.1 table the
-// reader enforces) and the admitted set is LockableEnvKeys (the §12.2
-// subset parseSystemEnvironments enforces via systemEnvKnobs). Every knob
-// needs a grammatically valid payload below, so a knob added to the reader
-// without a payload — or to LockableEnvKeys without §12.2 standing — fails
-// here instead of widening the system file's reach silently. A narrowing
-// mutant that admits exactly one non-lockable knob (for example
-// secret_material_waivers, xdg_seed_allowlist or in_place_mode) must fail
-// this test.
+// gate is class-wide, not per-knob-name. The knob list is EnvKnobNames (the
+// §12.1 table the reader enforces) with a grammatically valid system-file
+// payload per knob, so a knob added to the reader without a payload fails
+// here. The admitted set is transcribed from environments §12.2 — the six
+// keys the specification states, written out independently — and asserted
+// set-equal with LockableEnvKeys (the map parseSystemEnvironments enforces
+// via systemEnvKnobs), so a knob added to or removed from that map without
+// §12.2 standing fails here instead of widening or narrowing the system
+// file's reach silently. A narrowing mutant that admits exactly one
+// non-lockable knob (for example secret_material_waivers,
+// xdg_seed_allowlist or in_place_mode) must fail this test, and so must a
+// widening mutant that adds one member to LockableEnvKeys.
 func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
 	payloads := map[string]string{
@@ -402,13 +404,40 @@ func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 	if len(payloads) != len(EnvKnobNames) {
 		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
 	}
+	// The §12.2 transcription: exactly the six keys the specification
+	// states ("overlays_allowed, precedence, mcp_package_allowlist,
+	// passable_env_names, require_current_profile, and isolation"). This
+	// literal is the spec sentence; LockableEnvKeys is the implementation.
+	// Either drifting — a widening that would reach §9.1 secret material,
+	// or a narrowing that would drop a fleet-policy knob — fails below.
+	transcribed := map[string]bool{
+		"environments.overlays_allowed":        true,
+		"environments.precedence":              true,
+		"environments.mcp_package_allowlist":   true,
+		"environments.passable_env_names":      true,
+		"environments.require_current_profile": true,
+		"environments.isolation":               true,
+	}
+	if len(LockableEnvKeys) != len(transcribed) {
+		t.Fatalf("LockableEnvKeys carries %d keys, §12.2 transcribes %d: a widening or narrowing without spec standing fails here", len(LockableEnvKeys), len(transcribed))
+	}
+	for key := range transcribed {
+		if !LockableEnvKeys[key] {
+			t.Fatalf("§12.2 key %q missing from LockableEnvKeys: the implementation narrowed the transcribed set", key)
+		}
+	}
+	for key := range LockableEnvKeys {
+		if !transcribed[key] {
+			t.Fatalf("LockableEnvKeys key %q has no §12.2 standing: the implementation widened the transcribed set", key)
+		}
+	}
 	for _, knob := range EnvKnobNames {
 		body, ok := payloads[knob]
 		if !ok {
 			t.Fatalf("no system-file payload for knob %q: add one or the gate is untested", knob)
 		}
 		system := `{"schema_version": 2, "locked": [], "environments": ` + body + `}`
-		if LockableEnvKeys["environments."+knob] {
+		if transcribed["environments."+knob] {
 			t.Run("lockable/"+knob, func(t *testing.T) {
 				if _, _, err := loadWithSystem(t, user, system); err != nil {
 					t.Fatalf("lockable knob %q refused: %v", knob, err)
