@@ -719,11 +719,18 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 // the lock-hash comparison, the lock plus previous-lock publication, and the
 // resync of every scope already on this profile — but resolves the root from
 // the fresh input rather than from the store snapshot, which is what makes a
-// reinstall move the pin while an update must not. Like the git reinstall
-// delegation it replaces, it reports updated and never activates: a reinstall
-// refreshes the lock and re-materializes scopes already on the profile, and a
-// --use switch of a non-current profile takes the fresh-install path, not
-// this one.
+// reinstall move the pin while an update must not.
+//
+// A reinstall is still the install row (cli/curator.md), so it honours the
+// install row's flags: --use activates the installed root when it is not
+// current (a machine with no current activates the same way a first install
+// does), and --takeover covers the unmanaged files the activation or the
+// resync would write (environments §9.5). Both ride the useLocked seam, so
+// the locked require_current_profile gate applies here exactly as on every
+// other machine-scope switch. Without --use and with a current recorded, a
+// reinstall only re-materializes scopes already on the profile, exactly as
+// an update does. The reinstall always reports updated, never a fresh
+// install: activated reports whether the install row's activation ran.
 func reinstallPathLocked(op *operation, home, name string, source Source, input contextresolve.Input, options InstallOptions) (Info, bool, bool, error) {
 	policy := options.Policy
 	manager := newGitManager(home).withPolicy(policy)
@@ -766,6 +773,16 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 		}
 	}
 	if result.LockHash == oldHash {
+		// The snapshot is unchanged, so there is no lock to publish — but
+		// the install row's activation still runs. The §9.5 stop-and-retry
+		// lands here: the stopped attempt already published the lock, so
+		// the retry resolves identically and must still take over the
+		// unmanaged files and switch, never report success for no work.
+		if activate, err := reinstallActivation(home, name, options.Use); err != nil {
+			return Info{}, false, false, err
+		} else if activate {
+			return activateReinstall(op, home, name, source, result.Lock, oldHash, nil, policy)
+		}
 		machine, _ := Current(home)
 		info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name}
 		return info, false, true, nil
@@ -788,11 +805,56 @@ func reinstallPathLocked(op *operation, home, name string, source Source, input 
 		return Info{}, false, false, err
 	}
 	hash := contextlock.HashBytes(canonical)
+	if activate, err := reinstallActivation(home, name, options.Use); err != nil {
+		return Info{}, false, false, err
+	} else if activate {
+		return activateReinstall(op, home, name, source, result.Lock, hash, warnings, policy)
+	}
 	if err := resyncCurrentScopes(op, home, name, policy); err != nil {
 		return Info{}, false, false, err
 	}
 	machine, _ := Current(home)
 	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings}, false, true, nil
+}
+
+// reinstallActivation reports whether a same-source path reinstall must run
+// the install row's activation: the machine records no current (first
+// installs activate and say so), or the operator passed --use and the
+// installed root is not current. A --takeover without --use activates
+// nothing by itself — takeover covers only the files the carrying operation
+// would write (§9.5), and a reinstall that switches nothing writes no
+// native surface — so the flag alone never flips this.
+func reinstallActivation(home, name string, use bool) (bool, error) {
+	machine, err := Current(home)
+	if err != nil {
+		return false, err
+	}
+	if machine == "" {
+		return true, nil
+	}
+	return use && machine != name, nil
+}
+
+// activateReinstall runs the install row's activation for a reinstall: the
+// §9.2 machine-scope switch through useLocked — with the operation's
+// takeover flag and under the locked require_current_profile gate — then
+// the resync of every scoped current already on the profile. A partial
+// switch leaves the recorded current unchanged and returns the switch
+// error, exactly as a fresh install does; the lock work (published above
+// when the pin moved) still stands.
+func activateReinstall(op *operation, home, name string, source Source, lock *contextlock.Lock, hash string, warnings []string, policy Policy) (Info, bool, bool, error) {
+	results, switchErr := useLocked(op, home, name, "", "", false, policy)
+	machine, _ := Current(home)
+	info := Info{Name: name, Source: source, Lock: lock, LockHash: hash, Current: machine == name, Warnings: warnings, Activation: results}
+	if switchErr != nil {
+		return info, false, true, switchErr
+	}
+	if err := resyncScopedScopes(op, home, name, policy); err != nil {
+		return info, false, true, err
+	}
+	machine, _ = Current(home)
+	info.Current = machine == name
+	return info, true, true, nil
 }
 
 // Update re-resolves the root (and overlays, when the machine declares any)
@@ -1475,6 +1537,15 @@ func resyncCurrentScopes(op *operation, home, name string, policy Policy) error 
 			return err
 		}
 	}
+	return resyncScopedScopes(op, home, name, policy)
+}
+
+// resyncScopedScopes re-materializes every scoped current already on profile
+// name, under the held operation lock. It is the scoped half of
+// resyncCurrentScopes, split out so a reinstall activation — which switches
+// the machine scope itself through useLocked — still converges the scoped
+// currents without re-materializing the machine scope a second time.
+func resyncScopedScopes(op *operation, home, name string, policy Policy) error {
 	scoped, err := ScopedCurrents(home)
 	if err != nil {
 		return err
