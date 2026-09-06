@@ -336,6 +336,7 @@ internal/envprofile	TestImportLossyStopsWithoutConsent	linux,darwin,windows	-	-	
 internal/envprofile	TestImportLossyProceedsWithConsent	linux,darwin,windows	-	-	consent re-reports the loss list as warnings under the same diagnostic
 internal/envprofile	TestImportUnreadableRootIsLoss	linux,darwin,windows	-	-	an unreadable native root file is always a loss, never an absence
 internal/envprofile	TestImportInvalidUTF8IsLoss	linux,darwin,windows	-	-	a non-UTF-8 native root file is a loss
+internal/envprofile	TestImportPartialActivationKeepsLock	linux,darwin,windows	-	-	import activation stops partial on unmanaged files while the installed lock stands
 internal/envprofile	TestImportNameTakenBeforeAnyWrite	linux,darwin,windows	-	-	a taken import name stops with profile_import_name_taken before any write
 internal/envprofile	TestImportSkillForeignPinnedByRevision	linux,darwin,windows	-	-	a checkout skill maps onto a revision-pinned entry with environment_import_skill_foreign
 internal/envprofile	TestImportSkillMarkerRecovery	linux,darwin,windows	-	-	a marker skill recovers its exact declaration from its own records

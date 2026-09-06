@@ -278,6 +278,34 @@ func TestImportInvalidUTF8IsLoss(t *testing.T) {
 	}
 }
 
+// TestImportPartialActivationKeepsLock drives Import on a fresh machine
+// whose native home already carries the detected file: the ordinary path
+// pipeline installs the lock, and the activation it attempts under the
+// section 9.1 rules stops on the unmanaged file without --takeover —
+// converging it remains the takeover switch's job.
+func TestImportPartialActivationKeepsLock(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	seams := pinImportSeams(t)
+	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
+	t.Setenv("CLAUDE_CONFIG_DIR", seams.native["claude_code"])
+	t.Setenv("CODEX_HOME", filepath.Join(t.TempDir(), "codex"))
+	t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(t.TempDir(), "pi"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "xdg"))
+	_, activated, _, err := Import(home, seams.options(Policy{}))
+	// The activation stops per entry with the unmanaged conflict and
+	// the switch reports the ordinary partial diagnostic.
+	if err == nil || !strings.Contains(err.Error(), DiagUsePartial) {
+		t.Fatalf("err = %v, want %s", err, DiagUsePartial)
+	}
+	if activated {
+		t.Fatal("a conflicted activation must not report activated")
+	}
+	if _, statErr := readSource(home, "imported"); statErr != nil {
+		t.Fatal("the ordinary pipeline keeps the installed lock past a conflicted activation")
+	}
+}
+
 // TestImportNameTakenBeforeAnyWrite drives Import with a chosen name that
 // is already installed: the import stops with profile_import_name_taken
 // before any write, leaving the installed profile alone.
