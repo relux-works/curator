@@ -22,7 +22,6 @@ var lockTimeout = 30 * time.Second
 // operation binds one profile mutation to the held manager-home mutation
 // lock and the profile transaction journal.
 type operation struct {
-	home   string
 	lock   *managerlock.HomeLock
 	engine *transaction.Engine
 }
@@ -54,7 +53,7 @@ func beginOperation(home string) (*operation, error) {
 		_ = lock.Close()
 		return nil, fmt.Errorf("recover incomplete profile transactions: %w", err)
 	}
-	return &operation{home: home, lock: lock, engine: engine}, nil
+	return &operation{lock: lock, engine: engine}, nil
 }
 
 func (op *operation) close() error {
