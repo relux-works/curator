@@ -371,6 +371,9 @@ func unregisteredEnvironments(machine envregistry.MachineConfig) []string {
 	for id := range machine.InPlaceMode {
 		consider(id)
 	}
+	for _, ack := range machine.ShadowAcknowledged {
+		consider(ack.Env)
+	}
 	registered := map[string]bool{}
 	for _, adapter := range envregistry.Registry {
 		registered[adapter.ID] = true

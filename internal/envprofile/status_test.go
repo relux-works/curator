@@ -141,6 +141,7 @@ func TestStatusProfileMembersAndUnregistered(t *testing.T) {
 	req := statusRequest(fx)
 	req.Machine.Forms = map[string]string{"cursor": "monolithic", "claude_code": "monolithic"}
 	req.Machine.Isolation = map[string]map[string]string{"acme": {"cursor": "shared"}}
+	req.Machine.ShadowAcknowledged = []envregistry.ShadowAck{{Env: "ghost", Path: "AGENTS.override.md"}}
 	status, err := StatusOf(req)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +170,7 @@ func TestStatusProfileMembersAndUnregistered(t *testing.T) {
 	if profile.Precedence.Winner == "" || profile.Precedence.Placement == "" {
 		t.Fatalf("precedence %+v", profile.Precedence)
 	}
-	if len(status.UnregisteredEnvironments) != 1 || status.UnregisteredEnvironments[0] != "cursor" {
+	if len(status.UnregisteredEnvironments) != 2 || status.UnregisteredEnvironments[0] != "cursor" || status.UnregisteredEnvironments[1] != "ghost" {
 		t.Fatalf("unregistered %+v", status.UnregisteredEnvironments)
 	}
 	row := findHome(status, "acme", "claude_code")
