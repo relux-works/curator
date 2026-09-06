@@ -1,4 +1,4 @@
-// Managed homes (environments §8.1, §7.4, §10.1): one manager-owned home
+// Package envprofile managed homes (environments §8.1, §7.4, §10.1): one manager-owned home
 // per profile × environment below the environments root, provisioned on
 // the first env resolve --repair naming it, verified lock-free on every
 // resolve, and repaired under the manager-home mutation lock. Managed
@@ -124,9 +124,9 @@ func detectRelease(probe []string) string {
 }
 
 // nativeHome resolves the adapter's native home through the seam.
-func (r *ResolveRequest) nativeHome(id string) (string, error) {
-	if r.NativeHomeOf != nil {
-		return r.NativeHomeOf(id)
+func (req *ResolveRequest) nativeHome(id string) (string, error) {
+	if req.NativeHomeOf != nil {
+		return req.NativeHomeOf(id)
 	}
 	adapter, ok := adapterByID(id)
 	if !ok {
@@ -136,17 +136,17 @@ func (r *ResolveRequest) nativeHome(id string) (string, error) {
 }
 
 // detected resolves the tool release through the seam.
-func (r *ResolveRequest) detected(adapter envregistry.Adapter) string {
-	if r.Detect != nil {
-		return r.Detect(adapter)
+func (req *ResolveRequest) detected(adapter envregistry.Adapter) string {
+	if req.Detect != nil {
+		return req.Detect(adapter)
 	}
 	return detectRelease(adapter.Probe)
 }
 
 // operatorXDG resolves the operator's effective XDG config home.
-func (r *ResolveRequest) operatorXDG() string {
-	if r.OperatorXDG != "" {
-		return r.OperatorXDG
+func (req *ResolveRequest) operatorXDG() string {
+	if req.OperatorXDG != "" {
+		return req.OperatorXDG
 	}
 	if value := os.Getenv("XDG_CONFIG_HOME"); value != "" {
 		return value
@@ -228,18 +228,17 @@ func storeDocPath(home, profile, envID, rel string) string {
 // homePlan is the fully assembled managed home: every write, link, and
 // removal, with the marker recording them.
 type homePlan struct {
-	adapter     envregistry.Adapter
-	parent      string
-	homeDir     string
-	form        string
-	isolation   string
-	copies      map[string][]byte
-	links       map[string]string
-	docs        map[string][]byte
-	marker      *envmarker.Marker
-	fileHashes  map[string][]byte
-	warnings    []string
-	provisioned bool
+	adapter    envregistry.Adapter
+	parent     string
+	homeDir    string
+	form       string
+	isolation  string
+	copies     map[string][]byte
+	links      map[string]string
+	docs       map[string][]byte
+	marker     *envmarker.Marker
+	fileHashes map[string][]byte
+	warnings   []string
 }
 
 // assembleHome builds the desired managed home purely from the lock, the
@@ -609,7 +608,7 @@ func writeStoreDoc(path string, document []byte) error {
 func claudeSeed(homeDir, launchDir, form string) (seeded []string, err error) {
 	path := filepath.Join(homeDir, ".claude.json")
 	object := map[string]any{"hasCompletedOnboarding": true, "projects": map[string]any{}}
-	if payload, err := os.ReadFile(path); err == nil {
+	if payload, err := os.ReadFile(path); err == nil { // #nosec G304 -- managed .claude.json below the resolved home
 		parsed, ok := decodeJSONObject(payload)
 		if !ok {
 			return nil, fmt.Errorf("%s: managed .claude.json is not an object", envregistry.DiagSeedUnreadable)
@@ -678,7 +677,7 @@ func protocoljsonMarshal(object map[string]any) ([]byte, error) {
 // verification. A missing file means no entry; an unreadable or invalid
 // file is reported, never treated as absence (§8.4).
 func claudeProjects(homeDir string) (map[string]bool, error) {
-	payload, err := os.ReadFile(filepath.Join(homeDir, ".claude.json"))
+	payload, err := os.ReadFile(filepath.Join(homeDir, ".claude.json")) // #nosec G304 -- managed .claude.json below the resolved home
 	if err != nil {
 		if os.IsNotExist(err) {
 			return map[string]bool{}, nil
@@ -921,9 +920,7 @@ func finalizeMarker(req *ResolveRequest, plan *homePlan, seeds *seedBundle, prio
 				}
 			}
 		}
-		for _, warning := range shadowWarnings(req, plan, seedLinks) {
-			plan.warnings = append(plan.warnings, warning)
-		}
+		plan.warnings = append(plan.warnings, shadowWarnings(req, plan, seedLinks)...)
 	}
 	marker.SeedLinks = seedLinks
 	return marker, nil
@@ -1059,7 +1056,7 @@ func verifyHome(req *ResolveRequest, adapter envregistry.Adapter, source Source,
 	}
 	verdict.checkSurfaces(req, plan, marker)
 	verdict.checkPassthrough(req, plan, marker)
-	verdict.checkClaudeProject(req, plan, marker)
+	verdict.checkClaudeProject(req, plan)
 	verdict.checkXDG(req, plan, marker)
 	verdict.checkShadows(plan, marker)
 	verdict.checkToolRelease(req, adapter)
@@ -1255,7 +1252,7 @@ func (v *verification) checkPassthrough(req *ResolveRequest, plan *homePlan, mar
 // the referenced form: a launch directory without its entry makes the home
 // stale for that directory (§7.4, §10.1). Under monolithic the entry is
 // still merged on repair, but its absence is not staleness.
-func (v *verification) checkClaudeProject(req *ResolveRequest, plan *homePlan, marker *envmarker.Marker) {
+func (v *verification) checkClaudeProject(req *ResolveRequest, plan *homePlan) {
 	if plan.adapter.ID != envregistry.ClaudeCode {
 		return
 	}

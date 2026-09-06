@@ -1,4 +1,4 @@
-// MCP launch-channel materialization (environments §5.8): the resolved MCP
+// Package contextmaterialize MCP launch-channel materialization (environments §5.8): the resolved MCP
 // set of a profile for an adapter renders as one inert, hashed file per
 // adapter, in a managed home only. No env member, no value, and no
 // operator-supplied byte ever enters the file: the fragment carries the

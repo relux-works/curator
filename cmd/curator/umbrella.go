@@ -85,7 +85,7 @@ func (c cli) cmdUmbrella(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitFail
 	}
-	command := exec.Command(path, args[1:]...)
+	command := exec.Command(path, args[1:]...) // #nosec G204,G702 -- §11 dispatches the LookPath-resolved provider with operator argv verbatim
 	command.Stdin = os.Stdin
 	command.Stdout = c.stdout
 	command.Stderr = c.stderr

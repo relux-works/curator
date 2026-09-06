@@ -169,6 +169,7 @@ type Adapter struct {
 }
 
 // Registry is the closed revision-1 adapter set (environments §7.1).
+// #nosec G101 -- no credential material here: the strings name Keychain service schemes and file roles, never secret values.
 var Registry = []Adapter{
 	{
 		ID:          ClaudeCode,

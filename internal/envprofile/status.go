@@ -1,5 +1,6 @@
-// The env status matrix (environments §12): the profile × environment ×
-// surface matrix, read-only. Status recomputes and reports, never mutates
+// Package envprofile status matrix (environments §12): the profile ×
+// environment × surface matrix, read-only. Status recomputes and reports,
+// never mutates
 // — no fetch, no repair, no adoption, no channel application, no
 // onboarding — and derives every row from the same lock-free verifier
 // behind env resolve, so the two commands cannot disagree about currency.
@@ -107,14 +108,14 @@ type StatusRequest struct {
 	LaunchDir string
 }
 
-func (r *StatusRequest) resolve() ResolveRequest {
+func (req *StatusRequest) resolve() ResolveRequest {
 	return ResolveRequest{
-		Home:         r.Home,
-		Machine:      r.Machine,
-		Detect:       r.Detect,
-		NativeHomeOf: r.NativeHomeOf,
-		OperatorXDG:  r.OperatorXDG,
-		LaunchDir:    r.LaunchDir,
+		Home:         req.Home,
+		Machine:      req.Machine,
+		Detect:       req.Detect,
+		NativeHomeOf: req.NativeHomeOf,
+		OperatorXDG:  req.OperatorXDG,
+		LaunchDir:    req.LaunchDir,
 	}
 }
 
@@ -332,11 +333,14 @@ func scopeHomes(req StatusRequest, installed map[string]bool) []ScopeHome {
 func adapterStates(req StatusRequest) []AdapterState {
 	var out []AdapterState
 	for _, adapter := range envregistry.Registry {
-		detected := "unknown"
+		var detected string
 		if req.Detect != nil {
 			detected = req.Detect(adapter)
 		} else {
 			detected = detectRelease(adapter.Probe)
+		}
+		if detected == "" {
+			detected = "unknown"
 		}
 		recorded := adapter.VerifiedRelease
 		if recorded == "" {

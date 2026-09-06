@@ -1,4 +1,4 @@
-// Referenced-form materialization (environments §5.3): the applicable root
+// Package contextmaterialize referenced-form materialization (environments §5.3): the applicable root
 // modules materialize as individual files below
 // .agent-context/modules/<package-name>/<module-path> carrying their exact
 // bytes, and the root file references them through the tool's native
