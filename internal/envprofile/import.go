@@ -1,7 +1,8 @@
+package envprofile
+
 // Onboarding import (environments §9.6): the detected native context
 // becomes one installed profile through the ordinary path pipeline of
 // section 9.1.
-package envprofile
 
 import (
 	"encoding/json"

@@ -1,6 +1,7 @@
+package envprofile
+
 // Overlay composition input (environments §6): machine overlay declarations
 // join the closure beside the root and resolve jointly with it.
-package envprofile
 
 import (
 	"fmt"

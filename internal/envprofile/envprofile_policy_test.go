@@ -1,6 +1,7 @@
 package envprofile
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/relux-works/curator/internal/config"
@@ -21,7 +22,7 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 			"overlay_default_weight": float64(500),
 			"precedence":             map[string]any{"winner": "lower-weight", "placement": "winner-first"},
 			"overlays": map[string]any{
-				"a": []any{map[string]any{"source": "/srv/p", "weight": float64(7)}},
+				"a": []any{map[string]any{"source": "/srv/p", "revision": strings.Repeat("ab", 20), "weight": float64(7)}},
 			},
 		},
 	}, "config.json")

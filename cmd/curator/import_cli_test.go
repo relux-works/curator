@@ -85,12 +85,17 @@ func TestProfileImportNameTakenRow(t *testing.T) {
 }
 
 // TestProfileComposeAddPathRow drives `profile compose add` of a path
-// source: the bare source is accepted, the list shows the path form, and
-// a requirement flag with a path source is a usage error.
+// source: every overlay carries exactly one requirement form (§12.1), so
+// the bare source is a usage error while a path source with an exact form
+// is accepted and listed.
 func TestProfileComposeAddPathRow(t *testing.T) {
 	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
 	overlay := t.TempDir()
-	if code, _, stderr := runProfile(t, source, "profile", "compose", "acme", "add", overlay); code != exitOK {
+	if code, _, _ := runProfile(t, source, "profile", "compose", "acme", "add", overlay); code != exitUsage {
+		t.Fatalf("bare compose add = %d, want %d", code, exitUsage)
+	}
+	revision := strings.Repeat("ab", 20)
+	if code, _, stderr := runProfile(t, source, "profile", "compose", "acme", "add", overlay, "--revision", revision); code != exitOK {
 		t.Fatalf("compose add = %d\nstderr:\n%s", code, stderr)
 	}
 	source = reloadSource(t, source)
@@ -98,11 +103,8 @@ func TestProfileComposeAddPathRow(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("compose list = %d\nstderr:\n%s", code, stderr)
 	}
-	if !strings.Contains(stdout, overlay) || !strings.Contains(stdout, "path") {
+	if !strings.Contains(stdout, overlay) || !strings.Contains(stdout, "revision="+revision) {
 		t.Fatalf("list stdout:\n%s\nstderr:\n%s", stdout, stderr)
-	}
-	if code, _, _ := runProfile(t, source, "profile", "compose", "acme", "add", overlay, "--range", "*"); code != exitUsage {
-		t.Fatalf("compose add of a path with --range = %d, want %d", code, exitUsage)
 	}
 }
 

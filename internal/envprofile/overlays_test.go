@@ -36,7 +36,7 @@ func chapterOrder(t *testing.T, path string) []string {
 
 // installComposedPair installs a path root with a path overlay through the
 // production Install and returns the manager home and profile name.
-func installComposedPair(t *testing.T, policy Policy) (string, string) {
+func installComposedPair(t *testing.T) (string, string) {
 	t.Helper()
 	home := t.TempDir()
 	pinHomes(t)
@@ -77,7 +77,7 @@ func TestPrecedencePrimitivesDriveEmission(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.winner+"/"+tc.placement, func(t *testing.T) {
-			home, profile := installComposedPair(t, Policy{})
+			home, profile := installComposedPair(t)
 			// The helper already resolved the weighed lock; the switch
 			// reads it from the store and emits under the candidate
 			// precedence pair.
@@ -316,6 +316,36 @@ func TestGitOverlayJoinsClosure(t *testing.T) {
 	}
 	if member.Commit == "" || member.Source != "example.com/personal" {
 		t.Fatalf("git overlay member %+v carries no commit pin", member)
+	}
+}
+
+// TestPathOverlayFormIsSourceInvalid drives Install with a path overlay
+// carrying an exact form: reader grammar accepts it (§12.1), but the
+// section 1 declaration rule refuses it at resolution with
+// profile_source_invalid.
+func TestPathOverlayFormIsSourceInvalid(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	root := filepath.Join(t.TempDir(), "root")
+	writeManifestPackage(t, root,
+		`{"schema_version": 1, "name": "acme", "version": "1.0.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "root\n"})
+	overlay := filepath.Join(t.TempDir(), "overlay")
+	writeManifestPackage(t, overlay,
+		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
+			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+		map[string]string{"a.md": "overlay\n"})
+	policy := Policy{
+		OverlaysAllowed:      true,
+		OverlayDefaultWeight: 1000,
+		Overlays: map[string][]OverlaySpec{
+			"acme": {{Source: overlay, Revision: strings.Repeat("ab", 20)}},
+		},
+	}
+	_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
+	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
+		t.Fatalf("err = %v, want %s", err, DiagSourceInvalid)
 	}
 }
 

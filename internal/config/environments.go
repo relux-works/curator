@@ -375,41 +375,6 @@ func parseOverlays(raw any) (map[string][]OverlayDeclaration, error) {
 	return overlays, nil
 }
 
-// isPathSource tells a path overlay source from a git URL syntactically,
-// never by probing the filesystem (environments §9.1): an operand
-// beginning with /, ./, or ../ (or a platform absolute-path spelling) is a
-// path declaration; every other operand resolves as git under section 1.
-// It mirrors the install-operand rule so that machine configuration and the
-// CLI classify one operand one way.
-func isPathSource(operand string) bool {
-	if operand == "" {
-		return false
-	}
-	if strings.HasPrefix(operand, "/") {
-		return true
-	}
-	if strings.HasPrefix(operand, "./") || strings.HasPrefix(operand, `.\\`) {
-		return true
-	}
-	if strings.HasPrefix(operand, "../") || strings.HasPrefix(operand, `..\\`) {
-		return true
-	}
-	if operand == "." || operand == ".." {
-		return true
-	}
-	if len(operand) >= 2 && isDriveLetter(operand[0]) && operand[1] == ':' {
-		return true
-	}
-	if strings.HasPrefix(operand, `\\\\`) {
-		return true
-	}
-	return false
-}
-
-func isDriveLetter(c byte) bool {
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
-}
-
 func parseOverlay(raw any, label string) (OverlayDeclaration, error) {
 	entry, ok := raw.(map[string]any)
 	if !ok {
@@ -429,7 +394,6 @@ func parseOverlay(raw any, label string) (OverlayDeclaration, error) {
 	forms := 0
 	var decl OverlayDeclaration
 	decl.Source = source
-	pathSource := isPathSource(source)
 	if rawRange, present := entry["range"]; present {
 		forms++
 		rng, ok := rawRange.(string)
@@ -454,18 +418,12 @@ func parseOverlay(raw any, label string) (OverlayDeclaration, error) {
 		}
 		decl.Revision = revision
 	}
-	// A path overlay is an operator-local directory under the section 1
-	// rules: it carries no range, tag, revision, or directory — any of
-	// those on a path declaration is profile_source_invalid. A git overlay
-	// carries exactly one requirement form.
-	if pathSource {
-		if forms != 0 {
-			return OverlayDeclaration{}, verr.New(label, "a path overlay carries no range, tag, or revision")
-		}
-		if _, present := entry["directory"]; present {
-			return OverlayDeclaration{}, verr.New(label+".directory", "a path overlay carries no directory")
-		}
-	} else if forms != 1 {
+	// Every overlay carries exactly one requirement form — git or path
+	// alike (environments §12.1). A form on a `path` source is reader
+	// grammar but resolution-invalid: installing or updating a profile
+	// whose overlay declaration puts range, tag, revision, or directory
+	// on a path source fails with profile_source_invalid (section 1).
+	if forms != 1 {
 		return OverlayDeclaration{}, verr.New(label, "requires exactly one of range, tag, or revision")
 	}
 	if rawDir, present := entry["directory"]; present {

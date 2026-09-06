@@ -114,9 +114,8 @@ func TestSchema2KnobRejections(t *testing.T) {
 		{"overlay not list", `{"overlays": {"a": {}}}`, "overlays.a"},
 		{"overlay empty source", `{"overlays": {"a": [{"range": "^1"}]}}`, "source"},
 		{"overlay no form", `{"overlays": {"a": [{"source": "s"}]}}`, "exactly one"},
+		{"overlay path no form", `{"overlays": {"a": [{"source": "/p"}]}}`, "exactly one"},
 		{"overlay two forms", `{"overlays": {"a": [{"source": "s", "range": "^1", "tag": "v1"}]}}`, "exactly one"},
-		{"overlay path with range", `{"overlays": {"a": [{"source": "/p", "range": "^1"}]}}`, "no range"},
-		{"overlay path with directory", `{"overlays": {"a": [{"source": "/p", "directory": "ctx"}]}}`, "no directory"},
 		{"overlay range grammar", `{"overlays": {"a": [{"source": "s", "range": "^1 (x)"}]}}`, "range"},
 		{"overlay tag grammar", `{"overlays": {"a": [{"source": "s", "tag": "v1..x"}]}}`, "tag"},
 		{"overlay revision grammar", `{"overlays": {"a": [{"source": "s", "revision": "ABC"}]}}`, "revision"},
@@ -221,17 +220,21 @@ func TestOverlaysAllowedTrueKeepsLists(t *testing.T) {
 	}
 }
 
-// TestPathOverlayDeclarationParses proves the section 1 shape: a path
-// overlay carries no requirement form and no directory.
+// TestPathOverlayDeclarationParses proves the section 12.1 grammar: every
+// overlay carries exactly one requirement form, git or path alike — the
+// published family accepts a revision on a path source. The section 1
+// refusal for a form on a path source fires at resolution, not at the
+// reader.
 func TestPathOverlayDeclarationParses(t *testing.T) {
 	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
-		"environments": {"overlays": {"a": [{"source": "/srv/overlays/personal", "weight": 3}]}}}`)
+		"environments": {"overlays": {"a": [{"source": "/srv/overlays/personal",
+			"revision": "abababababababababababababababababababab", "weight": 3}]}}}`)
 	decls := cfg.Env.Overlays["a"]
 	if len(decls) != 1 || decls[0].Source != "/srv/overlays/personal" {
 		t.Fatalf("overlays: %+v", cfg.Env.Overlays)
 	}
-	if decls[0].Range != "" || decls[0].Tag != "" || decls[0].Revision != "" || decls[0].Directory != "" {
-		t.Fatalf("path overlay carries a form: %+v", decls[0])
+	if decls[0].Revision != "abababababababababababababababababababab" {
+		t.Fatalf("path overlay revision: %+v", decls[0])
 	}
 	if decls[0].Weight == nil || *decls[0].Weight != 3 {
 		t.Fatalf("path overlay weight: %+v", decls[0].Weight)
