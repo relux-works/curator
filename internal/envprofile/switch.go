@@ -600,8 +600,10 @@ func replaceLink(target, storeFile string) error {
 }
 
 // purgeHomes removes the in-place surfaces, markers, and backup generations
-// of every home whose marker names profile.
-func purgeHomes(profile string) error {
+// of every home whose marker names profile, and the profile's managed
+// homes with their markers and backups after the notice (environments
+// §9.2). Retained homes without a profile are orphans env status reports.
+func purgeHomes(home, profile string) error {
 	for _, adapter := range Adapters {
 		native, err := NativeHome(adapter)
 		if err != nil {
@@ -619,6 +621,12 @@ func purgeHomes(profile string) error {
 		_ = os.Remove(filepath.Join(native, envmarker.Name))
 		_ = os.RemoveAll(filepath.Join(native, ".agent-environment-backup"))
 	}
+	// Managed homes hold the operator's session data and are retained
+	// unless purged; a purge removes the profile's environments directory
+	// with every home, marker, and backup generation. The profile name is
+	// the only profile-derived component below the environments root, so
+	// the directory holds exactly this profile's homes.
+	_ = os.RemoveAll(filepath.Join(EnvRoot(home), profile))
 	return nil
 }
 

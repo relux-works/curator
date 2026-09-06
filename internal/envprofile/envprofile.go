@@ -133,6 +133,12 @@ func sourcePath(home, name string) string {
 }
 func lockPath(home, name string) string { return filepath.Join(ProfileDir(home, name), "lock.json") }
 
+// prevLockPath is the retained previous lock an update keeps beside the
+// new one until garbage collection drops it (environments §9.2).
+func prevLockPath(home, name string) string {
+	return filepath.Join(ProfileDir(home, name), "lock.prev.json")
+}
+
 // Info is one installed or listed profile. Warnings carries the
 // non-blocking audit findings of the install or update that produced it:
 // context-system-module-present, mcp_command_unresolved, and unmatched
@@ -676,7 +682,14 @@ func updateLocked(op *operation, home, name string, policy Policy) (Info, bool, 
 	if err != nil {
 		return Info{}, false, err
 	}
-	if err := op.publish(map[string][]byte{lockPath(home, name): canonical}); err != nil {
+	oldCanonical, err := oldLock.Canonical()
+	if err != nil {
+		return Info{}, false, err
+	}
+	// The old lock is retained beside the new one until the next garbage
+	// collection so that a stale managed home can still be identified
+	// (environments §9.2).
+	if err := op.publish(map[string][]byte{lockPath(home, name): canonical, prevLockPath(home, name): oldCanonical}); err != nil {
 		return Info{}, false, err
 	}
 	hash := contextlock.HashBytes(canonical)
@@ -710,7 +723,7 @@ func Remove(home, name string, purge bool) error {
 		return fmt.Errorf("%s: profile %q is current in a scope", DiagInUse, name)
 	}
 	if purge {
-		if err := purgeHomes(name); err != nil {
+		if err := purgeHomes(home, name); err != nil {
 			return err
 		}
 	}

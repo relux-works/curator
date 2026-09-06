@@ -1301,7 +1301,10 @@ func (v *verification) checkXDG(req *ResolveRequest, plan *homePlan, marker *env
 	}
 	for name := range expected {
 		if !recorded[name] {
-			v.reasons = append(v.reasons, fmt.Sprintf("xdg seed %s is not recorded", name))
+			// A newly present allowlisted entry is reconciliation
+			// input for the next repair, not staleness: the home is
+			// still exactly as recorded (§7.1).
+			v.warnings = append(v.warnings, fmt.Sprintf("xdg seed %s newly present: repair to seed", name))
 		}
 	}
 	v.warnings = append(v.warnings, shadowWarnings(req, plan, marker.SeedLinks)...)
