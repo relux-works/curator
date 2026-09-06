@@ -326,7 +326,10 @@ internal/envprofile	TestFoldedPathsAreSourceInvalid	linux	darwin,windows	host-ca
 internal/envprofile	TestRootGitExcluded	linux,darwin,windows	-	-	a root-level .git entry is excluded from the immutable snapshot
 internal/envprofile	TestUnreadablePathIsUnreadable	linux,darwin	windows	host-capability	an unreadable source reports profile_source_path_unreadable leading, never absence and never wrapped invalid
 internal/envprofile	TestUnreadablePathRootLeadsUnreadable	linux,darwin	windows	host-capability	an unreadable path root reports profile_source_path_unreadable leading
-internal/envprofile	TestPathSnapshotImmutableAcrossUpdateSyncUse	linux,darwin,windows	-	-	edits to a path source after install move nothing across update, sync and use until reinstall
+internal/envprofile	TestPathSnapshotImmutableAcrossUpdateSyncUse	linux,darwin,windows	-	-	edits to a path source after install move nothing across update, sync and use; a same-name reinstall moves the pin and re-materializes the surface
+internal/envprofile	TestUpdatePathWithoutStatePinIsSourceInvalid	linux,darwin,windows	-	-	an update whose lock carries no state pin for its path root fails with profile_source_invalid
+internal/envprofile	TestUpdatePathMissingSnapshotIsSourceInvalid	linux,darwin,windows	-	-	an update whose path snapshot cannot be read fails with profile_source_invalid, never a silent unchanged
+internal/envprofile	TestUpdatePathSnapshotNameMismatchIsSourceInvalid	linux,darwin,windows	-	-	an update whose path snapshot names another root fails with profile_source_invalid
 internal/envprofile	TestPathUpdateAllSucceedsWithImportedProfile	linux,darwin,windows	-	-	updating every profile succeeds with an imported profile whose staging directory is gone
 internal/envprofile	TestUseWithoutTakeoverRefusesUnmanaged	linux,darwin,windows	-	-	a switch over unmanaged files fails with environment_surface_unmanaged_conflict and writes nothing
 internal/envprofile	TestUseTakeoverBacksUpAndNotifies	linux,darwin,windows	-	-	takeover backs every replaced file up before the first write and reports the notice

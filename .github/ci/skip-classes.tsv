@@ -79,7 +79,7 @@ host-capability	hard links across the staging filesystem are unavailable	allow	n
 host-capability	mode did not produce a link on this filesystem	allow	the runner filesystem produced no link for this mode
 host-capability	(is unsupported|cannot publish a protected cache entry) 	allow	the platform provides no persistent protection primitive
 host-capability	persistent protection is unsupported on this platform	allow	the platform provides no persistent protection primitive
-host-capability	this environment can (inspect|read) a mode-000 directory	allow	the runner ignores mode-000 directory permissions
+host-capability	this environment can (inspect|read) a mode-000 (directory|file)	allow	the runner ignores mode-000 permissions
 host-capability	root ignores directory permissions	allow	the runner ignores directory permissions
 host-capability	this process can write through a read-only directory	allow	the runner ignores read-only directory permissions
 host-capability	(per-directory )?case sensitivity	allow	the runner filesystem case semantics differ
