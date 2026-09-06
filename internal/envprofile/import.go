@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/relux-works/curator/internal/contextstore"
+	"github.com/relux-works/curator/internal/envmarker"
 	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/identifiers"
 	"github.com/relux-works/curator/internal/marker"
@@ -83,6 +84,7 @@ type detectedSkill struct {
 	name     string
 	git      string
 	revision string
+	path     string
 }
 
 // Import turns the section 9.5 inventory into an installed profile through
@@ -116,6 +118,20 @@ func importLocked(op *operation, home string, options ImportOptions) (Info, bool
 		return Info{}, false, false, fmt.Errorf("%s: profile %q is already installed", DiagImportNameTaken, name)
 	}
 	roots, skills, losses := detectNative(home, options)
+	// A mapping skills entry that cannot be represented in the single
+	// requires.skills map is a loss, not a silent collapse (§9.6: one
+	// entry per mapping entry, and the loss list names every loss). Two
+	// adapters carrying the same skill name at the same commit and source
+	// collapse to one entry with no loss — one declaration, not two. Two
+	// adapters carrying the same name at different commits or sources are
+	// divergent: the first by ascending environment identifier wins the
+	// entry and each dropped declaration joins the loss list, making the
+	// import lossy. The deciding sentence is the reassembly one — "one
+	// requires.skills entry per mapping skills entry" — which a JSON
+	// object cannot satisfy for duplicate keys, so the excess mapping
+	// entry is an unmappable detected surface, hence a loss.
+	skills, dupLosses := deduplicateSkills(skills)
+	losses = append(losses, dupLosses...)
 	if len(losses) > 0 && !options.AllowLossy {
 		lines := make([]string, 0, len(losses))
 		for _, loss := range losses {
@@ -197,7 +213,7 @@ func detectNative(home string, options ImportOptions) ([]detectedRoot, []detecte
 			continue
 		}
 		rootPath := filepath.Join(native, adapter.Target)
-		if data, loss := readRootSurface(adapter.ID, rootPath); loss != nil {
+		if data, loss := readRootSurface(adapter.ID, native, rootPath); loss != nil {
 			losses = append(losses, *loss)
 		} else if data != nil {
 			roots = append(roots, detectedRoot{envID: adapter.ID, data: data})
@@ -226,11 +242,53 @@ func detectNative(home string, options ImportOptions) ([]detectedRoot, []detecte
 	return roots, skills, losses
 }
 
+// deduplicateSkills collapses same-named skills across adapters without
+// silent loss. Skills arrive sorted by ascending environment identifier.
+// The first declaration of a name wins the requires.skills entry; an
+// identical repeat (same git and revision) is the same declaration and
+// carries no loss; a divergent repeat (different commit or source) cannot
+// be represented beside the winner in one JSON object, so each dropped
+// declaration joins the loss list.
+func deduplicateSkills(skills []detectedSkill) ([]detectedSkill, []ImportLoss) {
+	seen := map[string]detectedSkill{}
+	var kept []detectedSkill
+	var losses []ImportLoss
+	for _, skill := range skills {
+		winner, ok := seen[skill.name]
+		if !ok {
+			seen[skill.name] = skill
+			kept = append(kept, skill)
+			continue
+		}
+		if winner.git == skill.git && winner.revision == skill.revision {
+			continue
+		}
+		losses = append(losses, ImportLoss{
+			Adapter: skill.envID, Path: skill.path,
+			Reason: fmt.Sprintf("duplicate skill %q diverges from %s at %s; only the first declaration carries over", skill.name, winner.envID, winner.revision),
+		})
+	}
+	sort.Slice(losses, func(i, j int) bool {
+		if losses[i].Adapter != losses[j].Adapter {
+			return losses[i].Adapter < losses[j].Adapter
+		}
+		return losses[i].Path < losses[j].Path
+	})
+	return kept, losses
+}
+
 // readRootSurface detects one native root-context file: absent is not
 // detected; an unreadable file and a file that is not valid UTF-8 are
 // losses. Reassembly normalization is content-preserving and never makes
-// an import lossy.
-func readRootSurface(envID, path string) ([]byte, *ImportLoss) {
+// an import lossy. A curator-managed home is never native input: when the
+// native directory carries a valid environment marker, its root-context
+// file reaches managed state through §9.2, never through import (§9.5
+// step 1 inventories unmanaged files, and §9.6's detected-surface list is
+// that inventory), so it is skipped — neither detected nor a loss.
+func readRootSurface(envID, native, path string) ([]byte, *ImportLoss) {
+	if marker, err := envmarker.Read(native); err == nil && marker != nil {
+		return nil, nil
+	}
 	payload, err := os.ReadFile(path) // #nosec G304 -- native home file named by the adapter registry
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -247,7 +305,10 @@ func readRootSurface(envID, path string) ([]byte, *ImportLoss) {
 // readSkillsSurface detects the unledgered skills entries of one surface:
 // a ledgered entry belongs to the machine-global scope and reaches
 // managed state through the section 9.4 migration, never through import.
-// An entry with no recoverable exact declaration is a loss.
+// An entry with no recoverable exact declaration is a loss. A ledger
+// that exists but cannot be read or decoded is never treated as absence
+// (§8.4): the manager cannot prove any entry unledgered, so the surface
+// contributes no skills and the ledger file itself is the loss.
 func readSkillsSurface(home, envID, dir string) ([]detectedSkill, []ImportLoss) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -256,7 +317,11 @@ func readSkillsSurface(home, envID, dir string) ([]detectedSkill, []ImportLoss) 
 		}
 		return nil, []ImportLoss{{Adapter: envID, Path: dir, Reason: "cannot be read: " + err.Error()}}
 	}
-	ledgered := readSkillsLedger(dir)
+	ledgered, ledgerErr := readSkillsLedger(dir)
+	if ledgerErr != nil {
+		ledgerPath := filepath.Join(dir, ".csk-managed.json")
+		return nil, []ImportLoss{{Adapter: envID, Path: ledgerPath, Reason: "cannot be read: " + ledgerErr.Error()}}
+	}
 	var skills []detectedSkill
 	var losses []ImportLoss
 	for _, entry := range entries {
@@ -280,18 +345,25 @@ func readSkillsSurface(home, envID, dir string) ([]detectedSkill, []ImportLoss) 
 			losses = append(losses, ImportLoss{Adapter: envID, Path: full, Reason: "names no recoverable exact declaration"})
 			continue
 		}
-		skills = append(skills, detectedSkill{envID: envID, name: name, git: git, revision: revision})
+		skills = append(skills, detectedSkill{envID: envID, name: name, git: git, revision: revision, path: full})
 	}
 	return skills, losses
 }
 
 // readSkillsLedger returns the skill names the manager's adapter ledger
-// records at the surface root.
-func readSkillsLedger(dir string) map[string]bool {
+// records at the surface root. Absence (no ledger file) is legitimate and
+// returns an empty set with no error; any other read or decode failure is
+// a failed read, never absence (§8.4), and returns the error so the caller
+// records the ledger itself as the loss instead of importing entries it
+// cannot prove unledgered.
+func readSkillsLedger(dir string) (map[string]bool, error) {
 	recorded := map[string]bool{}
 	payload, err := os.ReadFile(filepath.Join(dir, ".csk-managed.json")) // #nosec G304 -- ledger beside the scanned surface
 	if err != nil {
-		return recorded
+		if os.IsNotExist(err) {
+			return recorded, nil
+		}
+		return nil, err
 	}
 	var data struct {
 		SchemaVersion int      `json:"schema_version"`
@@ -299,15 +371,18 @@ func readSkillsLedger(dir string) map[string]bool {
 	}
 	decoder := json.NewDecoder(strings.NewReader(string(payload)))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&data); err != nil || data.SchemaVersion != 1 || data.Entries == nil {
-		return recorded
+	if err := decoder.Decode(&data); err != nil {
+		return nil, err
+	}
+	if data.SchemaVersion != 1 || data.Entries == nil {
+		return nil, fmt.Errorf("adapter ledger is not a schema_version 1 entry list")
 	}
 	for _, entry := range data.Entries {
 		if identifiers.Valid(entry) {
 			recorded[entry] = true
 		}
 	}
-	return recorded
+	return recorded, nil
 }
 
 // isStoreEntry reports whether path is a symlink into the manager's

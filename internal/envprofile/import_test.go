@@ -502,3 +502,175 @@ func TestImportRecordsImportedFromNative(t *testing.T) {
 		t.Fatal("imported profile is not listed")
 	}
 }
+
+// TestImportSkipsManagedRootContext drives the production Import on a
+// machine curator already manages: the managed root-context files carry
+// the §5.1 generation header and a valid marker, so they are not native
+// input (§9.5 inventories unmanaged files) and must be skipped — neither
+// detected nor a loss. Without the marker check the import reassembles
+// modules each carrying a full generation header.
+func TestImportSkipsManagedRootContext(t *testing.T) {
+	home := t.TempDir()
+	homes := pinHomes(t)
+	installIdleProfile(t, home, "acme")
+	managed, err := os.ReadFile(filepath.Join(homes["claude_code"], "CLAUDE.md"))
+	if err != nil || !strings.Contains(string(managed), "curator-root-context") {
+		t.Fatalf("managed surface lacks the generation header: %q %v", managed, err)
+	}
+	options := ImportOptions{
+		Policy: Policy{},
+		NativeHomeOf: func(id string) (string, error) {
+			return homes[id], nil
+		},
+		GlobalSkillsOf: func() (string, error) {
+			return t.TempDir(), nil
+		},
+	}
+	seedCurrentDefault(t, home)
+	// The managed homes carry markers, so the import must detect no roots.
+	// Drive detectNative directly for the precise assertion, then Import
+	// for the production path.
+	roots, _, losses := detectNative(home, options)
+	if len(roots) != 0 {
+		t.Fatalf("managed roots detected: %+v", roots)
+	}
+	for _, loss := range losses {
+		if strings.Contains(loss.Path, "CLAUDE.md") || strings.Contains(loss.Path, "AGENTS.md") {
+			t.Fatalf("managed surface reported as loss: %+v", loss)
+		}
+	}
+	info, _, _, err := Import(home, options)
+	if err != nil {
+		t.Fatalf("import over managed homes: %v", err)
+	}
+	member, ok := lockMember(info.Lock, "imported")
+	if !ok || member.StateHash == "" {
+		t.Fatalf("lock %+v", info.Lock.Members)
+	}
+	entry := contextstore.EntryDir(home, "context", "imported", member.StateHash)
+	manifest, err := os.ReadFile(filepath.Join(entry, "agent-context.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(manifest), "claude_code.md") || strings.Contains(string(manifest), "codex_cli.md") {
+		t.Fatalf("managed surfaces reassembled as native modules:\n%s", manifest)
+	}
+}
+
+// TestImportDivergentSkillsAreLoss drives the production Import over two
+// adapters carrying the same skill name at different commits: the first
+// by ascending environment identifier wins the requires.skills entry and
+// each dropped declaration joins the loss list, making the import lossy
+// (§9.6 one entry per mapping entry; a JSON object cannot hold duplicate
+// keys, so the excess mapping entry is an unmappable surface, hence a
+// loss). Identical repeats collapse with no loss.
+func TestImportDivergentSkillsAreLoss(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	seams := pinImportSeams(t)
+	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
+	ids := newGitIdentities(t)
+	repo := gitRepo(t, map[string]string{"SKILL.md": "# foo v1\n"}, "v1.0.0")
+	// Second commit for the divergent checkout.
+	cmd := exec.Command("git", "-C", repo, "commit", "--allow-empty", "-m", "two")
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("second commit: %v\n%s", err, out)
+	}
+	out, err := exec.Command("git", "-C", repo, "rev-parse", "HEAD~1").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit1 := strings.TrimSpace(string(out))
+	out, err = exec.Command("git", "-C", repo, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit2 := strings.TrimSpace(string(out))
+	operand := ids.serve(repo, "https://example.com/skills/foo")
+	clone := func(dir, commit string) {
+		t.Helper()
+		entry := filepath.Join(dir, "skills", "foo")
+		if out, err := exec.Command("git", "clone", repo, entry).CombinedOutput(); err != nil {
+			t.Fatalf("clone: %v\n%s", err, out)
+		}
+		for _, args := range [][]string{
+			{"remote", "set-url", "origin", operand},
+			{"checkout", "-q", commit},
+		} {
+			if out, err := exec.Command("git", append([]string{"-C", entry}, args...)...).CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v\n%s", args, err, out)
+			}
+		}
+	}
+	clone(seams.native["claude_code"], commit1)
+	clone(seams.native["codex_cli"], commit2)
+	seedCurrentDefault(t, home)
+	_, _, _, err = Import(home, seams.options(Policy{}))
+	if err == nil || !strings.Contains(err.Error(), DiagImportLossy) {
+		t.Fatalf("divergent skills err = %v, want %s", err, DiagImportLossy)
+	}
+	if !strings.Contains(err.Error(), "foo") {
+		t.Fatalf("loss list names no dropped declaration: %v", err)
+	}
+	options := seams.options(Policy{})
+	options.AllowLossy = true
+	info, _, _, err := Import(home, options)
+	if err != nil {
+		t.Fatalf("lossy import under consent: %v", err)
+	}
+	member, ok := lockMember(info.Lock, "foo")
+	if !ok {
+		t.Fatalf("lock %+v carries no surviving skill", info.Lock.Members)
+	}
+	// The ascending identifier wins: claude_code sorts before codex_cli.
+	if member.Commit != commit1 {
+		t.Fatalf("surviving revision %q, want the first declaration %q", member.Commit, commit1)
+	}
+	foundLoss, foundForeign := false, false
+	for _, warning := range info.Warnings {
+		if strings.Contains(warning, DiagImportLossy) && strings.Contains(warning, "foo") {
+			foundLoss = true
+		}
+		if strings.Contains(warning, DiagImportSkillForeign) && strings.Contains(warning, "foo") {
+			foundForeign = true
+		}
+	}
+	if !foundLoss {
+		t.Fatalf("warnings %+v re-report no loss list", info.Warnings)
+	}
+	if !foundForeign {
+		t.Fatalf("warnings %+v carry no %s", info.Warnings, DiagImportSkillForeign)
+	}
+}
+
+// TestImportLedgerFailureIsLoss drives the production Import over a skills
+// surface whose adapter ledger exists but does not decode: the ledger is
+// never treated as absence (§8.4), so the surface contributes no skills
+// and the ledger file itself is the loss.
+func TestImportLedgerFailureIsLoss(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	seams := pinImportSeams(t)
+	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
+	skills := filepath.Join(seams.native["claude_code"], "skills", "lonely")
+	if err := os.MkdirAll(skills, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skills, "SKILL.md"), []byte("# lonely\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ledger := filepath.Join(seams.native["claude_code"], "skills", ".csk-managed.json")
+	if err := os.WriteFile(ledger, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	seedCurrentDefault(t, home)
+	_, _, _, ledgerErr := Import(home, seams.options(Policy{}))
+	if ledgerErr == nil || !strings.Contains(ledgerErr.Error(), DiagImportLossy) {
+		t.Fatalf("corrupt ledger err = %v, want %s", ledgerErr, DiagImportLossy)
+	}
+	if !strings.Contains(ledgerErr.Error(), ".csk-managed.json") {
+		t.Fatalf("loss list names no ledger: %v", ledgerErr)
+	}
+}
