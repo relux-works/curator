@@ -36,3 +36,5 @@ internal/moduleroots	vectors/module-roots.json	TestModuleRootVectors reads the v
 internal/scriptpolicy	vectors/script-host-execution-policy.json	the schema-8 script execution-policy family is read directly by every case in conformance_test.go
 internal/skillspec	schema-cases/agent-skill-v6,schema-cases/agent-skill-v8,schema-cases/csk-skill-v8,fixtures/go-build-skill	the schema v6 cases, BOTH schema-8 manifest families and the go-build skill fixture
 internal/install	vectors/build-drivers.json,vectors/manager-lifecycle.json	TestAuthoritativeCacheOutcomesDriveInstallation and the dry-run bindings read the vectors directly
+internal/envfragment	schema-cases/launch-env-fragment-v1	TestFragmentAuthoritativeSchemaCases and TestFragmentEmissionMatchesReference read the fragment family directly
+internal/envmarker	schema-cases/agent-environment-marker-v1	TestParseAuthoritativeEnvMarkerSchemaCases reads the marker family directly

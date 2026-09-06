@@ -280,9 +280,9 @@ internal/envprofile	TestCodexUnreadableConfigFails	linux,darwin,windows	-	-	an u
 internal/envprofile	TestStatusProfileMembersAndUnregistered	linux,darwin,windows	-	-	status carries lock members with weights, precedence primitives, and unregistered env-ids
 internal/envregistry	TestSecondaryTargetsBoundToAdapters	linux,darwin,windows	-	-	revision 1 declares two secondary-target rows bound one per adapter and never for other adapters
 internal/envfragment	TestFragmentEnvCarriesOnlyEnvObject	linux,darwin,windows	-	-	--format env|shell render exactly the fragment env object, never a channel value
-internal/envmarker	TestParseAuthoritativeEnvMarkerSchemaCases	linux,darwin,windows	-	-	the published environment marker family parses under the managed-home rules and every invalid case is rejected
-internal/envfragment	TestFragmentAuthoritativeSchemaCases	linux,darwin,windows	-	-	the published fragment family validates against the closed adapter registry and the profile-influence boundary
-internal/envfragment	TestFragmentEmissionMatchesReference	linux,darwin,windows	-	-	the emitted canonical fragment re-encodes the published reference bytes exactly
+internal/envmarker	TestParseAuthoritativeEnvMarkerSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published environment marker family parses under the managed-home rules and every invalid case is rejected; a root which does not publish the family defers the package and records a root-unset skip
+internal/envfragment	TestFragmentAuthoritativeSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published fragment family validates against the closed adapter registry and the profile-influence boundary; a root which does not publish the family defers the package and records a root-unset skip
+internal/envfragment	TestFragmentEmissionMatchesReference	linux,darwin,windows	linux,darwin,windows	root-unset	the emitted canonical fragment re-encodes the published reference bytes exactly; a root which does not publish the family defers the package and records a root-unset skip
 cmd/curator	TestEnvResolveRepairEmitsFragment	linux,darwin,windows	-	-	env resolve --repair provisions through the CLI and emits the launch fragment with the managed home
 cmd/curator	TestEnvStatusMatrix	linux,darwin,windows	-	-	env status reports the profile by environment by surface matrix with --check and --json
 cmd/curator	TestUmbrellaMissingProvider	linux,darwin,windows	-	-	an unknown subcommand with no provider names the executable and the installation guidance
