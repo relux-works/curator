@@ -129,7 +129,7 @@ func validHex(value string, width int) bool {
 	}
 	for i := 0; i < len(value); i++ {
 		char := value[i]
-		if !(char >= '0' && char <= '9' || char >= 'a' && char <= 'f') {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
 			return false
 		}
 	}

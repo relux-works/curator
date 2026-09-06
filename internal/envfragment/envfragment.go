@@ -137,39 +137,33 @@ func (f *Fragment) JSON() ([]byte, error) {
 	return append(canonical, '\n'), nil
 }
 
-// variables lists the fragment variables in the adapter's declared
-// variable order (environments §10.1): the env member first, then every
-// engaged variable-kind channel value.
+// variables lists the fragment's env members in the adapter's declared
+// variable order (environments §10.1): the adapter's EnvVar first, then
+// any remaining names sorted. Only the env object is rendered: channel
+// paths and env_names never enter these formats, so all three formats
+// stay renderings of one object and resolving one activates nothing
+// (§10.2, §10.3).
 func (f *Fragment) variables(adapter envregistry.Adapter) [][2]string {
 	var out [][2]string
-	names := make([]string, 0, len(f.Env))
-	for name := range f.Env {
-		names = append(names, name)
+	if value, ok := f.Env[adapter.EnvVar]; ok {
+		out = append(out, [2]string{adapter.EnvVar, value})
 	}
-	sort.Strings(names)
-	for _, name := range names {
+	rest := make([]string, 0, len(f.Env))
+	for name := range f.Env {
+		if name == adapter.EnvVar {
+			continue
+		}
+		rest = append(rest, name)
+	}
+	sort.Strings(rest)
+	for _, name := range rest {
 		out = append(out, [2]string{name, f.Env[name]})
 	}
-	if f.MCP != nil {
-		for _, channel := range f.MCP.Channels {
-			if channel.Kind == envregistry.KindVariable {
-				out = append(out, [2]string{channel.Variable, f.MCP.Path})
-			}
-		}
-	}
-	if f.SystemPrompt != nil {
-		for _, channel := range f.SystemPrompt.Channels {
-			if channel.Kind == envregistry.KindVariable {
-				out = append(out, [2]string{channel.Variable, f.SystemPrompt.Path})
-			}
-		}
-	}
-	_ = adapter
 	return out
 }
 
-// EnvFormat renders --format env: one NAME=value line per fragment
-// variable, LF-terminated, in the adapter's declared variable order.
+// EnvFormat renders --format env: one NAME=value line per fragment env
+// member, LF-terminated, in the adapter's declared variable order.
 func (f *Fragment) EnvFormat(adapter envregistry.Adapter) []byte {
 	var out strings.Builder
 	for _, variable := range f.variables(adapter) {
@@ -182,7 +176,7 @@ func (f *Fragment) EnvFormat(adapter envregistry.Adapter) []byte {
 }
 
 // ShellFormat renders --format shell: one POSIX export NAME='value' line
-// per variable with single-quote escaping. POSIX-only by design;
+// per fragment env member with single-quote escaping. POSIX-only by design;
 // automation on Windows or in PowerShell consumes --format json
 // (environments §10.1).
 func (f *Fragment) ShellFormat(adapter envregistry.Adapter) []byte {

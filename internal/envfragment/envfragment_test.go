@@ -93,7 +93,11 @@ func TestFragmentEnvAndShellFormats(t *testing.T) {
 	}
 }
 
-func TestFragmentOpenCodeVariableOrder(t *testing.T) {
+// TestFragmentEnvCarriesOnlyEnvObject narrows the §10.1 gate: --format
+// env|shell render exactly the fragment's env object, never a
+// variable-kind channel value, so the three formats stay renderings of
+// one object.
+func TestFragmentEnvCarriesOnlyEnvObject(t *testing.T) {
 	adapter, err := envregistry.ByID("opencode")
 	if err != nil {
 		t.Fatal(err)
@@ -111,10 +115,11 @@ func TestFragmentOpenCodeVariableOrder(t *testing.T) {
 			Channels: []envregistry.Channel{{Kind: "variable", Variable: "OPENCODE_CONFIG"}},
 		},
 	}
-	got := string(fragment.EnvFormat(adapter))
-	want := "XDG_CONFIG_HOME=/manager/environments/companyA/opencode\nOPENCODE_CONFIG=/manager/environments/companyA/opencode/opencode/.agent-context/mcp/opencode.json\n"
-	if got != want {
-		t.Fatalf("opencode variable order differs:\n got %q\nwant %q", got, want)
+	if got := string(fragment.EnvFormat(adapter)); got != "XDG_CONFIG_HOME=/manager/environments/companyA/opencode\n" {
+		t.Fatalf("env format carries more than the env object: %q", got)
+	}
+	if got := string(fragment.ShellFormat(adapter)); got != "export XDG_CONFIG_HOME='/manager/environments/companyA/opencode'\n" {
+		t.Fatalf("shell format carries more than the env object: %q", got)
 	}
 }
 
@@ -152,6 +157,11 @@ func TestCheckBoundary(t *testing.T) {
 	outside.Env = map[string]string{"CLAUDE_CONFIG_DIR": "/tmp/evil"}
 	if err := CheckBoundary(adapter, root, outside); err == nil {
 		t.Fatal("a value outside the environments root must fail the boundary")
+	}
+	sibling := testFragment()
+	sibling.Env = map[string]string{"CLAUDE_CONFIG_DIR": "/manager/profiles/acme/rendered/claude_code/AGENTS.md"}
+	if err := CheckBoundary(adapter, root, sibling); err == nil {
+		t.Fatal("a value below the environments root parent but outside the root must fail the boundary")
 	}
 	outsideMCP := testFragment()
 	outsideMCP.MCP.Path = "/tmp/evil.json"
