@@ -93,7 +93,7 @@ type vectorSource struct {
 	packages map[string]vectorPackage
 }
 
-func (s vectorSource) Identity(kind, name, declared string) (string, error) {
+func (s vectorSource) Identity(_, name, _ string) (string, error) {
 	pkg, ok := s.packages[name]
 	if !ok {
 		return "", fmt.Errorf("vector declares no package %s", name)
@@ -101,7 +101,7 @@ func (s vectorSource) Identity(kind, name, declared string) (string, error) {
 	return pkg.Source, nil
 }
 
-func (s vectorSource) Candidates(kind, name, source string) ([]contextresolve.Candidate, error) {
+func (s vectorSource) Candidates(_, name, _ string) ([]contextresolve.Candidate, error) {
 	pkg := s.packages[name]
 	var out []contextresolve.Candidate
 	for tag, commit := range pkg.Tags {
@@ -114,7 +114,7 @@ func (s vectorSource) Candidates(kind, name, source string) ([]contextresolve.Ca
 	return out, nil
 }
 
-func (s vectorSource) ResolveTag(kind, name, source, tag string) (string, error) {
+func (s vectorSource) ResolveTag(_, name, _, tag string) (string, error) {
 	commit, ok := s.packages[name].Tags[tag]
 	if !ok {
 		return "", fmt.Errorf("%s has no tag %s", name, tag)
@@ -122,7 +122,7 @@ func (s vectorSource) ResolveTag(kind, name, source, tag string) (string, error)
 	return commit, nil
 }
 
-func (s vectorSource) Manifest(kind, name, source, directory, commit string) (*contextresolve.Package, error) {
+func (s vectorSource) Manifest(_, name, _, _, commit string) (*contextresolve.Package, error) {
 	info := s.packages[name].Commits[commit]
 	if info == nil {
 		return &contextresolve.Package{}, nil
@@ -289,7 +289,7 @@ func assertDetail(t *testing.T, err *contextresolve.Error, want map[string]any) 
 		got := append([]string(nil), err.Candidates...)
 		sort.Strings(got)
 		sort.Strings(candidates)
-		if !reflect.DeepEqual(got, candidates) && !(len(got) == 0 && len(candidates) == 0) {
+		if !reflect.DeepEqual(got, candidates) && (len(got) != 0 || len(candidates) != 0) {
 			t.Fatalf("detail candidates %v, want %v", err.Candidates, candidates)
 		}
 	}
