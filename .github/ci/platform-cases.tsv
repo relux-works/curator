@@ -301,7 +301,7 @@ internal/hashing	TestCrossCheckTree	-	linux,darwin,windows	opt-in	cross-implemen
 # Stage (c): composition, the path kind, onboarding takeover, and import rows.
 # Hermetic fixtures only: every row is required on all three runners.
 internal/config	TestPathOverlayDeclarationParses	linux,darwin,windows	-	-	a path overlay carrying a revision parses per the published family; the section 1 refusal fires at resolution (see TASK-260906-3x0w4y bound)
-internal/envprofile	TestPathOverlayJoinsClosure	linux,darwin,windows	-	-	a machine-declared path overlay joins the closure flagged overlay at the machine default weight
+internal/envprofile	TestPathOverlayJoinsClosure	linux,darwin,windows	-	-	a form-free path overlay joins the closure flagged overlay at the machine default weight from a manufactured Policy (resolution machinery only; no operator can declare it -- see TASK-260906-3x0w4y bound)
 internal/envprofile	TestPathOverlayFormIsSourceInvalid	linux,darwin,windows	-	-	a form on a path overlay is reader grammar but resolution-invalid under section 1
 internal/envprofile	TestOverlayExplicitWeightOverridesDefault	linux,darwin,windows	-	-	a declared overlay weight outranks the manifest weight and the default
 internal/envprofile	TestGitOverlayJoinsClosure	linux,darwin,windows	-	-	a machine-declared git overlay resolves jointly with the root and pins its commit

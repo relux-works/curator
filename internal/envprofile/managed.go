@@ -724,6 +724,14 @@ func claudeProjects(homeDir string) (map[string]bool, error) {
 // well-known dotfile-manager state location elevates the notice for plain
 // unmanaged files to environment_foreign_manager_suspected. The heuristic
 // never blocks.
+//
+// Stated bound (TASK-260906-vlrjo1): the entries are POSIX-portable
+// relative paths resolved under os.UserHomeDir, matching the §9.5
+// spellings verbatim. Whether the closed list is platform-specific —
+// chezmoi keeps state under %LOCALAPPDATA% on Windows, home-manager is
+// Nix-only — is a spec question §9.5 does not decide, so no Windows
+// location is invented here and the heuristic stays inert for those
+// layouts on that platform.
 var dotfileStateDirs = [][2]string{
 	{".local/share/chezmoi", "chezmoi"},
 	{".config/home-manager", "home-manager"},
@@ -870,9 +878,15 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 		}
 	}
 	// Copy seeds are written at provisioning only: after that the tool
-	// owns them, so repair never refreshes them (§7.4).
+	// owns them, so repair never refreshes them (§7.4). Like the copied
+	// surfaces above, the seed and marker writes remove first so a stray
+	// symlink in a managed home cannot redirect them; both targets stay
+	// under the manager's own tree. (claudeSeed is deliberately excluded:
+	// it reads the existing .claude.json and merges, so removing first
+	// would destroy the tool-owned state it must preserve.)
 	if provisioned {
 		for seed, payload := range seeds.files {
+			_ = os.Remove(filepath.Join(plan.homeDir, filepath.FromSlash(seed)))
 			if err := os.WriteFile(filepath.Join(plan.homeDir, filepath.FromSlash(seed)), payload, 0o644); err != nil {
 				return err
 			}
@@ -886,6 +900,7 @@ func applyPlan(req *ResolveRequest, plan *homePlan, seeds *seedBundle, recorded 
 	if err != nil {
 		return err
 	}
+	_ = os.Remove(filepath.Join(plan.homeDir, envmarker.Name))
 	return os.WriteFile(filepath.Join(plan.homeDir, envmarker.Name), payload, 0o644)
 }
 
