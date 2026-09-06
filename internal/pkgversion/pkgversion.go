@@ -332,8 +332,14 @@ func parsePrimitive(text string) ([]Comparator, error) {
 	}
 	operator := match[1]
 	if isWild(match[2]) {
-		// A bare "*", "x", or "X" — with or without an operator — is the
-		// any-comparator; node-semver reads every operator on "*" as "*".
+		// A bare "*", "x", or "X" with no operator — or with >=, <=, =,
+		// ^, or ~ — is the any-comparator. A bare ">" or "<" on a
+		// wildcard is rejected: node-semver reads those spellings as
+		// match-nothing (<0.0.0-0), and environments §1.4 admits neither
+		// reading, so neither meaning is silently substituted.
+		if operator == ">" || operator == "<" {
+			return nil, fmt.Errorf("primitive %q: > and < on a bare wildcard do not parse", text)
+		}
 		return []Comparator{{Any: true}}, nil
 	}
 	p := partial{}

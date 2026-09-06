@@ -56,6 +56,20 @@ func TestVersionPrefixInsideRangesIsRejected(t *testing.T) {
 	}
 }
 
+// TestBareWildcardComparatorsAreRejected narrows the range gate (review
+// F5): ">" and "<" on a bare wildcard ("*", "x", "X") do not parse —
+// node-semver reads them as match-nothing and §1.4 admits neither reading.
+// A mutant that treats them as match-everything must fail this test.
+func TestBareWildcardComparatorsAreRejected(t *testing.T) {
+	for _, text := range []string{">*", "<*", ">x", "<X"} {
+		if _, err := ParseRange(text); err == nil {
+			t.Fatalf("range %q must not parse", text)
+		} else if !strings.Contains(err.Error(), "profile_source_invalid") {
+			t.Fatalf("range %q error %q carries no profile_source_invalid class", text, err)
+		}
+	}
+}
+
 // TestLatestIsStar checks that "latest" spells "*".
 func TestLatestIsStar(t *testing.T) {
 	r, err := ParseRange("latest")

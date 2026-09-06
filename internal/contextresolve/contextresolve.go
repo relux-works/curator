@@ -746,40 +746,43 @@ func (r *resolver) build() (*Result, error) {
 			member.RequiredBy = append(member.RequiredBy, requirer)
 		}
 		sort.Strings(member.RequiredBy)
-		if sel.kind == contextlock.KindContext {
-			weight := int64(0)
-			if sel.pkg != nil {
-				weight = sel.pkg.Weight
-			}
-			sort.SliceStable(edgeWeights, func(i, j int) bool { return edgeWeights[i].Requirer < edgeWeights[j].Requirer })
-			if len(edgeWeights) > 0 {
-				agreed := true
-				for _, edge := range edgeWeights[1:] {
-					if edge.Weight != edgeWeights[0].Weight {
-						agreed = false
-					}
-				}
-				if !agreed {
-					if _, named := rootMap[name]; !named {
-						return nil, &Error{Diagnostic: DiagWeightConflict, Name: name, WeightRequirers: edgeWeights}
-					}
-					warnings = append(warnings, Warning{Diagnostic: DiagWeightConflict, Name: name, Requirers: edgeWeights})
-				} else {
-					weight = edgeWeights[0].Weight
-				}
-			}
-			if mapped, named := rootMap[name]; named {
-				weight = mapped
-			}
-			if sel.overlay != nil {
-				if sel.overlay.Weight != nil {
-					weight = *sel.overlay.Weight
-				} else {
-					weight = r.input.OverlayDefaultWeight
-				}
-			}
-			member.Weight = weight
+		// Environments §6: every closure member has one effective weight by
+		// rules 1–3 in order — the manifest weight, the agreeing
+		// direct-requirer edge weights, then the root weights map — whatever
+		// the member kind. Overlays name context members only; the override
+		// below is a no-op for any other kind.
+		weight := int64(0)
+		if sel.pkg != nil {
+			weight = sel.pkg.Weight
 		}
+		sort.SliceStable(edgeWeights, func(i, j int) bool { return edgeWeights[i].Requirer < edgeWeights[j].Requirer })
+		if len(edgeWeights) > 0 {
+			agreed := true
+			for _, edge := range edgeWeights[1:] {
+				if edge.Weight != edgeWeights[0].Weight {
+					agreed = false
+				}
+			}
+			if !agreed {
+				if _, named := rootMap[name]; !named {
+					return nil, &Error{Diagnostic: DiagWeightConflict, Name: name, WeightRequirers: edgeWeights}
+				}
+				warnings = append(warnings, Warning{Diagnostic: DiagWeightConflict, Name: name, Requirers: edgeWeights})
+			} else {
+				weight = edgeWeights[0].Weight
+			}
+		}
+		if mapped, named := rootMap[name]; named {
+			weight = mapped
+		}
+		if sel.overlay != nil {
+			if sel.overlay.Weight != nil {
+				weight = *sel.overlay.Weight
+			} else {
+				weight = r.input.OverlayDefaultWeight
+			}
+		}
+		member.Weight = weight
 		lock.Members = append(lock.Members, member)
 		result.Members[Key(sel.kind, name)] = Resolved{Kind: sel.kind, Name: name, Source: sel.source, Directory: sel.directory,
 			Commit: sel.commit, StateHash: member.StateHash, Version: member.Version, Package: sel.pkg}

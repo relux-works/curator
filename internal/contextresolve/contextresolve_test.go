@@ -190,6 +190,38 @@ func TestNonRootWeightsAreRejected(t *testing.T) {
 	}
 }
 
+// TestRootWeightsApplyToSkillMembers narrows the weights gate (review F6):
+// environments §6 gives every closure member one effective weight by rules
+// 1–3 whatever the kind, so a root weights entry naming a skill member lands
+// in the lock. Production entry point: Resolve. A mutant that restores the
+// context-only weight computation must fail this test.
+func TestRootWeightsApplyToSkillMembers(t *testing.T) {
+	source := &stubSource{
+		commits: map[string]string{"root@v1.0.0": strings.Repeat("1", 40), "sk@v1.0.0": strings.Repeat("2", 40)},
+		manifests: map[string]*Package{
+			strings.Repeat("1", 40): {Version: "1.0.0", Weights: map[string]int64{"sk": 900}, Requires: []Requirement{
+				{Kind: contextlock.KindSkill, Name: "sk", Source: "https://example.com/sk", Range: "*"},
+			}},
+			strings.Repeat("2", 40): {Version: "1.0.0"},
+		},
+	}
+	result, err := Resolve(source, Input{
+		Root: Requirement{Name: "root", Source: "https://example.com/root", Tag: "v1.0.0"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var weight int64 = -1
+	for _, member := range result.Lock.Members {
+		if member.Kind == contextlock.KindSkill && member.Name == "sk" {
+			weight = member.Weight
+		}
+	}
+	if weight != 900 {
+		t.Fatalf("skill member weight %d, want 900 (lock %+v)", weight, result.Lock.Members)
+	}
+}
+
 // TestDuplicateOverlayIsCompositionInvalid checks the overlay gate.
 func TestDuplicateOverlayIsCompositionInvalid(t *testing.T) {
 	source := &stubSource{}
