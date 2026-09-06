@@ -24,99 +24,99 @@ import (
 
 // SurfaceState is one recorded surface row.
 type SurfaceState struct {
-	Key    string
-	Paths  []string
-	Form   string
-	State  string
-	Detail string
+	Key    string   `json:"key"`
+	Paths  []string `json:"paths"`
+	Form   string   `json:"form"`
+	State  string   `json:"state"`
+	Detail string   `json:"detail"`
 }
 
 // HomeState is one profile × environment row.
 type HomeState struct {
-	Profile        string
-	Environment    string
-	Mode           string
-	Form           string
-	Home           string
-	Provisioned    bool
-	Current        bool
-	LockHash       string
-	MarkerHash     string
-	Surfaces       []SurfaceState
-	Passthrough    []string
-	Seeds          []string
-	SeedLinks      []string
-	SeededProjects []string
-	Backups        int
-	BackupsOldest  string
-	BackupsNewest  string
-	Findings       []string
-	Warnings       []string
+	Profile        string         `json:"profile"`
+	Environment    string         `json:"environment"`
+	Mode           string         `json:"mode"`
+	Form           string         `json:"form"`
+	Home           string         `json:"home"`
+	Provisioned    bool           `json:"provisioned"`
+	Current        bool           `json:"current"`
+	LockHash       string         `json:"lock_hash"`
+	MarkerHash     string         `json:"marker_hash"`
+	Surfaces       []SurfaceState `json:"surfaces"`
+	Passthrough    []string       `json:"passthrough"`
+	Seeds          []string       `json:"seeds"`
+	SeedLinks      []string       `json:"seed_links"`
+	SeededProjects []string       `json:"seeded_projects"`
+	Backups        int            `json:"backups"`
+	BackupsOldest  string         `json:"backups_oldest"`
+	BackupsNewest  string         `json:"backups_newest"`
+	Findings       []string       `json:"findings"`
+	Warnings       []string       `json:"warnings"`
 }
 
 // ScopeHome carries both doors of a current profile (§8.1): the native
 // home and the managed home with its provisioning state.
 type ScopeHome struct {
-	Scope       string
-	Profile     string
-	Environment string
-	Native      string
-	Managed     string
-	Provisioned bool
+	Scope       string `json:"scope"`
+	Profile     string `json:"profile"`
+	Environment string `json:"environment"`
+	Native      string `json:"native"`
+	Managed     string `json:"managed"`
+	Provisioned bool   `json:"provisioned"`
 }
 
 // AdapterState carries the recorded and detected tool release per adapter
 // (§7.9).
 type AdapterState struct {
-	ID        string
-	Recorded  string
-	Detected  string
-	Supported []string
+	ID        string   `json:"id"`
+	Recorded  string   `json:"recorded"`
+	Detected  string   `json:"detected"`
+	Supported []string `json:"supported"`
 }
 
 // TargetState carries one secondary-target row (§7.6, §12).
 type TargetState struct {
-	ID            string
-	Adapter       string
-	Participating bool
-	Consented     bool
-	Detail        string
-	Ungoverned    string
+	ID            string `json:"id"`
+	Adapter       string `json:"adapter"`
+	Participating bool   `json:"participating"`
+	Consented     bool   `json:"consented"`
+	Detail        string `json:"detail"`
+	Ungoverned    string `json:"ungoverned"`
 }
 
 // MemberState is one lock context member with its weight (§12).
 type MemberState struct {
-	Kind   string
-	Name   string
-	Weight int64
+	Kind   string `json:"kind"`
+	Name   string `json:"name"`
+	Weight int64  `json:"weight"`
 }
 
 // PrecedenceState carries the precedence primitives per activation (§12).
 type PrecedenceState struct {
-	Winner    string
-	Placement string
+	Winner    string `json:"winner"`
+	Placement string `json:"placement"`
 }
 
 // ProfileState carries the lock's context members with weights and the
 // precedence primitives per activation (§12).
 type ProfileState struct {
-	Profile    string
-	LockHash   string
-	Members    []MemberState
-	Precedence PrecedenceState
+	Profile    string          `json:"profile"`
+	LockHash   string          `json:"lock_hash"`
+	Members    []MemberState   `json:"members"`
+	Precedence PrecedenceState `json:"precedence"`
 }
 
 // Status is the whole matrix.
 type Status struct {
-	Homes                    []HomeState
-	Scopes                   []ScopeHome
-	Adapters                 []AdapterState
-	Targets                  []TargetState
-	Profiles                 []ProfileState
-	UnregisteredEnvironments []string
-	Orphans                  []string
-	Notes                    []string
-	NonCurrent               bool
+	Homes                    []HomeState    `json:"homes"`
+	Scopes                   []ScopeHome    `json:"scopes"`
+	Adapters                 []AdapterState `json:"adapters"`
+	Targets                  []TargetState  `json:"targets"`
+	Profiles                 []ProfileState `json:"profiles"`
+	UnregisteredEnvironments []string       `json:"unregistered_environments"`
+	Orphans                  []string       `json:"orphans"`
+	Notes                    []string       `json:"notes"`
+	NonCurrent               bool           `json:"non_current"`
 }
 
 // StatusRequest scopes one status computation. The seams mirror

@@ -137,6 +137,14 @@ func TestEnvStatusMatrix(t *testing.T) {
 	if err := json.Unmarshal([]byte(jsonOut), &decoded); err != nil {
 		t.Fatalf("status --json is not JSON: %v", err)
 	}
+	for _, key := range []string{"homes", "scopes", "adapters", "targets", "profiles", "unregistered_environments", "orphans", "notes", "non_current"} {
+		if _, ok := decoded[key]; !ok {
+			t.Fatalf("status --json misses snake_case member %q: %v", key, decoded)
+		}
+	}
+	if _, ok := decoded["Homes"]; ok {
+		t.Fatalf("status --json publishes Go field names: %v", decoded)
+	}
 }
 
 // TestUmbrellaMissingProvider narrows the discovery gate: an unknown
