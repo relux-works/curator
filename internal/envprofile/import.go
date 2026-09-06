@@ -284,9 +284,18 @@ func deduplicateSkills(skills []detectedSkill) ([]detectedSkill, []ImportLoss) {
 // native directory carries a valid environment marker, its root-context
 // file reaches managed state through §9.2, never through import (§9.5
 // step 1 inventories unmanaged files, and §9.6's detected-surface list is
-// that inventory), so it is skipped — neither detected nor a loss.
+// that inventory), so it is skipped — neither detected nor a loss. Absence
+// and a failed read stay different facts (§8.4): no marker file is absence
+// and detects the surface; a marker that exists but cannot be read or
+// decoded is a failed read of the evidence that classifies the surface, so
+// the surface is neither detected nor silently dropped — the marker file
+// itself joins the loss list and the consent gate decides.
 func readRootSurface(envID, native, path string) ([]byte, *ImportLoss) {
-	if marker, err := envmarker.Read(native); err == nil && marker != nil {
+	marker, err := envmarker.Read(native)
+	if err != nil {
+		return nil, &ImportLoss{Adapter: envID, Path: filepath.Join(native, envmarker.Name), Reason: "cannot be read: " + err.Error()}
+	}
+	if marker != nil {
 		return nil, nil
 	}
 	payload, err := os.ReadFile(path) // #nosec G304 -- native home file named by the adapter registry

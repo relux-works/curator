@@ -674,3 +674,144 @@ func TestImportLedgerFailureIsLoss(t *testing.T) {
 		t.Fatalf("loss list names no ledger: %v", ledgerErr)
 	}
 }
+
+// TestImportAbsentMarkerDetectsNative drives the production Import over a
+// native home with no marker file: absence is not a failed read (§8.4), so
+// the root-context file is detected as native input and the lossless
+// import installs it.
+func TestImportAbsentMarkerDetectsNative(t *testing.T) {
+	home := t.TempDir()
+	pinHomes(t)
+	seams := pinImportSeams(t)
+	writeNativeFile(t, seams.native["claude_code"], "CLAUDE.md", "hello\n")
+	seedCurrentDefault(t, home)
+	roots, _, losses := detectNative(home, seams.options(Policy{}))
+	if len(losses) != 0 {
+		t.Fatalf("absent marker reported losses: %+v", losses)
+	}
+	if len(roots) != 1 || roots[0].envID != "claude_code" {
+		t.Fatalf("absent marker roots = %+v, want the one native surface", roots)
+	}
+	if _, _, _, err := Import(home, seams.options(Policy{})); err != nil {
+		t.Fatalf("lossless import over an absent marker: %v", err)
+	}
+}
+
+// TestImportCorruptMarkerIsLoss drives the production Import on a machine
+// curator manages where one adapter's marker no longer decodes: the failed
+// read is never absence (§8.4), so the managed root-context file — which
+// carries a full §5.1 generation header — is neither detected as native
+// nor silently dropped. The marker file itself joins the loss list and the
+// consent gate stops the import.
+func TestImportCorruptMarkerIsLoss(t *testing.T) {
+	home := t.TempDir()
+	homes := pinHomes(t)
+	installIdleProfile(t, home, "acme")
+	marker := filepath.Join(homes["claude_code"], envmarker.Name)
+	if _, err := os.ReadFile(marker); err != nil {
+		t.Fatalf("managed home carries no marker: %v", err)
+	}
+	if err := os.WriteFile(marker, []byte("not json at all"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	options := ImportOptions{
+		Policy: Policy{},
+		NativeHomeOf: func(id string) (string, error) {
+			return homes[id], nil
+		},
+		GlobalSkillsOf: func() (string, error) {
+			return t.TempDir(), nil
+		},
+	}
+	seedCurrentDefault(t, home)
+	roots, _, losses := detectNative(home, options)
+	if len(roots) != 0 {
+		t.Fatalf("corrupt-marker roots detected: %+v", roots)
+	}
+	found := false
+	for _, loss := range losses {
+		if loss.Path == marker {
+			found = true
+		}
+		if strings.Contains(loss.Path, "CLAUDE.md") || strings.Contains(loss.Path, "AGENTS.md") {
+			t.Fatalf("managed surface reported as a root loss: %+v", loss)
+		}
+	}
+	if !found {
+		t.Fatalf("marker file names no loss: %+v", losses)
+	}
+	_, _, _, err := Import(home, options)
+	if err == nil || !strings.Contains(err.Error(), DiagImportLossy) {
+		t.Fatalf("corrupt marker err = %v, want %s", err, DiagImportLossy)
+	}
+	if !strings.Contains(err.Error(), envmarker.Name) {
+		t.Fatalf("loss list names no marker: %v", err)
+	}
+	// Under explicit consent the import proceeds, but the managed root is
+	// still never reassembled as a native module.
+	options.AllowLossy = true
+	info, _, _, err := Import(home, options)
+	if err != nil {
+		t.Fatalf("lossy import under consent: %v", err)
+	}
+	member, ok := lockMember(info.Lock, "imported")
+	if !ok || member.StateHash == "" {
+		t.Fatalf("lock %+v", info.Lock.Members)
+	}
+	entry := contextstore.EntryDir(home, "context", "imported", member.StateHash)
+	manifest, err := os.ReadFile(filepath.Join(entry, "agent-context.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(manifest), "claude_code.md") {
+		t.Fatalf("corrupt-marker root reassembled as a native module:\n%s", manifest)
+	}
+}
+
+// TestImportUnreadableMarkerIsLoss drives the production Import on a
+// managed machine where one adapter's marker cannot be read: like the
+// corrupt marker, the failed read is a loss naming the marker file, never
+// absence and never a silent drop.
+func TestImportUnreadableMarkerIsLoss(t *testing.T) {
+	home := t.TempDir()
+	homes := pinHomes(t)
+	installIdleProfile(t, home, "acme")
+	marker := filepath.Join(homes["claude_code"], envmarker.Name)
+	if err := os.Chmod(marker, 0o000); err != nil {
+		t.Skipf("chmod refused: %v", err)
+	}
+	defer func() { _ = os.Chmod(marker, 0o644) }()
+	if _, err := os.ReadFile(marker); err == nil {
+		t.Skip("this environment can read a mode-000 file; unreadability is untestable here")
+	}
+	options := ImportOptions{
+		Policy: Policy{},
+		NativeHomeOf: func(id string) (string, error) {
+			return homes[id], nil
+		},
+		GlobalSkillsOf: func() (string, error) {
+			return t.TempDir(), nil
+		},
+	}
+	seedCurrentDefault(t, home)
+	roots, _, losses := detectNative(home, options)
+	if len(roots) != 0 {
+		t.Fatalf("unreadable-marker roots detected: %+v", roots)
+	}
+	found := false
+	for _, loss := range losses {
+		if loss.Path == marker {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("marker file names no loss: %+v", losses)
+	}
+	_, _, _, err := Import(home, options)
+	if err == nil || !strings.Contains(err.Error(), DiagImportLossy) {
+		t.Fatalf("unreadable marker err = %v, want %s", err, DiagImportLossy)
+	}
+	if !strings.Contains(err.Error(), envmarker.Name) {
+		t.Fatalf("loss list names no marker: %v", err)
+	}
+}
