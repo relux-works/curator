@@ -633,9 +633,18 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	}
 	if prior, err := readSource(home, name); err == nil {
 		// Re-installing an installed source with the same requirement
-		// re-resolves exactly as profile update does and is reported as an
-		// update; a different source under the same name is taken.
+		// re-resolves and is reported as an update; a different source
+		// under the same name is taken. A git reinstall is an update, so
+		// it delegates to updateLocked. A path reinstall is the §1
+		// reinstall — the only operator path that refreshes the immutable
+		// snapshot — so it re-resolves from the freshly computed
+		// stateForPath result already in hand; routing it through
+		// updateLocked would throw that snapshot away and re-pin the old
+		// one, since update resolves a path root from the store.
 		if prior == source {
+			if isPath {
+				return reinstallPathLocked(op, home, name, source, input, options)
+			}
 			info, moved, err := updateLocked(op, home, name, options.Policy)
 			if err != nil {
 				return Info{}, false, false, err
@@ -701,6 +710,89 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 		return info, false, false, switchErr
 	}
 	return info, true, false, nil
+}
+
+// reinstallPathLocked re-resolves a same-source path reinstall from the fresh
+// snapshot the caller already computed with stateForPath (environments §1:
+// later edits change nothing until the operator reinstalls). It mirrors
+// updateLocked's publish-and-resync shape — the new-member blocking checks,
+// the lock-hash comparison, the lock plus previous-lock publication, and the
+// resync of every scope already on this profile — but resolves the root from
+// the fresh input rather than from the store snapshot, which is what makes a
+// reinstall move the pin while an update must not. Like the git reinstall
+// delegation it replaces, it reports updated and never activates: a reinstall
+// refreshes the lock and re-materializes scopes already on the profile, and a
+// --use switch of a non-current profile takes the fresh-install path, not
+// this one.
+func reinstallPathLocked(op *operation, home, name string, source Source, input contextresolve.Input, options InstallOptions) (Info, bool, bool, error) {
+	policy := options.Policy
+	manager := newGitManager(home).withPolicy(policy)
+	oldLock, oldHash, err := readLock(home, name)
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	overlays, err := resolveOverlays(home, manager, name, policy)
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	input.Overlays = overlays
+	input.MCPAllowlist = policy.MCPAllowlist
+	overlayInputDefaults(&input, policy)
+	result, err := contextresolve.Resolve(manager, input)
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	oldMembers := map[string]bool{}
+	for _, member := range oldLock.Members {
+		oldMembers[contextresolve.Key(member.Kind, member.Name)] = true
+	}
+	for key, resolved := range result.Members {
+		if oldMembers[key] {
+			continue
+		}
+		entry, err := manager.ensureEntry(home, resolved)
+		if err != nil {
+			return Info{}, false, false, err
+		}
+		report, err := contextaudit.Detect(packageRoot(entry, resolved.Directory), pinOf(resolved), nil)
+		if err != nil {
+			return Info{}, false, false, err
+		}
+		if report.Blocking() {
+			return Info{}, false, false, fmt.Errorf("%s: new member %s carries a blocking finding; the old lock stands", DiagUpdateBlocked, key)
+		}
+		if _, err := strictAuditMember(home, manager, resolved, entry, policy); err != nil {
+			return Info{}, false, false, fmt.Errorf("%s: new member %s %v; the old lock stands", DiagUpdateBlocked, key, err)
+		}
+	}
+	if result.LockHash == oldHash {
+		machine, _ := Current(home)
+		info := Info{Name: name, Source: source, Lock: result.Lock, LockHash: oldHash, Current: machine == name}
+		return info, false, true, nil
+	}
+	warnings := resolutionWarnings(result)
+	auditWarnings, err := auditAndStore(home, manager, result, policy)
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	warnings = append(warnings, auditWarnings...)
+	canonical, err := result.Lock.Canonical()
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	oldCanonical, err := oldLock.Canonical()
+	if err != nil {
+		return Info{}, false, false, err
+	}
+	if err := op.publish(map[string][]byte{lockPath(home, name): canonical, prevLockPath(home, name): oldCanonical}); err != nil {
+		return Info{}, false, false, err
+	}
+	hash := contextlock.HashBytes(canonical)
+	if err := resyncCurrentScopes(op, home, name, policy); err != nil {
+		return Info{}, false, false, err
+	}
+	machine, _ := Current(home)
+	return Info{Name: name, Source: source, Lock: result.Lock, LockHash: hash, Current: machine == name, Warnings: warnings}, false, true, nil
 }
 
 // Update re-resolves the root (and overlays, when the machine declares any)
