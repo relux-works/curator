@@ -61,6 +61,12 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	if err := policy.CheckMachineUse("other"); err == nil || !strings.Contains(err.Error(), "environments.require_current_profile") {
 		t.Fatalf("locked require must refuse another profile: %v", err)
 	}
+	// The builtin default profile is the first thing an operator under a
+	// lock tries; it is refused like any other non-required name. A mutant
+	// admitting exactly DefaultProfile must fail this row.
+	if err := policy.CheckMachineUse(DefaultProfile); err == nil || !strings.Contains(err.Error(), "environments.require_current_profile") {
+		t.Fatalf("locked require must refuse the builtin default profile: %v", err)
+	}
 	if err := policy.CheckMachineUse("acme"); err != nil {
 		t.Fatalf("required profile refused: %v", err)
 	}

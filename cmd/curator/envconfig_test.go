@@ -267,6 +267,14 @@ func TestProfileUseLockedRequireRefuses(t *testing.T) {
 	if code != exitFail || !strings.Contains(stderr, "environments.require_current_profile") {
 		t.Fatalf("use of another profile = %d\nstderr:\n%s", code, stderr)
 	}
+	// The builtin default profile is refused like any other non-required
+	// name: it is always present, so it is the first thing an operator
+	// under a lock tries. A mutant admitting exactly DefaultProfile must
+	// fail this row.
+	code, _, stderr = runProfile(t, source, "profile", "use", "default")
+	if code != exitFail || !strings.Contains(stderr, "environments.require_current_profile") {
+		t.Fatalf("use of the builtin default profile = %d\nstderr:\n%s", code, stderr)
+	}
 	// The required profile passes the gate: it proceeds to the switch,
 	// which fails only because no such profile is installed.
 	code, _, stderr = runProfile(t, source, "profile", "use", "companyA")
