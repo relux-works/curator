@@ -9,11 +9,11 @@ import (
 	"github.com/relux-works/curator/internal/envprofile"
 )
 
-// cmdProfile dispatches the profile family (cli/curator.md): install, list,
-// use, update, remove, sync, compose.
+// cmdProfile dispatches the profile family (cli/curator.md): install,
+// import, list, use, update, remove, sync, compose.
 func (c cli) cmdProfile(args []string) int {
 	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | list | use | update | remove | sync | compose")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile needs a subcommand: install | import | list | use | update | remove | sync | compose")
 		return exitUsage
 	}
 	cfg, code := c.loadConfig()
@@ -23,6 +23,8 @@ func (c cli) cmdProfile(args []string) int {
 	switch args[0] {
 	case "install":
 		return c.cmdProfileInstall(cfg, args[1:])
+	case "import":
+		return c.cmdProfileImport(cfg, args[1:])
 	case "list":
 		return c.cmdProfileList(cfg, args[1:])
 	case "use":
@@ -38,6 +40,51 @@ func (c cli) cmdProfile(args []string) int {
 	}
 	_, _ = fmt.Fprintf(c.stderr, "curator: unknown profile subcommand %q\n", args[0])
 	return exitUsage
+}
+
+// cmdProfileImport implements `profile import [--as <name>] [--allow-lossy]
+// [--use]` (cli/curator.md, environments §9.6): it reassembles the section
+// 9.5 inventory into a context-package-shaped directory and installs it
+// through the ordinary path pipeline. Machine configuration never
+// pre-records consent: only the per-operation flag proceeds past a lossy
+// classification.
+func (c cli) cmdProfileImport(cfg *config.Config, args []string) int {
+	flags := c.newFlagSet("profile import")
+	as := flags.String("as", "", "profile name (default: imported)")
+	allowLossy := flags.Bool("allow-lossy", false, "proceed past a lossy classification, re-reporting the loss list as warnings")
+	use := flags.Bool("use", false, "activate the installed profile")
+	positional, err := parseInterspersed(flags, args)
+	if err != nil || len(positional) != 0 {
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile import [--as <name>] [--allow-lossy] [--use]")
+		return exitUsage
+	}
+	policy := envprofile.PolicyFromConfig(cfg)
+	info, activated, updated, err := envprofile.Import(cfg.Home(), envprofile.ImportOptions{
+		As: *as, AllowLossy: *allowLossy, Use: *use, Policy: policy,
+	})
+	for _, warning := range info.Warnings {
+		_, _ = fmt.Fprintln(c.stderr, "warning:", warning)
+	}
+	for _, result := range info.Activation {
+		printEntryResult(c, result)
+	}
+	if err != nil {
+		if len(info.Activation) > 0 && info.Name != "" {
+			_, _ = fmt.Fprintf(c.stdout, "installed profile %s (lock %s)\n", info.Name, info.LockHash)
+		}
+		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+		return exitFail
+	}
+	root, _ := info.Lock.RootMember()
+	switch {
+	case updated:
+		_, _ = fmt.Fprintf(c.stdout, "updated profile %s (lock %s)\n", info.Name, info.LockHash)
+	case activated:
+		_, _ = fmt.Fprintf(c.stdout, "installed and activated profile %s (root %s %s, lock %s)\n", info.Name, root.Name, root.Version, info.LockHash)
+	default:
+		_, _ = fmt.Fprintf(c.stdout, "installed profile %s (root %s %s, lock %s); activate with 'curator profile use %s'\n", info.Name, root.Name, root.Version, info.LockHash, info.Name)
+	}
+	return exitOK
 }
 
 func (c cli) cmdProfileInstall(cfg *config.Config, args []string) int {
@@ -126,6 +173,11 @@ func (c cli) cmdProfileList(cfg *config.Config, args []string) int {
 		}
 		for _, scope := range info.ScopedFor {
 			markers = append(markers, scope+"="+info.Name)
+		}
+		// A path root reports whether it is imported-from-native
+		// (environments §12).
+		if info.Source.ImportedFromNative {
+			markers = append(markers, "imported")
 		}
 		sort.Strings(markers)
 		_, _ = fmt.Fprintf(c.stdout, "%s\t%s\t%s\t%s\t%s %s\t%s\t%s\t%s\n",

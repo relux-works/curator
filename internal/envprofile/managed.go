@@ -312,6 +312,7 @@ func assembleHome(req *ResolveRequest, source Source, lock *contextlock.Lock, ha
 			LockSHA256: strings.TrimPrefix(hash, "sha256:"),
 			Source:     markerSource(source), Requirement: markerRequirement(source),
 			Directory: source.Directory, SourcePath: markerSourcePath(source),
+			ImportedFromNative: source.ImportedFromNative,
 		},
 		Precedence: envmarker.Precedence{Winner: precedence.Winner, Placement: precedence.Placement},
 		Mode:       envmarker.ModeManagedHome,

@@ -523,6 +523,7 @@ func materializeOne(home string, source Source, profile string, lock *contextloc
 			LockSHA256: strings.TrimPrefix(hash, "sha256:"),
 			Source:     markerSource(source), Requirement: markerRequirement(source),
 			Directory: source.Directory, SourcePath: markerSourcePath(source),
+			ImportedFromNative: source.ImportedFromNative,
 		},
 		Precedence: envmarker.Precedence{Winner: precedence.Winner, Placement: precedence.Placement},
 		Mode:       envmarker.ModeLinked,

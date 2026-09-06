@@ -99,7 +99,7 @@ func (c cli) cmdComposeAdd(cfg *config.Config, profile string, args []string) in
 		entry["range"] = *rng
 	case *tag != "":
 		entry["tag"] = *tag
-	default:
+	case *revision != "":
 		entry["revision"] = *revision
 	}
 	if *directory != "" {

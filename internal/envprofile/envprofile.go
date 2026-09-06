@@ -93,13 +93,16 @@ func (r Requirement) Form() string {
 	}
 }
 
-// Source is the install record of one profile.
+// Source is the install record of one profile. ImportedFromNative marks a
+// path profile reassembled by the section 9.6 onboarding import; its
+// environment markers record imported_from_native.
 type Source struct {
-	Kind      string      `json:"kind"`
-	Git       string      `json:"git,omitempty"`
-	Path      string      `json:"path,omitempty"`
-	Directory string      `json:"directory,omitempty"`
-	Req       Requirement `json:"requirement"`
+	Kind               string      `json:"kind"`
+	Git                string      `json:"git,omitempty"`
+	Path               string      `json:"path,omitempty"`
+	Directory          string      `json:"directory,omitempty"`
+	Req                Requirement `json:"requirement"`
+	ImportedFromNative bool        `json:"imported_from_native,omitempty"`
 }
 
 // ProfilesDir is the profile store below the manager home.
@@ -504,6 +507,10 @@ type InstallOptions struct {
 	As        string
 	Use       bool
 	Policy    Policy
+	// Imported marks an installation reassembled by the section 9.6
+	// onboarding import: the install record and the environment markers
+	// carry imported_from_native. Only the import sets it.
+	Imported bool
 }
 
 // Install installs one root context package as a profile: it resolves the
@@ -566,7 +573,7 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 		if err != nil {
 			return Info{}, false, false, err
 		}
-		source = Source{Kind: KindPath, Path: options.Operand}
+		source = Source{Kind: KindPath, Path: options.Operand, ImportedFromNative: options.Imported}
 		input = contextresolve.Input{
 			Root:      contextresolve.Requirement{Kind: contextlock.KindContext, Name: manifest.Name},
 			RootState: state,
