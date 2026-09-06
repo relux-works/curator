@@ -230,6 +230,36 @@ func TestProfileUseTargetIsStageB(t *testing.T) {
 	}
 }
 
+// TestProfileUseTargetBoundToAdapter narrows the §7.6 per-adapter
+// resolution gate through the production run() entry point: the same
+// target resolves for the adapters that declare it and is
+// environment_target_unknown for the adapters that do not. Weakening
+// TargetFor to ignore its adapter argument (delegating to TargetByID)
+// admits pi/opencode here and fails this test.
+func TestProfileUseTargetBoundToAdapter(t *testing.T) {
+	source, _ := profileHome(t)
+	pkg := t.TempDir()
+	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
+	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
+		t.Fatalf("install stderr:\n%s", stderr)
+	}
+	for _, env := range []string{"pi", "opencode"} {
+		code, _, stderr := runProfile(t, source, "profile", "use", "acme", "--env", env, "--target", "xcode-coding-assistant")
+		if code != exitFail || !strings.Contains(stderr, "environment_target_unknown") {
+			t.Fatalf("use --env %s --target xcode-coding-assistant = %d, want environment_target_unknown\nstderr:\n%s", env, code, stderr)
+		}
+	}
+	for _, env := range []string{"claude_code", "codex_cli"} {
+		code, _, stderr := runProfile(t, source, "profile", "use", "acme", "--env", env, "--target", "xcode-coding-assistant")
+		if code != exitFail || strings.Contains(stderr, "environment_target_unknown") {
+			t.Fatalf("use --env %s --target xcode-coding-assistant must not report unknown: %d\nstderr:\n%s", env, code, stderr)
+		}
+		if !strings.Contains(stderr, "writes are deferred") {
+			t.Fatalf("use --env %s --target xcode-coding-assistant names the deferred writes: %d\nstderr:\n%s", env, code, stderr)
+		}
+	}
+}
+
 // TestProfileInstallWarnsOnSystemModule checks the always-warn class
 // reaches stderr on install with exit 0.
 func TestProfileInstallWarnsOnSystemModule(t *testing.T) {

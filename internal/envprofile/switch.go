@@ -168,7 +168,11 @@ func useLocked(op *operation, home, name, environment, target string, clearScope
 		}
 	}
 	if target != "" {
-		if _, err := envregistry.TargetByID(target); err != nil {
+		if environment != "" {
+			if _, err := envregistry.TargetFor(environment, target); err != nil {
+				return nil, err
+			}
+		} else if _, err := envregistry.TargetByID(target); err != nil {
 			return nil, err
 		}
 		return nil, fmt.Errorf("secondary fixed-home target %q writes are deferred: participation, consent, and status are implemented, surface writes are not", target)
