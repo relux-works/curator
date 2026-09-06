@@ -363,45 +363,59 @@ func TestRequireCurrentProfileUnlockedCarriesNoRefusal(t *testing.T) {
 }
 
 // TestSystemV2LockableSubsetIsClassWide proves the system-file allowed-knob
-// gate is class-wide, not per-knob-name: every §12.2 lockable key is
-// carriable by the system file, and every representative non-lockable key
-// is refused. A narrowing mutant that admits exactly one non-lockable knob
-// (for example environments.forms) must fail this test.
+// gate is class-wide, not per-knob-name. Both sides derive from the same
+// sources the code does: the knob list is EnvKnobNames (the §12.1 table the
+// reader enforces) and the admitted set is LockableEnvKeys (the §12.2
+// subset parseSystemEnvironments enforces via systemEnvKnobs). Every knob
+// needs a grammatically valid payload below, so a knob added to the reader
+// without a payload — or to LockableEnvKeys without §12.2 standing — fails
+// here instead of widening the system file's reach silently. A narrowing
+// mutant that admits exactly one non-lockable knob (for example
+// secret_material_waivers, xdg_seed_allowlist or in_place_mode) must fail
+// this test.
 func TestSystemV2LockableSubsetIsClassWide(t *testing.T) {
 	user := `{"schema_version": 2, "skills_root": "x", "projects": {}}`
-	lockable := []struct {
-		name   string
-		system string
-	}{
-		{"overlays_allowed", `{"schema_version": 2, "locked": [], "environments": {"overlays_allowed": false}}`},
-		{"precedence", `{"schema_version": 2, "locked": [], "environments": {"precedence": {"winner": "lower-weight"}}}`},
-		{"mcp_package_allowlist", `{"schema_version": 2, "locked": [], "environments": {"mcp_package_allowlist": []}}`},
-		{"passable_env_names", `{"schema_version": 2, "locked": [], "environments": {"passable_env_names": []}}`},
-		{"require_current_profile", `{"schema_version": 2, "locked": [], "environments": {"require_current_profile": "acme"}}`},
-		{"isolation", `{"schema_version": 2, "locked": [], "environments": {"isolation": {"a": {"pi": "shared"}}}}`},
+	payloads := map[string]string{
+		"current_profile":         `{"current_profile": "a"}`,
+		"scoped_current":          `{"scoped_current": {"codex_cli": "a"}}`,
+		"overlays":                `{"overlays": {}}`,
+		"overlay_default_weight":  `{"overlay_default_weight": 5}`,
+		"overlays_allowed":        `{"overlays_allowed": false}`,
+		"precedence":              `{"precedence": {"winner": "lower-weight"}}`,
+		"forms":                   `{"forms": {"claude_code": "monolithic"}}`,
+		"system_prompt_files":     `{"system_prompt_files": {"a": {"pi": "append"}}}`,
+		"targets":                 `{"targets": {"codex_cli": {"participation": "off"}}}`,
+		"isolation":               `{"isolation": {"a": {"pi": "shared"}}}`,
+		"xdg_seed_allowlist":      `{"xdg_seed_allowlist": ["git"]}`,
+		"passable_env_names":      `{"passable_env_names": []}`,
+		"mcp_package_allowlist":   `{"mcp_package_allowlist": []}`,
+		"shadow_acknowledged":     `{"shadow_acknowledged": [{"env": "codex_cli", "path": "some/path"}]}`,
+		"secret_material_waivers": `{"secret_material_waivers": [{"pin": "0123456789abcdef0123456789abcdef01234567", "file": "context/a.md", "span": [1, 2], "reason": "org policy"}]}`,
+		"backup_retention":        `{"backup_retention": 1}`,
+		"require_current_profile": `{"require_current_profile": "acme"}`,
+		"in_place_mode":           `{"in_place_mode": {"codex_cli": "linked"}}`,
 	}
-	for _, tc := range lockable {
-		t.Run("lockable/"+tc.name, func(t *testing.T) {
-			if _, _, err := loadWithSystem(t, user, tc.system); err != nil {
-				t.Fatalf("lockable knob %q refused: %v", tc.name, err)
-			}
-		})
+	if len(payloads) != len(EnvKnobNames) {
+		t.Fatalf("payloads cover %d knobs, EnvKnobNames carries %d: keep the two in step", len(payloads), len(EnvKnobNames))
 	}
-	nonLockable := []struct {
-		name   string
-		system string
-	}{
-		{"forms", `{"schema_version": 2, "locked": [], "environments": {"forms": {"claude_code": "monolithic"}}}`},
-		{"current_profile", `{"schema_version": 2, "locked": [], "environments": {"current_profile": "a"}}`},
-		{"overlays", `{"schema_version": 2, "locked": [], "environments": {"overlays": {}}}`},
-		{"overlay_default_weight", `{"schema_version": 2, "locked": [], "environments": {"overlay_default_weight": 5}}`},
-		{"backup_retention", `{"schema_version": 2, "locked": [], "environments": {"backup_retention": 1}}`},
-	}
-	for _, tc := range nonLockable {
-		t.Run("non-lockable/"+tc.name, func(t *testing.T) {
-			_, _, err := loadWithSystem(t, user, tc.system)
+	for _, knob := range EnvKnobNames {
+		body, ok := payloads[knob]
+		if !ok {
+			t.Fatalf("no system-file payload for knob %q: add one or the gate is untested", knob)
+		}
+		system := `{"schema_version": 2, "locked": [], "environments": ` + body + `}`
+		if LockableEnvKeys["environments."+knob] {
+			t.Run("lockable/"+knob, func(t *testing.T) {
+				if _, _, err := loadWithSystem(t, user, system); err != nil {
+					t.Fatalf("lockable knob %q refused: %v", knob, err)
+				}
+			})
+			continue
+		}
+		t.Run("non-lockable/"+knob, func(t *testing.T) {
+			_, _, err := loadWithSystem(t, user, system)
 			if err == nil || !strings.Contains(err.Error(), "not lockable") {
-				t.Fatalf("non-lockable knob %q admitted: err = %v", tc.name, err)
+				t.Fatalf("non-lockable knob %q admitted: err = %v", knob, err)
 			}
 		})
 	}

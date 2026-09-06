@@ -268,15 +268,24 @@ func parseEnvironments(raw any) (Environments, error) {
 	return env, nil
 }
 
+// EnvKnobNames is the closed §12.1 knob list: the single source the reader
+// (envKnob, SplitEnvKnob) and the system-file lockable-subset test derive
+// from, so a knob added to the reader without test coverage — or to the
+// test without the reader — fails instead of widening a gate silently.
+var EnvKnobNames = []string{
+	"current_profile", "scoped_current", "overlays", "overlay_default_weight",
+	"overlays_allowed", "precedence", "forms", "system_prompt_files",
+	"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
+	"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
+	"backup_retention", "require_current_profile", "in_place_mode",
+}
+
 // envKnob reports whether key is a §12.1 knob name.
 func envKnob(key string) bool {
-	switch key {
-	case "current_profile", "scoped_current", "overlays", "overlay_default_weight",
-		"overlays_allowed", "precedence", "forms", "system_prompt_files",
-		"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
-		"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
-		"backup_retention", "require_current_profile", "in_place_mode":
-		return true
+	for _, name := range EnvKnobNames {
+		if key == name {
+			return true
+		}
 	}
 	return false
 }
@@ -954,12 +963,7 @@ func SplitEnvKnob(knob string) ([]string, error) {
 	if len(segments) == 0 || segments[0] == "" {
 		return nil, verr.New("knob", "requires a section 12.1 knob name")
 	}
-	switch segments[0] {
-	case "current_profile", "scoped_current", "overlays", "overlay_default_weight",
-		"overlays_allowed", "precedence", "forms", "system_prompt_files",
-		"targets", "isolation", "xdg_seed_allowlist", "passable_env_names",
-		"mcp_package_allowlist", "shadow_acknowledged", "secret_material_waivers",
-		"backup_retention", "require_current_profile", "in_place_mode":
+	if envKnob(segments[0]) {
 		for _, segment := range segments[1:] {
 			if segment == "" {
 				return nil, verr.New("knob", "requires a section 12.1 knob name")
