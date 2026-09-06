@@ -4353,3 +4353,32 @@ A second lesson from the same cycle: the platform-path fold gate keys on the
 folded *full* path, so `Dir/x.txt` and `dir/y.txt` both pass and land in one
 physical directory on APFS. Pre-existing, not a regression, filed as its own
 task.
+
+## 2026-09-06 — stage (a) lands after six review cycles: sixteen defects a green suite hid
+
+Context packages, semver locks, the profile store, the always-strict audit and
+monolithic materialization are on curator main (`981b1eeb`, PR #59). The number
+worth remembering is sixteen: that is how many defects six adversarial review
+cycles on opus-xhigh found in work whose own suite was green at every handoff.
+None was a style quibble. The detector was bypassed for any package addressed
+with a `directory`. The builtin `default` profile pinned a store entry that was
+never created, so four CLI rows were dead on a fresh machine. The canonical
+source identity was never computed, so locks and markers failed the published
+schemas and three spellings of one repository gave three identities. `install`
+applied neither the source allowlist nor audit revocations — only the two
+detector classes the spec *adds* to a pipeline that was never run. The
+default-profile migration read its own weaker copy of the machine config, so
+system locks did not apply. `install --use` recorded a current profile without
+materializing anything and reported "activated". The `path`-vs-`git` decision
+probed the filesystem, so a local directory could shadow a git identity and
+bypass the network allowlist. A machine switch overwrote scoped adapters while
+the scope record kept claiming otherwise.
+
+Two method notes. First, the reviewer never accepted a producer's mutation
+table on trust; it ran its own, and one cycle found the negatives were
+delete-only, so three mutants that *weakened* a gate instead of removing it all
+survived. Narrowing beats deletion. Second, the last defect was invisible to
+every Unix lane and to every local run: the `insteadOf` fixtures wrote native
+Windows paths into git config, where a backslash is an escape, so
+`C:\Users\...` collapsed and twenty tests failed only on the hosted Windows
+runner.
