@@ -89,10 +89,13 @@ func Parse(rawURL string) (string, error) {
 		}
 		host = strings.ToLower(match[1])
 		repoPath = match[2]
-		if len(host) == 1 {
-			// A single-letter host is a Windows drive, not a hostname.
-			return "", nil
-		}
+		// A one-character host is a hostname, not a drive: core §6.1's host
+		// grammar is [A-Za-z0-9][A-Za-z0-9.-]*, which admits a single
+		// character, and manager-config-v2 $defs/overlay classifies
+		// `c:example/x` as git on exactly that grammar. The Windows drive
+		// spellings never reach here -- driveRE above returns them local
+		// for both `C:/x` and `C:\x` -- so a one-character host here is a
+		// remote whose path does not start with a slash or a backslash.
 	}
 	if !hostRE.MatchString(host) {
 		return "", fmt.Errorf("network source host is not portable ASCII")
