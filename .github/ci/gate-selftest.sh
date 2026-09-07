@@ -29,6 +29,9 @@ PASS=0; FAIL=0; SKIPPED=0
 # immutable, lowercase 40-hex revision -- the same shape a candidate must have.
 PIN="$(awk '/^[ \t]*SPEC_PIN:[ \t]*/{print $2; exit}' .github/workflows/ci.yml)"
 
+# The module path, so cases can name import paths the way `go list` prints them.
+MODULE_PATH="$(awk '/^module[ \t]/{print $2; exit}' go.mod)"
+
 ok()   { PASS=$((PASS + 1)); printf 'ok    %s\n' "$1"; }
 bad()  { FAIL=$((FAIL + 1)); printf 'FAIL  %s\n      %s\n' "$1" "$2"; }
 skip() { SKIPPED=$((SKIPPED + 1)); printf 'skip  %s\n      %s\n' "$1" "$2"; }
@@ -365,6 +368,74 @@ if command -v go >/dev/null 2>&1 && go list ./... >/dev/null 2>&1; then
 		assert_contains 'the partial root defers internal/marker' 'internal/marker' "$WORK/plan-partial/plan-deferred.txt"
 	else
 		bad 'the partial plan wrote a deferred list' 'missing plan-deferred.txt'
+	fi
+
+	# --- one missing environments family is fatal in the candidate lane -----
+	#
+	# `internal/interop/environments` exists so that the environments vector
+	# families can be DECLARED without deferring the pre-environments cases in
+	# `internal/interop`, which the default lane runs against the committed pin.
+	# The declaration is only worth something if EACH declared artefact is
+	# load-bearing on its own: a root that publishes five of the six and drops
+	# one must fail the candidate lane by name, not skip the family quietly.
+	#
+	# These cases delete exactly one artefact at a time from the otherwise fully
+	# serving root -- the narrowest possible weakening of the root -- and require
+	# the plan to name the package AND the missing family every time.
+	ENVPKG='internal/interop/environments'
+	ENV_ARTEFACTS="$(awk -F'\t' -v p="$ENVPKG" '$1 == p { gsub(/,/, " ", $2); print $2; exit }' "$HERE/root-artifacts.tsv")"
+
+	# The row must declare at least every family the package's own cases require.
+	# Reading the required set out of the row instead would make this loop
+	# self-referential: shrink the row and the loop shrinks with it, and a
+	# dropped family would test nothing while still reporting `ok`.
+	ENV_REQUIRED="$(sed -n 's/.*requireFamily(t, root, "\([^"]*\)").*/\1/p' \
+		"$ROOTDIR/$ENVPKG"/*_test.go 2>/dev/null | sort -u)"
+	# ...plus the two trees the vectors cross-reference by path, which no
+	# requireFamily call names. A root serving the vector but not the tree would
+	# fail mid-case instead of failing the lane by name.
+	ENV_REQUIRED="$ENV_REQUIRED expected/environments fixtures/byte-exact"
+	if [ -z "$(printf '%s' "$ENV_REQUIRED" | tr -d ' \n')" ]; then
+		bad "$ENVPKG requires at least one environments family" 'no requireFamily call found in the package'
+	fi
+	for required in $ENV_REQUIRED; do
+		case " $ENV_ARTEFACTS " in
+		*" $required "*) ok "root-artifacts.tsv declares $required for $ENVPKG" ;;
+		*) bad "root-artifacts.tsv declares $required for $ENVPKG" \
+			"the package reads it, so a root dropping it must DEFER the package; undeclared, the candidate lane stays green" ;;
+		esac
+	done
+
+	if [ -z "$ENV_ARTEFACTS" ]; then
+		bad "$ENVPKG declares its environments artefacts" "no row for $ENVPKG in root-artifacts.tsv"
+	else
+		for artefact in $ENV_ARTEFACTS; do
+			HOLED="$WORK/holed"
+			rm -rf "$HOLED"
+			cp -R "$SERVING" "$HOLED"
+			rm -rf "${HOLED:?}/${artefact:?}"
+			evdir="$WORK/plan-holed"
+			rm -rf "$evdir"
+			assert "a candidate root missing $artefact fails the lane" 1 \
+				env CI_GATE_GOOS=darwin CI_REQUIRE_FULL_ROOT=1 bash "$PLAN" "$HOLED" "$evdir"
+			if [ -f "$evdir/suite-plan.txt" ]; then
+				assert_contains "the failure names $ENVPKG"  "FAIL  $ENVPKG was deferred" "$evdir/suite-plan.txt"
+				assert_contains "the failure names $artefact" "missing: $artefact"          "$evdir/suite-plan.txt"
+				assert_contains "internal/interop itself is still served for $artefact" \
+					"$MODULE_PATH/internal/interop" "$evdir/plan-served.txt"
+			else
+				bad "the holed plan wrote its report for $artefact" "missing $evdir/suite-plan.txt"
+			fi
+		done
+	fi
+
+	# The pre-environments consumer must never be dragged into the deferral: it
+	# is the package whose cases the default lane runs against the pinned root.
+	if grep -qx "$MODULE_PATH/internal/interop" "$WORK/plan-partial/plan-deferred.txt"; then
+		bad 'internal/interop is never deferred by a partial root' \
+			'the pre-environments conformance cases would stop running on the default lane'
+	else
+		ok 'internal/interop is never deferred by a partial root'
 	fi
 
 	assert 'a root excluding linux excludes godriver there' 0 \
