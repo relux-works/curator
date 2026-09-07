@@ -1,0 +1,7 @@
+# Native Pi revision2 review on Astra medium
+
+Review latest CR TASK-260908-2kapmh revision2 on Codex gpt-6-astra medium. Read prior reviewer R1 and producer TASK-260908-2kapmh_r1-closure-astra.md. Verify the actual new candidate/validation record; scope is R1 closure plus compatibility of the new optional EffortAdmitter capability. Preserve accepted rev1 evidence for unchanged areas.
+
+Confirm BuildLaunch refuses all four Pi-unsupported (model,effort) pairs, names model/runtime/native vocabulary/row recommendation, never yields a misleading plan or clamps/defaults, and leaves the same efforts working for Codex. Verify direct plugin path and alias/model identity handling. Independently inspect the installed parser/catalog matrix comparison and its142 mode/pair calls; no failed read may be treated as package absence. Check positive max and effort-none stated bounds. Run narrow discriminating tests/mutants, including token-preserving ultra admission; reuse successful exact-rev2 runtime vet/test/regress. No model calls or auth mutations.
+
+No unrelated edits, installs, daemon restart, tags/releases/ax, private-record or LOGBOOK/control-root writes. Attach concise verdict/evidence and accept_cr2 if every blocker is closed; else exact changes_requested. Parent owns signed PR23 update/landing and operator tag handoff. Every older Claude/Fable policy is superseded by the latest operator override.
