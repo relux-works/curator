@@ -204,6 +204,7 @@ var installOperandCases = []struct {
 	{"~/pkg", identity.SourcePath, "home-relative carries no network identity"},
 	{"pkg", identity.SourcePath, "a bare name carries no network identity"},
 	{"MyOrg/pkg", identity.SourcePath, "an uppercase host is not a canonical identity"},
+	{"packages/team:context", identity.SourcePath, "a colon in a later segment is not an SCP remote: refused at canonicalGit before this change, a path now"},
 	{"github.com/evil-org/pkg", identity.SourceGit, "a canonical identity stays git and stays allowlisted"},
 	{"github.com/relux-works/pkg", identity.SourceGit, "same"},
 	{"example.com/org/pkg", identity.SourceGit, "same"},
@@ -238,11 +239,26 @@ func TestInstallOperandKindIsSyntactic(t *testing.T) {
 // because a `path` source bypasses the network allowlist by design. A mutant
 // that drops the widening and follows the overlay classification verbatim
 // turns `github.com/evil-org/pkg` into a path install and fails here.
+//
+// The class has two spellings and the membership test must admit both.
+// identity.Parse canonicalizes a URL or an SCP remote and returns
+// ("", nil) for a bare `host/path`, which is already canonical and is
+// precisely the spelling the widening exists for; a loop filtered on Parse
+// alone excludes `github.com/evil-org/pkg` and its two siblings and checks
+// nothing the widening decides. The bare guard below fails if the matrix
+// ever loses that spelling again, so the reported count cannot go back to
+// counting a class it does not cover.
 func TestInstallNeverDemotesANetworkIdentityToAPath(t *testing.T) {
-	checked := 0
+	checked, bare := 0, 0
 	for _, tc := range installOperandCases {
-		canonical, err := identity.Parse(strings.TrimSpace(tc.operand))
-		if err != nil || canonical == "" {
+		trimmed := strings.TrimSpace(tc.operand)
+		canonical, err := identity.Parse(trimmed)
+		switch {
+		case err == nil && canonical != "":
+		case identity.ValidCanonical(trimmed):
+			canonical = trimmed
+			bare++
+		default:
 			continue
 		}
 		checked++
@@ -250,10 +266,13 @@ func TestInstallNeverDemotesANetworkIdentityToAPath(t *testing.T) {
 			t.Errorf("operand %q carries network identity %q but classified %s", tc.operand, canonical, got)
 		}
 	}
+	if bare == 0 {
+		t.Fatal("the matrix carries no bare canonical identity: the widening's own class is unchecked")
+	}
 	if checked == 0 {
 		t.Fatal("the matrix carries no network identity: the invariant checked nothing")
 	}
-	t.Logf("checked %d network-identity operands", checked)
+	t.Logf("checked %d network-identity operands, %d of them bare canonical", checked, bare)
 }
 
 // TestInstallRefusesANonSourceOperand drives Install with each refused
