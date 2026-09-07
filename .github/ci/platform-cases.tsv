@@ -152,6 +152,22 @@ internal/install	TestEndToEndInstall	linux,darwin,windows	-	-	materialises the e
 internal/adapters	TestSymlinkModeStagesRelativeLinkTargets	linux,darwin,windows	-	-	creates a link (Windows: a reparse point) and asserts its target stays relative
 
 # ===========================================================================
+# Audit registry snapshot clock bound
+# ===========================================================================
+#
+# The future-timestamp gate is wall-clock sensitive and its only observed
+# failure was on the slowest runner in the matrix (BUG-260906-1bdotx: the
+# fixture minted created_at inside the request handler, so a fetch that
+# crossed a whole-second boundary served a timestamp ahead of the `now` the
+# checker had already sampled). Naming these here makes every runner --
+# windows above all -- execute the bound by name instead of leaving it to
+# whichever lane happens to be slow enough to notice.
+internal/install	TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch	linux,darwin,windows	-	-	a snapshot minted before the run installs even when the fetch crosses a whole-second boundary
+internal/install	TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries	linux,darwin,windows	-	-	a genuinely future-dated snapshot denies the install through the production resolveRegistries path
+internal/registry	TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew	linux,darwin,windows	-	-	the future-timestamp bound is exactly the configured skew at every skew a manager config can carry
+internal/registry	TestSnapshotZeroClockSkewIsLiteral	linux,darwin,windows	-	-	a zero clock skew is literal: no tolerance, not a fallback to the default
+
+# ===========================================================================
 # Transaction journal and install atomicity
 # ===========================================================================
 internal/transaction	TestValidateIndependentTargetNamespacesRejectsOverlappingPaths	linux,darwin,windows	linux,darwin,windows	host-capability	independent target namespaces reject overlapping paths (link-capability guarded)
