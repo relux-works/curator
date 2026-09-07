@@ -53,7 +53,7 @@ type contextDetectorsVector struct {
 // the store would hold it.
 func TestConformanceContextDetectors(t *testing.T) {
 	root := suiteRoot(t)
-	vectorPath := filepath.Join(root, "vectors", "context-detectors.json")
+	vectorPath := rootPath(t, root, "vectors/context-detectors.json")
 	payload := requireFamily(t, root, "vectors/context-detectors.json")
 	var vector contextDetectorsVector
 	if err := json.Unmarshal(payload, &vector); err != nil {

@@ -418,10 +418,12 @@ if command -v go >/dev/null 2>&1 && go list ./... >/dev/null 2>&1; then
 	# dropped family would test nothing while still reporting `ok`.
 	ENV_REQUIRED="$(sed -n 's/.*requireFamily(t, root, "\([^"]*\)").*/\1/p' \
 		"$ROOTDIR/$ENVPKG"/*_test.go 2>/dev/null | sort -u)"
-	# ...plus the two trees the vectors cross-reference by path, which no
-	# requireFamily call names. A root serving the vector but not the tree would
-	# fail mid-case instead of failing the lane by name.
-	ENV_REQUIRED="$ENV_REQUIRED expected/environments fixtures/byte-exact"
+	# The cross-referenced paths -- the trees and the expected file the VECTORS
+	# name, which no requireFamily call mentions -- are deliberately NOT listed
+	# here. A third hand-kept copy is a third place to forget, and one was
+	# already forgotten that way. They are derived from the vectors themselves by
+	# TestConformanceEveryPathTheVectorsNameIsDeclared, and the holing loop below
+	# proves each of them is load-bearing for the plan whatever the row says.
 	if [ -z "$(printf '%s' "$ENV_REQUIRED" | tr -d ' \n')" ]; then
 		bad "$ENVPKG requires at least one environments family" 'no requireFamily call found in the package'
 	fi

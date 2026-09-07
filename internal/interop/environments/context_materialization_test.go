@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -68,7 +67,7 @@ type environmentsVector struct {
 func loadEnvironmentsVector(t *testing.T) (string, environmentsVector) {
 	t.Helper()
 	root := suiteRoot(t)
-	vectorPath := filepath.Join(root, "vectors", "environments.json")
+	vectorPath := rootPath(t, root, "vectors/environments.json")
 	payload := requireFamily(t, root, "vectors/environments.json")
 	var vector environmentsVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
@@ -274,7 +273,7 @@ func TestConformanceEnvironmentsMonolithic(t *testing.T) {
 				if !ok {
 					t.Fatalf("produced no file for vector path %s", file.Path)
 				}
-				want, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file.Expected)))
+				want, err := os.ReadFile(rootPath(t, root, file.Expected))
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -60,7 +60,7 @@ func acquisitionGit(t *testing.T, dir string, args ...string) string {
 // family first, and a CI_REQUIRE_FULL_ROOT lane fails there.
 func TestConformanceSnapshotAcquisition(t *testing.T) {
 	root := suiteRoot(t)
-	vectorPath := filepath.Join(root, "vectors", "snapshot-acquisition.json")
+	vectorPath := rootPath(t, root, "vectors/snapshot-acquisition.json")
 	payload := requireFamily(t, root, "vectors/snapshot-acquisition.json")
 	var vector snapshotAcquisitionVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
@@ -71,7 +71,7 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
 	}
 	for _, tc := range vector.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			fixture := filepath.Join(root, filepath.FromSlash(tc.Fixture))
+			fixture := rootPath(t, root, tc.Fixture)
 			wantHash := readRootFile(t, root, tc.Expected)
 			if wantHash != tc.ExpectedSHA256 {
 				t.Fatalf("expected file %s (%s) disagrees with vector expected_sha256 (%s)", tc.Expected, wantHash, tc.ExpectedSHA256)

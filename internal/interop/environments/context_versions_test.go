@@ -3,7 +3,6 @@ package environments
 import (
 	"encoding/json"
 	"errors"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -44,7 +43,7 @@ type contextVersionsVector struct {
 func loadContextVersionsVector(t *testing.T) (string, contextVersionsVector) {
 	t.Helper()
 	root := suiteRoot(t)
-	vectorPath := filepath.Join(root, "vectors", "context-versions.json")
+	vectorPath := rootPath(t, root, "vectors/context-versions.json")
 	payload := requireFamily(t, root, "vectors/context-versions.json")
 	var vector contextVersionsVector
 	if err := json.Unmarshal(payload, &vector); err != nil {

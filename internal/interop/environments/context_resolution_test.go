@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
@@ -172,7 +171,7 @@ func vectorLockToLock(t *testing.T, in vectorLock) *contextlock.Lock {
 // hash against the lock family of vectors/context-versions.json.
 func TestConformanceContextResolution(t *testing.T) {
 	root := suiteRoot(t)
-	vectorPath := filepath.Join(root, "vectors", "context-versions.json")
+	vectorPath := rootPath(t, root, "vectors/context-versions.json")
 	payload := requireFamily(t, root, "vectors/context-versions.json")
 	var vector contextResolutionVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
