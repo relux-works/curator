@@ -1,0 +1,8 @@
+# Focused fragment F1/F2 rework on Astra medium
+
+Continue TASK-260908-ranc5y in preserved managed WIP, Codex gpt-6-astra medium only. Read the Astra reviewer outcome TASK-260908-ranc5y_review-verdict-rev1.md. Fix only F1/F2; the remaining implementation and exact-tree prior tests retain their evidence.
+
+F1: checkAbsolutePath uses bytes where the pinned schema requires Unicode character count (min2/max4096). UTF8 is already validated. Correct the length rule/comment; preserve absolute/NUL/traversal guards. Add named production-executable/fake-curator boundary tests for exactly4096 Unicode characters and4097 rejection, including a narrowing numeric mutant that the boundary test kills.
+F2: TestConformanceCorpus must attest the exact independently derived49-row indexed fixture set, expected verdicts and appropriate fixture integrity from curator-spec87a0d006. Replace the >=40 threshold with a real pinned correspondence; do not merely mirror the implementation's enumeration. A mutant dropping just invalid-path-prepend-outside-root from the index must make the behavioral corpus gate fail. Existing corpus bytes are currently correct; preserve all unchanged acceptance semantics.
+
+Parent draft PR5 signed8f0c68e/tree4f04bf708eb70afe019399c10586334f362099fe preserves rev1. Do not commit on your managed branch. Focused tests first, configured make check at publication once; no duplicate broad suites. Report source/fixture identity and precise R1/R2 evidence, then normal handoff. No hosted CI, extra stages/imports, installs, daemon restarts, tags/releases, real ax/model calls, runtime-home or LOGBOOK/control-root edits. All older Claude/Fable instructions are superseded.

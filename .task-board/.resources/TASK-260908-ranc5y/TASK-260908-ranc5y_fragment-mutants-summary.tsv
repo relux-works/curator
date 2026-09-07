@@ -1,0 +1,27 @@
+mutant	file	expected_failing_test	applied	suite_exit	expected_test_failed	verdict	description
+M01	resolve	TestNonZeroExitMapping	yes	1	yes	KILLED	map the unreachable environment_home_stale to resolve_repair_failed
+M02	resolve	TestArgvExactOrderAndRepair	yes	1	yes	KILLED	drop --repair from argv
+M03	resolve	TestArgvExactOrderAndRepair	yes	1	yes	KILLED	pass --profile=<name> as one token
+M04	resolve	TestNonZeroExitNeverYieldsFragmentEvenWithValidStdout	yes	1	yes	KILLED	treat exit 1 with parseable stdout as success
+M05	resolve	TestInvalidOutputIsFragmentInvalidNeverAbsence	yes	1	yes	KILLED	empty stdout treated as absence
+M06	resolve	TestInvalidOutputIsFragmentInvalidNeverAbsence	yes	1	yes	KILLED	accept a codex_cli fragment for any requested env
+M07	resolve	TestNonZeroExitMapping	yes	1	yes	KILLED	token preserved: match "curator: " anywhere in the line
+M08	resolve	TestNonZeroExitMapping	yes	1	yes	KILLED	retry once on exit 1
+M09	resolve	TestResolveSuccessForwardsWarnings	yes	1	yes	KILLED	forward stderr only on failure
+M10	json	TestRejections	yes	1	yes	KILLED	duplicate "environment" key admitted
+M11	json	TestReaderRejections	yes	1	yes	KILLED	lone low surrogate repaired instead of rejected
+M12	json	TestReaderRejections	yes	1	yes	KILLED	admit lowercase exponent numbers
+M13	json	TestReaderRejections	yes	1	yes	KILLED	trailing second object admitted
+M14	ccj1	TestA0FragmentsParseAndDigestMatch	yes	1	yes	KILLED	escape "\/" in canonical strings
+M15	ccj1	TestCanonicalRules	yes	1	yes	KILLED	escape U+2028 and U+2029
+M16	ccj1	TestCanonicalRules	yes	1	yes	KILLED	sort keys by UTF-16 code units
+M17	fragment	TestConformanceCorpus	yes	1	yes	KILLED	accept the withdrawn composition member
+M18	fragment	TestConformanceCorpus	yes	1	yes	KILLED	registry grants pi an MCP descriptor
+M19	fragment	TestConformanceCorpus	yes	1	yes	KILLED	admit semantics prepend at both layers
+M20	fragment	TestInvalidErrorShape	yes	1	yes	KILLED	admit an empty with list (registry compare still rejects; the path-level test catches it)
+M21	fragment	TestRejections	yes	1	yes	KILLED	admit duplicate env_names
+M22	fragment	TestRejections	yes	1	yes	KILLED	admit a one-descriptor subset of the system-prompt list
+M23	fragment	TestConformanceCorpus	yes	1	yes	KILLED	admit /usr/local/bin as path_prepend
+M24	fragment	TestConformanceCorpus	yes	1	yes	KILLED	admit two env variables
+M25	fragment	TestConformanceCorpus	yes	1	yes	KILLED	admit a sha256:-prefixed lock hash
+M26	main	TestRunResolveFailuresExit1	yes	1	yes	KILLED	entry point loses the resolve_fragment_invalid code line

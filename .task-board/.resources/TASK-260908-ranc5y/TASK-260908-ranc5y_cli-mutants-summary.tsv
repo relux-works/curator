@@ -1,0 +1,15 @@
+mutant	file	expected_failing_test	applied	suite_exit	expected_test_failed	verdict
+M01	cli	TestParseRejected/repeated_profile	yes	1	yes	KILLED
+M02	cli	TestParseRejected/unknown_flag	yes	1	yes	KILLED
+M03	cli	TestParseRejected/missing_value_empty_string	yes	1	yes	KILLED
+M04	cli	TestParseRejected/stray_operand	yes	1	yes	KILLED
+M05	cli	TestParseRejected/system_prompt_bad_value	yes	1	yes	KILLED
+M06	cli	TestParseRejected/ax_profile_bad_value_tracked	yes	1	yes	KILLED
+M07	cli	TestParseRejected/ax_profile_on_untracked_machine	yes	1	yes	KILLED
+M08	cli	TestParseRejected/name_65_chars	yes	1	yes	KILLED
+M09	cli	TestParseRejected/name_leading_dot	yes	1	yes	KILLED
+M10	cli	TestParseRejected/no_arguments	yes	1	yes	KILLED
+M11	cli	TestNativeTailVerbatim	yes	1	yes	KILLED
+M12	cli	TestParseRejected/unknown_flag_before_help	yes	1	yes	KILLED
+M13	main	TestRunUsageErrorsExit2	yes	1	yes	KILLED
+M14	main	TestRunParsedLaunchResolvesThenRefuses	yes	1	yes	KILLED
