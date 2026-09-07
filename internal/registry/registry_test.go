@@ -585,3 +585,80 @@ func TestPublish(t *testing.T) {
 		t.Fatalf("err = %v, want rejection with status", err)
 	}
 }
+
+// TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew pins the exact edge of
+// the future-timestamp gate at every skew a manager config can carry,
+// including the literal zero the schema allows. created_at is an exact UTC
+// seconds timestamp by contract, so one second is the smallest future step the
+// schema can express and `now + skew + 1s` is the narrowest snapshot the gate
+// must still refuse.
+//
+// This is the narrowing-mutant target: moving the threshold one second out —
+// `parsed.CreatedAt.After(now.Add(clockSkew + time.Second))` — leaves the gate
+// in place, still refuses everything further out, and admits exactly that one
+// class. This test fails when it does.
+func TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew(t *testing.T) {
+	s := newSigner(t)
+	// created_at round-trips as whole seconds, so anchor `now` on a whole
+	// second and keep every offset below a whole second too.
+	now := time.Now().UTC().Truncate(time.Second)
+	cases := []struct {
+		name    string
+		offset  time.Duration
+		refused bool
+	}{
+		{"one second inside the bound", -time.Second, false},
+		{"exactly on the bound", 0, false},
+		{"one second past the bound", time.Second, true},
+		{"an hour past the bound", time.Hour, true},
+	}
+	for _, skew := range []time.Duration{0, 30 * time.Second, DefaultSnapshotClockSkew} {
+		for _, tc := range cases {
+			name := skew.String() + "/" + tc.name
+			t.Run(name, func(t *testing.T) {
+				body := snapshotBody(5, now.Add(skew).Add(tc.offset))
+				fetch := func(string) (map[string]any, error) { return s.sign(body), nil }
+				reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+				tampered, warnings := CheckSnapshotsWithPolicy(
+					[]Registry{reg}, t.TempDir(), fetch, now, 0, skew)
+				joined := strings.Join(warnings, "\n")
+				if tampered[reg.URL] != tc.refused {
+					t.Fatalf("skew %v offset %v: refused=%v want %v (%v)",
+						skew, tc.offset, tampered[reg.URL], tc.refused, warnings)
+				}
+				if tc.refused && !strings.Contains(joined, "too far in the future") {
+					t.Fatalf("skew %v offset %v: refusal must name the future timestamp: %v",
+						skew, tc.offset, warnings)
+				}
+				if !tc.refused && joined != "" {
+					t.Fatalf("skew %v offset %v: accepted snapshot warned: %v", skew, tc.offset, warnings)
+				}
+			})
+		}
+	}
+}
+
+// TestSnapshotZeroClockSkewIsLiteral pins the documented reading of a zero
+// clock skew: zero means zero, not "fall back to the default". A manager that
+// configures no tolerance gets none, and a sub-second future timestamp is
+// already out of bounds. The install fixtures depend on this: they stamp their
+// snapshot before the run rather than during the fetch, because under this
+// policy any drift forward is tampering (BUG-260906-1bdotx).
+func TestSnapshotZeroClockSkewIsLiteral(t *testing.T) {
+	s := newSigner(t)
+	now := time.Now().UTC().Truncate(time.Second).Add(500 * time.Millisecond)
+	// The next whole second is 500ms ahead of `now` — the shape a snapshot
+	// minted during the fetch takes after RFC3339 truncation.
+	body := snapshotBody(5, now.Truncate(time.Second).Add(time.Second))
+	fetch := func(string) (map[string]any, error) { return s.sign(body), nil }
+	reg := Registry{Name: "one", URL: "https://one", PublicKeys: []string{s.pinned}}
+
+	tampered, warnings := CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, 0)
+	if !tampered[reg.URL] || !strings.Contains(strings.Join(warnings, "\n"), "too far in the future") {
+		t.Fatalf("a zero skew must refuse a sub-second future timestamp: %v %v", tampered, warnings)
+	}
+	tampered, warnings = CheckSnapshotsWithPolicy([]Registry{reg}, t.TempDir(), fetch, now, 0, DefaultSnapshotClockSkew)
+	if tampered[reg.URL] || len(warnings) != 0 {
+		t.Fatalf("the shipped default must absorb sub-second drift: %v %v", tampered, warnings)
+	}
+}
