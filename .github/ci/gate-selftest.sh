@@ -219,6 +219,10 @@ CLASSES="$HERE/skip-classes.tsv"
 	printf 'internal/buildcache\tTestWindowsProtectedStateMatrix/*\t-\twindows\thost-capability\ta symlink subtest may skip\n'
 	printf 'internal/shell\tTestPowerShellHookRunsOnEveryPrompt\twindows\tlinux,darwin\tplatform-control\tPowerShell prompt hook\n'
 	printf 'internal/godriver\tTestProbeRejectsAnUncoveredPlatformBeforeTheWorker\tlinux,darwin,windows\t-\t-\tuncovered platform rejected\n'
+	# A row that TOLERATES a deferred-only skip. It requires the case nowhere,
+	# so it constrains nothing else in this file; it exists to prove that
+	# tolerating a skip does not repeal the policy of its class.
+	printf 'internal/ledgerlisted\tTestRootUnsetIsToleratedHere\t-\tlinux,darwin,windows\troot-unset\ta ledger case whose skip is legitimate only while suite-plan defers it\n'
 } >"$LEDGER"
 
 # minimal test2json event builders
@@ -287,6 +291,29 @@ assert 'a host-capability skip is recorded and allowed' 0 run_gate "$S" env CI_G
   ev skip internal/shell TestPowerShellHookRunsOnEveryPrompt; } >"$S"
 assert 'a root-unset skip in a SERVED package fails' 1 run_gate "$S" env CI_GATE_GOOS=linux
 assert 'a root-unset skip in a DEFERRED package passes' 0 run_gate "$S" env CI_GATE_GOOS=linux CI_DEFERRED_PKGS=internal/marker
+
+# The two cases above go through the class-policy branch because no ledger row
+# lists them. A row that TOLERATES the skip must not be able to buy it back: the
+# `deferred-only` policy decides whether an unset root is legitimate, and a lane
+# that serves the package has already answered no. Without this pair the gate
+# tolerates a root-unset skip in a served package for every ledger-listed case
+# -- which is every case a candidate lane actually demands.
+{ ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+  evout internal/ledgerlisted TestRootUnsetIsToleratedHere 'CURATOR_CONFORMANCE_ROOT is not set'
+  ev skip internal/ledgerlisted TestRootUnsetIsToleratedHere; } >"$S"
+assert 'a LEDGER-TOLERATED root-unset skip in a SERVED package fails' 1 run_gate "$S" env CI_GATE_GOOS=linux
+assert 'the same ledger-tolerated skip passes once the package is deferred' 0 \
+	run_gate "$S" env CI_GATE_GOOS=linux CI_DEFERRED_PKGS=internal/ledgerlisted
+
+# ...and the toleration itself still works for a class whose policy is `allow`,
+# so the fix above narrows exactly one class and not the ledger as a whole.
+{ ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
+  evout internal/shell TestPowerShellHookRunsOnEveryPrompt 'PowerShell prompt integration is exercised on Windows'
+  ev skip internal/shell TestPowerShellHookRunsOnEveryPrompt
+  evout internal/ledgerlisted TestRootUnsetIsToleratedHere 'CURATOR_CONFORMANCE_ROOT is not set'
+  ev skip internal/ledgerlisted TestRootUnsetIsToleratedHere; } >"$S"
+assert 'an allow-policy tolerated skip survives beside a deferred package' 0 \
+	run_gate "$S" env CI_GATE_GOOS=linux CI_DEFERRED_PKGS=internal/ledgerlisted
 
 { ev pass internal/godriver TestProbeRejectsAnUncoveredPlatformBeforeTheWorker
   evout internal/shell TestPowerShellHookRunsOnEveryPrompt 'PowerShell prompt integration is exercised on Windows'

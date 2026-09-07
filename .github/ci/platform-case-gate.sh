@@ -12,7 +12,10 @@
 #     rather than shrinking the run. A skip of a listed case -- or of any of its
 #     subtests -- is fatal unless the row tolerates it on this GOOS, and then
 #     only if the reason the test actually printed carries the class the row
-#     declared.
+#     declared AND that class's own policy admits it in this lane. A ledger row
+#     tolerates a skip; it does not repeal the policy. `root-unset` is
+#     `deferred-only`, so a listed case that skips for an unset root inside a
+#     package this lane SERVES is fatal whether the ledger lists it or not.
 #
 #   TIER 2 -- `.github/ci/skip-classes.tsv`
 #     Every OTHER skip anywhere in the run must have a reason matching a
@@ -223,6 +226,17 @@ BEGIN {
 				printf "      the ledger tolerates a %s skip here; this one classified as %s\n", want, cls
 				printf "      reason: %s\n", reason
 				fail = 1; verdict = "FATAL-wrong-class"
+			} else if (ci != 0 && cpolicy[ci] == "deferred-only" && !(skippkg[key] in isdeferred)) {
+				# A ledger row tolerates a skip; it does not repeal the
+				# policy of the class. `deferred-only` is legitimate solely
+				# for a package suite-plan.sh deferred, so a row listing the
+				# case cannot buy back that skip in a lane that SERVES the
+				# package -- which is the state a candidate lane is always in.
+				printf "FAIL  %s skip in a package this lane serves: %s :: %s\n", cls, skippkg[key], skiptest[key]
+				printf "      reason: %s\n", reason
+				printf "      the ledger tolerates a %s skip here, but %s is policy `deferred-only`;\n", want, cls
+				print  "      this lane supplies a root that must serve this package; it ran without one."
+				fail = 1; verdict = "FATAL-served-package"
 			} else {
 				verdict = "tolerated-by-ledger"
 			}
