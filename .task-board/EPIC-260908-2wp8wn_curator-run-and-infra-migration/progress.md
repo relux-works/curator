@@ -23,6 +23,7 @@ code
 - [agents-infra-to-curator-mapping.md](file://EPIC-260908-2wp8wn/agents-infra-to-curator-mapping.md)
 - [story-map.json](file://EPIC-260908-2wp8wn/story-map.json)
 - [A1-common-producer-rules.md](file://EPIC-260908-2wp8wn/A1-common-producer-rules.md)
+- [pi-mcp-scope-decision.md](file://EPIC-260908-2wp8wn/pi-mcp-scope-decision.md) — Concrete Pi MCP channel conflict between full DoD and current protocol; operator scope decision
 
 ## Outcome Resources
 - [orchestration-state.md](file://EPIC-260908-2wp8wn/orchestration-state.md)
@@ -32,4 +33,4 @@ code
 2026-09-07T23:04:44Z
 
 ## Last Update
-2026-09-08T14:52:42Z
+2026-09-08T14:57:04Z
