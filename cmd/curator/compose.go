@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/identity"
 )
 
 // cmdProfileCompose implements `profile compose <profile> add|remove|list`
@@ -13,7 +14,7 @@ import (
 // manager-config schema 2. The lock moves only on profile update.
 func (c cli) cmdProfileCompose(cfg *config.Config, args []string) int {
 	if len(args) < 2 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile compose <profile> add|remove|list [<source> --range|--tag|--revision <ref>] [--weight <n>]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile compose <profile> add|remove|list [<source> [--range|--tag|--revision <ref>]] [--weight <n>]")
 		return exitUsage
 	}
 	profile, action := args[0], args[1]
@@ -38,7 +39,7 @@ func (c cli) cmdComposeAdd(cfg *config.Config, profile string, args []string) in
 	weight := flags.String("weight", "", "machine-assigned weight (default: overlay_default_weight)")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) != 1 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile compose <profile> add <source> --range|--tag|--revision <ref> [--directory <dir>] [--weight <n>]")
+		_, _ = fmt.Fprintln(c.stderr, "curator: profile compose <profile> add <source> [--range|--tag|--revision <ref>] [--directory <dir>] [--weight <n>] (a git source takes exactly one requirement form; a path source takes none)")
 		return exitUsage
 	}
 	forms := 0
@@ -47,14 +48,32 @@ func (c cli) cmdComposeAdd(cfg *config.Config, profile string, args []string) in
 			forms++
 		}
 	}
-	// Every overlay carries exactly one requirement form — git or path
-	// alike (environments §12.1); a form on a path source is reader
-	// grammar but resolution-invalid under section 1.
-	if forms != 1 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile compose add takes exactly one of --range, --tag, --revision")
+	// The requirement form is required only for a git source
+	// (manager-config-v2 $defs/overlay, environments §1 and §12.1). The
+	// kind comes from the one discriminator, the same helper the config
+	// reader and resolveOverlay use, so a row written here parses back as
+	// the kind this row decided.
+	source := positional[0]
+	switch identity.ClassifySource(source) {
+	case identity.SourceGit:
+		if forms != 1 {
+			_, _ = fmt.Fprintln(c.stderr, "curator: profile compose add takes exactly one of --range, --tag, --revision for a git source")
+			return exitUsage
+		}
+	case identity.SourcePath:
+		if forms != 0 {
+			_, _ = fmt.Fprintln(c.stderr, "curator: a path overlay carries no --range, --tag, or --revision")
+			return exitUsage
+		}
+		if *directory != "" {
+			_, _ = fmt.Fprintln(c.stderr, "curator: a path overlay carries no --directory")
+			return exitUsage
+		}
+	default:
+		_, _ = fmt.Fprintf(c.stderr, "curator: overlay source %q is neither a git source nor a path\n", source)
 		return exitUsage
 	}
-	entry := map[string]any{"source": positional[0]}
+	entry := map[string]any{"source": source}
 	switch {
 	case *rng != "":
 		entry["range"] = *rng
@@ -108,7 +127,7 @@ func (c cli) cmdComposeAdd(cfg *config.Config, profile string, args []string) in
 	if !cfg.Env.OverlaysAllowed {
 		_, _ = fmt.Fprintln(c.stderr, "warning: overlays_allowed is false: the added declaration is inert; resolution joins the root alone")
 	}
-	_, _ = fmt.Fprintf(c.stdout, "added overlay %s to profile %s; the lock moves on profile update\n", positional[0], profile)
+	_, _ = fmt.Fprintf(c.stdout, "added overlay %s to profile %s; the lock moves on profile update\n", source, profile)
 	return exitOK
 }
 

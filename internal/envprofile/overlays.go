@@ -9,6 +9,7 @@ import (
 
 	"github.com/relux-works/curator/internal/contextpkg"
 	"github.com/relux-works/curator/internal/contextresolve"
+	"github.com/relux-works/curator/internal/identity"
 )
 
 // resolveOverlays builds the resolution overlays for profile from the
@@ -42,9 +43,18 @@ func resolveOverlays(home string, manager *gitManager, profile string, policy Po
 	return overlays, nil
 }
 
+// resolveOverlay resolves one declaration. The kind comes from the spelling
+// alone through the single discriminator (identity.ClassifySource) — the
+// same one the config reader and `profile compose add` use — so a
+// declaration classified `path` at the reader can never resolve as `git`
+// here, and no filesystem probe can move it between the two.
 func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (contextresolve.Overlay, error) {
 	weight := decl.Weight
-	if isPathOperand(decl.Source) {
+	kind := identity.ClassifySource(decl.Source)
+	if kind == identity.SourceInvalid {
+		return contextresolve.Overlay{}, sourceKindRefusal("overlay source", decl.Source)
+	}
+	if kind == identity.SourcePath {
 		if decl.Range != "" || decl.Tag != "" || decl.Revision != "" || decl.Directory != "" {
 			return contextresolve.Overlay{}, fmt.Errorf("%s: a path overlay carries no range, tag, revision, or directory", DiagSourceInvalid)
 		}
@@ -61,15 +71,15 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (context
 			Weight: weight, State: state,
 		}, nil
 	}
-	identity, err := canonicalGit(decl.Source)
+	canonical, err := canonicalGit(decl.Source)
 	if err != nil {
 		return contextresolve.Overlay{}, fmt.Errorf("%s: %v", DiagSourceInvalid, err)
 	}
-	manager.recordRaw(identity, decl.Source)
-	if err := manager.fetch(identity); err != nil {
+	manager.recordRaw(canonical, decl.Source)
+	if err := manager.fetch(canonical); err != nil {
 		return contextresolve.Overlay{}, err
 	}
-	dir := manager.repoDir(identity)
+	dir := manager.repoDir(canonical)
 	commit, _, err := manager.commitFor(dir, Requirement{Range: decl.Range, Tag: decl.Tag, Revision: decl.Revision})
 	if err != nil {
 		return contextresolve.Overlay{}, err
@@ -79,7 +89,7 @@ func resolveOverlay(home string, manager *gitManager, decl OverlaySpec) (context
 		return contextresolve.Overlay{}, err
 	}
 	return contextresolve.Overlay{
-		Name: manifest.Name, Source: identity,
+		Name: manifest.Name, Source: canonical,
 		Range: decl.Range, Tag: decl.Tag, Revision: decl.Revision,
 		Directory: decl.Directory, Weight: weight,
 	}, nil

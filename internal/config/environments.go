@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/relux-works/curator/internal/identifiers"
+	"github.com/relux-works/curator/internal/identity"
 	"github.com/relux-works/curator/internal/verr"
 )
 
@@ -427,20 +428,35 @@ func parseOverlay(raw any, label string) (OverlayDeclaration, error) {
 		}
 		decl.Revision = revision
 	}
-	// Every overlay carries exactly one requirement form — git or path
-	// alike (environments §12.1). A form on a `path` source is reader
-	// grammar but resolution-invalid: installing or updating a profile
-	// whose overlay declaration puts range, tag, revision, or directory
-	// on a path source fails with profile_source_invalid (section 1).
-	if forms != 1 {
-		return OverlayDeclaration{}, verr.New(label, "requires exactly one of range, tag, or revision")
-	}
 	if rawDir, present := entry["directory"]; present {
 		dir, ok := rawDir.(string)
 		if !ok || !identifiers.PortablePath(dir) {
 			return OverlayDeclaration{}, verr.New(label+".directory", "must be a portable relative path")
 		}
 		decl.Directory = dir
+	}
+	// The requirement form is required only for a `git` source
+	// (manager-config-v2 $defs/overlay, environments §1 and §12.1). A
+	// `path` overlay carries no range, tag, revision, or directory —
+	// section 1 makes any of them profile_source_invalid, so the reader
+	// refuses the declaration outright rather than admitting a shape no
+	// resolution can accept. A spelling that is neither kind is refused
+	// here too: core §6.1 rejects an invalid network form instead of
+	// taking it as local.
+	switch identity.ClassifySource(source) {
+	case identity.SourceGit:
+		if forms != 1 {
+			return OverlayDeclaration{}, verr.New(label, "a git overlay requires exactly one of range, tag, or revision")
+		}
+	case identity.SourcePath:
+		if forms != 0 {
+			return OverlayDeclaration{}, verr.New(label, "a path overlay carries no range, tag, or revision")
+		}
+		if decl.Directory != "" {
+			return OverlayDeclaration{}, verr.New(label, "a path overlay carries no directory")
+		}
+	default:
+		return OverlayDeclaration{}, verr.New(label+".source", "is neither a git source nor a path")
 	}
 	if rawWeight, present := entry["weight"]; present {
 		weight, err := boundedInteger(rawWeight, 0, maxSafeInteger)
@@ -828,12 +844,16 @@ func (e Environments) render() map[string]any {
 		rendered := []any{}
 		for _, decl := range list {
 			entry := map[string]any{"source": decl.Source}
+			// A path overlay carries no requirement form, so the
+			// effective rendering carries none either: the §12.1 row
+			// is {source, range|tag|revision, directory?, weight?}
+			// for a git source and {source, weight?} for a path one.
 			switch {
 			case decl.Range != "":
 				entry["range"] = decl.Range
 			case decl.Tag != "":
 				entry["tag"] = decl.Tag
-			default:
+			case decl.Revision != "":
 				entry["revision"] = decl.Revision
 			}
 			if decl.Directory != "" {

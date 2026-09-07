@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/curator/internal/config"
+	"github.com/relux-works/curator/internal/envmarker"
 )
 
 // These tests drive the production run() entry point for the stage (c)
@@ -85,26 +89,186 @@ func TestProfileImportNameTakenRow(t *testing.T) {
 }
 
 // TestProfileComposeAddPathRow drives `profile compose add` of a path
-// source: every overlay carries exactly one requirement form (§12.1), so
-// the bare source is a usage error while a path source with an exact form
-// is accepted and listed.
+// source through run(): the requirement form is required only for a git
+// source (manager-config-v2 $defs/overlay, environments §1 and §12.1), so
+// the bare path source is accepted, the written row parses back as a path
+// declaration, and the list reports it in the `path` form column — the
+// branch that was dead while every overlay needed a form.
 func TestProfileComposeAddPathRow(t *testing.T) {
 	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
 	overlay := t.TempDir()
-	if code, _, _ := runProfile(t, source, "profile", "compose", "acme", "add", overlay); code != exitUsage {
-		t.Fatalf("bare compose add = %d, want %d", code, exitUsage)
-	}
-	revision := strings.Repeat("ab", 20)
-	if code, _, stderr := runProfile(t, source, "profile", "compose", "acme", "add", overlay, "--revision", revision); code != exitOK {
-		t.Fatalf("compose add = %d\nstderr:\n%s", code, stderr)
+	if code, stdout, stderr := runProfile(t, source, "profile", "compose", "acme", "add", overlay); code != exitOK {
+		t.Fatalf("bare compose add = %d, want %d\nstdout:\n%s\nstderr:\n%s", code, exitOK, stdout, stderr)
 	}
 	source = reloadSource(t, source)
+	decls := source.cfg.Env.Overlays["acme"]
+	if len(decls) != 1 || decls[0].Source != overlay {
+		t.Fatalf("overlays: %+v", source.cfg.Env.Overlays)
+	}
+	if decls[0].Range != "" || decls[0].Tag != "" || decls[0].Revision != "" || decls[0].Directory != "" {
+		t.Fatalf("path overlay carries a requirement form: %+v", decls[0])
+	}
 	code, stdout, stderr := runProfile(t, source, "profile", "compose", "acme", "list")
 	if code != exitOK {
 		t.Fatalf("compose list = %d\nstderr:\n%s", code, stderr)
 	}
-	if !strings.Contains(stdout, overlay) || !strings.Contains(stdout, "revision="+revision) {
+	if !strings.Contains(stdout, overlay) || !strings.Contains(stdout, "\tpath\t") {
 		t.Fatalf("list stdout:\n%s\nstderr:\n%s", stdout, stderr)
+	}
+}
+
+// TestProfileComposeAddRefusesAFormOnAPathSource drives the other arm
+// through run(): section 1 makes a range, tag, revision, or directory on a
+// path declaration profile_source_invalid, so the row refuses it rather
+// than writing a declaration no resolution can accept. A git source is
+// driven beside it in both directions, so a mutant that merely deletes the
+// kind switch admits a form-free git row and fails here.
+func TestProfileComposeAddRefusesAFormOnAPathSource(t *testing.T) {
+	overlay := t.TempDir()
+	revision := strings.Repeat("ab", 20)
+	cases := []struct {
+		name string
+		args []string
+		want int
+	}{
+		{"path with range", []string{overlay, "--range", "^1.2"}, exitUsage},
+		{"path with tag", []string{overlay, "--tag", "v1.0.0"}, exitUsage},
+		{"path with revision", []string{overlay, "--revision", revision}, exitUsage},
+		{"path with directory", []string{overlay, "--directory", "sub"}, exitUsage},
+		{"relative path with tag", []string{"packages/team-context", "--tag", "v1.0.0"}, exitUsage},
+		{"relative path bare", []string{"packages/team-context"}, exitOK},
+		{"git bare", []string{"https://example.com/org/pkg"}, exitUsage},
+		{"git two forms", []string{"https://example.com/org/pkg", "--range", "^1", "--tag", "v1"}, exitUsage},
+		{"git with range", []string{"https://example.com/org/pkg", "--range", "^1.2"}, exitOK},
+		{"scp git bare", []string{"git@example.com:org/pkg"}, exitUsage},
+		{"scp git with tag", []string{"git@example.com:org/pkg", "--tag", "v1.0.0"}, exitOK},
+		{"unknown scheme", []string{"svn://example.com/org/pkg", "--range", "^1"}, exitUsage},
+		{"bare drive letter", []string{"D:"}, exitUsage},
+		{"scp host grammar", []string{"git@my_host:org/pkg", "--range", "^1"}, exitUsage},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
+			args := append([]string{"profile", "compose", "acme", "add"}, tc.args...)
+			code, stdout, stderr := runProfile(t, source, args...)
+			if code != tc.want {
+				t.Fatalf("compose add %v = %d, want %d\nstdout:\n%s\nstderr:\n%s", tc.args, code, tc.want, stdout, stderr)
+			}
+			if tc.want != exitOK {
+				return
+			}
+			// An accepted row must parse back: the reader and this row
+			// share one discriminator, so the kind cannot change between
+			// writing the declaration and reading it.
+			reloadSource(t, source)
+		})
+	}
+}
+
+// TestPathOverlayFromMachineConfigJoinsTheClosure is the §6 promise driven
+// end to end through run(): a path overlay declared in machine
+// configuration joins the closure beside the root, carries its declared
+// weight, and is recorded as an overlay member in the environment marker.
+// Before the landed rule no operator could declare this row at all.
+func TestPathOverlayFromMachineConfigJoinsTheClosure(t *testing.T) {
+	pinOperatorHome(t)
+	root := t.TempDir()
+	writeContextPackage(t, root, "acme", "1.0.0", "root\n")
+	overlay := t.TempDir()
+	writeContextPackage(t, overlay, "personal", "0.3.0", "overlay\n")
+	encoded, err := json.Marshal(overlay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
+		"environments": {"overlays": {"acme": [{"source": `+string(encoded)+`, "weight": 250}]}}}`)
+	if code, stdout, stderr := runProfile(t, source, "profile", "install", root, "--use"); code != exitOK {
+		t.Fatalf("install = %d\nstdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+	marker, err := envmarker.Read(os.Getenv("CLAUDE_CONFIG_DIR"))
+	if err != nil || marker == nil {
+		t.Fatalf("marker %+v %v", marker, err)
+	}
+	var found *envmarker.Member
+	for index := range marker.Members {
+		if marker.Members[index].Name == "personal" {
+			found = &marker.Members[index]
+		}
+	}
+	if found == nil {
+		t.Fatalf("marker members %+v carry no overlay", marker.Members)
+	}
+	if !found.Overlay {
+		t.Fatalf("overlay member %+v is not flagged overlay", *found)
+	}
+	if found.Weight != 250 {
+		t.Fatalf("overlay weight %d, want the declared 250", found.Weight)
+	}
+	if found.StateSHA256 == "" || found.Commit != "" {
+		t.Fatalf("path overlay member %+v carries no state pin", *found)
+	}
+	payload, err := os.ReadFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "CLAUDE.md")) // #nosec G304 -- test home
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), "## Context: personal 0.3.0") {
+		t.Fatalf("document:\n%s", payload)
+	}
+}
+
+// TestOverlayFromMachineConfigIsRefusedByKind drives the refusals through
+// run() from the same surface: a path overlay carrying a requirement form
+// and a source that is neither kind are both refused before the load
+// succeeds, so no such declaration can reach resolution.
+func TestOverlayFromMachineConfigIsRefusedByKind(t *testing.T) {
+	overlay := t.TempDir()
+	encoded, err := json.Marshal(overlay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision := strings.Repeat("ab", 20)
+	cases := []struct {
+		name string
+		row  string
+	}{
+		{"path with revision", `{"source": ` + string(encoded) + `, "revision": "` + revision + `"}`},
+		{"path with range", `{"source": ` + string(encoded) + `, "range": "^1.2"}`},
+		{"path with directory", `{"source": ` + string(encoded) + `, "directory": "sub"}`},
+		{"relative path with tag", `{"source": "packages/team-context", "tag": "v1.0.0"}`},
+		{"git with no form", `{"source": "https://example.com/org/pkg"}`},
+		{"unknown scheme", `{"source": "svn://example.com/org/pkg", "range": "^1"}`},
+		{"file url", `{"source": "file:///tmp/pkg"}`},
+		{"bare drive letter", `{"source": "C:"}`},
+		{"scp host grammar", `{"source": "git@my_host:org/pkg", "range": "^1"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			source, _ := profileHome(t)
+			path := filepath.Join(t.TempDir(), "config.json")
+			text := `{"schema_version": 2, "skills_root": "x", "projects": {},
+				"environments": {"overlays": {"acme": [` + tc.row + `]}}}`
+			if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, loadErr := config.Load(path, nil)
+			if loadErr == nil {
+				t.Fatalf("config.Load accepted %s", tc.row)
+			}
+			// The refusal reaches the operator through run(): the config
+			// source hands run() exactly the reader's error, so every row
+			// stops there rather than resolving a declaration no kind
+			// admits.
+			source.path = path
+			source.cfg = cfg
+			source.err = loadErr
+			code, _, stderr := runProfile(t, source, "profile", "list")
+			if code == exitOK {
+				t.Fatalf("run() accepted %s\nstderr:\n%s", tc.row, stderr)
+			}
+			if !strings.Contains(stderr, "environments.overlays") {
+				t.Fatalf("run() stderr does not name the overlay row:\n%s", stderr)
+			}
+		})
 	}
 }
 

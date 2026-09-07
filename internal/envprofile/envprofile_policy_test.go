@@ -23,7 +23,7 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 			"precedence":              map[string]any{"winner": "lower-weight", "placement": "winner-first"},
 			"require_current_profile": "acme",
 			"overlays": map[string]any{
-				"a": []any{map[string]any{"source": "/srv/p", "revision": strings.Repeat("ab", 20), "weight": float64(7)}},
+				"a": []any{map[string]any{"source": "https://example.com/p", "revision": strings.Repeat("ab", 20), "weight": float64(7)}},
 			},
 		},
 	}, "config.json")
@@ -46,7 +46,7 @@ func TestPolicyFromConfigCarriesEnvGates(t *testing.T) {
 	}
 	// The declarations are carried even while the forbidding policy
 	// empties them at resolution time.
-	if len(policy.Overlays["a"]) != 1 || policy.Overlays["a"][0].Source != "/srv/p" {
+	if len(policy.Overlays["a"]) != 1 || policy.Overlays["a"][0].Source != "https://example.com/p" {
 		t.Fatalf("overlays = %+v", policy.Overlays)
 	}
 	if policy.Overlays["a"][0].Weight == nil || *policy.Overlays["a"][0].Weight != 7 {

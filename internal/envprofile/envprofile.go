@@ -570,7 +570,11 @@ func installLocked(op *operation, home string, options InstallOptions) (Info, bo
 	if err := ensureDefault(op, home, options.Policy); err != nil {
 		return Info{}, false, false, err
 	}
-	isPath := isPathOperand(options.Operand)
+	kind := installOperandKind(options.Operand)
+	if kind == identity.SourceInvalid {
+		return Info{}, false, false, sourceKindRefusal("operand", options.Operand)
+	}
+	isPath := kind == identity.SourcePath
 	if isPath && (options.Range != "" || options.Tag != "" || options.Revision != "" || options.Directory != "") {
 		return Info{}, false, false, fmt.Errorf("%s: a path operand takes no requirement flag or --directory", DiagRefConflict)
 	}
@@ -1278,42 +1282,49 @@ func checkMCPCommand(entry string) (string, bool) {
 	return "", false
 }
 
-// isPathOperand tells a path operand from a git URL syntactically, never by
-// probing the filesystem (environments §9.1): an operand beginning with /,
-// ./, or ../ (or a platform absolute-path spelling) is a path declaration;
-// every other operand resolves as git under section 1. A directory in the
-// operator's working directory must never shadow a git identity: path
-// sources bypass the core §6.1 network allowlist by design, so a
-// filesystem probe here would silently remove the F9 allowlist gate.
-func isPathOperand(operand string) bool {
-	if operand == "" {
-		return false
+// installOperandKind classifies a `profile install <git-url|path>` operand
+// through the one discriminator (identity.ClassifySource, the same helper
+// the config reader and `profile compose add` use) and never by probing the
+// filesystem: a directory in the operator's working directory must never
+// shadow a git identity, because a `path` source bypasses the core §6.1
+// network allowlist by design.
+//
+// The operand vocabulary of this row is wider than an overlay `source` in
+// one place, and the difference is stated rather than silent. `canonicalGit`
+// accepts an already-canonical `host/path` identity and `ensureRepo` clones
+// it over https, so `curator profile install github.com/example/x` is a git
+// install today. The landed manager-config-v2 discriminator classifies that
+// same bare spelling as a `path` — it has to, because `packages/team-context`
+// is a declarable path overlay and the two are syntactically identical.
+// Following the classification here would silently turn a git install into a
+// local one and hand a planted `./github.com/example/x` directory the
+// allowlist bypass that F14 exists to prevent, so a spelling the
+// discriminator calls `path` that is also a valid canonical network identity
+// stays `git` on this row. Nothing changes kind: `packages/team` was a git
+// install operand before this change and still is.
+//
+// The operand is trimmed before classification because every downstream git
+// entry point (canonicalGit, identity.Parse) already trims; the overlay
+// reader does not trim, because the schema does not.
+// sourceKindRefusal is the refusal for a spelling that is neither kind. A
+// file:// remote keeps the F12 wording: it is refused because it carries no
+// network identity, which is exactly why the landed discriminator refuses
+// it as neither kind, and the boundary is the same one canonicalGit and
+// gateSource enforce for a source that reaches them.
+func sourceKindRefusal(what, spelling string) error {
+	if isFileRemote(strings.TrimSpace(spelling)) {
+		return fmt.Errorf("%s: file:// git sources carry no network identity and are not accepted", DiagSourceInvalid)
 	}
-	if strings.HasPrefix(operand, "/") {
-		return true
-	}
-	if strings.HasPrefix(operand, "./") || strings.HasPrefix(operand, `.\`) {
-		return true
-	}
-	if strings.HasPrefix(operand, "../") || strings.HasPrefix(operand, `..\`) {
-		return true
-	}
-	if operand == "." || operand == ".." {
-		return true
-	}
-	// Windows absolute spellings: drive-letter (C:/, C:\) and UNC (\\host).
-	if len(operand) >= 2 && isASCIIDriveLetter(operand[0]) && operand[1] == ':' {
-		return true
-	}
-	if strings.HasPrefix(operand, `\\`) {
-		return true
-	}
-	return false
+	return fmt.Errorf("%s: %s %q is neither a git source nor a path", DiagSourceInvalid, what, spelling)
 }
 
-// isASCIIDriveLetter reports a Windows drive letter.
-func isASCIIDriveLetter(c byte) bool {
-	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+func installOperandKind(operand string) identity.SourceKind {
+	trimmed := strings.TrimSpace(operand)
+	kind := identity.ClassifySource(trimmed)
+	if kind == identity.SourcePath && identity.ValidCanonical(trimmed) {
+		return identity.SourceGit
+	}
+	return kind
 }
 
 // canonicalGit normalizes a git operand onto its core §6.1 canonical source

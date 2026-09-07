@@ -113,15 +113,22 @@ func TestSchema2KnobRejections(t *testing.T) {
 		{"overlay profile grammar", `{"overlays": {"-bad": []}}`, "overlays"},
 		{"overlay not list", `{"overlays": {"a": {}}}`, "overlays.a"},
 		{"overlay empty source", `{"overlays": {"a": [{"range": "^1"}]}}`, "source"},
-		{"overlay no form", `{"overlays": {"a": [{"source": "s"}]}}`, "exactly one"},
-		{"overlay path no form", `{"overlays": {"a": [{"source": "/p"}]}}`, "exactly one"},
-		{"overlay two forms", `{"overlays": {"a": [{"source": "s", "range": "^1", "tag": "v1"}]}}`, "exactly one"},
-		{"overlay range grammar", `{"overlays": {"a": [{"source": "s", "range": "^1 (x)"}]}}`, "range"},
-		{"overlay tag grammar", `{"overlays": {"a": [{"source": "s", "tag": "v1..x"}]}}`, "tag"},
-		{"overlay revision grammar", `{"overlays": {"a": [{"source": "s", "revision": "ABC"}]}}`, "revision"},
-		{"overlay directory traversal", `{"overlays": {"a": [{"source": "s", "range": "^1", "directory": "../x"}]}}`, "directory"},
-		{"overlay negative weight", `{"overlays": {"a": [{"source": "s", "range": "^1", "weight": -1}]}}`, "weight"},
-		{"overlay unknown field", `{"overlays": {"a": [{"source": "s", "range": "^1", "branch": "main"}]}}`, "unsupported"},
+		{"overlay git no form", `{"overlays": {"a": [{"source": "https://h/x"}]}}`, "exactly one"},
+		{"overlay git two forms", `{"overlays": {"a": [{"source": "https://h/x", "range": "^1", "tag": "v1"}]}}`, "exactly one"},
+		{"overlay path range", `{"overlays": {"a": [{"source": "/p", "range": "^1"}]}}`, "path overlay carries no range"},
+		{"overlay path tag", `{"overlays": {"a": [{"source": "/p", "tag": "v1.0.0"}]}}`, "path overlay carries no range"},
+		{"overlay path revision", `{"overlays": {"a": [{"source": "packages/team", "revision": "abababababababababababababababababababab"}]}}`, "path overlay carries no range"},
+		{"overlay path directory", `{"overlays": {"a": [{"source": "/p", "directory": "sub"}]}}`, "path overlay carries no directory"},
+		{"overlay path branch", `{"overlays": {"a": [{"source": "/p", "branch": "main"}]}}`, "unsupported"},
+		{"overlay unknown scheme", `{"overlays": {"a": [{"source": "svn://h/x"}]}}`, "neither a git source nor a path"},
+		{"overlay bare drive letter", `{"overlays": {"a": [{"source": "C:"}]}}`, "neither a git source nor a path"},
+		{"overlay scp host grammar", `{"overlays": {"a": [{"source": "git@my_host:example/x", "range": "^1"}]}}`, "neither a git source nor a path"},
+		{"overlay range grammar", `{"overlays": {"a": [{"source": "https://h/x", "range": "^1 (x)"}]}}`, "range"},
+		{"overlay tag grammar", `{"overlays": {"a": [{"source": "https://h/x", "tag": "v1..x"}]}}`, "tag"},
+		{"overlay revision grammar", `{"overlays": {"a": [{"source": "https://h/x", "revision": "ABC"}]}}`, "revision"},
+		{"overlay directory traversal", `{"overlays": {"a": [{"source": "https://h/x", "range": "^1", "directory": "../x"}]}}`, "directory"},
+		{"overlay negative weight", `{"overlays": {"a": [{"source": "https://h/x", "range": "^1", "weight": -1}]}}`, "weight"},
+		{"overlay unknown field", `{"overlays": {"a": [{"source": "https://h/x", "range": "^1", "branch": "main"}]}}`, "unsupported"},
 		{"overlay default weight negative", `{"overlay_default_weight": -1}`, "overlay_default_weight"},
 		{"overlays allowed type", `{"overlays_allowed": "yes"}`, "overlays_allowed"},
 		{"precedence winner", `{"precedence": {"winner": "heavier"}}`, "winner"},
@@ -214,30 +221,85 @@ func TestSchema2EveryKnobParses(t *testing.T) {
 // composition policy: the gate empties lists only when the knob is false.
 func TestOverlaysAllowedTrueKeepsLists(t *testing.T) {
 	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
-		"environments": {"overlays": {"a": [{"source": "s", "range": "^1"}]}}}`)
+		"environments": {"overlays": {"a": [{"source": "https://h/x", "range": "^1"}]}}}`)
 	if got := cfg.Env.EffectiveOverlays("a"); len(got) != 1 {
 		t.Fatalf("EffectiveOverlays = %v, want one declaration", got)
 	}
 }
 
-// TestPathOverlayDeclarationParses proves the section 12.1 grammar: every
-// overlay carries exactly one requirement form, git or path alike — the
-// published family accepts a revision on a path source. The section 1
-// refusal for a form on a path source fires at resolution, not at the
-// reader.
+// TestPathOverlayDeclarationParses proves the landed §12.1 row: the
+// requirement form is required only for a git source, so a path overlay is
+// {source, weight?} and parses with no form at all. Every path spelling the
+// discriminator admits is driven, including the ones the earlier
+// `/`-prefix-only classifier called git.
 func TestPathOverlayDeclarationParses(t *testing.T) {
-	cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
-		"environments": {"overlays": {"a": [{"source": "/srv/overlays/personal",
-			"revision": "abababababababababababababababababababab", "weight": 3}]}}}`)
-	decls := cfg.Env.Overlays["a"]
-	if len(decls) != 1 || decls[0].Source != "/srv/overlays/personal" {
-		t.Fatalf("overlays: %+v", cfg.Env.Overlays)
+	sources := []string{
+		"/srv/overlays/personal",
+		"./packages/personal",
+		"packages/team-context",
+		"packages/team:context",
+		`C:\Users\operator\context`,
+		"C:/Users/operator/context",
+		"C://Users/operator/context",
+		`c:\users\operator\context`,
 	}
-	if decls[0].Revision != "abababababababababababababababababababab" {
-		t.Fatalf("path overlay revision: %+v", decls[0])
+	for _, source := range sources {
+		t.Run(source, func(t *testing.T) {
+			encoded, err := json.Marshal(source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
+				"environments": {"overlays": {"a": [{"source": `+string(encoded)+`, "weight": 3}]}}}`)
+			decls := cfg.Env.Overlays["a"]
+			if len(decls) != 1 || decls[0].Source != source {
+				t.Fatalf("overlays: %+v", cfg.Env.Overlays)
+			}
+			if decls[0].Range != "" || decls[0].Tag != "" || decls[0].Revision != "" || decls[0].Directory != "" {
+				t.Fatalf("path overlay carries a requirement form: %+v", decls[0])
+			}
+			if decls[0].Weight == nil || *decls[0].Weight != 3 {
+				t.Fatalf("path overlay weight: %+v", decls[0].Weight)
+			}
+		})
 	}
-	if decls[0].Weight == nil || *decls[0].Weight != 3 {
-		t.Fatalf("path overlay weight: %+v", decls[0].Weight)
+}
+
+// TestGitOverlayDeclarationParses drives the other arm: every git spelling
+// the discriminator admits parses with exactly one requirement form, and
+// the same spelling with no form is refused. A discriminator that
+// misclassified one of these toward `path` would accept the form-free row
+// and fail here.
+func TestGitOverlayDeclarationParses(t *testing.T) {
+	sources := []string{
+		"https://github.com/example/x",
+		"HTTPS://github.com/example/x",
+		"HTTP://github.com/example/x",
+		"SSH://github.com/example/x",
+		"GIT://github.com/example/x",
+		"git@github.com:example/x",
+		"github.com:example/x",
+		"c:example/x",
+	}
+	for _, source := range sources {
+		t.Run(source, func(t *testing.T) {
+			encoded, err := json.Marshal(source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg := loadText(t, `{"schema_version": 2, "skills_root": "x", "projects": {},
+				"environments": {"overlays": {"a": [{"source": `+string(encoded)+`, "range": "^1.2"}]}}}`)
+			decls := cfg.Env.Overlays["a"]
+			if len(decls) != 1 || decls[0].Source != source || decls[0].Range != "^1.2" {
+				t.Fatalf("overlays: %+v", cfg.Env.Overlays)
+			}
+			path := writeConfig(t, t.TempDir(), "config.json",
+				`{"schema_version": 2, "skills_root": "x", "projects": {},
+				"environments": {"overlays": {"a": [{"source": `+string(encoded)+`}]}}}`)
+			if _, err := Load(path, nil); err == nil {
+				t.Fatalf("form-free git overlay %q accepted", source)
+			}
+		})
 	}
 }
 

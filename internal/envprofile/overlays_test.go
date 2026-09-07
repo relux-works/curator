@@ -320,32 +320,163 @@ func TestGitOverlayJoinsClosure(t *testing.T) {
 }
 
 // TestPathOverlayFormIsSourceInvalid drives Install with a path overlay
-// carrying an exact form: reader grammar accepts it (§12.1), but the
-// section 1 declaration rule refuses it at resolution with
-// profile_source_invalid.
+// carrying each of the four things section 1 forbids on a path
+// declaration: a range, a tag, a revision, and a directory are each
+// profile_source_invalid at resolution. The config reader refuses the same
+// declarations (internal/config), so this is the second gate, on a Policy
+// manufactured in process rather than read from a file. Each form is
+// driven on its own so a mutant that narrows the gate to admit exactly one
+// of them names the form it admitted.
 func TestPathOverlayFormIsSourceInvalid(t *testing.T) {
-	home := t.TempDir()
-	pinHomes(t)
-	root := filepath.Join(t.TempDir(), "root")
-	writeManifestPackage(t, root,
-		`{"schema_version": 1, "name": "acme", "version": "1.0.0",`+
-			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
-		map[string]string{"a.md": "root\n"})
-	overlay := filepath.Join(t.TempDir(), "overlay")
-	writeManifestPackage(t, overlay,
-		`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
-			`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
-		map[string]string{"a.md": "overlay\n"})
-	policy := Policy{
-		OverlaysAllowed:      true,
-		OverlayDefaultWeight: 1000,
-		Overlays: map[string][]OverlaySpec{
-			"acme": {{Source: overlay, Revision: strings.Repeat("ab", 20)}},
-		},
+	specs := map[string]OverlaySpec{
+		"range":     {Range: "^1.2"},
+		"tag":       {Tag: "v1.0.0"},
+		"revision":  {Revision: strings.Repeat("ab", 20)},
+		"directory": {Directory: "sub"},
 	}
-	_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
-	if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
-		t.Fatalf("err = %v, want %s", err, DiagSourceInvalid)
+	for name, spec := range specs {
+		spec := spec
+		t.Run(name, func(t *testing.T) {
+			home := t.TempDir()
+			pinHomes(t)
+			root := filepath.Join(t.TempDir(), "root")
+			writeManifestPackage(t, root,
+				`{"schema_version": 1, "name": "acme", "version": "1.0.0",`+
+					`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+				map[string]string{"a.md": "root\n"})
+			overlay := filepath.Join(t.TempDir(), "overlay")
+			writeManifestPackage(t, overlay,
+				`{"schema_version": 1, "name": "personal", "version": "0.3.0",`+
+					`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+				map[string]string{"a.md": "overlay\n"})
+			spec.Source = overlay
+			policy := Policy{
+				OverlaysAllowed:      true,
+				OverlayDefaultWeight: 1000,
+				Overlays:             map[string][]OverlaySpec{"acme": {spec}},
+			}
+			_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
+			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
+				t.Fatalf("path overlay with a %s: err = %v, want %s", name, err, DiagSourceInvalid)
+			}
+		})
+	}
+}
+
+// TestOverlayInvalidSourceKindIsSourceInvalid drives Install with an
+// overlay whose source is neither a git source nor a path: core §6.1
+// refuses an invalid network form rather than treating it as local, so
+// resolution stops with profile_source_invalid and never snapshots
+// whatever the spelling happens to name on disk. The refusals are driven
+// one at a time so a mutant that narrows the gate to admit exactly one of
+// them names the member it admitted.
+func TestOverlayInvalidSourceKindIsSourceInvalid(t *testing.T) {
+	sources := []string{
+		"svn://example.com/org/pkg",
+		"file:///tmp/pkg",
+		"C:",
+		"git@my_host:org/pkg",
+		"my_host:org/pkg",
+		`github.com:\org\pkg`,
+		"github.com:/org/pkg",
+	}
+	for _, source := range sources {
+		t.Run(source, func(t *testing.T) {
+			home := t.TempDir()
+			pinHomes(t)
+			root := filepath.Join(t.TempDir(), "root")
+			writeManifestPackage(t, root,
+				`{"schema_version": 1, "name": "acme", "version": "1.0.0",`+
+					`"context": {"modules": [{"path": "a.md"}]}}`+"\n",
+				map[string]string{"a.md": "root\n"})
+			policy := Policy{
+				OverlaysAllowed:      true,
+				OverlayDefaultWeight: 1000,
+				Overlays:             map[string][]OverlaySpec{"acme": {{Source: source}}},
+			}
+			_, _, _, err := Install(home, InstallOptions{Operand: root, Policy: policy})
+			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
+				t.Fatalf("overlay %q err = %v, want %s", source, err, DiagSourceInvalid)
+			}
+			// The refusal must come from the kind gate, not from a
+			// downstream clone or manifest failure that happens to carry
+			// the same diagnostic: a gate that let the spelling through
+			// to git or to a local snapshot would still produce
+			// profile_source_invalid here and prove nothing.
+			if !strings.Contains(err.Error(), "neither a git source nor a path") &&
+				!strings.Contains(err.Error(), "no network identity") {
+				t.Fatalf("overlay %q err = %v, want the source-kind refusal", source, err)
+			}
+			if entries, readErr := os.ReadDir(filepath.Join(home, "profile-repos")); readErr == nil && len(entries) != 0 {
+				t.Fatalf("refused overlay %q cloned: %v", source, entries)
+			}
+		})
+	}
+}
+
+// TestSCPOverlayResolvesAsGit drives Install with the SCP spellings the
+// landed discriminator classifies as git: each resolves over the network
+// fixture, pins a commit, and is recorded with its canonical identity. A
+// discriminator that misclassified one of these toward `path` would
+// snapshot a local directory instead and fail here.
+//
+// The one-character-host spelling (`c:example/x`, the landed
+// valid-overlay-git-single-letter-host case) is deliberately NOT driven
+// through this fixture: the fixture reaches git through a
+// `url.<base>.insteadOf` rewrite, and a `c:`-prefixed remote is exactly the
+// spelling git itself may read as a drive-relative local path on Windows,
+// which would make this row's result a property of the fixture rather than
+// of curator. It is pinned instead where it is portable —
+// identity.TestParseOneCharacterHostIsANetworkIdentity for the
+// canonicalization and identity.TestClassifySourceMatrix plus
+// config.TestGitOverlayDeclarationParses for the classification. That is a
+// stated bound: no test drives a one-character-host overlay through a live
+// clone.
+func TestSCPOverlayResolvesAsGit(t *testing.T) {
+	spellings := map[string]string{
+		"example.com:personal":     "example.com/personal",
+		"git@example.com:personal": "example.com/personal",
+	}
+	for spelling, wantIdentity := range spellings {
+		spelling, wantIdentity := spelling, wantIdentity
+		t.Run(spelling, func(t *testing.T) {
+			home := t.TempDir()
+			pinHomes(t)
+			ids := newGitIdentities(t)
+			overlayOperand := gitContextRepo(t, ids, spelling,
+				`{"schema_version": 1, "name": "personal", "version": "1.0.0",`+
+					`"context": {"modules": [{"path": "a.md"}]}}`,
+				map[string]string{"a.md": "overlay\n"})
+			rootOperand := gitContextRepo(t, ids, "https://example.com/root",
+				`{"schema_version": 1, "name": "root", "version": "1.0.0",`+
+					`"context": {"modules": [{"path": "a.md"}]}}`,
+				map[string]string{"a.md": "root\n"})
+			policy := Policy{
+				OverlaysAllowed:      true,
+				OverlayDefaultWeight: 1000,
+				Overlays:             map[string][]OverlaySpec{"root": {{Source: overlayOperand, Range: "*"}}},
+			}
+			info, _, _, err := Install(home, InstallOptions{Operand: rootOperand, Policy: policy})
+			if err != nil {
+				t.Fatal(err)
+			}
+			member, ok := lockMember(info.Lock, "personal")
+			if !ok || !member.Overlay {
+				t.Fatalf("lock members %+v carry no flagged overlay", info.Lock.Members)
+			}
+			if member.Commit == "" || member.StateHash != "" {
+				t.Fatalf("scp overlay member %+v carries no commit pin", member)
+			}
+			// The recorded source is the core §6.1 canonical identity,
+			// not the raw spelling: a one-character host canonicalizes
+			// like any other, which is what the landed corpus decides
+			// for `c:example/x`. A carve-out that treats a single-letter
+			// host as a Windows drive records the raw spelling instead
+			// and fails here.
+			if member.Source != wantIdentity {
+				t.Fatalf("scp overlay member source %q, want the canonical identity %q", member.Source, wantIdentity)
+			}
+		})
 	}
 }
 

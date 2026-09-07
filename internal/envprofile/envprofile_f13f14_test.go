@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/relux-works/curator/internal/envmarker"
+	"github.com/relux-works/curator/internal/identity"
 )
 
 // Production entry points under test: Install, Current, Use.
@@ -17,10 +18,13 @@ import (
 // did not. A mutant that only moves the current pointer (the pre-fix shape)
 // or that drops materialization for one adapter must fail these tests.
 //
-// F14 covers the syntactic path-vs-git distinction (§9.1): /, ./, ../ and
-// the platform absolute spellings are path; everything else is git, never
-// probed from the filesystem. A mutant that stats the operand to decide
-// must fail these tests.
+// F14 covers the syntactic path-vs-git distinction (§9.1). The kind of an
+// install operand is decided by spelling alone through the one
+// discriminator (identity.ClassifySource) and is never probed from the
+// filesystem, so a directory planted in the operator's working directory
+// can never shadow a git identity and carry it past the core §6.1 network
+// allowlist. A mutant that stats the operand to decide must fail these
+// tests.
 
 func TestInstallUseSwitchesAndAgrees(t *testing.T) {
 	home := t.TempDir()
@@ -174,42 +178,109 @@ func TestAbsentPathOperandWithRequirementIsRefConflict(t *testing.T) {
 	}
 }
 
-// TestIsPathOperandIsSyntactic pins the classifier table: /, ./, ../ and
-// the platform absolute spellings are path; every other spelling —
-// including git identities that happen to name an existing directory — is
-// git. A mutant that re-admits the stat fallback fails the git-identity
-// rows whenever the test working directory contains such a name.
-func TestIsPathOperandIsSyntactic(t *testing.T) {
-	cases := []struct {
-		operand string
-		want    bool
-	}{
-		{"/tmp/pkg", true},
-		{"/", true},
-		{"./pkg", true},
-		{"../pkg", true},
-		{".", true},
-		{"..", true},
-		{`.\pkg`, true},
-		{`..\pkg`, true},
-		{`C:/pkg`, true},
-		{`C:\pkg`, true},
-		{`D:`, true},
-		{`\\host\share\pkg`, true},
-		{"", false},
-		{"github.com/evil-org/pkg", false},
-		{"github.com/relux-works/pkg", false},
-		{"https://example.com/org/pkg", false},
-		{"git@example.com:org/pkg.git", false},
-		{"ssh://git@example.com/org/pkg", false},
-		{"example.com/org/pkg", false},
-		{"pkg", false},
-		{"./", true},
-		{"../", true},
-	}
-	for _, tc := range cases {
-		if got := isPathOperand(tc.operand); got != tc.want {
-			t.Errorf("isPathOperand(%q) = %v, want %v", tc.operand, got, tc.want)
+// installOperandCases is the `profile install <git-url|path>` operand
+// matrix. The kind comes from the one discriminator
+// (identity.ClassifySource) plus this row's stated widening: a spelling the
+// discriminator calls `path` that is also a valid core §6.1 canonical
+// network identity stays `git`, because `curator profile install
+// github.com/example/x` clones it over https today and following the
+// classification would silently turn a network install into a local one.
+var installOperandCases = []struct {
+	operand string
+	want    identity.SourceKind
+	why     string
+}{
+	{"/tmp/pkg", identity.SourcePath, "absolute"},
+	{"/", identity.SourcePath, "the root"},
+	{"./pkg", identity.SourcePath, "explicitly relative"},
+	{"../pkg", identity.SourcePath, "parent-relative"},
+	{".", identity.SourcePath, "the working directory"},
+	{"..", identity.SourcePath, "the parent directory"},
+	{`.\pkg`, identity.SourcePath, "windows relative"},
+	{`..\pkg`, identity.SourcePath, "windows parent-relative"},
+	{`C:/pkg`, identity.SourcePath, "drive, slash"},
+	{`C:\pkg`, identity.SourcePath, "drive, backslash"},
+	{`\\host\share\pkg`, identity.SourcePath, "UNC"},
+	{"~/pkg", identity.SourcePath, "home-relative carries no network identity"},
+	{"pkg", identity.SourcePath, "a bare name carries no network identity"},
+	{"MyOrg/pkg", identity.SourcePath, "an uppercase host is not a canonical identity"},
+	{"github.com/evil-org/pkg", identity.SourceGit, "a canonical identity stays git and stays allowlisted"},
+	{"github.com/relux-works/pkg", identity.SourceGit, "same"},
+	{"example.com/org/pkg", identity.SourceGit, "same"},
+	{"https://example.com/org/pkg", identity.SourceGit, "https"},
+	{"ssh://git@example.com/org/pkg", identity.SourceGit, "ssh"},
+	{"git@example.com:org/pkg.git", identity.SourceGit, "scp"},
+	{"c:example/pkg", identity.SourceGit, "an SCP remote on a one-character §6.1 host"},
+	{"D:", identity.SourceInvalid, "a bare drive letter names nothing"},
+	{"", identity.SourceInvalid, "an empty operand is no operand"},
+	{"my_host:example/pkg", identity.SourceInvalid, "outside the §6.1 host grammar"},
+	{"github.com:/org/pkg", identity.SourceInvalid, "a slash first path character is not an SCP remote"},
+	{"svn://example.com/org/pkg", identity.SourceInvalid, "an unsupported scheme"},
+	{"file:///tmp/pkg", identity.SourceInvalid, "file carries no network identity"},
+}
+
+// TestInstallOperandKindIsSyntactic pins the install classifier table: the
+// kind is decided by spelling alone. A mutant that re-admits the stat
+// fallback fails the git rows whenever the test working directory contains
+// such a name (TestOperandShadowedByDirectoryResolvesAsGit drives that
+// through Install).
+func TestInstallOperandKindIsSyntactic(t *testing.T) {
+	for _, tc := range installOperandCases {
+		if got := installOperandKind(tc.operand); got != tc.want {
+			t.Errorf("installOperandKind(%q) = %s, want %s (%s)", tc.operand, got, tc.want, tc.why)
 		}
+	}
+}
+
+// TestInstallNeverDemotesANetworkIdentityToAPath is the invariant behind the
+// widening above, stated as a property over the same matrix: an operand that
+// carries a core §6.1 canonical network identity is never classified `path`,
+// because a `path` source bypasses the network allowlist by design. A mutant
+// that drops the widening and follows the overlay classification verbatim
+// turns `github.com/evil-org/pkg` into a path install and fails here.
+func TestInstallNeverDemotesANetworkIdentityToAPath(t *testing.T) {
+	checked := 0
+	for _, tc := range installOperandCases {
+		canonical, err := identity.Parse(strings.TrimSpace(tc.operand))
+		if err != nil || canonical == "" {
+			continue
+		}
+		checked++
+		if got := installOperandKind(tc.operand); got == identity.SourcePath {
+			t.Errorf("operand %q carries network identity %q but classified %s", tc.operand, canonical, got)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("the matrix carries no network identity: the invariant checked nothing")
+	}
+	t.Logf("checked %d network-identity operands", checked)
+}
+
+// TestInstallRefusesANonSourceOperand drives Install with each refused
+// spelling: the operand never reaches a clone and never becomes a local
+// install of whatever the spelling happens to name.
+func TestInstallRefusesANonSourceOperand(t *testing.T) {
+	pinHomes(t)
+	for _, tc := range installOperandCases {
+		if tc.want != identity.SourceInvalid {
+			continue
+		}
+		t.Run(tc.operand, func(t *testing.T) {
+			home := t.TempDir()
+			_, _, _, err := Install(home, InstallOptions{Operand: tc.operand})
+			if err == nil || !strings.Contains(err.Error(), DiagSourceInvalid) {
+				t.Fatalf("operand %q err = %v, want %s", tc.operand, err, DiagSourceInvalid)
+			}
+			// The refusal must come from the kind gate, not from a
+			// downstream clone or manifest failure carrying the same
+			// diagnostic.
+			if !strings.Contains(err.Error(), "neither a git source nor a path") &&
+				!strings.Contains(err.Error(), "no network identity") {
+				t.Fatalf("operand %q err = %v, want the source-kind refusal", tc.operand, err)
+			}
+			if entries, readErr := os.ReadDir(filepath.Join(home, "profile-repos")); readErr == nil && len(entries) != 0 {
+				t.Fatalf("refused operand %q cloned: %v", tc.operand, entries)
+			}
+		})
 	}
 }
