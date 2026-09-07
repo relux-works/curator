@@ -226,7 +226,7 @@ func TestConformanceEveryPathTheVectorsNameIsDeclared(t *testing.T) {
 }
 
 // TestNoRootReadHereEscapesTheDeclaredArtefactGuard keeps `rootPath` the only
-// way this package turns the conformance root into a path on disk.
+// way a case here turns the identifier `root` into a path on disk.
 //
 // `rootPath` refuses a path no declared artefact covers, which is what stops a
 // new read from drifting undeclared -- but only while every read goes through
@@ -237,6 +237,13 @@ func TestConformanceEveryPathTheVectorsNameIsDeclared(t *testing.T) {
 // So outside suite_test.go, where the guard itself lives, the identifier `root`
 // may only be bound, returned, passed to one of the accountable helpers, or
 // formatted into a failure message. Anywhere else it is a finding.
+//
+// The scan enforces that syntactically, by tracking the identifier, and the
+// bound follows from it: a case that reaches the root by another door -- reading
+// CURATOR_CONFORMANCE_ROOT again under a different name -- is invisible here. That
+// read still fails, but red on the open() mid-case rather than by name at the
+// plan, and it cannot produce a silent skip, which is what this package exists to
+// make impossible.
 func TestNoRootReadHereEscapesTheDeclaredArtefactGuard(t *testing.T) {
 	fset, files := packageFiles(t)
 	occurrences := 0
