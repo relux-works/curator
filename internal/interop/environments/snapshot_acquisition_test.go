@@ -1,11 +1,10 @@
-package interop
+package environments
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -52,20 +51,17 @@ func acquisitionGit(t *testing.T, dir string, args ...string) string {
 
 // TestConformanceSnapshotAcquisition drives gitops.Extract (the production
 // acquisition path of internal/snapshot and internal/closure) against the
-// suite's byte-exact vector. A root that publishes no such vector (the pinned
-// rc.9 suite) records a root-content skip (.github/ci/skip-classes.tsv); a root
-// that has it must pass. The ledger row in .github/ci/platform-cases.tsv
-// requires the case on every GOOS and tolerates only that skip class.
+// suite's byte-exact vector. vectors/snapshot-acquisition.json is declared for
+// this package in .github/ci/root-artifacts.tsv, so a root that publishes no
+// such vector (the pinned rc.9 suite) defers the whole package and this case
+// records the `root-unset` skip -- the one class .github/ci/skip-classes.tsv
+// admits only for a deferred package. A root that serves the package and then
+// omits the vector never reaches `go test`: suite-plan.sh names the missing
+// family first, and a CI_REQUIRE_FULL_ROOT lane fails there.
 func TestConformanceSnapshotAcquisition(t *testing.T) {
 	root := suiteRoot(t)
 	vectorPath := filepath.Join(root, "vectors", "snapshot-acquisition.json")
-	payload, err := os.ReadFile(vectorPath)
-	if errors.Is(err, fs.ErrNotExist) {
-		t.Skipf("conformance root %s publishes no vectors/snapshot-acquisition.json (pre-environments suite; root-content)", root)
-	}
-	if err != nil {
-		t.Fatalf("reading %s: %v", vectorPath, err)
-	}
+	payload := requireFamily(t, root, "vectors/snapshot-acquisition.json")
 	var vector snapshotAcquisitionVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
 		t.Fatalf("decoding %s: %v", vectorPath, err)
@@ -76,7 +72,7 @@ func TestConformanceSnapshotAcquisition(t *testing.T) {
 	for _, tc := range vector.Cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			fixture := filepath.Join(root, filepath.FromSlash(tc.Fixture))
-			wantHash := readGolden(t, tc.Expected)
+			wantHash := readRootFile(t, root, tc.Expected)
 			if wantHash != tc.ExpectedSHA256 {
 				t.Fatalf("expected file %s (%s) disagrees with vector expected_sha256 (%s)", tc.Expected, wantHash, tc.ExpectedSHA256)
 			}

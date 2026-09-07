@@ -1,8 +1,7 @@
-package interop
+package environments
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -55,13 +54,7 @@ type contextDetectorsVector struct {
 func TestConformanceContextDetectors(t *testing.T) {
 	root := suiteRoot(t)
 	vectorPath := filepath.Join(root, "vectors", "context-detectors.json")
-	payload, err := os.ReadFile(vectorPath)
-	if errors.Is(err, os.ErrNotExist) {
-		t.Skipf("conformance root %s publishes no vectors/context-detectors.json (pre-environments suite; root-content)", root)
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	payload := requireFamily(t, root, "vectors/context-detectors.json")
 	var vector contextDetectorsVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
 		t.Fatalf("decoding %s: %v", vectorPath, err)

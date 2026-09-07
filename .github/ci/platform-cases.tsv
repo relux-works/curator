@@ -179,12 +179,31 @@ internal/transaction	TestWindowsNamespaceIdentityIsCompletedWhenItIsTaken	window
 # Interop / conformance consumer
 # ===========================================================================
 internal/interop	TestGoldenContextCopy	linux,darwin,windows	-	-	the agent context copied for a skill matches the authoritative golden file list
-internal/interop	TestConformanceSnapshotAcquisition	linux,darwin,windows	linux,darwin,windows	root-content	the root's byte-exact snapshot-acquisition vector reproduces through gitops.Extract; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
-internal/interop	TestConformanceContextVersions	linux,darwin,windows	linux,darwin,windows	root-content	the environments version/range vector drives pkgversion; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
-internal/interop	TestConformanceContextResolution	linux,darwin,windows	linux,darwin,windows	root-content	the environments resolution/lock vector drives contextresolve and contextlock; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
-internal/interop	TestConformanceEnvironmentsHeader	linux,darwin,windows	linux,darwin,windows	root-content	the environments header vector drives contextmaterialize; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
-internal/interop	TestConformanceEnvironmentsMonolithic	linux,darwin,windows	linux,darwin,windows	root-content	every root-context, system-prompt, referenced-form, and MCP materialization case matches byte for byte with its surface hash, resolved set, and env_names union; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
-internal/interop	TestConformanceContextDetectors	linux,darwin,windows	linux,darwin,windows	root-content	the environments detector vector drives contextaudit; a root that publishes no such vector (the pinned rc.9 suite) records a root-content skip
+
+# ---------------------------------------------------------------------------
+# Interop / environments conformance consumer
+#
+# `internal/interop/environments` declares its four environments vector
+# families and the two byte-exact trees they reference in
+# `.github/ci/root-artifacts.tsv`. That declaration -- not this ledger --
+# decides whether the package runs: a root publishing every family SERVES it
+# and every row below must be observed passing; a root publishing none of
+# them DEFERS it, and the only skip these rows tolerate is the `root-unset`
+# one `suite-plan.sh` caused. A root publishing SOME of them never reaches
+# `go test` at all -- `suite-plan.sh` names the missing family, and under
+# `CI_REQUIRE_FULL_ROOT=1` the candidate lane fails there.
+#
+# The class is therefore `root-unset` and NOT `root-content`. `root-content`
+# is policy `allow` in every lane, so a row tolerating it lets a candidate
+# root drop a family and still pass green. That is the exact hole these rows
+# used to carry.
+# ---------------------------------------------------------------------------
+internal/interop/environments	TestConformanceSnapshotAcquisition	linux,darwin,windows	linux,darwin,windows	root-unset	each snapshot-acquisition case is committed through git with its exact declared bytes and re-extracted by gitops.Extract, and the extracted tree's content hash equals the vector's expected_sha256 -- CRLF, mixed endings and substitution-bait content included; a root that publishes no such family defers the package and records a root-unset skip
+internal/interop/environments	TestConformanceContextVersions	linux,darwin,windows	linux,darwin,windows	root-unset	pkgversion parses, orders and range-matches every version and range case of vectors/context-versions.json, and rejects every invalid spelling it declares; a root that publishes no such family defers the package and records a root-unset skip
+internal/interop/environments	TestConformanceContextResolution	linux,darwin,windows	linux,darwin,windows	root-unset	contextresolve.Resolve reproduces every resolution case's selected set and diagnostics, and contextlock's canonical bytes and lock hash reproduce every lock case of vectors/context-versions.json; a root that publishes no such family defers the package and records a root-unset skip
+internal/interop/environments	TestConformanceEnvironmentsHeader	linux,darwin,windows	linux,darwin,windows	root-unset	contextmaterialize.EmittedOrder and Header reproduce every header case of vectors/environments.json, and the vector's header_type_line equals the one this module writes; a root that publishes no such family defers the package and records a root-unset skip
+internal/interop/environments	TestConformanceEnvironmentsMonolithic	linux,darwin,windows	linux,darwin,windows	root-unset	every root-context, system-prompt, referenced-form and MCP materialization case matches its published expected/environments file byte for byte, with the declared surface hash, resolved set and env_names union; a root that publishes no such family defers the package and records a root-unset skip
+internal/interop/environments	TestConformanceContextDetectors	linux,darwin,windows	linux,darwin,windows	root-unset	contextaudit.Detect reproduces every detector case's findings, severities, spans and waiver outcomes, and the detector's pattern class table equals the vector's; a root that publishes no such family defers the package and records a root-unset skip
 internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
 internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
 

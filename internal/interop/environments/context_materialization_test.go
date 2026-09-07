@@ -1,9 +1,8 @@
-package interop
+package environments
 
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -70,19 +69,16 @@ func loadEnvironmentsVector(t *testing.T) (string, environmentsVector) {
 	t.Helper()
 	root := suiteRoot(t)
 	vectorPath := filepath.Join(root, "vectors", "environments.json")
-	payload, err := os.ReadFile(vectorPath)
-	if errors.Is(err, os.ErrNotExist) {
-		t.Skipf("conformance root %s publishes no vectors/environments.json (pre-environments suite; root-content)", root)
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	payload := requireFamily(t, root, "vectors/environments.json")
 	var vector environmentsVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
 		t.Fatalf("decoding %s: %v", vectorPath, err)
 	}
 	if vector.HeaderTypeLine != contextmaterialize.HeaderTypeLine {
-		t.Skipf("conformance root %s publishes header type line %q, not %q (is a pre-revision root)", root, vector.HeaderTypeLine, contextmaterialize.HeaderTypeLine)
+		t.Fatalf("conformance root %s serves this package but publishes header type line %q, not %q\n"+
+			"\tvectors/environments.json is declared for internal/interop/environments in .github/ci/root-artifacts.tsv;\n"+
+			"\ta root that publishes the family at another revision is a candidate this module cannot bind, not a skip",
+			root, vector.HeaderTypeLine, contextmaterialize.HeaderTypeLine)
 	}
 	return root, vector
 }

@@ -1,10 +1,9 @@
-package interop
+package environments
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -174,13 +173,7 @@ func vectorLockToLock(t *testing.T, in vectorLock) *contextlock.Lock {
 func TestConformanceContextResolution(t *testing.T) {
 	root := suiteRoot(t)
 	vectorPath := filepath.Join(root, "vectors", "context-versions.json")
-	payload, err := os.ReadFile(vectorPath)
-	if errors.Is(err, os.ErrNotExist) {
-		t.Skipf("conformance root %s publishes no vectors/context-versions.json (pre-environments suite; root-content)", root)
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
+	payload := requireFamily(t, root, "vectors/context-versions.json")
 	var vector contextResolutionVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
 		t.Fatalf("decoding %s: %v", vectorPath, err)

@@ -1,10 +1,8 @@
-package interop
+package environments
 
 import (
 	"encoding/json"
 	"errors"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -47,13 +45,7 @@ func loadContextVersionsVector(t *testing.T) (string, contextVersionsVector) {
 	t.Helper()
 	root := suiteRoot(t)
 	vectorPath := filepath.Join(root, "vectors", "context-versions.json")
-	payload, err := os.ReadFile(vectorPath)
-	if errors.Is(err, fs.ErrNotExist) {
-		t.Skipf("conformance root %s publishes no vectors/context-versions.json (pre-environments suite; root-content)", root)
-	}
-	if err != nil {
-		t.Fatalf("reading %s: %v", vectorPath, err)
-	}
+	payload := requireFamily(t, root, "vectors/context-versions.json")
 	var vector contextVersionsVector
 	if err := json.Unmarshal(payload, &vector); err != nil {
 		t.Fatalf("decoding %s: %v", vectorPath, err)

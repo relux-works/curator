@@ -1,5 +1,17 @@
 // Package interop consumes the authoritative external Curator Protocol suite.
 // It contains no implementation-owned expected values.
+//
+// Every case here reads an artefact the committed SPEC_PIN root publishes, and
+// reads it WITHOUT a guard, so a root that drops one goes red with the open()
+// error naming the file. The package is therefore deliberately absent from
+// `.github/ci/root-artifacts.tsv`.
+//
+// The environments conformance cases are NOT here. They read families the
+// pinned root does not publish, so they live in `internal/interop/environments`,
+// which declares those families and is deferred as a whole against a root
+// without them. Keeping them here would have forced a choice between deferring
+// these pre-environments cases on every default lane and letting a candidate
+// root drop an environments family unnoticed.
 package interop
 
 import (
