@@ -1282,6 +1282,18 @@ func checkMCPCommand(entry string) (string, bool) {
 	return "", false
 }
 
+// sourceKindRefusal is the refusal for a spelling that is neither kind. A
+// file:// remote keeps the F12 wording: it is refused because it carries no
+// network identity, which is exactly why the landed discriminator refuses
+// it as neither kind, and the boundary is the same one canonicalGit and
+// gateSource enforce for a source that reaches them.
+func sourceKindRefusal(what, spelling string) error {
+	if isFileRemote(strings.TrimSpace(spelling)) {
+		return fmt.Errorf("%s: file:// git sources carry no network identity and are not accepted", DiagSourceInvalid)
+	}
+	return fmt.Errorf("%s: %s %q is neither a git source nor a path", DiagSourceInvalid, what, spelling)
+}
+
 // installOperandKind classifies a `profile install <git-url|path>` operand
 // through the one discriminator (identity.ClassifySource, the same helper
 // the config reader and `profile compose add` use) and never by probing the
@@ -1300,24 +1312,16 @@ func checkMCPCommand(entry string) (string, bool) {
 // local one and hand a planted `./github.com/example/x` directory the
 // allowlist bypass that F14 exists to prevent, so a spelling the
 // discriminator calls `path` that is also a valid canonical network identity
-// stays `git` on this row. Nothing changes kind: `packages/team` was a git
-// install operand before this change and still is.
+// stays `git` on this row. No operand that reached the network before this
+// change reaches a local path now -- `packages/team` was a git install
+// operand and still is. One class does move, in the other direction: a
+// colon in a later segment (`packages/team:context`) was unclassifiable and
+// refused at canonicalGit before, and is a path operand now, which is what
+// the landed discriminator decides it is.
 //
 // The operand is trimmed before classification because every downstream git
 // entry point (canonicalGit, identity.Parse) already trims; the overlay
 // reader does not trim, because the schema does not.
-// sourceKindRefusal is the refusal for a spelling that is neither kind. A
-// file:// remote keeps the F12 wording: it is refused because it carries no
-// network identity, which is exactly why the landed discriminator refuses
-// it as neither kind, and the boundary is the same one canonicalGit and
-// gateSource enforce for a source that reaches them.
-func sourceKindRefusal(what, spelling string) error {
-	if isFileRemote(strings.TrimSpace(spelling)) {
-		return fmt.Errorf("%s: file:// git sources carry no network identity and are not accepted", DiagSourceInvalid)
-	}
-	return fmt.Errorf("%s: %s %q is neither a git source nor a path", DiagSourceInvalid, what, spelling)
-}
-
 func installOperandKind(operand string) identity.SourceKind {
 	trimmed := strings.TrimSpace(operand)
 	kind := identity.ClassifySource(trimmed)
