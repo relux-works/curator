@@ -75,6 +75,8 @@ spawn agent resolution: Agent selection: claude via explicit_override (preferred
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [analyst] solution-architect (claude) (run=RUN-260908-133884, max_parallel=3)
 spawn run started: [analyst] solution-architect (claude) (run=RUN-260908-133884)
+agent completed: [analyst] solution-architect (claude) (exit=0)
+spawn run completed: claude (run=RUN-260908-133884, pid=75388, exit=0)
 
 ## Precondition Resources
 - [Pi-contract-brief.md](file://TASK-260908-ggxfte/Pi-contract-brief.md)
@@ -95,12 +97,13 @@ spawn run started: [analyst] solution-architect (claude) (run=RUN-260908-133884)
 - [TASK-260908-ggxfte_spawn-log_-reviewer--reviewer--claude-_RUN-260908-4bf65c.log](file://TASK-260908-ggxfte/TASK-260908-ggxfte_spawn-log_-reviewer--reviewer--claude-_RUN-260908-4bf65c.log) — System spawn log captured by task-board
 - [TASK-260908-ggxfte_review-verdict-rev2.md](file://TASK-260908-ggxfte/TASK-260908-ggxfte_review-verdict-rev2.md) — Reviewer verdict CR rev2: accepted
 - [TASK-260908-ggxfte_spawn-log_-analyst--solution-architect--claude-_RUN-260908-133884.log](file://TASK-260908-ggxfte/TASK-260908-ggxfte_spawn-log_-analyst--solution-architect--claude-_RUN-260908-133884.log) — System spawn log captured by task-board
+- [TASK-260908-ggxfte_integration-outcome.md](file://TASK-260908-ggxfte/TASK-260908-ggxfte_integration-outcome.md) — Integration run evidence for accepted CR rev2: worktree complete txn, signed board commit 324dc16a published to origin/main, task/story done
 
 ## Created
 2026-09-07T23:37:41Z
 
 ## Last Update
-2026-09-07T18:30:00Z
+2026-09-08T15:03:37Z
 
 ## Assigned To
 [analyst] solution-architect (claude)

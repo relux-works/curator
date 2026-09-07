@@ -34,7 +34,7 @@ estimated(fibonacci(5))
 - [x] Tests green
 - [x] Gate, refusal, validation, authorization, and attestation behavior attacked, not read — positive-path-only evidence is not accepted
 - [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
-- [ ] In a managed Story worktree the candidate is left UNCOMMITTED in the worktree for the handoff to snapshot — never commit on the Story branch. A producer commit moves the branch tip off the recorded checkpoint and the handoff refuses with change_request_candidate_committed_past_checkpoint; repair with `git reset --soft <checkpoint_oid>` before completing again.
+- [x] In a managed Story worktree the candidate is left UNCOMMITTED in the worktree for the handoff to snapshot — never commit on the Story branch. A producer commit moves the branch tip off the recorded checkpoint and the handoff refuses with change_request_candidate_committed_past_checkpoint; repair with `git reset --soft <checkpoint_oid>` before completing again.
 
 ## Notes
 spawn selection rationale tuple: {"role":"developer","pair":"claude-fable-5-1/low","text":"Operator-selected Fable 5.1 low; bounded SPEC section 3 parser and initial Go CI after accepted A0 evidence."}
@@ -61,6 +61,8 @@ spawn agent resolution: Agent selection: claude via explicit_override (preferred
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (claude) (run=RUN-260908-df687d, max_parallel=3)
 spawn run started: [implementer] developer (claude) (run=RUN-260908-df687d)
+agent completed: [implementer] developer (claude) (exit=0)
+spawn run completed: claude (run=RUN-260908-df687d, pid=27376, exit=0)
 
 ## Precondition Resources
 - [A1-cli-producer-brief.md](file://TASK-260908-2g6x65/A1-cli-producer-brief.md)
@@ -77,12 +79,14 @@ spawn run started: [implementer] developer (claude) (run=RUN-260908-df687d)
 - [TASK-260908-2g6x65_review-verdict-rev1.md](file://TASK-260908-2g6x65/TASK-260908-2g6x65_review-verdict-rev1.md) — Reviewer verdict rev1: accepted; make check 0, 14/14 mutants killed, 13/13 §3 rows driven
 - [TASK-260908-2g6x65_delivery.md](file://TASK-260908-2g6x65/TASK-260908-2g6x65_delivery.md)
 - [TASK-260908-2g6x65_spawn-log_-implementer--developer--claude-_RUN-260908-df687d.log](file://TASK-260908-2g6x65/TASK-260908-2g6x65_spawn-log_-implementer--developer--claude-_RUN-260908-df687d.log) — System spawn log captured by task-board
+- [TASK-260908-2g6x65_integration-evidence.md](file://TASK-260908-2g6x65/TASK-260908-2g6x65_integration-evidence.md) — Integration run evidence: worktree complete succeeded, signed board commit 22c0ce85 published, Story/task done
+- [TASK-260908-2g6x65_worktree-complete-01.json](file://TASK-260908-2g6x65/TASK-260908-2g6x65_worktree-complete-01.json) — Raw JSON stdout of task-board worktree complete (exit 0)
 
 ## Created
 2026-09-07T23:09:32Z
 
 ## Last Update
-2026-09-07T18:30:00Z
+2026-09-08T14:58:27Z
 
 ## Assigned To
 [implementer] developer (claude)

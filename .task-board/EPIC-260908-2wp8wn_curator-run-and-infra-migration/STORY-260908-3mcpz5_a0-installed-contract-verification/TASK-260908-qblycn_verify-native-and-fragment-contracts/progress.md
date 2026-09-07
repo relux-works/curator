@@ -76,6 +76,8 @@ spawn agent resolution: Agent selection: claude via explicit_override (preferred
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [analyst] researcher (claude) (run=RUN-260908-536d04, max_parallel=3)
 spawn run started: [analyst] researcher (claude) (run=RUN-260908-536d04)
+agent completed: [analyst] researcher (claude) (exit=0)
+spawn run completed: claude (run=RUN-260908-536d04, pid=3198, exit=0)
 
 ## Precondition Resources
 - [A0-producer-brief.md](file://TASK-260908-qblycn/A0-producer-brief.md)
@@ -105,12 +107,13 @@ spawn run started: [analyst] researcher (claude) (run=RUN-260908-536d04)
 - [TASK-260908-qblycn_spawn-log_-analyst--researcher--claude-_RUN-260908-70092d.log](file://TASK-260908-qblycn/TASK-260908-qblycn_spawn-log_-analyst--researcher--claude-_RUN-260908-70092d.log) — System spawn log captured by task-board
 - [TASK-260908-qblycn_a0-complete-attempt-01.md](file://TASK-260908-qblycn/TASK-260908-qblycn_a0-complete-attempt-01.md) — A0 completion attempt 01: worktree complete refused, worktree_protected_authority_indeterminate (curator has 2 remotes); no state written; next repair
 - [TASK-260908-qblycn_spawn-log_-analyst--researcher--claude-_RUN-260908-536d04.log](file://TASK-260908-qblycn/TASK-260908-qblycn_spawn-log_-analyst--researcher--claude-_RUN-260908-536d04.log) — System spawn log captured by task-board
+- [TASK-260908-qblycn_a0-complete-delivery.md](file://TASK-260908-qblycn/TASK-260908-qblycn_a0-complete-delivery.md) — A0 complete: signed board commit 4f980b1 published to Curator main, Story/task done
 
 ## Created
 2026-09-07T23:05:24Z
 
 ## Last Update
-2026-09-07T18:30:00Z
+2026-09-08T14:53:11Z
 
 ## Assigned To
 [analyst] researcher (claude)

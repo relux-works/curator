@@ -1,0 +1,38 @@
+$ make vet
+[exit 0]
+$ make test
+ok  	github.com/relux-works/skill-agents-management/internal/argvguard	0.369s
+ok  	github.com/relux-works/skill-agents-management/internal/gosources	0.715s
+ok  	github.com/relux-works/skill-agents-management/internal/ident	1.076s
+ok  	github.com/relux-works/skill-agents-management/internal/launchenv	1.413s
+ok  	github.com/relux-works/skill-agents-management/internal/mcpjson	1.750s
+?   	github.com/relux-works/skill-agents-management/internal/paritycase	[no test files]
+ok  	github.com/relux-works/skill-agents-management/internal/regress	2.140s
+ok  	github.com/relux-works/skill-agents-management/internal/runtimeenv	2.905s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic	2.694s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/parity	3.638s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/agy	3.377s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude	4.063s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex	4.401s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/gemini	4.704s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/muse	5.054s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/pi	5.351s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative	5.522s
+ok  	github.com/relux-works/skill-agents-management/pkg/agentic/systems/qwen	5.644s
+ok  	github.com/relux-works/skill-agents-management/pkg/inferenceengine	5.544s
+ok  	github.com/relux-works/skill-agents-management/pkg/inferenceengine/engines/mlx	5.499s
+ok  	github.com/relux-works/skill-agents-management/pkg/localruntime	5.515s
+ok  	github.com/relux-works/skill-agents-management/pkg/plugin	5.745s
+ok  	github.com/relux-works/skill-agents-management/pkg/providerlimits	11.085s
+ok  	github.com/relux-works/skill-agents-management/pkg/vendorplugin	5.450s
+?   	github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/alibaba	[no test files]
+?   	github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic	[no test files]
+?   	github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/google	[no test files]
+ok  	github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/local-models	5.803s
+?   	github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/openai	[no test files]
+?   	github.com/relux-works/skill-agents-management/tools/agents-management	[no test files]
+ok  	github.com/relux-works/skill-agents-management/tools/agents-management/cmd	6.778s
+[exit 0]
+$ make regress
+ok  	github.com/relux-works/skill-agents-management/internal/regress	0.389s
+[exit 0]

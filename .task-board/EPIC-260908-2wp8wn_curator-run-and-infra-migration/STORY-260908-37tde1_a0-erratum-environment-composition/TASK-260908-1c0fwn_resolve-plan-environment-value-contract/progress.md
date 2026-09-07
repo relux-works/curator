@@ -58,6 +58,8 @@ spawn agent resolution: Agent selection: claude via explicit_override (preferred
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=claude; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [analyst] solution-architect (claude) (run=RUN-260908-e456cd, max_parallel=3)
 spawn run started: [analyst] solution-architect (claude) (run=RUN-260908-e456cd)
+agent completed: [analyst] solution-architect (claude) (exit=0)
+spawn run completed: claude (run=RUN-260908-e456cd, pid=51448, exit=0)
 
 ## Precondition Resources
 - [Env-contract-brief.md](file://TASK-260908-1c0fwn/Env-contract-brief.md)
@@ -74,12 +76,13 @@ spawn run started: [analyst] solution-architect (claude) (run=RUN-260908-e456cd)
 - [TASK-260908-1c0fwn_review-verdict-rev1.md](file://TASK-260908-1c0fwn/TASK-260908-1c0fwn_review-verdict-rev1.md) — Reviewer verdict rev1: accepted
 - [TASK-260908-1c0fwn_review_probe_test.go](file://TASK-260908-1c0fwn/TASK-260908-1c0fwn_review_probe_test.go) — Reviewer probe: own-name subset and mutant
 - [TASK-260908-1c0fwn_spawn-log_-analyst--solution-architect--claude-_RUN-260908-e456cd.log](file://TASK-260908-1c0fwn/TASK-260908-1c0fwn_spawn-log_-analyst--solution-architect--claude-_RUN-260908-e456cd.log) — System spawn log captured by task-board
+- [TASK-260908-1c0fwn_integration-outcome.md](file://TASK-260908-1c0fwn/TASK-260908-1c0fwn_integration-outcome.md) — Integration run: worktree complete rev1 landed board commit a728e495 in Curator main; task and Story done
 
 ## Created
 2026-09-07T23:40:02Z
 
 ## Last Update
-2026-09-07T18:30:00Z
+2026-09-08T15:00:38Z
 
 ## Assigned To
 [analyst] solution-architect (claude)

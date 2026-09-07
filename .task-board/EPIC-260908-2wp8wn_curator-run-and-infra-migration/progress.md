@@ -24,13 +24,14 @@ code
 - [story-map.json](file://EPIC-260908-2wp8wn/story-map.json)
 - [A1-common-producer-rules.md](file://EPIC-260908-2wp8wn/A1-common-producer-rules.md)
 - [pi-mcp-scope-decision.md](file://EPIC-260908-2wp8wn/pi-mcp-scope-decision.md) — Concrete Pi MCP channel conflict between full DoD and current protocol; operator scope decision
+- [ongoing-delivery-policy.md](file://EPIC-260908-2wp8wn/ongoing-delivery-policy.md) — Ongoing operator policy: local tests, no hosted CI
 
 ## Outcome Resources
-- [orchestration-state.md](file://EPIC-260908-2wp8wn/orchestration-state.md)
+- [orchestration-state.md](file://EPIC-260908-2wp8wn/orchestration-state.md) — Current delivered evidence, active runs, roots and remaining scope
 - [task-board-cross-repository-decision.md](file://EPIC-260908-2wp8wn/task-board-cross-repository-decision.md)
 
 ## Created
 2026-09-07T23:04:44Z
 
 ## Last Update
-2026-09-08T14:57:04Z
+2026-09-08T15:12:37Z

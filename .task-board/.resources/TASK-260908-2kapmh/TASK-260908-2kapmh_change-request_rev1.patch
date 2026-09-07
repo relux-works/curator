@@ -1,0 +1,2155 @@
+diff --git a/README.md b/README.md
+index 1a8279e..53ac670 100644
+--- a/README.md
++++ b/README.md
+@@ -28,7 +28,8 @@ right now*.
+ ## What the tool does
+ 
+ - **Declares runtimes** — an agentic system (the harness that runs a turn:
+-  claude-code, codex, qwen-code, gemini-cli, antigravity, muse, pi) combined with a
++  claude-code, codex, qwen-code, gemini-cli, antigravity, muse, pi, pi-native)
++  combined with a
+   model vendor (who owns the models, the authentication and the quota:
+   anthropic, openai, alibaba, google, local-models).
+ - **Ranks and describes models** — each vendor plugin publishes its models,
+@@ -117,9 +118,11 @@ The agentic-system plugin contract and its registry.
+   neither miss the machine-local case nor quietly widen into ignoring real
+   code.
+ 
+-All seven concrete system plugins ship: `pkg/agentic/systems/{codex,claude,qwen,gemini,muse,agy,pi}`.
++All eight concrete system plugins ship: `pkg/agentic/systems/{codex,claude,qwen,gemini,muse,agy,pi,pinative}`.
+ Every one of them is proven against the launch-surface goldens its system has,
+-through the real `Registry` and `BuildPlan`. See below.
++through the real `Registry` and `BuildPlan`; `pinative` has no golden (native
++Pi never existed in the extraction source) and is pinned by exact-argv tests
++instead. See below.
+ 
+ The contract is also proven by one test double registered through the public
+ API, so the interface stays exercisable without any plugin compiled in.
+@@ -289,6 +292,37 @@ plugin id and runtime id are the same spelling.
+   and must NOT match the unextended one, and a mutant that emits the same pair
+   at the end of argv must fail.
+ 
++### The pi-native plugin: `pkg/agentic/systems/pinative`
++
++The Pi coding agent run natively — the `pi` binary on the launch PATH, as a
++human's interactive session against a cloud provider — as distinct from the
++`pi` plugin above, which is the `agents-infra pi` wrapper for local models.
++Plugin id `pi-native`; the frozen runtimes that bind it are `pi-anthropic`,
++`pi-openai` and `pi-google`. Added by TASK-260908-ggxfte (accepted rev2).
++
++- **Interactive and dry-run only.** No exec grammar: headless Pi is the
++  wrapper's, and a native `-p` run would be an unsupervised child. Exec is
++  refused with `ErrUnsupportedLaunchMode`.
++- **The model identity is always `<vendor>/<launch identity>`.** Pi 0.84.2
++  resolves a bare id across every provider file and exits "ambiguous"; a
++  wrong prefix falls to its custom-model path with a warning. The vendor is
++  `LaunchRequest.Vendor`, which `BuildLaunch` sets from the runtime binding
++  after the vendor's `Spawn` and overwrites unconditionally. A request with
++  no vendor is refused (`ErrVendorMissing`), never downgraded to a bare id.
++- **Effort is `--thinking <word>`**, transported verbatim from the row's
++  vocabulary; no Pi thinking level is enumerated here.
++- **Home is `PI_CODING_AGENT_DIR`, default `~/.pi/agent`.** Provider-limit
++  identity is (runtime, home), so two managed Pi homes hold separate records.
++- **No preflight.** The plugin does not implement `Preflightable`; a plan
++  builds with no `agents-infra` on PATH.
++- **Catalog-verified membership.** A vendor row names `pi-native` only when
++  its id is in the installed Pi catalog's provider data (Pi 0.84.2). Today: 8
++  anthropic, 9 openai and 7 google rows. `claude-fable-5-1`, `gpt-6-astra`
++  (and its `astra` alias), `gpt-5.2-codex`, `gpt-5.1-codex-max` and
++  `gpt-5.1-codex-mini` are absent from that catalog and are refused with
++  `ErrModelNotDrivenBySystem`. `TestPiNativeMembershipMatchesTheInstalledCatalog`
++  re-reads the installed bytes when Pi is present.
++
+ ### The agy plugin: `pkg/agentic/systems/agy`
+ 
+ The Antigravity CLI, proven against both agy goldens. Plugin id `antigravity`,
+@@ -457,7 +491,10 @@ The vendor plugin contract, its registry, and the runtime declarations.
+ - **Runtimes are declared pairs.** `RuntimeDeclaration` binds a stable id to
+   one agentic system and one vendor, and the six historical ids (`claude`,
+   `codex`, `qwen`, `gemini`, `agy`, `muse`) are seeded from the extraction
+-  source's frozen `runtimeid` table into every binary's default registry.
++  source's frozen `runtimeid` table into every binary's default registry,
++  joined by the three native-Pi rows (`pi-anthropic`, `pi-openai`,
++  `pi-google`), frozen because `providerlimits` resolves a runtime's broker
++  through the frozen slice alone.
+   `muse`'s broker is recorded UNKNOWN with a checked-and-empty evidence list,
+   exactly as the source records it. `ResolveRuntime` remains strict and reports
+   that unresolved broker on its own terms. `BuildLaunch` additionally supports
+diff --git a/docs/architecture.md b/docs/architecture.md
+index e29110b..97b5885 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -69,6 +69,7 @@ plugin per system:
+ | `antigravity` | Antigravity CLI |
+ | `muse` | Muse CLI |
+ | `pi` | Process A: exact `agents-infra pi spawn --profile <name> --prompt <prompt> --deadline 30m --result-schema 1`, with EOF stdin; agents-infra owns the shared-runtime lease, inner Pi policy, execution and cleanup |
++| `pi-native` | The Pi coding agent itself (`pi` on the launch PATH) as an interactive session against a cloud provider: `--model <vendor>/<model>` plus `--thinking <effort>`, home `PI_CODING_AGENT_DIR` (default `~/.pi/agent`), interactive and dry-run only, no preflight, no exec grammar |
+ 
+ An agentic-system plugin declares (this mirrors the adapter table the
+ extraction source already proved out):
+@@ -78,7 +79,8 @@ extraction source already proved out):
+   owns), `dry-run` (its side-effect-free mirror), `managed-session` (the
+   provider-args fragment an external composer splices in), and `interactive`
+   (the complete argv a launcher hands to a human's terminal, curator-spec
+-  Decision 0013 §5; declared today by `claude-code`, `codex` and `pi`),
++  Decision 0013 §5; declared today by `claude-code`, `codex`, `pi` and
++  `pi-native`),
+ - environment filtering — what the child must and must not inherit,
+ - stdin transport,
+ - reasoning-effort **transport** (argv / stdin / none),
+@@ -156,6 +158,23 @@ forever — they feed admitted-pair digests, limit-state filenames and free-text
+ records downstream, and renaming any of them orphans state silently. New
+ runtimes are declarations, not code.
+ 
++The three native-Pi runtimes — `pi-anthropic`, `pi-openai`, `pi-google`, each
++(`pi-native` × that vendor) — are the one exception to "declarations, not
++code": they sit in the frozen table. `providerlimits.brokerForRuntime` walks
++`vendorplugin.FrozenRuntimes()` only, so a consumer-declared `pi-anthropic`
++would resolve to no broker there, take the unclassifiable carve-out and read
++Healthy while its managed home held a limited record. As frozen rows,
++`pi-anthropic` and `pi-openai` route to the anthropic/openai classifiers,
++resolve an identity keyed on (runtime id, home) and read state; `pi-google`
++resolves to google, which ships no classifier, and stays carve-out. Their
++checked source is the installed Pi catalog's provider data file. Model groups
++resolve to `pi-<vendor>-unmapped:<model>` singletons: no group row is added,
++because Pi's own limit output has not been captured. `LaunchRequest.Vendor`
++is set by `BuildLaunch` from the binding at the same site as `Runtime`, and is
++what `pi-native` qualifies the model identity with. Membership in
++`pi-native` is catalog-verified per row (see the vendor lineups), never
++inferred from the vendor.
++
+ A declaration is a naming fact, not a dependency check: neither the system nor
+ the vendor plugin has to be compiled in for one to exist, and the six frozen
+ ids are seeded into every binary before any plugin registers. Resolution is
+diff --git a/docs/consuming-the-module.md b/docs/consuming-the-module.md
+index f399787..854de04 100644
+--- a/docs/consuming-the-module.md
++++ b/docs/consuming-the-module.md
+@@ -270,8 +270,21 @@ prefix, and no stdin unless the system carries effort on stdin. `BuildPlan`
+ refuses a request carrying any of those (`ErrCompositionNotInteractive`,
+ `ErrParameterNotInteractive`) rather than dropping them; the MCP channel, the
+ system-prompt channel and the permission posture are the composer's to append
+-after the plan's `Argv`. `claude-code`, `codex` and `pi` declare the mode; a
+-system that does not is refused with `ErrUnsupportedLaunchMode`.
++after the plan's `Argv`. `claude-code`, `codex`, `pi` and `pi-native` declare
++the mode; a system that does not is refused with `ErrUnsupportedLaunchMode`.
++
++For native Pi the launcher resolves one of the frozen `pi-anthropic`,
++`pi-openai` or `pi-google` runtimes, asks
++`providerlimits.Store.AvailabilityFor(VerdictQuery{Runtime: "pi-<vendor>",
++Home: <managed PI_CODING_AGENT_DIR>, Model: <id>})`, then calls
++`vendorplugin.BuildLaunch(…, agentic.LaunchModeInteractive)` and runs the
++plan's `Binary`/`Argv` as they are. The argv is `--model <vendor>/<model>`
++plus `--thinking <effort>` when the row carries one; the launcher never
++rebuilds it and never spells a bare id. Exec mode, a composition, a model
++absent from the installed Pi catalog (`ErrModelNotDrivenBySystem`), a vendor
++the runtime does not bind (`ErrUnknownModel`) and an effort outside the row's
++vocabulary are refused. Provider login in the managed home is the operator's,
++through Pi's own `/login`; this module never touches credentials.
+ 
+ ## What stays yours
+ 
+diff --git a/docs/shipped-state.md b/docs/shipped-state.md
+index 1381664..941fd57 100644
+--- a/docs/shipped-state.md
++++ b/docs/shipped-state.md
+@@ -367,3 +367,35 @@ was left open for the switch story to settle, and the answer it gave is that
+ nothing forces the question: the consumer links the packages directly and never
+ runs this binary. The empty list stays truthful and unused until something
+ other than the consumer needs the binary to enumerate.
++
++### 7. Native Pi support — landed on main, tag pending (TASK-260908-ggxfte / STORY-260908-3lmnfs)
++
++Added on top of `v0.5.10`: the `pi-native` system plugin
++(`pkg/agentic/systems/pinative`), `agentic.LaunchRequest.Vendor` set by
++`BuildLaunch`, three frozen runtimes (`pi-anthropic`, `pi-openai`,
++`pi-google`) and catalog-verified `pi-native` memberships on the anthropic,
++openai and google lineups. The legacy `pi` wrapper plugin, the local-models
++broker/runtime and every existing registry admission are unchanged; the
++source-port pin now compares only the systems the extraction source knew, and
++its narrowing (`TestTheSourcePortPinStillSeesASourceSystemDropped`) shows it
++still sees a dropped source harness.
++
++What is deliberately NOT here:
++
++- **No exec/headless native Pi.** Interactive and dry-run only; the wrapper
++  owns headless Pi.
++- **No group rows for `pi-*`.** Pi's own limit output has not been captured, so
++  models resolve to `pi-<vendor>-unmapped:<model>` singletons. `pi-google` has
++  no classifier and can never be suppressed.
++- **No thinking-word clamp.** The row's vocabulary is transported verbatim;
++  what installed Pi accepts is the harness residual.
++- **No `claude-fable-5-1` on `pi-native`.** Absent from the Pi 0.84.2 catalog;
++  refused rather than routed through Pi's custom-model fallback.
++- **No v2 snapshot tiers for `pi-*`** (`V2SnapshotTiers` answers false;
++  interactive launch does not use them).
++
++**Owner: the operator.** A dependent can only adopt this through a tag. The
++operator creates the next signed annotated tag (`v0.5.11`) after the reviewed
++head is landed and verified on `main`; nothing in this change creates it, and
++the consumer launcher's `go.mod` requires it. Provider login in the managed
++`PI_CODING_AGENT_DIR` home is likewise the operator's, through Pi's `/login`.
+diff --git a/internal/regress/interactive_test.go b/internal/regress/interactive_test.go
+index 3caa7e5..8c04b54 100644
+--- a/internal/regress/interactive_test.go
++++ b/internal/regress/interactive_test.go
+@@ -10,6 +10,7 @@ import (
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic"
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
+ 	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
+ )
+ 
+ // CLASS 6 — INTERACTIVE. An interactive plan (curator-spec Decision 0013 §5)
+@@ -65,8 +66,14 @@ func markersOn(argv []string) []string {
+ type interactiveCase struct {
+ 	system agentic.System
+ 	stub   string
+-	// exec adapts the interactive request into an admissible exec one.
++	// exec adapts the interactive request into an admissible exec one. It is
++	// NIL for a system that declares no exec mode at all (pi-native): there
++	// the narrowing is the registry's refusal of exec, and the marker sweep is
++	// proven live by the other cases in the same run.
+ 	exec func(t *testing.T, req agentic.LaunchRequest, workDir string) agentic.LaunchRequest
++	// vendor is the LaunchRequest.Vendor a system that qualifies its model
++	// identity needs (pi-native); BuildLaunch sets it in production.
++	vendor string
+ }
+ 
+ var interactiveCases = map[string]interactiveCase{
+@@ -84,6 +91,9 @@ var interactiveCases = map[string]interactiveCase{
+ 			return req
+ 		},
+ 	},
++	"pi-native": {
++		system: pinative.New(), stub: "pi", vendor: "anthropic",
++	},
+ }
+ 
+ func interactiveRequest(t *testing.T, c interactiveCase, workDir, binDir string) agentic.LaunchRequest {
+@@ -100,6 +110,7 @@ func interactiveRequest(t *testing.T, c interactiveCase, workDir, binDir string)
+ 		req.Model.Effort = agentic.EffortSupportNone
+ 		req.Effort = ""
+ 	}
++	req.Vendor = c.vendor
+ 	return req
+ }
+ 
+@@ -120,7 +131,16 @@ func TestAnInteractivePlanCarriesNoExecMarkerForAnyMappedSystem(t *testing.T) {
+ 			}
+ 
+ 			// The narrowing: the same sweep on the same system's exec plan
+-			// must fire, or its silence above measured nothing.
++			// must fire, or its silence above measured nothing. A system with
++			// no exec mode has no such plan; its narrowing is that the
++			// registry refuses exec outright, and the sweep's liveness is
++			// carried by the cases that do have one.
++			if c.exec == nil {
++				if _, err := paritycase.TryBuildPlan(c.system, req, agentic.LaunchModeExec); !errors.Is(err, agentic.ErrUnsupportedLaunchMode) {
++					t.Fatalf("%s: declares no exec mode and BuildPlan(exec) = %v, want ErrUnsupportedLaunchMode", name, err)
++				}
++				return
++			}
+ 			execReq := c.exec(t, req, workDir)
+ 			execPlan := paritycase.BuildPlan(t, c.system, execReq, agentic.LaunchModeExec)
+ 			if found := markersOn(execPlan.Argv); len(found) < 2 {
+@@ -166,6 +186,9 @@ func TestAnInteractivePlanRefusesACompositionForEveryMappedSystem(t *testing.T)
+ func TestAPlanRefusesAnEmptyModelForEveryMappedSystemInEveryMode(t *testing.T) {
+ 	for name, c := range interactiveCases {
+ 		for _, mode := range []agentic.LaunchMode{agentic.LaunchModeInteractive, agentic.LaunchModeExec} {
++			if mode == agentic.LaunchModeExec && c.exec == nil {
++				mode = agentic.LaunchModeDryRun
++			}
+ 			t.Run(name+"/"+mode.String(), func(t *testing.T) {
+ 				workDir, binDir := paritycase.TempSlot(t), paritycase.TempSlot(t)
+ 				req := interactiveRequest(t, c, workDir, binDir)
+diff --git a/internal/regress/localmodels_conditional_registration_test.go b/internal/regress/localmodels_conditional_registration_test.go
+index 01aea11..628501b 100644
+--- a/internal/regress/localmodels_conditional_registration_test.go
++++ b/internal/regress/localmodels_conditional_registration_test.go
+@@ -43,15 +43,18 @@ func (fakeRegressSystem) Stdin(agentic.LaunchRequest) (agentic.StdinPayload, err
+ func (fakeRegressSystem) ValidateComposition(agentic.Composition) error { return nil }
+ 
+ // isolatedSystems returns a fresh agentic.Registry carrying fake
+-// "claude-code" and "pi" systems, never touching agentic.Default.
++// "claude-code", "pi" and "pi-native" systems, never touching
++// agentic.Default. pi-native is here because the real anthropic vendor — the
++// "unaffected other vendor" these tests register — names it on its
++// catalog-verified rows, and a vendor naming an unregistered system is
++// refused at registration.
+ func isolatedSystems(t *testing.T) *agentic.Registry {
+ 	t.Helper()
+ 	systems := agentic.NewRegistry()
+-	if err := systems.Register(fakeRegressSystem{id: "claude-code"}); err != nil {
+-		t.Fatalf("registering fake claude-code: %v", err)
+-	}
+-	if err := systems.Register(fakeRegressSystem{id: "pi"}); err != nil {
+-		t.Fatalf("registering fake pi: %v", err)
++	for _, id := range []agentic.SystemID{"claude-code", "pi", "pi-native"} {
++		if err := systems.Register(fakeRegressSystem{id: id}); err != nil {
++			t.Fatalf("registering fake %s: %v", id, err)
++		}
+ 	}
+ 	return systems
+ }
+diff --git a/internal/regress/parity_smoke_test.go b/internal/regress/parity_smoke_test.go
+index 13ba763..29741d8 100644
+--- a/internal/regress/parity_smoke_test.go
++++ b/internal/regress/parity_smoke_test.go
+@@ -1,6 +1,7 @@
+ package regress
+ 
+ import (
++	"fmt"
+ 	"path/filepath"
+ 	"testing"
+ 
+@@ -209,10 +210,90 @@ func TestEveryLayerOneSystemHasASmokeCase(t *testing.T) {
+ 	if len(ids) == 0 {
+ 		t.Fatal("no agentic system plugin is compiled into this test binary, so this check ranged over nothing")
+ 	}
++	interactive := map[agentic.SystemID]bool{}
++	for name := range interactiveCases {
++		interactive[agentic.SystemID(name)] = true
++	}
+ 	for _, id := range ids {
+-		if _, ok := covered[id]; !ok {
+-			t.Errorf("agentic system %q is registered and has no smoke case in this file", id)
++		sys, ok := agentic.Default.Lookup(id)
++		if !ok {
++			t.Fatalf("Lookup(%q) failed for an id the registry listed", id)
++		}
++		if gap := smokeCoverageGap(id, sys, covered, interactive); gap != "" {
++			t.Error(gap)
++		}
++	}
++}
++
++// smokeCoverageGap is the one rule for "this registered system is driven by
++// this package": a golden smoke case, or — ONLY for a system that declares no
++// exec mode — an interactive case. A golden is a capture of the extraction
++// source's headless launch; a system with no headless launch (pi-native) has
++// nothing anywhere to capture, so its cross-cutting coverage is the
++// interactive net instead. A system WITH an exec mode is never excused by an
++// interactive case. It returns the report, or "" when covered.
++func smokeCoverageGap(id agentic.SystemID, sys agentic.System, covered map[agentic.SystemID]string, interactive map[agentic.SystemID]bool) string {
++	if _, ok := covered[id]; ok {
++		return ""
++	}
++	if !sys.Capabilities().SupportsMode(agentic.LaunchModeExec) {
++		if !interactive[id] {
++			return fmt.Sprintf("agentic system %q declares no exec mode and has no interactive case either; nothing in this package drives it", id)
+ 		}
++		return ""
++	}
++	return fmt.Sprintf("agentic system %q is registered and has no smoke case in this file", id)
++}
++
++// modeOnlySystem is a fake whose only fact is its declared mode set.
++type modeOnlySystem struct {
++	id    agentic.SystemID
++	modes []agentic.LaunchMode
++}
++
++func (s modeOnlySystem) ID() agentic.SystemID { return s.id }
++func (s modeOnlySystem) Capabilities() agentic.Capabilities {
++	return agentic.Capabilities{LaunchModes: s.modes}
++}
++func (modeOnlySystem) ResolveBinary(agentic.LaunchRequest) (string, error) { return "/bin/true", nil }
++func (modeOnlySystem) Argv(agentic.LaunchRequest, agentic.LaunchMode) ([]string, error) {
++	return nil, nil
++}
++func (modeOnlySystem) ChildEnv(parent []string, _ agentic.LaunchRequest) ([]string, error) {
++	return parent, nil
++}
++func (modeOnlySystem) Stdin(agentic.LaunchRequest) (agentic.StdinPayload, error) {
++	return agentic.StdinPayload{}, nil
++}
++func (modeOnlySystem) ValidateComposition(agentic.Composition) error { return nil }
++
++// TestTheSmokeExemptionIsOnlyForExecLessSystems is the narrowing for the
++// exemption: driven through the same rule the guard uses, an exec-capable
++// system with an interactive case and no golden is still reported, and an
++// exec-less system with neither is reported too. Only the exec-less system
++// WITH an interactive case is excused.
++func TestTheSmokeExemptionIsOnlyForExecLessSystems(t *testing.T) {
++	execCapable := modeOnlySystem{id: "exec-capable", modes: []agentic.LaunchMode{agentic.LaunchModeExec, agentic.LaunchModeInteractive}}
++	execLess := modeOnlySystem{id: "exec-less", modes: []agentic.LaunchMode{agentic.LaunchModeDryRun, agentic.LaunchModeInteractive}}
++	covered := map[agentic.SystemID]string{}
++	interactive := map[agentic.SystemID]bool{"exec-capable": true, "exec-less": true}
++	if gap := smokeCoverageGap(execCapable.id, execCapable, covered, interactive); gap == "" {
++		t.Error("an exec-capable system with only an interactive case was excused from the smoke; the exemption has widened past exec-less systems")
++	}
++	if gap := smokeCoverageGap(execLess.id, execLess, covered, interactive); gap != "" {
++		t.Errorf("the exec-less system with an interactive case was reported: %s", gap)
++	}
++	if gap := smokeCoverageGap(execLess.id, execLess, covered, map[agentic.SystemID]bool{}); gap == "" {
++		t.Error("an exec-less system with no interactive case was excused; nothing would drive it")
++	}
++	for name, c := range interactiveCases {
++		hasExec := c.system.Capabilities().SupportsMode(agentic.LaunchModeExec)
++		if hasExec != (c.exec != nil) {
++			t.Errorf("%s: declares exec=%v but its interactive case's exec adapter nil=%v; the two must agree", name, hasExec, c.exec == nil)
++		}
++	}
++	if c, ok := interactiveCases["pi-native"]; !ok || c.system.Capabilities().SupportsMode(agentic.LaunchModeExec) {
++		t.Fatal("fixture assumption broken: pi-native must be the exec-less interactive case")
+ 	}
+ }
+ 
+diff --git a/pkg/agentic/system.go b/pkg/agentic/system.go
+index 2423afe..3b74f0f 100644
+--- a/pkg/agentic/system.go
++++ b/pkg/agentic/system.go
+@@ -454,6 +454,20 @@ type LaunchRequest struct {
+ 	// not need it (every one except pi today) simply never reads it, the same
+ 	// pattern Profile already established.
+ 	Runtime string
++
++	// Vendor is the vendorplugin.VendorID string of the broker the resolved
++	// runtime binds to, under the SAME contract as Runtime: an opaque string
++	// (no import cycle), populated uniformly by vendorplugin.BuildLaunch after
++	// the vendor's Spawn returns and never by a vendor or system plugin. A
++	// vendor double that sets it is overwritten. A system-only binding (muse)
++	// carries "" here, because its broker is recorded as unresolved and this
++	// field never fabricates one.
++	//
++	// pi-native is the one reader today: Pi's model identity is
++	// `<provider>/<model>` and a bare id is ambiguous across providers, so
++	// the plugin refuses to build argv without this value rather than emit an
++	// identity Pi would resolve to whichever provider it likes.
++	Vendor string
+ }
+ 
+ // RunContext is the caller's identity for one tracked run, carried to the
+diff --git a/pkg/agentic/systems/pinative/args.go b/pkg/agentic/systems/pinative/args.go
+new file mode 100644
+index 0000000..73b4793
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/args.go
+@@ -0,0 +1,77 @@
++package pinative
++
++import (
++	"errors"
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// THIS FILE IS THE ONE PLACE NATIVE PI FLAGS ARE SPELLED.
++//
++// # The model identity is ALWAYS provider-qualified
++//
++// Pi 0.84.2 resolves `--model <pattern>` across every provider whose data file
++// it ships. A bare `claude-opus-5` exits 1 as "ambiguous across providers";
++// `gpt-5.5` appears in six provider files. `anthropic/claude-opus-5` resolves
++// to exactly one row (probe pi-probe-provider-qualified-01.log,
++// TASK-260908-ggxfte rev2 §5). The provider segment is the runtime's VENDOR,
++// which BuildLaunch writes onto LaunchRequest.Vendor after the vendor's Spawn
++// and which Pi spells identically (`anthropic`, `openai`, `google` are the
++// literal data-file names), so no mapping table exists here.
++//
++// A request with no Vendor is REFUSED (ErrVendorMissing), never downgraded to
++// a bare id: a bare id is the one shape this plugin exists to never emit, and
++// a wrong-prefix id (`openai/claude-opus-5`) falls to Pi's custom-model path
++// with only a warning — an unverified launch that looks like the one asked for.
++//
++// # The effort is pure transport
++//
++// `--thinking <word>` is emitted exactly when the request carries an effort.
++// BuildLaunch has already refused a word outside the row's vocabulary and a
++// required-effort row given none, so reaching that line means a value the
++// operator chose. Which words the installed Pi build accepts is not known
++// here (invariant 4): the row's vocabulary is the contract, the harness's
++// acceptance is the harness's.
++//
++// # The two modes build the SAME argv
++//
++// A dry run mirrors the interactive launch byte for byte; there is no prompt
++// placeholder because there is no prompt.
++
++// ErrVendorMissing is returned when the launch request names no vendor, so no
++// provider-qualified identity can be built.
++var ErrVendorMissing = errors.New("pinative: launch request names no vendor; a native Pi model identity is <provider>/<model> and a bare id is ambiguous across providers")
++
++// Args builds the native Pi argv for one launch mode, excluding the binary. It
++// is the single construction site.
++func Args(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error) {
++	switch mode {
++	case agentic.LaunchModeInteractive, agentic.LaunchModeDryRun:
++	default:
++		return nil, fmt.Errorf("pinative: unsupported launch mode %s", mode)
++	}
++	vendor := strings.TrimSpace(req.Vendor)
++	if vendor == "" {
++		return nil, ErrVendorMissing
++	}
++	if strings.Contains(vendor, "/") {
++		return nil, fmt.Errorf("pinative: vendor %q contains a path separator and cannot prefix a Pi model identity", vendor)
++	}
++	// BuildPlan substitutes the alias target before Argv is called, so
++	// req.Model.ID is the launch identity here. LaunchIdentity() is applied
++	// anyway so a caller holding the plugin directly gets the same answer.
++	model := req.Model.LaunchIdentity()
++	if model == "" {
++		return nil, fmt.Errorf("pinative: launch request names no model")
++	}
++	if strings.Contains(model, "/") {
++		return nil, fmt.Errorf("pinative: model %q already carries a provider segment; the identity is qualified here, once, from the runtime's vendor", model)
++	}
++	args := []string{"--model", vendor + "/" + model}
++	if effort := strings.TrimSpace(req.Effort); effort != "" {
++		args = append(args, "--thinking", effort)
++	}
++	return args, nil
++}
+diff --git a/pkg/agentic/systems/pinative/binary.go b/pkg/agentic/systems/pinative/binary.go
+new file mode 100644
+index 0000000..ed7728e
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/binary.go
+@@ -0,0 +1,23 @@
++package pinative
++
++import (
++	"github.com/relux-works/skill-agents-management/internal/launchenv"
++)
++
++// Native Pi has ONE binary-resolution path: whatever `pi` resolves to on the
++// launch environment's PATH. The lookup reads the environment it was HANDED,
++// never the process's own, so a dry run provably reports the same target a
++// real launch would use.
++
++// executableName is the Pi program name, spelled once.
++const executableName = "pi"
++
++// ErrNoPathInLaunchEnvironment is returned when the launch environment carries
++// no PATH at all. It is a refusal rather than a fallback onto the ambient
++// process PATH, aliased from internal/launchenv under this plugin's own name.
++var ErrNoPathInLaunchEnvironment = launchenv.ErrNoPath
++
++// resolveBinary returns the exact executable a launch will run.
++func resolveBinary(env []string) (string, error) {
++	return launchenv.LookPath(env, executableName)
++}
+diff --git a/pkg/agentic/systems/pinative/env.go b/pkg/agentic/systems/pinative/env.go
+new file mode 100644
+index 0000000..a254494
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/env.go
+@@ -0,0 +1,29 @@
++package pinative
++
++import (
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// HomeEnvVar is the environment variable Pi reads its agent directory from
++// (Pi 0.84.2, `PI_CODING_AGENT_DIR`). It is exported so a launcher composing
++// the child environment and a limit-state query can spell the managed home
++// from one constant.
++const HomeEnvVar = "PI_CODING_AGENT_DIR"
++
++// DefaultHome is Pi's conventional agent directory when HomeEnvVar is unset.
++const DefaultHome = "~/.pi/agent"
++
++// THE NATIVE-PI CHILD-ENVIRONMENT CONTRACT IS AN EMPTY FILTER, and it is
++// written down rather than left out. The child inherits the whole parent
++// environment with only the run context written over it. A launcher that
++// wants the session in a managed home sets PI_CODING_AGENT_DIR on the
++// request's Env; this plugin neither invents nor strips it, and
++// TestTheManagedHomeVariableReachesTheChildVerbatim pins that.
++//
++// The plan's Home (BuildPlan: req.Home, else DefaultHome) is the value a
++// provider-limit query must be keyed by; it is reported, not exported into
++// the child here, because a launcher composing its own environment must be
++// able to see the two agree rather than have one silently overwrite the other.
++func childEnv(parent []string, req agentic.LaunchRequest) []string {
++	return agentic.WithRunContext(parent, req)
++}
+diff --git a/pkg/agentic/systems/pinative/pinative.go b/pkg/agentic/systems/pinative/pinative.go
+new file mode 100644
+index 0000000..76b11d3
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/pinative.go
+@@ -0,0 +1,132 @@
++// Package pinative is the agentic-system plugin for the Pi coding agent run
++// NATIVELY: the `pi` binary itself, on the launch PATH, started as a human's
++// interactive session against a cloud provider Pi authenticates with in its
++// own managed home.
++//
++// It is the upstream half of TASK-260908-ggxfte (accepted rev2). The existing
++// `pi` plugin (pkg/agentic/systems/pi) is a DIFFERENT thing and is untouched:
++// that one is Process A of the local-models design, the `agents-infra pi`
++// wrapper that holds a shared-runtime lease and drives a local model server.
++// Rebinding `pi` would break `local-models.toml system="pi"` and the frozen
++// local-qwen goldens, so native Pi gets its own id.
++//
++// # What this plugin is, stated where a reader meets it
++//
++//   - Binary: whatever `pi` resolves to on the LAUNCH environment's PATH
++//     (binary.go). No wrapper, no npm root, no shim.
++//   - Modes: interactive and dry-run ONLY. There is no exec grammar here —
++//     the wrapper owns headless Pi (`spawn --profile … --result-schema 1`), and
++//     a native `-p`/`--print` run would be an unbounded unsupervised child.
++//     BuildPlan refuses exec with ErrUnsupportedLaunchMode.
++//   - Argv: `--model <vendor>/<launch identity>` and, when the row carries an
++//     effort, `--thinking <effort>`. NEVER a bare model id (args.go says why).
++//   - Home: PI_CODING_AGENT_DIR with `~/.pi/agent` as the default. On-disk
++//     provider-limit state is keyed by (runtime, home), so this is the one
++//     declaration that separates two Pi homes' limit records.
++//   - No preflight. This plugin does NOT implement agentic.Preflightable;
++//     vendorplugin.BuildLaunch gates on that interface and therefore never
++//     probes anything before a native plan. A plan builds with no
++//     agents-infra on PATH.
++//   - No composition grammar, no goal, budget or service tier. The interactive
++//     mode carries none of those by contract (Decision 0013 §5).
++//   - ChildEnv: run-context passthrough, unfiltered (env.go).
++//
++// # What this plugin deliberately does NOT know
++//
++// Which models the installed Pi catalog can launch. That is the vendor layer's
++// fact — a row declares `pi-native` in Systems only when the id is present in
++// the installed catalog's provider data — and BuildLaunch refuses a row that
++// does not (ErrModelNotDrivenBySystem) before this plugin sees it. The plugin
++// also does not know which thinking words Pi accepts: the effort is the row's
++// vocabulary and is transported verbatim (invariant 4 of docs/architecture.md).
++package pinative
++
++import (
++	"fmt"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// systemID is this plugin's identity. The frozen runtimes that bind it are
++// pi-anthropic, pi-openai and pi-google (pkg/vendorplugin/runtime.go).
++const systemID agentic.SystemID = "pi-native"
++
++// System is the native-Pi agentic-system plugin. It holds NO state.
++type System struct{}
++
++// New returns the plugin, exported so an isolated registry can register it.
++func New() *System { return &System{} }
++
++// init registers the plugin into the default registry. A failure PANICS: every
++// refusal Register can produce here is a build-time bug in this package.
++func init() {
++	if err := agentic.Register(New()); err != nil {
++		panic(fmt.Sprintf("pinative: registering the plugin: %v", err))
++	}
++}
++
++// ID answers the frozen identifier, stably and in its own normalized spelling.
++func (*System) ID() agentic.SystemID { return systemID }
++
++// Capabilities is the static declaration.
++//
++// EffortTransportArgv is a claim that args.go carries through: a row with a
++// required effort reaches `--thinking <word>`, and TestTheArgvTransportIsActuallyCarried
++// holds the two halves together. HomeEnvVar/DefaultHome are Pi's own
++// (`PI_CODING_AGENT_DIR`, `~/.pi/agent`), read from Pi 0.84.2's config
++// resolution, and they are what providerlimits resolves an identity from.
++func (*System) Capabilities() agentic.Capabilities {
++	return agentic.Capabilities{
++		LaunchModes: []agentic.LaunchMode{
++			agentic.LaunchModeDryRun,
++			agentic.LaunchModeInteractive,
++		},
++		EffortTransport:     agentic.EffortTransportArgv,
++		SupportsGoal:        false,
++		SupportsBudget:      false,
++		SupportsServiceTier: false,
++		CompositionGrammar:  agentic.GrammarNone,
++		HomeEnvVar:          HomeEnvVar,
++		DefaultHome:         DefaultHome,
++		// Pi's own remediation for a missing provider credential: it stops at
++		// "No API key found for <provider>" and offers /login inside the
++		// session (probe pi-probe-provider-qualified-01.log, TASK-260908-ggxfte).
++		AuthHint: "run /login inside pi for the provider, in the managed PI_CODING_AGENT_DIR home",
++	}
++}
++
++// ResolveBinary returns the exact executable this launch will run, the same
++// function for every mode so a dry run reports the launch's real target.
++func (*System) ResolveBinary(req agentic.LaunchRequest) (string, error) {
++	return resolveBinary(req.Env)
++}
++
++// Argv builds the argument vector for one launch mode, excluding the binary.
++func (s *System) Argv(req agentic.LaunchRequest, mode agentic.LaunchMode) ([]string, error) {
++	if !s.Capabilities().SupportsMode(mode) {
++		return nil, fmt.Errorf("pinative: launch mode %s is not declared by this system", mode)
++	}
++	return Args(req, mode)
++}
++
++// ChildEnv passes the parent environment through with the run context written
++// over it. See env.go.
++func (*System) ChildEnv(parent []string, req agentic.LaunchRequest) ([]string, error) {
++	return childEnv(parent, req), nil
++}
++
++// Stdin attaches NOTHING, for every launch and every mode: an interactive
++// session owns its terminal, and there is no exec mode with a prompt to feed.
++func (*System) Stdin(agentic.LaunchRequest) (agentic.StdinPayload, error) {
++	return agentic.StdinPayload{}, nil
++}
++
++// ValidateComposition refuses EVERY composition, because this system declares
++// no composition grammar and its only real mode is interactive, where the MCP
++// channel is the composer's to append after the plan.
++func (*System) ValidateComposition(c agentic.Composition) error {
++	if c.IsZero() {
++		return nil
++	}
++	return fmt.Errorf("pinative: unsupported launch composition; this system declares no composition grammar")
++}
+diff --git a/pkg/agentic/systems/pinative/pinative_test.go b/pkg/agentic/systems/pinative/pinative_test.go
+new file mode 100644
+index 0000000..68f50e1
+--- /dev/null
++++ b/pkg/agentic/systems/pinative/pinative_test.go
+@@ -0,0 +1,369 @@
++package pinative_test
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/pi"
++	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
++)
++
++// The Layer-1 contract of the native-Pi plugin, driven through the real
++// agentic.BuildPlan on an isolated registry. There is no golden — native Pi
++// never existed in the extraction source, so nothing captured one — and the
++// evidence is the exact argv, binary, environment, stdin and home, plus the
++// negatives: no bare model id under any request shape, no exec grammar, no
++// preflight, no composition.
++
++// execModeMarkers is the sweep from the design (§4): every headless flag of
++// every system in this module, none of which may appear on a native-Pi argv.
++var execModeMarkers = []string{
++	"spawn", "--profile", "--prompt", "--deadline", "--result-schema",
++	"-p", "--print", "--mode",
++	"exec", "--output-format",
++	"--dangerously-skip-permissions",
++	"--dangerously-bypass-approvals-and-sandbox",
++	"--max-budget-usd",
++}
++
++func markersOn(argv []string) []string {
++	var found []string
++	for _, arg := range argv {
++		for _, marker := range execModeMarkers {
++			if arg == marker {
++				found = append(found, arg)
++			}
++		}
++	}
++	return found
++}
++
++func writeExecutable(t *testing.T, path string) {
++	t.Helper()
++	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o755); err != nil {
++		t.Fatalf("writing fake executable %s: %v", path, err)
++	}
++}
++
++// request is the reference launch: pi-anthropic × claude-opus-5 × high, the
++// design's golden row. Only `pi` is on PATH — no agents-infra wrapper.
++func request(t *testing.T) (agentic.LaunchRequest, string) {
++	t.Helper()
++	binDir := t.TempDir()
++	writeExecutable(t, filepath.Join(binDir, "pi"))
++	return agentic.LaunchRequest{
++		System:  pinative.New().ID(),
++		Model:   agentic.Model{ID: "claude-opus-5", Effort: agentic.EffortSupportRequired},
++		Effort:  "high",
++		WorkDir: "/Users/op/project",
++		Env:     []string{"PATH=" + binDir, "PI_CODING_AGENT_DIR=/Users/op/.managed/pi"},
++		Run:     agentic.RunContext{RunID: "RUN-pinative", TaskID: "TASK-pinative"},
++		Runtime: "pi-anthropic",
++		Vendor:  "anthropic",
++	}, binDir
++}
++
++func buildPlan(t *testing.T, req agentic.LaunchRequest, mode agentic.LaunchMode) (agentic.Plan, error) {
++	t.Helper()
++	registry := agentic.NewRegistry()
++	if err := registry.Register(pinative.New()); err != nil {
++		t.Fatalf("Register: %v", err)
++	}
++	return agentic.BuildPlan(registry, req, mode)
++}
++
++func TestTheInteractiveArgvIsTheQualifiedModelAndThinking(t *testing.T) {
++	req, binDir := request(t)
++	plan, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildPlan(interactive): %v", err)
++	}
++	if want := []string{"--model", "anthropic/claude-opus-5", "--thinking", "high"}; !reflect.DeepEqual(plan.Argv, want) {
++		t.Errorf("Argv = %#v, want %#v", plan.Argv, want)
++	}
++	if filepath.Base(plan.Binary) != "pi" || filepath.Dir(plan.Binary) != binDir {
++		t.Errorf("Binary = %q, want raw pi on the launch PATH", plan.Binary)
++	}
++	if plan.Stdin.Attached || len(plan.Stdin.Bytes) != 0 {
++		t.Errorf("Stdin = %#v, want detached", plan.Stdin)
++	}
++	if plan.Home != "" && plan.Home != "~/.pi/agent" {
++		t.Errorf("Home = %q, want the declared default when the request carries none", plan.Home)
++	}
++	if found := markersOn(plan.Argv); len(found) != 0 {
++		t.Errorf("the interactive argv carries exec-mode marker(s) %v", found)
++	}
++	if plan.WorkDir != req.WorkDir {
++		t.Errorf("WorkDir = %q, want %q", plan.WorkDir, req.WorkDir)
++	}
++}
++
++func TestTheDryRunMirrorsTheInteractiveLaunchExactly(t *testing.T) {
++	req, _ := request(t)
++	interactive, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildPlan(interactive): %v", err)
++	}
++	dry, err := buildPlan(t, req, agentic.LaunchModeDryRun)
++	if err != nil {
++		t.Fatalf("BuildPlan(dry-run): %v", err)
++	}
++	if !reflect.DeepEqual(dry.Argv, interactive.Argv) || dry.Binary != interactive.Binary || !reflect.DeepEqual(dry.Env, interactive.Env) || dry.Home != interactive.Home {
++		t.Errorf("dry run differs from the launch it mirrors:\n dry=%#v\n int=%#v", dry, interactive)
++	}
++}
++
++// TestTheArgvTransportIsActuallyCarried holds the Capabilities declaration
++// (EffortTransportArgv) and args.go together: a request with an effort reaches
++// `--thinking`, and a request without one carries no thinking flag at all.
++func TestTheArgvTransportIsActuallyCarried(t *testing.T) {
++	if got := pinative.New().Capabilities().EffortTransport; got != agentic.EffortTransportArgv {
++		t.Fatalf("EffortTransport = %s, want argv", got)
++	}
++	req, _ := request(t)
++	req.Model = agentic.Model{ID: "gemini-3.1-pro-preview", Effort: agentic.EffortSupportNone}
++	req.Effort = ""
++	req.Vendor = "google"
++	plan, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildPlan(effort-none): %v", err)
++	}
++	if want := []string{"--model", "google/gemini-3.1-pro-preview"}; !reflect.DeepEqual(plan.Argv, want) {
++		t.Errorf("effort-none Argv = %#v, want %#v", plan.Argv, want)
++	}
++	for _, mode := range []agentic.LaunchMode{agentic.LaunchModeInteractive, agentic.LaunchModeDryRun} {
++		req, _ := request(t)
++		req.Effort = "xhigh"
++		plan, err := buildPlan(t, req, mode)
++		if err != nil {
++			t.Fatalf("BuildPlan(%s): %v", mode, err)
++		}
++		if i := index(plan.Argv, "--thinking"); i < 0 || i+1 >= len(plan.Argv) || plan.Argv[i+1] != "xhigh" {
++			t.Errorf("%s: the operator's effort did not reach --thinking: %v", mode, plan.Argv)
++		}
++	}
++}
++
++func index(argv []string, want string) int {
++	for i, arg := range argv {
++		if arg == want {
++			return i
++		}
++	}
++	return -1
++}
++
++// TestAnAliasLaunchesItsTargetWithTheVendorPrefix drives BuildPlan's one alias
++// substitution: the requested spelling never reaches argv, the target does,
++// qualified.
++func TestAnAliasLaunchesItsTargetWithTheVendorPrefix(t *testing.T) {
++	req, _ := request(t)
++	req.Model = agentic.Model{ID: "astra", AliasOf: "gpt-6-astra", Effort: agentic.EffortSupportRequired}
++	req.Vendor = "openai"
++	plan, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildPlan(alias): %v", err)
++	}
++	if want := []string{"--model", "openai/gpt-6-astra", "--thinking", "high"}; !reflect.DeepEqual(plan.Argv, want) {
++		t.Errorf("Argv = %#v, want %#v", plan.Argv, want)
++	}
++	if plan.ModelIdentity.Requested != "astra" || plan.ModelIdentity.Launched != "gpt-6-astra" {
++		t.Errorf("ModelIdentity = %#v", plan.ModelIdentity)
++	}
++	for _, arg := range plan.Argv {
++		if strings.HasSuffix(arg, "/astra") || arg == "astra" {
++			t.Errorf("the alias spelling reached argv: %v", plan.Argv)
++		}
++	}
++}
++
++// TestAMissingVendorIsRefusedNeverDowngradedToABareID is the F2 narrowing: the
++// gate that qualifies the identity, with its input removed, refuses rather
++// than falls back. A plugin that emitted `--model claude-opus-5` here would
++// hand Pi an id it resolves as ambiguous across providers.
++func TestAMissingVendorIsRefusedNeverDowngradedToABareID(t *testing.T) {
++	for _, vendor := range []string{"", "   "} {
++		req, _ := request(t)
++		req.Vendor = vendor
++		for _, mode := range []agentic.LaunchMode{agentic.LaunchModeInteractive, agentic.LaunchModeDryRun} {
++			plan, err := buildPlan(t, req, mode)
++			if !errors.Is(err, pinative.ErrVendorMissing) {
++				t.Fatalf("Vendor=%q %s: err = %v (argv %v), want ErrVendorMissing", vendor, mode, err, plan.Argv)
++			}
++		}
++	}
++	// The same refusal from the plugin held directly, so a caller bypassing
++	// BuildPlan gets no bare id either.
++	req, _ := request(t)
++	req.Vendor = ""
++	if argv, err := pinative.Args(req, agentic.LaunchModeInteractive); !errors.Is(err, pinative.ErrVendorMissing) {
++		t.Fatalf("Args(no vendor) = %v, %v; want ErrVendorMissing", argv, err)
++	}
++}
++
++// TestAModelAlreadyQualifiedIsRefused keeps qualification single: a model id
++// carrying its own provider segment would otherwise become
++// `anthropic/openai/x` or, worse, be passed through as somebody else's prefix.
++func TestAModelAlreadyQualifiedOrABadVendorIsRefused(t *testing.T) {
++	req, _ := request(t)
++	req.Model.ID = "openai/claude-opus-5"
++	if argv, err := pinative.Args(req, agentic.LaunchModeInteractive); err == nil {
++		t.Fatalf("Args(pre-qualified model) = %v, want a refusal", argv)
++	}
++	req, _ = request(t)
++	req.Vendor = "anthropic/extra"
++	if argv, err := pinative.Args(req, agentic.LaunchModeInteractive); err == nil {
++		t.Fatalf("Args(vendor with separator) = %v, want a refusal", argv)
++	}
++}
++
++func TestNoArgvElementIsEverABareModelID(t *testing.T) {
++	for _, shape := range []struct {
++		name   string
++		mutate func(*agentic.LaunchRequest)
++	}{
++		{"reference", func(*agentic.LaunchRequest) {}},
++		{"effort none", func(r *agentic.LaunchRequest) { r.Model.Effort = agentic.EffortSupportNone; r.Effort = "" }},
++		{"alias", func(r *agentic.LaunchRequest) { r.Model.AliasOf = "claude-opus-4-8" }},
++		{"profile carried", func(r *agentic.LaunchRequest) { r.Profile = "some-profile" }},
++	} {
++		req, _ := request(t)
++		shape.mutate(&req)
++		for _, mode := range []agentic.LaunchMode{agentic.LaunchModeInteractive, agentic.LaunchModeDryRun} {
++			plan, err := buildPlan(t, req, mode)
++			if err != nil {
++				t.Fatalf("%s/%s: %v", shape.name, mode, err)
++			}
++			for i, arg := range plan.Argv {
++				if arg == req.Model.ID || arg == req.Model.LaunchIdentity() {
++					t.Errorf("%s/%s: argv[%d] = %q is a bare model id: %v", shape.name, mode, i, arg, plan.Argv)
++				}
++				if i > 0 && plan.Argv[i-1] == "--model" && !strings.HasPrefix(arg, req.Vendor+"/") {
++					t.Errorf("%s/%s: --model value %q lacks the %q/ prefix", shape.name, mode, arg, req.Vendor)
++				}
++			}
++		}
++	}
++}
++
++func TestExecIsNotDeclaredAndIsRefused(t *testing.T) {
++	req, _ := request(t)
++	req.Prompt = []byte("body")
++	_, err := buildPlan(t, req, agentic.LaunchModeExec)
++	if !errors.Is(err, agentic.ErrUnsupportedLaunchMode) {
++		t.Fatalf("BuildPlan(exec): err = %v, want ErrUnsupportedLaunchMode", err)
++	}
++	if _, err := pinative.Args(req, agentic.LaunchModeExec); err == nil {
++		t.Fatal("Args(exec) built an argv for a mode this plugin does not declare")
++	}
++	if _, err := pinative.Args(req, agentic.LaunchModeManagedSession); err == nil {
++		t.Fatal("Args(managed-session) built an argv for a mode this plugin does not declare")
++	}
++}
++
++func TestACompositionIsRefusedOnTheInteractiveLaunch(t *testing.T) {
++	req, _ := request(t)
++	req.Composition = agentic.Composition{Prefix: []string{"--mcp", "x"}}
++	if _, err := buildPlan(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrCompositionNotInteractive) {
++		t.Fatalf("err = %v, want ErrCompositionNotInteractive", err)
++	}
++	if err := pinative.New().ValidateComposition(req.Composition); err == nil {
++		t.Fatal("ValidateComposition admitted a composition; this system declares no grammar")
++	}
++	if err := pinative.New().ValidateComposition(agentic.Composition{}); err != nil {
++		t.Fatalf("ValidateComposition(zero) = %v", err)
++	}
++}
++
++// TestNoPreflightIsWiredAndAPlanBuildsWithoutTheWrapper is the "no
++// agents-infra Preflightable" clause. The narrowing is the sibling assertion:
++// the wrapper plugin IS Preflightable, so the type assertion discriminates.
++func TestNoPreflightIsWiredAndAPlanBuildsWithoutTheWrapper(t *testing.T) {
++	var system agentic.System = pinative.New()
++	if _, ok := system.(agentic.Preflightable); ok {
++		t.Fatal("pi-native implements Preflightable; the native plan must never probe agents-infra")
++	}
++	var wrapper agentic.System = pi.New(nil)
++	if _, ok := wrapper.(agentic.Preflightable); !ok {
++		t.Fatal("fixture assumption broken: the wrapper pi plugin must be Preflightable for this assertion to discriminate")
++	}
++	req, binDir := request(t)
++	if _, err := os.Stat(filepath.Join(binDir, "agents-infra")); !os.IsNotExist(err) {
++		t.Fatalf("fixture assumption broken: agents-infra must be absent from the launch PATH (%v)", err)
++	}
++	if _, err := buildPlan(t, req, agentic.LaunchModeInteractive); err != nil {
++		t.Fatalf("a native plan needs no wrapper on PATH, got %v", err)
++	}
++}
++
++func TestTheSweepFiresOnTheWrapperExecArgv(t *testing.T) {
++	// The marker sweep's silence on pi-native means nothing unless it sees
++	// the wrapper's headless grammar on the sibling plugin.
++	binDir := t.TempDir()
++	writeExecutable(t, filepath.Join(binDir, "agents-infra"))
++	req := agentic.LaunchRequest{
++		System:  pi.New(nil).ID(),
++		Model:   agentic.Model{ID: "qwen-3.8-27b-mlx-8bit", Effort: agentic.EffortSupportNone},
++		Env:     []string{"PATH=" + binDir},
++		Profile: "local-qwen",
++	}
++	argv, err := pi.New(nil).Argv(req, agentic.LaunchModeDryRun)
++	if err != nil {
++		t.Fatalf("wrapper dry-run argv: %v", err)
++	}
++	if found := markersOn(argv); len(found) < 2 {
++		t.Fatalf("the sweep saw %v on the wrapper argv %v; it has to see the headless grammar there", found, argv)
++	}
++}
++
++func TestTheManagedHomeVariableReachesTheChildVerbatimAndTheHomeIsReported(t *testing.T) {
++	req, _ := request(t)
++	req.Home = "/Users/op/.managed/pi"
++	plan, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildPlan: %v", err)
++	}
++	if plan.Home != "/Users/op/.managed/pi" {
++		t.Errorf("Home = %q, want the request's managed home", plan.Home)
++	}
++	found := false
++	for _, entry := range plan.Env {
++		if entry == "PI_CODING_AGENT_DIR=/Users/op/.managed/pi" {
++			found = true
++		}
++	}
++	if !found {
++		t.Errorf("PI_CODING_AGENT_DIR did not reach the child verbatim: %v", plan.Env)
++	}
++	for _, key := range []string{"TASK_BOARD_RUN_ID=RUN-pinative", "TASK_BOARD_TASK_ID=TASK-pinative"} {
++		if index(plan.Env, key) < 0 {
++			t.Errorf("run context %q missing from the child environment %v", key, plan.Env)
++		}
++	}
++	caps := pinative.New().Capabilities()
++	if caps.HomeEnvVar != "PI_CODING_AGENT_DIR" || caps.DefaultHome != "~/.pi/agent" {
++		t.Errorf("home rule = (%q, %q), want (PI_CODING_AGENT_DIR, ~/.pi/agent)", caps.HomeEnvVar, caps.DefaultHome)
++	}
++}
++
++func TestNoPATHIsARefusalNotAFallback(t *testing.T) {
++	req, _ := request(t)
++	req.Env = []string{"PI_CODING_AGENT_DIR=/x"}
++	_, err := buildPlan(t, req, agentic.LaunchModeInteractive)
++	if !errors.Is(err, pinative.ErrNoPathInLaunchEnvironment) {
++		t.Fatalf("err = %v, want ErrNoPathInLaunchEnvironment", err)
++	}
++}
++
++func TestAnEmptyModelIsRefusedBeforeArgv(t *testing.T) {
++	req, _ := request(t)
++	req.Model.ID = ""
++	if _, err := buildPlan(t, req, agentic.LaunchModeInteractive); !errors.Is(err, agentic.ErrModelMissing) {
++		t.Fatalf("err = %v, want ErrModelMissing", err)
++	}
++}
+diff --git a/pkg/providerlimits/pinative_runtime_test.go b/pkg/providerlimits/pinative_runtime_test.go
+new file mode 100644
+index 0000000..51cc4db
+--- /dev/null
++++ b/pkg/providerlimits/pinative_runtime_test.go
+@@ -0,0 +1,170 @@
++package providerlimits
++
++import (
++	"errors"
++	"path/filepath"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
++)
++
++// F1 of TASK-260908-ggxfte: the native-Pi runtimes are FROZEN rows so that
++// this package's broker resolution — which walks vendorplugin.FrozenRuntimes
++// only — routes pi-anthropic / pi-openai to a classified broker, resolves an
++// identity keyed on (runtime, home), and reads the state file instead of
++// taking the unclassifiable carve-out. The production call site is the
++// launcher's AvailabilityFor{Runtime:"pi-<vendor>", Home:<managed>, Model}
++// before BuildLaunch (curator launcher SPEC §4.4).
++
++func TestALimitedRecordOnPiAnthropicReadsAsLimitedFromItsOwnHome(t *testing.T) {
++	f := newVerdictFixture(t, "pi-anthropic")
++	group := UnmappedGroup("pi-anthropic", "claude-opus-5")
++	record := suppressedRecord(f.clock.Now())
++	record.Provider = "pi-anthropic"
++	f.plantRecord(t, group, record)
++
++	verdict := f.verdict(t, "claude-opus-5")
++	if verdict.State != vendorplugin.AvailabilityLimited {
++		t.Fatalf("pi-anthropic with a limited record read as %s; the frozen row is not routing to the state file\n%s", verdict.State, verdictDetails(verdict))
++	}
++	for _, checked := range verdict.Checked {
++		if checked == SourceFrozenTable {
++			t.Fatalf("Checked names the frozen table %v; the verdict came from the carve-out, not the state", verdict.Checked)
++		}
++	}
++	if len(verdict.Checked) == 0 {
++		t.Fatal("a Limited verdict names no checked source")
++	}
++}
++
++func TestTheSameRecordIsInvisibleFromAnotherPiHome(t *testing.T) {
++	f := newVerdictFixture(t, "pi-anthropic")
++	group := UnmappedGroup("pi-anthropic", "claude-opus-5")
++	record := suppressedRecord(f.clock.Now())
++	record.Provider = "pi-anthropic"
++	f.plantRecord(t, group, record)
++
++	otherHome := filepath.Join(f.layout.Root, "another-pi-home")
++	verdict, err := f.store.AvailabilityFor(VerdictQuery{Runtime: "pi-anthropic", Model: "claude-opus-5", Home: otherHome})
++	if err != nil {
++		t.Fatalf("AvailabilityFor(other home): %v", err)
++	}
++	if verdict.State != vendorplugin.AvailabilityHealthy {
++		t.Fatalf("a record in one Pi home read as %s from another; identity is (runtime, home)\n%s", verdict.State, verdictDetails(verdict))
++	}
++	// And from the wrapper-era `claude` runtime on the SAME home: a different
++	// runtime id is a different identity, so the record is not shared.
++	verdict, err = f.store.AvailabilityFor(VerdictQuery{Runtime: ProviderClaude, Model: "claude-opus-5", Home: f.home})
++	if err != nil {
++		t.Fatalf("AvailabilityFor(claude, same home): %v", err)
++	}
++	if verdict.State != vendorplugin.AvailabilityHealthy {
++		t.Fatalf("a pi-anthropic record leaked into the claude runtime's verdict: %s", verdict.State)
++	}
++}
++
++// TestAConsumerDeclaredPiRuntimeWouldTakeTheCarveOut is the narrowing that
++// shows the frozen row is load-bearing. The same store, the same planted
++// record, the same home, but a runtime id the frozen table does not carry —
++// exactly what a consumer-declared pi-anthropic would be — reads Healthy from
++// the frozen-table carve-out while its state file says Limited. That is the
++// reviewer's observed failure, reproduced.
++func TestAConsumerDeclaredPiRuntimeWouldTakeTheCarveOut(t *testing.T) {
++	const consumerRuntime = "pi-anthropic-consumer"
++	f := newVerdictFixture(t, consumerRuntime)
++	group := UnmappedGroup(consumerRuntime, "claude-opus-5")
++	record := suppressedRecord(f.clock.Now())
++	record.Provider = consumerRuntime
++	f.plantRecord(t, group, record)
++
++	if HasClassifierForRuntime(consumerRuntime) {
++		t.Fatal("fixture assumption broken: the consumer runtime must not be in the frozen table")
++	}
++	verdict, err := f.store.AvailabilityFor(VerdictQuery{Runtime: consumerRuntime, Model: "claude-opus-5", Home: f.home})
++	if err != nil {
++		t.Fatalf("AvailabilityFor: %v", err)
++	}
++	if verdict.State != vendorplugin.AvailabilityHealthy || len(verdict.Checked) != 1 || verdict.Checked[0] != SourceFrozenTable {
++		t.Fatalf("the unfrozen runtime did not take the carve-out (%s, checked %v); the frozen-row argument would then rest on nothing", verdict.State, verdict.Checked)
++	}
++	if !HasClassifierForRuntime("pi-anthropic") || !HasClassifierForRuntime("pi-openai") {
++		t.Fatal("pi-anthropic / pi-openai resolve to no classifier; the frozen rows are missing or bind the wrong broker")
++	}
++}
++
++// TestPiGoogleStaysUnclassifiableAndIsNeverWritten: google has no classifier,
++// so pi-google can never be suppressed, through the production write gate.
++func TestPiGoogleStaysUnclassifiableAndIsNeverWritten(t *testing.T) {
++	if HasClassifierForRuntime("pi-google") {
++		t.Fatal("pi-google resolves to a classifier; google ships none")
++	}
++	f := newStoreFixture(t)
++	identity, err := IdentityFor("pi-google", filepath.Join(f.root, "pi-home"))
++	if err != nil {
++		t.Fatalf("IdentityFor: %v", err)
++	}
++	if class := ClassifyManaged("pi-google", ManagedSignalUsageLimited); class.Class != ClassNotLimit {
++		t.Fatalf("ClassifyManaged(pi-google) = %q, want not-a-limit", class.Class)
++	}
++	forged := Observation{quota: true, Provider: "pi-google", Evidence: Evidence{RunID: "RUN-260908-pi-google"}}
++	if err := f.store.Observe(identity, UnmappedGroup("pi-google", "gemini-3.1-pro-preview"), nil, forged); !errors.Is(err, ErrUnsupportedProvider) {
++		t.Fatalf("Observe(pi-google) = %v, want ErrUnsupportedProvider", err)
++	}
++	verdict, err := f.store.AvailabilityFor(VerdictQuery{Runtime: "pi-google", Model: "gemini-3.1-pro-preview", Home: filepath.Join(f.root, "pi-home")})
++	if err != nil {
++		t.Fatalf("AvailabilityFor(pi-google): %v", err)
++	}
++	if verdict.State != vendorplugin.AvailabilityHealthy {
++		t.Fatalf("pi-google = %s", verdict.State)
++	}
++}
++
++// TestObserveAdmitsPiAnthropicThroughTheProductionWriteGate: the write side
++// of the same routing. ClassifyManaged mints a limit class for pi-anthropic
++// (broker anthropic) and Store.Observe records it under the runtime id.
++func TestObserveAdmitsPiAnthropicThroughTheProductionWriteGate(t *testing.T) {
++	f := newStoreFixture(t)
++	home := filepath.Join(f.root, "managed-pi-home")
++	identity, err := IdentityFor("pi-anthropic", home)
++	if err != nil {
++		t.Fatalf("IdentityFor: %v", err)
++	}
++	class := ClassifyManaged("pi-anthropic", ManagedSignalUsageLimited)
++	obs, ok := class.QuotaObservation(Evidence{RunID: "RUN-260908-pi-anthropic", Model: "claude-opus-5"})
++	if !ok {
++		t.Fatalf("ClassifyManaged(pi-anthropic, usage_limited) = %q; anthropic's classifier must apply through the frozen row", class.Class)
++	}
++	group := UnmappedGroup("pi-anthropic", "claude-opus-5")
++	if err := f.store.Observe(identity, group, nil, obs); err != nil {
++		t.Fatalf("Observe(pi-anthropic): %v", err)
++	}
++	record, exists := f.store.GroupRecordFor(identity, group)
++	if !exists || record.Provider != "pi-anthropic" {
++		t.Fatalf("record = %#v, exists %v; want one keyed under the runtime id", record, exists)
++	}
++}
++
++// TestTheManagedHomeResolvesFromThePluginDeclaration: DefaultProviderHome walks
++// runtime → system → capabilities, so a pi-* runtime resolves a home from
++// PI_CODING_AGENT_DIR, else ~/.pi/agent, and never from a table here.
++func TestTheManagedHomeResolvesFromThePluginDeclaration(t *testing.T) {
++	t.Setenv("PI_CODING_AGENT_DIR", "")
++	home, err := DefaultProviderHomeIn(vendorplugin.Default, agentic.Default, "pi-anthropic")
++	if err != nil {
++		t.Fatalf("DefaultProviderHome(pi-anthropic): %v", err)
++	}
++	if home != "~/.pi/agent" {
++		t.Errorf("default home = %q, want ~/.pi/agent", home)
++	}
++	t.Setenv("PI_CODING_AGENT_DIR", "/Users/op/.managed/pi")
++	home, err = DefaultProviderHomeIn(vendorplugin.Default, agentic.Default, "pi-openai")
++	if err != nil {
++		t.Fatalf("DefaultProviderHome(pi-openai): %v", err)
++	}
++	if home != "/Users/op/.managed/pi" {
++		t.Errorf("home = %q, want the managed PI_CODING_AGENT_DIR", home)
++	}
++}
+diff --git a/pkg/vendorplugin/admissionpin_test.go b/pkg/vendorplugin/admissionpin_test.go
+index 77d8b5b..e2545e2 100644
+--- a/pkg/vendorplugin/admissionpin_test.go
++++ b/pkg/vendorplugin/admissionpin_test.go
+@@ -628,7 +628,7 @@ func TestEveryFrozenRuntimeWithAVendorResolvesThroughTheDefaultRegistry(t *testi
+ func TestEveryFrozenRuntimeBuildsThroughTheOneLaunchEntryPoint(t *testing.T) {
+ 	registry := isolatedRegistry(t, nil)
+ 	binDir := t.TempDir()
+-	for _, name := range []string{"agy", "claude", "codex", "gemini", "muse", "qwen"} {
++	for _, name := range []string{"agy", "claude", "codex", "gemini", "muse", "pi", "qwen"} {
+ 		writeStubBinary(t, binDir, name)
+ 	}
+ 	workDir := t.TempDir()
+diff --git a/pkg/vendorplugin/openai_astra_alias_test.go b/pkg/vendorplugin/openai_astra_alias_test.go
+index 7a77c4b..cc14077 100644
+--- a/pkg/vendorplugin/openai_astra_alias_test.go
++++ b/pkg/vendorplugin/openai_astra_alias_test.go
+@@ -452,6 +452,10 @@ func TestTheAstraLaunchProofFiresOnEveryWayTheSubstitutionCouldBreak(t *testing.
+ 			mutate: func(m vendorplugin.Model) vendorplugin.Model {
+ 				if m.ID == astraAlias {
+ 					m.AliasOf = "gpt-5.6-sol"
++					// The alias-mirror rule (sameSystems) would refuse the
++					// mutant otherwise; the mutant is about the TARGET, so the
++					// systems follow the new target as the rule demands.
++					m.Systems = []agentic.SystemID{"codex", "pi-native"}
+ 				}
+ 				return m
+ 			},
+@@ -508,6 +512,9 @@ func TestTheAstraLaunchProofFiresOnEveryWayTheSubstitutionCouldBreak(t *testing.
+ 			mutate: func(m vendorplugin.Model) vendorplugin.Model {
+ 				if m.ID == "gpt-5.6-sol" {
+ 					m.AliasOf = astraIdentity
++					// Mirror the target's systems so the mutant registers
++					// (sameSystems); the fact under test is the redirect.
++					m.Systems = []agentic.SystemID{"codex"}
+ 				}
+ 				return m
+ 			},
+diff --git a/pkg/vendorplugin/pinative_runtime_test.go b/pkg/vendorplugin/pinative_runtime_test.go
+new file mode 100644
+index 0000000..85b9542
+--- /dev/null
++++ b/pkg/vendorplugin/pinative_runtime_test.go
+@@ -0,0 +1,371 @@
++package vendorplugin_test
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"sort"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++)
++
++// The native-Pi runtimes through the ONE launch entry point, BuildLaunch, on
++// the real vendor rows (TASK-260908-ggxfte rev2 §4). Every refusal below is a
++// production gate reached through that call, never a helper unit test.
++
++var piRuntimes = []vendorplugin.RuntimeID{"pi-anthropic", "pi-openai", "pi-google"}
++
++// piLaunchEnv is a launch PATH holding ONLY a stub `pi`: no agents-infra
++// wrapper, so a plan that needed one could not build.
++func piLaunchEnv(t *testing.T) ([]string, string) {
++	t.Helper()
++	binDir := t.TempDir()
++	writeStubBinary(t, binDir, "pi")
++	return []string{"PATH=" + binDir, "PI_CODING_AGENT_DIR=/Users/op/.managed/pi"}, binDir
++}
++
++func piRequest(t *testing.T, runtime vendorplugin.RuntimeID, model, effort string) vendorplugin.SpawnRequest {
++	t.Helper()
++	env, _ := piLaunchEnv(t)
++	return vendorplugin.SpawnRequest{
++		Runtime: runtime,
++		Model:   vendorplugin.ModelID(model),
++		Effort:  effort,
++		WorkDir: "/Users/op/project",
++		Home:    "/Users/op/.managed/pi",
++		Env:     env,
++		Run:     agentic.RunContext{RunID: "RUN-pi-native", TaskID: "TASK-pi-native"},
++	}
++}
++
++func TestPiAnthropicGoldenPlan(t *testing.T) {
++	registry := isolatedRegistry(t, nil)
++	req := piRequest(t, "pi-anthropic", "claude-opus-5", "high")
++	plan, err := vendorplugin.BuildLaunch(context.Background(), registry, req, agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildLaunch(pi-anthropic, claude-opus-5, high): %v", err)
++	}
++	if want := []string{"--model", "anthropic/claude-opus-5", "--thinking", "high"}; !reflect.DeepEqual(plan.Argv, want) {
++		t.Errorf("Argv = %#v, want %#v", plan.Argv, want)
++	}
++	if filepath.Base(plan.Binary) != "pi" {
++		t.Errorf("Binary = %q, want the pi binary on the launch PATH", plan.Binary)
++	}
++	if plan.Stdin.Attached {
++		t.Errorf("stdin attached to an interactive native launch")
++	}
++	if plan.Home != "/Users/op/.managed/pi" {
++		t.Errorf("Home = %q, want the managed home the request named", plan.Home)
++	}
++	if plan.System != "pi-native" || plan.Mode != agentic.LaunchModeInteractive {
++		t.Errorf("plan = (%s, %s)", plan.System, plan.Mode)
++	}
++	found := false
++	for _, entry := range plan.Env {
++		if entry == "PI_CODING_AGENT_DIR=/Users/op/.managed/pi" {
++			found = true
++		}
++	}
++	if !found {
++		t.Errorf("the managed-home variable did not pass through: %v", plan.Env)
++	}
++	dry, err := vendorplugin.BuildLaunch(context.Background(), registry, req, agentic.LaunchModeDryRun)
++	if err != nil {
++		t.Fatalf("BuildLaunch(dry-run): %v", err)
++	}
++	if !reflect.DeepEqual(dry.Argv, plan.Argv) || dry.Binary != plan.Binary {
++		t.Errorf("dry run argv %v / binary %q differ from the interactive %v / %q", dry.Argv, dry.Binary, plan.Argv, plan.Binary)
++	}
++}
++
++func TestPiGoogleEffortNoneRowCarriesNoThinkingFlag(t *testing.T) {
++	registry := isolatedRegistry(t, nil)
++	plan, err := vendorplugin.BuildLaunch(context.Background(), registry, piRequest(t, "pi-google", "gemini-3.1-pro-preview", ""), agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildLaunch(pi-google): %v", err)
++	}
++	if want := []string{"--model", "google/gemini-3.1-pro-preview"}; !reflect.DeepEqual(plan.Argv, want) {
++		t.Errorf("Argv = %#v, want %#v", plan.Argv, want)
++	}
++}
++
++// TestEveryPiRuntimeModelLaunchesProviderQualified is the argv-never-bare
++// sweep over every (pi-* runtime × model) pair the registry admits, and it
++// reports the count it drove so a shrunken membership is visible.
++func TestEveryPiRuntimeModelLaunchesProviderQualified(t *testing.T) {
++	registry := isolatedRegistry(t, nil)
++	driven := 0
++	for _, id := range piRuntimes {
++		runtime, err := registry.ResolveRuntime(id)
++		if err != nil {
++			t.Fatalf("ResolveRuntime(%s): %v", id, err)
++		}
++		models := vendorplugin.RuntimeModels(runtime)
++		if len(models) == 0 {
++			t.Fatalf("runtime %s admits no model; it is declared and unlaunchable", id)
++		}
++		for _, model := range models {
++			effort := model.Effort.Recommended
++			plan, err := vendorplugin.BuildLaunch(context.Background(), registry, piRequest(t, id, string(model.ID), effort), agentic.LaunchModeInteractive)
++			if err != nil {
++				t.Errorf("BuildLaunch(%s, %s, %q): %v", id, model.ID, effort, err)
++				continue
++			}
++			driven++
++			prefix := string(runtime.VendorID) + "/"
++			for i, arg := range plan.Argv {
++				if arg == string(model.ID) || arg == string(model.AliasOf) {
++					t.Errorf("%s/%s: argv[%d] = %q is a bare id: %v", id, model.ID, i, arg, plan.Argv)
++				}
++				if i > 0 && plan.Argv[i-1] == "--model" && !strings.HasPrefix(arg, prefix) {
++					t.Errorf("%s/%s: --model value %q lacks the %q prefix", id, model.ID, arg, prefix)
++				}
++			}
++			if strings.TrimSpace(effort) == "" && len(plan.Argv) != 2 {
++				t.Errorf("%s/%s: effort-none row produced %v", id, model.ID, plan.Argv)
++			}
++			if strings.TrimSpace(effort) != "" && !reflect.DeepEqual(plan.Argv[2:], []string{"--thinking", effort}) {
++				t.Errorf("%s/%s: effort %q not transported: %v", id, model.ID, effort, plan.Argv)
++			}
++		}
++	}
++	t.Logf("drove %d (runtime × model) pairs through BuildLaunch", driven)
++	if driven < 24 {
++		t.Fatalf("drove only %d pairs; the catalog-verified membership is 8 anthropic + 9 openai + 7 google = 24 rows", driven)
++	}
++}
++
++// spoofingVendor wraps a real vendor and has its Spawn set Vendor (and
++// Runtime) to a lie. BuildLaunch must overwrite both after Spawn returns.
++type spoofingVendor struct{ inner vendorplugin.Vendor }
++
++func (s spoofingVendor) ID() vendorplugin.VendorID    { return s.inner.ID() }
++func (s spoofingVendor) Models() []vendorplugin.Model { return s.inner.Models() }
++func (s spoofingVendor) Availability(q vendorplugin.AvailabilityQuery) (vendorplugin.Availability, error) {
++	return s.inner.Availability(q)
++}
++func (s spoofingVendor) Spawn(sc vendorplugin.SpawnContext) (agentic.LaunchRequest, error) {
++	launch, err := s.inner.Spawn(sc)
++	launch.Vendor = "openai"
++	launch.Runtime = "codex"
++	return launch, err
++}
++
++func spoofedRegistry(t *testing.T) *vendorplugin.Registry {
++	t.Helper()
++	registry := vendorplugin.NewRegistry(agentic.Default)
++	if err := vendorplugin.SeedFrozenRuntimes(registry); err != nil {
++		t.Fatalf("seeding: %v", err)
++	}
++	anthropic, ok := vendorplugin.Default.Lookup("anthropic")
++	if !ok {
++		t.Fatal("anthropic is not registered in the default registry")
++	}
++	if err := registry.Register(spoofingVendor{inner: anthropic}); err != nil {
++		t.Fatalf("registering the spoofing vendor: %v", err)
++	}
++	return registry
++}
++
++// TestBuildLaunchOverwritesAVendorSetBySpawn is the authoritative-Vendor
++// clause: the qualified identity comes from the binding, not from whatever
++// the vendor's Spawn wrote.
++func TestBuildLaunchOverwritesAVendorSetBySpawn(t *testing.T) {
++	plan, err := vendorplugin.BuildLaunch(context.Background(), spoofedRegistry(t), piRequest(t, "pi-anthropic", "claude-opus-5", "high"), agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildLaunch: %v", err)
++	}
++	if want := []string{"--model", "anthropic/claude-opus-5", "--thinking", "high"}; !reflect.DeepEqual(plan.Argv, want) {
++		t.Fatalf("Argv = %#v, want %#v; the vendor's spoofed Vendor reached argv", plan.Argv, want)
++	}
++}
++
++// TestTheSpoofWouldHaveReachedArgvWithoutTheOverwrite is the narrowing for the
++// test above: the same spoofing Spawn handed straight to the plugin (the path
++// BuildLaunch's overwrite guards) DOES emit the lie, so the overwrite is
++// load-bearing rather than the spoof being inert.
++func TestTheSpoofWouldHaveReachedArgvWithoutTheOverwrite(t *testing.T) {
++	anthropic, _ := vendorplugin.Default.Lookup("anthropic")
++	registry := spoofedRegistry(t)
++	runtime, err := registry.ResolveRuntime("pi-anthropic")
++	if err != nil {
++		t.Fatalf("ResolveRuntime: %v", err)
++	}
++	var model vendorplugin.Model
++	for _, row := range anthropic.Models() {
++		if row.ID == "claude-opus-5" {
++			model = row
++		}
++	}
++	launch, err := spoofingVendor{inner: anthropic}.Spawn(vendorplugin.SpawnContext{Runtime: runtime, Model: model, Effort: "high", Request: piRequest(t, "pi-anthropic", "claude-opus-5", "high")})
++	if err != nil {
++		t.Fatalf("Spawn: %v", err)
++	}
++	argv, err := pinative.Args(launch, agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("Args: %v", err)
++	}
++	if argv[1] != "openai/claude-opus-5" {
++		t.Fatalf("the spoof did not reach argv on the unguarded path (%v); the overwrite test above measures nothing", argv)
++	}
++}
++
++func TestBuildLaunchRefusalsOnPiRuntimes(t *testing.T) {
++	registry := isolatedRegistry(t, nil)
++	for _, tt := range []struct {
++		name    string
++		runtime vendorplugin.RuntimeID
++		model   string
++		effort  string
++		mode    agentic.LaunchMode
++		mutate  func(*vendorplugin.SpawnRequest)
++		want    error
++	}{
++		{"effort outside the vocabulary", "pi-anthropic", "claude-opus-5", "ultra", agentic.LaunchModeInteractive, nil, vendorplugin.ErrEffortNotInVocabulary},
++		{"empty effort on a required row", "pi-anthropic", "claude-opus-5", "", agentic.LaunchModeInteractive, nil, vendorplugin.ErrEffortMissing},
++		{"effort on an effort-none row", "pi-google", "gemini-3.1-pro-preview", "high", agentic.LaunchModeInteractive, nil, vendorplugin.ErrEffortNotInVocabulary},
++		{"empty model", "pi-anthropic", "", "high", agentic.LaunchModeInteractive, nil, vendorplugin.ErrUnknownModel},
++		{"exec mode", "pi-anthropic", "claude-opus-5", "high", agentic.LaunchModeExec, func(r *vendorplugin.SpawnRequest) { r.Prompt = []byte("body") }, agentic.ErrUnsupportedLaunchMode},
++		{"composition", "pi-anthropic", "claude-opus-5", "high", agentic.LaunchModeInteractive, func(r *vendorplugin.SpawnRequest) {
++			r.Composition = agentic.Composition{Prefix: []string{"--mcp", "x"}}
++		}, agentic.ErrCompositionNotInteractive},
++		{"another vendor's model", "pi-anthropic", "gpt-5.5", "high", agentic.LaunchModeInteractive, nil, vendorplugin.ErrUnknownModel},
++		{"a row absent from the Pi catalog", "pi-anthropic", "claude-fable-5-1", "high", agentic.LaunchModeInteractive, nil, vendorplugin.ErrModelNotDrivenBySystem},
++		{"an openai head absent from the catalog", "pi-openai", "gpt-6-astra", "high", agentic.LaunchModeInteractive, nil, vendorplugin.ErrModelNotDrivenBySystem},
++		{"the alias mirrors its absent target", "pi-openai", "astra", "high", agentic.LaunchModeInteractive, nil, vendorplugin.ErrModelNotDrivenBySystem},
++		{"an antigravity-only google row", "pi-google", "gemini-3.1-pro-high", "", agentic.LaunchModeInteractive, nil, vendorplugin.ErrModelNotDrivenBySystem},
++	} {
++		t.Run(tt.name, func(t *testing.T) {
++			req := piRequest(t, tt.runtime, tt.model, tt.effort)
++			if tt.mutate != nil {
++				tt.mutate(&req)
++			}
++			plan, err := vendorplugin.BuildLaunch(context.Background(), registry, req, tt.mode)
++			if !errors.Is(err, tt.want) {
++				t.Fatalf("BuildLaunch(%s, %q, %q, %s) = argv %v, err %v; want %v", tt.runtime, tt.model, tt.effort, tt.mode, plan.Argv, err, tt.want)
++			}
++		})
++	}
++}
++
++// TestAnAliasRowLaunchesItsTargetQualified drives the alias substitution
++// through BuildLaunch on a mutant that admits the astra pair to pi-native
++// (the real pair is refused because gpt-6-astra is absent from the catalog;
++// the mutant is the only way to reach the alias arm on a pi runtime).
++func TestAnAliasRowLaunchesItsTargetQualified(t *testing.T) {
++	registry := isolatedRegistry(t, map[vendorplugin.VendorID]func(vendorplugin.Model) vendorplugin.Model{
++		"openai": func(m vendorplugin.Model) vendorplugin.Model {
++			if m.ID == "astra" || m.ID == "gpt-6-astra" {
++				m.Systems = append(append([]agentic.SystemID(nil), m.Systems...), "pi-native")
++			}
++			return m
++		},
++	})
++	plan, err := vendorplugin.BuildLaunch(context.Background(), registry, piRequest(t, "pi-openai", "astra", "high"), agentic.LaunchModeInteractive)
++	if err != nil {
++		t.Fatalf("BuildLaunch(pi-openai, astra): %v", err)
++	}
++	if want := []string{"--model", "openai/gpt-6-astra", "--thinking", "high"}; !reflect.DeepEqual(plan.Argv, want) {
++		t.Errorf("Argv = %#v, want %#v", plan.Argv, want)
++	}
++	if plan.ModelIdentity.Requested != "astra" || plan.ModelIdentity.Launched != "gpt-6-astra" {
++		t.Errorf("ModelIdentity = %#v", plan.ModelIdentity)
++	}
++}
++
++// TestAliasMirrorRefusesAOneSidedPiNativeMembership is the sameSystems rule
++// applied to pi-native: an alias that names it while its target does not (or
++// the reverse) does not register.
++func TestAliasMirrorRefusesAOneSidedPiNativeMembership(t *testing.T) {
++	for _, side := range []string{"astra", "gpt-6-astra"} {
++		registry := vendorplugin.NewRegistry(agentic.Default)
++		if err := vendorplugin.SeedFrozenRuntimes(registry); err != nil {
++			t.Fatalf("seeding: %v", err)
++		}
++		openai, _ := vendorplugin.Default.Lookup("openai")
++		err := registry.Register(mutantVendor{inner: openai, mutate: func(m vendorplugin.Model) vendorplugin.Model {
++			if m.ID == vendorplugin.ModelID(side) {
++				m.Systems = append(append([]agentic.SystemID(nil), m.Systems...), "pi-native")
++			}
++			return m
++		}})
++		if !errors.Is(err, vendorplugin.ErrAliasInvalid) {
++			t.Fatalf("%s alone naming pi-native registered with %v; want ErrAliasInvalid", side, err)
++		}
++	}
++}
++
++func TestThePiRuntimesAreFrozenWithTheirCatalogProvenance(t *testing.T) {
++	want := map[vendorplugin.RuntimeID]vendorplugin.VendorID{"pi-anthropic": "anthropic", "pi-openai": "openai", "pi-google": "google"}
++	seen := 0
++	for _, declaration := range vendorplugin.FrozenRuntimes() {
++		vendor, ok := want[declaration.ID]
++		if !ok {
++			continue
++		}
++		seen++
++		if declaration.System != "pi-native" || declaration.Vendor != vendor {
++			t.Errorf("%s = (%s × %s), want (pi-native × %s)", declaration.ID, declaration.System, declaration.Vendor, vendor)
++		}
++		if len(declaration.Broker.Checked) != 1 || !strings.Contains(declaration.Broker.Checked[0], "pi 0.84.2") || !strings.Contains(declaration.Broker.Checked[0], string(vendor)+".json") {
++			t.Errorf("%s checked sources = %v, want the installed Pi provider data file", declaration.ID, declaration.Broker.Checked)
++		}
++	}
++	if seen != 3 {
++		t.Fatalf("saw %d native-Pi frozen rows, want 3", seen)
++	}
++}
++
++// TestPiNativeMembershipMatchesTheInstalledCatalog is the no-secret installed-Pi
++// probe: with Pi's provider data on disk, every row naming pi-native must be
++// in the catalog and every registry row present in the catalog must name it.
++// It reads bytes only; no model call, no credential. It skips, loudly, when
++// Pi is not installed where the design recorded it.
++func TestPiNativeMembershipMatchesTheInstalledCatalog(t *testing.T) {
++	dataDir := os.Getenv("PI_AI_PROVIDER_DATA_DIR")
++	if dataDir == "" {
++		dataDir = "/opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/providers/data"
++	}
++	if _, err := os.Stat(dataDir); err != nil {
++		t.Skipf("installed Pi provider data not found at %s (%v); set PI_AI_PROVIDER_DATA_DIR", dataDir, err)
++	}
++	for _, vendor := range []vendorplugin.VendorID{"anthropic", "openai", "google"} {
++		raw, err := os.ReadFile(filepath.Join(dataDir, string(vendor)+".json"))
++		if err != nil {
++			t.Fatalf("reading %s catalog: %v", vendor, err)
++		}
++		var byAPI map[string]map[string]json.RawMessage
++		if err := json.Unmarshal(raw, &byAPI); err != nil {
++			t.Fatalf("decoding %s catalog: %v", vendor, err)
++		}
++		catalog := map[string]bool{}
++		for _, models := range byAPI {
++			for id := range models {
++				catalog[id] = true
++			}
++		}
++		plugin, _ := vendorplugin.Default.Lookup(vendor)
++		var mismatches []string
++		for _, row := range plugin.Models() {
++			native := row.DrivenBy("pi-native")
++			inCatalog := catalog[row.Launchable().LaunchIdentity()]
++			if native && !inCatalog {
++				mismatches = append(mismatches, string(row.ID)+" names pi-native but is absent from the catalog")
++			}
++			if !native && inCatalog && row.AliasOf == "" {
++				mismatches = append(mismatches, string(row.ID)+" is in the catalog but does not name pi-native")
++			}
++		}
++		sort.Strings(mismatches)
++		if len(mismatches) != 0 {
++			t.Errorf("%s: %s", vendor, strings.Join(mismatches, "; "))
++		}
++	}
++}
+diff --git a/pkg/vendorplugin/runtime.go b/pkg/vendorplugin/runtime.go
+index 23268bb..c4279f1 100644
+--- a/pkg/vendorplugin/runtime.go
++++ b/pkg/vendorplugin/runtime.go
+@@ -301,7 +301,8 @@ func (d RuntimeDeclaration) LineupOfDeclaration() []RankedModel { return Lineup(
+ const runtimeIDSource = "skill-project-management pkg/remoteconfig/runtimeid (frozen table)"
+ 
+ // frozenRuntimes are the six historical runtime ids, carried verbatim from the
+-// extraction source's frozen table.
++// extraction source's frozen table, plus the three native-Pi rows added by
++// TASK-260908-ggxfte.
+ //
+ // It is a SLICE, not a map: the binding table these declarations end up in is
+ // the registry's, and a second id-keyed map here would be the shadow table
+@@ -352,6 +353,38 @@ var frozenRuntimes = []RuntimeDeclaration{
+ 		Broker: BrokerProvenance{Checked: []string{runtimeIDSource}},
+ 		Models: museModels(),
+ 	},
++	// The three native-Pi rows (TASK-260908-ggxfte rev2 §3.4). They are FROZEN
++	// rather than consumer-declared because providerlimits.brokerForRuntime
++	// walks this slice only: a consumer-declared pi-anthropic would resolve to
++	// no broker there, take the unclassifiable carve-out, and read Healthy
++	// while its managed home held a limited record. The binding is what the
++	// installed Pi catalog established — its provider data files are literally
++	// anthropic.json, openai.json and google.json — and that is the checked
++	// source recorded here.
++	{
++		ID:     "pi-anthropic",
++		System: "pi-native",
++		Vendor: "anthropic",
++		Broker: BrokerProvenance{Checked: []string{piCatalogSource("anthropic")}, Found: "the installed Pi catalog resolves anthropic/<model> against its anthropic provider data"},
++	},
++	{
++		ID:     "pi-openai",
++		System: "pi-native",
++		Vendor: "openai",
++		Broker: BrokerProvenance{Checked: []string{piCatalogSource("openai")}, Found: "the installed Pi catalog resolves openai/<model> against its openai provider data"},
++	},
++	{
++		ID:     "pi-google",
++		System: "pi-native",
++		Vendor: "google",
++		Broker: BrokerProvenance{Checked: []string{piCatalogSource("google")}, Found: "the installed Pi catalog resolves google/<model> against its google provider data"},
++	},
++}
++
++// piCatalogSource names the installed Pi provider data file a native-Pi runtime
++// row was checked against, spelled once.
++func piCatalogSource(vendor string) string {
++	return "pi 0.84.2 pi-ai providers/data/" + vendor + ".json"
+ }
+ 
+ // boardRegistry is where the muse rows' facts were read from. It names the
+diff --git a/pkg/vendorplugin/runtime_test.go b/pkg/vendorplugin/runtime_test.go
+index 1b5decf..1a34cd6 100644
+--- a/pkg/vendorplugin/runtime_test.go
++++ b/pkg/vendorplugin/runtime_test.go
+@@ -30,6 +30,9 @@ func TestTheSixHistoricalRuntimesAreSeededWithTheirFrozenBindings(t *testing.T)
+ 		{"codex", "codex", "openai"},
+ 		{"gemini", "gemini-cli", "google"},
+ 		{"muse", "muse", VendorUnresolved},
++		{"pi-anthropic", "pi-native", "anthropic"},
++		{"pi-google", "pi-native", "google"},
++		{"pi-openai", "pi-native", "openai"},
+ 		{"qwen", "qwen-code", "alibaba"},
+ 	}
+ 
+diff --git a/pkg/vendorplugin/sourceport_test.go b/pkg/vendorplugin/sourceport_test.go
+index f99c52c..bad34cd 100644
+--- a/pkg/vendorplugin/sourceport_test.go
++++ b/pkg/vendorplugin/sourceport_test.go
+@@ -294,6 +294,18 @@ func comparePort(fixture sourceRegistry, declarations []vendorplugin.RuntimeDecl
+ 		remaining[vendor] = index
+ 	}
+ 
++	// The systems the SOURCE table knows about. A system this module added
++	// after the port — pi-native, which never existed in the extraction
++	// source — is not a drift from the source and is filtered out of the
++	// comparison below; TestTheSourcePortPinStillSeesASourceSystemDropped
++	// proves the filter does not blind the pin to the systems it does own.
++	sourceSystems := map[string]bool{}
++	for _, source := range fixture.Models {
++		for _, system := range source.AgenticSystems {
++			sourceSystems[system] = true
++		}
++	}
++
+ 	for _, source := range fixture.Models {
+ 		if source.Broker == "" {
+ 			continue
+@@ -312,8 +324,13 @@ func comparePort(fixture sourceRegistry, declarations []vendorplugin.RuntimeDecl
+ 		delete(rows, model.ID)
+ 
+ 		gotSystems := make([]string, 0, len(model.Systems))
++		var portedSystems []agentic.SystemID
+ 		for _, system := range model.Systems {
++			if !sourceSystems[string(system)] {
++				continue
++			}
+ 			gotSystems = append(gotSystems, string(system))
++			portedSystems = append(portedSystems, system)
+ 		}
+ 		if !equalStrings(gotSystems, source.AgenticSystems) {
+ 			report("model %q declares systems %v and the source binds it to %v", source.ID, gotSystems, source.AgenticSystems)
+@@ -322,14 +339,14 @@ func comparePort(fixture sourceRegistry, declarations []vendorplugin.RuntimeDecl
+ 		// The runtime binding, DERIVED from the (system x vendor) pair rather
+ 		// than restated: a table of runtimes written here would be one more
+ 		// place the bindings live.
+-		if len(model.Systems) > 0 {
+-			got, unique := runtimeOf(declarations, model.Systems[0], vendor)
++		if len(portedSystems) > 0 {
++			got, unique := runtimeOf(declarations, portedSystems[0], vendor)
+ 			switch {
+ 			case !unique:
+-				report("model %q's pair (%s x %s) does not name exactly one declared runtime", source.ID, model.Systems[0], vendor)
++				report("model %q's pair (%s x %s) does not name exactly one declared runtime", source.ID, portedSystems[0], vendor)
+ 			case string(got) != source.Runtime:
+ 				report("model %q resolves to runtime %s through (%s x %s) and the source registers it under %s",
+-					source.ID, got, model.Systems[0], vendor, source.Runtime)
++					source.ID, got, portedSystems[0], vendor, source.Runtime)
+ 			}
+ 		}
+ 
+@@ -416,6 +433,34 @@ func TestEverySourceModelRowIsPorted(t *testing.T) {
+ 	}
+ }
+ 
++// TestTheSourcePortPinStillSeesASourceSystemDropped is the narrowing for the
++// source-systems filter above: a ported row that keeps pi-native and LOSES its
++// source harness must still be reported, or the filter has turned the pin
++// into one that accepts any row naming a post-port system.
++func TestTheSourcePortPinStillSeesASourceSystemDropped(t *testing.T) {
++	models := portedModels(t)
++	rows := append([]vendorplugin.Model(nil), models["anthropic"]...)
++	mutated := false
++	for i := range rows {
++		if rows[i].ID == "claude-opus-5" {
++			rows[i].Systems = []agentic.SystemID{"pi-native"}
++			mutated = true
++		}
++	}
++	if !mutated {
++		t.Fatal("fixture assumption broken: anthropic declares no claude-opus-5 row")
++	}
++	models["anthropic"] = rows
++	problems := comparePort(loadSourceRegistry(t), declaredRuntimes(t), models)
++	want := `model "claude-opus-5" declares systems [] and the source binds it to [claude-code]`
++	for _, problem := range problems {
++		if strings.Contains(problem, want) {
++			return
++		}
++	}
++	t.Fatalf("a row that dropped its source harness and kept pi-native was not reported; got %v", problems)
++}
++
+ // TestTheFullSetPinFiresOnDrift narrows the gate instead of deleting it.
+ //
+ // Each subtest drifts the SOURCE table by one field — the shape a real drift
+diff --git a/pkg/vendorplugin/spawn.go b/pkg/vendorplugin/spawn.go
+index bd868e1..01af60a 100644
+--- a/pkg/vendorplugin/spawn.go
++++ b/pkg/vendorplugin/spawn.go
+@@ -189,6 +189,12 @@ func BuildLaunch(ctx context.Context, r *Registry, req SpawnRequest, mode agenti
+ 	// not) is overwritten: this is the one place the fact is authoritative,
+ 	// sourced from the SAME req.Runtime every resolution above already used.
+ 	launch.Runtime = string(req.Runtime)
++	// Vendor is set here for the same reason and with the same authority:
++	// binding.VendorID is what ResolveRuntime established, and a system-only
++	// binding carries VendorUnresolved (""), which is the honest value for a
++	// broker nobody established. TestBuildLaunchOverwritesAVendorSetBySpawn
++	// holds the overwrite.
++	launch.Vendor = string(binding.VendorID)
+ 
+ 	// A system may own a pure request gate that must precede every observation
+ 	// and preflight. Pi uses it to validate and snapshot exact prompt bytes; the
+diff --git a/pkg/vendorplugin/vendors/anthropic/anthropic.go b/pkg/vendorplugin/vendors/anthropic/anthropic.go
+index 380d077..471e797 100644
+--- a/pkg/vendorplugin/vendors/anthropic/anthropic.go
++++ b/pkg/vendorplugin/vendors/anthropic/anthropic.go
+@@ -37,6 +37,7 @@ import (
+ 
+ 	// The agentic system this vendor's models declare. See the package doc.
+ 	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
+ )
+ 
+ // vendorID is this plugin's identity, and it is the same spelling the frozen
+diff --git a/pkg/vendorplugin/vendors/anthropic/models.go b/pkg/vendorplugin/vendors/anthropic/models.go
+index a20b892..5676766 100644
+--- a/pkg/vendorplugin/vendors/anthropic/models.go
++++ b/pkg/vendorplugin/vendors/anthropic/models.go
+@@ -118,6 +118,16 @@ func effortNone() vendorplugin.EffortDeclaration {
+ }
+ 
+ // models is the declaration itself, most capable first.
++//
++// `pi-native` membership is CATALOG-VERIFIED, not inferred from the vendor: a
++// row names it only when the id is present in the installed Pi built-in
++// catalog (Pi 0.84.2, pi-ai providers/data/anthropic.json, api
++// anthropic-messages), because native Pi resolves `anthropic/<id>` against
++// that file and an absent id silently takes the custom-model fallback with a
++// warning — an unverified launch. claude-fable-5-1 is absent from that
++// catalog and therefore deliberately does NOT name pi-native; the launch is
++// refused as ErrModelNotDrivenBySystem rather than guessed at. Re-verify the
++// membership against the installed catalog bytes before changing it.
+ var models = []vendorplugin.Model{
+ 	{
+ 		ID:          "claude-fable-5-1",
+@@ -134,7 +144,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:    vendorplugin.LifecycleLegacy,
+ 		SupersededBy: "claude-fable-5-1",
+ 		Effort:       effortRequired("high", []string{"low", "medium", "high", "xhigh", "max"}),
+-		Systems:      []agentic.SystemID{"claude-code"},
++		Systems:      []agentic.SystemID{"claude-code", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "claude-opus-5",
+@@ -143,7 +153,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("high", []string{"low", "medium", "high", "xhigh", "max"}),
+ 		Recommended: true,
+-		Systems:     []agentic.SystemID{"claude-code"},
++		Systems:     []agentic.SystemID{"claude-code", "pi-native"},
+ 	},
+ 	{
+ 		ID:           "claude-opus-4-8",
+@@ -152,7 +162,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:    vendorplugin.LifecycleLegacy,
+ 		SupersededBy: "claude-opus-5",
+ 		Effort:       effortRequired("xhigh", []string{"low", "medium", "high", "xhigh", "max"}),
+-		Systems:      []agentic.SystemID{"claude-code"},
++		Systems:      []agentic.SystemID{"claude-code", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "claude-sonnet-5",
+@@ -160,7 +170,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(60, "below opus-4-8 and above opus-4-6", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("high", []string{"low", "medium", "high", "xhigh", "max"}),
+-		Systems:     []agentic.SystemID{"claude-code"},
++		Systems:     []agentic.SystemID{"claude-code", "pi-native"},
+ 	},
+ 	{
+ 		ID:           "claude-opus-4-6",
+@@ -169,7 +179,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:    vendorplugin.LifecycleLegacy,
+ 		SupersededBy: "claude-opus-5",
+ 		Effort:       effortRequired("high", []string{"low", "medium", "high", "max"}),
+-		Systems:      []agentic.SystemID{"claude-code"},
++		Systems:      []agentic.SystemID{"claude-code", "pi-native"},
+ 	},
+ 	{
+ 		ID:           "claude-sonnet-4-6",
+@@ -178,7 +188,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:    vendorplugin.LifecycleLegacy,
+ 		SupersededBy: "claude-sonnet-5",
+ 		Effort:       effortRequired("medium", []string{"low", "medium", "high", "max"}),
+-		Systems:      []agentic.SystemID{"claude-code"},
++		Systems:      []agentic.SystemID{"claude-code", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "claude-haiku-4-5",
+@@ -186,7 +196,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(10, "the lowest of the nine anthropic rows, tied with its dated snapshot", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortNone(),
+-		Systems:     []agentic.SystemID{"claude-code"},
++		Systems:     []agentic.SystemID{"claude-code", "pi-native"},
+ 	},
+ 	{
+ 		ID:           "claude-haiku-4-5-20251001",
+@@ -195,6 +205,6 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:    vendorplugin.LifecycleLegacy,
+ 		SupersededBy: "claude-haiku-4-5",
+ 		Effort:       effortNone(),
+-		Systems:      []agentic.SystemID{"claude-code"},
++		Systems:      []agentic.SystemID{"claude-code", "pi-native"},
+ 	},
+ }
+diff --git a/pkg/vendorplugin/vendors/google/google.go b/pkg/vendorplugin/vendors/google/google.go
+index 84b9866..194ec80 100644
+--- a/pkg/vendorplugin/vendors/google/google.go
++++ b/pkg/vendorplugin/vendors/google/google.go
+@@ -43,6 +43,7 @@ import (
+ 	// BOTH agentic systems this vendor's models declare. See the package doc.
+ 	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/agy"
+ 	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/gemini"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
+ )
+ 
+ // vendorID is this plugin's identity, and the spelling the frozen runtime
+diff --git a/pkg/vendorplugin/vendors/google/models.go b/pkg/vendorplugin/vendors/google/models.go
+index e088eb5..0a2cc7b 100644
+--- a/pkg/vendorplugin/vendors/google/models.go
++++ b/pkg/vendorplugin/vendors/google/models.go
+@@ -143,7 +143,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:           vendorplugin.LifecyclePreview,
+ 		Effort:              effortNone(),
+ 		ContextWindowTokens: 1_048_576,
+-		Systems:             []agentic.SystemID{"gemini-cli"},
++		Systems:             []agentic.SystemID{"gemini-cli", "pi-native"},
+ 	},
+ 	{
+ 		ID:                  "gemini-3.6-flash-high",
+@@ -163,7 +163,7 @@ var models = []vendorplugin.Model{
+ 		Effort:              effortNone(),
+ 		Recommended:         true,
+ 		ContextWindowTokens: 1_048_576,
+-		Systems:             []agentic.SystemID{"gemini-cli"},
++		Systems:             []agentic.SystemID{"gemini-cli", "pi-native"},
+ 	},
+ 	{
+ 		ID:                  "gemini-3.6-flash-medium",
+@@ -181,7 +181,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:           vendorplugin.LifecyclePreview,
+ 		Effort:              effortNone(),
+ 		ContextWindowTokens: 1_048_576,
+-		Systems:             []agentic.SystemID{"gemini-cli"},
++		Systems:             []agentic.SystemID{"gemini-cli", "pi-native"},
+ 	},
+ 	{
+ 		ID:                  "gemini-3.6-flash-low",
+@@ -199,7 +199,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:           vendorplugin.LifecycleCurrent,
+ 		Effort:              effortNone(),
+ 		ContextWindowTokens: 1_048_576,
+-		Systems:             []agentic.SystemID{"gemini-cli"},
++		Systems:             []agentic.SystemID{"gemini-cli", "pi-native"},
+ 	},
+ 	{
+ 		ID:                  "gemini-3.5-flash-high",
+@@ -217,7 +217,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:           vendorplugin.LifecycleCurrent,
+ 		Effort:              effortNone(),
+ 		ContextWindowTokens: 1_048_576,
+-		Systems:             []agentic.SystemID{"gemini-cli"},
++		Systems:             []agentic.SystemID{"gemini-cli", "pi-native"},
+ 	},
+ 	{
+ 		ID:                  "gemini-3.5-flash-medium",
+@@ -244,7 +244,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:           vendorplugin.LifecycleCurrent,
+ 		Effort:              effortNone(),
+ 		ContextWindowTokens: 262_144,
+-		Systems:             []agentic.SystemID{"gemini-cli"},
++		Systems:             []agentic.SystemID{"gemini-cli", "pi-native"},
+ 	},
+ 	{
+ 		ID:                  "gemma-4-26b-a4b-it",
+@@ -253,6 +253,6 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:           vendorplugin.LifecycleCurrent,
+ 		Effort:              effortNone(),
+ 		ContextWindowTokens: 262_144,
+-		Systems:             []agentic.SystemID{"gemini-cli"},
++		Systems:             []agentic.SystemID{"gemini-cli", "pi-native"},
+ 	},
+ }
+diff --git a/pkg/vendorplugin/vendors/openai/models.go b/pkg/vendorplugin/vendors/openai/models.go
+index 3fed435..b04f49d 100644
+--- a/pkg/vendorplugin/vendors/openai/models.go
++++ b/pkg/vendorplugin/vendors/openai/models.go
+@@ -285,7 +285,7 @@ var models = []vendorplugin.Model{
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("max", []string{"low", "medium", "high", "xhigh", "max", "ultra"}),
+ 		Recommended: true,
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.6-terra",
+@@ -293,7 +293,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(110, "below sol and above luna", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("max", []string{"low", "medium", "high", "xhigh", "max", "ultra"}),
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.6-luna",
+@@ -301,7 +301,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(100, "below terra and above gpt-5.5", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("max", []string{"low", "medium", "high", "xhigh", "max"}),
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.5",
+@@ -309,7 +309,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(90, "below luna and above gpt-5.4", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("xhigh", []string{"low", "medium", "high", "xhigh"}),
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.4",
+@@ -317,7 +317,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(80, "below gpt-5.5 and above gpt-5.4-mini", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("xhigh", []string{"low", "medium", "high", "xhigh"}),
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.4-mini",
+@@ -325,7 +325,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(70, "below gpt-5.4 and above the spark row", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("xhigh", []string{"low", "medium", "high", "xhigh"}),
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.3-codex-spark",
+@@ -333,7 +333,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(60, "the lowest of the current rows, above every legacy one", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleCurrent,
+ 		Effort:      effortRequired("xhigh", []string{"low", "medium", "high", "xhigh"}),
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.3-codex",
+@@ -341,7 +341,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(50, "the highest of the legacy rows", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleLegacy,
+ 		Effort:      effortRequired("xhigh", []string{"minimal", "low", "medium", "high", "xhigh"}),
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.2-codex",
+@@ -365,7 +365,7 @@ var models = []vendorplugin.Model{
+ 		Rank:        rank(20, "below gpt-5.1-codex-max and above gpt-5.1-codex-mini", lineup),
+ 		Lifecycle:   vendorplugin.LifecycleLegacy,
+ 		Effort:      effortRequired("xhigh", []string{"minimal", "low", "medium", "high", "xhigh"}),
+-		Systems:     []agentic.SystemID{"codex"},
++		Systems:     []agentic.SystemID{"codex", "pi-native"},
+ 	},
+ 	{
+ 		ID:          "gpt-5.1-codex-mini",
+diff --git a/pkg/vendorplugin/vendors/openai/openai.go b/pkg/vendorplugin/vendors/openai/openai.go
+index b71074b..a87e32b 100644
+--- a/pkg/vendorplugin/vendors/openai/openai.go
++++ b/pkg/vendorplugin/vendors/openai/openai.go
+@@ -44,6 +44,7 @@ import (
+ 
+ 	// The agentic system this vendor's models declare. See the package doc.
+ 	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
+ )
+ 
+ // vendorID is this plugin's identity, and the spelling the frozen runtime
+diff --git a/tools/agents-management/cmd/vendors_test.go b/tools/agents-management/cmd/vendors_test.go
+index ef3f4f5..f5d4e78 100644
+--- a/tools/agents-management/cmd/vendors_test.go
++++ b/tools/agents-management/cmd/vendors_test.go
+@@ -87,6 +87,9 @@ func TestRuntimesCommandListsTheFrozenDeclarations(t *testing.T) {
+ 		"codex\tcodex\topenai",
+ 		"gemini\tgemini-cli\tgoogle",
+ 		"muse\tmuse\tvendor unresolved",
++		"pi-anthropic\tpi-native\tanthropic",
++		"pi-google\tpi-native\tgoogle",
++		"pi-openai\tpi-native\topenai",
+ 		"qwen\tqwen-code\talibaba",
+ 	}, "\n") + "\n"
+ 	if stdout != want {
+@@ -108,8 +111,8 @@ func TestRuntimesJSONCarriesTheUnresolvedBrokerHonestly(t *testing.T) {
+ 	if err := json.Unmarshal([]byte(stdout), &decoded); err != nil {
+ 		t.Fatalf("decoding %q: %v", stdout, err)
+ 	}
+-	if len(decoded) != 6 {
+-		t.Fatalf("decoded %d runtimes, want the six frozen ids", len(decoded))
++	if len(decoded) != 9 {
++		t.Fatalf("decoded %d runtimes, want the nine frozen ids", len(decoded))
+ 	}
+ 	for _, row := range decoded {
+ 		if row.ID != "muse" {
