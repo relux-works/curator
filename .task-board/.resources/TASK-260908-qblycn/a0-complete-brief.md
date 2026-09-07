@@ -1,0 +1,11 @@
+# Complete the accepted A0 evidence-only Story using installed separate-owner support
+
+Current installed task-board contains PR 187 (416693dd). The scoped config now declares board_repository.root=/Users/iv/Developer/ReluxWorks/curator and validation make check. Authoritative board remains Curator; code/control is /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control. Parent fast-forwarded Curator main with git -c pull.rebase=false pull --ff-only origin main; unrelated dirty board/LOGBOOK changes preserved. No hosted CI until further operator instruction; do not enable workflows.
+
+This is a tracked integration-owner run, same researcher/analyst role as accepted CR TASK-260908-qblycn revision 1. Do not repeat research, change accepted artifacts, publish a new CR, or invoke colocated worktree integrate from an older automatic assignment. Use the new installed command:
+
+task-board --no-update-check --board-dir /Users/iv/Developer/ReluxWorks/curator/.task-board worktree complete STORY-260908-3mcpz5 --cr TASK-260908-qblycn --revision 1 --commit-time 2026-09-07T21:30:00+03:00 --json
+
+Run from the frozen control root with inherited TASK_BOARD_CONFIG. This CR is repository_delta=empty: NO --landed-commit and no fictitious code commit or test evidence. Before each attempt that may publish a board commit, run git -C /Users/iv/Developer/ReluxWorks/curator -c pull.rebase=false pull --ff-only origin main. Preserve all unrelated state; if it refuses, record why instead of stash/reset. The command is authorized to publish only the scoped signed board-state commit and apply its proven done transition. Never hand-edit board, lease, workspace, CR or transaction records. No LOGBOOK/control-root edits, code commits, installs, daemon restarts, tags/releases or ax actions.
+
+On success, verify Story/task done, transaction published commit and signed remote containment; attach or report concise delivery evidence without changing the frozen projection mid-transaction. On refusal, capture exact JSON/output and transaction show via supported CLI, attach a task outcome when permitted and explain the concrete next repair. Do not invent fallback closures. Finish without a new handoff candidate: this is completion of existing accepted evidence.
