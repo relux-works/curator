@@ -364,6 +364,100 @@ for goos in linux darwin windows; do
 done
 
 echo ''
+echo '=== platform-cases.tsv: the packages this pin promoted tolerate no skip ==='
+#
+# The committed SPEC_PIN publishes every artefact `root-artifacts.tsv` declares
+# for these four packages. The previous pin published none of them, so
+# `suite-plan.sh` deferred all four and their ledger rows tolerated the
+# `root-unset` skip that deferral produced. Against this pin the plan defers
+# nothing, so that tolerance can never fire again -- and a tolerance that cannot
+# fire is a false ledger row: it states a survivable skip the gate would in fact
+# refuse, and it becomes live again, unnoticed, if the pin is ever moved back.
+#
+# The list is the DELTA this pin move made and not the set of every served
+# package. The `root-unset` rows for internal/skillspec, internal/marker,
+# internal/moduleroots and internal/scriptpolicy were already unreachable under
+# the previous pin, which published their families too; they lost no deferral
+# here and are left alone. That bound is stated rather than left to be inferred
+# from the absence of a check.
+PROMOTED_PACKAGES='internal/config internal/envfragment internal/envmarker internal/interop/environments'
+for pkg in $PROMOTED_PACKAGES; do
+	rows="$(awk -F'\t' -v p="$pkg" '$1 == p { n++ } END { print n + 0 }' "$SHIPPED")"
+	if [ "$rows" -eq 0 ]; then
+		bad "$pkg has ledger rows to check" \
+			'no row names this package, so the toleration check below would pass vacuously'
+		continue
+	fi
+	tolerating="$(awk -F'\t' -v p="$pkg" '$1 == p && ($4 != "-" || $5 != "-") { printf "%s[skip=%s class=%s] ", $2, $4, $5 }' "$SHIPPED")"
+	if [ -n "$tolerating" ]; then
+		bad "$pkg tolerates no skip in the shipped ledger ($rows rows)" \
+			"the committed pin serves this package, so these rows tolerate a skip that can never legitimately happen: $tolerating"
+	else
+		ok "$pkg tolerates no skip in the shipped ledger ($rows rows)"
+	fi
+done
+
+# ...and the removal is behavioural, not cosmetic.
+#
+# Take the same OTHERWISE-SATISFYING stream the loop above built for each
+# runner -- every case the shipped ledger requires there, observed passing --
+# and change exactly one event: `TestConformanceContextVersions` skips with the
+# unset-root reason, in a lane that DEFERRED its package. That is the one
+# combination the old `linux,darwin,windows` / `root-unset` columns made
+# survivable, and it is the narrowest weakening of the stream there is.
+#
+# The exit code alone would not prove this. A stream carrying only the skip
+# fails anyway, because every other required case is then missing -- so the
+# assertion has to run against a stream that would otherwise pass, and the
+# verdict recorded for the skip itself is checked by name.
+PROMOTED_CASE=TestConformanceContextVersions
+for goos in linux darwin windows; do
+	stream="$WORK/promoted-skip-$goos.json"
+	excluded=''
+	[ "$goos" = linux ] && excluded='internal/godriver'
+	awk -F'\t' -v goos="$goos" -v excl="$excluded" -v skipcase="$PROMOTED_CASE" '
+		function listed(set, want,   n, i, a) {
+			if (set == "-" || set == "") return 0
+			n = split(set, a, ",")
+			for (i = 1; i <= n; i++) if (a[i] == want) return 1
+			return 0
+		}
+		/^[ \t]*#/ || /^[ \t]*$/ { next }
+		{
+			if ($2 ~ /\/\*$/) next
+			if (!listed($3, goos)) next
+			if ($1 == excl && $2 != "TestProbeRejectsAnUncoveredPlatformBeforeTheWorker") next
+			if ($2 == skipcase) {
+				printf "{\"Action\":\"output\",\"Package\":\"github.com/relux-works/curator/%s\",\"Test\":\"%s\",\"Output\":\"    suite_test.go:1: CURATOR_CONFORMANCE_ROOT is not set\\n\"}\n", $1, $2
+				printf "{\"Action\":\"skip\",\"Package\":\"github.com/relux-works/curator/%s\",\"Test\":\"%s\"}\n", $1, $2
+				seen = 1
+				next
+			}
+			printf "{\"Action\":\"pass\",\"Package\":\"github.com/relux-works/curator/%s\",\"Test\":\"%s\"}\n", $1, $2
+		}
+		END { if (!seen) exit 3 }
+	' "$SHIPPED" >"$stream"
+	if [ $? -ne 0 ]; then
+		bad "the shipped ledger still requires $PROMOTED_CASE on $goos" \
+			'the case this narrowing is built around is no longer a required row'
+		continue
+	fi
+	evdir="$WORK/promoted-ev-$goos"
+	assert "a root-unset skip of $PROMOTED_CASE fails an otherwise-passing $goos stream, even deferred" 1 \
+		env CI_GATE_GOOS="$goos" CI_DEFERRED_PKGS=internal/interop/environments \
+		    CI_EXCLUDED_PKGS="$excluded" \
+		    CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+		    CI_GATE_MODULE='github.com/relux-works/curator' \
+		    bash "$GATE" "$stream" "$evdir"
+	if [ -f "$evdir/skips-observed.tsv" ]; then
+		assert_contains "the $goos verdict is the ledger refusing it, not a class policy" \
+			"$PROMOTED_CASE	root-unset	FATAL-not-tolerated" "$evdir/skips-observed.tsv"
+	else
+		bad "the $goos run recorded its skip verdict" "missing $evdir/skips-observed.tsv"
+	fi
+done
+
+echo ''
 echo '=== suite-plan.sh: the plan comes from the root, not from the lane ==='
 PLAN="$HERE/suite-plan.sh"
 assert 'suite-plan rejects a nonexistent root'      2 bash "$PLAN" "$WORK/absent" "$WORK/planev"

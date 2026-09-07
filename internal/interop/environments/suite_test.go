@@ -48,10 +48,16 @@ const (
 )
 
 // suiteRoot resolves the conformance root, or skips because the suite plan
-// deferred this package. This is the ONLY legitimate skip in the package: it is
-// classified `root-unset`, which `.github/ci/skip-classes.tsv` admits only for
-// a package `suite-plan.sh` actually deferred, so it cannot fire unnoticed in a
-// lane that requires a fully serving root.
+// deferred this package. This is the ONLY skip in the package: it is classified
+// `root-unset`, which `.github/ci/skip-classes.tsv` admits only for a package
+// `suite-plan.sh` actually deferred, so it cannot fire unnoticed in a lane that
+// requires a fully serving root.
+//
+// No hosted lane reaches it any more. The committed SPEC_PIN publishes every
+// declared artefact, so the plan serves this package everywhere and
+// `.github/ci/platform-cases.tsv` tolerates no skip of these cases at all --
+// the guard survives for a local `go test ./...` run with no root exported, and
+// is fatal wherever the gate is what runs.
 func suiteRoot(t *testing.T) string {
 	t.Helper()
 	root := os.Getenv("CURATOR_CONFORMANCE_ROOT")

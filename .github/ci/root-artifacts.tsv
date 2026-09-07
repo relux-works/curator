@@ -16,6 +16,20 @@
 # `CI_REQUIRE_FULL_ROOT=1` asserts in the candidate lane, so a candidate run can
 # never report success while a package quietly ran without its vectors.
 #
+# The committed SPEC_PIN is now such a root: it publishes every artefact this
+# table declares, so `suite-plan.sh` defers nothing on the default lanes either
+# and the deferred column of the plan is empty on every hosted runner. The
+# deferral shapes below are therefore the CANDIDATE story and the partial-root
+# story, not a description of what the default lane does. The rows stay: they
+# are what makes a pin or a candidate that stopped publishing an artefact fail
+# by name instead of running the package without its vectors.
+#
+# One consequence is recorded in `.github/ci/platform-cases.tsv` rather than
+# here: a package this pin serves can no longer be deferred by any hosted lane,
+# so a `root-unset` tolerance on its ledger rows can never fire. The rows for
+# the four packages this pin promoted from deferred to served carry no
+# tolerated skip.
+#
 # A row is what makes a missing artefact LOUD. Two shapes are loud, and they are
 # the only two allowed:
 #

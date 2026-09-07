@@ -425,22 +425,35 @@ func TestNoCaseHereSkipsForAnythingButTheDeferredRoot(t *testing.T) {
 	}
 }
 
-// TestTheLedgerTolerationForThisPackageIsTheDeferredRootClass checks the column
-// that decides whether a skip of these cases is survivable.
+// TestNoLedgerRowForThisPackageToleratesASkip checks the columns that decide
+// whether a skip of these cases is survivable. There is no longer a survivable
+// one.
 //
-// `.github/ci/platform-case-gate.sh` tolerates a skip of a ledger case only when
-// the reason carries the class the row declares AND the class's own policy
-// admits it in this lane. `root-unset` is policy `deferred-only`: legitimate
-// solely for a package suite-plan.sh deferred. `root-content` is policy `allow`
-// everywhere -- a row carrying it lets these cases skip in the candidate lane
-// and pass. That is what the rows said before the split, and it is the single
-// character of this ledger a regression would most plausibly touch.
-func TestTheLedgerTolerationForThisPackageIsTheDeferredRootClass(t *testing.T) {
+// `.github/ci/platform-case-gate.sh` tolerates a skip of a ledger case only
+// when the row lists this GOOS in `skip_allowed_on`. Only then does it go on to
+// check the reason's class and that class's policy. With the column at `-` the
+// gate stops at the first test and reports the skip as one the ledger does not
+// tolerate, on every runner and for every reason.
+//
+// These rows used to read `linux,darwin,windows` / `root-unset`, which was
+// survivable on one condition: that `suite-plan.sh` had deferred this package
+// for want of the environments families. The committed SPEC_PIN publishes all
+// of them, so no lane defers it and that condition can no longer be met. A
+// tolerance that cannot fire is worse than none -- it states a survivable skip
+// the gate would in fact refuse, and it would silently become live again if the
+// pin ever moved back.
+//
+// Both columns are checked, not just the class. `skip_allowed_on` alone decides
+// whether the tolerance branch is entered at all, and a row reading
+// `linux,darwin,windows` with class `-` tolerates a skip for ANY reason while
+// leaving no `root-unset` text for a reader -- or a grep -- to notice.
+func TestNoLedgerRowForThisPackageToleratesASkip(t *testing.T) {
 	payload, err := os.ReadFile(platformCases)
 	if err != nil {
 		t.Fatal(err)
 	}
 	declared := map[string]string{}
+	rows := 0
 	for _, line := range strings.Split(string(payload), "\n") {
 		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
 			continue
@@ -451,33 +464,29 @@ func TestTheLedgerTolerationForThisPackageIsTheDeferredRootClass(t *testing.T) {
 		}
 		name, mustRun, skipOK, class := fields[1], fields[2], fields[3], fields[4]
 		declared[name] = class
+		rows++
 		if mustRun != "linux,darwin,windows" {
 			t.Errorf("%s :: %s must run on every platform, not %q", thisPackage, name, mustRun)
 		}
-		if !strings.HasPrefix(name, "TestConformance") {
-			// The contract cases below read committed files only. They never
-			// touch the conformance root, so they tolerate no skip at all.
-			if skipOK != "-" || class != "-" {
-				t.Errorf("%s :: %s reads no conformance root, so it must tolerate no skip; row says skip=%q class=%q",
-					thisPackage, name, skipOK, class)
-			}
-			continue
-		}
-		if class != "root-unset" {
-			t.Errorf("%s :: %s declares skip class %q; only root-unset is survivable here.\n"+
-				"\troot-content is policy `allow` in every lane, so the candidate lane would stay\n"+
-				"\tgreen while this case skipped, which is exactly the state before the split.",
-				thisPackage, name, class)
-		}
-		if skipOK != "linux,darwin,windows" {
-			t.Errorf("%s :: %s tolerates the deferred-root skip on every platform, not %q", thisPackage, name, skipOK)
+		// One rule for both groups. The contract cases read committed files
+		// only and never touched the conformance root; the TestConformance
+		// cases read it and used to tolerate the deferred-root skip. Against a
+		// pin that serves this package neither may skip, so the row shape is
+		// the same for both and the two are no longer distinguished here.
+		if skipOK != "-" || class != "-" {
+			t.Errorf("%s :: %s tolerates a skip; row says skip=%q class=%q, both must be %q.\n"+
+				"\tThe committed SPEC_PIN publishes every environments family this package\n"+
+				"\tdeclares, so no lane defers it and no skip of this case is survivable.\n"+
+				"\tA non-empty skip_allowed_on lets platform-case-gate.sh enter its toleration\n"+
+				"\tbranch, and with class %q it would tolerate a skip for any reason at all.",
+				thisPackage, name, skipOK, class, "-", "-")
 		}
 	}
 
 	// Every conformance case here needs a row: an undeclared case can be
 	// renamed or deleted without the platform-case gate noticing.
 	_, files := packageFiles(t)
-	cases := 0
+	cases, matched := 0, 0
 	for name, file := range files {
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
@@ -488,15 +497,22 @@ func TestTheLedgerTolerationForThisPackageIsTheDeferredRootClass(t *testing.T) {
 			if _, ok := declared[fn.Name.Name]; !ok {
 				t.Errorf("%s declares %s, but %s has no row for it under %s",
 					name, fn.Name.Name, platformCases, thisPackage)
+				continue
 			}
+			matched++
 		}
+	}
+	if rows == 0 {
+		t.Fatal("no ledger row names this package; the toleration check above passed vacuously")
 	}
 	if cases == 0 {
 		t.Fatal("no TestConformance case found in this package; the ledger check would pass vacuously")
 	}
 	for _, name := range sortedKeys(declared) {
-		t.Logf("ledger row: %s :: %s [%s]", thisPackage, name, declared[name])
+		t.Logf("ledger row: %s :: %s [skip=- class=-]", thisPackage, name)
 	}
+	t.Logf("%d ledger row(s) for %s checked, none tolerating a skip; %d of %d TestConformance case(s) matched to a row",
+		rows, thisPackage, matched, cases)
 }
 
 // enclosingFunc names the top-level function a node sits inside, or "".

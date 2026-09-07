@@ -202,32 +202,38 @@ internal/interop	TestGoldenContextCopy	linux,darwin,windows	-	-	the agent contex
 # `internal/interop/environments` declares its four environments vector
 # families, plus the two trees and the one expected file those vectors name
 # by path, in `.github/ci/root-artifacts.tsv`. That declaration -- not this ledger --
-# decides whether the package runs: a root publishing every family SERVES it
-# and every row below must be observed passing; a root publishing none of
-# them DEFERS it, and the only skip these rows tolerate is the `root-unset`
-# one `suite-plan.sh` caused. A root publishing SOME of them never reaches
-# `go test` at all -- `suite-plan.sh` names the missing family, and under
-# `CI_REQUIRE_FULL_ROOT=1` the candidate lane fails there.
+# decides whether the package runs: a root publishing every declared artefact
+# SERVES it and every row below must be observed passing, and a root missing
+# ANY ONE of them defers the whole package with that artefact named in the
+# plan -- fatal under `CI_REQUIRE_FULL_ROOT=1`, where the candidate lane never
+# reaches `go test` for it at all.
 #
-# The class is therefore `root-unset` and NOT `root-content`. `root-content`
-# is policy `allow` in every lane, so a row tolerating it lets a candidate
-# root drop a family and still pass green. That is the exact hole these rows
-# used to carry. `root-unset` is policy `deferred-only`, and
-# `platform-case-gate.sh` applies that policy to a ledger-tolerated skip too:
-# a row here cannot buy back a skip in a lane that serves the package.
+# The committed SPEC_PIN publishes every one of them, so no hosted lane defers
+# this package and NONE of these rows tolerates a skip. That is a narrowing,
+# not bookkeeping. While they carried `root-unset` on all three platforms the
+# tolerance survived on one condition -- that `suite-plan.sh` had deferred the
+# package -- and `platform-case-gate.sh` had to consult the class policy to
+# refuse it. With the column at `-` there is no condition left to satisfy: a
+# skip of any of these cases, for any reason, on any runner, is refused by the
+# ledger itself before a class is ever looked up.
+#
+# The column is `-` and not a reclassification. `root-content` is policy
+# `allow` in every lane, so a row carrying it would let a candidate root drop
+# a family and still pass green -- the exact hole these rows used to carry.
+# The tolerance is gone, not renamed.
 # ---------------------------------------------------------------------------
-internal/interop/environments	TestConformanceSnapshotAcquisition	linux,darwin,windows	linux,darwin,windows	root-unset	each snapshot-acquisition case is committed through git with its exact declared bytes and re-extracted by gitops.Extract, and the extracted tree's content hash equals the vector's expected_sha256 -- CRLF, mixed endings and substitution-bait content included; a root that publishes no such family defers the package and records a root-unset skip
-internal/interop/environments	TestConformanceContextVersions	linux,darwin,windows	linux,darwin,windows	root-unset	pkgversion parses, orders and range-matches every version and range case of vectors/context-versions.json, and rejects every invalid spelling it declares; a root that publishes no such family defers the package and records a root-unset skip
-internal/interop/environments	TestConformanceContextResolution	linux,darwin,windows	linux,darwin,windows	root-unset	contextresolve.Resolve reproduces every resolution case's selected set and diagnostics, and contextlock's canonical bytes and lock hash reproduce every lock case of vectors/context-versions.json; a root that publishes no such family defers the package and records a root-unset skip
-internal/interop/environments	TestConformanceEnvironmentsHeader	linux,darwin,windows	linux,darwin,windows	root-unset	contextmaterialize.EmittedOrder and Header reproduce every header case of vectors/environments.json, and the vector's header_type_line equals the one this module writes; a root that publishes no such family defers the package and records a root-unset skip
-internal/interop/environments	TestConformanceEnvironmentsMonolithic	linux,darwin,windows	linux,darwin,windows	root-unset	every root-context, system-prompt, referenced-form and MCP materialization case matches its published expected/environments file byte for byte, with the declared surface hash, resolved set and env_names union; a root that publishes no such family defers the package and records a root-unset skip
-internal/interop/environments	TestConformanceContextDetectors	linux,darwin,windows	linux,darwin,windows	root-unset	contextaudit.Detect reproduces every detector case's findings, severities, spans and waiver outcomes, and the detector's pattern class table equals the vector's; a root that publishes no such family defers the package and records a root-unset skip
+internal/interop/environments	TestConformanceSnapshotAcquisition	linux,darwin,windows	-	-	each snapshot-acquisition case is committed through git with its exact declared bytes and re-extracted by gitops.Extract, and the extracted tree's content hash equals the vector's expected_sha256 -- CRLF, mixed endings and substitution-bait content included
+internal/interop/environments	TestConformanceContextVersions	linux,darwin,windows	-	-	pkgversion parses, orders and range-matches every version and range case of vectors/context-versions.json, and rejects every invalid spelling it declares
+internal/interop/environments	TestConformanceContextResolution	linux,darwin,windows	-	-	contextresolve.Resolve reproduces every resolution case's selected set and diagnostics, and contextlock's canonical bytes and lock hash reproduce every lock case of vectors/context-versions.json
+internal/interop/environments	TestConformanceEnvironmentsHeader	linux,darwin,windows	-	-	contextmaterialize.EmittedOrder and Header reproduce every header case of vectors/environments.json, and the vector's header_type_line equals the one this module writes
+internal/interop/environments	TestConformanceEnvironmentsMonolithic	linux,darwin,windows	-	-	every root-context, system-prompt, referenced-form and MCP materialization case matches its published expected/environments file byte for byte, with the declared surface hash, resolved set and env_names union
+internal/interop/environments	TestConformanceContextDetectors	linux,darwin,windows	-	-	contextaudit.Detect reproduces every detector case's findings, severities, spans and waiver outcomes, and the detector's pattern class table equals the vector's
 internal/interop/environments	TestEveryFamilyThisPackageReadsIsDeclaredInRootArtefacts	linux,darwin,windows	-	-	every artefact a requireFamily call in this package names is declared in .github/ci/root-artifacts.tsv, so a case that starts reading an undeclared family cannot leave that family droppable by a candidate root; the cross-referenced paths and the no-superset direction need a served root and are asserted by TestConformanceEveryPathTheVectorsNameIsDeclared
 internal/interop/environments	TestNoCaseHereSkipsForAnythingButTheDeferredRoot	linux,darwin,windows	-	-	the syntax tree of this package reaches exactly one Skip selector, inside suiteRoot; the scan matches the selector and not the receiver, so a renamed binding, a selector chain and a method value are all caught, and the residue it cannot see statically -- reflection, or a helper elsewhere not named Skip* -- is classified behaviourally by platform-case-gate.sh instead
-internal/interop/environments	TestTheLedgerTolerationForThisPackageIsTheDeferredRootClass	linux,darwin,windows	-	-	every row this ledger carries for the package declares class root-unset on all three platforms, and every TestConformance case in the package has such a row
+internal/interop/environments	TestNoLedgerRowForThisPackageToleratesASkip	linux,darwin,windows	-	-	every row this ledger carries for the package requires the case on all three platforms and tolerates no skip in either column, and every TestConformance case in the package has such a row
 internal/interop/environments	TestNoRootReadHereEscapesTheDeclaredArtefactGuard	linux,darwin,windows	-	-	outside suite_test.go the identifier `root` is only bound, returned, passed to one of the accountable helpers or formatted into a failure message, so a read written the ordinary way goes through rootPath and is checked against the root-artifacts.tsv row as it is read; the scan tracks that identifier, so a case that re-reads the environment variable under another name is outside it and is caught only by failing red on the open()
 internal/interop/environments	TestTheRootIsAlwaysBoundToThatOneName	linux,darwin,windows	-	-	every binding of suiteRoot's result is named root, the identifier the guard scan above tracks; a second name would hide every read made through it
-internal/interop/environments	TestConformanceEveryPathTheVectorsNameIsDeclared	linux,darwin,windows	linux,darwin,windows	root-unset	every string the four vectors carry that this root resolves as a path is covered by a declared artefact, and every declared artefact is either a required family or covers such a path, so the cross-referenced part of the declaration is derived from the vectors rather than restated; a root that publishes no such family defers the package and records a root-unset skip
+internal/interop/environments	TestConformanceEveryPathTheVectorsNameIsDeclared	linux,darwin,windows	-	-	every string the four vectors carry that this root resolves as a path is covered by a declared artefact, and every declared artefact is either a required family or covers such a path, so the cross-referenced part of the declaration is derived from the vectors rather than restated
 internal/godriver	TestCandidateGoV1SourceAwareContract	darwin,windows	darwin,windows	root-content	the go-v1 driver honours the source-aware contract published by the supplied root
 internal/godriver	TestFingerprintReportsUnreadableDirectoryIdentically	darwin,windows	-	-	a directory the host refuses to list is reported identically by both traversals (unix mode bits, Windows DACL)
 
@@ -283,11 +289,22 @@ internal/godriver	TestProbeRejectsAnUncoveredPlatformBeforeTheWorker	linux,darwi
 # These rows are the other half. They name the cases that actually READ the
 # schema-8 families, so a rename, a deletion or a -run filter matching nothing
 # fails by name instead of shrinking the run. Every row is required on all
-# three runners and tolerates exactly one skip class: the one the case prints
-# when it ran without a root -- `root-unset` for the packages the artefact
-# table defers, `root-content` for the driver case that guards its own read.
-# `root-unset` is `deferred-only` in `.github/ci/skip-classes.tsv`, so in a
-# lane that requires a fully serving root there is no tolerated skip left.
+# three runners.
+#
+# The `internal/config` rows below tolerate NOTHING. The committed SPEC_PIN
+# publishes the schema-2 config families, so `suite-plan.sh` never defers that
+# package and the `root-unset` tolerance it used to carry could not fire: a
+# tolerance that cannot fire states a survivable skip that the gate would in
+# fact refuse, and it would come back to life unnoticed if the pin regressed.
+#
+# The remaining `root-unset` rows here -- internal/skillspec, internal/marker,
+# internal/moduleroots and internal/scriptpolicy -- keep their column. Their
+# families were already published by the previous pin, so they lost no
+# deferral in this move and are outside the change that removed the others.
+# `root-unset` is `deferred-only` in `.github/ci/skip-classes.tsv`, so a lane
+# that serves the package refuses the skip on policy whatever the row says;
+# `internal/godriver` carries `root-content` because that case guards its own
+# read, and `root-content` is policy `allow` in every lane.
 # ===========================================================================
 internal/skillspec	TestReleasedSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published agent-skill-v8 and csk-skill-v8 families are loaded, and every case in them is consumed
 internal/marker	TestReadAuthoritativeMarkerV4SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published install-marker-v4 family is read back through the marker reader
@@ -297,9 +314,9 @@ internal/scriptpolicy	TestScriptHostExecutionPolicySectionsAreAllClassified	linu
 internal/scriptpolicy	TestScriptExecutionPolicyIdentityMatchesTheSuite	linux,darwin,windows	linux,darwin,windows	root-unset	the closed policy identity and interpreter set this build hard-codes are the suite's own
 internal/scriptpolicy	TestScriptExecutionOptInCases	linux,darwin,windows	linux,darwin,windows	root-unset	every published opt-in case decides manifest acceptance and enforced/declared-only classification
 internal/scriptpolicy	TestARefusalPrecedesEveryWorkerSurface	linux,darwin,windows	linux,darwin,windows	root-unset	every enforced shape the suite declares is refused with script_execution_policy_unsupported before any worker surface
-internal/config	TestManagerConfigV2SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published manager-config-v2 family is accepted or rejected through the config reader
-internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published system-config-v2 family merges or fails through the config loader
-internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	linux,darwin,windows	root-unset	the published manager-config-v2 vectors render the expected effective configuration
+internal/config	TestManagerConfigV2SchemaCases	linux,darwin,windows	-	-	the published manager-config-v2 family is accepted or rejected through the config reader
+internal/config	TestSystemConfigV2SchemaCases	linux,darwin,windows	-	-	the published system-config-v2 family merges or fails through the config loader
+internal/config	TestManagerConfigV2Vectors	linux,darwin,windows	-	-	the published manager-config-v2 vectors render the expected effective configuration
 internal/config	TestSystemV2LockableSubsetIsClassWide	linux,darwin,windows	-	-	the system file carries exactly the transcribed section 12.2 set class-wide: every lockable key is carriable and every non-lockable key is refused
 
 # ===========================================================================
@@ -327,9 +344,9 @@ internal/envprofile	TestCodexUnreadableConfigFails	linux,darwin,windows	-	-	an u
 internal/envprofile	TestStatusProfileMembersAndUnregistered	linux,darwin,windows	-	-	status carries lock members with weights, precedence primitives, and unregistered env-ids
 internal/envregistry	TestSecondaryTargetsBoundToAdapters	linux,darwin,windows	-	-	revision 1 declares two secondary-target rows bound one per adapter and never for other adapters
 internal/envfragment	TestFragmentEnvCarriesOnlyEnvObject	linux,darwin,windows	-	-	--format env|shell render exactly the fragment env object, never a channel value
-internal/envmarker	TestParseAuthoritativeEnvMarkerSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published environment marker family parses under the managed-home rules and every invalid case is rejected; a root which does not publish the family defers the package and records a root-unset skip
-internal/envfragment	TestFragmentAuthoritativeSchemaCases	linux,darwin,windows	linux,darwin,windows	root-unset	the published fragment family validates against the closed adapter registry and the profile-influence boundary; a root which does not publish the family defers the package and records a root-unset skip
-internal/envfragment	TestFragmentEmissionMatchesReference	linux,darwin,windows	linux,darwin,windows	root-unset	the emitted canonical fragment re-encodes the published reference bytes exactly; a root which does not publish the family defers the package and records a root-unset skip
+internal/envmarker	TestParseAuthoritativeEnvMarkerSchemaCases	linux,darwin,windows	-	-	the published environment marker family parses under the managed-home rules and every invalid case is rejected
+internal/envfragment	TestFragmentAuthoritativeSchemaCases	linux,darwin,windows	-	-	the published fragment family validates against the closed adapter registry and the profile-influence boundary
+internal/envfragment	TestFragmentEmissionMatchesReference	linux,darwin,windows	-	-	the emitted canonical fragment re-encodes the published reference bytes exactly
 cmd/curator	TestEnvResolveRepairEmitsFragment	linux,darwin,windows	-	-	env resolve --repair provisions through the CLI and emits the launch fragment with the managed home
 cmd/curator	TestEnvStatusMatrix	linux,darwin,windows	-	-	env status reports the profile by environment by surface matrix with --check and --json
 cmd/curator	TestUmbrellaMissingProvider	linux,darwin,windows	-	-	an unknown subcommand with no provider names the executable and the installation guidance
