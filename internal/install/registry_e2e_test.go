@@ -217,11 +217,12 @@ func TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries(t *testing.
 	}
 }
 
-// TestRegistrySnapshotAtTheSkewBoundIsAcceptedThroughInstall is the positive
-// half of the same bound at the production entry point: the configured skew is
-// the accepted edge, so a snapshot exactly there installs. Without it the
-// refusal above could be satisfied by a gate that rejects every snapshot.
-func TestRegistrySnapshotAtTheSkewBoundIsAcceptedThroughInstall(t *testing.T) {
+// TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall is the positive
+// half of the same bound at the production entry point: an ordinarily
+// past-dated snapshot installs. It does not sit at the edge -- the exact edge
+// is pinned in internal/registry -- and its job here is to stop the refusal
+// above being satisfied by a gate that rejects every snapshot.
+func TestRegistrySnapshotWithinTheBoundIsAcceptedThroughInstall(t *testing.T) {
 	t.Parallel()
 	e, server := registryEnv(t, "audited", snapshotCreatedAt(time.Now().Add(-time.Minute)))
 	defer server.Close()

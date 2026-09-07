@@ -164,7 +164,7 @@ internal/adapters	TestSymlinkModeStagesRelativeLinkTargets	linux,darwin,windows	
 # whichever lane happens to be slow enough to notice.
 internal/install	TestRegistrySnapshotSurvivesASecondBoundaryDuringFetch	linux,darwin,windows	-	-	a snapshot minted before the run installs even when the fetch crosses a whole-second boundary
 internal/install	TestRegistryFutureSnapshotDeniesInstallThroughResolveRegistries	linux,darwin,windows	-	-	a genuinely future-dated snapshot denies the install through the production resolveRegistries path
-internal/registry	TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew	linux,darwin,windows	-	-	the future-timestamp bound is exactly the configured skew at every skew a manager config can carry
+internal/registry	TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew	linux,darwin,windows	-	-	the future-timestamp bound is exactly the configured skew at three sampled skews — the literal zero the e2e path uses, an arbitrary middle, and the shipped default; the gate is linear in clockSkew, so those three fix the line, and the row claims the sample rather than the unbounded set a config can express
 internal/registry	TestSnapshotZeroClockSkewIsLiteral	linux,darwin,windows	-	-	a zero clock skew is literal: no tolerance, not a fallback to the default
 
 # ===========================================================================

@@ -587,8 +587,11 @@ func TestPublish(t *testing.T) {
 }
 
 // TestSnapshotFutureBoundIsExactAtEveryConfiguredSkew pins the exact edge of
-// the future-timestamp gate at every skew a manager config can carry,
-// including the literal zero the schema allows. created_at is an exact UTC
+// the future-timestamp gate at three sampled skews: the literal zero the e2e
+// path uses, an arbitrary middle, and the shipped default. A config accepts any
+// integer up to maximumDurationSeconds, so this is a sample and not the set --
+// but the gate is linear in clockSkew, and two of the three are the skews that
+// actually occur, so the three points fix the line. created_at is an exact UTC
 // seconds timestamp by contract, so one second is the smallest future step the
 // schema can express and `now + skew + 1s` is the narrowest snapshot the gate
 // must still refuse.
