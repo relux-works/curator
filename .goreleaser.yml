@@ -69,6 +69,10 @@ nfpms:
 
 homebrew_casks:
   - name: curator
+    # A release candidate must not replace the stable formula: `auto` skips the
+    # upload whenever the release is a prerelease. v0.14.0-rc.1 reached the tap
+    # because this was unset.
+    skip_upload: "auto"
     repository:
       owner: relux-works
       name: homebrew-tap
@@ -80,6 +84,8 @@ homebrew_casks:
 
 scoops:
   - name: curator
+    # Same reason as the cask above.
+    skip_upload: "auto"
     repository:
       owner: relux-works
       name: scoop-bucket
@@ -94,6 +100,10 @@ release:
     owner: relux-works
     name: curator
   draft: false
+  # `auto` marks the GitHub release as a prerelease when the tag carries a
+  # SemVer prerelease suffix, so an rc says what it is on the releases page
+  # instead of appearing as the latest stable download.
+  prerelease: "auto"
   footer: |
     ## Verify what you downloaded
 
