@@ -201,6 +201,10 @@ func loopbackRegistry(t *testing.T, calls *int) (*httptest.Server, string) {
 		t.Fatal(err)
 	}
 	pinned := "ed25519:" + base64.StdEncoding.EncodeToString(public)
+	// Minted once, like a published snapshot. Stamping it per request instead
+	// lets it drift past the `now` the checker sampled before fetching, and the
+	// gate then reads a legitimate fixture as a future-dated one.
+	createdAt := time.Now().UTC().Truncate(time.Second).Format(time.RFC3339)
 	sign := func(body map[string]any) map[string]any {
 		signature := ed25519.Sign(private, registry.CanonicalBytes(body))
 		body["sig"] = map[string]any{
@@ -217,7 +221,7 @@ func loopbackRegistry(t *testing.T, calls *int) (*httptest.Server, string) {
 			_ = json.NewEncoder(w).Encode(sign(map[string]any{
 				"schema_version": 1, "merkle_root": strings.Repeat("a", 64), "log_size": 1,
 				"head": strings.Repeat("b", 64), "version": 1,
-				"created_at": time.Now().UTC().Format(time.RFC3339),
+				"created_at": createdAt,
 			}))
 		case strings.HasSuffix(r.URL.Path, "/v1/records"):
 			_ = json.NewEncoder(w).Encode(map[string]any{"records": []any{}, "next_cursor": nil})
