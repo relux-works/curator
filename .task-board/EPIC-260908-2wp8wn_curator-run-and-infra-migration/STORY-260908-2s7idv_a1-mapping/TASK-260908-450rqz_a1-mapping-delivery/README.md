@@ -7,4 +7,4 @@ SPEC section 4.2: closed environment to system and provider mapping.
 (define task scope)
 
 ## Acceptance Criteria
-Follow the exact corresponding workstream in the epic goal-file precondition; producer and independent reviewer evidence; signed scoped PR delivery where code changes.
+Closed environment mapping uses native pi-native from landed upstream; supported rows return exact system/provider pairs, while opencode/unknown refuse env_unsupported. Production ordering is fragment then mapping before later stages. Existing CLI/fragment behavior stays covered, only evidenced SPEC mapping/version metadata changes, and local checks pass.

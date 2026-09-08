@@ -1,0 +1,393 @@
+diff --git a/.scripts/mapping-mutants.py b/.scripts/mapping-mutants.py
+new file mode 100644
+index 0000000..8786a54
+--- /dev/null
++++ b/.scripts/mapping-mutants.py
+@@ -0,0 +1,42 @@
++#!/usr/bin/env python3
++"""Task A1 narrowing probes; restore exact candidate bytes, never from Git."""
++import pathlib
++import subprocess
++import sys
++
++root = pathlib.Path(__file__).resolve().parents[1]
++out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / '.temp/mapping-mutants').resolve()
++out.mkdir(parents=True, exist_ok=True)
++mapping = root / 'internal/mapping/mapping.go'
++main = root / 'cmd/curator-run/main.go'
++mutants = [
++    ('M1', mapping, '\tdefault:', '\tcase fragment.EnvOpenCode:\n\t\treturn Target{System: "opencode", Provider: "opencode"}, nil\n\tdefault:', 'TestRunMapping/opencode', 'admit exactly opencode'),
++    ('M2', mapping, '\tdefault:', '\tcase "future_env":\n\t\treturn Target{System: "future_env", Provider: "future_env"}, nil\n\tdefault:', 'TestRunUnknownResolvedMapping', 'admit exactly future_env'),
++    ('M3', main, 'if err != nil {\n\t\tfmt.Fprintf(stderr, "%s: %s: %v\\n", name, mapping.CodeUnsupported, err)', 'if err != nil && frag.Environment != "opencode" {\n\t\tfmt.Fprintf(stderr, "%s: %s: %v\\n", name, mapping.CodeUnsupported, err)', 'TestRunMapping/opencode', 'continue after opencode mapping error only'),
++    ('M4', mapping, 'System: "pi-native"', 'System: "pi"', 'TestRunMapping/pi', 'route Pi to legacy wrapper system'),
++]
++rows = ['mutant\tnarrows_to\ttest\texit\tverdict']
++failed = False
++for ident, path, old, new, test, bound in mutants:
++    original = path.read_bytes()
++    try:
++        source = original.decode()
++        if source.count(old) != 1:
++            raise RuntimeError(f'{ident}: anchor is not unique')
++        path.write_text(source.replace(old, new, 1))
++        command = ['go', 'test', './cmd/curator-run', './internal/mapping', '-count=1', '-v']
++        with (out / f'{ident}.log').open('w') as log:
++            log.write('COMMAND: ' + ' '.join(command) + '\n')
++            log.flush()
++            result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT)
++            log.write(f'\nEXIT: {result.returncode}\n')
++        killed = result.returncode == 1 and f'--- FAIL: {test} ' in (out / f'{ident}.log').read_text()
++        rows.append(f'{ident}\t{bound}\t{test}\t{result.returncode}\t' + ('killed' if killed else 'SURVIVOR/unverified'))
++        failed |= not killed
++    finally:
++        path.write_bytes(original)
++        if path.read_bytes() != original:
++            raise RuntimeError(f'{ident}: restore mismatch')
++(out / 'summary.tsv').write_text('\n'.join(rows) + '\n')
++print('\n'.join(rows))
++sys.exit(1 if failed else 0)
+diff --git a/README.md b/README.md
+index 975600f..8d82a3d 100644
+--- a/README.md
++++ b/README.md
+@@ -21,7 +21,7 @@ diagnostics, and versioning, lives in [SPEC.md](SPEC.md).
+ ## Status
+ 
+ **Specification draft — partially implemented.** The specification is
+-`0.2.1-draft`. This build implements SPEC.md §3, the closed CLI surface
++`0.3.0-draft`. This build implements SPEC.md §3, the closed CLI surface
+ (`internal/cli`) — flag grammar, the `--` boundary with a verbatim native
+ tail, the `usage` diagnostic family with exit 2, and the informational
+ flags — and §4.1, fragment resolution (`internal/fragment`): the
+@@ -29,12 +29,16 @@ flags — and §4.1, fragment resolution (`internal/fragment`): the
+ subprocess with Curator's stderr forwarded verbatim, the closed
+ `launch-env-fragment-v1` parser (CCJ-1 reader rules, the conformance
+ schema, and the adapter channel registry), the CCJ-1 digest computed from
+-the parsed object, and the `resolve_*` diagnostic family. The later
+-composition steps (§4.2–§4.6), system-prompt application (§5), and the
++the parsed object, and the `resolve_*` diagnostic family. §4.2 maps the
++resolved environment to its system/provider pair (`internal/mapping`):
++`claude_code` → `claude-code`/`claude`, `codex_cli` → `codex`/`codex`,
++`pi` → `pi-native`/`pi`. Unsupported IDs (including known `opencode`)
++refuse `env_unsupported` with exit 1 before later stages. The later
++composition steps (§4.3–§4.6), system-prompt application (§5), and the
+ `defaults.json`/`ax.json` file family (§4.7) are not delivered: a
+ well-formed launch invocation parses, resolves its fragment (repairing the
+-managed home when Curator finds it stale), and is then refused with exit 1
+-and a `not_implemented` line that reports the home and fragment digest,
++managed home when Curator finds it stale), maps its supported system/provider pair, and is then refused with exit 1
++and a `not_implemented` line that reports the mapping, home and fragment digest,
+ launching nothing. A resolve failure is reported as its `resolve_*` code
+ with exit 1.
+ Because no `ax.json` is read yet, the binary always parses as an untracked
+@@ -74,6 +78,7 @@ or tag workflow yet.
+ | CLI goldens | frozen accepted/rejected §3 shapes | `go test ./internal/cli -run TestGolden -update` to regenerate, then review the diff | `internal/cli/testdata/cases.golden` |
+ | `.scripts/cli-mutants.sh` | narrowing-mutant harness for the §3 gates: each mutant weakens one gate to admit one rejected shape and the named test must fail | `.scripts/cli-mutants.sh [evidence-dir]` | per-mutant logs and `summary.tsv` under the evidence dir (default `.temp/cli-mutants/`); the source tree is restored on exit |
+ | `.scripts/fragment-mutants.sh` | narrowing-mutant harness for the §4.1 gates (argv, exit mapping, stderr transport, reader rules, schema closure, CCJ-1 emission, entry-point wiring); the behavioral suite runs against every mutant | `.scripts/fragment-mutants.sh [evidence-dir]` (optional `FRAGMENT_MUTANT_IDS="M27 M28" FRAGMENT_TEST_PATTERN="TestExecutableUnicodePathBoundary|TestConformanceCorpus"` for focused rework) | `mutants.log` under the evidence dir (default `.temp/fragment-mutants/`); sources are restored from byte copies on exit |
++| `.scripts/mapping-mutants.py` | §4.2 narrowing probes with named production-entry failures; restores candidate bytes after each mutation | `python3 .scripts/mapping-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/mapping-mutants/`) |
+ | fragment test corpus | `internal/fragment/testdata/schema-cases` is the `launch-env-fragment-v1` slice of curator-spec `conformance/v1/schema-cases` (index rows copied with their verdicts, source commit recorded in `index.json`); `testdata/a0` holds the three fragments and digests the installed Curator printed during A0 verification | `go test ./internal/fragment` | none; 49 indexed names/verdicts and fixture bytes are pinned by an independently upstream-derived manifest hash in `TestConformanceCorpus`; refresh requires reviewing the upstream rows and updating that pin as well as `index.json` |
+ 
+ ## License
+diff --git a/SPEC.md b/SPEC.md
+index f6205e7..93312bc 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -1,6 +1,6 @@
+ # Curator Agent Launcher — Specification
+ 
+-**Specification version:** `0.2.1-draft`
++**Specification version:** `0.3.0-draft`
+ **Status:** in-repository draft (see [Versioning](#8-versioning))
+ 
+ The launcher is the **execution plane** of the four-plane composition fixed
+@@ -272,9 +272,20 @@ mapping between the three:
+ |---|---|---|
+ | `claude_code` | `claude-code` | `claude` |
+ | `codex_cli` | `codex` | `codex` |
+-| `pi` | `pi` | `pi` |
++| `pi` | `pi-native` | `pi` |
+ | `opencode` | none in this revision — `env_unsupported` | none — `env_unsupported` |
+ 
++The Pi system cell corrects accepted A0 errata E1/E2
++(TASK-260908-qblycn, `TASK-260908-qblycn_a0-verification-findings.md`):
++at v0.5.10, system `pi` invokes the legacy `agents-infra` wrapper, which
++replaces the managed home, and has no declared Pi runtime. The accepted
++native-Pi design (TASK-260908-ggxfte) is now landed in
++[agents-management PR23](https://github.com/relux-works/skill-agents-management/pull/23),
++commit `a2a6e9f377f62a5872d99ecdfff0d1690e385f2a`: system `pi-native`
++provides native interactive Pi plans for managed homes. This mapping does
++not require a Go import. The operator-only v0.5.11 tag is pending; this
++revision neither pins an unreleased module nor implements §4.3/§4.4.
++
+ An env-id outside this table that Curator nevertheless resolves is
+ `env_unsupported`: the launcher refuses rather than guessing a system or
+ a provider. The table grows by specification revision, never by
+@@ -830,7 +841,7 @@ reordered.
+ ## 8. Versioning
+ 
+ - This specification is versioned semantically; the current version is
+-  **`0.2.1-draft`**. Draft versions may change incompatibly between
++  **`0.3.0-draft`**. Draft versions may change incompatibly between
+   commits; the `-draft` suffix is the signal that nothing downstream may
+   pin them.
+ - The `curator-run` binary reports both its build version and the
+@@ -846,6 +857,7 @@ reordered.
+ 
+ | Version | Change |
+ |---|---|
++| `0.3.0-draft` | §4.2: correct the Pi system to `pi-native` using accepted A0 E1/E2 and landed native-Pi support (PR23, `a2a6e9f`). Other API/environment errata remain separately tracked. |
+ | `0.2.1-draft` | Follow-ups against environments.md 1.1 and the cycle-2 review. §4.1: the resolve invocation always passes `--repair`, with the read-only/fail-closed semantics of environments.md §10.1 stated, `resolve_repair_failed` kept, `resolve_lock_unavailable` added for `environment_lock_unavailable`, and `environment_home_stale` declared unreachable. §4.5: the codex layer file `<home>/curator-mcp.config.toml` MUST be stat-ed immediately before handoff or exec whenever the argv carries `-p curator-mcp` (a missing layer is silently ignored by codex, under `--strict-config` too), with `mcp_layer_missing` / `mcp_layer_unreadable`; `-p` takes exactly one value, so an operator `-p` after `--` fails the launch (Decision 0012 open question 3 closed). §4.6: `ax.json` `enabled: false` is not configured; the machine-over-operator precedence explained; the configuration read fires before a usage error. New §4.7 names the `defaults.json`/`ax.json` file family as launcher-owned knobs against the environments.md §12.1 manager knob table. §6: `defaults` row names §4.6/`ax.json`, `mcp` family added, invariant 1 extended. §9: docs-confidence item covers both files; codex `-p` item closed; residual-window item added. |
+ | `0.2.0-draft` | Decision 0013 D6 applied. §4 reordered fragment-first and grown to six steps: the managed home from the fragment is `LaunchRequest.Home` (D6.1, M7); the plan is requested as `LaunchModeInteractive` with an empty `Composition` and the launcher spells no provider flag (D5, M2); launcher-owned model/effort default precedence — flags, lockable `defaults.json` machine configuration, lineup fallback — with the resolved pair printed every launch (D6.2, M8); the composition rule with argv order as contract, the MCP channel applied by the launcher, the four-layer environment, and the literal-versus-lookup `env_names` collision rule (D6.3, F5); tracked mode specified as `ax start <name> --provider <id> --launch-plan - [--profile] --workspace <cwd>` with the request document, the four `works.relux.curator.*` extension keys, the `profile-pin` as the lock hash, session-name derivation, and Structured Error pass-through (D6.4). §3 gains `--name` and `--ax-profile`; §4.2 gains the `ax` provider-id column; §6 gains the `defaults` family; §7 requires the interactive-mode module release; §1 non-goals restated (D6.5). §5 unchanged apart from renumbered cross-references. |
+ | `0.1.2-draft` | §5.1 probe re-keyed from the fragment's descriptor list to the environment adapter's closed file-channel filename set, run on every launch into a managed home regardless of the fragment's `system_prompt` section; false stray-file drift-and-repair claim removed — a stray file at a registry filename is unmanaged, no automated contract removes it, and every launcher-mediated launch warns until the operator removes it; native/hand-launch and probe-to-exec race residuals recorded in §9. |
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index 51dc5c9..6655dfb 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -4,10 +4,11 @@
+ //
+ // This build implements SPEC.md §3, the closed CLI surface, through
+ // internal/cli, and §4.1, the fragment resolution, through
+-// internal/fragment. The later composition steps (§4.2-§4.6), system-prompt
++// internal/fragment, and §4.2 through internal/mapping. The later
++// composition steps (§4.3-§4.6), system-prompt
+ // application (§5), and the configuration file family (§4.7) are not
+ // delivered yet: a launch invocation whose fragment resolves is refused
+-// after resolution with exit 1 and launches nothing. The agents-management
++// after mapping with exit 1 and launches nothing. The agents-management
+ // Go module is the planned spawn-plane dependency and is deliberately not
+ // imported yet.
+ package main
+@@ -20,11 +21,12 @@ import (
+ 
+ 	"github.com/relux-works/curator-agent-launcher/internal/cli"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/curator-agent-launcher/internal/mapping"
+ )
+ 
+ const (
+ 	name        = cli.Name
+-	specVersion = "0.2.1-draft"
++	specVersion = "0.3.0-draft"
+ 	// buildVersion is the launcher's own version; the specification
+ 	// version is reported beside it (SPEC §8).
+ 	buildVersion = "0.0.0-dev"
+@@ -34,6 +36,11 @@ func main() {
+ 	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, fragment.New()))
+ }
+ 
++// fragmentResolver is the context-plane boundary; main uses fragment.New.
++type fragmentResolver interface {
++	Resolve(context.Context, fragment.Request) (*fragment.Fragment, error)
++}
++
+ // run is the production entry point behind main. It reads the ax
+ // configuration fact (not yet: §4.6 ax.json is owned by a later section,
+ // so this build parses against an unconfigured integration), parses argv
+@@ -42,9 +49,10 @@ func main() {
+ // goes to §4.1: the fragment is resolved through resolver — always with
+ // --repair, Curator's stderr forwarded verbatim — and a resolve failure is
+ // printed as its §6 resolve-family code line with exit 1. A resolved
+-// fragment is then refused with exit 1 because no later composition stage
++// fragment is mapped under §4.2 (unsupported IDs refuse env_unsupported),
++// then refused with exit 1 because no later composition stage
+ // exists in this build; nothing is launched.
+-func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver *fragment.Resolver) int {
++func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver fragmentResolver) int {
+ 	opts := cli.Options{AxConfigured: false}
+ 	inv, err := cli.Parse(args, opts)
+ 	if err != nil {
+@@ -82,7 +90,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver
+ 		return 1
+ 	}
+ 
+-	fmt.Fprintf(stderr, "%s: not_implemented: resolved environment %q (profile %q, home %s, fragment digest %s), but composition beyond SPEC §4.1 is not delivered in this build; nothing was launched\n",
+-		name, frag.Environment, frag.Profile.Name, frag.Home(), frag.Digest)
++	target, err := mapping.Resolve(frag.Environment)
++	if err != nil {
++		fmt.Fprintf(stderr, "%s: %s: %v\n", name, mapping.CodeUnsupported, err)
++		return 1
++	}
++
++	fmt.Fprintf(stderr, "%s: not_implemented: resolved environment %q (profile %q, home %s, fragment digest %s), mapped system %q / provider %q, but composition beyond SPEC §4.2 is not delivered in this build; nothing was launched\n",
++		name, frag.Environment, frag.Profile.Name, frag.Home(), frag.Digest, target.System, target.Provider)
+ 	return 1
+ }
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index 5b71e87..85cc0f7 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -3,11 +3,13 @@ package main
+ import (
+ 	"context"
+ 	"encoding/json"
++	"fmt"
+ 	"io"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+ 	"runtime"
++	"slices"
+ 	"strings"
+ 	"testing"
+ 
+@@ -226,7 +228,7 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+ // TestSpecVersionPinned fails when the reported specification version
+ // drifts from the version SPEC.md and README.md state; the three are one fact.
+ func TestSpecVersionPinned(t *testing.T) {
+-	const want = "0.2.1-draft"
++	const want = "0.3.0-draft"
+ 	if specVersion != want {
+ 		t.Fatalf("specVersion = %q, want %q", specVersion, want)
+ 	}
+@@ -289,3 +291,76 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
+ 		})
+ 	}
+ }
++
++// TestRunMapping drives the production entry point with the real fragment
++// parser. Unsupported mappings must not reach the later-stage stub.
++func TestRunMapping(t *testing.T) {
++	for _, tc := range []struct{ env, system, provider string }{
++		{"claude_code", "claude-code", "claude"},
++		{"codex_cli", "codex", "codex"},
++		{"pi", "pi-native", "pi"},
++		{"opencode", "", ""},
++	} {
++		t.Run(tc.env, func(t *testing.T) {
++			line := strings.ReplaceAll(piFragmentLine, `"environment":"pi"`, `"environment":"`+tc.env+`"`)
++			line = strings.ReplaceAll(line, "PI_CODING_AGENT_DIR", fragment.HomeVariable(tc.env))
++			sr := &scriptedRunner{stdout: line}
++			var out, stderr strings.Builder
++			args := []string{tc.env, "--", "", "--help", "--profile", "native", "--"}
++			before := append([]string(nil), args...)
++			code := run(context.Background(), args, &out, &stderr, fragment.NewWithRunner("curator", sr))
++			if code != 1 || out.Len() != 0 || sr.calls != 1 {
++				t.Fatalf("exit=%d stdout=%q resolves=%d", code, out.String(), sr.calls)
++			}
++			if !slices.Equal(args, before) {
++				t.Fatalf("native argv changed: %q", args)
++			}
++			if tc.system == "" {
++				if !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "not_implemented") {
++					t.Fatalf("refusal: %q", stderr.String())
++				}
++			} else if !strings.HasPrefix(stderr.String(), name+": not_implemented: ") || !strings.Contains(stderr.String(), fmt.Sprintf("mapped system %q / provider %q", tc.system, tc.provider)) {
++				t.Fatalf("mapping: %q", stderr.String())
++			}
++		})
++	}
++}
++
++// A future resolver may extend its registry. Exercise run's mapping defense
++// without weakening today's closed fragment parser to manufacture that state.
++type resolvedUnknown struct{}
++
++func (resolvedUnknown) Resolve(context.Context, fragment.Request) (*fragment.Fragment, error) {
++	return &fragment.Fragment{Environment: "future_env"}, nil
++}
++func TestRunUnknownResolvedMapping(t *testing.T) {
++	var out, stderr strings.Builder
++	if got := run(context.Background(), []string{"future_env"}, &out, &stderr, resolvedUnknown{}); got != 1 {
++		t.Fatalf("exit=%d", got)
++	}
++	if out.Len() != 0 || !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "not_implemented") {
++		t.Fatalf("stdout=%q stderr=%q", out.String(), stderr.String())
++	}
++}
++
++func TestRunUnknownFragmentStillRefusesResolution(t *testing.T) {
++	sr := &scriptedRunner{stdout: strings.ReplaceAll(piFragmentLine, `"environment":"pi"`, `"environment":"future_env"`)}
++	var out, stderr strings.Builder
++	if got := run(context.Background(), []string{"future_env"}, &out, &stderr, fragment.NewWithRunner("curator", sr)); got != 1 {
++		t.Fatalf("exit=%d", got)
++	}
++	if sr.calls != 1 || out.Len() != 0 || !strings.HasPrefix(stderr.String(), name+": resolve_fragment_invalid: ") {
++		t.Fatalf("stderr=%q calls=%d", stderr.String(), sr.calls)
++	}
++}
++
++func TestRunResolveFailurePrecedesMapping(t *testing.T) {
++	sr := &scriptedRunner{exit: 1, stderr: "curator: environment_unknown: missing\n"}
++	var out, stderr strings.Builder
++	if got := run(context.Background(), []string{"opencode"}, &out, &stderr, fragment.NewWithRunner("curator", sr)); got != 1 {
++		t.Fatalf("exit=%d", got)
++	}
++	if sr.calls != 1 || out.Len() != 0 || !strings.Contains(stderr.String(), name+": resolve_environment_unknown: ") || strings.Contains(stderr.String(), "env_unsupported") || strings.Contains(stderr.String(), "not_implemented") {
++		t.Fatalf("stderr=%q calls=%d", stderr.String(), sr.calls)
++	}
++}
+diff --git a/internal/mapping/mapping.go b/internal/mapping/mapping.go
+new file mode 100644
+index 0000000..3c916f7
+--- /dev/null
++++ b/internal/mapping/mapping.go
+@@ -0,0 +1,33 @@
++// Package mapping implements the closed SPEC §4.2 system/provider mapping.
++// Adapter identity remains owned by fragment; launch support is separate.
++package mapping
++
++import (
++	"fmt"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++)
++
++const CodeUnsupported = "env_unsupported"
++
++// Target names both consumers. A partial mapping is never launchable.
++type Target struct {
++	System   string
++	Provider string
++}
++
++// Resolve maps only explicitly supported environment identifiers. It neither
++// interprets native argv nor infers a provider from an environment name.
++// Use fragment.HomeVariable for registry membership in configuration readers:
++// opencode is known there even though this revision cannot launch it.
++func Resolve(environment string) (Target, error) {
++	switch environment {
++	case fragment.EnvClaudeCode:
++		return Target{System: "claude-code", Provider: "claude"}, nil
++	case fragment.EnvCodexCLI:
++		return Target{System: "codex", Provider: "codex"}, nil
++	case fragment.EnvPi:
++		return Target{System: "pi-native", Provider: "pi"}, nil
++	default:
++		return Target{}, fmt.Errorf("environment %q has no supported system/provider pair", environment)
++	}
++}
+diff --git a/internal/mapping/mapping_test.go b/internal/mapping/mapping_test.go
+new file mode 100644
+index 0000000..1862a80
+--- /dev/null
++++ b/internal/mapping/mapping_test.go
+@@ -0,0 +1,30 @@
++package mapping
++
++import (
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"testing"
++)
++
++func TestResolveClosedMapping(t *testing.T) {
++	for _, tc := range []struct {
++		env  string
++		want Target
++	}{
++		{"claude_code", Target{"claude-code", "claude"}},
++		{"codex_cli", Target{"codex", "codex"}},
++		{"pi", Target{"pi-native", "pi"}},
++		{"opencode", Target{}}, {"future_env", Target{}}, {"", Target{}}, {"PI", Target{}}, {"pi-native", Target{}},
++	} {
++		t.Run(tc.env, func(t *testing.T) {
++			got, err := Resolve(tc.env)
++			if got != tc.want || (err != nil) != (tc.want == (Target{})) {
++				t.Fatalf("Resolve(%q)=%+v, %v; want %+v", tc.env, got, err, tc.want)
++			}
++		})
++	}
++}
++func TestKnownUnsupportedIsNotUnknown(t *testing.T) {
++	if fragment.HomeVariable("opencode") == "" || fragment.HomeVariable("future_env") != "" {
++		t.Fatal("adapter registry conflates unsupported and unknown")
++	}
++}
