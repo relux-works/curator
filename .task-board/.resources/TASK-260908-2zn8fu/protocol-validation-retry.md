@@ -1,0 +1,7 @@
+# Publication environment repaired; publish unchanged documentation
+
+Codex gpt-6-astra medium. TASK-260908-2zn8fu documentation is already implemented; do not rerun implementation or broaden scope. The parent has now fixed the SUPPORTED scoped validation configuration itself, not just the handoff shell PATH. curator-spec.config.json invokes `env PATH=/Users/iv/Developer/ReluxWorks/curator-agent-launcher/.temp/launcher-migration/spec-validation-venv/bin:$PATH make validate`. The isolated Python3.14.7 venv has the exact declared jsonschema4.25.1 installed (dependency log attached).
+
+Prior runs69af20/62fee1 failed publication because the runtime used unconfigured Python; e12b30 properly stopped with evidence. That blocker is now repaired by the parent. Preserve the exact two-file documentation candidate and prior evidence. Confirm the current configured recipe, recheck the unchecked validation item based on actual passing validation in the supplied environment, attach a concise repair note, and handoff normally so the runtime runs the NEW recipe and binds success to the exact tree. No source Makefile changes, invented pass, dependency suppression or repeated old-runtime retry.
+
+All original scope/ownership/version rules apply; no installations by this worker, CI, tags/releases, daemon operations, ax, private-record or LOGBOOK/control-root edits. After runtime publication, parent routes independent Astra-medium review. Do not call the documentation delivered before accepted signed landing.
