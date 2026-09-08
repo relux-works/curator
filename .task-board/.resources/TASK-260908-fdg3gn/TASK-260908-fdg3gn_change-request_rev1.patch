@@ -1,0 +1,693 @@
+diff --git a/.scripts/systemprompt-mutants.py b/.scripts/systemprompt-mutants.py
+new file mode 100644
+index 0000000..175f3a9
+--- /dev/null
++++ b/.scripts/systemprompt-mutants.py
+@@ -0,0 +1,51 @@
++#!/usr/bin/env python3
++"""SPEC5 behavioral narrowing probes; restore exact candidate bytes on exit."""
++import pathlib
++import subprocess
++import sys
++
++root = pathlib.Path(__file__).resolve().parents[1]
++out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / '.temp/systemprompt-mutants').resolve()
++out.mkdir(parents=True, exist_ok=True)
++path = root / 'internal/systemprompt/systemprompt.go'
++mutants = [
++    ('M1', 'if opt == "" {', 'if opt == "" && f.Environment == fragment.EnvClaudeCode { opt = fragment.SemanticsAppend }; if opt == "" {', 'TestSelectRefusalsAndNoOptIn/claude_code/section/', 'apply append without opt-in for Claude only'),
++    ('M2', 'if c.Semantics != opt || c.Kind == fragment.KindFile {', 'if c.Semantics != opt && f.Environment != fragment.EnvCodexCLI || c.Kind == fragment.KindFile {', 'TestSelectRefusalsAndNoOptIn/codex_cli/section/append', 'admit Codex append using replace descriptor'),
++    ('M3', 'if c.Semantics != opt || c.Kind == fragment.KindFile {', 'if c.Kind == fragment.KindFile && c.Semantics == opt && opt == fragment.SemanticsReplace { return Selection{}, nil }; if c.Semantics != opt || c.Kind == fragment.KindFile {', 'TestSelectRefusalsAndNoOptIn/pi/section/replace', 'admit matching replace file as an opt-in no-op'),
++    ('M4', 'return Selection{}, &Refusal{Code: CodeUnavailable', 'if f.SystemPrompt == nil && opt == fragment.SemanticsAppend { return Selection{}, nil }; return Selection{}, &Refusal{Code: CodeUnavailable', 'TestSelectRefusalsAndNoOptIn/pi/absent/append', 'admit append with absent section'),
++    ('M5', 'if f.Environment != fragment.EnvPi {', 'if f.Environment != fragment.EnvPi || f.SystemPrompt == nil {', 'TestPrepareLaunchLateFilesAndWarnings/no-section', 'skip registry probe only without section'),
++    ('M6', 'if err != nil {\n\t\treturn fail(err)\n\t}\n\tif !info.Mode().IsRegular()', 'if err != nil {\n\t\tif errors.Is(err, os.ErrNotExist) { return false, nil }; return fail(err)\n\t}\n\tif !info.Mode().IsRegular()', 'TestPrepareLaunchFileFailures/APPEND_SYSTEM.md/dangling', 'treat dangling target as absence'),
++    ('M7', 'if !info.Mode().IsRegular() {', 'if info.IsDir() { return true, nil }; if !info.Mode().IsRegular() {', 'TestPrepareLaunchFileFailures/APPEND_SYSTEM.md/directory', 'admit directory only at regular-file check'),
++    ('M8', 'file, err := os.Open(path)\n\tif err != nil {', 'file, err := os.Open(path)\n\tif errors.Is(err, os.ErrPermission) { return true, nil }; if err != nil {', 'TestPrepareLaunchFileFailures/APPEND_SYSTEM.md/permissions', 'admit permission-denied open only'),
++    ('M9', 'if allowAbsent && errors.Is(err, os.ErrNotExist) {', 'if errors.Is(err, os.ErrNotExist) && (allowAbsent || strings.HasSuffix(path, "prompt.md")) {', 'TestPrepareLaunchFileFailures/selected/missing', 'admit missing selected Pi prompt path'),
++    ('M10', 'if s.channel.Kind == fragment.KindFlag && s.channel.Semantics == file.Semantics {', 'if s.channel.Kind == fragment.KindFlag {', 'TestPrepareLaunchLateFilesAndWarnings/section', 'claim suppression for opposite-semantics home file'),
++    ('M11', 'observed, err := ProbeFiles(f)', 'observed, err := ProbeFiles(f)\n if s.channel.Kind == fragment.KindFlag && err != nil && strings.HasSuffix(err.(*Refusal).Path, "APPEND_SYSTEM.md") { err = nil }', 'TestPrepareLaunchFileFailures/APPEND_SYSTEM.md/directory', 'bypass file failure only for suppressed append file'),
++]
++original = path.read_bytes()
++rows = ['mutant\tnarrows_to\ttest\texit\tverdict']
++failed = False
++try:
++    for ident, old, new, test, bound in mutants:
++        source = original.decode()
++        count = source.count(old)
++        if count != 1 and not (ident in ('M6', 'M7') and count == 2):
++            raise RuntimeError(f'{ident}: anchor count {count}')
++        path.write_text(source.replace(old, new, 1))
++        command = ['go', 'test', './internal/systemprompt', '-count=1', '-v']
++        with (out / f'{ident}.log').open('w') as log:
++            log.write('COMMAND: ' + ' '.join(command) + '\n')
++            log.flush()
++            result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=120)
++            log.write(f'\nEXIT: {result.returncode}\n')
++        text = (out / f'{ident}.log').read_text()
++        killed = result.returncode == 1 and ('--- FAIL: ' + test) in text
++        rows.append(f'{ident}\t{bound}\t{test}\t{result.returncode}\t' + ('killed' if killed else 'SURVIVOR/unverified'))
++        failed |= not killed
++        path.write_bytes(original)
++finally:
++    path.write_bytes(original)
++    if path.read_bytes() != original:
++        raise RuntimeError('restore mismatch')
++(out / 'summary.tsv').write_text('\n'.join(rows) + '\n')
++print('\n'.join(rows))
++sys.exit(1 if failed else 0)
+diff --git a/README.md b/README.md
+index c7ac409..0e22631 100644
+--- a/README.md
++++ b/README.md
+@@ -35,7 +35,7 @@ resolved environment to its system/provider pair (`internal/mapping`):
+ `claude_code` → `claude-code`/`claude`, `codex_cli` → `codex`/`codex`,
+ `pi` → `pi-native`/`pi`. Unsupported IDs (including known `opencode`)
+ refuse `env_unsupported` with exit 1 before later stages. The executable wiring for the later
+-steps (§4.3–§4.6), system-prompt application (§5), and the
++steps (§4.3–§4.6), main integration of system-prompt policy (§5), and the
+ `defaults.json`/`ax.json` file family (§4.7) are not delivered: a
+ well-formed launch invocation parses, resolves its fragment (repairing the
+ managed home when Curator finds it stale), maps its supported system/provider pair, and is then refused with exit 1
+@@ -75,7 +75,7 @@ It never repairs or silently drops MCP flags. The execution Story must call it
+ binary and §5 file-kind checks; calling it during composition is insufficient.
+ The pathname check has a residual replacement window before process creation.
+ No main call site or execution guarantee is claimed here. Full pipeline tests,
+-BuildLaunch admission, model/default resolution, §5 prompt policy/application,
++BuildLaunch admission, model/default resolution, §5 prompt API integration,
+ tracked schema/extensions, stderr delivery and actual exec/ax remain later
+ stories' obligations. The existing executable still refuses `not_implemented`.
+ 
+@@ -83,6 +83,30 @@ Reserved `path_prepend` parsing and hashing remain unchanged. Composition does
+ not transform PATH for that reserved field or claim managed command-root
+ support; environments §9.4 and the future skill-command-roots proposal bound it.
+ 
++## System-prompt API boundary
++
++The reusable `internal/systemprompt` API implements §5 selection and encoding,
++typed `sysprompt_channel_unavailable` / `sysprompt_file_unreadable` refusals,
++and late Pi file validation. `Select` accepts a validated fragment and an
++explicit `fragment.Semantics` (empty means no opt-in), returning only channel
++argv/env for composition. No system-prompt variable channel exists in the
++closed revision-1 registry, so `Selection.Env()` is empty; no adapter support
++is inferred. Codex uses `-c` plus a TOML-quoted `model_instructions_file` value.
++That native override remains **docs-confidence** in the accepted A0 evidence
++(Codex 0.153.4), while encoding is covered by exact-argv tests.
++
++**Execution Story obligation:** main still does not call this API. Immediately
++before **every** tracked handoff or untracked exec it must call
++`systemprompt.PrepareLaunch(fragment, optIn)`, refuse its errors, compose
++`Selection.Argv()` / `Selection.Env()`, and emit every returned warning line
++to stderr. It must not cache the launch-boundary result. The operation rechecks
++Pi's selected polymorphic flag path and both registry home filenames even
++without a system-prompt section. `ProbeFiles` also exposes the independent
++home probe; `FormatWarnings` is pure. Warnings distinguish flag suppression
++from conditional discovery under native-flag and trusted-project precedence.
++The API writes nothing and does not inspect native argv or project files;
++probe-to-exec races and native source selection remain outside its evidence.
++
+ ## Install and discovery
+ 
+ The launcher ships the `curator-run` executable. Curator dispatches
+@@ -118,6 +142,7 @@ or tag workflow yet.
+ | `.scripts/fragment-mutants.sh` | narrowing-mutant harness for the §4.1 gates (argv, exit mapping, stderr transport, reader rules, schema closure, CCJ-1 emission, entry-point wiring); the behavioral suite runs against every mutant | `.scripts/fragment-mutants.sh [evidence-dir]` (optional `FRAGMENT_MUTANT_IDS="M27 M28" FRAGMENT_TEST_PATTERN="TestExecutableUnicodePathBoundary|TestConformanceCorpus"` for focused rework) | `mutants.log` under the evidence dir (default `.temp/fragment-mutants/`); sources are restored from byte copies on exit |
+ | `.scripts/mapping-mutants.py` | §4.2 narrowing probes with named production-entry failures; restores candidate bytes after each mutation | `python3 .scripts/mapping-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/mapping-mutants/`) |
+ | `.scripts/composition-mutants.py` | §4.5 behavioral narrowing probes for environment ownership, collisions, stdin and launch-boundary file refusal; restores candidate bytes after every mutant | `python3 .scripts/composition-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/composition-mutants/`); permission probe requires a non-root host |
++| `.scripts/systemprompt-mutants.py` | SPEC §5 narrowing probes through exported production APIs; exact source bytes restored after every mutation | `python3 .scripts/systemprompt-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/systemprompt-mutants/`) |
+ | fragment test corpus | `internal/fragment/testdata/schema-cases` is the `launch-env-fragment-v1` slice of curator-spec `conformance/v1/schema-cases` (index rows copied with their verdicts, source commit recorded in `index.json`); `testdata/a0` holds the three fragments and digests the installed Curator printed during A0 verification | `go test ./internal/fragment` | none; 49 indexed names/verdicts and fixture bytes are pinned by an independently upstream-derived manifest hash in `TestConformanceCorpus`; refresh requires reviewing the upstream rows and updating that pin as well as `index.json` |
+ 
+ ## License
+diff --git a/internal/systemprompt/systemprompt.go b/internal/systemprompt/systemprompt.go
+new file mode 100644
+index 0000000..8bd5774
+--- /dev/null
++++ b/internal/systemprompt/systemprompt.go
+@@ -0,0 +1,216 @@
++// Package systemprompt implements SPEC §5 policy for validated fragments.
++// Execution must call PrepareLaunch immediately before EVERY handoff or exec.
++// It does not compose a plan, inspect native arguments, print, or write files.
++package systemprompt
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++)
++
++const (
++	CodeUnavailable = "sysprompt_channel_unavailable"
++	CodeUnreadable  = "sysprompt_file_unreadable"
++)
++
++// Refusal is a terminal launch diagnostic. Cause preserves filesystem errors.
++type Refusal struct {
++	Code, Path string
++	Cause      error
++}
++
++func (e *Refusal) Error() string { return fmt.Sprintf("%s: %q: %v", e.Code, e.Path, e.Cause) }
++func (e *Refusal) Unwrap() error { return e.Cause }
++
++// Selection contains only the launcher-applied channel, never native inputs.
++// Its argv and environment are copied out for later composition.
++type Selection struct {
++	channel fragment.Channel
++	path    string
++	argv    []string
++}
++
++func (s Selection) Argv() []string { return append([]string(nil), s.argv...) }
++
++// Env is empty in registry revision 1: no system-prompt variable is declared.
++func (s Selection) Env() map[string]string { return nil }
++
++// Select accepts a fragment from fragment.Parse and an explicit append/replace
++// opt-in, or "" for no opt-in. It performs no I/O. File channels cannot opt in.
++func Select(f *fragment.Fragment, opt fragment.Semantics) (Selection, error) {
++	if opt == "" {
++		return Selection{}, nil
++	}
++	if f != nil && f.SystemPrompt != nil && (opt == fragment.SemanticsAppend || opt == fragment.SemanticsReplace) {
++		for _, c := range f.SystemPrompt.Channels {
++			if c.Semantics != opt || c.Kind == fragment.KindFile {
++				continue
++			}
++			s := Selection{channel: c, path: f.SystemPrompt.Path}
++			switch c.Kind {
++			case fragment.KindFlag:
++				if c.Argument != fragment.ArgumentPath {
++					continue
++				}
++				s.argv = append([]string{c.Flag, s.path}, c.With...)
++			case fragment.KindConfigKey:
++				if f.Environment != fragment.EnvCodexCLI {
++					continue
++				}
++				s.argv = []string{"-c", c.Key + "=" + tomlString(s.path)}
++			default:
++				// No variable channel or contents/name prompt flag exists in the closed
++				// registry. New adapters require a protocol revision, not a fallback.
++				continue
++			}
++			return s, nil
++		}
++	}
++	return Selection{}, &Refusal{Code: CodeUnavailable, Cause: fmt.Errorf("no non-file system-prompt channel for %q", opt)}
++}
++
++// Codex -c parses a TOML value, not shell text. Go's \x escapes are not TOML.
++func tomlString(s string) string {
++	var b strings.Builder
++	b.WriteByte('"')
++	for _, r := range s {
++		switch {
++		case r == '"' || r == '\\':
++			b.WriteByte('\\')
++			b.WriteRune(r)
++		case r < 0x20 || r == 0x7f:
++			fmt.Fprintf(&b, "\\u%04X", r)
++		default:
++			b.WriteRune(r)
++		}
++	}
++	b.WriteByte('"')
++	return b.String()
++}
++
++// Observation records a readable regular managed-home file, not application.
++type Observation struct {
++	Filename  string
++	Semantics fragment.Semantics
++}
++
++// ProbeFiles probes the closed registry set regardless of SystemPrompt presence.
++// Absence returns no observation; errors (including dangling links) refuse.
++// Symlinks to readable regular files are accepted. No contents are consumed.
++func ProbeFiles(f *fragment.Fragment) ([]Observation, error) {
++	if f.Environment != fragment.EnvPi {
++		return nil, nil
++	}
++	files := []Observation{
++		{Filename: "APPEND_SYSTEM.md", Semantics: fragment.SemanticsAppend},
++		{Filename: "SYSTEM.md", Semantics: fragment.SemanticsReplace},
++	}
++	var observed []Observation
++	for _, file := range files {
++		present, err := readable(filepath.Join(f.Home(), file.Filename), true)
++		if err != nil {
++			return nil, err
++		}
++		if present {
++			observed = append(observed, file)
++		}
++	}
++	return observed, nil
++}
++
++func readable(path string, allowAbsent bool) (bool, error) {
++	fail := func(err error) (bool, error) { return false, &Refusal{Code: CodeUnreadable, Path: path, Cause: err} }
++	_, err := os.Lstat(path)
++	if err != nil {
++		if allowAbsent && errors.Is(err, os.ErrNotExist) {
++			return false, nil
++		}
++		return fail(err)
++	}
++	info, err := os.Stat(path)
++	if err != nil {
++		return fail(err)
++	}
++	if !info.Mode().IsRegular() {
++		return fail(fmt.Errorf("not a regular file"))
++	}
++	// Open only after the regular-file check, so stable FIFOs cannot block.
++	file, err := os.Open(path)
++	if err != nil {
++		return fail(err)
++	}
++	defer file.Close()
++	info, err = file.Stat()
++	if err != nil {
++		return fail(err)
++	}
++	if !info.Mode().IsRegular() {
++		return fail(fmt.Errorf("opened object is not a regular file"))
++	}
++	return true, nil
++}
++
++// Launch contains composition inputs and warning lines (without a trailing LF).
++// Both tracked and untracked execution must emit every line before launching.
++type Launch struct {
++	Selection Selection
++	Warnings  []string
++}
++
++// PrepareLaunch is the execution boundary operation: select, freshly validate
++// Pi's polymorphic flag path and managed-home files, then format warnings.
++// Do not cache its result across launches. It does not attest project discovery
++// or prevent changes between this probe and the native tool's subsequent open.
++func PrepareLaunch(f *fragment.Fragment, opt fragment.Semantics) (Launch, error) {
++	s, err := Select(f, opt)
++	if err != nil {
++		return Launch{}, err
++	}
++	if f.Environment == fragment.EnvPi && s.channel.Kind == fragment.KindFlag {
++		if _, err = readable(s.path, false); err != nil {
++			return Launch{}, err
++		}
++	}
++	observed, err := ProbeFiles(f)
++	if err != nil {
++		return Launch{}, err
++	}
++	return Launch{Selection: s, Warnings: FormatWarnings(f.Profile.Name, s, observed)}, nil
++}
++
++const cacheWarning = " A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix."
++
++// FormatWarnings is pure and shared by both execution modes. Native arguments
++// remain opaque, so only the selected launcher flag establishes suppression.
++func FormatWarnings(profile string, s Selection, observed []Observation) []string {
++	var lines []string
++	if s.channel.Kind != "" {
++		line := fmt.Sprintf("warning: profile %q: applied %s/%s system-prompt channel", profile, s.channel.Kind, s.channel.Semantics)
++		if s.channel.Kind == fragment.KindFlag {
++			line += fmt.Sprintf(" %q", s.channel.Flag)
++		}
++		line += "."
++		if s.channel.Semantics == fragment.SemanticsReplace {
++			line += " Replacement discards the tool's built-in system behavior entirely."
++		}
++		lines = append(lines, line+cacheWarning)
++	}
++	for _, file := range observed {
++		line := fmt.Sprintf("warning: profile %q: observed file/%s %q in managed home; ", profile, file.Semantics, file.Filename)
++		if s.channel.Kind == fragment.KindFlag && s.channel.Semantics == file.Semantics {
++			line += fmt.Sprintf("discovery suppressed by applied launcher flag %q.", s.channel.Flag)
++		} else {
++			line += "conditional native-discovery candidate, subject to native flags and trusted-project precedence."
++			if file.Semantics == fragment.SemanticsReplace {
++				line += " If selected, replacement discards the tool's built-in system behavior entirely."
++			}
++		}
++		lines = append(lines, line+cacheWarning)
++	}
++	return lines
++}
+diff --git a/internal/systemprompt/systemprompt_test.go b/internal/systemprompt/systemprompt_test.go
+new file mode 100644
+index 0000000..26ff432
+--- /dev/null
++++ b/internal/systemprompt/systemprompt_test.go
+@@ -0,0 +1,347 @@
++package systemprompt_test
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"syscall"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	sp "github.com/relux-works/curator-agent-launcher/internal/systemprompt"
++)
++
++// Fixtures come from the independently pinned conformance corpus; mutate only
++// paths, keeping registry descriptors validated through the production parser.
++func fixture(t *testing.T, env, home, path string, section bool) *fragment.Fragment {
++	t.Helper()
++	name := map[string]string{"claude_code": "valid-system-prompt-only.json", "codex_cli": "valid-codex-config-key-and-name-channel.json", "pi": "valid-pi-file-channels.json", "opencode": "valid-minimal.json"}[env]
++	raw, err := os.ReadFile("../fragment/testdata/schema-cases/" + name)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var v map[string]any
++	if err = json.Unmarshal(raw, &v); err != nil {
++		t.Fatal(err)
++	}
++	v["environment"] = env
++	v["env"] = map[string]string{fragment.HomeVariable(env): home}
++	delete(v, "mcp")
++	if section {
++		if env == "opencode" {
++			v["system_prompt"] = map[string]any{"path": path, "channels": []any{}}
++		} else {
++			v["system_prompt"].(map[string]any)["path"] = path
++		}
++	} else {
++		delete(v, "system_prompt")
++	}
++	raw, err = json.Marshal(v)
++	if err != nil {
++		t.Fatal(err)
++	}
++	f, err := fragment.Parse(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return f
++}
++func refusal(t *testing.T, err error, code string) *sp.Refusal {
++	t.Helper()
++	var r *sp.Refusal
++	if !errors.As(err, &r) || r.Code != code {
++		t.Fatalf("want %s refusal, got %v", code, err)
++	}
++	return r
++}
++func write(t *testing.T, path string) {
++	t.Helper()
++	if err := os.WriteFile(path, []byte("unchanged prompt"), 0600); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestSelectExactArgv(t *testing.T) {
++	path := "/tmp/a \"quote\" \\ ' $()`\n\t\x01\x7f—.md"
++	for _, tc := range []struct {
++		env  string
++		opt  fragment.Semantics
++		want []string
++	}{
++		{"claude_code", fragment.SemanticsAppend, []string{"--append-system-prompt-file", path}},
++		{"claude_code", fragment.SemanticsReplace, []string{"--system-prompt-file", path}},
++		{"pi", fragment.SemanticsAppend, []string{"--append-system-prompt", path}},
++		{"codex_cli", fragment.SemanticsReplace, []string{"-c", "model_instructions_file=\"/tmp/a \\\"quote\\\" \\\\ ' $()`\\u000A\\u0009\\u0001\\u007F—.md\""}},
++	} {
++		t.Run(tc.env+"/"+string(tc.opt), func(t *testing.T) {
++			f := fixture(t, tc.env, t.TempDir(), path, true)
++			s, err := sp.Select(f, tc.opt)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !reflect.DeepEqual(s.Argv(), tc.want) || len(s.Env()) != 0 {
++				t.Fatalf("argv=%q env=%v", s.Argv(), s.Env())
++			}
++			args := s.Argv()
++			args[0] = "mutated"
++			if !reflect.DeepEqual(s.Argv(), tc.want) {
++				t.Fatal("aliased argv")
++			}
++		})
++	}
++}
++
++func TestSelectRefusalsAndNoOptIn(t *testing.T) {
++	for _, env := range []string{"claude_code", "codex_cli", "pi", "opencode"} {
++		for _, section := range []bool{false, true} {
++			for _, opt := range []fragment.Semantics{"", fragment.SemanticsAppend, fragment.SemanticsReplace, "bogus"} {
++				t.Run(env+"/"+map[bool]string{true: "section", false: "absent"}[section]+"/"+string(opt), func(t *testing.T) {
++					f := fixture(t, env, t.TempDir(), "/missing/prompt.md", section)
++					s, err := sp.Select(f, opt)
++					supported := section && (env == "claude_code" || env == "codex_cli" && opt == fragment.SemanticsReplace || env == "pi" && opt == fragment.SemanticsAppend) && opt != "bogus"
++					if opt != "" && !supported {
++						refusal(t, err, sp.CodeUnavailable)
++						return
++					}
++					if err != nil {
++						t.Fatal(err)
++					}
++					if opt == "" && (len(s.Argv()) != 0 || len(s.Env()) != 0) {
++						t.Fatal("applied without opt-in")
++					}
++				})
++			}
++		}
++	}
++}
++
++func TestPrepareLaunchLateFilesAndWarnings(t *testing.T) {
++	for _, section := range []bool{false, true} {
++		t.Run(map[bool]string{true: "section", false: "no-section"}[section], func(t *testing.T) {
++			home := t.TempDir()
++			prompt := filepath.Join(home, "inert.md")
++			write(t, prompt)
++			f := fixture(t, "pi", home, prompt, section)
++			launch, err := sp.PrepareLaunch(f, "")
++			if err != nil || len(launch.Warnings) != 0 {
++				t.Fatalf("absent: %+v %v", launch, err)
++			}
++			for _, name := range []string{"APPEND_SYSTEM.md", "SYSTEM.md"} {
++				write(t, filepath.Join(home, name))
++			}
++			launch, err = sp.PrepareLaunch(f, "")
++			if err != nil {
++				t.Fatal(err)
++			}
++			if len(launch.Warnings) != 2 {
++				t.Fatalf("warnings=%q", launch.Warnings)
++			}
++			for i, name := range []string{"APPEND_SYSTEM.md", "SYSTEM.md"} {
++				line := launch.Warnings[i]
++				for _, want := range []string{f.Profile.Name, name, "file/", "conditional native-discovery candidate", "native flags and trusted-project precedence", "caching and billing", "own cache prefix"} {
++					if !strings.Contains(line, want) {
++						t.Fatalf("missing %q in %q", want, line)
++					}
++				}
++			}
++			if !strings.Contains(launch.Warnings[1], "If selected, replacement discards the tool's built-in system behavior entirely.") {
++				t.Fatal(launch.Warnings)
++			}
++			if section {
++				launch, err = sp.PrepareLaunch(f, fragment.SemanticsAppend)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if len(launch.Warnings) != 3 {
++					t.Fatal(launch.Warnings)
++				}
++				want := "warning: profile \"" + f.Profile.Name + "\": observed file/append \"APPEND_SYSTEM.md\" in managed home; discovery suppressed by applied launcher flag \"--append-system-prompt\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix."
++				if launch.Warnings[1] != want {
++					t.Fatalf("got %q want %q", launch.Warnings[1], want)
++				}
++				if !strings.Contains(launch.Warnings[0], "applied flag/append") || !strings.Contains(launch.Warnings[2], "conditional native-discovery candidate") {
++					t.Fatal(launch.Warnings)
++				}
++			}
++			for _, name := range []string{"APPEND_SYSTEM.md", "SYSTEM.md", "inert.md"} {
++				raw, err := os.ReadFile(filepath.Join(home, name))
++				if err != nil || string(raw) != "unchanged prompt" {
++					t.Fatalf("file changed %s", name)
++				}
++			}
++			if err := os.Remove(filepath.Join(home, "APPEND_SYSTEM.md")); err != nil {
++				t.Fatal(err)
++			}
++			launch, err = sp.PrepareLaunch(f, "")
++			if err != nil || len(launch.Warnings) != 1 {
++				t.Fatalf("late removal: %+v %v", launch, err)
++			}
++			if err := os.Mkdir(filepath.Join(home, "APPEND_SYSTEM.md"), 0700); err != nil {
++				t.Fatal(err)
++			}
++			_, err = sp.PrepareLaunch(f, "")
++			refusal(t, err, sp.CodeUnreadable)
++		})
++	}
++}
++
++func TestPrepareLaunchFileFailures(t *testing.T) {
++	for _, which := range []string{"APPEND_SYSTEM.md", "SYSTEM.md", "selected"} {
++		for _, kind := range []string{"missing", "directory", "dangling", "symlink", "permissions", "fifo", "loop"} {
++			t.Run(which+"/"+kind, func(t *testing.T) {
++				home := t.TempDir()
++				prompt := filepath.Join(home, "prompt.md")
++				write(t, prompt)
++				path := filepath.Join(home, which)
++				if which == "selected" {
++					path = prompt
++					if err := os.Remove(prompt); err != nil {
++						t.Fatal(err)
++					}
++				}
++				switch kind {
++				case "directory":
++					if err := os.Mkdir(path, 0700); err != nil {
++						t.Fatal(err)
++					}
++				case "dangling":
++					if err := os.Symlink(filepath.Join(home, "missing-target"), path); err != nil {
++						t.Fatal(err)
++					}
++				case "symlink":
++					target := filepath.Join(home, "target")
++					write(t, target)
++					if err := os.Symlink(target, path); err != nil {
++						t.Fatal(err)
++					}
++				case "permissions":
++					write(t, path)
++					if err := os.Chmod(path, 0000); err != nil {
++						t.Fatal(err)
++					}
++					t.Cleanup(func() { _ = os.Chmod(path, 0600) })
++					if os.Geteuid() == 0 {
++						t.Skip("root bypasses mode permissions; permission denial not proven")
++					}
++				case "fifo":
++					if err := syscall.Mkfifo(path, 0600); err != nil {
++						t.Fatal(err)
++					}
++				case "loop":
++					if err := os.Symlink(path, path); err != nil {
++						t.Fatal(err)
++					}
++				}
++				f := fixture(t, "pi", home, prompt, true)
++				// Opt-in must not bypass a suppressed APPEND_SYSTEM.md failure.
++				launch, err := sp.PrepareLaunch(f, fragment.SemanticsAppend)
++				good := kind == "symlink" || kind == "missing" && which != "selected"
++				if good {
++					if err != nil {
++						t.Fatal(err)
++					}
++					return
++				}
++				r := refusal(t, err, sp.CodeUnreadable)
++				if r.Path != path {
++					t.Fatalf("path=%q want %q", r.Path, path)
++				}
++				if len(launch.Selection.Argv()) != 0 {
++					t.Fatal("partial launch leaked on refusal")
++				}
++			})
++		}
++	}
++}
++
++func TestProbeIndependentAndNoWrites(t *testing.T) {
++	home := t.TempDir()
++	f := fixture(t, "pi", home, "/absent", false)
++	for _, name := range []string{"APPEND_SYSTEM.md", "SYSTEM.md"} {
++		write(t, filepath.Join(home, name))
++	}
++	observed, err := sp.ProbeFiles(f)
++	if err != nil || len(observed) != 2 {
++		t.Fatalf("%v %v", observed, err)
++	}
++	// A descriptor-less section cannot disable the environment registry probe.
++	f.SystemPrompt = &fragment.SystemPrompt{Path: "/absent"}
++	observed, err = sp.ProbeFiles(f)
++	if err != nil || len(observed) != 2 {
++		t.Fatalf("%v %v", observed, err)
++	}
++	for _, env := range []string{"claude_code", "codex_cli", "opencode"} {
++		f := fixture(t, env, home, "/absent", false)
++		observed, err := sp.ProbeFiles(f)
++		if err != nil || len(observed) != 0 {
++			t.Fatalf("non-Pi probe: %v %v", observed, err)
++		}
++	}
++	entries, err := os.ReadDir(home)
++	if err != nil || len(entries) != 2 {
++		t.Fatalf("unexpected write: %v %v", entries, err)
++	}
++}
++
++func TestAppliedReplacementWarning(t *testing.T) {
++	for _, env := range []string{"claude_code", "codex_cli"} {
++		f := fixture(t, env, t.TempDir(), "/prompt", true)
++		launch, err := sp.PrepareLaunch(f, fragment.SemanticsReplace)
++		if err != nil {
++			t.Fatal(err)
++		}
++		kind := map[string]string{"claude_code": "flag", "codex_cli": "config-key"}[env]
++		prefix := "warning: profile \"" + f.Profile.Name + "\": applied " + kind + "/replace system-prompt channel"
++		if len(launch.Warnings) != 1 || !strings.HasPrefix(launch.Warnings[0], prefix) || !strings.Contains(launch.Warnings[0], "Replacement discards the tool's built-in system behavior entirely.") || !strings.Contains(launch.Warnings[0], "caching and billing") {
++			t.Fatal(launch.Warnings)
++		}
++	}
++}
++
++func TestPrepareLaunchSelectedPathChangesLate(t *testing.T) {
++	home := t.TempDir()
++	path := filepath.Join(home, "prompt.md")
++	write(t, path)
++	f := fixture(t, "pi", home, path, true)
++	if _, err := sp.Select(f, fragment.SemanticsAppend); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := sp.PrepareLaunch(f, fragment.SemanticsAppend); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(path); err != nil {
++		t.Fatal(err)
++	}
++	_, err := sp.PrepareLaunch(f, fragment.SemanticsAppend)
++	refusal(t, err, sp.CodeUnreadable)
++	// Missing inert data is not a refusal when no channel was requested.
++	if _, err = sp.PrepareLaunch(f, ""); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestProbeParentFailures(t *testing.T) {
++	for _, kind := range []string{"permissions", "non-directory"} {
++		t.Run(kind, func(t *testing.T) {
++			root := t.TempDir()
++			home := filepath.Join(root, "home")
++			if kind == "permissions" {
++				if os.Geteuid() == 0 {
++					t.Skip("root bypasses directory permissions")
++				}
++				if err := os.Mkdir(home, 0000); err != nil {
++					t.Fatal(err)
++				}
++				t.Cleanup(func() { _ = os.Chmod(home, 0700) })
++			} else {
++				write(t, home)
++			}
++			f := fixture(t, "pi", home, "/prompt", false)
++			_, err := sp.PrepareLaunch(f, "")
++			refusal(t, err, sp.CodeUnreadable)
++		})
++	}
++}
