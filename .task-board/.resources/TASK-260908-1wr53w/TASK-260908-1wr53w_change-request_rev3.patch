@@ -1,0 +1,2266 @@
+diff --git a/.scripts/diagnostics-mutants.sh b/.scripts/diagnostics-mutants.sh
+new file mode 100755
+index 0000000..7412801
+--- /dev/null
++++ b/.scripts/diagnostics-mutants.sh
+@@ -0,0 +1,228 @@
++#!/usr/bin/env bash
++# Mutant harness for the SPEC §6 diagnostics gates.
++#
++# Two classes of mutants share this harness. NARROWING mutants keep the
++# gate present and weaken it to admit exactly one member of the class it
++# must reject: D01, D03, D09, D10, D11, D13, D14, D15, D16, D17, D18,
++# D19, D20, D21. D06 and D12 preserve the searched-for token and change
++# behavior, so only the behavioral suites — never a static checker — can
++# catch them, but they are NOT narrowing: D06 admits arbitrary prefixes
++# and D12 disables framing for ALL multiline details, so both stay as
++# RETAINED broad behavioral probes. The other retained probes are broader
++# by design and are not narrowing evidence either: D02/D04/D07 replace a
++# whole clause, D05 drops one accepted member instead of admitting a
++# rejected one, and D08 is a formatting change. They stay because they
++# pin useful failures, but only the narrowing set proves a gate's bound.
++#
++# D13-D21 are adopted from the independently accepted owner/form gate
++# (TASK-260909-3d1589 rev3): D13/D14/D15 admit one foreign code at one
++# owner gate (D14/D15 are the prior R3 survivors the hand-selected
++# matrix missed); D16 rejects one joined owned code; D17-D20 reject one
++# fixed-owner positive-form cell each (D17 is the exact rev2 reviewer
++# survivor); D21 exempts exactly one complete hostile Detail from
++# framing at the real main/resolver entry while companions stay framed.
++#
++# For every mutant the behavioral suites of the two affected packages run
++# (`go test ./internal/diagnostics/ ./cmd/curator-run/`), and the harness
++# requires the named test to be among the failures. Narrowing mutants
++# D13-D21 additionally require their named single-member assertion in
++# the log. A mutant that does not change the file, or that the suites
++# survive, fails the harness.
++#
++# usage: .scripts/diagnostics-mutants.sh [evidence-dir]
++set -u
++cd "$(dirname "$0")/.."
++out="${1:-.temp/diagnostics-mutants}"
++mkdir -p "$out"
++
++DIAG=internal/diagnostics/diagnostics.go
++MAIN=cmd/curator-run/main.go
++cp "$DIAG" "$out/diagnostics.go.orig"
++cp "$MAIN" "$out/main.go.orig"
++restore() { cp "$out/diagnostics.go.orig" "$DIAG"; cp "$out/main.go.orig" "$MAIN"; }
++trap restore EXIT
++
++# Fields separated by "@@": id, file, expected failing test, from, to.
++# from/to are literal text; the first occurrence is replaced. D04, D06,
++# D09, D11, D16, D17, D18, D19, D20 and D21 carry multi-line replacements
++# and are handled in the special cases below; their table from/to are
++# placeholders.
++mutants=(
++  'D01@@diag@@TestExitForCode@@if code == CodeUsage {@@if code == CodeUsage || code == CodeExecMissing {'
++  'D02@@diag@@TestExitForCode@@	return ExitOperational@@	return 0'
++  'D03@@diag@@TestDiagnosticLineDistinguishesTransport@@func Valid(code string) bool { return valid[code] }@@func Valid(code string) bool { return valid[code] || code == "environment_home_stale" }'
++  'D04@@diag@@TestCodeOfUnknownFailsClosed@@D04_PLACEHOLDER_FROM@@D04_PLACEHOLDER_TO'
++  'D05@@diag@@TestCodeOfProductionTypes@@D05_PLACEHOLDER_FROM@@D05_PLACEHOLDER_TO'
++  'D06@@diag@@TestDiagnosticLineDistinguishesTransport@@D06_PLACEHOLDER_FROM@@D06_PLACEHOLDER_TO'
++  'D07@@main@@TestRunDiagnosticsContract@@			return diagnostics.ExitForCode(re.Code)@@			return 0'
++  'D08@@diag@@TestEmitDeterministic@@+ ": " + detail + "@@+ " " + detail + "'
++  'D09@@diag@@TestExitForCode@@D09_PLACEHOLDER_FROM@@D09_PLACEHOLDER_TO'
++  'D10@@diag@@TestCodeOfRejectsForeignFamily@@&& resolveFamily[re.Code] {@@&& (resolveFamily[re.Code] || re.Code == CodeUsage) {'
++  'D11@@main@@TestRunDiagnosticsContract@@D11_PLACEHOLDER_FROM@@D11_PLACEHOLDER_TO'
++  'D12@@diag@@TestDiagnosticDetailCannotForgeLine@@strings.ReplaceAll(detail, "\n", "\n  ")@@strings.ReplaceAll(detail, "\n", "\n")'
++  'D13@@diag@@TestGateResolveRejectsForeignCodes@@&& resolveFamily[re.Code] {@@&& (resolveFamily[re.Code] || re.Code == composition.CodeMCPLayerMissing) {'
++  'D14@@diag@@TestGateLayerRejectsForeignCodes@@&& layerFamily[le.Code] {@@&& (layerFamily[le.Code] || le.Code == fragment.CodeInvocationFailed) {'
++  'D15@@diag@@TestGateRefusalRejectsForeignCodes@@&& refusalFamily[sr.Code] {@@&& (refusalFamily[sr.Code] || sr.Code == fragment.CodeInvocationFailed) {'
++  'D16@@diag@@TestGateJoinedOwnedAccepted@@D16_PLACEHOLDER_FROM@@D16_PLACEHOLDER_TO'
++  'D17@@diag@@TestGateOwnerFormPositives@@D17_PLACEHOLDER_FROM@@D17_PLACEHOLDER_TO'
++  'D18@@diag@@TestGateOwnerFormPositives@@D18_PLACEHOLDER_FROM@@D18_PLACEHOLDER_TO'
++  'D19@@diag@@TestGateOwnerFormPositives@@D19_PLACEHOLDER_FROM@@D19_PLACEHOLDER_TO'
++  'D20@@diag@@TestGateOwnerFormPositives@@D20_PLACEHOLDER_FROM@@D20_PLACEHOLDER_TO'
++  'D21@@diag@@TestGateFramingSingleDetailAtRealResolver@@D21_PLACEHOLDER_FROM@@D21_PLACEHOLDER_TO'
++)
++
++status=0
++summary="$out/summary.tsv"
++printf 'mutant\tfile\texpected_failing_test\tapplied\tsuite_exit\texpected_test_failed\tnamed_assertion\tverdict\n' >"$summary"
++for m in "${mutants[@]}"; do
++  id="${m%%@@*}"; rest="${m#*@@}"
++  which="${rest%%@@*}"; rest="${rest#*@@}"
++  test="${rest%%@@*}"; rest="${rest#*@@}"
++  from="${rest%%@@*}"; to="${rest#*@@}"
++  restore
++  file="$DIAG"; [ "$which" = main ] && file="$MAIN"
++  # D04 (retained, broad): hides the whole unknown class inside the
++  # resolve family instead of yielding no code — the invention the
++  # no-invention gate forbids.
++  if [ "$id" = D04 ]; then
++    from=$'\t\treturn "", false\n\t})'
++    to=$'\t\treturn CodeResolveInvocationFailed, true\n\t})'
++  fi
++  # D05 (retained, drop-one): rejects exactly one accepted member
++  # (mcp_layer_missing) instead of admitting a rejected one.
++  if [ "$id" = D05 ]; then
++    from='&& layerFamily[le.Code] {'
++    to='&& layerFamily[le.Code] && le.Code != composition.CodeMCPLayerMissing {'
++  fi
++  # D06 (anchor weakening, token preserved): a contains-lookup instead
++  # of the prefix match. The behavioral suites, not a static checker,
++  # must catch it.
++  if [ "$id" = D06 ]; then
++    from=$'\trest, ok := strings.CutPrefix(line, cli.Name+": ")\n\tif !ok {\n\t\treturn false\n\t}'
++    to=$'\tidx := strings.Index(line, cli.Name+": ")\n\tif idx < 0 {\n\t\treturn false\n\t}\n\trest := line[idx+len(cli.Name+": "):]'
++  fi
++  # D09 (narrowing): the unknown-code terminal gate admits exactly one
++  # rejected member — the empty code — as success.
++  if [ "$id" = D09 ]; then
++    from=$'\treturn ExitOperational'
++    to=$'\tif code == "" {\n\t\treturn 0\n\t}\n\treturn ExitOperational'
++  fi
++  # D11 (narrowing): the main resolve path admits exactly one
++  # operational failure as success instead of exiting 1.
++  if [ "$id" = D11 ]; then
++    from=$'\t\t\treturn diagnostics.ExitForCode(re.Code)'
++    to=$'\t\t\tif re.Code == fragment.CodeLockUnavailable {\n\t\t\t\treturn 0\n\t\t\t}\n\t\t\treturn diagnostics.ExitForCode(re.Code)'
++  fi
++  # D16 (narrowing, adopted gate joined-positive): a joined chain holding
++  # an owned resolve_invocation_failed is rejected instead of accepted.
++  if [ "$id" = D16 ]; then
++    from='func CodeOf(err error) (code string, ok bool) {'
++    to='func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if re, yes := child.(*fragment.ResolveError); yes && re != nil && re.Code == fragment.CodeInvocationFailed { return "", false }
++		}
++	}'
++  fi
++  # D17-D20 (narrowing, adopted gate fixed-owner form cells): one
++  # fixed-owner positive form is rejected instead of accepted. Wrapped
++  # mutants guard with nilValue before Unwrap: several owners'
++  # Unwrap methods dereference the receiver and panic on typed-nil
++  # values, which the production chain() walk skips first.
++  if [ "$id" = D17 ]; then
++    from='func CodeOf(err error) (code string, ok bool) {'
++    to='func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if ue, yes := child.(*cli.UsageError); yes && ue != nil { return "", false }
++		}
++	}'
++  fi
++  if [ "$id" = D18 ]; then
++    from='func CodeOf(err error) (code string, ok bool) {'
++    to='func CodeOf(err error) (code string, ok bool) {
++	if w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {
++		if ue, yes := w.Unwrap().(*cli.UsageError); yes && ue != nil { return "", false }
++	}'
++  fi
++  if [ "$id" = D19 ]; then
++    from='func CodeOf(err error) (code string, ok bool) {'
++    to='func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if ae, yes := child.(*axconfig.Error); yes && ae != nil { return "", false }
++		}
++	}'
++  fi
++  if [ "$id" = D20 ]; then
++    from='func CodeOf(err error) (code string, ok bool) {'
++    to='func CodeOf(err error) (code string, ok bool) {
++	if w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {
++		if ae, yes := w.Unwrap().(*axconfig.Error); yes && ae != nil { return "", false }
++	}'
++  fi
++  # D21 (narrowing, adopted gate framing): Line exempts exactly one
++  # complete hostile Detail (the fixed-binary main-entry Detail) via
++  # equality, returning it unframed; every other detail stays framed.
++  if [ "$id" = D21 ]; then
++    python3 - <<'PY' || { echo "D21 mutant application failed" >&2; exit 1; }
++import pathlib
++p = pathlib.Path("internal/diagnostics/diagnostics.go")
++src = p.read_text()
++frm = 'func Line(code, detail string) string {'
++assert src.count(frm) == 1, "FROM anchor not unique/found"
++exempt_detail = "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory"
++exempt_go = exempt_detail.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
++exempt = 'func Line(code, detail string) string {\n\tif detail == "' + exempt_go + '" {\n\t\treturn cli.Name + ": " + code + ": " + detail + "\\n"\n\t}'
++p.write_text(src.replace(frm, exempt, 1))
++print("framing mutant applied for exactly one complete Detail")
++PY
++    from='D21_APPLIED_ABOVE'; to='D21_APPLIED_ABOVE'
++    # Mark applied so the generic literal replace below is a no-op that
++    # still verifies the file changed.
++    if cmp -s "$file" "$out/$(basename "$file").orig"; then
++      printf '%s\t%s\t%s\tno\t-\t-\t-\tNOT_APPLIED\n' "$id" "$which" "$test" >>"$summary"; status=1; continue
++    fi
++  fi
++  FROM="$from" TO="$to" python3 -c '
++import os, sys
++p = sys.argv[1]; src = open(p).read()
++f, t = os.environ["FROM"], os.environ["TO"]
++if f in src:
++    open(p, "w").write(src.replace(f, t, 1))
++' "$file"
++  if cmp -s "$file" "$out/$(basename "$file").orig"; then
++    printf '%s\t%s\t%s\tno\t-\t-\t-\tNOT_APPLIED\n' "$id" "$which" "$test" >>"$summary"; status=1; continue
++  fi
++  # Narrowing mutants D13-D21 additionally require their named
++  # single-member assertion: exit 1 with the right test failing is not
++  # enough, the log must show the exact admitted/rejected member.
++  needle=""
++  case "$id" in
++    D13) needle='resolve accepted foreign "mcp_layer_missing"' ;;
++    D14) needle='layer accepted foreign "resolve_invocation_failed"' ;;
++    D15) needle='refusal accepted foreign "resolve_invocation_failed"' ;;
++    D16) needle='joined owned resolve "resolve_invocation_failed" lost' ;;
++    D17) needle='usage joined lost: "" false' ;;
++    D18) needle='usage wrapped lost: "" false' ;;
++    D19) needle='axconfig joined lost: "" false' ;;
++    D20) needle='axconfig wrapped lost: "" false' ;;
++    D21) needle='does not carry code "resolve_invocation_failed"' ;;
++  esac
++  log="$out/$id.log"
++  { echo "== $id (expected to fail: $test)"; diff -u "$out/$(basename "$file").orig" "$file"; echo; } >"$log"
++  go test ./internal/diagnostics/ ./cmd/curator-run/ -count=1 -v >>"$log" 2>&1; code=$?
++  failed=no
++  grep -Eq "^[[:space:]]*--- FAIL: ${test}( |$)" "$log" && failed=yes
++  asserted="-"
++  if [ -n "$needle" ]; then
++    asserted=no
++    grep -F -q "$needle" "$log" && asserted=yes
++  fi
++  verdict=KILLED
++  if [ "$code" -eq 0 ] || [ "$failed" = no ] || [ "$asserted" = no ]; then verdict=SURVIVED; status=1; fi
++  printf '%s\t%s\t%s\tyes\t%s\t%s\t%s\t%s\n' "$id" "$which" "$test" "$code" "$failed" "$asserted" "$verdict" >>"$summary"
++done
++restore
++column -t -s $'\t' "$summary"
++exit "$status"
+diff --git a/README.md b/README.md
+index 10e266e..72584b5 100644
+--- a/README.md
++++ b/README.md
+@@ -46,6 +46,21 @@ Because no `ax.json` is read yet, the binary always parses as an untracked
+ machine, so `--ax-profile` is currently always a usage error and `--name`
+ is accepted without effect.
+ 
++SPEC §6 is implemented as a stable contract in `internal/diagnostics`:
++the closed 18-code family table, the exit rule (usage 2, every
++operational failure 1, unknown codes still 1 — never silent success),
++and the deterministic `curator-run: <code>: <detail>` rendering. The
++entry point reports its own families (usage, resolve, environment)
++through it; later families are classified from their owners' real error
++types (`axconfig.Error`, `composition.LayerError`, `systemprompt.Refusal`)
++at their own production APIs. Absence and read failure stay distinct
++(missing layer vs unreadable layer, absent config vs broken config,
++absent home file vs unreadable file), warnings and child stderr are
++never diagnostic code lines, and no failure degrades into a weaker
++launch. The remaining main call-site obligations (ax policy before
++parsing, defaults/lineup, plan and provider limits, late boundary
++binding) are enumerated in `diagnostics.RemainingObligations` and below.
++
+ ## Composition API boundary
+ 
+ `internal/composition.Compose` implements the §4.5 value API over an already
+@@ -179,6 +194,45 @@ claim native Pi admission on module v0.5.10. Independent review and signed
+ publication/landing belong to the parent; the managed producer leaves this
+ candidate uncommitted for the review snapshot.
+ 
++## Diagnostics contract and remaining call sites
++
++`internal/diagnostics` owns the SPEC §6 table (18 codes), `ExitForCode`
++(usage 2, operational 1, unknown 1), `Line`/`Emit` rendering, `CodeOf`
++classification over the owners' concrete error types, and
++`IsDiagnosticLine` transport separation. Each wiring step below must
++choose the named family code at its boundary, render through `Emit`, and
++exit through `ExitForCode`, with no fallback to a weaker launch shape:
++
++1. `axconfig.Load` before `cli.Parse` (`defaults_config_invalid` even
++   when argv is also a usage error) — TASK-260908-1o7i8y.
++2. `defaults.json` read, locked-member refusal, lineup fallback,
++   `defaults_unresolvable`, per-member stderr line-group —
++   TASK-260909-2vy977 (SPEC §4.3 lineup/defaults delivery).
++3. `vendorplugin.BuildLaunch` admission as `plan_refused` and
++   `providerlimits.Store.AvailabilityFor` enforcement as
++   `plan_provider_limited` with verbatim verdict evidence (state,
++   `Until`, `Checked`, `Observed`, `Failures`); indeterminate reads stay
++   terminal refusals, never healthy by inference —
++   TASK-260908-2so46q (SPEC §4.4 plan delivery).
++4. `composition.Value.CheckLaunchBoundary` with the binary check and
++   `systemprompt.PrepareLaunch` as the execution boundary immediately
++   before both handoff and exec — TASK-260908-1o7i8y.
++5. `ax` Structured Error pass-through after the launcher's own
++   `ax_handoff_failed` line (already owned by `execution.Launch.Run`;
++   no untracked fallback) — preserved, not re-implemented here.
++
++`defaults_unresolvable`, `plan_refused`, and `plan_provider_limited`
++have no producer in this build; they are declared bounds, not dropped
++rows. `.scripts/diagnostics-mutants.sh` carries 21 mutants for the new
++gates: 14 narrowing probes (single-member exit/classifier/framing
++weakenings, each requiring its named single-member assertion in the
++log) plus 7 retained broad, drop-one, token-preserving-broad, and
++formatting probes that pin useful failures without proving a bound.
++The narrowing set includes the adopted owner/form gate probes
++(D13–D21: one foreign admission per mutable owner, one joined-owned
++rejection, one rejection per fixed-owner non-direct form, and one
++exact-Detail framing exemption at the real main/resolver entry).
++
+ ## Install and discovery
+ 
+ The launcher ships the `curator-run` executable. Curator dispatches
+@@ -216,6 +270,7 @@ or tag workflow yet.
+ | `.scripts/composition-mutants.py` | §4.5 behavioral narrowing probes for environment ownership, collisions, stdin and launch-boundary file refusal; restores candidate bytes after every mutant | `python3 .scripts/composition-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/composition-mutants/`); permission probe requires a non-root host |
+ | `.scripts/systemprompt-mutants.py` | SPEC §5 narrowing probes through exported production APIs; exact source bytes restored after every mutation | `python3 .scripts/systemprompt-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/systemprompt-mutants/`) |
+ | `.scripts/execution-mutants.py` | narrowing probes at tracking-policy Load and execution Launch.Run, using actual fake subprocesses; restores candidate bytes | `python3 .scripts/execution-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv`, default `.temp/execution-mutants/`; permission tests require non-root |
++| `.scripts/diagnostics-mutants.sh` | narrowing mutants for the §6 gates (exit mapping, closed membership, no-invention classification, anchored code-line parsing, entry exits, owner/form registry, exact-Detail framing exemption); restores candidate bytes after every mutant | `.scripts/diagnostics-mutants.sh [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/diagnostics-mutants/`) |
+ | execution process helpers | exact document/argv/env/stdin/exit and late-check tests; compiles disposable fake provider/ax and API signal driver; Python 3 supplies isolated POSIX PTY regression | `go test ./internal/axconfig ./internal/execution -count=1` | test stdout; helper binaries use temporary directories and are removed |
+ | fragment test corpus | `internal/fragment/testdata/schema-cases` is the `launch-env-fragment-v1` slice of curator-spec `conformance/v1/schema-cases` (index rows copied with their verdicts, source commit recorded in `index.json`); `testdata/a0` holds the three fragments and digests the installed Curator printed during A0 verification | `go test ./internal/fragment` | none; 49 indexed names/verdicts and fixture bytes are pinned by an independently upstream-derived manifest hash in `TestConformanceCorpus`; refresh requires reviewing the upstream rows and updating that pin as well as `index.json` |
+ 
+diff --git a/cmd/curator-run/gate_framing_test.go b/cmd/curator-run/gate_framing_test.go
+new file mode 100644
+index 0000000..ece75cb
+--- /dev/null
++++ b/cmd/curator-run/gate_framing_test.go
+@@ -0,0 +1,101 @@
++// Gate (TASK-260909-3d1589): single-member framing probe at the real main/resolver entry.
++// Adopted from TASK-260909-3d1589 (accepted rev3): board resource
++// TASK-260909-3d1589_rev2_gate-framing_test.go, committed here under its
++// adopted name per TASK-260909-3d1589_rev3_adoption.md. Test bodies are
++// unchanged from the accepted gate; only this header is new.
++// The gate was verified against candidate tree
++// fbe90d5e60593a3a069721b2ad9e53cd071d8c02 (base 3ff66a9).
++//
++// R3 fix: the exempted-detail probe and the companion checks are
++// independently executed tests. The framing mutant aborts
++// TestGateFramingSingleDetailAtRealResolver before any companion could run,
++// so companions live in TestGateFramingCompanionsStayFramed with byte-exact
++// assertions; the runner executes each name separately and requires the
++// first to fail and the second to pass under the mutant.
++package main
++
++import (
++	"context"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++)
++
++// Fixed absent binary keeps the resolver Detail deterministic across runs
++// (no TempDir in the string), so the framing mutant can exempt exactly one
++// complete Detail value via equality.
++const gateFixedBinary = "/nonexistent-missing-curator-xtvqf3"
++
++// Operator profile value carrying the forged code line.
++const gateInjectedProfile = "normal\ncurator-run: usage: forged"
++
++// gateExemptedDetail is the complete Detail string Line receives via
++// run -> Resolver.Resolve -> ExecRunner -> diagnostics.Emit/Line for the
++// fixed binary and injected profile above (Darwin arm64, Go 1.25.5):
++// "could not run <binary> env resolve pi --profile <injected> --repair
++// --format json: fork/exec <binary>: no such file or directory".
++// The framing mutant exempts exactly this string and nothing else.
++const gateExemptedDetail = "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory"
++
++// gateOtherHostiles must stay framed even under the single-member mutant.
++var gateOtherHostiles = []string{
++	"a\ncurator-run: resolve_repair_failed: forged\nb",
++	"carriage\rcurator-run: usage: forged",
++	"crlf\r\ncurator-run: usage: forged\r\n",
++}
++
++// gateFrame renders the expected framed form: CRLF and CR fold to LF, every
++// LF becomes LF plus two spaces, so continuation lines start with
++// whitespace and IsDiagnosticLine never recognizes them.
++func gateFrame(detail string) string {
++	s := strings.ReplaceAll(detail, "\r\n", "\n")
++	s = strings.ReplaceAll(s, "\r", "\n")
++	return strings.ReplaceAll(s, "\n", "\n  ")
++}
++
++// TestGateFramingSingleDetailAtRealResolver drives the exempted Detail
++// through the production entry. Baseline: exactly one diagnostic line.
++// Single-member mutant (equality on gateExemptedDetail, unframed return):
++// two diagnostic lines, named failure here.
++func TestGateFramingSingleDetailAtRealResolver(t *testing.T) {
++	var out, errOut strings.Builder
++	resolver := fragment.NewWithRunner(gateFixedBinary, fragment.ExecRunner{})
++	got := run(context.Background(),
++		[]string{"pi", "--profile", gateInjectedProfile}, &out, &errOut, resolver)
++	if got != 1 {
++		t.Fatalf("exit = %d, want 1 (stderr %q)", got, errOut.String())
++	}
++	assertSingleDiagnostic(t, errOut.String(), "resolve_invocation_failed")
++	if out.Len() != 0 {
++		t.Fatalf("stdout = %q, want empty", out.String())
++	}
++}
++
++// TestGateFramingCompanionsStayFramed proves the framing mutant weakens only
++// the exempted Detail: every other hostile detail still renders byte-exact
++// through Line with exactly one diagnostic line. It executes independently
++// of TestGateFramingSingleDetailAtRealResolver, so it runs to completion
++// even when the mutant aborts that test.
++func TestGateFramingCompanionsStayFramed(t *testing.T) {
++	for _, detail := range gateOtherHostiles {
++		t.Run(detail, func(t *testing.T) {
++			want := "curator-run: resolve_invocation_failed: " + gateFrame(detail) + "\n"
++			if got := diagnostics.Line("resolve_invocation_failed", detail); got != want {
++				t.Fatalf("companion detail %q: got %q want %q", detail, got, want)
++			}
++			rendered := diagnostics.Line("resolve_invocation_failed", detail)
++			lines := strings.Split(strings.TrimSuffix(rendered, "\n"), "\n")
++			found := 0
++			for _, line := range lines {
++				if diagnostics.IsDiagnosticLine(line) {
++					found++
++				}
++			}
++			if found != 1 {
++				t.Errorf("companion detail %q: %d diagnostic lines, want 1 (%q)", detail, found, rendered)
++			}
++		})
++	}
++}
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index 6655dfb..f2a2374 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -15,11 +15,13 @@ package main
+ 
+ import (
+ 	"context"
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"os"
+ 
+ 	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
+ 	"github.com/relux-works/curator-agent-launcher/internal/mapping"
+ )
+@@ -52,16 +54,27 @@ type fragmentResolver interface {
+ // fragment is mapped under §4.2 (unsupported IDs refuse env_unsupported),
+ // then refused with exit 1 because no later composition stage
+ // exists in this build; nothing is launched.
++//
++// Every failure renders through internal/diagnostics: one deterministic
++// `curator-run: <code>: <detail>` line and the SPEC §6 exit for that code
++// (2 for usage, 1 for every operational failure). The rendering is
++// byte-identical to the stage-owned formats it replaces.
+ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver fragmentResolver) int {
+ 	opts := cli.Options{AxConfigured: false}
+ 	inv, err := cli.Parse(args, opts)
+ 	if err != nil {
+ 		if cli.IsUsage(err) {
+-			fmt.Fprintf(stderr, "%s: %s\n\n%s", name, err.Error(), cli.Usage)
+-			return cli.ExitCode
++			detail := err.Error()
++			var ue *cli.UsageError
++			if errors.As(err, &ue) {
++				detail = ue.Detail
++			}
++			_ = diagnostics.Emit(stderr, diagnostics.CodeUsage, detail)
++			fmt.Fprintf(stderr, "\n%s", cli.Usage)
++			return diagnostics.ExitForCode(diagnostics.CodeUsage)
+ 		}
+ 		fmt.Fprintf(stderr, "%s: %v\n", name, err)
+-		return 1
++		return diagnostics.ExitOperational
+ 	}
+ 	switch inv.Info {
+ 	case cli.InfoHelp:
+@@ -83,17 +96,17 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver
+ 	})
+ 	if err != nil {
+ 		if re, ok := fragment.IsResolve(err); ok {
+-			fmt.Fprintf(stderr, "%s: %s: %s\n", name, re.Code, re.Detail)
+-			return 1
++			_ = diagnostics.Emit(stderr, re.Code, re.Detail)
++			return diagnostics.ExitForCode(re.Code)
+ 		}
+-		fmt.Fprintf(stderr, "%s: %s: %v\n", name, fragment.CodeInvocationFailed, err)
+-		return 1
++		_ = diagnostics.Emit(stderr, fragment.CodeInvocationFailed, err.Error())
++		return diagnostics.ExitForCode(fragment.CodeInvocationFailed)
+ 	}
+ 
+ 	target, err := mapping.Resolve(frag.Environment)
+ 	if err != nil {
+-		fmt.Fprintf(stderr, "%s: %s: %v\n", name, mapping.CodeUnsupported, err)
+-		return 1
++		_ = diagnostics.Emit(stderr, mapping.CodeUnsupported, err.Error())
++		return diagnostics.ExitForCode(mapping.CodeUnsupported)
+ 	}
+ 
+ 	fmt.Fprintf(stderr, "%s: not_implemented: resolved environment %q (profile %q, home %s, fragment digest %s), mapped system %q / provider %q, but composition beyond SPEC §4.2 is not delivered in this build; nothing was launched\n",
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index 85cc0f7..849e6aa 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -13,6 +13,7 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
+ )
+ 
+@@ -354,6 +355,134 @@ func TestRunUnknownFragmentStillRefusesResolution(t *testing.T) {
+ 	}
+ }
+ 
++// TestRunDiagnosticsContract drives every failure this build can produce
++// through the production entry point and pins the SPEC §6 contract there:
++// the exit status for the code, exactly one launcher diagnostic code
++// line on stderr carrying that code, Curator's stderr forwarded verbatim
++// ahead of it (never parsed as a launcher diagnostic), and nothing on
++// stdout. Later pipeline families (defaults, plan, exec, ax, mcp,
++// sysprompt) are covered at their own production APIs in
++// internal/diagnostics; their main call sites are stated obligations,
++// not claimed here.
++func TestRunDiagnosticsContract(t *testing.T) {
++	opencodeLine := strings.ReplaceAll(piFragmentLine, `"environment":"pi"`, `"environment":"opencode"`)
++	opencodeLine = strings.ReplaceAll(opencodeLine, "PI_CODING_AGENT_DIR", fragment.HomeVariable("opencode"))
++	cases := []struct {
++		name     string
++		args     []string
++		stdout   string
++		stderr   string
++		exit     int
++		wantCode string
++		wantExit int
++	}{
++		{"usage missing env", []string{}, "", "", 0, "usage", 2},
++		{"usage stray operand", []string{"codex_cli", "resume"}, "", "", 0, "usage", 2},
++		{"usage unknown flag", []string{"codex_cli", "--unknown"}, "", "", 0, "usage", 2},
++		{"usage ax-profile untracked", []string{"codex_cli", "--ax-profile", "yolo"}, "", "", 0, "usage", 2},
++		{"resolve environment unknown", []string{"pi"}, "", "curator: environment_unknown: unregistered\n", 1, "resolve_environment_unknown", 1},
++		{"resolve profile unknown", []string{"pi"}, "", "curator: profile_unknown: none current\n", 1, "resolve_profile_unknown", 1},
++		{"resolve repair failed", []string{"pi"}, "", "curator: environment_repair_failed: store\n", 1, "resolve_repair_failed", 1},
++		{"resolve lock unavailable", []string{"pi"}, "", "curator: environment_lock_unavailable: busy\n", 1, "resolve_lock_unavailable", 1},
++		{"resolve invocation failed", []string{"pi"}, "", "boom\n", 3, "resolve_invocation_failed", 1},
++		{"resolve fragment invalid", []string{"pi"}, "{}\n", "", 0, "resolve_fragment_invalid", 1},
++		{"env unsupported", []string{"opencode"}, opencodeLine, "", 0, "env_unsupported", 1},
++	}
++	for _, c := range cases {
++		t.Run(c.name, func(t *testing.T) {
++			sr := &scriptedRunner{stdout: c.stdout, stderr: c.stderr, exit: c.exit}
++			var out, errOut strings.Builder
++			resolver := fragment.NewWithRunner("curator", sr)
++			if diagnostics.CodeUsage == c.wantCode {
++				resolver = fragment.NewWithRunner("curator", forbiddenRunner{t})
++			}
++			got := run(context.Background(), c.args, &out, &errOut, resolver)
++			if got != c.wantExit {
++				t.Fatalf("exit = %d, want %d (stderr %q)", got, c.wantExit, errOut.String())
++			}
++			if got != diagnostics.ExitForCode(c.wantCode) {
++				t.Fatalf("exit = %d, want ExitForCode(%q)", got, c.wantCode)
++			}
++			if out.Len() != 0 {
++				t.Fatalf("stdout = %q, want empty", out.String())
++			}
++			lines := strings.Split(strings.TrimSuffix(errOut.String(), "\n"), "\n")
++			found := 0
++			for _, line := range lines {
++				if diagnostics.IsDiagnosticLine(line) {
++					found++
++					if !strings.HasPrefix(line, name+": "+c.wantCode+": ") {
++						t.Fatalf("diagnostic line %q does not carry code %q", line, c.wantCode)
++					}
++				}
++			}
++			if found != 1 {
++				t.Fatalf("stderr has %d diagnostic lines, want exactly 1: %q", found, errOut.String())
++			}
++			if c.stderr != "" && !strings.HasPrefix(errOut.String(), c.stderr) {
++				t.Fatalf("stderr %q does not forward curator stderr %q verbatim first", errOut.String(), c.stderr)
++			}
++		})
++	}
++}
++
++// TestRunDetailInjectionCannotForgeLine is the one-code-line regression:
++// operator bytes that spell a launcher code line still render as exactly
++// one diagnostic code line at the production entry point. The resolve
++// case is the framing regression: the profile value reaches the detail
++// raw through the real fragment Resolver (only the binary is absent).
++// The usage case pins the companion path, where the parser's %q-quoted
++// echo plus the same framing keep a hostile flag token to one line.
++func TestRunDetailInjectionCannotForgeLine(t *testing.T) {
++	injected := "normal\ncurator-run: usage: forged"
++	t.Run("resolve", func(t *testing.T) {
++		var out, errOut strings.Builder
++		resolver := fragment.NewWithRunner(
++			filepath.Join(t.TempDir(), "missing-curator"), fragment.ExecRunner{})
++		got := run(context.Background(),
++			[]string{"pi", "--profile", injected}, &out, &errOut, resolver)
++		if got != 1 {
++			t.Fatalf("exit = %d, want 1 (stderr %q)", got, errOut.String())
++		}
++		assertSingleDiagnostic(t, errOut.String(), "resolve_invocation_failed")
++		if out.Len() != 0 {
++			t.Fatalf("stdout = %q, want empty", out.String())
++		}
++	})
++	t.Run("usage", func(t *testing.T) {
++		var out, errOut strings.Builder
++		got := runNoResolve(t,
++			[]string{"pi", "--bad\ncurator-run: usage: forged"}, &out, &errOut)
++		if got != 2 {
++			t.Fatalf("exit = %d, want 2 (stderr %q)", got, errOut.String())
++		}
++		assertSingleDiagnostic(t, errOut.String(), "usage")
++		if out.Len() != 0 {
++			t.Fatalf("stdout = %q, want empty", out.String())
++		}
++	})
++}
++
++// assertSingleDiagnostic requires exactly one launcher diagnostic code
++// line carrying wantCode; every other stderr line — forwarded transport,
++// usage text, framed continuations — must not parse as one.
++func assertSingleDiagnostic(t *testing.T, stderr, wantCode string) {
++	t.Helper()
++	lines := strings.Split(strings.TrimSuffix(stderr, "\n"), "\n")
++	found := 0
++	for _, line := range lines {
++		if diagnostics.IsDiagnosticLine(line) {
++			found++
++			if !strings.HasPrefix(line, name+": "+wantCode+": ") {
++				t.Fatalf("diagnostic line %q does not carry code %q", line, wantCode)
++			}
++		}
++	}
++	if found != 1 {
++		t.Fatalf("stderr has %d diagnostic lines, want exactly 1: %q", found, stderr)
++	}
++}
++
+ func TestRunResolveFailurePrecedesMapping(t *testing.T) {
+ 	sr := &scriptedRunner{exit: 1, stderr: "curator: environment_unknown: missing\n"}
+ 	var out, stderr strings.Builder
+diff --git a/internal/diagnostics/diagnostics.go b/internal/diagnostics/diagnostics.go
+new file mode 100644
+index 0000000..4baf919
+--- /dev/null
++++ b/internal/diagnostics/diagnostics.go
+@@ -0,0 +1,317 @@
++// Package diagnostics implements the stable SPEC §6 diagnostic contract:
++// the closed code families, the exit-code rule, and the deterministic
++// stderr rendering.
++//
++// This package produces no diagnostics of its own. Every code is owned by
++// the pipeline stage named below; the constants here transcribe the SPEC
++// §6 table verbatim, and TestOwnedCodesMatchOwners pins each owned literal
++// to its owner's constant or method, so the owner stays the single source
++// of truth. New behavior must reuse those owners' error contracts rather
++// than duplicating them here.
++//
++// Closed families (code → owner → production call site):
++//
++//	usage                          cli.UsageError              cli.Parse (exit 2)
++//	resolve_invocation_failed      fragment.ResolveError       fragment.Resolver.Resolve (exit 1)
++//	resolve_environment_unknown    fragment.ResolveError       fragment.Resolver.Resolve (exit 1)
++//	resolve_profile_unknown        fragment.ResolveError       fragment.Resolver.Resolve (exit 1)
++//	resolve_repair_failed          fragment.ResolveError       fragment.Resolver.Resolve (exit 1)
++//	resolve_lock_unavailable       fragment.ResolveError       fragment.Resolver.Resolve (exit 1)
++//	resolve_fragment_invalid       fragment.ResolveError       fragment.Resolver.Resolve (exit 1)
++//	defaults_config_invalid        axconfig.Error              axconfig.Load (exit 1)
++//	defaults_unresolvable          (no producer in this build) separately owned (exit 1)
++//	plan_refused                   (no producer in this build) separately owned (exit 1)
++//	plan_provider_limited          (no producer in this build) separately owned (exit 1)
++//	env_unsupported                mapping (constant)          mapping.Resolve (exit 1)
++//	exec_provider_missing          execution (sentinel text)   execution.Launch.Run (exit 1)
++//	ax_handoff_failed              execution (sentinel text)   execution.Launch.Run (exit 1)
++//	mcp_layer_missing              composition.LayerError      composition.Value.CheckLaunchBoundary (exit 1)
++//	mcp_layer_unreadable           composition.LayerError      composition.Value.CheckLaunchBoundary (exit 1)
++//	sysprompt_channel_unavailable  systemprompt.Refusal        systemprompt.Select via PrepareLaunch (exit 1)
++//	sysprompt_file_unreadable      systemprompt.Refusal        systemprompt.ProbeFiles via PrepareLaunch (exit 1)
++//
++// Two invariants hold across every family (SPEC §6). First, an absence and
++// a failure to read are different facts: a fallback defined for absence
++// never fires on a failed or malformed read, and where absence is itself
++// the failure (mcp_layer_missing) it carries its own code rather than
++// sharing the read failure's. Second, no diagnostic downgrades the launch:
++// every failure is terminal for that invocation. ExitForCode encodes the
++// second invariant: any error code — including one outside the closed set,
++// which signals a caller bug rather than a new contract — exits 1, never
++// 0. CodeOf encodes the first half of the first: an error this layer does
++// not recognize yields no code at all rather than an invented one.
++//
++// Warnings (`warning: <code>: <detail>`) and child/subprocess stderr are
++// transport, not diagnostics: IsDiagnosticLine distinguishes a launcher
++// code line from them so a warning is never mistaken for the contract.
++//
++// Byte rule: Line frames launcher-owned detail (see Line). Forwarded
++// bytes — Curator's stderr, provider verdict evidence, ax Structured
++// Error payloads — are written verbatim by their owners and never pass
++// through Line, so this package transforms no foreign bytes.
++//
++// Bound: CodeOf has no production caller in this build; main classifies
++// through the owners' own predicates (cli.IsUsage, fragment.IsResolve)
++// and chooses the mapping/execution codes at their call sites. CodeOf is
++// the API-only statement of the same closed contract for the later
++// pipeline families.
++package diagnostics
++
++import (
++	"fmt"
++	"io"
++	"reflect"
++	"strings"
++
++	"github.com/relux-works/curator-agent-launcher/internal/axconfig"
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/curator-agent-launcher/internal/systemprompt"
++)
++
++// Process exit statuses of SPEC §6: usage errors exit 2; every operational
++// failure exits 1. ExitUsage equals cli.ExitCode by contract (pinned).
++const (
++	ExitUsage       = 2
++	ExitOperational = 1
++)
++
++// Stable diagnostic codes of SPEC §6, in table order. Owned literals are
++// pinned to their owners in tests; the three separately-owned codes have
++// no producer in this build and name their pending call site in
++// RemainingObligations.
++const (
++	CodeUsage = "usage"
++
++	CodeResolveInvocationFailed   = "resolve_invocation_failed"
++	CodeResolveEnvironmentUnknown = "resolve_environment_unknown"
++	CodeResolveProfileUnknown     = "resolve_profile_unknown"
++	CodeResolveRepairFailed       = "resolve_repair_failed"
++	CodeResolveLockUnavailable    = "resolve_lock_unavailable"
++	CodeResolveFragmentInvalid    = "resolve_fragment_invalid"
++
++	CodeDefaultsInvalid      = "defaults_config_invalid"
++	CodeDefaultsUnresolvable = "defaults_unresolvable"
++
++	CodePlanRefused         = "plan_refused"
++	CodePlanProviderLimited = "plan_provider_limited"
++
++	CodeEnvUnsupported = "env_unsupported"
++
++	CodeExecMissing = "exec_provider_missing"
++
++	CodeAxHandoffFailed = "ax_handoff_failed"
++
++	CodeMCPLayerMissing    = "mcp_layer_missing"
++	CodeMCPLayerUnreadable = "mcp_layer_unreadable"
++
++	CodeSyspromptUnavailable = "sysprompt_channel_unavailable"
++	CodeSyspromptUnreadable  = "sysprompt_file_unreadable"
++)
++
++// Codes returns the closed code set in SPEC §6 table order.
++func Codes() []string {
++	return []string{
++		CodeUsage,
++		CodeResolveInvocationFailed,
++		CodeResolveEnvironmentUnknown,
++		CodeResolveProfileUnknown,
++		CodeResolveRepairFailed,
++		CodeResolveLockUnavailable,
++		CodeResolveFragmentInvalid,
++		CodeDefaultsInvalid,
++		CodeDefaultsUnresolvable,
++		CodePlanRefused,
++		CodePlanProviderLimited,
++		CodeEnvUnsupported,
++		CodeExecMissing,
++		CodeAxHandoffFailed,
++		CodeMCPLayerMissing,
++		CodeMCPLayerUnreadable,
++		CodeSyspromptUnavailable,
++		CodeSyspromptUnreadable,
++	}
++}
++
++var valid = func() map[string]bool {
++	m := map[string]bool{}
++	for _, c := range Codes() {
++		m[c] = true
++	}
++	return m
++}()
++
++// Valid reports whether code is a member of the closed set. Codes outside
++// the set — including Curator's environment_home_stale, which SPEC §4.1
++// declares unreachable from a --repair invocation — are not launcher
++// diagnostics.
++func Valid(code string) bool { return valid[code] }
++
++// ExitForCode maps a diagnostic code to its process exit status: usage
++// exits 2, everything else exits 1. An unknown code still exits 1: a bug
++// in code selection stays terminal and visible, never silent success and
++// never a usage report.
++func ExitForCode(code string) int {
++	if code == CodeUsage {
++		return ExitUsage
++	}
++	return ExitOperational
++}
++
++// resolveFamily, layerFamily, and refusalFamily are the closed code sets
++// each typed owner may speak. They transcribe the owner constants, so the
++// owner stays the single source of truth; a typed error carrying any
++// other code — another family's member, a Curator-internal code, or an
++// invented one — is a caller bug and yields no code.
++var resolveFamily = map[string]bool{
++	fragment.CodeInvocationFailed:   true,
++	fragment.CodeEnvironmentUnknown: true,
++	fragment.CodeProfileUnknown:     true,
++	fragment.CodeRepairFailed:       true,
++	fragment.CodeLockUnavailable:    true,
++	fragment.CodeFragmentInvalid:    true,
++}
++
++var layerFamily = map[string]bool{
++	composition.CodeMCPLayerMissing:    true,
++	composition.CodeMCPLayerUnreadable: true,
++}
++
++var refusalFamily = map[string]bool{
++	systemprompt.CodeUnavailable: true,
++	systemprompt.CodeUnreadable:  true,
++}
++
++// chain walks err breadth-first through Unwrap() error and
++// Unwrap() []error links, calling fn at every level until it reports a
++// code, so wrapping (including errors.Join) preserves the classification.
++// A typed-nil link ends its branch with no match: several owners'
++// Unwrap methods dereference the receiver, so the stdlib errors.As walk
++// panics on them, while this guarded walk fails closed instead.
++func chain(err error, fn func(error) (string, bool)) (string, bool) {
++	queue := []error{err}
++	for len(queue) > 0 {
++		e := queue[0]
++		queue = queue[1:]
++		if e == nil || nilValue(e) {
++			continue
++		}
++		if code, ok := fn(e); ok {
++			return code, true
++		}
++		switch u := e.(type) {
++		case interface{ Unwrap() []error }:
++			queue = append(queue, u.Unwrap()...)
++		case interface{ Unwrap() error }:
++			queue = append(queue, u.Unwrap())
++		}
++	}
++	return "", false
++}
++
++// nilValue reports whether e is a typed nil: a non-nil error interface
++// holding a nil pointer, map, slice, channel, function, or interface.
++func nilValue(e error) bool {
++	switch v := reflect.ValueOf(e); v.Kind() {
++	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
++		return v.IsNil()
++	default:
++		return false
++	}
++}
++
++// CodeOf extracts the stable diagnostic code from a production error
++// without inventing one. It recognizes the concrete error types of the
++// owning stages at every level of their wrap chains, and accepts only
++// the owner's own closed family. Mapping failures (plain errors under
++// mapping.CodeUnsupported) and execution sentinels
++// (exec_provider_missing, ax_handoff_failed) are chosen explicitly at
++// their call sites and are not classified here. An error no owner claims
++// — including a bare fragment parse error, which only becomes a
++// diagnostic when the resolver wraps it — yields ok=false. Typed-nil
++// owner values (a non-nil error interface holding a nil pointer, direct
++// or wrapped) also yield ok=false rather than panicking.
++func CodeOf(err error) (code string, ok bool) {
++	return chain(err, func(e error) (string, bool) {
++		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
++			return CodeUsage, true
++		}
++		if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {
++			return re.Code, true
++		}
++		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
++			return le.Code, true
++		}
++		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {
++			return sr.Code, true
++		}
++		if ae, ok := e.(*axconfig.Error); ok && ae != nil {
++			return CodeDefaultsInvalid, true
++		}
++		return "", false
++	})
++}
++
++// Line renders one deterministic diagnostic code line: the executable
++// name, the stable code, and the human-oriented detail. The code, not the
++// prose, is the contract.
++//
++// Framing rule: detail is launcher-owned text and may carry operator or
++// subprocess bytes (a profile name, an argv rendering, a start error),
++// so every CR and LF inside it is folded to a LF followed by two spaces.
++// The first line of the result is therefore always the only code line;
++// each continuation line starts with whitespace, so IsDiagnosticLine
++// never recognizes it — even when the embedded bytes spell a code line.
++// Only detail is framed: code is chosen by the call site from the closed
++// set, and forwarded child/provider/ax bytes never pass through Line.
++func Line(code, detail string) string {
++	detail = strings.ReplaceAll(detail, "\r\n", "\n")
++	detail = strings.ReplaceAll(detail, "\r", "\n")
++	detail = strings.ReplaceAll(detail, "\n", "\n  ")
++	return cli.Name + ": " + code + ": " + detail + "\n"
++}
++
++// Emit writes Line to w. It validates nothing: the call site owns the
++// family-correct code, and even a caller bug stays terminal through
++// ExitForCode. The returned error is the write error, if any.
++func Emit(w io.Writer, code, detail string) error {
++	_, err := fmt.Fprint(w, Line(code, detail))
++	return err
++}
++
++// IsDiagnosticLine reports whether line is a single launcher diagnostic
++// code line: anchored at the executable name, carrying a closed-set code,
++// followed by the detail separator. Warning lines, Curator's own
++// `curator: <code>: <detail>` lines, and child stderr never satisfy it,
++// even when they embed a launcher code token.
++func IsDiagnosticLine(line string) bool {
++	if strings.Contains(line, "\n") {
++		return false
++	}
++	rest, ok := strings.CutPrefix(line, cli.Name+": ")
++	if !ok {
++		return false
++	}
++	code, _, found := strings.Cut(rest, ":")
++	code = strings.TrimSuffix(code, " ")
++	if !found || code == "" {
++		return false
++	}
++	return Valid(code)
++}
++
++// RemainingObligations names the production call sites this contract
++// covers but this build does not yet wire into the launcher entry point.
++// Each is owned by the task in parentheses; wiring one means choosing the
++// named family code at that boundary and exiting through ExitForCode, with
++// no fallback to a weaker launch shape.
++func RemainingObligations() []string {
++	return []string{
++		"axconfig.Load before cli.Parse, so a present-but-unreadable ax.json reports defaults_config_invalid even when argv is also a usage error (TASK-260908-1o7i8y)",
++		"defaults.json read, locked-member usage refusal, lineup fallback, defaults_unresolvable, and the per-member stderr line-group (TASK-260909-2vy977)",
++		"vendorplugin.BuildLaunch admission and providerlimits.Store.AvailabilityFor verdict enforcement as plan_refused / plan_provider_limited with verbatim verdict evidence (TASK-260908-2so46q)",
++		"composition.Value.CheckLaunchBoundary immediately before both ax handoff and direct exec, with the binary check and systemprompt.PrepareLaunch as the execution Boundary (TASK-260908-1o7i8y)",
++		"systemprompt.PrepareLaunch selection, file-kind probe, and warning emission on every launch (TASK-260908-1o7i8y)",
++	}
++}
+diff --git a/internal/diagnostics/diagnostics_test.go b/internal/diagnostics/diagnostics_test.go
+new file mode 100644
+index 0000000..579c927
+--- /dev/null
++++ b/internal/diagnostics/diagnostics_test.go
+@@ -0,0 +1,445 @@
++package diagnostics_test
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"slices"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/axconfig"
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	sp "github.com/relux-works/curator-agent-launcher/internal/systemprompt"
++)
++
++var specCodeToken = regexp.MustCompile("^[a-z][a-z0-9_]*$")
++
++// specSection6Codes derives the closed code set from the normative source:
++// the Codes column of the SPEC §6 table in SPEC.md, in table order. The
++// test transcribes nothing by hand, so a code added to or dropped from
++// the table without the matching contract change fails here.
++func specSection6Codes(t *testing.T) []string {
++	t.Helper()
++	raw, err := os.ReadFile(specPath(t))
++	if err != nil {
++		t.Fatalf("read SPEC.md: %v", err)
++	}
++	lines := strings.Split(string(raw), "\n")
++	start := -1
++	for i, l := range lines {
++		if l == "## 6. Errors and diagnostics" {
++			start = i
++			break
++		}
++	}
++	if start < 0 {
++		t.Fatal("SPEC.md has no '## 6. Errors and diagnostics' section")
++	}
++	var codes []string
++	inTable := false
++	for _, l := range lines[start+1:] {
++		if !strings.HasPrefix(l, "|") {
++			if inTable {
++				break
++			}
++			continue
++		}
++		inTable = true
++		fields := strings.Split(l, "|")
++		if len(fields) < 4 {
++			t.Fatalf("malformed SPEC §6 table row: %q", l)
++		}
++		if strings.Contains(fields[1], "Family") || strings.Contains(fields[1], "---") {
++			continue
++		}
++		for _, tok := range strings.Split(fields[2], "`") {
++			tok = strings.TrimSpace(tok)
++			if tok == "" || !specCodeToken.MatchString(tok) {
++				continue
++			}
++			codes = append(codes, tok)
++		}
++	}
++	if len(codes) == 0 {
++		t.Fatal("derived no codes from the SPEC §6 table")
++	}
++	return codes
++}
++
++// specPath locates the repository SPEC.md from the test's own file so the
++// derivation holds wherever the package is checked out.
++func specPath(t *testing.T) string {
++	t.Helper()
++	if raw, err := os.ReadFile(filepath.Join("..", "..", "SPEC.md")); err == nil && len(raw) > 0 {
++		return filepath.Join("..", "..", "SPEC.md")
++	}
++	_, file, _, ok := runtime.Caller(0)
++	if !ok {
++		t.Fatal("runtime.Caller unavailable")
++	}
++	dir := filepath.Dir(file)
++	for i := 0; i < 6; i++ {
++		cand := filepath.Join(dir, "SPEC.md")
++		if raw, err := os.ReadFile(cand); err == nil && len(raw) > 0 {
++			return cand
++		}
++		dir = filepath.Dir(dir)
++	}
++	t.Fatal("SPEC.md not found")
++	return ""
++}
++
++// TestClosedSetMatchesSpec pins the closed set against the normative
++// source: Codes() must equal the SPEC §6 table's Codes column, in table
++// order. Adding or dropping a code is a specification change and must
++// update SPEC.md and the contract together.
++func TestClosedSetMatchesSpec(t *testing.T) {
++	want := specSection6Codes(t)
++	got := diagnostics.Codes()
++	if !slices.Equal(got, want) {
++		t.Fatalf("Codes() = %q, SPEC §6 table = %q", got, want)
++	}
++	for _, c := range got {
++		if !diagnostics.Valid(c) {
++			t.Fatalf("Valid(%q) = false for a closed code", c)
++		}
++	}
++}
++
++// TestOwnedCodesMatchOwners pins every owned literal to its owner's
++// constant or method: the owner stays the single source of truth and this
++// package only transcribes the SPEC table.
++func TestOwnedCodesMatchOwners(t *testing.T) {
++	if diagnostics.CodeUsage != (&cli.UsageError{}).Code() {
++		t.Fatalf("CodeUsage = %q, cli code = %q", diagnostics.CodeUsage, (&cli.UsageError{}).Code())
++	}
++	pairs := [][2]string{
++		{diagnostics.CodeResolveInvocationFailed, fragment.CodeInvocationFailed},
++		{diagnostics.CodeResolveEnvironmentUnknown, fragment.CodeEnvironmentUnknown},
++		{diagnostics.CodeResolveProfileUnknown, fragment.CodeProfileUnknown},
++		{diagnostics.CodeResolveRepairFailed, fragment.CodeRepairFailed},
++		{diagnostics.CodeResolveLockUnavailable, fragment.CodeLockUnavailable},
++		{diagnostics.CodeResolveFragmentInvalid, fragment.CodeFragmentInvalid},
++		{diagnostics.CodeDefaultsInvalid, axconfig.CodeInvalid},
++		{diagnostics.CodeEnvUnsupported, "env_unsupported"},
++		{diagnostics.CodeMCPLayerMissing, composition.CodeMCPLayerMissing},
++		{diagnostics.CodeMCPLayerUnreadable, composition.CodeMCPLayerUnreadable},
++		{diagnostics.CodeSyspromptUnavailable, sp.CodeUnavailable},
++		{diagnostics.CodeSyspromptUnreadable, sp.CodeUnreadable},
++	}
++	for _, p := range pairs {
++		if p[0] != p[1] {
++			t.Errorf("contract %q != owner %q", p[0], p[1])
++		}
++	}
++	if diagnostics.ExitUsage != cli.ExitCode {
++		t.Fatalf("ExitUsage = %d, cli.ExitCode = %d", diagnostics.ExitUsage, cli.ExitCode)
++	}
++}
++
++// TestExitForCode is the no-silent-degradation gate: usage exits 2, every
++// operational code exits 1, and anything outside the closed set — empty,
++// Curator-internal, or invented — still exits 1, never 0 and never 2.
++func TestExitForCode(t *testing.T) {
++	for _, c := range diagnostics.Codes() {
++		want := diagnostics.ExitOperational
++		if c == diagnostics.CodeUsage {
++			want = diagnostics.ExitUsage
++		}
++		if got := diagnostics.ExitForCode(c); got != want {
++			t.Errorf("ExitForCode(%q) = %d, want %d", c, got, want)
++		}
++	}
++	for _, c := range []string{"", "environment_home_stale", "Usage", "USAGE", "resolve", "internal_error", "not_implemented", "ok", "0"} {
++		if got := diagnostics.ExitForCode(c); got != diagnostics.ExitOperational {
++			t.Errorf("ExitForCode(%q) = %d, want operational %d", c, got, diagnostics.ExitOperational)
++		}
++	}
++}
++
++// TestCodeOfProductionTypes drives CodeOf through the real concrete error
++// types of each owning stage, including errors produced by real production
++// calls (axconfig.Load against temp dirs, composition boundary probes and
++// systemprompt selection against temp homes).
++func TestCodeOfProductionTypes(t *testing.T) {
++	if code, ok := diagnostics.CodeOf(&cli.UsageError{Detail: "missing <env-id>"}); !ok || code != "usage" {
++		t.Fatalf("usage error: %q %v", code, ok)
++	}
++	if _, err := cli.Parse(nil, cli.Options{}); err != nil {
++		if code, ok := diagnostics.CodeOf(err); !ok || code != "usage" {
++			t.Fatalf("real cli.Parse error: %q %v (%v)", code, ok, err)
++		}
++	} else {
++		t.Fatal("cli.Parse(nil) must fail")
++	}
++	re := &fragment.ResolveError{Code: fragment.CodeRepairFailed, Detail: "x"}
++	if code, ok := diagnostics.CodeOf(re); !ok || code != "resolve_repair_failed" {
++		t.Fatalf("resolve error: %q %v", code, ok)
++	}
++	wrapped := &fragment.ResolveError{Code: fragment.CodeLockUnavailable, Detail: "x"}
++	if code, ok := diagnostics.CodeOf(errors.Join(errors.New("outer"), wrapped)); !ok || code != "resolve_lock_unavailable" {
++		t.Fatalf("wrapped resolve error: %q %v", code, ok)
++	}
++	missing, unreadable := codexBoundary(t)
++	if code, ok := diagnostics.CodeOf(missing); !ok || code != "mcp_layer_missing" {
++		t.Fatalf("mcp missing: %q %v (%v)", code, ok, missing)
++	}
++	if code, ok := diagnostics.CodeOf(unreadable); !ok || code != "mcp_layer_unreadable" {
++		t.Fatalf("mcp unreadable: %q %v (%v)", code, ok, unreadable)
++	}
++	if code, ok := diagnostics.CodeOf(syspromptSelection(t)); !ok || code != "sysprompt_channel_unavailable" {
++		t.Fatalf("sysprompt selection: %q %v", code, ok)
++	}
++	if code, ok := diagnostics.CodeOf(syspromptProbe(t)); !ok || code != "sysprompt_file_unreadable" {
++		t.Fatalf("sysprompt probe: %q %v", code, ok)
++	}
++	if code, ok := diagnostics.CodeOf(axconfigFailure(t)); !ok || code != "defaults_config_invalid" {
++		t.Fatalf("axconfig failure: %q %v", code, ok)
++	}
++}
++
++// TestCodeOfUnknownFailsClosed is the no-invention gate: errors no owner
++// claims yield no code, including a bare fragment parse error (which only
++// becomes a diagnostic when the resolver wraps it) and nil.
++func TestCodeOfUnknownFailsClosed(t *testing.T) {
++	bad, err := fragment.Parse([]byte(`{"fragment":"launch-env-fragment-v1"}`))
++	if err == nil || bad != nil {
++		t.Fatalf("fixture must fail parse: %v %v", bad, err)
++	}
++	for name, err := range map[string]error{
++		"plain":          errors.New("boom"),
++		"wrapped plain":  errors.Join(errors.New("a"), errors.New("b")),
++		"bare parse":     err,
++		"empty resolve":  &fragment.ResolveError{},
++		"empty layer":    &composition.LayerError{},
++		"empty refusal":  &sp.Refusal{},
++		"nil":            nil,
++		"mapping-shaped": errors.New(`environment "future_env" has no supported system/provider pair`),
++	} {
++		if code, ok := diagnostics.CodeOf(err); ok || code != "" {
++			t.Errorf("%s: CodeOf = %q %v, want no code", name, code, ok)
++		}
++	}
++}
++
++// TestCodeOfRejectsForeignFamily is the closed-family gate: a typed
++// owner error carrying another family's code, a Curator-internal code,
++// or an invented one yields no code — including through a wrapping
++// chain. A resolve-family error reading "usage" must never exit 2.
++//
++// The strangers are derived, not hand-selected: every normative SPEC §6
++// code outside the probed owner's own family (families transcribed from
++// the owner constants, the single source of truth) plus the
++// Curator-internal, invented, and empty extras. A hand list previously
++// omitted five resolve codes for the layer and refusal owners; the
++// derivation cannot. The committed gate_conformance_test.go asserts the
++// same matrix per owner/form cell with named per-owner tests.
++func TestCodeOfRejectsForeignFamily(t *testing.T) {
++	// Codes no owner may speak beyond its own family.
++	extras := []string{
++		"environment_home_stale",
++		"environment_unknown",
++		"invented_code",
++		"",
++	}
++	own := map[string][]string{
++		"resolve": {
++			fragment.CodeInvocationFailed,
++			fragment.CodeEnvironmentUnknown,
++			fragment.CodeProfileUnknown,
++			fragment.CodeRepairFailed,
++			fragment.CodeLockUnavailable,
++			fragment.CodeFragmentInvalid,
++		},
++		"layer":   {composition.CodeMCPLayerMissing, composition.CodeMCPLayerUnreadable},
++		"refusal": {sp.CodeUnavailable, sp.CodeUnreadable},
++	}
++	normative := specSection6Codes(t)
++	if got := diagnostics.Codes(); !slices.Equal(got, normative) {
++		t.Fatalf("Codes() = %q, SPEC §6 table = %q", got, normative)
++	}
++	strangers := func(family []string) []string {
++		var out []string
++		for _, c := range normative {
++			if !slices.Contains(family, c) {
++				out = append(out, c)
++			}
++		}
++		for _, c := range extras {
++			if !slices.Contains(family, c) && !slices.Contains(out, c) {
++				out = append(out, c)
++			}
++		}
++		return out
++	}
++	mk := map[string]func(string) error{
++		"resolve": func(c string) error { return &fragment.ResolveError{Code: c, Detail: "x"} },
++		"layer":   func(c string) error { return &composition.LayerError{Code: c, Path: "p"} },
++		"refusal": func(c string) error { return &sp.Refusal{Code: c, Path: "p"} },
++	}
++	for owner, makeErr := range mk {
++		for _, code := range strangers(own[owner]) {
++			err := makeErr(code)
++			cands := map[string]error{
++				"direct":  err,
++				"wrapped": fmt.Errorf("outer: %w", err),
++				"joined":  errors.Join(errors.New("outer"), err),
++			}
++			for name, cand := range cands {
++				if got, ok := diagnostics.CodeOf(cand); ok || got != "" {
++					t.Errorf("%s/%s code %q: CodeOf = %q %v, want no code", owner, name, code, got, ok)
++				}
++			}
++		}
++		// Each own-family member is still accepted, wrapped or not.
++		for _, code := range own[owner] {
++			if got, ok := diagnostics.CodeOf(fmt.Errorf("outer: %w", makeErr(code))); !ok || got != code {
++				t.Errorf("%s own code %q: CodeOf = %q %v", owner, code, got, ok)
++			}
++		}
++	}
++	// UsageError carries no code field: it always reads "usage" no matter
++	// what the detail smuggles.
++	if got, ok := diagnostics.CodeOf(&cli.UsageError{Detail: "usage"}); !ok || got != "usage" {
++		t.Errorf("usage: CodeOf = %q %v, want usage", got, ok)
++	}
++}
++
++// TestCodeOfTypedNil proves a typed-nil owner value — a non-nil error
++// interface holding a nil pointer, direct or wrapped — yields no code
++// instead of panicking.
++func TestCodeOfTypedNil(t *testing.T) {
++	var ue *cli.UsageError
++	var re *fragment.ResolveError
++	var le *composition.LayerError
++	var sr *sp.Refusal
++	var ae *axconfig.Error
++	cands := map[string]error{
++		"usage":   ue,
++		"resolve": re,
++		"layer":   le,
++		"refusal": sr,
++		"ax":      ae,
++	}
++	for name, err := range cands {
++		if got, ok := diagnostics.CodeOf(err); ok || got != "" {
++			t.Errorf("%s typed nil: CodeOf = %q %v, want no code", name, got, ok)
++		}
++		wrapped := fmt.Errorf("outer: %w", err)
++		if got, ok := diagnostics.CodeOf(wrapped); ok || got != "" {
++			t.Errorf("%s wrapped typed nil: CodeOf = %q %v, want no code", name, got, ok)
++		}
++	}
++}
++
++// TestDiagnosticDetailCannotForgeLine proves the framing rule: hostile
++// detail bytes (embedded newlines, carriage returns, a spelled-out code
++// line) render as one code line plus whitespace-led continuations that
++// IsDiagnosticLine never recognizes.
++func TestDiagnosticDetailCannotForgeLine(t *testing.T) {
++	hostile := []string{
++		"normal\ncurator-run: usage: forged",
++		"a\ncurator-run: resolve_repair_failed: forged\nb",
++		"carriage\rcurator-run: usage: forged",
++		"crlf\r\ncurator-run: usage: forged\r\n",
++		"\ncurator-run: usage: leading",
++		"trailing curator-run: usage: forged\n",
++	}
++	for _, detail := range hostile {
++		rendered := diagnostics.Line("resolve_invocation_failed", detail)
++		lines := strings.Split(strings.TrimSuffix(rendered, "\n"), "\n")
++		if len(lines) < 1 {
++			t.Fatalf("detail %q rendered empty", detail)
++		}
++		found := 0
++		for _, line := range lines {
++			if diagnostics.IsDiagnosticLine(line) {
++				found++
++				if !strings.HasPrefix(line, "curator-run: resolve_invocation_failed: ") {
++					t.Fatalf("detail %q: diagnostic line %q carries the wrong code", detail, line)
++				}
++			}
++		}
++		if found != 1 {
++			t.Errorf("detail %q: %d diagnostic lines, want exactly 1 (%q)", detail, found, rendered)
++		}
++		var b strings.Builder
++		if err := diagnostics.Emit(&b, "usage", detail); err != nil {
++			t.Fatal(err)
++		}
++		if b.String() != diagnostics.Line("usage", detail) {
++			t.Errorf("Emit/Line diverge for detail %q", detail)
++		}
++	}
++}
++
++// TestEmitDeterministic pins the stderr rendering bytes: one line,
++// `curator-run: <code>: <detail>`, parseable by IsDiagnosticLine.
++func TestEmitDeterministic(t *testing.T) {
++	var b strings.Builder
++	if err := diagnostics.Emit(&b, "resolve_repair_failed", "store cannot restore"); err != nil {
++		t.Fatal(err)
++	}
++	want := "curator-run: resolve_repair_failed: store cannot restore\n"
++	if b.String() != want {
++		t.Fatalf("Emit = %q, want %q", b.String(), want)
++	}
++	if got := diagnostics.Line("usage", "missing <env-id>"); got != "curator-run: usage: missing <env-id>\n" {
++		t.Fatalf("Line = %q", got)
++	}
++}
++
++// TestDiagnosticLineDistinguishesTransport proves warnings, Curator lines,
++// and child stderr are never launcher diagnostic lines, while every closed
++// code renders one.
++func TestDiagnosticLineDistinguishesTransport(t *testing.T) {
++	for _, c := range diagnostics.Codes() {
++		line := strings.TrimSuffix(diagnostics.Line(c, "detail"), "\n")
++		if !diagnostics.IsDiagnosticLine(line) {
++			t.Errorf("IsDiagnosticLine(Line(%q)) = false", c)
++		}
++	}
++	if !diagnostics.IsDiagnosticLine("curator-run: usage: missing <env-id>") {
++		t.Fatal("usage line must parse")
++	}
++	for _, line := range []string{
++		"warning: environment_tool_version_unverified: pi detected 0.84.3, recorded 0.84.2",
++		"warning: profile \"default\": applied flag/append system-prompt channel.",
++		"curator: environment_unknown: unregistered environment \"pi\"",
++		"curator: resolve_repair_failed: not curator-run shaped",
++		"boom",
++		"",
++		"x curator-run: usage: embedded token is not anchored",
++		" curator-run: usage: leading space is not the contract",
++		"curator-run: environment_home_stale: unreachable codes are not launcher codes",
++		"curator-run: internal_error: invented codes are not launcher codes",
++		"curator-run: usage",
++		"curator-run: usage: multi\nline detail is not one line",
++		"curator-run:: empty code",
++	} {
++		if diagnostics.IsDiagnosticLine(line) {
++			t.Errorf("IsDiagnosticLine(%q) = true, want false", line)
++		}
++	}
++}
++
++// TestRemainingObligationsAreStated bounds the contract: families without
++// a producer in this build are declared, not silently dropped.
++func TestRemainingObligationsAreStated(t *testing.T) {
++	joined := strings.Join(diagnostics.RemainingObligations(), "\n")
++	for _, need := range []string{"axconfig.Load", "defaults_unresolvable", "plan_refused", "plan_provider_limited", "CheckLaunchBoundary", "PrepareLaunch"} {
++		if !strings.Contains(joined, need) {
++			t.Errorf("obligations missing %q:\n%s", need, joined)
++		}
++	}
++	if len(diagnostics.RemainingObligations()) == 0 {
++		t.Fatal("no obligations stated")
++	}
++}
+diff --git a/internal/diagnostics/gate_conformance_test.go b/internal/diagnostics/gate_conformance_test.go
+new file mode 100644
+index 0000000..6c246f5
+--- /dev/null
++++ b/internal/diagnostics/gate_conformance_test.go
+@@ -0,0 +1,673 @@
++// Gate: single exhaustive owner-by-form registry for diagnostics CodeOf.
++// Adopted from TASK-260909-3d1589 (accepted rev3): board resource
++// TASK-260909-3d1589_rev2_gate-conformance_test.go, committed here under
++// its adopted name per TASK-260909-3d1589_rev3_adoption.md. Test bodies
++// are unchanged from the accepted gate; only this header is new.
++// The gate was verified against candidate tree
++// fbe90d5e60593a3a069721b2ad9e53cd071d8c02 (base 3ff66a9).
++//
++// ONE owner registry (gateOwnerRegistry) crossed with ONE form registry
++// (gateFormRegistry: direct/wrapped/joined) derives every positive and nil
++// expectation below. All five CodeOf-recognized owners are rows:
++// ResolveError, LayerError and Refusal carry a mutable per-value Code;
++// UsageError carries a constant code ("usage" via Code()) and
++// axconfig.Error always maps to defaults_config_invalid. Both fixed-code
++// owners are pinned as direct/wrapped/joined positives with named
++// positive-form narrowing mutants in the runner: the rev2 reviewer showed a
++// joined-UsageError rejection surviving the whole published gate, so every
++// fixed owner/form combination is asserted here and counted in
++// TestGateCoverageCounts. Claimed combinations cannot be silently omitted:
++// the coverage test fails when the registry stops matching the measured
++// matrix.
++//
++// Vectors are additionally derived at test runtime from SPEC section 6 and
++// the owner constants, never hand-enumerated. Each mutable owner gate has
++// its own named test so a single-foreign-code weakening fails exactly one
++// name. The remaining normative codes (defaults_unresolvable,
++// plan_refused, plan_provider_limited, env_unsupported, exec_provider_missing,
++// ax_handoff_failed) are call-site-selected with no CodeOf classification in
++// this tree; they appear here only as rejected foreign values and as
++// Codes() members, with production call sites pinned in vectors.
++package diagnostics_test
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"slices"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/axconfig"
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	sp "github.com/relux-works/curator-agent-launcher/internal/systemprompt"
++)
++
++// gateOwnerEntry is one row of the single owner registry: every
++// CodeOf-recognized owner, its kind, its owned codes, the owner-side
++// constant or method pinning each code, the production call site choosing
++// the code, how to build an owned error for a listed code, and a typed-nil
++// value of the owner's error type. kind is "mutable" (per-value Code field
++// the gate can weaken with a foreign admission) or "fixed" (constant
++// mapping; only positive-form narrowings apply).
++type gateOwnerEntry struct {
++	name     string
++	kind     string
++	owned    []string
++	consts   []string
++	callSite string
++	makeErr  func(code string) error
++	nilErr   error
++}
++
++// gateOwnerRegistry is the complete owner table. Mutable families reuse the
++// owner constants so the owner stays the single source of truth; fixed
++// owners pin their constant mapping (UsageError.Code(), axconfig.CodeInvalid).
++var gateOwnerRegistry = []gateOwnerEntry{
++	{
++		name: "usage", kind: "fixed",
++		owned:    []string{diagnostics.CodeUsage},
++		consts:   []string{"cli.UsageError.Code()"},
++		callSite: "cli.Parse (exit 2)",
++		makeErr:  func(string) error { return &cli.UsageError{Detail: "x"} },
++		nilErr:   (*cli.UsageError)(nil),
++	},
++	{
++		name: "resolve", kind: "mutable",
++		owned: gateResolveCodes,
++		consts: []string{
++			"fragment.CodeInvocationFailed",
++			"fragment.CodeEnvironmentUnknown",
++			"fragment.CodeProfileUnknown",
++			"fragment.CodeRepairFailed",
++			"fragment.CodeLockUnavailable",
++			"fragment.CodeFragmentInvalid",
++		},
++		callSite: "fragment.Resolver.Resolve",
++		makeErr:  func(c string) error { return &fragment.ResolveError{Code: c, Detail: "x"} },
++		nilErr:   (*fragment.ResolveError)(nil),
++	},
++	{
++		name: "layer", kind: "mutable",
++		owned: gateLayerCodes,
++		consts: []string{
++			"composition.CodeMCPLayerMissing",
++			"composition.CodeMCPLayerUnreadable",
++		},
++		callSite: "composition.Value.CheckLaunchBoundary",
++		makeErr:  func(c string) error { return &composition.LayerError{Code: c, Path: "p"} },
++		nilErr:   (*composition.LayerError)(nil),
++	},
++	{
++		name: "refusal", kind: "mutable",
++		owned: gateRefusalCodes,
++		consts: []string{
++			"systemprompt.CodeUnavailable",
++			"systemprompt.CodeUnreadable",
++		},
++		callSite: "systemprompt.Select via PrepareLaunch / systemprompt.ProbeFiles via PrepareLaunch",
++		makeErr:  func(c string) error { return &sp.Refusal{Code: c, Path: "p"} },
++		nilErr:   (*sp.Refusal)(nil),
++	},
++	{
++		name: "axconfig", kind: "fixed",
++		owned:    []string{diagnostics.CodeDefaultsInvalid},
++		consts:   []string{"axconfig.CodeInvalid"},
++		callSite: "axconfig.Load (exit 1)",
++		makeErr:  func(string) error { return &axconfig.Error{Path: "p", Err: errors.New("cause")} },
++		nilErr:   (*axconfig.Error)(nil),
++	},
++}
++
++// gateFormRegistry is the complete wrap-form table: the exact error value,
++// one %w wrap layer, and an errors.Join chain holding the value beside an
++// outer error.
++var gateFormRegistry = []string{"direct", "wrapped", "joined"}
++
++// gateFormErr renders one registry form around err.
++func gateFormErr(form string, err error) error {
++	switch form {
++	case "direct":
++		return err
++	case "wrapped":
++		return fmt.Errorf("outer: %w", err)
++	case "joined":
++		return errors.Join(errors.New("outer"), err)
++	default:
++		panic("unknown gate form " + form)
++	}
++}
++
++// gateRegistryByName resolves one owner row by name; unknown names fail the
++// calling test instead of silently narrowing the matrix.
++func gateRegistryByName(t *testing.T, name string) gateOwnerEntry {
++	t.Helper()
++	for _, owner := range gateOwnerRegistry {
++		if owner.name == name {
++			return owner
++		}
++	}
++	t.Fatalf("owner %q not in gateOwnerRegistry", name)
++	return gateOwnerEntry{}
++}
++
++var gateSpecCodeToken = regexp.MustCompile("^[a-z][a-z0-9_]*$")
++
++func gateSpecPath(t *testing.T) string {
++	t.Helper()
++	if raw, err := os.ReadFile(filepath.Join("..", "..", "SPEC.md")); err == nil && len(raw) > 0 {
++		return filepath.Join("..", "..", "SPEC.md")
++	}
++	_, file, _, ok := runtime.Caller(0)
++	if !ok {
++		t.Fatal("runtime.Caller unavailable")
++	}
++	dir := filepath.Dir(file)
++	for i := 0; i < 6; i++ {
++		cand := filepath.Join(dir, "SPEC.md")
++		if raw, err := os.ReadFile(cand); err == nil && len(raw) > 0 {
++			return cand
++		}
++		dir = filepath.Dir(dir)
++	}
++	t.Fatal("SPEC.md not found")
++	return ""
++}
++
++func gateSpecSection6Codes(t *testing.T) []string {
++	t.Helper()
++	raw, err := os.ReadFile(gateSpecPath(t))
++	if err != nil {
++		t.Fatalf("read SPEC.md: %v", err)
++	}
++	lines := strings.Split(string(raw), "\n")
++	start := -1
++	for i, l := range lines {
++		if l == "## 6. Errors and diagnostics" {
++			start = i
++			break
++		}
++	}
++	if start < 0 {
++		t.Fatal("SPEC.md has no '## 6. Errors and diagnostics' section")
++	}
++	var codes []string
++	inTable := false
++	for _, l := range lines[start+1:] {
++		if !strings.HasPrefix(l, "|") {
++			if inTable {
++				break
++			}
++			continue
++		}
++		inTable = true
++		fields := strings.Split(l, "|")
++		if len(fields) < 4 {
++			t.Fatalf("malformed SPEC section 6 table row: %q", l)
++		}
++		if strings.Contains(fields[1], "Family") || strings.Contains(fields[1], "---") {
++			continue
++		}
++		for _, tok := range strings.Split(fields[2], "`") {
++			tok = strings.TrimSpace(tok)
++			if tok == "" || !gateSpecCodeToken.MatchString(tok) {
++				continue
++			}
++			codes = append(codes, tok)
++		}
++	}
++	if len(codes) == 0 {
++		t.Fatal("derived no codes from the SPEC section 6 table")
++	}
++	return codes
++}
++
++// gateResolveCodes, gateLayerCodes and gateRefusalCodes are the mutable
++// families transcribed from the owner constants. The registry rows below
++// reuse these same slices, so the owner constants stay the single source
++// of truth for both the registry and the foreign-rejection matrix.
++var gateResolveCodes = []string{
++	fragment.CodeInvocationFailed,
++	fragment.CodeEnvironmentUnknown,
++	fragment.CodeProfileUnknown,
++	fragment.CodeRepairFailed,
++	fragment.CodeLockUnavailable,
++	fragment.CodeFragmentInvalid,
++}
++
++var gateLayerCodes = []string{
++	composition.CodeMCPLayerMissing,
++	composition.CodeMCPLayerUnreadable,
++}
++
++var gateRefusalCodes = []string{
++	sp.CodeUnavailable,
++	sp.CodeUnreadable,
++}
++
++func gateResolveFamily() []string {
++	return slices.Clone(gateResolveCodes)
++}
++
++func gateLayerFamily() []string {
++	return slices.Clone(gateLayerCodes)
++}
++
++func gateRefusalFamily() []string {
++	return slices.Clone(gateRefusalCodes)
++}
++
++func gateExtraStrangers() []string {
++	return []string{
++		"environment_home_stale",
++		"environment_unknown",
++		"invented_code",
++		"",
++	}
++}
++
++func gateForeign(normative, own []string) []string {
++	var out []string
++	for _, c := range normative {
++		if !slices.Contains(own, c) {
++			out = append(out, c)
++		}
++	}
++	for _, c := range gateExtraStrangers() {
++		if !slices.Contains(own, c) && !slices.Contains(out, c) {
++			out = append(out, c)
++		}
++	}
++	return out
++}
++
++// gateForms builds the three registry wrap forms for one owner error. The
++// owned error is constructed fresh per form so no shared state leaks across
++// cases.
++func gateForms(makeErr func(string) error, code string) map[string]error {
++	out := make(map[string]error, len(gateFormRegistry))
++	for _, form := range gateFormRegistry {
++		out[form] = gateFormErr(form, makeErr(code))
++	}
++	return out
++}
++
++func gateCheckRejects(t *testing.T, owner string, makeErr func(string) error, own []string) {
++	t.Helper()
++	normative := gateSpecSection6Codes(t)
++	if got := diagnostics.Codes(); !slices.Equal(got, normative) {
++		t.Fatalf("%s: Codes() = %q, SPEC section 6 = %q", owner, got, normative)
++	}
++	for _, want := range own {
++		if !slices.Contains(normative, want) {
++			t.Fatalf("%s: owned code %q not in SPEC section 6 table", owner, want)
++		}
++	}
++	foreign := gateForeign(normative, own)
++	if len(foreign) == 0 {
++		t.Fatalf("%s: no foreign codes derived", owner)
++	}
++	for _, code := range foreign {
++		for name, cand := range gateForms(makeErr, code) {
++			if got, ok := diagnostics.CodeOf(cand); ok || got != "" {
++				t.Errorf("%s accepted foreign %q as %q (%s form)", owner, code, got, name)
++			}
++		}
++	}
++	// Owned positives must hold in every form: direct, %w-wrapped, and
++	// errors.Join chains. A gate that weakens joined acceptance (the rev1
++	// surviving mutant) fails here as well as in TestGateJoinedOwnedAccepted.
++	for _, code := range own {
++		for name, cand := range gateForms(makeErr, code) {
++			if got, ok := diagnostics.CodeOf(cand); !ok || got != code {
++				t.Errorf("%s own code %q lost in %s form: CodeOf = %q %v, want acceptance", owner, code, name, got, ok)
++			}
++		}
++	}
++}
++
++// TestGateResolveRejectsForeignCodes gates the resolve owner: every
++// normative non-resolve code plus unknown/empty must yield no code in all
++// three wrap forms; every resolve-family member stays accepted in all forms.
++// Constructor and owned set come from the single owner registry row.
++func TestGateResolveRejectsForeignCodes(t *testing.T) {
++	owner := gateRegistryByName(t, "resolve")
++	gateCheckRejects(t, "resolve", owner.makeErr, owner.owned)
++}
++
++// TestGateLayerRejectsForeignCodes gates the layer owner, including the
++// five resolve codes the prior hand-selected matrix omitted.
++func TestGateLayerRejectsForeignCodes(t *testing.T) {
++	owner := gateRegistryByName(t, "layer")
++	gateCheckRejects(t, "layer", owner.makeErr, owner.owned)
++}
++
++// TestGateRefusalRejectsForeignCodes gates the refusal owner on the same
++// complete derived set.
++func TestGateRefusalRejectsForeignCodes(t *testing.T) {
++	owner := gateRegistryByName(t, "refusal")
++	gateCheckRejects(t, "refusal", owner.makeErr, owner.owned)
++}
++
++func gateMakeOwnerErr(t *testing.T, owner, code string) error {
++	t.Helper()
++	return gateRegistryByName(t, owner).makeErr(code)
++}
++
++func gateOwnedByName(owner string) []string {
++	switch owner {
++	case "resolve":
++		return gateResolveFamily()
++	case "layer":
++		return gateLayerFamily()
++	case "refusal":
++		return gateRefusalFamily()
++	}
++	return nil
++}
++
++// TestGateJoinedOwnedAccepted pins joined acceptance for every owned code of
++// every mutable-Code owner. It is the dedicated regression for the rev1
++// surviving mutant that rejected a joined chain holding a direct
++// ResolveError with resolve_invocation_failed while keeping direct/wrapped
++// acceptance: that mutant exits 1 here with the named loss below.
++func TestGateJoinedOwnedAccepted(t *testing.T) {
++	for _, owner := range []string{"resolve", "layer", "refusal"} {
++		for _, code := range gateOwnedByName(owner) {
++			joined := errors.Join(errors.New("outer"), gateMakeOwnerErr(t, owner, code))
++			if got, ok := diagnostics.CodeOf(joined); !ok || got != code {
++				t.Errorf("joined owned %s %q lost: CodeOf = %q %v, want acceptance", owner, code, got, ok)
++			}
++			// Joined acceptance must also survive a typed-nil sibling in the
++			// same chain: the nil branch fails closed, the owned branch wins.
++			var reNil *fragment.ResolveError
++			mixed := errors.Join(reNil, gateMakeOwnerErr(t, owner, code))
++			if got, ok := diagnostics.CodeOf(mixed); !ok || got != code {
++				t.Errorf("joined owned %s %q lost beside typed nil: CodeOf = %q %v", owner, code, got, ok)
++			}
++		}
++	}
++}
++
++// TestGateOwnerFormPositives derives one positive case per owner/code/form
++// cell of the single registry: 12 owned slots (resolve 6, layer 2,
++// refusal 2, usage 1, axconfig 1) x 3 forms = 36 assertions. A mutant that
++// drops any single cell -- including the rev2 surviving joined-UsageError
++// rejection and its axconfig/wrapped siblings -- fails here with a named
++// "<owner> <form> lost" assertion the runner requires by name.
++func TestGateOwnerFormPositives(t *testing.T) {
++	normative := gateSpecSection6Codes(t)
++	if got := diagnostics.Codes(); !slices.Equal(got, normative) {
++		t.Fatalf("Codes() = %q, SPEC section 6 = %q", got, normative)
++	}
++	for _, owner := range gateOwnerRegistry {
++		for _, code := range owner.owned {
++			if !slices.Contains(normative, code) {
++				t.Errorf("%s: owned code %q not in SPEC section 6 table", owner.name, code)
++			}
++		}
++		for _, code := range owner.owned {
++			for _, form := range gateFormRegistry {
++				cand := gateFormErr(form, owner.makeErr(code))
++				if got, ok := diagnostics.CodeOf(cand); !ok || got != code {
++					t.Errorf("%s %s lost: %q %v (owned code %q)", owner.name, form, got, ok, code)
++				}
++			}
++		}
++	}
++}
++
++// TestGateOwnerFormNil derives one nil rejection per owner/form cell of the
++// single registry: each owner's typed nil must fail closed direct, %w-wrapped,
++// and joined in both sibling orders. The all-typed-nil join, a nil
++// interface and a plain error complete the absence matrix.
++func TestGateOwnerFormNil(t *testing.T) {
++	for _, owner := range gateOwnerRegistry {
++		nils := map[string]error{
++			"direct":             owner.nilErr,
++			"wrapped":            fmt.Errorf("outer: %w", owner.nilErr),
++			"joined-outer-first": errors.Join(errors.New("outer"), owner.nilErr),
++			"joined-nil-first":   errors.Join(owner.nilErr, errors.New("outer")),
++		}
++		for form, cand := range nils {
++			if got, ok := diagnostics.CodeOf(cand); ok || got != "" {
++				t.Errorf("%s nil %s: CodeOf = %q %v, want no code", owner.name, form, got, ok)
++			}
++		}
++	}
++	var all []error
++	for _, owner := range gateOwnerRegistry {
++		all = append(all, owner.nilErr)
++	}
++	if got, ok := diagnostics.CodeOf(errors.Join(all...)); ok || got != "" {
++		t.Errorf("all-typed-nil join: CodeOf = %q %v, want no code", got, ok)
++	}
++	if got, ok := diagnostics.CodeOf(nil); ok || got != "" {
++		t.Errorf("nil interface: CodeOf = %q %v, want no code", got, ok)
++	}
++	if got, ok := diagnostics.CodeOf(errors.New("boom")); ok || got != "" {
++		t.Errorf("plain error: CodeOf = %q %v, want no code", got, ok)
++	}
++}
++
++// TestGateCoverageCounts pins the complete coverage arithmetic derived from
++// the single registry: 5 owners, 3 forms, 18 normative codes; mutable-Code
++// families resolve 6 / layer 2 / refusal 2 with foreign sets 12 / 16 / 16
++// (44 normative rejection pairs); 4 extra strangers; 56 codes x 3 forms =
++// 168 rejection cases; 12 owned slots (10 mutable + 2 fixed) x 3 forms =
++// 36 positive cases (30 mutable + 6 fixed); 5 owners x 4 nil forms + 3
++// absence extras = 23 nil cases. Fixed-code owners (usage, axconfig) carry
++// no mutable-Code gate by construction; their constant mappings are pinned
++// here and their positives asserted in TestGateOwnerFormPositives.
++// Call-site-selected codes carry no CodeOf classification; they are asserted
++// as Codes() members and rejected foreign values elsewhere here.
++func TestGateCoverageCounts(t *testing.T) {
++	normative := gateSpecSection6Codes(t)
++	if len(normative) != 18 {
++		t.Fatalf("normative codes = %d, want 18: %q", len(normative), normative)
++	}
++	if len(gateOwnerRegistry) != 5 {
++		t.Fatalf("owner registry rows = %d, want 5 (usage, resolve, layer, refusal, axconfig)", len(gateOwnerRegistry))
++	}
++	if !slices.Equal([]string{
++		gateOwnerRegistry[0].name,
++		gateOwnerRegistry[1].name,
++		gateOwnerRegistry[2].name,
++		gateOwnerRegistry[3].name,
++		gateOwnerRegistry[4].name,
++	}, []string{"usage", "resolve", "layer", "refusal", "axconfig"}) {
++		t.Fatalf("owner registry names = %q, want [usage resolve layer refusal axconfig]",
++			[]string{
++				gateOwnerRegistry[0].name,
++				gateOwnerRegistry[1].name,
++				gateOwnerRegistry[2].name,
++				gateOwnerRegistry[3].name,
++				gateOwnerRegistry[4].name,
++			})
++	}
++	if !slices.Equal(gateFormRegistry, []string{"direct", "wrapped", "joined"}) {
++		t.Fatalf("form registry = %q, want [direct wrapped joined]", gateFormRegistry)
++	}
++	mutableSlots, fixedSlots := 0, 0
++	for _, owner := range gateOwnerRegistry {
++		switch owner.kind {
++		case "mutable":
++			mutableSlots += len(owner.owned)
++		case "fixed":
++			fixedSlots += len(owner.owned)
++		default:
++			t.Fatalf("%s: unknown owner kind %q, want mutable or fixed", owner.name, owner.kind)
++		}
++		if len(owner.owned) == 0 {
++			t.Fatalf("%s: no owned codes in registry", owner.name)
++		}
++		if len(owner.consts) != len(owner.owned) {
++			t.Fatalf("%s: %d const pins for %d owned codes", owner.name, len(owner.consts), len(owner.owned))
++		}
++		if owner.makeErr == nil || owner.nilErr == nil {
++			t.Fatalf("%s: registry row missing constructor or typed nil", owner.name)
++		}
++		for _, code := range owner.owned {
++			if !slices.Contains(normative, code) {
++				t.Fatalf("%s: owned code %q not in SPEC section 6 table", owner.name, code)
++			}
++		}
++	}
++	if mutableSlots != 10 {
++		t.Fatalf("mutable owned slots = %d, want 10 (resolve 6 + layer 2 + refusal 2)", mutableSlots)
++	}
++	if fixedSlots != 2 {
++		t.Fatalf("fixed owned slots = %d, want 2 (usage 1 + axconfig 1)", fixedSlots)
++	}
++	positives := (mutableSlots + fixedSlots) * len(gateFormRegistry)
++	if positives != 36 {
++		t.Fatalf("positive owner/form cases = %d, want 36 (12 slots x 3 forms; 30 mutable + 6 fixed)", positives)
++	}
++	nils := len(gateOwnerRegistry)*4 + 3
++	if nils != 23 {
++		t.Fatalf("nil owner/form cases = %d, want 23 (5 owners x 4 forms + 3 absence extras)", nils)
++	}
++	// Normative code mapping: fixed owners pin their constant codes, and the
++	// mutable families transcribe the owner constants (shared slices above).
++	if diagnostics.CodeUsage != "usage" {
++		t.Fatalf("diagnostics.CodeUsage = %q, want %q", diagnostics.CodeUsage, "usage")
++	}
++	if diagnostics.CodeDefaultsInvalid != axconfig.CodeInvalid {
++		t.Fatalf("diagnostics.CodeDefaultsInvalid = %q, axconfig.CodeInvalid = %q",
++			diagnostics.CodeDefaultsInvalid, axconfig.CodeInvalid)
++	}
++	if diagnostics.CodeDefaultsInvalid != "defaults_config_invalid" {
++		t.Fatalf("defaults_config_invalid literal = %q", diagnostics.CodeDefaultsInvalid)
++	}
++	type fam struct {
++		name      string
++		own, want int
++	}
++	for _, f := range []fam{
++		{"resolve", len(gateResolveFamily()), 6},
++		{"layer", len(gateLayerFamily()), 2},
++		{"refusal", len(gateRefusalFamily()), 2},
++	} {
++		if f.own != f.want {
++			t.Fatalf("%s owned = %d, want %d", f.name, f.own, f.want)
++		}
++		foreign := gateForeign(normative, gateOwnedByName(f.name))
++		wantForeign := 18 - f.want + len(gateExtraStrangers())
++		if len(foreign) != wantForeign {
++			t.Fatalf("%s foreign+extras = %d, want %d: %q", f.name, len(foreign), wantForeign, foreign)
++		}
++	}
++	normPairs := 12 + 16 + 16
++	if normPairs != 44 {
++		t.Fatalf("normative rejection pairs = %d, want 44", normPairs)
++	}
++	withExtras := (12 + 4) + (16 + 4) + (16 + 4)
++	if withExtras*3 != 168 {
++		t.Fatalf("rejection cases with extras x forms = %d, want 168", withExtras*3)
++	}
++}
++
++// TestGateOwnFamilyAndNilPreserved pins the acceptance side the rejection
++// matrix must not break: production-typed values (direct, wrapped, joined),
++// fixed-code owners in all three forms, typed-nil fails closed without panic
++// in every form including errors.Join chains, and unclaimed errors invent
++// nothing.
++func TestGateOwnFamilyAndNilPreserved(t *testing.T) {
++	if code, ok := diagnostics.CodeOf(&cli.UsageError{Detail: "missing <env-id>"}); !ok || code != "usage" {
++		t.Fatalf("usage error: %q %v", code, ok)
++	}
++	re := &fragment.ResolveError{Code: fragment.CodeRepairFailed, Detail: "x"}
++	if code, ok := diagnostics.CodeOf(re); !ok || code != "resolve_repair_failed" {
++		t.Fatalf("resolve error: %q %v", code, ok)
++	}
++	// Every production-typed positive holds direct, %w-wrapped, and joined,
++	// including both fixed-code owners in every form (the rev2 gap: only
++	// usage-direct was pinned here before).
++	joinedPositives := map[string]struct {
++		err  error
++		want string
++	}{
++		"usage-direct":    {&cli.UsageError{Detail: "x"}, "usage"},
++		"usage-wrapped":   {fmt.Errorf("outer: %w", &cli.UsageError{Detail: "x"}), "usage"},
++		"usage-joined":    {errors.Join(errors.New("outer"), &cli.UsageError{Detail: "x"}), "usage"},
++		"axconfig-direct": {&axconfig.Error{Path: "p", Err: errors.New("cause")}, "defaults_config_invalid"},
++		"axconfig-wrapped": {
++			fmt.Errorf("outer: %w", &axconfig.Error{Path: "p", Err: errors.New("cause")}),
++			"defaults_config_invalid",
++		},
++		"axconfig-joined": {
++			errors.Join(errors.New("outer"), &axconfig.Error{Path: "p", Err: errors.New("cause")}),
++			"defaults_config_invalid",
++		},
++		"resolve-joined":  {errors.Join(errors.New("outer"), &fragment.ResolveError{Code: fragment.CodeInvocationFailed, Detail: "x"}), "resolve_invocation_failed"},
++		"resolve-wrapped": {fmt.Errorf("outer: %w", &fragment.ResolveError{Code: fragment.CodeFragmentInvalid, Detail: "x"}), "resolve_fragment_invalid"},
++	}
++	for name, tc := range joinedPositives {
++		if code, ok := diagnostics.CodeOf(tc.err); !ok || code != tc.want {
++			t.Errorf("%s: CodeOf = %q %v, want %q", name, code, ok, tc.want)
++		}
++	}
++	missing, unreadable := codexBoundary(t)
++	if code, ok := diagnostics.CodeOf(missing); !ok || code != "mcp_layer_missing" {
++		t.Fatalf("mcp missing: %q %v (%v)", code, ok, missing)
++	}
++	if code, ok := diagnostics.CodeOf(unreadable); !ok || code != "mcp_layer_unreadable" {
++		t.Fatalf("mcp unreadable: %q %v (%v)", code, ok, unreadable)
++	}
++	if joined := errors.Join(errors.New("outer"), missing); true {
++		if code, ok := diagnostics.CodeOf(joined); !ok || code != "mcp_layer_missing" {
++			t.Errorf("mcp missing joined: CodeOf = %q %v", code, ok)
++		}
++	}
++	if code, ok := diagnostics.CodeOf(syspromptSelection(t)); !ok || code != "sysprompt_channel_unavailable" {
++		t.Fatalf("sysprompt selection: %q %v", code, ok)
++	}
++	if code, ok := diagnostics.CodeOf(syspromptProbe(t)); !ok || code != "sysprompt_file_unreadable" {
++		t.Fatalf("sysprompt probe: %q %v", code, ok)
++	}
++	if code, ok := diagnostics.CodeOf(axconfigFailure(t)); !ok || code != "defaults_config_invalid" {
++		t.Fatalf("axconfig failure: %q %v", code, ok)
++	}
++	var ue *cli.UsageError
++	var reNil *fragment.ResolveError
++	var leNil *composition.LayerError
++	var srNil *sp.Refusal
++	var aeNil *axconfig.Error
++	for name, err := range map[string]error{
++		"usage": ue, "resolve": reNil, "layer": leNil, "refusal": srNil, "ax": aeNil,
++		"nil": nil, "plain": errors.New("boom"),
++	} {
++		if got, ok := diagnostics.CodeOf(err); ok || got != "" {
++			t.Errorf("%s: CodeOf = %q %v, want no code", name, got, ok)
++		}
++		wrapped := fmt.Errorf("outer: %w", err)
++		if got, ok := diagnostics.CodeOf(wrapped); ok || got != "" {
++			t.Errorf("%s wrapped: CodeOf = %q %v, want no code", name, got, ok)
++		}
++		// Joined typed-nil behavior: a typed nil beside an outer error, a
++		// typed nil leading the chain, and an all-typed-nil chain all fail
++		// closed with no code and no panic.
++		for joinName, joined := range map[string]error{
++			"outer-first": errors.Join(errors.New("outer"), err),
++			"nil-first":   errors.Join(err, errors.New("outer")),
++		} {
++			if err == nil && joinName == "nil-first" {
++				// errors.Join(nil, outer) == Join(outer): plain outer error
++				// still yields no code; assertions below hold either way.
++				_ = joined
++			}
++			if got, ok := diagnostics.CodeOf(joined); ok || got != "" {
++				t.Errorf("%s joined %s: CodeOf = %q %v, want no code", name, joinName, got, ok)
++			}
++		}
++	}
++	if got, ok := diagnostics.CodeOf(errors.Join(reNil, leNil, srNil)); ok || got != "" {
++		t.Errorf("all-typed-nil join: CodeOf = %q %v, want no code", got, ok)
++	}
++}
+diff --git a/internal/diagnostics/helpers_test.go b/internal/diagnostics/helpers_test.go
+new file mode 100644
+index 0000000..a46ad72
+--- /dev/null
++++ b/internal/diagnostics/helpers_test.go
+@@ -0,0 +1,166 @@
++package diagnostics_test
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/axconfig"
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	sp "github.com/relux-works/curator-agent-launcher/internal/systemprompt"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// stubEnv stands in for the spawn-plane module at the ChildEnv boundary:
++// the composition and probe code under test is real, only the external
++// module's owned literals are stubbed.
++type stubEnv struct{ env []string }
++
++func (s stubEnv) ChildEnv([]string, agentic.LaunchRequest) ([]string, error) {
++	return s.env, nil
++}
++
++func codexFragment(t *testing.T, home, layer string) fragment.Fragment {
++	t.Helper()
++	f := map[string]any{
++		"fragment":    fragment.Identity,
++		"environment": fragment.EnvCodexCLI,
++		"profile":     map[string]any{"name": "default", "lock_sha256": strings.Repeat("a", 64)},
++		"precedence":  map[string]string{"winner": "higher-weight", "placement": "winner-last"},
++		"env":         map[string]string{fragment.HomeVariable(fragment.EnvCodexCLI): home},
++		"mcp": map[string]any{
++			"path":      layer,
++			"env_names": []string{},
++			"channels":  []any{map[string]any{"kind": "flag", "flag": "-p", "argument": "name", "name": "curator-mcp"}},
++		},
++	}
++	raw, err := json.Marshal(f)
++	if err != nil {
++		t.Fatal(err)
++	}
++	frag, err := fragment.Parse(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return *frag
++}
++
++// codexBoundary composes a real codex_cli value through production
++// composition.Compose and returns the real CheckLaunchBoundary failures
++// for a missing layer file and for a directory at the layer path.
++func codexBoundary(t *testing.T) (missing, unreadable error) {
++	t.Helper()
++	home := t.TempDir()
++	plan := agentic.Plan{Binary: "codex", WorkDir: home, Argv: []string{}, Env: []string{"PATH=/usr/bin"}}
++	req := agentic.LaunchRequest{}
++	mk := func(layer string) composition.Value {
++		t.Helper()
++		v, err := composition.Compose(plan, stubEnv{env: []string{"PATH=/usr/bin"}}, req, codexFragment(t, home, layer), composition.PromptApplication{}, nil)
++		if err != nil {
++			t.Fatal(err)
++		}
++		return v
++	}
++	missing = mk(filepath.Join(home, "absent-curator-mcp.config.toml")).CheckLaunchBoundary()
++	if missing == nil {
++		t.Fatal("absent layer must fail")
++	}
++	dirLayer := filepath.Join(home, "dir-layer.toml")
++	if err := os.Mkdir(dirLayer, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	unreadable = mk(dirLayer).CheckLaunchBoundary()
++	if unreadable == nil {
++		t.Fatal("directory layer must fail")
++	}
++	// A readable regular layer launches: absence and failure stay distinct.
++	fileLayer := filepath.Join(home, "curator-mcp.config.toml")
++	if err := os.WriteFile(fileLayer, []byte("# mcp\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++	if err := mk(fileLayer).CheckLaunchBoundary(); err != nil {
++		t.Fatalf("readable layer must pass: %v", err)
++	}
++	return missing, unreadable
++}
++
++func minimalFragment(t *testing.T, env, home string, section bool) *fragment.Fragment {
++	t.Helper()
++	f := map[string]any{
++		"fragment":    fragment.Identity,
++		"environment": env,
++		"profile":     map[string]any{"name": "default", "lock_sha256": strings.Repeat("b", 64)},
++		"precedence":  map[string]string{"winner": "higher-weight", "placement": "winner-last"},
++		"env":         map[string]string{fragment.HomeVariable(env): home},
++	}
++	if section {
++		f["system_prompt"] = map[string]any{"path": filepath.Join(home, "prompt.md"), "channels": []any{}}
++	}
++	raw, err := json.Marshal(f)
++	if err != nil {
++		t.Fatal(err)
++	}
++	frag, err := fragment.Parse(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return frag
++}
++
++// syspromptSelection drives the real Select refusal: opt-in over a
++// fragment with no system_prompt section.
++func syspromptSelection(t *testing.T) error {
++	t.Helper()
++	_, err := sp.Select(minimalFragment(t, fragment.EnvClaudeCode, t.TempDir(), false), fragment.SemanticsAppend)
++	if err == nil {
++		t.Fatal("opt-in without a section must refuse")
++	}
++	return err
++}
++
++// syspromptProbe drives the real ProbeFiles refusal: a directory where the
++// Pi registry filename must be a readable regular file.
++func syspromptProbe(t *testing.T) error {
++	t.Helper()
++	home := t.TempDir()
++	if err := os.Mkdir(filepath.Join(home, "SYSTEM.md"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	_, refusal := sp.ProbeFiles(minimalFragment(t, fragment.EnvPi, home, false))
++	if refusal == nil {
++		t.Fatal("directory at the registry filename must refuse")
++	}
++	// Absence stays absence: no observation, no error, no diagnostic.
++	empty := t.TempDir()
++	obs, err := sp.ProbeFiles(minimalFragment(t, fragment.EnvPi, empty, false))
++	if err != nil || len(obs) != 0 {
++		t.Fatalf("absent files: %v %v", obs, err)
++	}
++	return refusal
++}
++
++// axconfigFailure drives the real Load read failure: a present but broken
++// ax.json is defaults_config_invalid, never "not configured".
++func axconfigFailure(t *testing.T) error {
++	t.Helper()
++	root := t.TempDir()
++	machine := filepath.Join(root, "machine")
++	if err := os.MkdirAll(machine, 0o700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(machine, "ax.json"), []byte("{broken"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	_, err := axconfig.Load(machine, filepath.Join(root, "absent-operator"))
++	if err == nil {
++		t.Fatal("broken ax.json must fail")
++	}
++	// Absence stays absence: both dirs missing means not configured.
++	if enabled, err := axconfig.Load(filepath.Join(root, "no-machine"), filepath.Join(root, "no-operator")); err != nil || enabled {
++		t.Fatalf("absent files: %v %v", enabled, err)
++	}
++	return err
++}

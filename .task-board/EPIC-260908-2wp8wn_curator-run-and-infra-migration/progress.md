@@ -1,5 +1,5 @@
 ## Status
-reviewing
+integrating
 
 ## Review
 required
@@ -35,9 +35,10 @@ code
 - [continuation-active-recovery-and-conformance.md](file://EPIC-260908-2wp8wn/continuation-active-recovery-and-conformance.md) — Active continuation: execution delivered, source validation and repeated diagnostics gate in progress
 - [source-pr197-complete-and-live-recovery.md](file://EPIC-260908-2wp8wn/source-pr197-complete-and-live-recovery.md) — Verified source delivery/install/board completion and subsequent live recovery handles
 - [verified-recovery-publication-sequence.md](file://EPIC-260908-2wp8wn/verified-recovery-publication-sequence.md) — Real recovery/publication boundary, current independent review and pending runs
+- [diagnostics-landed-checkpoint-ownership-followup.md](file://EPIC-260908-2wp8wn/diagnostics-landed-checkpoint-ownership-followup.md) — Verified landed diagnostics and remaining cross-owner checkpoint recovery
 
 ## Created
 2026-09-07T23:04:44Z
 
 ## Last Update
-2026-09-09T11:49:28Z
+2026-09-09T12:25:42Z

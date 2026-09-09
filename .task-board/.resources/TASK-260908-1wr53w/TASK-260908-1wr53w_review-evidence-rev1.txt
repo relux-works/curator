@@ -1,0 +1,1078 @@
+
+===== .temp/TASK-260908-1wr53w-review/tree-verification.log =====
+All 7 candidate files byte-equal to tree 1839f385bcb3d966620f0fad5ea5aad32b072953. HEAD..main count 0.
+
+===== .temp/TASK-260908-1wr53w-review/readiness-01.log =====
+Python 3.14.7
+
+===== .temp/TASK-260908-1wr53w-review/focused-01.log =====
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+--- PASS: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+--- PASS: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+--- PASS: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+--- PASS: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+--- PASS: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.247s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+--- PASS: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+--- PASS: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+--- PASS: TestRunProductionResolverAgainstFakeCurator (0.47s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+--- PASS: TestExecutableUnicodePathBoundary (0.66s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.52s)
+    --- PASS: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+--- PASS: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- PASS: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+--- PASS: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+--- PASS: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+--- PASS: TestRunDiagnosticsContract (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- PASS: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+--- PASS: TestRunResolveFailurePrecedesMapping (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.588s
+
+===== .temp/TASK-260908-1wr53w-review/execution-01.log =====
+=== RUN   TestLateChecksBothModes
+=== RUN   TestLateChecksBothModes/tracked=false/nil_boundary
+=== RUN   TestLateChecksBothModes/tracked=false/boundary_refusal
+=== RUN   TestLateChecksBothModes/tracked=false/provider_removed
+=== RUN   TestLateChecksBothModes/tracked=false/provider_nonexec
+=== RUN   TestLateChecksBothModes/tracked=false/provider_PATH_missing
+=== RUN   TestLateChecksBothModes/tracked=false/mcp_removed
+=== RUN   TestLateChecksBothModes/tracked=false/mcp_dangling
+=== RUN   TestLateChecksBothModes/tracked=false/mcp_directory
+=== RUN   TestLateChecksBothModes/tracked=false/mcp_unreadable
+=== RUN   TestLateChecksBothModes/tracked=true/nil_boundary
+=== RUN   TestLateChecksBothModes/tracked=true/boundary_refusal
+=== RUN   TestLateChecksBothModes/tracked=true/provider_removed
+=== RUN   TestLateChecksBothModes/tracked=true/provider_nonexec
+=== RUN   TestLateChecksBothModes/tracked=true/provider_PATH_missing
+=== RUN   TestLateChecksBothModes/tracked=true/mcp_removed
+=== RUN   TestLateChecksBothModes/tracked=true/mcp_dangling
+=== RUN   TestLateChecksBothModes/tracked=true/mcp_directory
+=== RUN   TestLateChecksBothModes/tracked=true/mcp_unreadable
+--- PASS: TestLateChecksBothModes (0.03s)
+    --- PASS: TestLateChecksBothModes/tracked=false/nil_boundary (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=false/boundary_refusal (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=false/provider_removed (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=false/provider_nonexec (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=false/provider_PATH_missing (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=false/mcp_removed (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=false/mcp_dangling (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=false/mcp_directory (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=false/mcp_unreadable (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/nil_boundary (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/boundary_refusal (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/provider_removed (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/provider_nonexec (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/provider_PATH_missing (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/mcp_removed (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/mcp_dangling (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/mcp_directory (0.00s)
+    --- PASS: TestLateChecksBothModes/tracked=true/mcp_unreadable (0.00s)
+=== RUN   TestAxFailureNoFallback
+=== RUN   TestAxFailureNoFallback/nonzero
+=== RUN   TestAxFailureNoFallback/missing
+=== RUN   TestAxFailureNoFallback/nonexec
+=== RUN   TestAxFailureNoFallback/bad_format
+--- PASS: TestAxFailureNoFallback (0.42s)
+    --- PASS: TestAxFailureNoFallback/nonzero (0.42s)
+    --- PASS: TestAxFailureNoFallback/missing (0.00s)
+    --- PASS: TestAxFailureNoFallback/nonexec (0.00s)
+    --- PASS: TestAxFailureNoFallback/bad_format (0.00s)
+=== RUN   TestDirectExitAndSignal
+=== RUN   TestDirectExitAndSignal/exit:23
+=== RUN   TestDirectExitAndSignal/signal
+--- PASS: TestDirectExitAndSignal (0.01s)
+    --- PASS: TestDirectExitAndSignal/exit:23 (0.00s)
+    --- PASS: TestDirectExitAndSignal/signal (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/internal/execution	1.166s
+
+===== .temp/TASK-260908-1wr53w-review/adversarial-01.log =====
+=== RUN   TestReviewUnknownTypedCode
+=== RUN   TestReviewUnknownTypedCode/invented_code
+    review_edge_test.go:3: accepted wrong-family/unknown code "invented_code", exit=1
+=== RUN   TestReviewUnknownTypedCode/usage
+    review_edge_test.go:3: accepted wrong-family/unknown code "usage", exit=2
+--- FAIL: TestReviewUnknownTypedCode (0.00s)
+    --- FAIL: TestReviewUnknownTypedCode/invented_code (0.00s)
+    --- FAIL: TestReviewUnknownTypedCode/usage (0.00s)
+=== RUN   TestReviewTypedNil
+    review_edge_test.go:4: typed-nil error panicked: runtime error: invalid memory address or nil pointer dereference
+--- FAIL: TestReviewTypedNil (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.667s
+=== RUN   TestReviewOneLineAtRealResolver
+    review_edge_test.go:3: exit=1 diagnostic_lines=2 stderr="curator-run: resolve_invocation_failed: could not run /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestReviewOneLineAtRealResolver2660315609/001/missing-curator env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestReviewOneLineAtRealResolver2660315609/001/missing-curator: no such file or directory\n"
+--- FAIL: TestReviewOneLineAtRealResolver (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.020s
+FAIL
+
+===== .temp/TASK-260908-1wr53w-review/edge_test.go =====
+package diagnostics_test
+import("testing";"fmt";"github.com/relux-works/curator-agent-launcher/internal/diagnostics";"github.com/relux-works/curator-agent-launcher/internal/fragment")
+func TestReviewUnknownTypedCode(t *testing.T){ for _, c := range []string{"invented_code", "usage"} { t.Run(c,func(t *testing.T){err:=fmt.Errorf("wrapped: %w", &fragment.ResolveError{Code:c,Detail:"operational failure"}); code,ok:=diagnostics.CodeOf(err); if ok {t.Fatalf("accepted wrong-family/unknown code %q, exit=%d",code,diagnostics.ExitForCode(code))}}) } }
+func TestReviewTypedNil(t *testing.T){ defer func(){if p:=recover();p!=nil{t.Fatalf("typed-nil error panicked: %v",p)}}(); var err *fragment.ResolveError; code,ok:=diagnostics.CodeOf(err); if ok {t.Fatalf("typed nil accepted: %q",code)} }
+
+===== .temp/TASK-260908-1wr53w-review/main_edge_test.go =====
+package main
+import("testing";"context";"strings";"path/filepath";"github.com/relux-works/curator-agent-launcher/internal/fragment";"github.com/relux-works/curator-agent-launcher/internal/diagnostics")
+func TestReviewOneLineAtRealResolver(t *testing.T){var out,stderr strings.Builder; r:=fragment.NewWithRunner(filepath.Join(t.TempDir(),"missing-curator"),fragment.ExecRunner{}); code:=run(context.Background(),[]string{"pi","--profile","normal\ncurator-run: usage: forged"},&out,&stderr,r); n:=0;for _,line:=range strings.Split(stderr.String(),"\n"){if diagnostics.IsDiagnosticLine(line){n++}};if code!=1||n!=1{t.Fatalf("exit=%d diagnostic_lines=%d stderr=%q",code,n,stderr.String())}}
+
+===== .temp/diagnostics-mutants/summary.tsv =====
+mutant	file	expected_failing_test	applied	suite_exit	expected_test_failed	verdict
+D01	diag	TestExitForCode	yes	1	yes	KILLED
+D02	diag	TestExitForCode	yes	1	yes	KILLED
+D03	diag	TestDiagnosticLineDistinguishesTransport	yes	1	yes	KILLED
+D04	diag	TestCodeOfUnknownFailsClosed	yes	1	yes	KILLED
+D05	diag	TestCodeOfProductionTypes	yes	1	yes	KILLED
+D06	diag	TestDiagnosticLineDistinguishesTransport	yes	1	yes	KILLED
+D07	main	TestRunDiagnosticsContract	yes	1	yes	KILLED
+D08	diag	TestEmitDeterministic	yes	1	yes	KILLED
+
+===== .temp/diagnostics-mutants/D01.log =====
+== D01 (expected to fail: TestExitForCode)
+--- .temp/diagnostics-mutants/diagnostics.go.orig	2026-09-09 14:09:18
++++ internal/diagnostics/diagnostics.go	2026-09-09 14:09:18
+@@ -142,7 +142,7 @@
+ // in code selection stays terminal and visible, never silent success and
+ // never a usage report.
+ func ExitForCode(code string) int {
+-	if code == CodeUsage {
++	if code == CodeUsage || code == CodeExecMissing {
+ 		return ExitUsage
+ 	}
+ 	return ExitOperational
+
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+    diagnostics_test.go:92: ExitForCode("exec_provider_missing") = 2, want 1
+--- FAIL: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+--- PASS: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+--- PASS: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+--- PASS: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+--- PASS: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.352s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+--- PASS: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+--- PASS: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+--- PASS: TestRunProductionResolverAgainstFakeCurator (0.20s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+--- PASS: TestExecutableUnicodePathBoundary (0.67s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.52s)
+    --- PASS: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+--- PASS: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- PASS: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+--- PASS: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+--- PASS: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+--- PASS: TestRunDiagnosticsContract (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- PASS: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+--- PASS: TestRunResolveFailurePrecedesMapping (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.431s
+FAIL
+
+===== .temp/diagnostics-mutants/D02.log =====
+== D02 (expected to fail: TestExitForCode)
+--- .temp/diagnostics-mutants/diagnostics.go.orig	2026-09-09 14:09:18
++++ internal/diagnostics/diagnostics.go	2026-09-09 14:09:19
+@@ -145,7 +145,7 @@
+ 	if code == CodeUsage {
+ 		return ExitUsage
+ 	}
+-	return ExitOperational
++	return 0
+ }
+ 
+ // CodeOf extracts the stable diagnostic code from a production error
+
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+    diagnostics_test.go:92: ExitForCode("resolve_invocation_failed") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("resolve_environment_unknown") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("resolve_profile_unknown") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("resolve_repair_failed") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("resolve_lock_unavailable") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("resolve_fragment_invalid") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("defaults_config_invalid") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("defaults_unresolvable") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("plan_refused") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("plan_provider_limited") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("env_unsupported") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("exec_provider_missing") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("ax_handoff_failed") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("mcp_layer_missing") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("mcp_layer_unreadable") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("sysprompt_channel_unavailable") = 0, want 1
+    diagnostics_test.go:92: ExitForCode("sysprompt_file_unreadable") = 0, want 1
+    diagnostics_test.go:97: ExitForCode("") = 0, want operational 1
+    diagnostics_test.go:97: ExitForCode("environment_home_stale") = 0, want operational 1
+    diagnostics_test.go:97: ExitForCode("Usage") = 0, want operational 1
+    diagnostics_test.go:97: ExitForCode("USAGE") = 0, want operational 1
+    diagnostics_test.go:97: ExitForCode("resolve") = 0, want operational 1
+    diagnostics_test.go:97: ExitForCode("internal_error") = 0, want operational 1
+    diagnostics_test.go:97: ExitForCode("not_implemented") = 0, want operational 1
+    diagnostics_test.go:97: ExitForCode("ok") = 0, want operational 1
+    diagnostics_test.go:97: ExitForCode("0") = 0, want operational 1
+--- FAIL: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+--- PASS: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+--- PASS: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+--- PASS: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+--- PASS: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.261s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+--- PASS: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+    main_test.go:172: environment_unknown: exit 0, want 1
+    main_test.go:172: profile_unknown: exit 0, want 1
+    main_test.go:172: repair_failed: exit 0, want 1
+    main_test.go:172: lock_unavailable: exit 0, want 1
+    main_test.go:172: home_stale is unexpected: exit 0, want 1
+    main_test.go:172: no diagnostic: exit 0, want 1
+    main_test.go:172: invalid fragment: exit 0, want 1
+    main_test.go:172: empty stdout is not absence: exit 0, want 1
+    main_test.go:172: other environment's fragment: exit 0, want 1
+--- FAIL: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+    main_test.go:225: missing curator: exit 0 stderr "curator-run: resolve_invocation_failed: could not run curator env resolve pi --repair --format json: exec: \"curator\": executable file not found in $PATH\n"
+--- FAIL: TestRunProductionResolverAgainstFakeCurator (0.20s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+    main_test.go:287: exit: <nil>
+--- FAIL: TestExecutableUnicodePathBoundary (0.58s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.44s)
+    --- FAIL: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+    main_test.go:314: exit=0 stdout="" resolves=1
+--- FAIL: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- FAIL: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+    main_test.go:340: exit=0
+--- FAIL: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+    main_test.go:351: exit=0
+--- FAIL: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+    main_test.go:401: exit = 0, want 1 (stderr "curator: environment_unknown: unregistered\ncurator-run: resolve_environment_unknown: curator env resolve exited 1: environment_unknown: unregistered\n")
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+    main_test.go:401: exit = 0, want 1 (stderr "curator: profile_unknown: none current\ncurator-run: resolve_profile_unknown: curator env resolve exited 1: profile_unknown: none current\n")
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+    main_test.go:401: exit = 0, want 1 (stderr "curator: environment_repair_failed: store\ncurator-run: resolve_repair_failed: curator env resolve exited 1: environment_repair_failed: store\n")
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+    main_test.go:401: exit = 0, want 1 (stderr "curator: environment_lock_unavailable: busy\ncurator-run: resolve_lock_unavailable: curator env resolve exited 1: environment_lock_unavailable: busy\n")
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+    main_test.go:401: exit = 0, want 1 (stderr "boom\ncurator-run: resolve_invocation_failed: curator env resolve exited 3 without a curator diagnostic line\n")
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+    main_test.go:401: exit = 0, want 1 (stderr "curator-run: resolve_fragment_invalid: curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1: fragment: missing required member \"fragment\"\n")
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+    main_test.go:401: exit = 0, want 1 (stderr "curator-run: env_unsupported: environment \"opencode\" has no supported system/provider pair\n")
+--- FAIL: TestRunDiagnosticsContract (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+    main_test.go:433: exit=0
+--- FAIL: TestRunResolveFailurePrecedesMapping (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.258s
+FAIL
+
+===== .temp/diagnostics-mutants/D03.log =====
+== D03 (expected to fail: TestDiagnosticLineDistinguishesTransport)
+--- .temp/diagnostics-mutants/diagnostics.go.orig	2026-09-09 14:09:18
++++ internal/diagnostics/diagnostics.go	2026-09-09 14:09:21
+@@ -135,7 +135,7 @@
+ // the set — including Curator's environment_home_stale, which SPEC §4.1
+ // declares unreachable from a --repair invocation — are not launcher
+ // diagnostics.
+-func Valid(code string) bool { return valid[code] }
++func Valid(code string) bool { return valid[code] || code == "environment_home_stale" }
+ 
+ // ExitForCode maps a diagnostic code to its process exit status: usage
+ // exits 2, everything else exits 1. An unknown code still exits 1: a bug
+
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+--- PASS: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+--- PASS: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+--- PASS: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+--- PASS: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+    diagnostics_test.go:212: IsDiagnosticLine("curator-run: environment_home_stale: unreachable codes are not launcher codes") = true, want false
+--- FAIL: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.299s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+--- PASS: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+--- PASS: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+--- PASS: TestRunProductionResolverAgainstFakeCurator (0.32s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+--- PASS: TestExecutableUnicodePathBoundary (0.90s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.75s)
+    --- PASS: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+--- PASS: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- PASS: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+--- PASS: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+--- PASS: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+--- PASS: TestRunDiagnosticsContract (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- PASS: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+--- PASS: TestRunResolveFailurePrecedesMapping (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.737s
+FAIL
+
+===== .temp/diagnostics-mutants/D04.log =====
+== D04 (expected to fail: TestCodeOfUnknownFailsClosed)
+--- .temp/diagnostics-mutants/diagnostics.go.orig	2026-09-09 14:09:18
++++ internal/diagnostics/diagnostics.go	2026-09-09 14:09:23
+@@ -186,7 +186,7 @@
+ 	if errors.As(err, &ae) {
+ 		return CodeDefaultsInvalid, true
+ 	}
+-	return "", false
++	return CodeResolveInvocationFailed, true
+ }
+ 
+ // Line renders one deterministic diagnostic code line: the executable
+
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+--- PASS: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+--- PASS: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+    diagnostics_test.go:162: mapping-shaped: CodeOf = "resolve_invocation_failed" true, want no code
+    diagnostics_test.go:162: nil: CodeOf = "resolve_invocation_failed" true, want no code
+    diagnostics_test.go:162: plain: CodeOf = "resolve_invocation_failed" true, want no code
+    diagnostics_test.go:162: wrapped plain: CodeOf = "resolve_invocation_failed" true, want no code
+    diagnostics_test.go:162: bare parse: CodeOf = "resolve_invocation_failed" true, want no code
+--- FAIL: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+--- PASS: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+--- PASS: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.258s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+--- PASS: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+--- PASS: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+--- PASS: TestRunProductionResolverAgainstFakeCurator (0.25s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+--- PASS: TestExecutableUnicodePathBoundary (0.81s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.65s)
+    --- PASS: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+--- PASS: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- PASS: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+--- PASS: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+--- PASS: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+--- PASS: TestRunDiagnosticsContract (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- PASS: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+--- PASS: TestRunResolveFailurePrecedesMapping (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.644s
+FAIL
+
+===== .temp/diagnostics-mutants/D05.log =====
+== D05 (expected to fail: TestCodeOfProductionTypes)
+--- .temp/diagnostics-mutants/diagnostics.go.orig	2026-09-09 14:09:18
++++ internal/diagnostics/diagnostics.go	2026-09-09 14:09:25
+@@ -169,7 +169,7 @@
+ 		return re.Code, true
+ 	}
+ 	var le *composition.LayerError
+-	if errors.As(err, &le) {
++	if errors.As(err, &le) && le.Code != CodeMCPLayerMissing {
+ 		if le.Code == "" {
+ 			return "", false
+ 		}
+
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+--- PASS: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+    diagnostics_test.go:127: mcp missing: "" false (mcp_layer_missing: /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestCodeOfProductionTypes1270721576/001/absent-curator-mcp.config.toml: lstat /var/folders/cz/jqbthtks55zbkpcdkfyk4bl80000gp/T/TestCodeOfProductionTypes1270721576/001/absent-curator-mcp.config.toml: no such file or directory)
+--- FAIL: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+--- PASS: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+--- PASS: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+--- PASS: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.402s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+--- PASS: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+--- PASS: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+--- PASS: TestRunProductionResolverAgainstFakeCurator (0.20s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+--- PASS: TestExecutableUnicodePathBoundary (0.78s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.61s)
+    --- PASS: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+--- PASS: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- PASS: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+--- PASS: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+--- PASS: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+--- PASS: TestRunDiagnosticsContract (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- PASS: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+--- PASS: TestRunResolveFailurePrecedesMapping (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	2.179s
+FAIL
+
+===== .temp/diagnostics-mutants/D06.log =====
+== D06 (expected to fail: TestDiagnosticLineDistinguishesTransport)
+--- .temp/diagnostics-mutants/diagnostics.go.orig	2026-09-09 14:09:18
++++ internal/diagnostics/diagnostics.go	2026-09-09 14:09:27
+@@ -214,10 +214,11 @@
+ 	if strings.Contains(line, "\n") {
+ 		return false
+ 	}
+-	rest, ok := strings.CutPrefix(line, cli.Name+": ")
+-	if !ok {
++	idx := strings.Index(line, cli.Name+": ")
++	if idx < 0 {
+ 		return false
+ 	}
++	rest := line[idx+len(cli.Name+": "):]
+ 	code, _, found := strings.Cut(rest, ":")
+ 	code = strings.TrimSuffix(code, " ")
+ 	if !found || code == "" {
+
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+--- PASS: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+--- PASS: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+--- PASS: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+--- PASS: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+    diagnostics_test.go:212: IsDiagnosticLine("x curator-run: usage: embedded token is not anchored") = true, want false
+    diagnostics_test.go:212: IsDiagnosticLine(" curator-run: usage: leading space is not the contract") = true, want false
+--- FAIL: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.295s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+--- PASS: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+--- PASS: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+--- PASS: TestRunProductionResolverAgainstFakeCurator (0.28s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+--- PASS: TestExecutableUnicodePathBoundary (0.60s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.45s)
+    --- PASS: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+--- PASS: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- PASS: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+--- PASS: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+--- PASS: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+--- PASS: TestRunDiagnosticsContract (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- PASS: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- PASS: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+--- PASS: TestRunResolveFailurePrecedesMapping (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.383s
+FAIL
+
+===== .temp/diagnostics-mutants/D07.log =====
+== D07 (expected to fail: TestRunDiagnosticsContract)
+--- .temp/diagnostics-mutants/main.go.orig	2026-09-09 14:09:18
++++ cmd/curator-run/main.go	2026-09-09 14:09:29
+@@ -97,7 +97,7 @@
+ 	if err != nil {
+ 		if re, ok := fragment.IsResolve(err); ok {
+ 			_ = diagnostics.Emit(stderr, re.Code, re.Detail)
+-			return diagnostics.ExitForCode(re.Code)
++			return 0
+ 		}
+ 		_ = diagnostics.Emit(stderr, fragment.CodeInvocationFailed, err.Error())
+ 		return diagnostics.ExitForCode(fragment.CodeInvocationFailed)
+
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+--- PASS: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+--- PASS: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+--- PASS: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+--- PASS: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+--- PASS: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.296s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+--- PASS: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+    main_test.go:172: environment_unknown: exit 0, want 1
+    main_test.go:172: profile_unknown: exit 0, want 1
+    main_test.go:172: repair_failed: exit 0, want 1
+    main_test.go:172: lock_unavailable: exit 0, want 1
+    main_test.go:172: home_stale is unexpected: exit 0, want 1
+    main_test.go:172: no diagnostic: exit 0, want 1
+    main_test.go:172: invalid fragment: exit 0, want 1
+    main_test.go:172: empty stdout is not absence: exit 0, want 1
+    main_test.go:172: other environment's fragment: exit 0, want 1
+--- FAIL: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+    main_test.go:225: missing curator: exit 0 stderr "curator-run: resolve_invocation_failed: could not run curator env resolve pi --repair --format json: exec: \"curator\": executable file not found in $PATH\n"
+--- FAIL: TestRunProductionResolverAgainstFakeCurator (0.29s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+    main_test.go:287: exit: <nil>
+--- FAIL: TestExecutableUnicodePathBoundary (0.60s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.45s)
+    --- FAIL: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+--- PASS: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- PASS: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+--- PASS: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+    main_test.go:351: exit=0
+--- FAIL: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+    main_test.go:401: exit = 0, want 1 (stderr "curator: environment_unknown: unregistered\ncurator-run: resolve_environment_unknown: curator env resolve exited 1: environment_unknown: unregistered\n")
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+    main_test.go:401: exit = 0, want 1 (stderr "curator: profile_unknown: none current\ncurator-run: resolve_profile_unknown: curator env resolve exited 1: profile_unknown: none current\n")
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+    main_test.go:401: exit = 0, want 1 (stderr "curator: environment_repair_failed: store\ncurator-run: resolve_repair_failed: curator env resolve exited 1: environment_repair_failed: store\n")
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+    main_test.go:401: exit = 0, want 1 (stderr "curator: environment_lock_unavailable: busy\ncurator-run: resolve_lock_unavailable: curator env resolve exited 1: environment_lock_unavailable: busy\n")
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+    main_test.go:401: exit = 0, want 1 (stderr "boom\ncurator-run: resolve_invocation_failed: curator env resolve exited 3 without a curator diagnostic line\n")
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+    main_test.go:401: exit = 0, want 1 (stderr "curator-run: resolve_fragment_invalid: curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1: fragment: missing required member \"fragment\"\n")
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+--- FAIL: TestRunDiagnosticsContract (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- PASS: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- PASS: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+    main_test.go:433: exit=0
+--- FAIL: TestRunResolveFailurePrecedesMapping (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.400s
+FAIL
+
+===== .temp/diagnostics-mutants/D08.log =====
+== D08 (expected to fail: TestEmitDeterministic)
+--- .temp/diagnostics-mutants/diagnostics.go.orig	2026-09-09 14:09:18
++++ internal/diagnostics/diagnostics.go	2026-09-09 14:09:30
+@@ -194,7 +194,7 @@
+ // prose, is the contract. The first line of the result is always the code
+ // line; detail newlines, when present, follow it as continuation.
+ func Line(code, detail string) string {
+-	return cli.Name + ": " + code + ": " + detail + "\n"
++	return cli.Name + ": " + code + " " + detail + "\n"
+ }
+ 
+ // Emit writes Line to w. It validates nothing: the call site owns the
+
+=== RUN   TestClosedSetMatchesSpec
+--- PASS: TestClosedSetMatchesSpec (0.00s)
+=== RUN   TestOwnedCodesMatchOwners
+--- PASS: TestOwnedCodesMatchOwners (0.00s)
+=== RUN   TestExitForCode
+--- PASS: TestExitForCode (0.00s)
+=== RUN   TestCodeOfProductionTypes
+--- PASS: TestCodeOfProductionTypes (0.00s)
+=== RUN   TestCodeOfUnknownFailsClosed
+--- PASS: TestCodeOfUnknownFailsClosed (0.00s)
+=== RUN   TestEmitDeterministic
+    diagnostics_test.go:176: Emit = "curator-run: resolve_repair_failed store cannot restore\n", want "curator-run: resolve_repair_failed: store cannot restore\n"
+--- FAIL: TestEmitDeterministic (0.00s)
+=== RUN   TestDiagnosticLineDistinguishesTransport
+    diagnostics_test.go:190: IsDiagnosticLine(Line("usage")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("resolve_invocation_failed")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("resolve_environment_unknown")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("resolve_profile_unknown")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("resolve_repair_failed")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("resolve_lock_unavailable")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("resolve_fragment_invalid")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("defaults_config_invalid")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("defaults_unresolvable")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("plan_refused")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("plan_provider_limited")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("env_unsupported")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("exec_provider_missing")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("ax_handoff_failed")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("mcp_layer_missing")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("mcp_layer_unreadable")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("sysprompt_channel_unavailable")) = false
+    diagnostics_test.go:190: IsDiagnosticLine(Line("sysprompt_file_unreadable")) = false
+--- FAIL: TestDiagnosticLineDistinguishesTransport (0.00s)
+=== RUN   TestRemainingObligationsAreStated
+--- PASS: TestRemainingObligationsAreStated (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.417s
+=== RUN   TestRunInformationalFlags
+--- PASS: TestRunInformationalFlags (0.00s)
+=== RUN   TestRunUsageErrorsExit2
+    main_test.go:68: run([]) first stderr line "curator-run: usage missing <env-id>" is not the usage code line
+    main_test.go:68: run([--]) first stderr line "curator-run: usage missing <env-id>" is not the usage code line
+    main_test.go:68: run([codex_cli resume]) first stderr line "curator-run: usage stray operand \"resume\" before --: native arguments must follow --" is not the usage code line
+    main_test.go:68: run([codex_cli --unknown]) first stderr line "curator-run: usage unknown flag \"--unknown\" before --" is not the usage code line
+    main_test.go:68: run([codex_cli --profile]) first stderr line "curator-run: usage flag --profile requires a value" is not the usage code line
+    main_test.go:68: run([codex_cli --profile a --profile b]) first stderr line "curator-run: usage flag --profile given more than once" is not the usage code line
+    main_test.go:68: run([pi --system-prompt prepend]) first stderr line "curator-run: usage --system-prompt accepts append or replace, got \"prepend\"" is not the usage code line
+    main_test.go:68: run([codex_cli --ax-profile bogus]) first stderr line "curator-run: usage --ax-profile accepts standard or yolo, got \"bogus\"" is not the usage code line
+    main_test.go:68: run([codex_cli --ax-profile yolo]) first stderr line "curator-run: usage --ax-profile yolo given but the ax integration is not configured on this machine; an execution profile is ax's and would be discarded" is not the usage code line
+    main_test.go:68: run([codex_cli --name bad/name]) first stderr line "curator-run: usage --name \"bad/name\" is not a valid ax session name: [A-Za-z0-9][A-Za-z0-9._-]{0,63}" is not the usage code line
+    main_test.go:68: run([codex_cli --name xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]) first stderr line "curator-run: usage --name \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\" is not a valid ax session name: [A-Za-z0-9][A-Za-z0-9._-]{0,63}" is not the usage code line
+    main_test.go:68: run([--nope --help]) first stderr line "curator-run: usage unknown flag \"--nope\" before --" is not the usage code line
+--- FAIL: TestRunUsageErrorsExit2 (0.00s)
+=== RUN   TestRunParsedLaunchResolvesThenRefuses
+--- PASS: TestRunParsedLaunchResolvesThenRefuses (0.00s)
+=== RUN   TestRunResolveFailuresExit1
+    main_test.go:179: environment_unknown: stderr "curator: environment_unknown: unregistered environment \"pi\"\ncurator-run: resolve_environment_unknown curator env resolve exited 1: environment_unknown: unregistered environment \"pi\"\n", want prefix "curator: environment_unknown: unregistered environment \"pi\"\ncurator-run: resolve_environment_unknown: "
+    main_test.go:179: profile_unknown: stderr "curator: profile_unknown: no profile is current\ncurator-run: resolve_profile_unknown curator env resolve exited 1: profile_unknown: no profile is current\n", want prefix "curator: profile_unknown: no profile is current\ncurator-run: resolve_profile_unknown: "
+    main_test.go:179: repair_failed: stderr "curator: environment_repair_failed: x\ncurator-run: resolve_repair_failed curator env resolve exited 1: environment_repair_failed: x\n", want prefix "curator: environment_repair_failed: x\ncurator-run: resolve_repair_failed: "
+    main_test.go:179: lock_unavailable: stderr "curator: environment_lock_unavailable: x\ncurator-run: resolve_lock_unavailable curator env resolve exited 1: environment_lock_unavailable: x\n", want prefix "curator: environment_lock_unavailable: x\ncurator-run: resolve_lock_unavailable: "
+    main_test.go:179: home_stale is unexpected: stderr "curator: environment_home_stale: x\ncurator-run: resolve_invocation_failed curator env resolve exited 1 with unmapped diagnostic environment_home_stale: x\n", want prefix "curator: environment_home_stale: x\ncurator-run: resolve_invocation_failed: "
+    main_test.go:179: no diagnostic: stderr "boom\ncurator-run: resolve_invocation_failed curator env resolve exited 3 without a curator diagnostic line\n", want prefix "boom\ncurator-run: resolve_invocation_failed: "
+    main_test.go:179: invalid fragment: stderr "curator-run: resolve_fragment_invalid curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1: fragment: missing required member \"environment\"\n", want prefix "curator-run: resolve_fragment_invalid: "
+    main_test.go:179: empty stdout is not absence: stderr "curator-run: resolve_fragment_invalid curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1: json: unexpected end of input at byte 0\n", want prefix "curator-run: resolve_fragment_invalid: "
+    main_test.go:179: other environment's fragment: stderr "curator-run: resolve_fragment_invalid fragment names environment \"codex_cli\", resolve was asked for \"pi\"\n", want prefix "curator-run: resolve_fragment_invalid: "
+--- FAIL: TestRunResolveFailuresExit1 (0.00s)
+=== RUN   TestRunProductionResolverAgainstFakeCurator
+    main_test.go:225: missing curator: exit 1 stderr "curator-run: resolve_invocation_failed could not run curator env resolve pi --repair --format json: exec: \"curator\": executable file not found in $PATH\n"
+--- FAIL: TestRunProductionResolverAgainstFakeCurator (0.20s)
+=== RUN   TestSpecVersionPinned
+--- PASS: TestSpecVersionPinned (0.00s)
+=== RUN   TestExecutableUnicodePathBoundary
+=== RUN   TestExecutableUnicodePathBoundary/accept4096
+=== RUN   TestExecutableUnicodePathBoundary/reject4097
+    main_test.go:290: stdout "" stderr "curator-run: resolve_fragment_invalid curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1: fragment: /env/PI_CODING_AGENT_DIR: \"/éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\" is not an absolute path\n"
+--- FAIL: TestExecutableUnicodePathBoundary (0.82s)
+    --- PASS: TestExecutableUnicodePathBoundary/accept4096 (0.64s)
+    --- FAIL: TestExecutableUnicodePathBoundary/reject4097 (0.01s)
+=== RUN   TestRunMapping
+=== RUN   TestRunMapping/claude_code
+=== RUN   TestRunMapping/codex_cli
+=== RUN   TestRunMapping/pi
+=== RUN   TestRunMapping/opencode
+    main_test.go:321: refusal: "curator-run: env_unsupported environment \"opencode\" has no supported system/provider pair\n"
+--- FAIL: TestRunMapping (0.00s)
+    --- PASS: TestRunMapping/claude_code (0.00s)
+    --- PASS: TestRunMapping/codex_cli (0.00s)
+    --- PASS: TestRunMapping/pi (0.00s)
+    --- FAIL: TestRunMapping/opencode (0.00s)
+=== RUN   TestRunUnknownResolvedMapping
+    main_test.go:343: stdout="" stderr="curator-run: env_unsupported environment \"future_env\" has no supported system/provider pair\n"
+--- FAIL: TestRunUnknownResolvedMapping (0.00s)
+=== RUN   TestRunUnknownFragmentStillRefusesResolution
+    main_test.go:354: stderr="curator-run: resolve_fragment_invalid curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1: fragment: /environment: \"future_env\" is not one of claude_code, codex_cli, opencode, pi\n" calls=1
+--- FAIL: TestRunUnknownFragmentStillRefusesResolution (0.00s)
+=== RUN   TestRunDiagnosticsContract
+=== RUN   TestRunDiagnosticsContract/usage_missing_env
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator-run: usage missing <env-id>\n\nusage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]\n                   [--model <model>] [--effort <effort>]\n                   [--name <session-name>] [--ax-profile <standard|yolo>]\n                   [--] <native args...>\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile <name>                  Curator profile forwarded to env resolve\n  --system-prompt <append|replace>  engage the fragment's system-prompt channel\n  --model <model>                   model passed to the spawn plane as declared\n  --effort <effort>                 reasoning effort passed as declared\n  --name <session-name>             ax session name (tracked machines only)\n  --ax-profile <standard|yolo>      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
+=== RUN   TestRunDiagnosticsContract/usage_stray_operand
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator-run: usage stray operand \"resume\" before --: native arguments must follow --\n\nusage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]\n                   [--model <model>] [--effort <effort>]\n                   [--name <session-name>] [--ax-profile <standard|yolo>]\n                   [--] <native args...>\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile <name>                  Curator profile forwarded to env resolve\n  --system-prompt <append|replace>  engage the fragment's system-prompt channel\n  --model <model>                   model passed to the spawn plane as declared\n  --effort <effort>                 reasoning effort passed as declared\n  --name <session-name>             ax session name (tracked machines only)\n  --ax-profile <standard|yolo>      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
+=== RUN   TestRunDiagnosticsContract/usage_unknown_flag
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator-run: usage unknown flag \"--unknown\" before --\n\nusage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]\n                   [--model <model>] [--effort <effort>]\n                   [--name <session-name>] [--ax-profile <standard|yolo>]\n                   [--] <native args...>\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile <name>                  Curator profile forwarded to env resolve\n  --system-prompt <append|replace>  engage the fragment's system-prompt channel\n  --model <model>                   model passed to the spawn plane as declared\n  --effort <effort>                 reasoning effort passed as declared\n  --name <session-name>             ax session name (tracked machines only)\n  --ax-profile <standard|yolo>      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
+=== RUN   TestRunDiagnosticsContract/usage_ax-profile_untracked
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator-run: usage --ax-profile yolo given but the ax integration is not configured on this machine; an execution profile is ax's and would be discarded\n\nusage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]\n                   [--model <model>] [--effort <effort>]\n                   [--name <session-name>] [--ax-profile <standard|yolo>]\n                   [--] <native args...>\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile <name>                  Curator profile forwarded to env resolve\n  --system-prompt <append|replace>  engage the fragment's system-prompt channel\n  --model <model>                   model passed to the spawn plane as declared\n  --effort <effort>                 reasoning effort passed as declared\n  --name <session-name>             ax session name (tracked machines only)\n  --ax-profile <standard|yolo>      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
+=== RUN   TestRunDiagnosticsContract/resolve_environment_unknown
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator: environment_unknown: unregistered\ncurator-run: resolve_environment_unknown curator env resolve exited 1: environment_unknown: unregistered\n"
+=== RUN   TestRunDiagnosticsContract/resolve_profile_unknown
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator: profile_unknown: none current\ncurator-run: resolve_profile_unknown curator env resolve exited 1: profile_unknown: none current\n"
+=== RUN   TestRunDiagnosticsContract/resolve_repair_failed
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator: environment_repair_failed: store\ncurator-run: resolve_repair_failed curator env resolve exited 1: environment_repair_failed: store\n"
+=== RUN   TestRunDiagnosticsContract/resolve_lock_unavailable
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator: environment_lock_unavailable: busy\ncurator-run: resolve_lock_unavailable curator env resolve exited 1: environment_lock_unavailable: busy\n"
+=== RUN   TestRunDiagnosticsContract/resolve_invocation_failed
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "boom\ncurator-run: resolve_invocation_failed curator env resolve exited 3 without a curator diagnostic line\n"
+=== RUN   TestRunDiagnosticsContract/resolve_fragment_invalid
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator-run: resolve_fragment_invalid curator env resolve exited 0 but its output is not a valid launch-env-fragment-v1: fragment: missing required member \"fragment\"\n"
+=== RUN   TestRunDiagnosticsContract/env_unsupported
+    main_test.go:420: stderr has 0 diagnostic lines, want exactly 1: "curator-run: env_unsupported environment \"opencode\" has no supported system/provider pair\n"
+--- FAIL: TestRunDiagnosticsContract (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/usage_missing_env (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/usage_stray_operand (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/usage_unknown_flag (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/usage_ax-profile_untracked (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_environment_unknown (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_profile_unknown (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_repair_failed (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_lock_unavailable (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_invocation_failed (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/resolve_fragment_invalid (0.00s)
+    --- FAIL: TestRunDiagnosticsContract/env_unsupported (0.00s)
+=== RUN   TestRunResolveFailurePrecedesMapping
+    main_test.go:436: stderr="curator: environment_unknown: missing\ncurator-run: resolve_environment_unknown curator env resolve exited 1: environment_unknown: missing\n" calls=1
+--- FAIL: TestRunResolveFailurePrecedesMapping (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.768s
+FAIL
