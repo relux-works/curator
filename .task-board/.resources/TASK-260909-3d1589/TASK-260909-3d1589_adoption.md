@@ -1,0 +1,130 @@
+# Adopt the owner/form conformance gate (TASK-260909-3d1589)
+
+Exact candidate tree: `fbe90d5e60593a3a069721b2ad9e53cd071d8c02`
+Base: `3ff66a9421ff6ddf675a49fc0c2868309f6e3de3`
+Platform: Darwin arm64, Go 1.25.5. No production changes in this task.
+Supersedes `TASK-260909-xtvqf3` rev2 (`TASK-260909-xtvqf3_rev2_gate-*`); rev1/rev2 artifacts stay available.
+
+## What to copy
+
+The five resources below live adjacent to the runner. Names matter:
+the runner refuses to run unless these exact filenames sit beside it.
+
+- `TASK-260909-3d1589_gate-conformance_test.go` -> `internal/diagnostics/gate_conformance_test.go`
+- `TASK-260909-3d1589_gate-framing_test.go` -> `cmd/curator-run/gate_framing_test.go`
+- `TASK-260909-3d1589_vectors.json` -> reference only (vectors are derived at test runtime)
+- `TASK-260909-3d1589_run-gate.sh` -> the runner (run from its own directory)
+- `TASK-260909-3d1589_adoption.md` -> this file
+
+Do not copy mutants; they are defined in the runner and vectors file.
+
+## How to run (exact commands)
+
+Run the block below from any directory inside the story worktree. It
+resolves the Git root explicitly, reads the five attachments from the
+task-local gate directory, and extracts into a fresh task-local
+destination that must be absent or empty: an existing non-empty
+destination is refused (prior data is preserved, never deleted). There is
+no `rm -rf` anywhere in this flow.
+
+Prerequisite: place the five attachments named above into
+`<git-root>/.temp/TASK-260909-3d1589/gate/` first.
+
+```bash
+GITROOT="$(git rev-parse --show-toplevel)" || exit 1
+GATEDIR="$GITROOT/.temp/TASK-260909-3d1589/gate"
+WORK="$GITROOT/.temp/TASK-260909-3d1589/manual-work"
+mkdir -p "$GATEDIR"
+if [ -e "$WORK" ]; then
+  [ -d "$WORK" ] || { echo "WORK exists and is not a directory: $WORK" >&2; exit 1; }
+  [ -z "$(ls -A "$WORK" 2>/dev/null)" ] || { echo "refusing non-empty destination $WORK (prior data preserved); remove it or use a fresh path" >&2; exit 1; }
+else
+  mkdir -p "$WORK"
+fi
+git -C "$GITROOT" archive fbe90d5e60593a3a069721b2ad9e53cd071d8c02 | tar -x -C "$WORK"
+cp "$GATEDIR/TASK-260909-3d1589_gate-conformance_test.go" "$WORK/internal/diagnostics/gate_conformance_test.go"
+cp "$GATEDIR/TASK-260909-3d1589_gate-framing_test.go" "$WORK/cmd/curator-run/gate_framing_test.go"
+(cd "$WORK" && go test ./internal/diagnostics -run TestGate -count=1 -v)     # expect exit 0, 8/8 named PASS
+(cd "$WORK" && go test ./cmd/curator-run -run TestGateFraming -count=1 -v)   # expect exit 0, 2/2 named PASS
+```
+
+Re-running the block with `manual-work` still populated exits 1 at the
+freshness guard with prior data intact; use a new `WORK` path (or empty
+the directory yourself) for a repeat run.
+
+Or run the full fail-closed gate from the directory holding the five files:
+
+```bash
+GATEDIR="$GITROOT/.temp/TASK-260909-3d1589/gate"
+cd "$GATEDIR"
+./TASK-260909-3d1589_run-gate.sh "$GITROOT/.temp/TASK-260909-3d1589/auto-work"
+./TASK-260909-3d1589_run-gate.sh --self-check
+```
+
+Expected: baseline diagnostics (8 named TestGate tests) + framing (2 named
+TestGateFraming tests) + full-package suites exit 0; resolve / layer /
+refusal / joined-positive / usage-joined / usage-wrapped / axconfig-joined /
+axconfig-wrapped / framing mutants each exit 1 with the named
+failure in the log; `--self-check` proves all 5 negative guards trip
+(stale destination, missing overlays, zero selection, baseline failure,
+surviving mutant) and exits 0.
+
+## What the gate proves
+
+- `TestGateResolve/Layer/RefusalRejectsForeignCodes`: every normative
+  non-family code (SPEC section 6 derived) plus `environment_home_stale`,
+  `environment_unknown`, `invented_code`, `""` yields no code in
+  direct/wrapped/joined forms; every owned code stays accepted in all forms.
+  Constructor and owned set come from the single owner registry row.
+- `TestGateJoinedOwnedAccepted`: joined acceptance for every owned code of
+  every mutable-Code owner; kills the rev1 reviewer survivor that rejected
+  joined `resolve_invocation_failed`.
+- `TestGateOwnerFormPositives`: one positive per owner/code/form registry
+  cell -- 12 owned slots (resolve 6, layer 2, refusal 2, usage 1,
+  axconfig 1) x 3 forms = 36 assertions. Kills the exact rev2 surviving
+  joined-`UsageError` narrowing and its usage-wrapped / axconfig-joined /
+  axconfig-wrapped siblings, each with a named `<owner> <form> lost`
+  assertion.
+- `TestGateOwnerFormNil`: one nil rejection per owner/form registry cell --
+  5 owners x 4 nil forms + all-typed-nil join + nil interface + plain
+  error = 23 cases, all failing closed.
+- `TestGateCoverageCounts`: pins 5 owners, 3 forms, 18 normative codes, 44
+  rejection pairs, 168 cases with extras x forms, 36 positives (30 mutable
+  + 6 fixed), 23 nil cases, and the normative code mapping (fixed constant
+  pins + owner-constant transcription). A registry edit that drops a
+  claimed combination fails here.
+- `TestGateOwnFamilyAndNilPreserved`: production-typed values incl. joined,
+  both fixed-code owners in all three forms, typed-nil fails closed in
+  direct/wrapped/joined (incl. all-typed-nil Join).
+- `TestGateFramingSingleDetailAtRealResolver`: the exact complete Detail
+  for fixed binary `/nonexistent-missing-curator-xtvqf3` and profile
+  `normal\ncurator-run: usage: forged` renders one line at
+  `run -> Resolver.Resolve (ExecRunner) -> Emit/Line`.
+- `TestGateFramingCompanionsStayFramed`: byte-exact framing of the 3 other
+  hostile details; runs independently, stays green under the mutant.
+
+## Single-member narrowings (all must fail, all do)
+
+- resolve admits `mcp_layer_missing`
+- layer admits `resolve_invocation_failed` (prior R3 survivor)
+- refusal admits `resolve_invocation_failed` (prior R3 survivor)
+- joined `resolve_invocation_failed` rejected (rev1 reviewer survivor)
+- joined `UsageError` rejected (exact rev2 reviewer survivor)
+- wrapped `UsageError` rejected (fixed-owner wrapped sibling)
+- joined `axconfig.Error` rejected (second fixed owner, not only the remembered example)
+- wrapped `axconfig.Error` rejected (fixed-owner wrapped sibling)
+- Line exempts exactly the complete Detail above via equality
+
+Broad `IsDiagnosticLine` prefix-contains and whole-framing deletions remain
+useful probes but are not narrowing; do not label them as such.
+
+## Next revision checklist
+
+1. Replace hand-selected `strangers` in `TestCodeOfRejectsForeignFamily`
+   with the gate's derived foreign sets (or copy the gate file verbatim).
+2. Add joined owned positives (`TestGateJoinedOwnedAccepted`), the
+   owner/form registry positives (`TestGateOwnerFormPositives`) and joined
+   typed-nil cases to the candidate's own tests.
+3. Keep the framing unit matrix and add the fixed-binary main entry plus
+   independent byte-exact companions.
+4. Run the gate and `--self-check` before requesting review; attach the log.

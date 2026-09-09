@@ -1,0 +1,453 @@
+task-board version 0.24.3-332-gac72ed99 (commit ac72ed99, built 2026-09-09T11:17:36Z)
+git version 2.50.1 (Apple Git-155)
+Python 3.14.7
+go version go1.25.5 darwin/arm64
+COMMAND ['git', 'diff', '3ff66a9421ff6ddf675a49fc0c2868309f6e3de3', 'ff61be4a8bd43fa4ffb179d31aa38e41891d4313']
+
+EXIT 0
+--- rev2
++++ rev3
+@@ -1,25 +1,28 @@
+-# Adopt the owner/form conformance gate (TASK-260909-3d1589, rev2)
++# Adopt the owner/form conformance gate (TASK-260909-3d1589, rev3)
+ 
+ Exact candidate tree: `fbe90d5e60593a3a069721b2ad9e53cd071d8c02`
+ Base: `3ff66a9421ff6ddf675a49fc0c2868309f6e3de3`
+ Platform: Darwin arm64, Go 1.25.5. No production changes in this task.
+-Supersedes `TASK-260909-3d1589` rev1 (`TASK-260909-3d1589_gate-*`, whose
+-separate manual entry is fail-open per
+-`TASK-260909-3d1589_review-verdict-rev1.md` R1) and `TASK-260909-xtvqf3`
+-rev2 (`TASK-260909-xtvqf3_rev2_gate-*`); rev1/rev2 artifacts stay available.
+-Gate logic, owner/form registries, overlays and vectors are byte-identical
+-to rev1; only the manual entry and the `rev2` file names are new.
++Supersedes `TASK-260909-3d1589` rev2 (`TASK-260909-3d1589_rev2_adoption.md`,
++whose automatic entry masked a primary-runner refusal with a passing
++`--self-check`, both exiting 0, per
++`TASK-260909-3d1589_review-verdict-rev2.md` R1); rev1/rev2 artifacts stay
++available. Gate logic, owner/form registries, overlays, vectors, runner
++and the manual entry are byte-identical to rev2; only the automatic
++block below is new (one short-circuit line).
+ 
+ ## What to copy
+ 
+ The five resources below live adjacent to the runner. Names matter:
+ the runner refuses to run unless these exact filenames sit beside it.
++They are the unchanged rev2 package; rev3 adds no new overlay, vector
++or runner.
+ 
+ - `TASK-260909-3d1589_rev2_gate-conformance_test.go` -> `internal/diagnostics/gate_conformance_test.go`
+ - `TASK-260909-3d1589_rev2_gate-framing_test.go` -> `cmd/curator-run/gate_framing_test.go`
+ - `TASK-260909-3d1589_rev2_vectors.json` -> reference only (vectors are derived at test runtime)
+ - `TASK-260909-3d1589_rev2_run-gate.sh` -> the runner (make it executable)
+-- `TASK-260909-3d1589_rev2_adoption.md` -> this file
++- `TASK-260909-3d1589_rev3_adoption.md` -> this file
+ 
+ Do not copy mutants; they are defined in the runner and vectors file.
+ 
+@@ -57,13 +60,16 @@
+ (or empty the directory yourself) for a repeat run.
+ 
+ The same runner covers the automatic flow from the directory holding
+-the five files:
++the five files. The primary invocation short-circuits: if it refuses
++(e.g. a stale non-empty destination), the block exits with its status
++before `--self-check` can mask it as success (rev2 R1: the unguarded
++sequence exited 0 because the passing self-check was the last command).
+ 
+ ```bash
+ GITROOT="$(git rev-parse --show-toplevel)" || exit 1
+ GATEDIR="$GITROOT/.temp/TASK-260909-3d1589/gate"
+ cd "$GATEDIR" || exit 1
+-./TASK-260909-3d1589_rev2_run-gate.sh "$GITROOT/.temp/TASK-260909-3d1589/auto-work"
++./TASK-260909-3d1589_rev2_run-gate.sh "$GITROOT/.temp/TASK-260909-3d1589/auto-work" || exit $?
+ ./TASK-260909-3d1589_rev2_run-gate.sh --self-check
+ ```
+ 
+COMMAND ['git', 'clone', '--shared', '--no-checkout', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay']
+Cloning into '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay'...
+done.
+
+EXIT 0
+COMMAND ['git', 'checkout', '--detach', '3ff66a9421ff6ddf675a49fc0c2868309f6e3de3']
+HEAD is now at 3ff66a9 feat: add direct execution and tracked handoff APIs [skip ci]
+
+EXIT 0
+SHA256 TASK-260909-3d1589_rev2_gate-conformance_test.go 8495946dce980b9e6a69a17f20fd40703917da51880f4aaa50d7b43f0da754e9
+SHA256 TASK-260909-3d1589_rev2_gate-framing_test.go 5031d27fdcdb65c3a69ee723baa202d5f928335a26ac225a935b3763810b5f9e
+SHA256 TASK-260909-3d1589_rev2_vectors.json a404a9b703ea8f3fa585b4de45d04f5d8e9079b19129c44fc28164e286ddb76d
+SHA256 TASK-260909-3d1589_rev2_run-gate.sh 6b278b35604507f741ffd03f1f1e3b8ccf57d8c841f69573ab93e479686b224d
+EXACT BLOCK automatic
+GITROOT="$(git rev-parse --show-toplevel)" || exit 1
+GATEDIR="$GITROOT/.temp/TASK-260909-3d1589/gate"
+cd "$GATEDIR" || exit 1
+./TASK-260909-3d1589_rev2_run-gate.sh "$GITROOT/.temp/TASK-260909-3d1589/auto-work" || exit $?
+./TASK-260909-3d1589_rev2_run-gate.sh --self-check
+
+EXACT BLOCK unguarded-control
+GITROOT="$(git rev-parse --show-toplevel)" || exit 1
+GATEDIR="$GITROOT/.temp/TASK-260909-3d1589/gate"
+cd "$GATEDIR" || exit 1
+./TASK-260909-3d1589_rev2_run-gate.sh "$GITROOT/.temp/TASK-260909-3d1589/auto-work"
+./TASK-260909-3d1589_rev2_run-gate.sh --self-check
+
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/automatic.sh']
+== provenance ==
+tree=fbe90d5e60593a3a069721b2ad9e53cd071d8c02
+gate_dir=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/gate
+work=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work
+3ff66a9421ff6ddf675a49fc0c2868309f6e3de3
+go version go1.25.5 darwin/arm64
+== exact-tree verification ==
+identity: tree fbe90d5e60593a3a069721b2ad9e53cd071d8c02 pinned (8 blobs + SPEC sha256 match)
+== extract disposable copy ==
+extract: disposable copy ready at /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work
+diagnostics.go
+diagnostics_test.go
+helpers_test.go
+install: gate overlays staged under published names
+== BASELINE: gate must pass (exit 0, all named tests) ==
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.699s
+baseline-diagnostics-gate exit=0 (8/8 named TestGate tests PASS)
+=== RUN   TestGateFramingSingleDetailAtRealResolver
+--- PASS: TestGateFramingSingleDetailAtRealResolver (0.00s)
+=== RUN   TestGateFramingCompanionsStayFramed
+=== RUN   TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b
+=== RUN   TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged
+=== RUN   TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__
+--- PASS: TestGateFramingCompanionsStayFramed (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__ (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.349s
+baseline-framing-gate exit=0 (2/2 named TestGateFraming tests PASS)
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.471s
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.750s
+baseline full-package suites exit=0 (overlays break no existing test)
+== MUTANT resolve: admits mcp_layer_missing (expect TestGateResolveRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:49
+@@ -237,7 +237,7 @@
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+ 		}
+-		if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {
++		if re, ok := e.(*fragment.ResolveError); ok && re != nil && (resolveFamily[re.Code] || re.Code == composition.CodeMCPLayerMissing) {
+ 			return re.Code, true
+ 		}
+ 		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
+=== RUN   TestGateResolveRejectsForeignCodes
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (direct form)
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (wrapped form)
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (joined form)
+--- FAIL: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.01s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.361s
+FAIL
+resolve-mutant exit=1 via TestGateResolveRejectsForeignCodes (other owners still PASS)
+== MUTANT layer: admits resolve_invocation_failed (expect TestGateLayerRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:50
+@@ -240,7 +240,7 @@
+ 		if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {
+ 			return re.Code, true
+ 		}
+-		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
++		if le, ok := e.(*composition.LayerError); ok && le != nil && (layerFamily[le.Code] || le.Code == fragment.CodeInvocationFailed) {
+ 			return le.Code, true
+ 		}
+ 		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (direct form)
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (wrapped form)
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (joined form)
+--- FAIL: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.415s
+FAIL
+layer-mutant exit=1 via TestGateLayerRejectsForeignCodes (prior R3 survivor killed)
+== MUTANT refusal: admits resolve_invocation_failed (expect TestGateRefusalRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:50
+@@ -243,7 +243,7 @@
+ 		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
+ 			return le.Code, true
+ 		}
+-		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {
++		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && (refusalFamily[sr.Code] || sr.Code == fragment.CodeInvocationFailed) {
+ 			return sr.Code, true
+ 		}
+ 		if ae, ok := e.(*axconfig.Error); ok && ae != nil {
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (direct form)
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (wrapped form)
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (joined form)
+--- FAIL: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.413s
+FAIL
+refusal-mutant exit=1 via TestGateRefusalRejectsForeignCodes (prior R3 survivor killed)
+== MUTANT joined-positive: joined resolve_invocation_failed rejected (expect TestGateJoinedOwnedAccepted fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:51
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if re, yes := child.(*fragment.ResolveError); yes && re != nil && re.Code == fragment.CodeInvocationFailed { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateJoinedOwnedAccepted
+    gate_conformance_test.go:382: joined owned resolve "resolve_invocation_failed" lost: CodeOf = "" false, want acceptance
+    gate_conformance_test.go:389: joined owned resolve "resolve_invocation_failed" lost beside typed nil: CodeOf = "" false
+--- FAIL: TestGateJoinedOwnedAccepted (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.349s
+FAIL
+joined-positive-mutant exit=1 via TestGateJoinedOwnedAccepted (rev1 reviewer survivor killed)
+== MUTANT usage-joined (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:52
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if ue, yes := child.(*cli.UsageError); yes && ue != nil { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: usage joined lost: "" false (owned code "usage")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.356s
+FAIL
+usage-joined-mutant exit=1 via TestGateOwnerFormPositives (usage joined lost: "" false)
+== MUTANT usage-wrapped (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:53
+@@ -233,6 +233,9 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {
++		if ue, yes := w.Unwrap().(*cli.UsageError); yes && ue != nil { return "", false }
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: usage wrapped lost: "" false (owned code "usage")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.404s
+FAIL
+usage-wrapped-mutant exit=1 via TestGateOwnerFormPositives (usage wrapped lost: "" false)
+== MUTANT axconfig-joined (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:54
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if ae, yes := child.(*axconfig.Error); yes && ae != nil { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: axconfig joined lost: "" false (owned code "defaults_config_invalid")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.356s
+FAIL
+axconfig-joined-mutant exit=1 via TestGateOwnerFormPositives (axconfig joined lost: "" false)
+== MUTANT axconfig-wrapped (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:55
+@@ -233,6 +233,9 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {
++		if ae, yes := w.Unwrap().(*axconfig.Error); yes && ae != nil { return "", false }
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: axconfig wrapped lost: "" false (owned code "defaults_config_invalid")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.380s
+FAIL
+axconfig-wrapped-mutant exit=1 via TestGateOwnerFormPositives (axconfig wrapped lost: "" false)
+== MUTANT framing: exempts exactly one hostile complete Detail ==
+   (expect TestGateFramingSingleDetailAtRealResolver fail exit 1;
+    companions TestGateFramingCompanionsStayFramed must stay exit 0)
+framing mutant applied for exactly one complete Detail
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:50:44
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:50:56
+@@ -266,6 +266,9 @@
+ // Only detail is framed: code is chosen by the call site from the closed
+ // set, and forwarded child/provider/ax bytes never pass through Line.
+ func Line(code, detail string) string {
++	if detail == "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory" {
++		return cli.Name + ": " + code + ": " + detail + "\n"
++	}
+ 	detail = strings.ReplaceAll(detail, "\r\n", "\n")
+ 	detail = strings.ReplaceAll(detail, "\r", "\n")
+ 	detail = strings.ReplaceAll(detail, "\n", "\n  ")
+=== RUN   TestGateFramingSingleDetailAtRealResolver
+    gate_framing_test.go:67: diagnostic line "curator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory" does not carry code "resolve_invocation_failed"
+--- FAIL: TestGateFramingSingleDetailAtRealResolver (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.399s
+FAIL
+framing-mutant exit=1 via TestGateFramingSingleDetailAtRealResolver at run -> Resolver.Resolve -> Emit/Line
+=== RUN   TestGateFramingCompanionsStayFramed
+=== RUN   TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b
+=== RUN   TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged
+=== RUN   TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__
+--- PASS: TestGateFramingCompanionsStayFramed (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.251s
+framing-mutant companions exit=0: all 3 hostile companions stay byte-exact framed
+framing-mutant diagnostics-gate exit=0 (owner matrix untouched)
+== restored ==
+diagnostics.go restored byte-equal
+== GATE RESULT: PASS (baseline 0; resolve/layer/refusal/joined/usage-joined/usage-wrapped/axconfig-joined/axconfig-wrapped/framing mutants each exit 1 with named assertions) ==
+== SELF-CHECK: 5 negative guard probes ==
+SELF-CHECK 1 stale-destination: trips (refuses non-empty dir)
+SELF-CHECK 2 missing-overlays: trips (no false success)
+SELF-CHECK 3 zero-selection: trips
+SELF-CHECK 4 baseline-failure: trips (mutated baseline exit=1 != 0)
+SELF-CHECK 5 surviving-mutant: trips (no-op change reported SURVIVED)
+SELF-CHECK: 5/5 negative probes trip (stale-dest, missing-overlays, zero-selection, baseline-failure, surviving-mutant)
+
+EXIT 0
+CASE fresh: expected=0 actual=0
+BEFORE {".archive.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", ".github/workflows/ci.yml": "bcdf8816bfbcff1795cd05eb0c4afd28face4dc42f5993311c6e9094b536ee16", ".gitignore": "d81370d8cf901502dc64af885424f2ff7a8ca74a48c86050b128f955c6a563fb", ".scripts/cli-mutants.sh": "02c2a49ac6ec5c11e124b53a8ea848a1019c7a703cb4a4624aab0cfdc4db2c88", ".scripts/composition-mutants.py": "d44ad2197018850a608b0c34f26bef852c2a6ac994eec9ad51c7f74147003c78", ".scripts/diagnostics-mutants.sh": "beeaf5977564210cd6b98f4bc78ef2c4e5332cc2629cb641dca0bbdee030558c", ".scripts/execution-mutants.py": "9c0d4087a8461c4f85e4a73dd49b6dd935281538c272714ef0c01fbe7c93a046", ".scripts/fragment-mutants.sh": "1cd701c6a1d7f68b9ed79006f79d0b846ba0f5f93c5f98a5f30ac50b8a123a9b", ".scripts/mapping-mutants.py": "6e6e7e6d5a1a1ea06a40242219e431890c4bcafb39b8881d7d45061b3ae06d41", ".scripts/systemprompt-mutants.py": "36a5c69d50af75dd0e40ad64a66949521b0b06d383b11f36a0c9363a0ecf6a9c", ".tar.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30", "Makefile": "335fa62cb350a805e887f8106db3ed2943fc0acb86b84dea7557b9761424f130", "NOTICE": "0d30b4f3d38b194378668801e7d277ca9ff6eb40a9f9757a651b4a3b663112a1", "README.md": "c3e94e0927221b49e55b267193a100cf1e68bcce1fa9a4ec655a47f345fafed6", "SENTINEL": "06162108e0696b68291d620315fead3fb34580be7f771feb880b2d4241124996", "SPEC.md": "5a7ccf0ba95708cb573a586977eb0ba4bad1e46233a540dc99784c1d4d922d48", "cmd/curator-run/gate_framing_test.go": "5031d27fdcdb65c3a69ee723baa202d5f928335a26ac225a935b3763810b5f9e", "cmd/curator-run/main.go": "d04f19983ea359e64adb0da9811ec8496f3dfbba7af7485a5d76806c2d4ca88a", "cmd/curator-run/main_test.go": "266ac6d518ee346c360b0ffaa56095c02f5d8584f63222521bfc574e47c20fa1", "diagnostics.go.orig": "06112c6dee71036a63fb2e7667c5c9f47b499cd6dc42990546cd7dcbe1ada106", "go.mod": "f5a91ac64b7485254be556e06f35839a7a57f8bd4dae05ba7e9943944a8891a8", "go.sum": "61692218a85029aa4c33b388e1d816ff643c35d843d7432c8c9e5892ddca9807", "internal/axconfig/config.go": "548de1bdf4b87750a83fdd06ca9b65dc57ec8871caa27f78b5b736eda9ce93ee", "internal/axconfig/config_test.go": "2593f367d7fbe547fa51e9b797c3225d48d3d9f2f35799bc75f89e5cc9189702", "internal/axconfig/fifo_test.go": "7fa7c619bb480bdf68e822258200cd167cc9f6d66c2e8d414edb8c86437fc6e7", "internal/cli/cli.go": "618562a4316d61d905fdf7c34d44393502ff37cdd101ed93c3eb2fd6daa567fc", "internal/cli/cli_test.go": "bfaeff685d22010dcac231ecb2a62bd660b3c4a7c3e5ef23ebe7a24494b68d14", "internal/cli/testdata/cases.golden": "260849cbf27d1bbfc8569c0856a1f533a2db4c3d4be8f5918c6c026ab02a668f", "internal/composition/composition.go": "e53003ce5aa27b8412d9c7323a43aa7ac7808fa313bc0db7aaefa2a898dfe1a2", "internal/composition/composition_test.go": "ef28f326adef93519c127095dd2168d944eea195b11a4040aecbbe6b9ee1069f", "internal/composition/probe.go": "0f45362923c8efcfe9308e4858421d306ae6d62599db06471d999ae64593187a", "internal/diagnostics/diagnostics.go": "06112c6dee71036a63fb2e7667c5c9f47b499cd6dc42990546cd7dcbe1ada106", "internal/diagnostics/diagnostics_test.go": "7d3f8d7da4e10778486d8e58545c8fcfcce506b4fb9fe43b1e116d9e35024f5f", "internal/diagnostics/gate_conformance_test.go": "8495946dce980b9e6a69a17f20fd40703917da51880f4aaa50d7b43f0da754e9", "internal/diagnostics/helpers_test.go": "4f4ae3c67dd189844a749638e257e8e32f2446611656b5ac42073c96841d0c8d", "internal/execution/execution.go": "da47ea6e581814dc21cfe25846539fd96baab56ee1e0aa54b236f1c1e0854259", "internal/execution/execution_test.go": "744a2a72effa7725794f68fd937a9de50c36f757e55d56b54441f628dcbbd23a", "internal/execution/process.go": "1a8b0b1eb1ca54196fe27e10054ba97a5725ccb9020169e46a14e4195042dba4", "internal/execution/testdata/driver/main.go": "05215488fd8bf3fdb6f837b628b7a68d1f8232209953357aa8b79bcdfa576fb1", "internal/execution/testdata/helper/main.go": "427b08e0804100100b41b6f7492bc25686ced702e8cb8119c6828542b377c119", "internal/execution/testdata/terminal_probe.py": "f90165fbd0f488a6a7540d9b86daf15ecb89c83c7eae77d47b6a9225a4c294d5", "internal/fragment/ccj1.go": "73a26d98464e341060d9ea5d31a233e5417ddbf7ed835602e181ca18f4cc4d65", "internal/fragment/ccj1_test.go": "133d4b02d225fdc249f4e8f0f064c0a8554cdd2f9b12893a4875dd72abe28f55", "internal/fragment/fragment.go": "f3516e4780253e28368792c76078900f929b49b3dd7e100df560a0661c1cdc76", "internal/fragment/fragment_test.go": "75e305ac5b6f89e86f9c8a507853e8b2c5c1bcdbbaef73de0814fe4590d387be", "internal/fragment/json.go": "b298effc0dcafadad9e16715a84ba999baad142ba4456bb7ed34ba46ed68d4a4", "internal/fragment/resolve.go": "57e244cb31107c1f376aae7d28f8868d9e52d123de27d7b86e5bed3c4512c613", "internal/fragment/resolve_test.go": "0f8b0098c30aa0f7070cece599385b70e8bdf9b49bfecaf3f3827027a85bdae0", "internal/fragment/testdata/a0/claude_code.json": "39545291e5d1b36e190c3432220b410c89e0f7ea88be43bb5e2e70f6ba15ad93", "internal/fragment/testdata/a0/codex_cli.json": "3eb2fb7c099f0454000570c9c7f7c7593665f0c2875291661508701c293e478d", "internal/fragment/testdata/a0/digests.txt": "1eb4cec936c13a1a66adbde9a3bbcedad57d7159a8252cf47cb5993c8c3c1c5c", "internal/fragment/testdata/a0/pi.json": "c2e7d1e8a98e6850ba821d3da5beef2e3fffabe6dabced9ff7b3917a4a7bd95b", "internal/fragment/testdata/schema-cases/index.json": "581a0e7df640e7579522c8945d4bc5c8a6363c4bdcc36ebaa0c88c8be9aaea4d", "internal/fragment/testdata/schema-cases/invalid-channel-missing-semantics.json": "9d0273d336b6be15319c0b28940f842de96593f2f81155250d23412941dd3baf", "internal/fragment/testdata/schema-cases/invalid-channel-unknown-field.json": "75a9b8dc1fd0916675f2cbef5389c9b30c61518b5329b8d3b54dde1b80ba64c0", "internal/fragment/testdata/schema-cases/invalid-channel-unknown-kind.json": "0f09adac7d06912ec9e4952d65dbc41c0c0edc32cad74bcb2bb388c7969f801d", "internal/fragment/testdata/schema-cases/invalid-channel-unknown-semantics.json": "ba16e2ed2e641a90c585e8d492420ee7ba6bdc51ac80f3f5584a06944f197c6b", "internal/fragment/testdata/schema-cases/invalid-env-dotdot-segment.json": "8c0fb17e176d008cc80852d02b59023ad544992e104a02eb4945b16219964345", "internal/fragment/testdata/schema-cases/invalid-env-empty.json": "8b24f1e3eb6edc299011828ee885aab95434977e2fbd193efc2e0b006f734226", "internal/fragment/testdata/schema-cases/invalid-env-lowercase-variable.json": "cf6574b0a87a6e075c690ba2ec94350295cf3d1df292c7858437a58179a622d6", "internal/fragment/testdata/schema-cases/invalid-env-relative-path.json": "f86c28358d3bd402baced04566fb1add392fa062aee93598eea670f3d29493e8", "internal/fragment/testdata/schema-cases/invalid-env-two-variables.json": "8d0c1449e70d7b327c56da669a9cb8ec1d6d1a1b76177d68991c72caf719180c", "internal/fragment/testdata/schema-cases/invalid-env-wrong-adapter-variable.json": "8218395b90654faff9ec362e6094aa16353957a05ba57f30ccf873f705abb3fc", "internal/fragment/testdata/schema-cases/invalid-flag-empty-with.json": "92cffb9e2ea6f389f458e0d7db1561ed78da338d978e68c722067f376b2879a8", "internal/fragment/testdata/schema-cases/invalid-flag-missing-argument.json": "ddcebcd9e0c4452c2da629355adbca037f9bfa658e8327433020ff431e30ff8a", "internal/fragment/testdata/schema-cases/invalid-flag-name-argument-without-name.json": "b21cef428fa72c5afc037a7ca5033915ad16edce0d6a0691dea3b42c30c92ac5", "internal/fragment/testdata/schema-cases/invalid-flag-name-without-name-argument.json": "b4a40d4d210cbab5534563fd5485f3ce409d063995de34786c1c4e5cc7e76474", "internal/fragment/testdata/schema-cases/invalid-flag-unknown-argument.json": "b83bc47e114a6e1c3f2d73b5462be0a4cd8a7313299efba56a2ec7ddc40bfb69", "internal/fragment/testdata/schema-cases/invalid-flag-with-filename.json": "634510c2e490238ccd482a844b4d8951774230b7c2f0d02b998a1d99cab3fdc8", "internal/fragment/testdata/schema-cases/invalid-fragment-identity.json": "4d6682480caeeba100d8c4b8f89054978c605e580fde5fad8926697cdff23f0a", "internal/fragment/testdata/schema-cases/invalid-mcp-channel-not-registry.json": "492367ccdef288d12a2c2336421987d4f8f075ed9d7b9e0465ed30fd07655201", "internal/fragment/testdata/schema-cases/invalid-mcp-channel-with-semantics.json": "87548639165f43fce5b27ddc7756ef6e4c0d846f6590360f94a6afc151e73292", "internal/fragment/testdata/schema-cases/invalid-mcp-env-names-reserved.json": "9b182cd054d026e9b5a417b9eb66943b34e18d287e74c9bb2a05e1fbd42f7a6b", "internal/fragment/testdata/schema-cases/invalid-mcp-env-names-unsorted.json": "d96d32dd21c581102134b96221664ab4aec5010e7e10ab900c62ab28bb13081d", "internal/fragment/testdata/schema-cases/invalid-mcp-missing-env-names.json": "93ac91b17c8edd4f5bb51968ab91c86d87f08e986fc0e78707ad41cf7a2c8f09", "internal/fragment/testdata/schema-cases/invalid-mcp-on-pi.json": "e5c3f21a6ffef2a2ced318304bd8f995d10d9a2f3aacba8e470e49c9c5fefa7b", "internal/fragment/testdata/schema-cases/invalid-mcp-two-channels.json": "0f7aa04b63d81a44a25d0a2199a3b4c38de71518da31e570bd0d5cb9b00cb6e8", "internal/fragment/testdata/schema-cases/invalid-mcp-unknown-field.json": "20e7e56206b83f658bec64176b223c612ea8bd0a7e671f6d35502b520bbbcbcb", "internal/fragment/testdata/schema-cases/invalid-missing-precedence.json": "7d2d71c38c0b8566fc9bfd96df76a4f7cc1f52ce3ca71ad173b1f629970dc327", "internal/fragment/testdata/schema-cases/invalid-path-prepend-dotdot-segment.json": "bd6d32e2c8044ddd7a891cdbff9707a4aa63a42dbf2e8f251407e349f004c96e", "internal/fragment/testdata/schema-cases/invalid-path-prepend-outside-root.json": "213c7ff58ce0582bed068fa2e951bea11a48812a10fd05031cf534f361d606f7", "internal/fragment/testdata/schema-cases/invalid-path-prepend-relative.json": "d71d29429f130495ee8ba2ff7185b07d54566ceb0d083abb2d7eff1ede0cc40d", "internal/fragment/testdata/schema-cases/invalid-precedence-string.json": "90526b9c865936c0e81da2e3e892881e8dcffe6821419178bed6f0b7e19d26c0", "internal/fragment/testdata/schema-cases/invalid-profile-commit-pin.json": "c90924d10b9be951d2d4fa5500a4befd1c853d78595763a85c1d06e3faadf50f", "internal/fragment/testdata/schema-cases/invalid-profile-lock-prefixed.json": "8d16811a67620e7a9c9268d5f314b1e27a7bbdc1248df4a9da68b0380da9482e", "internal/fragment/testdata/schema-cases/invalid-profile-unknown-field.json": "5e0bba04c8c0855b4069a84c4381d1385a86b2aa256ce29d7b708814982a04f5", "internal/fragment/testdata/schema-cases/invalid-system-prompt-channels-not-registry.json": "c5950e114c07ec02b4806d3e9a711f8710c675a3a8da86ba968b670ead2eb881", "internal/fragment/testdata/schema-cases/invalid-system-prompt-missing-channels.json": "0d0e928e311d4987cbf4570006dfb555015ca11b2c69f9b862c8506c947e676c", "internal/fragment/testdata/schema-cases/invalid-system-prompt-path-dotdot-segment.json": "9bd2778259c92b4c607d71f5c094fffe5ea1c59abf4569e9ca537b25b545cb5b", "internal/fragment/testdata/schema-cases/invalid-system-prompt-unknown-field.json": "a9288cb8c356a181991a525f4812ee3540e615b4399d344ae748452f0124d40f", "internal/fragment/testdata/schema-cases/invalid-unknown-environment.json": "2d00009d8793841f9209fea9145441ab1f8bc3333e3514df189f1d984d7da7bd", "internal/fragment/testdata/schema-cases/invalid-unknown-field.json": "1b399fc72e420a496d498aba5c2b1ba8e62d2872353803695cac9b944175113f", "internal/fragment/testdata/schema-cases/invalid.json": "3a1158f207caa69a85d12124907396f1902b00aa49f6fbf9d6a6cdf9ee383725", "internal/fragment/testdata/schema-cases/valid-codex-config-key-and-name-channel.json": "d5c0ea960a0897b3ca4e080f1baa2fe155d8ff5607b6f269a0dafdbbfed051fd", "internal/fragment/testdata/schema-cases/valid-mcp-only.json": "2ed8e3abe51114487b24fb18bfb94a8ecd67c5583406e320707c079be02fe0d0", "internal/fragment/testdata/schema-cases/valid-minimal.json": "ef6f1bf37f0509a89d02e5b0b52817de13ca539a7f46077e7f436e552a5b9d0c", "internal/fragment/testdata/schema-cases/valid-opencode-empty-channels-and-variable.json": "7ce8b5b3c5b14b24e8e21d3dcf6c899259b91ced18ff2944ad0537b01cdd05d6", "internal/fragment/testdata/schema-cases/valid-path-prepend.json": "29e1a29c850581c82fc65448a93fa00a28fc16bf12ce1dab1037e9ebccf9709d", "internal/fragment/testdata/schema-cases/valid-pi-file-channels.json": "fdca4a07627804ceaa8f6af3beeebddcb50442ec0e358764dabef11106643d7c", "internal/fragment/testdata/schema-cases/valid-system-prompt-only.json": "2b361b8abe5a354abcc3a3200f337b852f07533a0eef6a61a7c6b23293a47683", "internal/fragment/testdata/schema-cases/valid-winner-first.json": "5fade7c4080bebbb1ee0ff9f3f5978a99b4de72fdf6290904ad866e9d7dc31d9", "internal/fragment/testdata/schema-cases/valid.json": "8ec5a08a84fe81a939b505f182834d9939e545fd385c1b28957d70c39bea2c48", "internal/mapping/mapping.go": "9e8629b8cbd6a8754c3d988dbee089118726e5867561848c8c8c731788cd9728", "internal/mapping/mapping_test.go": "504be6a97ce847a6212b15d855ccc1832ffef8937d6f244463c48ec72ea82d01", "internal/systemprompt/systemprompt.go": "f6b62900581d8abb3be2df0bf58d7098d43abdb7eae345bcbb1aaa2e9e578528", "internal/systemprompt/systemprompt_test.go": "4ebb898e292d5eff788b1f7bb2ea69af642534ee39cf80087d4b1c4a37b660d9"}
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/automatic.sh']
+GATE-FAIL: refuses existing non-empty destination /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work (stale files would mask results); remove it or pass a fresh path
+
+EXIT 1
+CASE stale: expected=1 actual=1
+STALE: all prior bytes preserved; self-check not called
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/unguarded-control.sh']
+GATE-FAIL: refuses existing non-empty destination /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review3/replay/.temp/TASK-260909-3d1589/auto-work (stale files would mask results); remove it or pass a fresh path
+== SELF-CHECK: 5 negative guard probes ==
+SELF-CHECK 1 stale-destination: trips (refuses non-empty dir)
+SELF-CHECK 2 missing-overlays: trips (no false success)
+SELF-CHECK 3 zero-selection: trips
+SELF-CHECK 4 baseline-failure: trips (mutated baseline exit=1 != 0)
+SELF-CHECK 5 surviving-mutant: trips (no-op change reported SURVIVED)
+SELF-CHECK: 5/5 negative probes trip (stale-dest, missing-overlays, zero-selection, baseline-failure, surviving-mutant)
+
+EXIT 0
+CASE short-circuit-removed: expected=0 actual=0
+AFTER {".archive.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", ".github/workflows/ci.yml": "bcdf8816bfbcff1795cd05eb0c4afd28face4dc42f5993311c6e9094b536ee16", ".gitignore": "d81370d8cf901502dc64af885424f2ff7a8ca74a48c86050b128f955c6a563fb", ".scripts/cli-mutants.sh": "02c2a49ac6ec5c11e124b53a8ea848a1019c7a703cb4a4624aab0cfdc4db2c88", ".scripts/composition-mutants.py": "d44ad2197018850a608b0c34f26bef852c2a6ac994eec9ad51c7f74147003c78", ".scripts/diagnostics-mutants.sh": "beeaf5977564210cd6b98f4bc78ef2c4e5332cc2629cb641dca0bbdee030558c", ".scripts/execution-mutants.py": "9c0d4087a8461c4f85e4a73dd49b6dd935281538c272714ef0c01fbe7c93a046", ".scripts/fragment-mutants.sh": "1cd701c6a1d7f68b9ed79006f79d0b846ba0f5f93c5f98a5f30ac50b8a123a9b", ".scripts/mapping-mutants.py": "6e6e7e6d5a1a1ea06a40242219e431890c4bcafb39b8881d7d45061b3ae06d41", ".scripts/systemprompt-mutants.py": "36a5c69d50af75dd0e40ad64a66949521b0b06d383b11f36a0c9363a0ecf6a9c", ".tar.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30", "Makefile": "335fa62cb350a805e887f8106db3ed2943fc0acb86b84dea7557b9761424f130", "NOTICE": "0d30b4f3d38b194378668801e7d277ca9ff6eb40a9f9757a651b4a3b663112a1", "README.md": "c3e94e0927221b49e55b267193a100cf1e68bcce1fa9a4ec655a47f345fafed6", "SENTINEL": "06162108e0696b68291d620315fead3fb34580be7f771feb880b2d4241124996", "SPEC.md": "5a7ccf0ba95708cb573a586977eb0ba4bad1e46233a540dc99784c1d4d922d48", "cmd/curator-run/gate_framing_test.go": "5031d27fdcdb65c3a69ee723baa202d5f928335a26ac225a935b3763810b5f9e", "cmd/curator-run/main.go": "d04f19983ea359e64adb0da9811ec8496f3dfbba7af7485a5d76806c2d4ca88a", "cmd/curator-run/main_test.go": "266ac6d518ee346c360b0ffaa56095c02f5d8584f63222521bfc574e47c20fa1", "diagnostics.go.orig": "06112c6dee71036a63fb2e7667c5c9f47b499cd6dc42990546cd7dcbe1ada106", "go.mod": "f5a91ac64b7485254be556e06f35839a7a57f8bd4dae05ba7e9943944a8891a8", "go.sum": "61692218a85029aa4c33b388e1d816ff643c35d843d7432c8c9e5892ddca9807", "internal/axconfig/config.go": "548de1bdf4b87750a83fdd06ca9b65dc57ec8871caa27f78b5b736eda9ce93ee", "internal/axconfig/config_test.go": "2593f367d7fbe547fa51e9b797c3225d48d3d9f2f35799bc75f89e5cc9189702", "internal/axconfig/fifo_test.go": "7fa7c619bb480bdf68e822258200cd167cc9f6d66c2e8d414edb8c86437fc6e7", "internal/cli/cli.go": "618562a4316d61d905fdf7c34d44393502ff37cdd101ed93c3eb2fd6daa567fc", "internal/cli/cli_test.go": "bfaeff685d22010dcac231ecb2a62bd660b3c4a7c3e5ef23ebe7a24494b68d14", "internal/cli/testdata/cases.golden": "260849cbf27d1bbfc8569c0856a1f533a2db4c3d4be8f5918c6c026ab02a668f", "internal/composition/composition.go": "e53003ce5aa27b8412d9c7323a43aa7ac7808fa313bc0db7aaefa2a898dfe1a2", "internal/composition/composition_test.go": "ef28f326adef93519c127095dd2168d944eea195b11a4040aecbbe6b9ee1069f", "internal/composition/probe.go": "0f45362923c8efcfe9308e4858421d306ae6d62599db06471d999ae64593187a", "internal/diagnostics/diagnostics.go": "06112c6dee71036a63fb2e7667c5c9f47b499cd6dc42990546cd7dcbe1ada106", "internal/diagnostics/diagnostics_test.go": "7d3f8d7da4e10778486d8e58545c8fcfcce506b4fb9fe43b1e116d9e35024f5f", "internal/diagnostics/gate_conformance_test.go": "8495946dce980b9e6a69a17f20fd40703917da51880f4aaa50d7b43f0da754e9", "internal/diagnostics/helpers_test.go": "4f4ae3c67dd189844a749638e257e8e32f2446611656b5ac42073c96841d0c8d", "internal/execution/execution.go": "da47ea6e581814dc21cfe25846539fd96baab56ee1e0aa54b236f1c1e0854259", "internal/execution/execution_test.go": "744a2a72effa7725794f68fd937a9de50c36f757e55d56b54441f628dcbbd23a", "internal/execution/process.go": "1a8b0b1eb1ca54196fe27e10054ba97a5725ccb9020169e46a14e4195042dba4", "internal/execution/testdata/driver/main.go": "05215488fd8bf3fdb6f837b628b7a68d1f8232209953357aa8b79bcdfa576fb1", "internal/execution/testdata/helper/main.go": "427b08e0804100100b41b6f7492bc25686ced702e8cb8119c6828542b377c119", "internal/execution/testdata/terminal_probe.py": "f90165fbd0f488a6a7540d9b86daf15ecb89c83c7eae77d47b6a9225a4c294d5", "internal/fragment/ccj1.go": "73a26d98464e341060d9ea5d31a233e5417ddbf7ed835602e181ca18f4cc4d65", "internal/fragment/ccj1_test.go": "133d4b02d225fdc249f4e8f0f064c0a8554cdd2f9b12893a4875dd72abe28f55", "internal/fragment/fragment.go": "f3516e4780253e28368792c76078900f929b49b3dd7e100df560a0661c1cdc76", "internal/fragment/fragment_test.go": "75e305ac5b6f89e86f9c8a507853e8b2c5c1bcdbbaef73de0814fe4590d387be", "internal/fragment/json.go": "b298effc0dcafadad9e16715a84ba999baad142ba4456bb7ed34ba46ed68d4a4", "internal/fragment/resolve.go": "57e244cb31107c1f376aae7d28f8868d9e52d123de27d7b86e5bed3c4512c613", "internal/fragment/resolve_test.go": "0f8b0098c30aa0f7070cece599385b70e8bdf9b49bfecaf3f3827027a85bdae0", "internal/fragment/testdata/a0/claude_code.json": "39545291e5d1b36e190c3432220b410c89e0f7ea88be43bb5e2e70f6ba15ad93", "internal/fragment/testdata/a0/codex_cli.json": "3eb2fb7c099f0454000570c9c7f7c7593665f0c2875291661508701c293e478d", "internal/fragment/testdata/a0/digests.txt": "1eb4cec936c13a1a66adbde9a3bbcedad57d7159a8252cf47cb5993c8c3c1c5c", "internal/fragment/testdata/a0/pi.json": "c2e7d1e8a98e6850ba821d3da5beef2e3fffabe6dabced9ff7b3917a4a7bd95b", "internal/fragment/testdata/schema-cases/index.json": "581a0e7df640e7579522c8945d4bc5c8a6363c4bdcc36ebaa0c88c8be9aaea4d", "internal/fragment/testdata/schema-cases/invalid-channel-missing-semantics.json": "9d0273d336b6be15319c0b28940f842de96593f2f81155250d23412941dd3baf", "internal/fragment/testdata/schema-cases/invalid-channel-unknown-field.json": "75a9b8dc1fd0916675f2cbef5389c9b30c61518b5329b8d3b54dde1b80ba64c0", "internal/fragment/testdata/schema-cases/invalid-channel-unknown-kind.json": "0f09adac7d06912ec9e4952d65dbc41c0c0edc32cad74bcb2bb388c7969f801d", "internal/fragment/testdata/schema-cases/invalid-channel-unknown-semantics.json": "ba16e2ed2e641a90c585e8d492420ee7ba6bdc51ac80f3f5584a06944f197c6b", "internal/fragment/testdata/schema-cases/invalid-env-dotdot-segment.json": "8c0fb17e176d008cc80852d02b59023ad544992e104a02eb4945b16219964345", "internal/fragment/testdata/schema-cases/invalid-env-empty.json": "8b24f1e3eb6edc299011828ee885aab95434977e2fbd193efc2e0b006f734226", "internal/fragment/testdata/schema-cases/invalid-env-lowercase-variable.json": "cf6574b0a87a6e075c690ba2ec94350295cf3d1df292c7858437a58179a622d6", "internal/fragment/testdata/schema-cases/invalid-env-relative-path.json": "f86c28358d3bd402baced04566fb1add392fa062aee93598eea670f3d29493e8", "internal/fragment/testdata/schema-cases/invalid-env-two-variables.json": "8d0c1449e70d7b327c56da669a9cb8ec1d6d1a1b76177d68991c72caf719180c", "internal/fragment/testdata/schema-cases/invalid-env-wrong-adapter-variable.json": "8218395b90654faff9ec362e6094aa16353957a05ba57f30ccf873f705abb3fc", "internal/fragment/testdata/schema-cases/invalid-flag-empty-with.json": "92cffb9e2ea6f389f458e0d7db1561ed78da338d978e68c722067f376b2879a8", "internal/fragment/testdata/schema-cases/invalid-flag-missing-argument.json": "ddcebcd9e0c4452c2da629355adbca037f9bfa658e8327433020ff431e30ff8a", "internal/fragment/testdata/schema-cases/invalid-flag-name-argument-without-name.json": "b21cef428fa72c5afc037a7ca5033915ad16edce0d6a0691dea3b42c30c92ac5", "internal/fragment/testdata/schema-cases/invalid-flag-name-without-name-argument.json": "b4a40d4d210cbab5534563fd5485f3ce409d063995de34786c1c4e5cc7e76474", "internal/fragment/testdata/schema-cases/invalid-flag-unknown-argument.json": "b83bc47e114a6e1c3f2d73b5462be0a4cd8a7313299efba56a2ec7ddc40bfb69", "internal/fragment/testdata/schema-cases/invalid-flag-with-filename.json": "634510c2e490238ccd482a844b4d8951774230b7c2f0d02b998a1d99cab3fdc8", "internal/fragment/testdata/schema-cases/invalid-fragment-identity.json": "4d6682480caeeba100d8c4b8f89054978c605e580fde5fad8926697cdff23f0a", "internal/fragment/testdata/schema-cases/invalid-mcp-channel-not-registry.json": "492367ccdef288d12a2c2336421987d4f8f075ed9d7b9e0465ed30fd07655201", "internal/fragment/testdata/schema-cases/invalid-mcp-channel-with-semantics.json": "87548639165f43fce5b27ddc7756ef6e4c0d846f6590360f94a6afc151e73292", "internal/fragment/testdata/schema-cases/invalid-mcp-env-names-reserved.json": "9b182cd054d026e9b5a417b9eb66943b34e18d287e74c9bb2a05e1fbd42f7a6b", "internal/fragment/testdata/schema-cases/invalid-mcp-env-names-unsorted.json": "d96d32dd21c581102134b96221664ab4aec5010e7e10ab900c62ab28bb13081d", "internal/fragment/testdata/schema-cases/invalid-mcp-missing-env-names.json": "93ac91b17c8edd4f5bb51968ab91c86d87f08e986fc0e78707ad41cf7a2c8f09", "internal/fragment/testdata/schema-cases/invalid-mcp-on-pi.json": "e5c3f21a6ffef2a2ced318304bd8f995d10d9a2f3aacba8e470e49c9c5fefa7b", "internal/fragment/testdata/schema-cases/invalid-mcp-two-channels.json": "0f7aa04b63d81a44a25d0a2199a3b4c38de71518da31e570bd0d5cb9b00cb6e8", "internal/fragment/testdata/schema-cases/invalid-mcp-unknown-field.json": "20e7e56206b83f658bec64176b223c612ea8bd0a7e671f6d35502b520bbbcbcb", "internal/fragment/testdata/schema-cases/invalid-missing-precedence.json": "7d2d71c38c0b8566fc9bfd96df76a4f7cc1f52ce3ca71ad173b1f629970dc327", "internal/fragment/testdata/schema-cases/invalid-path-prepend-dotdot-segment.json": "bd6d32e2c8044ddd7a891cdbff9707a4aa63a42dbf2e8f251407e349f004c96e", "internal/fragment/testdata/schema-cases/invalid-path-prepend-outside-root.json": "213c7ff58ce0582bed068fa2e951bea11a48812a10fd05031cf534f361d606f7", "internal/fragment/testdata/schema-cases/invalid-path-prepend-relative.json": "d71d29429f130495ee8ba2ff7185b07d54566ceb0d083abb2d7eff1ede0cc40d", "internal/fragment/testdata/schema-cases/invalid-precedence-string.json": "90526b9c865936c0e81da2e3e892881e8dcffe6821419178bed6f0b7e19d26c0", "internal/fragment/testdata/schema-cases/invalid-profile-commit-pin.json": "c90924d10b9be951d2d4fa5500a4befd1c853d78595763a85c1d06e3faadf50f", "internal/fragment/testdata/schema-cases/invalid-profile-lock-prefixed.json": "8d16811a67620e7a9c9268d5f314b1e27a7bbdc1248df4a9da68b0380da9482e", "internal/fragment/testdata/schema-cases/invalid-profile-unknown-field.json": "5e0bba04c8c0855b4069a84c4381d1385a86b2aa256ce29d7b708814982a04f5", "internal/fragment/testdata/schema-cases/invalid-system-prompt-channels-not-registry.json": "c5950e114c07ec02b4806d3e9a711f8710c675a3a8da86ba968b670ead2eb881", "internal/fragment/testdata/schema-cases/invalid-system-prompt-missing-channels.json": "0d0e928e311d4987cbf4570006dfb555015ca11b2c69f9b862c8506c947e676c", "internal/fragment/testdata/schema-cases/invalid-system-prompt-path-dotdot-segment.json": "9bd2778259c92b4c607d71f5c094fffe5ea1c59abf4569e9ca537b25b545cb5b", "internal/fragment/testdata/schema-cases/invalid-system-prompt-unknown-field.json": "a9288cb8c356a181991a525f4812ee3540e615b4399d344ae748452f0124d40f", "internal/fragment/testdata/schema-cases/invalid-unknown-environment.json": "2d00009d8793841f9209fea9145441ab1f8bc3333e3514df189f1d984d7da7bd", "internal/fragment/testdata/schema-cases/invalid-unknown-field.json": "1b399fc72e420a496d498aba5c2b1ba8e62d2872353803695cac9b944175113f", "internal/fragment/testdata/schema-cases/invalid.json": "3a1158f207caa69a85d12124907396f1902b00aa49f6fbf9d6a6cdf9ee383725", "internal/fragment/testdata/schema-cases/valid-codex-config-key-and-name-channel.json": "d5c0ea960a0897b3ca4e080f1baa2fe155d8ff5607b6f269a0dafdbbfed051fd", "internal/fragment/testdata/schema-cases/valid-mcp-only.json": "2ed8e3abe51114487b24fb18bfb94a8ecd67c5583406e320707c079be02fe0d0", "internal/fragment/testdata/schema-cases/valid-minimal.json": "ef6f1bf37f0509a89d02e5b0b52817de13ca539a7f46077e7f436e552a5b9d0c", "internal/fragment/testdata/schema-cases/valid-opencode-empty-channels-and-variable.json": "7ce8b5b3c5b14b24e8e21d3dcf6c899259b91ced18ff2944ad0537b01cdd05d6", "internal/fragment/testdata/schema-cases/valid-path-prepend.json": "29e1a29c850581c82fc65448a93fa00a28fc16bf12ce1dab1037e9ebccf9709d", "internal/fragment/testdata/schema-cases/valid-pi-file-channels.json": "fdca4a07627804ceaa8f6af3beeebddcb50442ec0e358764dabef11106643d7c", "internal/fragment/testdata/schema-cases/valid-system-prompt-only.json": "2b361b8abe5a354abcc3a3200f337b852f07533a0eef6a61a7c6b23293a47683", "internal/fragment/testdata/schema-cases/valid-winner-first.json": "5fade7c4080bebbb1ee0ff9f3f5978a99b4de72fdf6290904ad866e9d7dc31d9", "internal/fragment/testdata/schema-cases/valid.json": "8ec5a08a84fe81a939b505f182834d9939e545fd385c1b28957d70c39bea2c48", "internal/mapping/mapping.go": "9e8629b8cbd6a8754c3d988dbee089118726e5867561848c8c8c731788cd9728", "internal/mapping/mapping_test.go": "504be6a97ce847a6212b15d855ccc1832ffef8937d6f244463c48ec72ea82d01", "internal/systemprompt/systemprompt.go": "f6b62900581d8abb3be2df0bf58d7098d43abdb7eae345bcbb1aaa2e9e578528", "internal/systemprompt/systemprompt_test.go": "4ebb898e292d5eff788b1f7bb2ea69af642534ee39cf80087d4b1c4a37b660d9"}
+REGRESSION PASS: stale nonzero assertion kills removal of short-circuit (mutant exits 0)
+REPLAY SCRIPT
+import pathlib, subprocess, shutil, hashlib, re, json, difflib
+root=pathlib.Path.cwd(); out=root/'.temp/TASK-260909-3d1589-review3'; src=out/'pkg'; log=open(out/'TASK-260909-3d1589_review-evidence-rev3.txt','w')
+def run(args,cwd=root):
+ p=subprocess.run(args,cwd=cwd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True); log.write(f'COMMAND {args}\n{p.stdout}\nEXIT {p.returncode}\n'); log.flush(); return p
+log.write((out/'readiness.log').read_text())
+p=run(['git','diff','3ff66a9421ff6ddf675a49fc0c2868309f6e3de3','ff61be4a8bd43fa4ffb179d31aa38e41891d4313']); assert p.returncode==0 and not p.stdout
+old=(src/'TASK-260909-3d1589_rev2_adoption.md').read_text(); new=(src/'TASK-260909-3d1589_rev3_adoption.md').read_text()
+log.write(''.join(difflib.unified_diff(old.splitlines(True),new.splitlines(True),fromfile='rev2',tofile='rev3')))
+a=re.findall(r'```bash\n(.*?)```',old,re.S); b=re.findall(r'```bash\n(.*?)```',new,re.S); assert a[0]==b[0]; assert b[1].replace(' || exit $?','')==a[1]
+clone=out/'replay'; assert run(['git','clone','--shared','--no-checkout',str(root),str(clone)]).returncode==0
+assert run(['git','checkout','--detach','3ff66a9421ff6ddf675a49fc0c2868309f6e3de3'],clone).returncode==0
+stage=clone/'.temp/TASK-260909-3d1589/gate'; stage.mkdir(parents=True)
+for suffix in ['gate-conformance_test.go','gate-framing_test.go','vectors.json','run-gate.sh']:
+ p=src/f'TASK-260909-3d1589_rev2_{suffix}'; shutil.copy2(p,stage/p.name); log.write(f'SHA256 {p.name} {hashlib.sha256(p.read_bytes()).hexdigest()}\n'); assert p.read_bytes()==(root/'.temp/TASK-260909-3d1589/rev2/pkg'/p.name).read_bytes()
+shutil.copy2(src/'TASK-260909-3d1589_rev3_adoption.md',stage)
+(stage/'TASK-260909-3d1589_rev2_run-gate.sh').chmod(0o755)
+for name,block in [('automatic',b[1]),('unguarded-control',a[1])]:
+ (out/f'{name}.sh').write_text(block); log.write(f'EXACT BLOCK {name}\n{block}\n')
+def trial(name,script,expected):
+ p=run(['bash',str(out/f'{script}.sh')],clone); print(name,p.returncode,flush=True); assert p.returncode==expected; log.write(f'CASE {name}: expected={expected} actual={p.returncode}\n'); return p
+p=trial('fresh','automatic',0); assert 'GATE RESULT: PASS' in p.stdout
+work=clone/'.temp/TASK-260909-3d1589/auto-work'; (work/'SENTINEL').write_bytes(b'prior bytes\x00\xff\n')
+def hashes(): return {str(p.relative_to(work)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(work.rglob('*')) if p.is_file()}
+before=hashes(); log.write('BEFORE '+json.dumps(before,sort_keys=True)+'\n')
+p=trial('stale','automatic',1); assert 'GATE-FAIL: refuses existing non-empty' in p.stdout; assert 'SELF-CHECK' not in p.stdout; assert hashes()==before
+log.write('STALE: all prior bytes preserved; self-check not called\n')
+p=trial('short-circuit-removed','unguarded-control',0); assert 'GATE-FAIL: refuses existing non-empty' in p.stdout; assert 'SELF-CHECK' in p.stdout; assert hashes()==before
+log.write('AFTER '+json.dumps(hashes(),sort_keys=True)+'\nREGRESSION PASS: stale nonzero assertion kills removal of short-circuit (mutant exits 0)\n')
+log.write('REPLAY SCRIPT\n'+(out/'replay.py').read_text()); log.close()
+
+Review replay harness exit: 0

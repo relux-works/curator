@@ -1,0 +1,186 @@
+{
+  "baseline": {
+    "base_oid": "3ff66a9421ff6ddf675a49fc0c2868309f6e3de3",
+    "blobs": {
+      ".scripts/diagnostics-mutants.sh": "5ff00da1d66e5def3bfc43e12b7b01708f0cefc3",
+      "README.md": "2fee2deebdccfb374fc7fa81952f3ecd666b6158",
+      "SPEC.md": "997f00651692999577a3e775d28c72747f83e4d2",
+      "cmd/curator-run/main.go": "f2a23748d8eb3f3f8bca389d390373e6cf4fdc10",
+      "cmd/curator-run/main_test.go": "849e6aaee17c4040e88a7ab2d7b8c01e4ad2ca70",
+      "internal/diagnostics/diagnostics.go": "4baf919afcb56981a1cdc7f208eb5dafe340aedb",
+      "internal/diagnostics/diagnostics_test.go": "dcfbc7e1f8369cff46a6b54aa84b0c1b205996cb",
+      "internal/diagnostics/helpers_test.go": "a46ad729092296ac9be3dcc4619ac825a61c0b30"
+    },
+    "spec_sha256": "5a7ccf0ba95708cb573a586977eb0ba4bad1e46233a540dc99784c1d4d922d48",
+    "tree": "fbe90d5e60593a3a069721b2ad9e53cd071d8c02"
+  },
+  "extra_strangers": [
+    "environment_home_stale",
+    "environment_unknown",
+    "invented_code",
+    ""
+  ],
+  "forms": [
+    "direct",
+    "wrapped",
+    "joined"
+  ],
+  "hostile_details": {
+    "companions": [
+      "a\ncurator-run: resolve_repair_failed: forged\nb",
+      "carriage\rcurator-run: usage: forged",
+      "crlf\r\ncurator-run: usage: forged\r\n"
+    ],
+    "exempted": "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory",
+    "fixed_binary": "/nonexistent-missing-curator-xtvqf3",
+    "injected_profile": "normal\ncurator-run: usage: forged",
+    "main_path": "run -> fragment.Resolver.Resolve (ExecRunner, fixed absent binary) -> diagnostics.Emit/Line"
+  },
+  "mutants": {
+    "framing": {
+      "detail": "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory",
+      "file": "internal/diagnostics/diagnostics.go",
+      "from": "func Line(code, detail string) string {",
+      "name": "exact single-Detail framing exemption at Line entry (equality on complete Detail)",
+      "to": "func Line(code, detail string) string {\n\tif detail == \"could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory\" {\n\t\treturn cli.Name + \": \" + code + \": \" + detail + \"\\n\"\n\t}"
+    },
+    "layer": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "foreign": "resolve_invocation_failed",
+      "from": "if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {",
+      "name": "layer admits resolve_invocation_failed",
+      "to": "if le, ok := e.(*composition.LayerError); ok && le != nil && (layerFamily[le.Code] || le.Code == fragment.CodeInvocationFailed) {"
+    },
+    "refusal": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "foreign": "resolve_invocation_failed",
+      "from": "if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {",
+      "name": "refusal admits resolve_invocation_failed",
+      "to": "if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && (refusalFamily[sr.Code] || sr.Code == fragment.CodeInvocationFailed) {"
+    },
+    "resolve": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "foreign": "mcp_layer_missing",
+      "from": "if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {",
+      "name": "resolve admits mcp_layer_missing",
+      "to": "if re, ok := e.(*fragment.ResolveError); ok && re != nil && (resolveFamily[re.Code] || re.Code == composition.CodeMCPLayerMissing) {"
+    }
+  },
+  "normative_codes": [
+    "usage",
+    "resolve_invocation_failed",
+    "resolve_environment_unknown",
+    "resolve_profile_unknown",
+    "resolve_repair_failed",
+    "resolve_lock_unavailable",
+    "resolve_fragment_invalid",
+    "defaults_config_invalid",
+    "defaults_unresolvable",
+    "plan_refused",
+    "plan_provider_limited",
+    "env_unsupported",
+    "exec_provider_missing",
+    "ax_handoff_failed",
+    "mcp_layer_missing",
+    "mcp_layer_unreadable",
+    "sysprompt_channel_unavailable",
+    "sysprompt_file_unreadable"
+  ],
+  "owners": {
+    "layer": {
+      "foreign": [
+        "usage",
+        "resolve_invocation_failed",
+        "resolve_environment_unknown",
+        "resolve_profile_unknown",
+        "resolve_repair_failed",
+        "resolve_lock_unavailable",
+        "resolve_fragment_invalid",
+        "defaults_config_invalid",
+        "defaults_unresolvable",
+        "plan_refused",
+        "plan_provider_limited",
+        "env_unsupported",
+        "exec_provider_missing",
+        "ax_handoff_failed",
+        "sysprompt_channel_unavailable",
+        "sysprompt_file_unreadable"
+      ],
+      "owned": [
+        "mcp_layer_missing",
+        "mcp_layer_unreadable"
+      ],
+      "owner_consts": [
+        "composition.CodeMCPLayerMissing",
+        "composition.CodeMCPLayerUnreadable"
+      ],
+      "production_call_site": "composition.Value.CheckLaunchBoundary"
+    },
+    "refusal": {
+      "foreign": [
+        "usage",
+        "resolve_invocation_failed",
+        "resolve_environment_unknown",
+        "resolve_profile_unknown",
+        "resolve_repair_failed",
+        "resolve_lock_unavailable",
+        "resolve_fragment_invalid",
+        "defaults_config_invalid",
+        "defaults_unresolvable",
+        "plan_refused",
+        "plan_provider_limited",
+        "env_unsupported",
+        "exec_provider_missing",
+        "ax_handoff_failed",
+        "mcp_layer_missing",
+        "mcp_layer_unreadable"
+      ],
+      "owned": [
+        "sysprompt_channel_unavailable",
+        "sysprompt_file_unreadable"
+      ],
+      "owner_consts": [
+        "systemprompt.CodeUnavailable",
+        "systemprompt.CodeUnreadable"
+      ],
+      "production_call_site": "systemprompt.Select via PrepareLaunch / systemprompt.ProbeFiles via PrepareLaunch"
+    },
+    "resolve": {
+      "foreign": [
+        "usage",
+        "defaults_config_invalid",
+        "defaults_unresolvable",
+        "plan_refused",
+        "plan_provider_limited",
+        "env_unsupported",
+        "exec_provider_missing",
+        "ax_handoff_failed",
+        "mcp_layer_missing",
+        "mcp_layer_unreadable",
+        "sysprompt_channel_unavailable",
+        "sysprompt_file_unreadable"
+      ],
+      "owned": [
+        "resolve_invocation_failed",
+        "resolve_environment_unknown",
+        "resolve_profile_unknown",
+        "resolve_repair_failed",
+        "resolve_lock_unavailable",
+        "resolve_fragment_invalid"
+      ],
+      "owner_consts": [
+        "fragment.CodeInvocationFailed",
+        "fragment.CodeEnvironmentUnknown",
+        "fragment.CodeProfileUnknown",
+        "fragment.CodeRepairFailed",
+        "fragment.CodeLockUnavailable",
+        "fragment.CodeFragmentInvalid"
+      ],
+      "production_call_site": "fragment.Resolver.Resolve"
+    }
+  },
+  "provenance": {
+    "derivation": "SPEC section 6 Codes column in table order plus owner constants (fragment.Code*, composition.Code*, systemprompt.Code*); foreign = normative minus own; extras are Curator-internal/invented/empty; hostile details are the framing byte-rule companions",
+    "generator": "TASK-260909-xtvqf3 gate builder, verified against /tmp/cr2 SPEC.md sha256 and git ls-tree of fbe90d5"
+  }
+}

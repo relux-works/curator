@@ -1,0 +1,778 @@
+COMMAND ['git', 'clone', '--shared', '--no-checkout', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay']
+Cloning into '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay'...
+done.
+
+EXIT 0
+COMMAND ['git', 'checkout', '--detach', '3ff66a9421ff6ddf675a49fc0c2868309f6e3de3']
+HEAD is now at 3ff66a9 feat: add direct execution and tracked handoff APIs [skip ci]
+
+EXIT 0
+SHA256 TASK-260909-3d1589_rev2_gate-conformance_test.go 8495946dce980b9e6a69a17f20fd40703917da51880f4aaa50d7b43f0da754e9
+SHA256 TASK-260909-3d1589_rev2_gate-framing_test.go 5031d27fdcdb65c3a69ee723baa202d5f928335a26ac225a935b3763810b5f9e
+SHA256 TASK-260909-3d1589_rev2_vectors.json a404a9b703ea8f3fa585b4de45d04f5d8e9079b19129c44fc28164e286ddb76d
+SHA256 TASK-260909-3d1589_rev2_run-gate.sh 6b278b35604507f741ffd03f1f1e3b8ccf57d8c841f69573ab93e479686b224d
+SHA256 TASK-260909-3d1589_rev2_adoption.md 7819a5d0f0f8fb4341c3962a16932db56a0183b6495eee110a00a5a282d2cfb9
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/block0.sh']
+== provenance ==
+tree=fbe90d5e60593a3a069721b2ad9e53cd071d8c02
+gate_dir=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/gate
+work=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work
+3ff66a9421ff6ddf675a49fc0c2868309f6e3de3
+go version go1.25.5 darwin/arm64
+== exact-tree verification ==
+identity: tree fbe90d5e60593a3a069721b2ad9e53cd071d8c02 pinned (8 blobs + SPEC sha256 match)
+== extract disposable copy ==
+extract: disposable copy ready at /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work
+diagnostics.go
+diagnostics_test.go
+helpers_test.go
+install: gate overlays staged under published names
+== BASELINE: gate must pass (exit 0, all named tests) ==
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.612s
+baseline-diagnostics-gate exit=0 (8/8 named TestGate tests PASS)
+=== RUN   TestGateFramingSingleDetailAtRealResolver
+--- PASS: TestGateFramingSingleDetailAtRealResolver (0.00s)
+=== RUN   TestGateFramingCompanionsStayFramed
+=== RUN   TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b
+=== RUN   TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged
+=== RUN   TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__
+--- PASS: TestGateFramingCompanionsStayFramed (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__ (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.417s
+baseline-framing-gate exit=0 (2/2 named TestGateFraming tests PASS)
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.448s
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	5.583s
+baseline full-package suites exit=0 (overlays break no existing test)
+== MUTANT resolve: admits mcp_layer_missing (expect TestGateResolveRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:16
+@@ -237,7 +237,7 @@
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+ 		}
+-		if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {
++		if re, ok := e.(*fragment.ResolveError); ok && re != nil && (resolveFamily[re.Code] || re.Code == composition.CodeMCPLayerMissing) {
+ 			return re.Code, true
+ 		}
+ 		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
+=== RUN   TestGateResolveRejectsForeignCodes
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (direct form)
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (wrapped form)
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (joined form)
+--- FAIL: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.946s
+FAIL
+resolve-mutant exit=1 via TestGateResolveRejectsForeignCodes (other owners still PASS)
+== MUTANT layer: admits resolve_invocation_failed (expect TestGateLayerRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:17
+@@ -240,7 +240,7 @@
+ 		if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {
+ 			return re.Code, true
+ 		}
+-		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
++		if le, ok := e.(*composition.LayerError); ok && le != nil && (layerFamily[le.Code] || le.Code == fragment.CodeInvocationFailed) {
+ 			return le.Code, true
+ 		}
+ 		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (direct form)
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (wrapped form)
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (joined form)
+--- FAIL: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.428s
+FAIL
+layer-mutant exit=1 via TestGateLayerRejectsForeignCodes (prior R3 survivor killed)
+== MUTANT refusal: admits resolve_invocation_failed (expect TestGateRefusalRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:18
+@@ -243,7 +243,7 @@
+ 		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
+ 			return le.Code, true
+ 		}
+-		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {
++		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && (refusalFamily[sr.Code] || sr.Code == fragment.CodeInvocationFailed) {
+ 			return sr.Code, true
+ 		}
+ 		if ae, ok := e.(*axconfig.Error); ok && ae != nil {
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (direct form)
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (wrapped form)
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (joined form)
+--- FAIL: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.396s
+FAIL
+refusal-mutant exit=1 via TestGateRefusalRejectsForeignCodes (prior R3 survivor killed)
+== MUTANT joined-positive: joined resolve_invocation_failed rejected (expect TestGateJoinedOwnedAccepted fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:19
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if re, yes := child.(*fragment.ResolveError); yes && re != nil && re.Code == fragment.CodeInvocationFailed { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateJoinedOwnedAccepted
+    gate_conformance_test.go:382: joined owned resolve "resolve_invocation_failed" lost: CodeOf = "" false, want acceptance
+    gate_conformance_test.go:389: joined owned resolve "resolve_invocation_failed" lost beside typed nil: CodeOf = "" false
+--- FAIL: TestGateJoinedOwnedAccepted (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.465s
+FAIL
+joined-positive-mutant exit=1 via TestGateJoinedOwnedAccepted (rev1 reviewer survivor killed)
+== MUTANT usage-joined (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:20
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if ue, yes := child.(*cli.UsageError); yes && ue != nil { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: usage joined lost: "" false (owned code "usage")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.352s
+FAIL
+usage-joined-mutant exit=1 via TestGateOwnerFormPositives (usage joined lost: "" false)
+== MUTANT usage-wrapped (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:20
+@@ -233,6 +233,9 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {
++		if ue, yes := w.Unwrap().(*cli.UsageError); yes && ue != nil { return "", false }
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: usage wrapped lost: "" false (owned code "usage")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.417s
+FAIL
+usage-wrapped-mutant exit=1 via TestGateOwnerFormPositives (usage wrapped lost: "" false)
+== MUTANT axconfig-joined (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:21
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if ae, yes := child.(*axconfig.Error); yes && ae != nil { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: axconfig joined lost: "" false (owned code "defaults_config_invalid")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	3.002s
+FAIL
+axconfig-joined-mutant exit=1 via TestGateOwnerFormPositives (axconfig joined lost: "" false)
+== MUTANT axconfig-wrapped (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:25
+@@ -233,6 +233,9 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {
++		if ae, yes := w.Unwrap().(*axconfig.Error); yes && ae != nil { return "", false }
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: axconfig wrapped lost: "" false (owned code "defaults_config_invalid")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	1.275s
+FAIL
+axconfig-wrapped-mutant exit=1 via TestGateOwnerFormPositives (axconfig wrapped lost: "" false)
+== MUTANT framing: exempts exactly one hostile complete Detail ==
+   (expect TestGateFramingSingleDetailAtRealResolver fail exit 1;
+    companions TestGateFramingCompanionsStayFramed must stay exit 0)
+framing mutant applied for exactly one complete Detail
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/diagnostics.go.orig	2026-09-09 15:40:07
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:27
+@@ -266,6 +266,9 @@
+ // Only detail is framed: code is chosen by the call site from the closed
+ // set, and forwarded child/provider/ax bytes never pass through Line.
+ func Line(code, detail string) string {
++	if detail == "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory" {
++		return cli.Name + ": " + code + ": " + detail + "\n"
++	}
+ 	detail = strings.ReplaceAll(detail, "\r\n", "\n")
+ 	detail = strings.ReplaceAll(detail, "\r", "\n")
+ 	detail = strings.ReplaceAll(detail, "\n", "\n  ")
+=== RUN   TestGateFramingSingleDetailAtRealResolver
+    gate_framing_test.go:67: diagnostic line "curator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory" does not carry code "resolve_invocation_failed"
+--- FAIL: TestGateFramingSingleDetailAtRealResolver (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.900s
+FAIL
+framing-mutant exit=1 via TestGateFramingSingleDetailAtRealResolver at run -> Resolver.Resolve -> Emit/Line
+=== RUN   TestGateFramingCompanionsStayFramed
+=== RUN   TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b
+=== RUN   TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged
+=== RUN   TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__
+--- PASS: TestGateFramingCompanionsStayFramed (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.551s
+framing-mutant companions exit=0: all 3 hostile companions stay byte-exact framed
+framing-mutant diagnostics-gate exit=0 (owner matrix untouched)
+== restored ==
+diagnostics.go restored byte-equal
+== GATE RESULT: PASS (baseline 0; resolve/layer/refusal/joined/usage-joined/usage-wrapped/axconfig-joined/axconfig-wrapped/framing mutants each exit 1 with named assertions) ==
+
+EXIT 0
+CASE manual-positive: expected=0 actual=0
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/block0.sh']
+GATE-FAIL: refuses existing non-empty destination /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work (stale files would mask results); remove it or pass a fresh path
+
+EXIT 1
+CASE manual-stale: expected=1 actual=1
+ALL stale destination bytes preserved
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/block0.sh']
+== provenance ==
+tree=fbe90d5e60593a3a069721b2ad9e53cd071d8c02
+gate_dir=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/gate
+work=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work
+3ff66a9421ff6ddf675a49fc0c2868309f6e3de3
+go version go1.25.5 darwin/arm64
+== exact-tree verification ==
+identity: tree fbe90d5e60593a3a069721b2ad9e53cd071d8c02 pinned (8 blobs + SPEC sha256 match)
+== extract disposable copy ==
+extract: disposable copy ready at /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work
+diagnostics.go
+diagnostics_test.go
+helpers_test.go
+GATE-FAIL: missing overlay source: /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/gate/TASK-260909-3d1589_rev2_gate-conformance_test.go
+
+EXIT 1
+CASE manual-missing: expected=1 actual=1
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/block0.sh']
+== provenance ==
+tree=fbe90d5e60593a3a069721b2ad9e53cd071d8c02
+gate_dir=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/gate
+work=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work
+3ff66a9421ff6ddf675a49fc0c2868309f6e3de3
+go version go1.25.5 darwin/arm64
+== exact-tree verification ==
+identity: tree fbe90d5e60593a3a069721b2ad9e53cd071d8c02 pinned (8 blobs + SPEC sha256 match)
+== extract disposable copy ==
+extract: disposable copy ready at /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work
+diagnostics.go
+diagnostics_test.go
+helpers_test.go
+install: gate overlays staged under published names
+== BASELINE: gate must pass (exit 0, all named tests) ==
+testing: warning: no tests to run
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.346s [no tests to run]
+GATE-FAIL: baseline diagnostics gate: zero tests selected (missing overlay or wrong -run filter)
+
+EXIT 1
+CASE manual-zero: expected=1 actual=1
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/block0.sh']
+== provenance ==
+tree=fbe90d5e60593a3a069721b2ad9e53cd071d8c02
+gate_dir=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/gate
+work=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work
+3ff66a9421ff6ddf675a49fc0c2868309f6e3de3
+go version go1.25.5 darwin/arm64
+== exact-tree verification ==
+identity: tree fbe90d5e60593a3a069721b2ad9e53cd071d8c02 pinned (8 blobs + SPEC sha256 match)
+== extract disposable copy ==
+extract: disposable copy ready at /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work
+diagnostics.go
+diagnostics_test.go
+helpers_test.go
+install: gate overlays staged under published names
+/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/manual-work/internal/diagnostics/gate_conformance_test.go
+== BASELINE: gate must pass (exit 0, all named tests) ==
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+    gate_conformance_test.go:468: review injected diagnostics failure
+--- FAIL: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.460s
+FAIL
+GATE-FAIL: baseline diagnostics gate exit=1, want 0
+
+EXIT 1
+CASE manual-failure: expected=1 actual=1
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/block1.sh']
+== provenance ==
+tree=fbe90d5e60593a3a069721b2ad9e53cd071d8c02
+gate_dir=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/gate
+work=/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work
+3ff66a9421ff6ddf675a49fc0c2868309f6e3de3
+go version go1.25.5 darwin/arm64
+== exact-tree verification ==
+identity: tree fbe90d5e60593a3a069721b2ad9e53cd071d8c02 pinned (8 blobs + SPEC sha256 match)
+== extract disposable copy ==
+extract: disposable copy ready at /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work
+diagnostics.go
+diagnostics_test.go
+helpers_test.go
+install: gate overlays staged under published names
+== BASELINE: gate must pass (exit 0, all named tests) ==
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.378s
+baseline-diagnostics-gate exit=0 (8/8 named TestGate tests PASS)
+=== RUN   TestGateFramingSingleDetailAtRealResolver
+--- PASS: TestGateFramingSingleDetailAtRealResolver (0.00s)
+=== RUN   TestGateFramingCompanionsStayFramed
+=== RUN   TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b
+=== RUN   TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged
+=== RUN   TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__
+--- PASS: TestGateFramingCompanionsStayFramed (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged (0.00s)
+    --- PASS: TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__ (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.352s
+baseline-framing-gate exit=0 (2/2 named TestGateFraming tests PASS)
+ok  	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.477s
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	1.695s
+baseline full-package suites exit=0 (overlays break no existing test)
+== MUTANT resolve: admits mcp_layer_missing (expect TestGateResolveRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:38
+@@ -237,7 +237,7 @@
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+ 		}
+-		if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {
++		if re, ok := e.(*fragment.ResolveError); ok && re != nil && (resolveFamily[re.Code] || re.Code == composition.CodeMCPLayerMissing) {
+ 			return re.Code, true
+ 		}
+ 		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
+=== RUN   TestGateResolveRejectsForeignCodes
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (wrapped form)
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (joined form)
+    gate_conformance_test.go:338: resolve accepted foreign "mcp_layer_missing" as "mcp_layer_missing" (direct form)
+--- FAIL: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.363s
+FAIL
+resolve-mutant exit=1 via TestGateResolveRejectsForeignCodes (other owners still PASS)
+== MUTANT layer: admits resolve_invocation_failed (expect TestGateLayerRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:38
+@@ -240,7 +240,7 @@
+ 		if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {
+ 			return re.Code, true
+ 		}
+-		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
++		if le, ok := e.(*composition.LayerError); ok && le != nil && (layerFamily[le.Code] || le.Code == fragment.CodeInvocationFailed) {
+ 			return le.Code, true
+ 		}
+ 		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (direct form)
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (wrapped form)
+    gate_conformance_test.go:345: layer accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (joined form)
+--- FAIL: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+--- PASS: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.360s
+FAIL
+layer-mutant exit=1 via TestGateLayerRejectsForeignCodes (prior R3 survivor killed)
+== MUTANT refusal: admits resolve_invocation_failed (expect TestGateRefusalRejectsForeignCodes fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:39
+@@ -243,7 +243,7 @@
+ 		if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {
+ 			return le.Code, true
+ 		}
+-		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {
++		if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && (refusalFamily[sr.Code] || sr.Code == fragment.CodeInvocationFailed) {
+ 			return sr.Code, true
+ 		}
+ 		if ae, ok := e.(*axconfig.Error); ok && ae != nil {
+=== RUN   TestGateResolveRejectsForeignCodes
+--- PASS: TestGateResolveRejectsForeignCodes (0.00s)
+=== RUN   TestGateLayerRejectsForeignCodes
+--- PASS: TestGateLayerRejectsForeignCodes (0.00s)
+=== RUN   TestGateRefusalRejectsForeignCodes
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (direct form)
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (wrapped form)
+    gate_conformance_test.go:352: refusal accepted foreign "resolve_invocation_failed" as "resolve_invocation_failed" (joined form)
+--- FAIL: TestGateRefusalRejectsForeignCodes (0.00s)
+=== RUN   TestGateJoinedOwnedAccepted
+--- PASS: TestGateJoinedOwnedAccepted (0.00s)
+=== RUN   TestGateOwnerFormPositives
+--- PASS: TestGateOwnerFormPositives (0.00s)
+=== RUN   TestGateOwnerFormNil
+--- PASS: TestGateOwnerFormNil (0.00s)
+=== RUN   TestGateCoverageCounts
+--- PASS: TestGateCoverageCounts (0.00s)
+=== RUN   TestGateOwnFamilyAndNilPreserved
+--- PASS: TestGateOwnFamilyAndNilPreserved (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.429s
+FAIL
+refusal-mutant exit=1 via TestGateRefusalRejectsForeignCodes (prior R3 survivor killed)
+== MUTANT joined-positive: joined resolve_invocation_failed rejected (expect TestGateJoinedOwnedAccepted fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:40
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if re, yes := child.(*fragment.ResolveError); yes && re != nil && re.Code == fragment.CodeInvocationFailed { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateJoinedOwnedAccepted
+    gate_conformance_test.go:382: joined owned resolve "resolve_invocation_failed" lost: CodeOf = "" false, want acceptance
+    gate_conformance_test.go:389: joined owned resolve "resolve_invocation_failed" lost beside typed nil: CodeOf = "" false
+--- FAIL: TestGateJoinedOwnedAccepted (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.388s
+FAIL
+joined-positive-mutant exit=1 via TestGateJoinedOwnedAccepted (rev1 reviewer survivor killed)
+== MUTANT usage-joined (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:41
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if ue, yes := child.(*cli.UsageError); yes && ue != nil { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: usage joined lost: "" false (owned code "usage")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.368s
+FAIL
+usage-joined-mutant exit=1 via TestGateOwnerFormPositives (usage joined lost: "" false)
+== MUTANT usage-wrapped (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:42
+@@ -233,6 +233,9 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {
++		if ue, yes := w.Unwrap().(*cli.UsageError); yes && ue != nil { return "", false }
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: usage wrapped lost: "" false (owned code "usage")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.353s
+FAIL
+usage-wrapped-mutant exit=1 via TestGateOwnerFormPositives (usage wrapped lost: "" false)
+== MUTANT axconfig-joined (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:43
+@@ -233,6 +233,11 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if joined, yes := err.(interface{ Unwrap() []error }); yes {
++		for _, child := range joined.Unwrap() {
++			if ae, yes := child.(*axconfig.Error); yes && ae != nil { return "", false }
++		}
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: axconfig joined lost: "" false (owned code "defaults_config_invalid")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.357s
+FAIL
+axconfig-joined-mutant exit=1 via TestGateOwnerFormPositives (axconfig joined lost: "" false)
+== MUTANT axconfig-wrapped (expect TestGateOwnerFormPositives fail, exit 1) ==
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:44
+@@ -233,6 +233,9 @@
+ // owner values (a non-nil error interface holding a nil pointer, direct
+ // or wrapped) also yield ok=false rather than panicking.
+ func CodeOf(err error) (code string, ok bool) {
++	if w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {
++		if ae, yes := w.Unwrap().(*axconfig.Error); yes && ae != nil { return "", false }
++	}
+ 	return chain(err, func(e error) (string, bool) {
+ 		if ue, ok := e.(*cli.UsageError); ok && ue != nil && ue.Code() == CodeUsage {
+ 			return CodeUsage, true
+=== RUN   TestGateOwnerFormPositives
+    gate_conformance_test.go:416: axconfig wrapped lost: "" false (owned code "defaults_config_invalid")
+--- FAIL: TestGateOwnerFormPositives (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/internal/diagnostics	0.634s
+FAIL
+axconfig-wrapped-mutant exit=1 via TestGateOwnerFormPositives (axconfig wrapped lost: "" false)
+== MUTANT framing: exempts exactly one hostile complete Detail ==
+   (expect TestGateFramingSingleDetailAtRealResolver fail exit 1;
+    companions TestGateFramingCompanionsStayFramed must stay exit 0)
+framing mutant applied for exactly one complete Detail
+--- /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/diagnostics.go.orig	2026-09-09 15:40:34
++++ /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work/internal/diagnostics/diagnostics.go	2026-09-09 15:40:45
+@@ -266,6 +266,9 @@
+ // Only detail is framed: code is chosen by the call site from the closed
+ // set, and forwarded child/provider/ax bytes never pass through Line.
+ func Line(code, detail string) string {
++	if detail == "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory" {
++		return cli.Name + ": " + code + ": " + detail + "\n"
++	}
+ 	detail = strings.ReplaceAll(detail, "\r\n", "\n")
+ 	detail = strings.ReplaceAll(detail, "\r", "\n")
+ 	detail = strings.ReplaceAll(detail, "\n", "\n  ")
+=== RUN   TestGateFramingSingleDetailAtRealResolver
+    gate_framing_test.go:67: diagnostic line "curator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory" does not carry code "resolve_invocation_failed"
+--- FAIL: TestGateFramingSingleDetailAtRealResolver (0.00s)
+FAIL
+FAIL	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.365s
+FAIL
+framing-mutant exit=1 via TestGateFramingSingleDetailAtRealResolver at run -> Resolver.Resolve -> Emit/Line
+=== RUN   TestGateFramingCompanionsStayFramed
+=== RUN   TestGateFramingCompanionsStayFramed/a_curator-run:_resolve_repair_failed:_forged_b
+=== RUN   TestGateFramingCompanionsStayFramed/carriage_curator-run:_usage:_forged
+=== RUN   TestGateFramingCompanionsStayFramed/crlf__curator-run:_usage:_forged__
+--- PASS: TestGateFramingCompanionsStayFramed (0.00s)
+PASS
+ok  	github.com/relux-works/curator-agent-launcher/cmd/curator-run	0.243s
+framing-mutant companions exit=0: all 3 hostile companions stay byte-exact framed
+framing-mutant diagnostics-gate exit=0 (owner matrix untouched)
+== restored ==
+diagnostics.go restored byte-equal
+== GATE RESULT: PASS (baseline 0; resolve/layer/refusal/joined/usage-joined/usage-wrapped/axconfig-joined/axconfig-wrapped/framing mutants each exit 1 with named assertions) ==
+== SELF-CHECK: 5 negative guard probes ==
+SELF-CHECK 1 stale-destination: trips (refuses non-empty dir)
+SELF-CHECK 2 missing-overlays: trips (no false success)
+SELF-CHECK 3 zero-selection: trips
+SELF-CHECK 4 baseline-failure: trips (mutated baseline exit=1 != 0)
+SELF-CHECK 5 surviving-mutant: trips (no-op change reported SURVIVED)
+SELF-CHECK: 5/5 negative probes trip (stale-dest, missing-overlays, zero-selection, baseline-failure, surviving-mutant)
+
+EXIT 0
+CASE automatic-positive-and-selfcheck: expected=0 actual=0
+COMMAND ['bash', '/Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/block1.sh']
+GATE-FAIL: refuses existing non-empty destination /Users/iv/Developer/ReluxWorks/.worktrees/launcher-control/.temp/STORY-260909-1cw05m/worktree/.temp/TASK-260909-3d1589-review2/replay/.temp/TASK-260909-3d1589/auto-work (stale files would mask results); remove it or pass a fresh path
+== SELF-CHECK: 5 negative guard probes ==
+SELF-CHECK 1 stale-destination: trips (refuses non-empty dir)
+SELF-CHECK 2 missing-overlays: trips (no false success)
+SELF-CHECK 3 zero-selection: trips
+SELF-CHECK 4 baseline-failure: trips (mutated baseline exit=1 != 0)
+SELF-CHECK 5 surviving-mutant: trips (no-op change reported SURVIVED)
+SELF-CHECK: 5/5 negative probes trip (stale-dest, missing-overlays, zero-selection, baseline-failure, surviving-mutant)
+
+EXIT 0
+
+REVIEW HARNESS EXIT 1: automatic-stale expected 1, actual 0 (AssertionError). This is the reproduced defect, not a Go test failure.
+
+REPLAY SCRIPT
+import pathlib, subprocess, shutil, hashlib, re
+root=pathlib.Path.cwd(); out=root/'.temp/TASK-260909-3d1589-review2'; src=pathlib.Path('/Users/iv/Developer/ReluxWorks/curator/.task-board/.resources/TASK-260909-3d1589'); log=open(out/'evidence.txt','w')
+def run(args,cwd=root):
+ p=subprocess.run(args,cwd=cwd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True); log.write(f'COMMAND {args}\n{p.stdout}\nEXIT {p.returncode}\n'); log.flush(); return p
+clone=out/'replay'; assert run(['git','clone','--shared','--no-checkout',str(root),str(clone)]).returncode==0
+assert run(['git','checkout','--detach','3ff66a9421ff6ddf675a49fc0c2868309f6e3de3'],clone).returncode==0
+stage=clone/'.temp/TASK-260909-3d1589/gate'; stage.mkdir(parents=True)
+for suffix in ['gate-conformance_test.go','gate-framing_test.go','vectors.json','run-gate.sh','adoption.md']:
+ p=src/f'TASK-260909-3d1589_rev2_{suffix}'; shutil.copy2(p,stage/p.name); log.write(f'SHA256 {p.name} {hashlib.sha256(p.read_bytes()).hexdigest()}\n')
+ if suffix in ['gate-conformance_test.go','gate-framing_test.go','vectors.json']: assert p.read_bytes()==(src/f'TASK-260909-3d1589_{suffix}').read_bytes()
+runner=stage/'TASK-260909-3d1589_rev2_run-gate.sh'; runner.chmod(0o755)
+blocks=re.findall(r'```bash\n(.*?)```',(stage/'TASK-260909-3d1589_rev2_adoption.md').read_text(),re.S)
+for i,b in enumerate(blocks): (out/f'block{i}.sh').write_text(b)
+work=clone/'.temp/TASK-260909-3d1589/manual-work'; conf=stage/'TASK-260909-3d1589_rev2_gate-conformance_test.go'; orig=conf.read_text()
+def trial(name,expected,block=0):
+ p=run(['bash',str(out/f'block{block}.sh')],clone); print(name,p.returncode,flush=True); assert p.returncode==expected,(name,p.returncode); log.write(f'CASE {name}: expected={expected} actual={p.returncode}\n'); log.flush()
+def preserve(name): work.rename(work.with_name(name))
+trial('manual-positive',0)
+(work/'SENTINEL').write_bytes(b'prior data\x00preserve\n'); before={str(p.relative_to(work)):hashlib.sha256(p.read_bytes()).hexdigest() for p in work.rglob('*') if p.is_file()}
+trial('manual-stale',1); assert before=={str(p.relative_to(work)):hashlib.sha256(p.read_bytes()).hexdigest() for p in work.rglob('*') if p.is_file()}; log.write('ALL stale destination bytes preserved\n'); preserve('positive-preserved')
+conf.rename(conf.with_suffix('.saved')); trial('manual-missing',1); conf.with_suffix('.saved').rename(conf); preserve('missing-preserved')
+conf.write_text(orig.replace('func TestGate','func DisabledGate')); trial('manual-zero',1); preserve('zero-preserved'); conf.write_text(orig)
+conf.write_text(orig.replace('func TestGateCoverageCounts(t *testing.T) {','func TestGateCoverageCounts(t *testing.T) {\n t.Fatal("review injected diagnostics failure")')); assert conf.read_text()!=orig; trial('manual-failure',1); preserve('failure-preserved'); conf.write_text(orig)
+trial('automatic-positive-and-selfcheck',0,1)
+# Attack the newly published automatic block through its real entry.
+trial('automatic-stale',1,1)
+
+READINESS
+task-board version 0.24.3-332-gac72ed99 (commit ac72ed99, built 2026-09-09T11:17:36Z)
+git version 2.50.1 (Apple Git-155)
+go version go1.25.5 darwin/arm64
+Python 3.14.7
+
+CR exact diff
+exit 0, empty
+
+Tool discovery anomaly: task-board q resources(...) failed exit 1 (unknown operation); recovered via get(...) { outcomeResources checklist }. schema(set_checklist_item) failed exit 1; documented check_item/uncheck_item used instead.
+
+EXACT PUBLISHED BLOCK 0
+GITROOT="$(git rev-parse --show-toplevel)" || exit 1
+GATEDIR="$GITROOT/.temp/TASK-260909-3d1589/gate"
+RUNNER="$GATEDIR/TASK-260909-3d1589_rev2_run-gate.sh"
+WORK="$GITROOT/.temp/TASK-260909-3d1589/manual-work"
+[ -x "$RUNNER" ] || { echo "missing executable runner $RUNNER; stage the five rev2 attachments first" >&2; exit 1; }
+"$RUNNER" "$WORK"
+
+EXACT PUBLISHED BLOCK 1
+GITROOT="$(git rev-parse --show-toplevel)" || exit 1
+GATEDIR="$GITROOT/.temp/TASK-260909-3d1589/gate"
+cd "$GATEDIR" || exit 1
+./TASK-260909-3d1589_rev2_run-gate.sh "$GITROOT/.temp/TASK-260909-3d1589/auto-work"
+./TASK-260909-3d1589_rev2_run-gate.sh --self-check

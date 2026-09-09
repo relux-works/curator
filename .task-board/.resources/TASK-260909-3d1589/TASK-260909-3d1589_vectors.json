@@ -1,0 +1,287 @@
+{
+  "baseline": {
+    "base_oid": "3ff66a9421ff6ddf675a49fc0c2868309f6e3de3",
+    "blobs": {
+      ".scripts/diagnostics-mutants.sh": "5ff00da1d66e5def3bfc43e12b7b01708f0cefc3",
+      "README.md": "2fee2deebdccfb374fc7fa81952f3ecd666b6158",
+      "SPEC.md": "997f00651692999577a3e775d28c72747f83e4d2",
+      "cmd/curator-run/main.go": "f2a23748d8eb3f3f8bca389d390373e6cf4fdc10",
+      "cmd/curator-run/main_test.go": "849e6aaee17c4040e88a7ab2d7b8c01e4ad2ca70",
+      "internal/diagnostics/diagnostics.go": "4baf919afcb56981a1cdc7f208eb5dafe340aedb",
+      "internal/diagnostics/diagnostics_test.go": "dcfbc7e1f8369cff46a6b54aa84b0c1b205996cb",
+      "internal/diagnostics/helpers_test.go": "a46ad729092296ac9be3dcc4619ac825a61c0b30"
+    },
+    "spec_sha256": "5a7ccf0ba95708cb573a586977eb0ba4bad1e46233a540dc99784c1d4d922d48",
+    "tree": "fbe90d5e60593a3a069721b2ad9e53cd071d8c02"
+  },
+  "coverage": {
+    "call_site_selected_codes": [
+      "defaults_unresolvable",
+      "plan_refused",
+      "plan_provider_limited",
+      "env_unsupported",
+      "exec_provider_missing",
+      "ax_handoff_failed"
+    ],
+    "call_site_selected_note": "Chosen explicitly at their production call sites (mapping.Resolve, execution.Launch.Run, future defaults/plan owners); CodeOf performs no classification for them in this tree, so no mutable-Code admission mutant exists. They appear in the gate only as rejected foreign values and as Codes() members.",
+    "fixed_code_owners": [
+      "cli.UsageError(always usage via Code())",
+      "axconfig.Error(always defaults_config_invalid)"
+    ],
+    "fixed_code_note": "No Code field to weaken, so no foreign-admission mutant is expressible; both fixed owners ARE pinned as positives in every registry form (1 owned slot x 3 forms = 3 positive cases each, 6 total) by TestGateOwnerFormPositives and TestGateOwnFamilyAndNilPreserved, with one narrowing mutant per owner per non-direct form (joined and wrapped) proven killed by the runner. Typed-nil rejections for both are pinned by TestGateOwnerFormNil (4 forms each).",
+    "fixed_positive_cases": 6,
+    "forms": ["direct", "wrapped", "joined"],
+    "mutable_code_owners": ["resolve", "layer", "refusal"],
+    "mutable_positive_cases": 30,
+    "nil_cases": 23,
+    "nil_note": "5 registry owners x 4 nil forms (direct, wrapped, joined-outer-first, joined-nil-first) + all-typed-nil join + nil interface + plain error, all failing closed with no code and no panic.",
+    "normative_codes": 18,
+    "normative_rejection_pairs": 44,
+    "owned": {"axconfig": 1, "layer": 2, "refusal": 2, "resolve": 6, "usage": 1},
+    "owned_slots": 12,
+    "foreign_normative": {"layer": 16, "refusal": 16, "resolve": 12},
+    "extra_strangers": 4,
+    "positive_cases": 36,
+    "positive_note": "12 owned slots (10 mutable + 2 fixed) x 3 registry forms = 36 positive assertions, all derived from the single owner registry crossed with the single form registry and asserted by TestGateOwnerFormPositives with named per-cell failures.",
+    "rejection_cases_with_extras_x_forms": 168
+  },
+  "extra_strangers": [
+    "environment_home_stale",
+    "environment_unknown",
+    "invented_code",
+    ""
+  ],
+  "forms": [
+    "direct",
+    "wrapped",
+    "joined"
+  ],
+  "hostile_details": {
+    "companions": [
+      "a\ncurator-run: resolve_repair_failed: forged\nb",
+      "carriage\rcurator-run: usage: forged",
+      "crlf\r\ncurator-run: usage: forged\r\n"
+    ],
+    "exempted": "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory",
+    "fixed_binary": "/nonexistent-missing-curator-xtvqf3",
+    "injected_profile": "normal\ncurator-run: usage: forged",
+    "main_path": "run -> fragment.Resolver.Resolve (ExecRunner, fixed absent binary) -> diagnostics.Emit/Line"
+  },
+  "mutants": {
+    "framing": {
+      "detail": "could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory",
+      "file": "internal/diagnostics/diagnostics.go",
+      "from": "func Line(code, detail string) string {",
+      "name": "exact single-Detail framing exemption at Line entry (equality on complete Detail)",
+      "to": "func Line(code, detail string) string {\n\tif detail == \"could not run /nonexistent-missing-curator-xtvqf3 env resolve pi --profile normal\\ncurator-run: usage: forged --repair --format json: fork/exec /nonexistent-missing-curator-xtvqf3: no such file or directory\" {\n\t\treturn cli.Name + \": \" + code + \": \" + detail + \"\\n\"\n\t}"
+    },
+    "joined_positive": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "from": "func CodeOf(err error) (code string, ok bool) {",
+      "name": "joined owned resolve_invocation_failed rejected (rev1 reviewer survivor; must fail TestGateJoinedOwnedAccepted)",
+      "to": "func CodeOf(err error) (code string, ok bool) {\n\tif joined, yes := err.(interface{ Unwrap() []error }); yes {\n\t\tfor _, child := range joined.Unwrap() {\n\t\t\tif re, yes := child.(*fragment.ResolveError); yes && re != nil && re.Code == fragment.CodeInvocationFailed { return \"\", false }\n\t\t}\n\t}"
+    },
+    "layer": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "foreign": "resolve_invocation_failed",
+      "from": "if le, ok := e.(*composition.LayerError); ok && le != nil && layerFamily[le.Code] {",
+      "name": "layer admits resolve_invocation_failed",
+      "to": "if le, ok := e.(*composition.LayerError); ok && le != nil && (layerFamily[le.Code] || le.Code == fragment.CodeInvocationFailed) {"
+    },
+    "refusal": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "foreign": "resolve_invocation_failed",
+      "from": "if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && refusalFamily[sr.Code] {",
+      "name": "refusal admits resolve_invocation_failed",
+      "to": "if sr, ok := e.(*systemprompt.Refusal); ok && sr != nil && (refusalFamily[sr.Code] || sr.Code == fragment.CodeInvocationFailed) {"
+    },
+    "resolve": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "foreign": "mcp_layer_missing",
+      "from": "if re, ok := e.(*fragment.ResolveError); ok && re != nil && resolveFamily[re.Code] {",
+      "name": "resolve admits mcp_layer_missing",
+      "to": "if re, ok := e.(*fragment.ResolveError); ok && re != nil && (resolveFamily[re.Code] || re.Code == composition.CodeMCPLayerMissing) {"
+    },
+    "usage_joined": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "form": "joined",
+      "from": "func CodeOf(err error) (code string, ok bool) {",
+      "name": "joined UsageError rejected (exact rev2 reviewer survivor; must fail TestGateOwnerFormPositives with 'usage joined lost')",
+      "needle": "usage joined lost: \"\" false",
+      "to": "func CodeOf(err error) (code string, ok bool) {\n\tif joined, yes := err.(interface{ Unwrap() []error }); yes {\n\t\tfor _, child := range joined.Unwrap() {\n\t\t\tif ue, yes := child.(*cli.UsageError); yes && ue != nil { return \"\", false }\n\t\t}\n\t}"
+    },
+    "usage_wrapped": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "form": "wrapped",
+      "from": "func CodeOf(err error) (code string, ok bool) {",
+      "name": "wrapped UsageError rejected (fixed-owner wrapped sibling; must fail TestGateOwnerFormPositives with 'usage wrapped lost')",
+      "needle": "usage wrapped lost: \"\" false",
+      "to": "func CodeOf(err error) (code string, ok bool) {\n\tif w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {\n\t\tif ue, yes := w.Unwrap().(*cli.UsageError); yes && ue != nil { return \"\", false }\n\t}"
+    },
+    "axconfig_joined": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "form": "joined",
+      "from": "func CodeOf(err error) (code string, ok bool) {",
+      "name": "joined axconfig.Error rejected (fixed-owner symmetric proof, not only the remembered UsageError; must fail TestGateOwnerFormPositives with 'axconfig joined lost')",
+      "needle": "axconfig joined lost: \"\" false",
+      "to": "func CodeOf(err error) (code string, ok bool) {\n\tif joined, yes := err.(interface{ Unwrap() []error }); yes {\n\t\tfor _, child := range joined.Unwrap() {\n\t\t\tif ae, yes := child.(*axconfig.Error); yes && ae != nil { return \"\", false }\n\t\t}\n\t}"
+    },
+    "axconfig_wrapped": {
+      "file": "internal/diagnostics/diagnostics.go",
+      "form": "wrapped",
+      "from": "func CodeOf(err error) (code string, ok bool) {",
+      "name": "wrapped axconfig.Error rejected (fixed-owner wrapped sibling; must fail TestGateOwnerFormPositives with 'axconfig wrapped lost')",
+      "needle": "axconfig wrapped lost: \"\" false",
+      "to": "func CodeOf(err error) (code string, ok bool) {\n\tif w, yes := err.(interface{ Unwrap() error }); yes && !nilValue(err) {\n\t\tif ae, yes := w.Unwrap().(*axconfig.Error); yes && ae != nil { return \"\", false }\n\t}"
+    }
+  },
+  "nil_matrix": {
+    "absence_extras": ["all-typed-nil join", "nil interface", "plain error"],
+    "forms_per_owner": ["direct", "wrapped", "joined-outer-first", "joined-nil-first"],
+    "owners": ["usage", "resolve", "layer", "refusal", "axconfig"]
+  },
+  "normative_codes": [
+    "usage",
+    "resolve_invocation_failed",
+    "resolve_environment_unknown",
+    "resolve_profile_unknown",
+    "resolve_repair_failed",
+    "resolve_lock_unavailable",
+    "resolve_fragment_invalid",
+    "defaults_config_invalid",
+    "defaults_unresolvable",
+    "plan_refused",
+    "plan_provider_limited",
+    "env_unsupported",
+    "exec_provider_missing",
+    "ax_handoff_failed",
+    "mcp_layer_missing",
+    "mcp_layer_unreadable",
+    "sysprompt_channel_unavailable",
+    "sysprompt_file_unreadable"
+  ],
+  "owners": {
+    "axconfig": {
+      "owned": [
+        "defaults_config_invalid"
+      ],
+      "kind": "fixed",
+      "owner_consts": [
+        "axconfig.CodeInvalid"
+      ],
+      "positive_forms": ["direct", "wrapped", "joined"],
+      "production_call_site": "axconfig.Load"
+    },
+    "usage": {
+      "owned": [
+        "usage"
+      ],
+      "kind": "fixed",
+      "owner_consts": [
+        "cli.UsageError.Code()"
+      ],
+      "positive_forms": ["direct", "wrapped", "joined"],
+      "production_call_site": "cli.Parse"
+    },
+    "layer": {
+      "foreign": [
+        "usage",
+        "resolve_invocation_failed",
+        "resolve_environment_unknown",
+        "resolve_profile_unknown",
+        "resolve_repair_failed",
+        "resolve_lock_unavailable",
+        "resolve_fragment_invalid",
+        "defaults_config_invalid",
+        "defaults_unresolvable",
+        "plan_refused",
+        "plan_provider_limited",
+        "env_unsupported",
+        "exec_provider_missing",
+        "ax_handoff_failed",
+        "sysprompt_channel_unavailable",
+        "sysprompt_file_unreadable"
+      ],
+      "owned": [
+        "mcp_layer_missing",
+        "mcp_layer_unreadable"
+      ],
+      "kind": "mutable",
+      "owner_consts": [
+        "composition.CodeMCPLayerMissing",
+        "composition.CodeMCPLayerUnreadable"
+      ],
+      "production_call_site": "composition.Value.CheckLaunchBoundary"
+    },
+    "refusal": {
+      "foreign": [
+        "usage",
+        "resolve_invocation_failed",
+        "resolve_environment_unknown",
+        "resolve_profile_unknown",
+        "resolve_repair_failed",
+        "resolve_lock_unavailable",
+        "resolve_fragment_invalid",
+        "defaults_config_invalid",
+        "defaults_unresolvable",
+        "plan_refused",
+        "plan_provider_limited",
+        "env_unsupported",
+        "exec_provider_missing",
+        "ax_handoff_failed",
+        "mcp_layer_missing",
+        "mcp_layer_unreadable"
+      ],
+      "owned": [
+        "sysprompt_channel_unavailable",
+        "sysprompt_file_unreadable"
+      ],
+      "kind": "mutable",
+      "owner_consts": [
+        "systemprompt.CodeUnavailable",
+        "systemprompt.CodeUnreadable"
+      ],
+      "production_call_site": "systemprompt.Select via PrepareLaunch / systemprompt.ProbeFiles via PrepareLaunch"
+    },
+    "resolve": {
+      "foreign": [
+        "usage",
+        "defaults_config_invalid",
+        "defaults_unresolvable",
+        "plan_refused",
+        "plan_provider_limited",
+        "env_unsupported",
+        "exec_provider_missing",
+        "ax_handoff_failed",
+        "mcp_layer_missing",
+        "mcp_layer_unreadable",
+        "sysprompt_channel_unavailable",
+        "sysprompt_file_unreadable"
+      ],
+      "owned": [
+        "resolve_invocation_failed",
+        "resolve_environment_unknown",
+        "resolve_profile_unknown",
+        "resolve_repair_failed",
+        "resolve_lock_unavailable",
+        "resolve_fragment_invalid"
+      ],
+      "kind": "mutable",
+      "owner_consts": [
+        "fragment.CodeInvocationFailed",
+        "fragment.CodeEnvironmentUnknown",
+        "fragment.CodeProfileUnknown",
+        "fragment.CodeRepairFailed",
+        "fragment.CodeLockUnavailable",
+        "fragment.CodeFragmentInvalid"
+      ],
+      "production_call_site": "fragment.Resolver.Resolve"
+    }
+  },
+  "provenance": {
+    "derivation": "SPEC section 6 Codes column in table order plus owner constants (fragment.Code*, composition.Code*, systemprompt.Code*, cli.UsageError.Code(), axconfig.CodeInvalid); foreign = normative minus own; extras are Curator-internal/invented/empty; hostile details are the framing byte-rule companions; positive/nil cells are the single owner registry crossed with the single form registry declared in the conformance test",
+    "generator": "TASK-260909-3d1589 gate builder, verified against SPEC.md sha256 and git ls-tree of fbe90d5",
+    "revision": 3,
+    "supersedes": "TASK-260909-xtvqf3 rev2 gate artifacts (kept available; adds single owner/form registry, 36 registry positives with normative mapping pins, 23 registry nil cases, and 4 fixed-owner narrowing mutants)"
+  }
+}
