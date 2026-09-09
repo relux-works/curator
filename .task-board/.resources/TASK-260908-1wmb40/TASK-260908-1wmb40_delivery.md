@@ -1,0 +1,5 @@
+# Composition code delivery and recovery state
+
+PR9 MERGED at signed84747c326eee9863ddfd7e86ac65be1056718fbc/tree16088377353639e64afda5bc4275aae8fc726a90. Canonical independent reviewer1233da accepted original CR1; final7implementation paths identical, full-tree difference only already-landed Pi SPEC from PR8. Parent exact-tree make check passed and actual comment review/full remote diff/signature/ancestor/head checks preceded plain exactSHA:main push. Branch deleted only after MERGED; source main FF updated. Hosted CI unused, no fake success.
+
+Installed new task-board prepare-landed-review succeeds with observed exact currenthead and produces attached export. The next documented `set_status(TASK-260908-1wmb40,status=to-dev)` refuses exit1 because accepted work cannot leave integrating outside the privileged integration path. No status or CR mutation occurred, no private bypass. This actual executable/datastore defect is tracked upstream as BUG-260909-24mm7l. Story remains integrating until supported new-candidate review and signed board completion succeed. Full launcher main execution is still unimplemented.

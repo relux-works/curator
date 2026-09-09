@@ -1,5 +1,5 @@
 ## Status
-integrating
+reviewing
 
 ## Review
 required
@@ -32,9 +32,12 @@ code
 - [orchestration-state.md](file://EPIC-260908-2wp8wn/orchestration-state.md) — Current delivered evidence, active runs, roots and remaining scope
 - [task-board-cross-repository-decision.md](file://EPIC-260908-2wp8wn/task-board-cross-repository-decision.md)
 - [resume-2026-09-09-evidence.md](file://EPIC-260908-2wp8wn/resume-2026-09-09-evidence.md) — Authorized resume, worker policy, preserved-source recovery and honest delivery state
+- [continuation-active-recovery-and-conformance.md](file://EPIC-260908-2wp8wn/continuation-active-recovery-and-conformance.md) — Active continuation: execution delivered, source validation and repeated diagnostics gate in progress
+- [source-pr197-complete-and-live-recovery.md](file://EPIC-260908-2wp8wn/source-pr197-complete-and-live-recovery.md) — Verified source delivery/install/board completion and subsequent live recovery handles
+- [verified-recovery-publication-sequence.md](file://EPIC-260908-2wp8wn/verified-recovery-publication-sequence.md) — Real recovery/publication boundary, current independent review and pending runs
 
 ## Created
 2026-09-07T23:04:44Z
 
 ## Last Update
-2026-09-09T09:30:05Z
+2026-09-09T11:49:28Z

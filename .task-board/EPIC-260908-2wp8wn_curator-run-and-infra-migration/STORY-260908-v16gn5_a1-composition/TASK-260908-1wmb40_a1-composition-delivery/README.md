@@ -1,10 +1,10 @@
 # TASK-260908-1wmb40: a1-composition-delivery
 
 ## Description
-SPEC section 4.5: argv order, four env layers, env_names minus literals, stdin and codex layer stat.
+Implement the SPEC4.5 composition value/API: exact plan/prompt/MCP/native argv order, full Plan.Env overlay, own-name literals and name-only collision warnings, disjoint env_names, attached/unattached stdin encoding, and a launch-boundary codex-layer probe. Preserve Binary/WorkDir and avoid plan rebuilding. Real full-pipeline wiring remains the execution/plan stories obligation; no native Pi admission is claimed before its operator tag.
 
 ## Scope
 (define task scope)
 
 ## Acceptance Criteria
-Follow the exact corresponding workstream in the epic goal-file precondition; producer and independent reviewer evidence; signed scoped PR delivery where code changes.
+Implement the SPEC4.5 composition value/API: exact plan/prompt/MCP/native argv order, full Plan.Env overlay, own-name literals and name-only collision warnings, disjoint env_names, attached/unattached stdin encoding, and a launch-boundary codex-layer probe. Preserve Binary/WorkDir and avoid plan rebuilding. Real full-pipeline wiring remains the execution/plan stories obligation; no native Pi admission is claimed before its operator tag.

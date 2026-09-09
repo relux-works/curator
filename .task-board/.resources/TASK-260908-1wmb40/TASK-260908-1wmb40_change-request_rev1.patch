@@ -1,0 +1,679 @@
+diff --git a/.scripts/composition-mutants.py b/.scripts/composition-mutants.py
+new file mode 100644
+index 0000000..4fc0d1c
+--- /dev/null
++++ b/.scripts/composition-mutants.py
+@@ -0,0 +1,47 @@
++#!/usr/bin/env python3
++"""Run scoped behavioral narrowing mutants; restore the uncommitted candidate."""
++import pathlib
++import subprocess
++import sys
++
++root = pathlib.Path(__file__).resolve().parent.parent
++out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / '.temp/composition-mutants')
++out.mkdir(parents=True, exist_ok=True)
++composer = root / 'internal/composition/composition.go'
++probe = root / 'internal/composition/probe.go'
++mutants = [
++ ('M1', composer, 'literals := maps.Clone(own)', 'literals := maps.Clone(own); literals["SECRET"] = env["SECRET"]', 'TestComposeEnvironmentBoundary', 'admit exactly inherited SECRET as a tracked literal'),
++ ('M2', composer, 'if _, collision := literals[name]; collision {', 'if _, collision := literals[name]; collision && name != "OWN" {', 'TestComposeEnvironmentBoundary', 'admit OWN as both literal and lookup'),
++ ('M3', composer, 'env := envMap(plan.Env)', 'env := envMap(plan.Env); env["REMOVED"] = envMap(req.Env)["REMOVED"]', 'TestComposeEnvironmentBoundary', 're-admit exactly plugin-removed REMOVED'),
++ ('M4', composer, 'if err != nil {', 'if err != nil && err.Error() != "ownership failed" {', 'TestComposeOwnershipFailure', 'admit one ChildEnv failure'),
++ ('M5', probe, 'return fail(CodeMCPLayerMissing, err)', 'return nil', 'TestLaunchBoundaryFilesystem/missing', 'admit absent layer while retaining all unreadable gates'),
++ ('M6', probe, 'info, err := os.Stat(path)', 'info, err := os.Stat(path); if errors.Is(err, os.ErrNotExist) { return nil }', 'TestLaunchBoundaryFilesystem/dangling', 'admit dangling symlink after successful lstat'),
++ ('M7', probe, 'if !info.Mode().IsRegular() {', 'if !info.Mode().IsRegular() && !info.IsDir() {', 'TestLaunchBoundaryFilesystem/directory', 'admit directories but retain other nonregular rejection'),
++ ('M8', probe, 'f, err := os.Open(path)', 'f, err := os.Open(path); if errors.Is(err, os.ErrPermission) { return nil }', 'TestLaunchBoundaryFilesystem/unreadable', 'admit permission-denied open only'),
++ ('M9', composer, 'if plan.Stdin.Attached {', 'if plan.Stdin.Attached && len(plan.Stdin.Bytes) > 0 {', 'TestComposeStdin/empty', 'collapse attached empty only to null'),
++]
++rows = ['mutant\tnarrows_to\tnamed_failing_test\texit\tverdict\tsurvival_bound']
++failed = False
++for ident, path, old, new, test, bound in mutants:
++ original = path.read_bytes()
++ try:
++  source = original.decode()
++  expected = 2 if ident == 'M7' else 1
++  if source.count(old) != expected:
++   raise RuntimeError(f'{ident}: expected {expected} anchors, got {source.count(old)}')
++  path.write_text(source.replace(old, new))
++  command = ['go', 'test', './internal/composition', '-count=1', '-v']
++  with (out / f'{ident}.log').open('w') as log:
++   log.write('COMMAND: ' + ' '.join(command) + '\n'); log.flush()
++   result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT)
++   log.write(f'\nEXIT: {result.returncode}\n')
++  killed = result.returncode == 1 and f'--- FAIL: {test} ' in (out / f'{ident}.log').read_text()
++  rows.append(f'{ident}\t{bound}\t{test if killed else "none"}\t{result.returncode}\t' + ('killed\tnone' if killed else 'SURVIVOR\t' + bound + ' remains unproven on this host'))
++  failed |= not killed
++ finally:
++  path.write_bytes(original)
++  if path.read_bytes() != original:
++   raise RuntimeError(f'{ident}: restoration failed')
++(out / 'summary.tsv').write_text('\n'.join(rows) + '\n')
++print('\n'.join(rows))
++sys.exit(1 if failed else 0)
+diff --git a/README.md b/README.md
+index bfa1209..c7ac409 100644
+--- a/README.md
++++ b/README.md
+@@ -34,8 +34,8 @@ the parsed object, and the `resolve_*` diagnostic family. §4.2 maps the
+ resolved environment to its system/provider pair (`internal/mapping`):
+ `claude_code` → `claude-code`/`claude`, `codex_cli` → `codex`/`codex`,
+ `pi` → `pi-native`/`pi`. Unsupported IDs (including known `opencode`)
+-refuse `env_unsupported` with exit 1 before later stages. The later
+-composition steps (§4.3–§4.6), system-prompt application (§5), and the
++refuse `env_unsupported` with exit 1 before later stages. The executable wiring for the later
++steps (§4.3–§4.6), system-prompt application (§5), and the
+ `defaults.json`/`ax.json` file family (§4.7) are not delivered: a
+ well-formed launch invocation parses, resolves its fragment (repairing the
+ managed home when Curator finds it stale), maps its supported system/provider pair, and is then refused with exit 1
+@@ -46,6 +46,43 @@ Because no `ax.json` is read yet, the binary always parses as an untracked
+ machine, so `--ax-profile` is currently always a usage error and `--name`
+ is accepted without effect.
+ 
++## Composition API boundary
++
++`internal/composition.Compose` implements the §4.5 value API over an already
++admitted `agentic.Plan`, its original system/request, a validated fragment,
++and an already selected/encoded `PromptApplication`. It calls only
++`System.ChildEnv(nil, sameRequest)` to obtain owned literals; it never builds
++another plan. Argv retains plan → prompt → MCP → native order. Native arguments
++are uninspected, including duplicate `-p` and operator permission flags.
++`Binary` and `WorkDir` are preserved. Direct `Env` starts from all of `Plan.Env`;
++tracked JSON omits that environment, executable, work directory and raw stdin.
++It includes only argv suffix, owned literals, disjoint lookup names and D4 stdin.
++`RawStdin` preserves bytes for direct execution; attached empty is distinct from
++unattached. `Warnings` contains names only, and both launch modes must print
++these warnings to stderr.
++
++The only direct module dependency is the real `skill-agents-management`
++`v0.5.10` release (commit `12f443d10bc217ca7a48e2edab19c739f441df9c`),
++which requires Go 1.25.5. No replacement, workspace override or pseudo-version
++is used. Pi-shaped input values test composition only: they do **not** claim
++native Pi admission in that release. Integration must use the later real
++operator-tagged native Pi release before making that claim.
++
++`Value.CheckLaunchBoundary` freshly checks the codex MCP layer for a readable
++regular file, distinguishing missing from dangling, unreadable and nonregular.
++It never repairs or silently drops MCP flags. The execution Story must call it
++**immediately before both direct process creation and ax handoff**, with the
++binary and §5 file-kind checks; calling it during composition is insufficient.
++The pathname check has a residual replacement window before process creation.
++No main call site or execution guarantee is claimed here. Full pipeline tests,
++BuildLaunch admission, model/default resolution, §5 prompt policy/application,
++tracked schema/extensions, stderr delivery and actual exec/ax remain later
++stories' obligations. The existing executable still refuses `not_implemented`.
++
++Reserved `path_prepend` parsing and hashing remain unchanged. Composition does
++not transform PATH for that reserved field or claim managed command-root
++support; environments §9.4 and the future skill-command-roots proposal bound it.
++
+ ## Install and discovery
+ 
+ The launcher ships the `curator-run` executable. Curator dispatches
+@@ -80,6 +117,7 @@ or tag workflow yet.
+ | `.scripts/cli-mutants.sh` | narrowing-mutant harness for the §3 gates: each mutant weakens one gate to admit one rejected shape and the named test must fail | `.scripts/cli-mutants.sh [evidence-dir]` | per-mutant logs and `summary.tsv` under the evidence dir (default `.temp/cli-mutants/`); the source tree is restored on exit |
+ | `.scripts/fragment-mutants.sh` | narrowing-mutant harness for the §4.1 gates (argv, exit mapping, stderr transport, reader rules, schema closure, CCJ-1 emission, entry-point wiring); the behavioral suite runs against every mutant | `.scripts/fragment-mutants.sh [evidence-dir]` (optional `FRAGMENT_MUTANT_IDS="M27 M28" FRAGMENT_TEST_PATTERN="TestExecutableUnicodePathBoundary|TestConformanceCorpus"` for focused rework) | `mutants.log` under the evidence dir (default `.temp/fragment-mutants/`); sources are restored from byte copies on exit |
+ | `.scripts/mapping-mutants.py` | §4.2 narrowing probes with named production-entry failures; restores candidate bytes after each mutation | `python3 .scripts/mapping-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/mapping-mutants/`) |
++| `.scripts/composition-mutants.py` | §4.5 behavioral narrowing probes for environment ownership, collisions, stdin and launch-boundary file refusal; restores candidate bytes after every mutant | `python3 .scripts/composition-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/composition-mutants/`); permission probe requires a non-root host |
+ | fragment test corpus | `internal/fragment/testdata/schema-cases` is the `launch-env-fragment-v1` slice of curator-spec `conformance/v1/schema-cases` (index rows copied with their verdicts, source commit recorded in `index.json`); `testdata/a0` holds the three fragments and digests the installed Curator printed during A0 verification | `go test ./internal/fragment` | none; 49 indexed names/verdicts and fixture bytes are pinned by an independently upstream-derived manifest hash in `TestConformanceCorpus`; refresh requires reviewing the upstream rows and updating that pin as well as `index.json` |
+ 
+ ## License
+diff --git a/go.mod b/go.mod
+index 07105c4..6300aeb 100644
+--- a/go.mod
++++ b/go.mod
+@@ -1,3 +1,7 @@
+ module github.com/relux-works/curator-agent-launcher
+ 
+-go 1.23
++go 1.25.5
++
++require github.com/relux-works/skill-agents-management v0.5.10
++
++require github.com/pelletier/go-toml/v2 v2.4.3 // indirect
+diff --git a/go.sum b/go.sum
+new file mode 100644
+index 0000000..cb11879
+--- /dev/null
++++ b/go.sum
+@@ -0,0 +1,4 @@
++github.com/pelletier/go-toml/v2 v2.4.3 h1:GTRvJQutkOSftxIFD5xw9aepkYNuPWmVJpffdDPYVpY=
++github.com/pelletier/go-toml/v2 v2.4.3/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
++github.com/relux-works/skill-agents-management v0.5.10 h1:mrpOOLcW+YaNvwdsQldULZ7H5WLTSoZoUVgFvLdinAQ=
++github.com/relux-works/skill-agents-management v0.5.10/go.mod h1:wi+oH6fVUBF0bBOPs2bU7iyUhJveSAFh369CQB91ryk=
+diff --git a/internal/composition/composition.go b/internal/composition/composition.go
+new file mode 100644
+index 0000000..779a73e
+--- /dev/null
++++ b/internal/composition/composition.go
+@@ -0,0 +1,152 @@
++// Package composition implements SPEC §4.5 over an already admitted plan.
++// It does not build plans, select prompt policy, admit providers, or execute.
++package composition
++
++import (
++	"encoding/base64"
++	"fmt"
++	"maps"
++	"slices"
++	"sort"
++	"strings"
++	"unicode/utf8"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// ChildEnvironment is the ownership surface of agentic.System. Pass the same
++// system and request used to obtain Plan. A second BuildPlan is neither needed
++// nor permitted: only ChildEnv over a nil parent defines owned literals.
++type ChildEnvironment interface {
++	ChildEnv(parent []string, req agentic.LaunchRequest) ([]string, error)
++}
++
++// PromptApplication is the already selected and encoded §5 channel application.
++// Its Env contains only engaged variable-channel literals. File channels have
++// no argv/env contribution. Selection, reading, encoding and file checks belong
++// to §5; this API does not invent a policy for them.
++type PromptApplication struct {
++	Argv []string
++	Env  map[string]string
++}
++
++// Stdin is the D4 wire representation. A nil pointer means unattached.
++type Stdin struct {
++	Encoding string `json:"encoding"`
++	Bytes    string `json:"bytes"`
++}
++
++// Value carries direct execution data and tracked transport data separately.
++// JSON contains only the composition-owned subset of a tracked document; the
++// execution layer must add schema_version and extensions before handing to ax.
++// Binary is never an argv element. Env is the FULL direct-execution environment
++// and must never be serialized into a tracked request.
++type Value struct {
++	Binary      string               `json:"-"`
++	WorkDir     string               `json:"-"`
++	Argv        []string             `json:"argv_suffix"`
++	Env         []string             `json:"-"`
++	RawStdin    agentic.StdinPayload `json:"-"`
++	EnvLiterals map[string]string    `json:"env_literals"`
++	EnvNames    []string             `json:"env_names"`
++	Stdin       *Stdin               `json:"stdin"`
++	// Warnings are mode-independent and name variables only. Both execution
++	// paths must print them to stderr before launch.
++	Warnings []string `json:"-"`
++	mcpLayer string
++}
++
++// Compose consumes a validated fragment, an admitted single-process plan, and
++// the same system/request that produced that plan. Native is appended verbatim,
++// including duplicate provider flags. Inputs are not modified or retained.
++func Compose(plan agentic.Plan, system ChildEnvironment, req agentic.LaunchRequest, frag fragment.Fragment, prompt PromptApplication, native []string) (Value, error) {
++	ownEnv, err := system.ChildEnv(nil, req)
++	if err != nil {
++		return Value{}, fmt.Errorf("composition child environment: %w", err)
++	}
++	own := envMap(ownEnv)
++	env := envMap(plan.Env)
++	literals := maps.Clone(own)
++	v := Value{Binary: plan.Binary, WorkDir: plan.WorkDir, Argv: append([]string{}, plan.Argv...), EnvNames: []string{}, EnvLiterals: literals,
++		RawStdin: agentic.StdinPayload{Attached: plan.Stdin.Attached, Bytes: slices.Clone(plan.Stdin.Bytes)}}
++	warned := map[string]bool{}
++	overlay := func(layer map[string]string) {
++		for _, name := range sortedKeys(layer) {
++			if _, ok := own[name]; ok && !warned[name] {
++				v.Warnings = append(v.Warnings, "environment override: "+name)
++				warned[name] = true
++			}
++			env[name], literals[name] = layer[name], layer[name]
++		}
++	}
++	overlay(frag.Env)
++	v.Argv = append(v.Argv, prompt.Argv...)
++	overlay(prompt.Env)
++	if frag.MCP != nil {
++		for _, ch := range frag.MCP.Channels {
++			switch ch.Kind {
++			case fragment.KindFlag:
++				arg := frag.MCP.Path
++				if ch.Argument == fragment.ArgumentName {
++					arg = ch.Name
++				}
++				v.Argv = append(v.Argv, ch.Flag, arg)
++				v.Argv = append(v.Argv, ch.With...)
++			case fragment.KindVariable:
++				overlay(map[string]string{ch.Variable: frag.MCP.Path})
++			}
++		}
++		if frag.Environment == fragment.EnvCodexCLI {
++			v.mcpLayer = frag.MCP.Path
++		}
++		seen := map[string]bool{}
++		for _, name := range frag.MCP.EnvNames {
++			if seen[name] {
++				continue
++			}
++			seen[name] = true
++			if _, collision := literals[name]; collision {
++				v.Warnings = append(v.Warnings, "environment literal replaces lookup: "+name)
++			} else {
++				v.EnvNames = append(v.EnvNames, name)
++			}
++		}
++	}
++	sort.Strings(v.EnvNames)
++	v.Argv = append(v.Argv, native...)
++	for _, name := range sortedKeys(env) {
++		v.Env = append(v.Env, name+"="+env[name])
++	}
++	// A non-nil empty environment must remain distinct from os/exec's nil inherit.
++	if v.Env == nil {
++		v.Env = []string{}
++	}
++	if plan.Stdin.Attached {
++		v.Stdin = &Stdin{Encoding: "utf-8", Bytes: string(plan.Stdin.Bytes)}
++		if !utf8.Valid(plan.Stdin.Bytes) {
++			v.Stdin.Encoding = "base64url"
++			v.Stdin.Bytes = base64.RawURLEncoding.EncodeToString(plan.Stdin.Bytes)
++		}
++	}
++	return v, nil
++}
++
++func envMap(values []string) map[string]string {
++	out := map[string]string{}
++	for _, entry := range values {
++		if name, value, ok := strings.Cut(entry, "="); ok {
++			out[name] = value
++		}
++	}
++	return out
++}
++
++func sortedKeys(m map[string]string) []string {
++	names := make([]string, 0, len(m))
++	for name := range m {
++		names = append(names, name)
++	}
++	sort.Strings(names)
++	return names
++}
+diff --git a/internal/composition/composition_test.go b/internal/composition/composition_test.go
+new file mode 100644
+index 0000000..843007f
+--- /dev/null
++++ b/internal/composition/composition_test.go
+@@ -0,0 +1,302 @@
++package composition_test
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++)
++
++type owner struct {
++	t     *testing.T
++	req   agentic.LaunchRequest
++	env   []string
++	err   error
++	calls int
++}
++
++func (o *owner) ChildEnv(parent []string, req agentic.LaunchRequest) ([]string, error) {
++	o.t.Helper()
++	o.calls++
++	if parent != nil || !reflect.DeepEqual(req, o.req) {
++		o.t.Fatal("ownership must use nil parent and exact request")
++	}
++	return o.env, o.err
++}
++func equal(t *testing.T, got, want any) {
++	t.Helper()
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("got %#v; want %#v", got, want)
++	}
++}
++func parsed(t *testing.T, env, path string, names []string) fragment.Fragment {
++	t.Helper()
++	home := filepath.Dir(path)
++	f := map[string]any{"fragment": fragment.Identity, "environment": env, "profile": map[string]any{"name": "default", "lock_sha256": strings.Repeat("a", 64)}, "precedence": map[string]string{"winner": "higher-weight", "placement": "winner-last"}, "env": map[string]string{fragment.HomeVariable(env): home}}
++	if env != "pi" {
++		ch := map[string]any{"kind": "flag", "flag": "--mcp-config", "argument": "path", "with": []string{"--strict-mcp-config"}}
++		if env == "codex_cli" {
++			ch = map[string]any{"kind": "flag", "flag": "-p", "argument": "name", "name": "curator-mcp"}
++		}
++		if env == "opencode" {
++			ch = map[string]any{"kind": "variable", "variable": "OPENCODE_CONFIG"}
++		}
++		if names == nil {
++			names = []string{}
++		}
++		f["mcp"] = map[string]any{"path": path, "env_names": names, "channels": []any{ch}}
++	}
++	b, err := json.Marshal(f)
++	if err != nil {
++		t.Fatal(err)
++	}
++	frag, err := fragment.Parse(b)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return *frag
++}
++func TestComposeOrderAndChannels(t *testing.T) {
++	for _, env := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
++		t.Run(env, func(t *testing.T) {
++			f := parsed(t, env, "/managed/default/tool/mcp.json", nil)
++			p := agentic.Plan{System: "pi-native", Binary: "/exact/bin", WorkDir: "/exact/work", Argv: []string{"--model", "model with spaces", "--effort", "medium"}, Env: []string{"PATH=/sanitized"}}
++			native := []string{"", "-p", "operator", "--dangerously-skip-permissions", "a\nb", "--", "--model=literal"}
++			prompt := composition.PromptApplication{Argv: []string{"--selected-prompt", "verbatim content"}, Env: map[string]string{"PROMPT_CHANNEL": "selected"}}
++			o := &owner{t: t}
++			v, err := composition.Compose(p, o, agentic.LaunchRequest{}, f, prompt, native)
++			if err != nil {
++				t.Fatal(err)
++			}
++			want := []string{"--model", "model with spaces", "--effort", "medium", "--selected-prompt", "verbatim content"}
++			switch env {
++			case "claude_code":
++				want = append(want, "--mcp-config", f.MCP.Path, "--strict-mcp-config")
++			case "codex_cli":
++				want = append(want, "-p", "curator-mcp")
++			case "opencode":
++				equal(t, v.EnvLiterals["OPENCODE_CONFIG"], f.MCP.Path)
++			}
++			want = append(want, native...)
++			equal(t, v.Argv, want)
++			equal(t, v.Binary, p.Binary)
++			equal(t, v.WorkDir, p.WorkDir)
++			equal(t, o.calls, 1)
++			equal(t, v.EnvLiterals["PROMPT_CHANNEL"], "selected")
++			p.Argv[0] = "changed"
++			native[0] = "changed"
++			prompt.Argv[0] = "changed"
++			prompt.Env["PROMPT_CHANNEL"] = "changed"
++			f.Env[fragment.HomeVariable(env)] = "changed"
++			equal(t, v.Argv, want)
++			equal(t, v.EnvLiterals["PROMPT_CHANNEL"], "selected")
++		})
++	}
++}
++func TestComposeEnvironmentBoundary(t *testing.T) {
++	req := agentic.LaunchRequest{Env: []string{"REMOVED=must-not-return", "PATH=/unsafe", "SECRET=inherited-secret"}, Home: "/same/request"}
++	p := agentic.Plan{Env: []string{"HOME=/parent", "PATH=/sanitized", "SECRET=inherited-secret", "FIGMA_API_KEY=source-secret", "OWN=old=literal", "EMPTY="}}
++	f := parsed(t, "opencode", "/managed/default/tool/mcp.json", []string{"CHANNEL", "FIGMA_API_KEY", "OWN"})
++	o := &owner{t: t, req: req, env: []string{"OWN=owned-value", "XDG_CONFIG_HOME=owned-home", "CHANNEL=owned-channel"}}
++	v, err := composition.Compose(p, o, req, f, composition.PromptApplication{Env: map[string]string{"CHANNEL": "channel-value"}}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	equal(t, v.EnvNames, []string{"FIGMA_API_KEY"})
++	equal(t, v.EnvLiterals, map[string]string{"OWN": "owned-value", "CHANNEL": "channel-value", "XDG_CONFIG_HOME": "/managed/default/tool", "OPENCODE_CONFIG": f.MCP.Path})
++	equal(t, v.Env, []string{"CHANNEL=channel-value", "EMPTY=", "FIGMA_API_KEY=source-secret", "HOME=/parent", "OPENCODE_CONFIG=" + f.MCP.Path, "OWN=old=literal", "PATH=/sanitized", "SECRET=inherited-secret", "XDG_CONFIG_HOME=/managed/default/tool"})
++	equal(t, v.Warnings, []string{"environment override: XDG_CONFIG_HOME", "environment override: CHANNEL", "environment literal replaces lookup: CHANNEL", "environment literal replaces lookup: OWN"})
++	b, err := json.Marshal(v)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, secret := range []string{"inherited-secret", "source-secret", "/parent", "/sanitized", "REMOVED"} {
++		if strings.Contains(string(b), secret) {
++			t.Fatalf("serialized inherited data: %s", secret)
++		}
++	}
++	equal(t, o.calls, 1)
++}
++func TestComposeUnownedOverrideNoWarning(t *testing.T) {
++	f := parsed(t, "pi", "/managed/default/pi/prompt", nil)
++	v, err := composition.Compose(agentic.Plan{Env: []string{"PI_CODING_AGENT_DIR=/inherited"}}, &owner{t: t}, agentic.LaunchRequest{}, f, composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	equal(t, len(v.Warnings), 0)
++}
++func TestComposeStdin(t *testing.T) {
++	for _, tc := range []struct {
++		name     string
++		attached bool
++		data     []byte
++		wire     string
++	}{
++		{"unattached", false, []byte("ignored"), "null"}, {"empty", true, nil, `{"encoding":"utf-8","bytes":""}`}, {"utf8", true, []byte("hello 日本語\n"), `{"encoding":"utf-8","bytes":"hello 日本語\n"}`}, {"binary", true, []byte{255, 254}, `{"encoding":"base64url","bytes":"__4"}`},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			data := append([]byte(nil), tc.data...)
++			v, err := composition.Compose(agentic.Plan{Stdin: agentic.StdinPayload{Attached: tc.attached, Bytes: data}}, &owner{t: t}, agentic.LaunchRequest{}, parsed(t, "pi", "/managed/default/pi/prompt", nil), composition.PromptApplication{}, nil)
++			if err != nil {
++				t.Fatal(err)
++			}
++			b, err := json.Marshal(v.Stdin)
++			if err != nil {
++				t.Fatal(err)
++			}
++			equal(t, string(b), tc.wire)
++			equal(t, v.RawStdin, agentic.StdinPayload{Attached: tc.attached, Bytes: tc.data})
++			if len(data) > 0 {
++				data[0] = 0
++				equal(t, v.RawStdin.Bytes, tc.data)
++			}
++		})
++	}
++}
++func TestComposeOwnershipFailure(t *testing.T) {
++	sentinel := errors.New("ownership failed")
++	v, err := composition.Compose(agentic.Plan{}, &owner{t: t, err: sentinel}, agentic.LaunchRequest{}, fragment.Fragment{}, composition.PromptApplication{}, nil)
++	if !errors.Is(err, sentinel) {
++		t.Fatalf("lost failure: %v", err)
++	}
++	equal(t, v, composition.Value{})
++}
++func TestComposeEmptyEnvironment(t *testing.T) {
++	v, err := composition.Compose(agentic.Plan{}, &owner{t: t}, agentic.LaunchRequest{}, fragment.Fragment{}, composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if v.Env == nil {
++		t.Fatal("nil environment would inherit parent in os/exec")
++	}
++}
++func TestLaunchBoundaryFilesystem(t *testing.T) {
++	for _, kind := range []string{"missing", "regular", "directory", "dangling", "symlink", "unreadable", "parent-file"} {
++		t.Run(kind, func(t *testing.T) {
++			dir := t.TempDir()
++			path := filepath.Join(dir, "layer.toml")
++			write := func(p string) {
++				t.Helper()
++				if err := os.WriteFile(p, []byte("mcp"), 0600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			switch kind {
++			case "regular":
++				write(path)
++			case "directory":
++				if err := os.Mkdir(path, 0700); err != nil {
++					t.Fatal(err)
++				}
++			case "dangling":
++				if err := os.Symlink(filepath.Join(dir, "absent"), path); err != nil {
++					t.Fatal(err)
++				}
++			case "symlink":
++				target := filepath.Join(dir, "target")
++				write(target)
++				if err := os.Symlink(target, path); err != nil {
++					t.Fatal(err)
++				}
++			case "unreadable":
++				write(path)
++				if err := os.Chmod(path, 0); err != nil {
++					t.Fatal(err)
++				}
++				t.Cleanup(func() { _ = os.Chmod(path, 0600) })
++				if os.Geteuid() == 0 {
++					t.Skip("root bypasses Unix file permissions")
++				}
++			case "parent-file":
++				write(path)
++				path = filepath.Join(path, "child")
++			}
++			f := parsed(t, "codex_cli", path, nil)
++			v, err := composition.Compose(agentic.Plan{}, &owner{t: t}, agentic.LaunchRequest{}, f, composition.PromptApplication{}, []string{"-p", "operator"})
++			if err != nil {
++				t.Fatal("composition must not probe early", err)
++			}
++			err = v.CheckLaunchBoundary()
++			if kind == "regular" || kind == "symlink" {
++				if err != nil {
++					t.Fatal(err)
++				}
++			} else {
++				code := composition.CodeMCPLayerUnreadable
++				if kind == "missing" {
++					code = composition.CodeMCPLayerMissing
++				}
++				var layer *composition.LayerError
++				if !errors.As(err, &layer) {
++					t.Fatalf("expected %s, got %v", code, err)
++				}
++				equal(t, layer.Code, code)
++				equal(t, layer.Path, path)
++			}
++			equal(t, v.Argv, []string{"-p", "curator-mcp", "-p", "operator"})
++		})
++	}
++}
++func TestLaunchBoundaryLateReplacement(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "layer.toml")
++	v, err := composition.Compose(agentic.Plan{}, &owner{t: t}, agentic.LaunchRequest{}, parsed(t, "codex_cli", path, nil), composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, nil, 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := v.CheckLaunchBoundary(); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(path); err != nil {
++		t.Fatal(err)
++	}
++	var layer *composition.LayerError
++	if !errors.As(v.CheckLaunchBoundary(), &layer) || layer.Code != composition.CodeMCPLayerMissing {
++		t.Fatal("late deletion admitted")
++	}
++	if err := os.Mkdir(path, 0700); err != nil {
++		t.Fatal(err)
++	}
++	if !errors.As(v.CheckLaunchBoundary(), &layer) || layer.Code != composition.CodeMCPLayerUnreadable {
++		t.Fatal("late replacement admitted")
++	}
++}
++func TestLaunchBoundaryUnengaged(t *testing.T) {
++	f := parsed(t, "codex_cli", "/missing/layer", nil)
++	f.MCP = nil
++	v, err := composition.Compose(agentic.Plan{}, &owner{t: t}, agentic.LaunchRequest{}, f, composition.PromptApplication{}, []string{"-p", "operator"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := v.CheckLaunchBoundary(); err != nil {
++		t.Fatal(err)
++	}
++	equal(t, v.Argv, []string{"-p", "operator"})
++}
++
++// This exercises the real released ownership surface, not native Pi admission.
++func TestComposeReleasedChildEnvironment(t *testing.T) {
++	sys := codex.New()
++	req := agentic.LaunchRequest{Env: []string{"PATH=/usr/bin:/tmp/codex-path", "HOME=/parent", "SECRET=inherited-secret", "CODEX_THREAD_ID=removed", "TASK_BOARD_RUN_ID=removed", "FIGMA_API_KEY=local-secret"}}
++	env, err := sys.ChildEnv(req.Env, req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	v, err := composition.Compose(agentic.Plan{Env: env}, sys, req, parsed(t, "codex_cli", "/managed/default/codex/layer.toml", []string{"FIGMA_API_KEY"}), composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	equal(t, v.Env, []string{"CODEX_HOME=/managed/default/codex", "FIGMA_API_KEY=local-secret", "HOME=/parent", "PATH=/usr/bin", "SECRET=inherited-secret"})
++	equal(t, v.EnvLiterals, map[string]string{"CODEX_HOME": "/managed/default/codex"})
++	equal(t, v.EnvNames, []string{"FIGMA_API_KEY"})
++}
+diff --git a/internal/composition/probe.go b/internal/composition/probe.go
+new file mode 100644
+index 0000000..9423c8d
+--- /dev/null
++++ b/internal/composition/probe.go
+@@ -0,0 +1,64 @@
++package composition
++
++import (
++	"errors"
++	"fmt"
++	"os"
++)
++
++const (
++	CodeMCPLayerMissing    = "mcp_layer_missing"
++	CodeMCPLayerUnreadable = "mcp_layer_unreadable"
++)
++
++// LayerError distinguishes actual absence from a failed or nonregular read.
++type LayerError struct {
++	Code string
++	Path string
++	Err  error
++}
++
++func (e *LayerError) Error() string { return fmt.Sprintf("%s: %s: %v", e.Code, e.Path, e.Err) }
++func (e *LayerError) Unwrap() error { return e.Err }
++
++// CheckLaunchBoundary probes the codex MCP layer afresh on every invocation.
++// The execution Story MUST call this immediately before BOTH direct process
++// creation and ax handoff, alongside binary and §5 file-kind checks. Compose
++// deliberately never calls it: a successful early check is stale evidence.
++// This read-only check never removes flags, repairs files, or falls back.
++// As with any pathname probe, a replacement after this check remains a TOCTOU
++// bound; execution must minimize that window, not treat this as an open handle.
++func (v Value) CheckLaunchBoundary() error {
++	if v.mcpLayer == "" {
++		return nil
++	}
++	path := v.mcpLayer
++	fail := func(code string, err error) error { return &LayerError{Code: code, Path: path, Err: err} }
++	_, err := os.Lstat(path)
++	if err != nil {
++		if errors.Is(err, os.ErrNotExist) {
++			return fail(CodeMCPLayerMissing, err)
++		}
++		return fail(CodeMCPLayerUnreadable, err)
++	}
++	info, err := os.Stat(path)
++	if err != nil {
++		return fail(CodeMCPLayerUnreadable, err)
++	}
++	if !info.Mode().IsRegular() {
++		return fail(CodeMCPLayerUnreadable, errors.New("not a regular file"))
++	}
++	f, err := os.Open(path)
++	if err != nil {
++		return fail(CodeMCPLayerUnreadable, err)
++	}
++	defer f.Close()
++	info, err = f.Stat()
++	if err != nil {
++		return fail(CodeMCPLayerUnreadable, err)
++	}
++	if !info.Mode().IsRegular() {
++		return fail(CodeMCPLayerUnreadable, errors.New("opened file is not regular"))
++	}
++	return nil
++}

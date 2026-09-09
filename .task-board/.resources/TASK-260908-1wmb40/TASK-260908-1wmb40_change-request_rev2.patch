@@ -1,0 +1,3063 @@
+diff --git a/.scripts/composition-mutants.py b/.scripts/composition-mutants.py
+new file mode 100644
+index 0000000..4fc0d1c
+--- /dev/null
++++ b/.scripts/composition-mutants.py
+@@ -0,0 +1,47 @@
++#!/usr/bin/env python3
++"""Run scoped behavioral narrowing mutants; restore the uncommitted candidate."""
++import pathlib
++import subprocess
++import sys
++
++root = pathlib.Path(__file__).resolve().parent.parent
++out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / '.temp/composition-mutants')
++out.mkdir(parents=True, exist_ok=True)
++composer = root / 'internal/composition/composition.go'
++probe = root / 'internal/composition/probe.go'
++mutants = [
++ ('M1', composer, 'literals := maps.Clone(own)', 'literals := maps.Clone(own); literals["SECRET"] = env["SECRET"]', 'TestComposeEnvironmentBoundary', 'admit exactly inherited SECRET as a tracked literal'),
++ ('M2', composer, 'if _, collision := literals[name]; collision {', 'if _, collision := literals[name]; collision && name != "OWN" {', 'TestComposeEnvironmentBoundary', 'admit OWN as both literal and lookup'),
++ ('M3', composer, 'env := envMap(plan.Env)', 'env := envMap(plan.Env); env["REMOVED"] = envMap(req.Env)["REMOVED"]', 'TestComposeEnvironmentBoundary', 're-admit exactly plugin-removed REMOVED'),
++ ('M4', composer, 'if err != nil {', 'if err != nil && err.Error() != "ownership failed" {', 'TestComposeOwnershipFailure', 'admit one ChildEnv failure'),
++ ('M5', probe, 'return fail(CodeMCPLayerMissing, err)', 'return nil', 'TestLaunchBoundaryFilesystem/missing', 'admit absent layer while retaining all unreadable gates'),
++ ('M6', probe, 'info, err := os.Stat(path)', 'info, err := os.Stat(path); if errors.Is(err, os.ErrNotExist) { return nil }', 'TestLaunchBoundaryFilesystem/dangling', 'admit dangling symlink after successful lstat'),
++ ('M7', probe, 'if !info.Mode().IsRegular() {', 'if !info.Mode().IsRegular() && !info.IsDir() {', 'TestLaunchBoundaryFilesystem/directory', 'admit directories but retain other nonregular rejection'),
++ ('M8', probe, 'f, err := os.Open(path)', 'f, err := os.Open(path); if errors.Is(err, os.ErrPermission) { return nil }', 'TestLaunchBoundaryFilesystem/unreadable', 'admit permission-denied open only'),
++ ('M9', composer, 'if plan.Stdin.Attached {', 'if plan.Stdin.Attached && len(plan.Stdin.Bytes) > 0 {', 'TestComposeStdin/empty', 'collapse attached empty only to null'),
++]
++rows = ['mutant\tnarrows_to\tnamed_failing_test\texit\tverdict\tsurvival_bound']
++failed = False
++for ident, path, old, new, test, bound in mutants:
++ original = path.read_bytes()
++ try:
++  source = original.decode()
++  expected = 2 if ident == 'M7' else 1
++  if source.count(old) != expected:
++   raise RuntimeError(f'{ident}: expected {expected} anchors, got {source.count(old)}')
++  path.write_text(source.replace(old, new))
++  command = ['go', 'test', './internal/composition', '-count=1', '-v']
++  with (out / f'{ident}.log').open('w') as log:
++   log.write('COMMAND: ' + ' '.join(command) + '\n'); log.flush()
++   result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT)
++   log.write(f'\nEXIT: {result.returncode}\n')
++  killed = result.returncode == 1 and f'--- FAIL: {test} ' in (out / f'{ident}.log').read_text()
++  rows.append(f'{ident}\t{bound}\t{test if killed else "none"}\t{result.returncode}\t' + ('killed\tnone' if killed else 'SURVIVOR\t' + bound + ' remains unproven on this host'))
++  failed |= not killed
++ finally:
++  path.write_bytes(original)
++  if path.read_bytes() != original:
++   raise RuntimeError(f'{ident}: restoration failed')
++(out / 'summary.tsv').write_text('\n'.join(rows) + '\n')
++print('\n'.join(rows))
++sys.exit(1 if failed else 0)
+diff --git a/.scripts/execution-mutants.py b/.scripts/execution-mutants.py
+new file mode 100644
+index 0000000..9230efc
+--- /dev/null
++++ b/.scripts/execution-mutants.py
+@@ -0,0 +1,78 @@
++#!/usr/bin/env python3
++"""Behavioral narrowing probes at Load and Launch.Run; restore candidate bytes."""
++import os
++import pathlib
++import subprocess
++import sys
++
++root = pathlib.Path(__file__).resolve().parent.parent
++out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / '.temp/execution-mutants')
++out.mkdir(parents=True, exist_ok=True)
++config = root / 'internal/axconfig/config.go'
++launch = root / 'internal/execution/execution.go'
++reader = root / 'internal/fragment/json.go'
++process = root / 'internal/execution/process.go'
++mutants = [
++ ('F1', process, 'cmd.SysProcAttr.Foreground = true', 'cmd.SysProcAttr.Foreground = !(len(cmd.Args) > 1 && cmd.Args[1] == "start")', 'TestRealPTYOwnershipBothModes/tracked=true', 'withhold foreground ownership only for tracked ax; direct ownership remains'),
++ ('F2', process, '_ = syscall.Kill(-int(group), s.(syscall.Signal))', 'if s != os.Interrupt { _ = syscall.Kill(-int(group), s.(syscall.Signal)) }', 'TestRealPTYOwnershipBothModes/tracked=false', 'omit parent-only INT relay while retaining TERM/HUP/QUIT and terminal delivery'),
++ ('C1', config, 'len(v.Obj) != 2', '(len(v.Obj) != 2 && !(len(v.Obj) == 3 && v.Obj[2].Key == "locked"))', 'TestLoadClosedSchema/unknown', 'admit exactly one extra trailing locked member'),
++ ('C2', config, 'schema.Str != "curator-run-ax-v1"', '(schema.Str != "curator-run-ax-v1" && schema.Str != "other")', 'TestLoadClosedSchema/bad_schema', 'admit exactly schema other'),
++ ('C3', config, 'enabled.Kind != fragment.KindBool', 'enabled.Kind != fragment.KindBool && !(enabled.Kind == fragment.KindNull && v.Obj[1].Key == "enabled")', 'TestLoadClosedSchema/null', 'admit null enabled while refusing string/number'),
++ ('C4', reader, 'if seen[key] {', 'if seen[key] && key != "enabled" {', 'TestLoadClosedSchema/duplicate', 'admit duplicate enabled only with last-wins object storage'),
++ ('C5', config, 'return enabled, nil', 'if !enabled { continue }; return enabled, nil', 'TestLoadPrecedenceBeforeParse', 'ignore only explicit false machine policy'),
++ ('C6', config, 'if !info.Mode().IsRegular() {', 'if !info.Mode().IsRegular() && info.Mode()&os.ModeNamedPipe == 0 {', 'TestLoadFilesystemFailures/fifo', 'admit FIFO only; bound test timeout prevents hanging read'),
++ ('C7', config, 'info, err = os.Stat(path)', 'info, err = os.Stat(path); if os.IsNotExist(err) { return false, nil }', 'TestLoadFilesystemFailures/dangling_file', 'treat dangling symlinks only as absence'),
++ ('C8', config, 'data, err := os.ReadFile(path)', 'data, err := os.ReadFile(path); if os.IsPermission(err) { continue }', 'TestLoadFilesystemFailures/unreadable_file', 'turn permission-denied read only into fallback'),
++ ('C9', config, 'return false, fmt.Errorf("ancestor %s is not a directory", path)', 'return false, nil', 'TestLoadFilesystemFailures/file_ancestor', 'non-directory ancestor only becomes absence; other ancestor failures remain'),
++ ('E1', launch, 'if opts.Boundary == nil {', 'if opts.Boundary == nil && !l.tracked { opts.Boundary = func() error { return nil } }; if opts.Boundary == nil {', 'TestLateChecksBothModes/tracked=false/nil_boundary', 'admit absent third boundary in direct mode only'),
++ ('E2', launch, 'if err := opts.Boundary(); err != nil {', 'if err := opts.Boundary(); err != nil && !(l.tracked && strings.HasPrefix(err.Error(), "prompt_file_detected:")) {', 'TestLateChecksBothModes/tracked=true/boundary_refusal', 'admit prompt-file refusal in tracked mode only'),
++ ('E3', launch, 'if err != nil {\n\t\treturn fail(fmt.Errorf("exec_provider_missing:', 'if err != nil && !(l.tracked && os.IsNotExist(err) && strings.HasSuffix(l.value.Binary, "/provider")) {\n\t\treturn fail(fmt.Errorf("exec_provider_missing:', 'TestLateChecksBothModes/tracked=true/provider_removed', 'admit only absent binary named provider in tracked mode; nonexecutable still refuses'),
++ ('E4', launch, 'if err := l.value.CheckLaunchBoundary(); err != nil {', 'if err := l.value.CheckLaunchBoundary(); err != nil && !(l.tracked && strings.HasPrefix(err.Error(), "mcp_layer_missing:")) {', 'TestLateChecksBothModes/tracked=true/mcp_removed', 'admit missing MCP only in tracked mode'),
++ ('E5', launch, 'if err := l.value.CheckLaunchBoundary(); err != nil {', 'if err := l.value.CheckLaunchBoundary(); err != nil && !(!l.tracked && strings.HasPrefix(err.Error(), "mcp_layer_missing:")) {', 'TestLateChecksBothModes/tracked=false/mcp_removed', 'admit missing MCP only in direct mode'),
++ ('E6', launch, 'fail(errors.New("ax_handoff_failed: ax could not take the launch"))', 'if child, ok := err.(*processExit); ok && child.ExitCode() == 16 { l.tracked = false; return l.Run(opts) }; fail(errors.New("ax_handoff_failed: ax could not take the launch"))', 'TestAxFailureNoFallback/nonzero', 'fallback only for ax exit 16; other ax failures still refuse'),
++ ('E7', launch, 'Env: append([]string{}, l.value.Env...)', 'Env: append([]string(nil), l.value.Env...)', 'TestEmptyEnvironmentAndLaunchPATH/empty', 'inherit parent only for empty fullEnv'),
++]
++rows = ['mutant\tnarrows_to\tnamed_failing_test\texit\tverdict\tsurvival_bound']
++failed = False
++selected = set(os.environ.get("EXECUTION_MUTANT_IDS", "").split())
++for ident, path, old, new, test, bound in mutants:
++ if selected and ident not in selected:
++  continue
++ original = path.read_bytes()
++ try:
++  source = original.decode()
++  expected = 2 if ident == 'C7' else 1
++  if source.count(old) != expected:
++   raise RuntimeError(f'{ident}: expected {expected} anchors, got {source.count(old)}')
++  mutated = source.replace(old, new)
++  if ident == 'C4':
++   # Merely suppressing the duplicate error leaves three members, independently
++   # rejected by Load's cardinality gate. Model actual last-wins admission.
++   anchor = 'v.Obj = append(v.Obj, Member{Key: key, Value: val})'
++   replacement = 'replaced := false; if key == "enabled" { for i := range v.Obj { if v.Obj[i].Key == key { v.Obj[i].Value = val; replaced = true } } }; if !replaced { ' + anchor + ' }'
++   if mutated.count(anchor) != 1:
++    raise RuntimeError('C4: object-storage anchor drift')
++   mutated = mutated.replace(anchor, replacement)
++  path.write_text(mutated)
++  # FIFO admission is narrowed to one class and reaches the real blocking read.
++  # All other mutants run the complete scoped behavioral suite.
++  command = ['go', 'test', './internal/axconfig', './internal/execution', '-count=1', '-v', '-timeout=30s']
++  if ident in ('F1', 'F2'):
++   command = ['go', 'test', './internal/execution', '-count=1', '-v', '-run=TestRealPTYOwnershipBothModes', '-timeout=30s']
++  if ident == 'C6':
++   command = ['go', 'test', './internal/axconfig', '-count=1', '-v', '-run=TestLoadFilesystemFailures/fifo', '-timeout=2s']
++  with (out / f'{ident}.log').open('w') as log:
++   log.write('COMMAND: ' + ' '.join(command) + '\n'); log.flush()
++   result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=90)
++   log.write(f'\nEXIT: {result.returncode}\n')
++  evidence = (out / f'{ident}.log').read_text()
++  killed = result.returncode == 1 and (f'--- FAIL: {test} ' in evidence or (ident == 'C6' and f'{test} (2s)' in evidence and 'panic: test timed out' in evidence))
++  rows.append(f'{ident}\t{bound}\t{test if killed else "none"}\t{result.returncode}\t' + ('killed\tnone' if killed else 'SURVIVOR\t' + bound + ' is not proven on this host'))
++  failed |= not killed
++ finally:
++  path.write_bytes(original)
++  if path.read_bytes() != original:
++   raise RuntimeError(f'{ident}: restoration failed')
++(out / 'summary.tsv').write_text('\n'.join(rows) + '\n')
++print('\n'.join(rows))
++sys.exit(1 if failed else 0)
+diff --git a/.scripts/systemprompt-mutants.py b/.scripts/systemprompt-mutants.py
+new file mode 100644
+index 0000000..175f3a9
+--- /dev/null
++++ b/.scripts/systemprompt-mutants.py
+@@ -0,0 +1,51 @@
++#!/usr/bin/env python3
++"""SPEC5 behavioral narrowing probes; restore exact candidate bytes on exit."""
++import pathlib
++import subprocess
++import sys
++
++root = pathlib.Path(__file__).resolve().parents[1]
++out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / '.temp/systemprompt-mutants').resolve()
++out.mkdir(parents=True, exist_ok=True)
++path = root / 'internal/systemprompt/systemprompt.go'
++mutants = [
++    ('M1', 'if opt == "" {', 'if opt == "" && f.Environment == fragment.EnvClaudeCode { opt = fragment.SemanticsAppend }; if opt == "" {', 'TestSelectRefusalsAndNoOptIn/claude_code/section/', 'apply append without opt-in for Claude only'),
++    ('M2', 'if c.Semantics != opt || c.Kind == fragment.KindFile {', 'if c.Semantics != opt && f.Environment != fragment.EnvCodexCLI || c.Kind == fragment.KindFile {', 'TestSelectRefusalsAndNoOptIn/codex_cli/section/append', 'admit Codex append using replace descriptor'),
++    ('M3', 'if c.Semantics != opt || c.Kind == fragment.KindFile {', 'if c.Kind == fragment.KindFile && c.Semantics == opt && opt == fragment.SemanticsReplace { return Selection{}, nil }; if c.Semantics != opt || c.Kind == fragment.KindFile {', 'TestSelectRefusalsAndNoOptIn/pi/section/replace', 'admit matching replace file as an opt-in no-op'),
++    ('M4', 'return Selection{}, &Refusal{Code: CodeUnavailable', 'if f.SystemPrompt == nil && opt == fragment.SemanticsAppend { return Selection{}, nil }; return Selection{}, &Refusal{Code: CodeUnavailable', 'TestSelectRefusalsAndNoOptIn/pi/absent/append', 'admit append with absent section'),
++    ('M5', 'if f.Environment != fragment.EnvPi {', 'if f.Environment != fragment.EnvPi || f.SystemPrompt == nil {', 'TestPrepareLaunchLateFilesAndWarnings/no-section', 'skip registry probe only without section'),
++    ('M6', 'if err != nil {\n\t\treturn fail(err)\n\t}\n\tif !info.Mode().IsRegular()', 'if err != nil {\n\t\tif errors.Is(err, os.ErrNotExist) { return false, nil }; return fail(err)\n\t}\n\tif !info.Mode().IsRegular()', 'TestPrepareLaunchFileFailures/APPEND_SYSTEM.md/dangling', 'treat dangling target as absence'),
++    ('M7', 'if !info.Mode().IsRegular() {', 'if info.IsDir() { return true, nil }; if !info.Mode().IsRegular() {', 'TestPrepareLaunchFileFailures/APPEND_SYSTEM.md/directory', 'admit directory only at regular-file check'),
++    ('M8', 'file, err := os.Open(path)\n\tif err != nil {', 'file, err := os.Open(path)\n\tif errors.Is(err, os.ErrPermission) { return true, nil }; if err != nil {', 'TestPrepareLaunchFileFailures/APPEND_SYSTEM.md/permissions', 'admit permission-denied open only'),
++    ('M9', 'if allowAbsent && errors.Is(err, os.ErrNotExist) {', 'if errors.Is(err, os.ErrNotExist) && (allowAbsent || strings.HasSuffix(path, "prompt.md")) {', 'TestPrepareLaunchFileFailures/selected/missing', 'admit missing selected Pi prompt path'),
++    ('M10', 'if s.channel.Kind == fragment.KindFlag && s.channel.Semantics == file.Semantics {', 'if s.channel.Kind == fragment.KindFlag {', 'TestPrepareLaunchLateFilesAndWarnings/section', 'claim suppression for opposite-semantics home file'),
++    ('M11', 'observed, err := ProbeFiles(f)', 'observed, err := ProbeFiles(f)\n if s.channel.Kind == fragment.KindFlag && err != nil && strings.HasSuffix(err.(*Refusal).Path, "APPEND_SYSTEM.md") { err = nil }', 'TestPrepareLaunchFileFailures/APPEND_SYSTEM.md/directory', 'bypass file failure only for suppressed append file'),
++]
++original = path.read_bytes()
++rows = ['mutant\tnarrows_to\ttest\texit\tverdict']
++failed = False
++try:
++    for ident, old, new, test, bound in mutants:
++        source = original.decode()
++        count = source.count(old)
++        if count != 1 and not (ident in ('M6', 'M7') and count == 2):
++            raise RuntimeError(f'{ident}: anchor count {count}')
++        path.write_text(source.replace(old, new, 1))
++        command = ['go', 'test', './internal/systemprompt', '-count=1', '-v']
++        with (out / f'{ident}.log').open('w') as log:
++            log.write('COMMAND: ' + ' '.join(command) + '\n')
++            log.flush()
++            result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=120)
++            log.write(f'\nEXIT: {result.returncode}\n')
++        text = (out / f'{ident}.log').read_text()
++        killed = result.returncode == 1 and ('--- FAIL: ' + test) in text
++        rows.append(f'{ident}\t{bound}\t{test}\t{result.returncode}\t' + ('killed' if killed else 'SURVIVOR/unverified'))
++        failed |= not killed
++        path.write_bytes(original)
++finally:
++    path.write_bytes(original)
++    if path.read_bytes() != original:
++        raise RuntimeError('restore mismatch')
++(out / 'summary.tsv').write_text('\n'.join(rows) + '\n')
++print('\n'.join(rows))
++sys.exit(1 if failed else 0)
+diff --git a/README.md b/README.md
+index bfa1209..10e266e 100644
+--- a/README.md
++++ b/README.md
+@@ -34,8 +34,8 @@ the parsed object, and the `resolve_*` diagnostic family. §4.2 maps the
+ resolved environment to its system/provider pair (`internal/mapping`):
+ `claude_code` → `claude-code`/`claude`, `codex_cli` → `codex`/`codex`,
+ `pi` → `pi-native`/`pi`. Unsupported IDs (including known `opencode`)
+-refuse `env_unsupported` with exit 1 before later stages. The later
+-composition steps (§4.3–§4.6), system-prompt application (§5), and the
++refuse `env_unsupported` with exit 1 before later stages. The executable wiring for the later
++steps (§4.3–§4.6), main integration of system-prompt policy (§5), and the
+ `defaults.json`/`ax.json` file family (§4.7) are not delivered: a
+ well-formed launch invocation parses, resolves its fragment (repairing the
+ managed home when Curator finds it stale), maps its supported system/provider pair, and is then refused with exit 1
+@@ -46,6 +46,139 @@ Because no `ax.json` is read yet, the binary always parses as an untracked
+ machine, so `--ax-profile` is currently always a usage error and `--name`
+ is accepted without effect.
+ 
++## Composition API boundary
++
++`internal/composition.Compose` implements the §4.5 value API over an already
++admitted `agentic.Plan`, its original system/request, a validated fragment,
++and an already selected/encoded `PromptApplication`. It calls only
++`System.ChildEnv(nil, sameRequest)` to obtain owned literals; it never builds
++another plan. Argv retains plan → prompt → MCP → native order. Native arguments
++are uninspected, including duplicate `-p` and operator permission flags.
++`Binary` and `WorkDir` are preserved. Direct `Env` starts from all of `Plan.Env`;
++tracked JSON omits that environment, executable, work directory and raw stdin.
++It includes only argv suffix, owned literals, disjoint lookup names and D4 stdin.
++`RawStdin` preserves bytes for direct execution; attached empty is distinct from
++unattached. `Warnings` contains names only, and both launch modes must print
++these warnings to stderr.
++
++The only direct module dependency is the real `skill-agents-management`
++`v0.5.10` release (commit `12f443d10bc217ca7a48e2edab19c739f441df9c`),
++which requires Go 1.25.5. No replacement, workspace override or pseudo-version
++is used. Pi-shaped input values test composition only: they do **not** claim
++native Pi admission in that release. Integration must use the later real
++operator-tagged native Pi release before making that claim.
++
++`Value.CheckLaunchBoundary` freshly checks the codex MCP layer for a readable
++regular file, distinguishing missing from dangling, unreadable and nonregular.
++It never repairs or silently drops MCP flags. The execution Story must call it
++**immediately before both direct process creation and ax handoff**, with the
++binary and §5 file-kind checks; calling it during composition is insufficient.
++The pathname check has a residual replacement window before process creation.
++No main call site or execution guarantee is claimed here. Full pipeline tests,
++BuildLaunch admission, model/default resolution, §5 prompt API integration,
++main integration remain later stories' obligations. The execution API below
++now owns tracked schema/extensions, stderr delivery and actual subprocesses.
++The existing executable still refuses `not_implemented`.
++
++Reserved `path_prepend` parsing and hashing remain unchanged. Composition does
++not transform PATH for that reserved field or claim managed command-root
++support; environments §9.4 and the future skill-command-roots proposal bound it.
++
++## System-prompt API boundary
++
++The reusable `internal/systemprompt` API implements §5 selection and encoding,
++typed `sysprompt_channel_unavailable` / `sysprompt_file_unreadable` refusals,
++and late Pi file validation. `Select` accepts a validated fragment and an
++explicit `fragment.Semantics` (empty means no opt-in), returning only channel
++argv/env for composition. No system-prompt variable channel exists in the
++closed revision-1 registry, so `Selection.Env()` is empty; no adapter support
++is inferred. Codex uses `-c` plus a TOML-quoted `model_instructions_file` value.
++That native override remains **docs-confidence** in the accepted A0 evidence
++(Codex 0.153.4), while encoding is covered by exact-argv tests.
++
++**Execution Story obligation:** main still does not call this API. Immediately
++before **every** tracked handoff or untracked exec it must call
++`systemprompt.PrepareLaunch(fragment, optIn)`, refuse its errors, compose
++`Selection.Argv()` / `Selection.Env()`, and emit every returned warning line
++to stderr. It must not cache the launch-boundary result. The operation rechecks
++Pi's selected polymorphic flag path and both registry home filenames even
++without a system-prompt section. `ProbeFiles` also exposes the independent
++home probe; `FormatWarnings` is pure. Warnings distinguish flag suppression
++from conditional discovery under native-flag and trusted-project precedence.
++The API writes nothing and does not inspect native argv or project files;
++probe-to-exec races and native source selection remain outside its evidence.
++
++## Execution and tracking-policy APIs
++
++`axconfig.Load(machineDir, operatorDir)` reads `ax.json` with closed schema
++`curator-run-ax-v1` and a required boolean `enabled`. Machine policy, including
++false, decides without even inspecting the ignored operator directory. Both
++absent means false. Unknown/duplicate/wrong-typed members, broken ancestors,
++dangling links, nonregular files and read failures return
++`defaults_config_invalid`; the API writes nothing. Supply `/etc/curator-run`
++and the operator's `$XDG_CONFIG_HOME/curator-run` (or
++`~/.config/curator-run`) directories explicitly. Integration must call this
++**before `cli.Parse`**, including invalid argv, and pass `AxConfigured`.
++
++`execution.Prepare(value, fragment, invocation, target, compositionTime)` takes
++an actual `composition.Compose` result, validated fragment, parsed invocation
++and mapped target. It snapshots the D3.2 document and direct argv/env/stdin.
++Pass the composition timestamp; default names use its UTC value. Explicit
++name, profile and workspace become the exact §4.6 ax argv. The closed document
++contains schema/version, the entire argv suffix, owned literals, lookup names,
++D4 stdin and exactly four Curator extensions. It never serializes Binary or
++the full inherited environment. Native arguments remain untouched.
++
++`Launch.Run(execution.Options{Boundary: probe, IO: streams, AxBinary: path})`
++starts and waits for a real `os/exec` child on Darwin/Linux. `AxBinary` may be
++an explicit executable path; otherwise `ax` resolves on the launcher's PATH.
++Validation always supplies a compiled **fake ax**, never an installed real ax.
++Tracked transport inherits the launcher environment (with os/exec's working
++`PWD`); it never uses the direct environment as ax's environment. Nonzero or
++not-startable ax returns 1 with `ax_handoff_failed`, then its stderr bytes
++verbatim, and never falls back. Successful ax stdout/stderr are forwarded.
++
++Direct execution uses the composed binary, argv, working directory and exact
++full environment; empty means empty. Bare provider names resolve against the
++composed PATH, relative paths against WorkDir. Unattached stdin shares the
++supplied input; attached empty or binary stdin uses exactly the plan bytes.
++Default stdio shares `os.Stdin`, `os.Stdout`, `os.Stderr`, including terminal
++file descriptors. Normal child exit codes are returned unchanged; signal exits
++return `128 + signal`. The caller must propagate that return code. Incoming
++SIGINT/TERM/HUP/QUIT sent only to the launcher are forwarded to the child
++process group. The child owns a separate foreground group on a controlling
++terminal, avoiding duplicate delivery of terminal-generated interrupts. A child
++stop suspends the launcher and restores its terminal group; continuing the
++launcher restores the child foreground group and resumes it. Terminal ownership
++returns after exit. This is a waited child, without process replacement or PTY
++allocation. Real isolated PTY tests exercise one Ctrl-C, foreground reads,
++Ctrl-Z, continuation and terminal restoration in both routes (five trials each).
++Parent-only TERM and direct signal exit status have separate real-process tests.
++Full interactive shell bg/disown semantics and Linux runtime remain unverified.
++
++Both routes print composition's name-only warnings and require a non-nil typed
++`execution.Boundary`. Immediately before process creation they invoke that
++callback, freshly resolve/check the provider executable and call
++`Value.CheckLaunchBoundary`. Callback errors are terminal; no implicit success
++exists. These pathname probes retain a replacement/permission-change race up
++to process creation; they are not open-handle guarantees. The upstream §5 package and its tests are carried byte-for-byte from
++`adf627607eb334e9839288cfffce63e1268ae688`, with its README section and mutant
++harness preserved. The callback remains the final pipeline's explicit obligation:
++bind `systemprompt.PrepareLaunch` (including `ProbeFiles` and warning formatting)
++rather than a second implementation. Merely carrying that API does not wire it
++into main. The managed branch checkpoint remains
++`84747c326eee9863ddfd7e86ac65be1056718fbc`.
++
++**Pending production wiring belongs to TASK-260908-1o7i8y:** load ax policy
++before usage validation, resolve defaults, obtain an admitted single plan via
++the settled spawn-plane API, select/apply §5 prompt policy, compose once,
++prepare at composition time, bind the real third late probe, run and propagate
++its exit code. Main and SPEC remain untouched by this API task. The current
++executable still refuses `not_implemented`. Pi-shaped process values do not
++claim native Pi admission on module v0.5.10. Independent review and signed
++publication/landing belong to the parent; the managed producer leaves this
++candidate uncommitted for the review snapshot.
++
+ ## Install and discovery
+ 
+ The launcher ships the `curator-run` executable. Curator dispatches
+@@ -80,6 +213,10 @@ or tag workflow yet.
+ | `.scripts/cli-mutants.sh` | narrowing-mutant harness for the §3 gates: each mutant weakens one gate to admit one rejected shape and the named test must fail | `.scripts/cli-mutants.sh [evidence-dir]` | per-mutant logs and `summary.tsv` under the evidence dir (default `.temp/cli-mutants/`); the source tree is restored on exit |
+ | `.scripts/fragment-mutants.sh` | narrowing-mutant harness for the §4.1 gates (argv, exit mapping, stderr transport, reader rules, schema closure, CCJ-1 emission, entry-point wiring); the behavioral suite runs against every mutant | `.scripts/fragment-mutants.sh [evidence-dir]` (optional `FRAGMENT_MUTANT_IDS="M27 M28" FRAGMENT_TEST_PATTERN="TestExecutableUnicodePathBoundary|TestConformanceCorpus"` for focused rework) | `mutants.log` under the evidence dir (default `.temp/fragment-mutants/`); sources are restored from byte copies on exit |
+ | `.scripts/mapping-mutants.py` | §4.2 narrowing probes with named production-entry failures; restores candidate bytes after each mutation | `python3 .scripts/mapping-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/mapping-mutants/`) |
++| `.scripts/composition-mutants.py` | §4.5 behavioral narrowing probes for environment ownership, collisions, stdin and launch-boundary file refusal; restores candidate bytes after every mutant | `python3 .scripts/composition-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/composition-mutants/`); permission probe requires a non-root host |
++| `.scripts/systemprompt-mutants.py` | SPEC §5 narrowing probes through exported production APIs; exact source bytes restored after every mutation | `python3 .scripts/systemprompt-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/systemprompt-mutants/`) |
++| `.scripts/execution-mutants.py` | narrowing probes at tracking-policy Load and execution Launch.Run, using actual fake subprocesses; restores candidate bytes | `python3 .scripts/execution-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv`, default `.temp/execution-mutants/`; permission tests require non-root |
++| execution process helpers | exact document/argv/env/stdin/exit and late-check tests; compiles disposable fake provider/ax and API signal driver; Python 3 supplies isolated POSIX PTY regression | `go test ./internal/axconfig ./internal/execution -count=1` | test stdout; helper binaries use temporary directories and are removed |
+ | fragment test corpus | `internal/fragment/testdata/schema-cases` is the `launch-env-fragment-v1` slice of curator-spec `conformance/v1/schema-cases` (index rows copied with their verdicts, source commit recorded in `index.json`); `testdata/a0` holds the three fragments and digests the installed Curator printed during A0 verification | `go test ./internal/fragment` | none; 49 indexed names/verdicts and fixture bytes are pinned by an independently upstream-derived manifest hash in `TestConformanceCorpus`; refresh requires reviewing the upstream rows and updating that pin as well as `index.json` |
+ 
+ ## License
+diff --git a/SPEC.md b/SPEC.md
+index 2557286..997f006 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -38,6 +38,10 @@ RFC 2119. Normative references:
+   Revision 1.1 carries Decision 0012 D8, so the fragment members this
+   document consumes (`lock_sha256`, `mcp`) are now spelled there.
+   `profiles/manager.md` §12.5 restates `env resolve` for the manager.
++  Pi prompt discovery follows the accepted A0 E5 evidence (§4.3/§6,
++  TASK-260908-qblycn) and the [revision 1.1 corrections at `d019f0e`](https://github.com/relux-works/curator-spec/blob/d019f0e/protocol/environments.md):
++  installed Pi 0.84.2 `dist/core/resource-loader.js`, source selection
++  at lines 380–388 and discovery at lines 808–829.
+ - `curator-spec/protocol/registry.md` §1 — CCJ-1 canonicalization, used
+   for the fragment digest.
+ - `agent-session-manager-spec/SPEC.md` (`ax`) — §2.1 (session-name
+@@ -702,8 +706,8 @@ The launcher is the one component that applies a `flag`, `config-key`, or
+ `variable` channel, and only behind the explicit
+ `--system-prompt <append|replace>` opt-in. `file`-kind channels are the
+ one exception: the launcher never applies them — the tool does, on its
+-own, whenever the file is present — so the launcher's whole duty for them
+-is detection and warning (§5.1).
++own, subject to native discovery precedence — so the launcher's whole
++duty for them is detection and warning (§5.1).
+ 
+ Application, by descriptor kind (the per-environment channel tables are
+ environments.md §7.3 and are not restated here):
+@@ -719,17 +723,18 @@ environments.md §7.3 and are not restated here):
+ - **variable-class** (`gemini`, once that adapter lands): set the
+   descriptor's variable to the fragment's path in the child environment.
+ - **file-class** (`pi`: `APPEND_SYSTEM.md` for `append`, `SYSTEM.md` for
+-  `replace`): the launcher applies nothing, because there is nothing left
+-  to apply — the tool reads the file from its home unconditionally when
+-  it is present. The launcher MUST NOT place, remove, or edit a
++  `replace`): the launcher applies nothing, because native discovery belongs
++  to the tool: same-semantics flags suppress discovery, and a trusted
++  project file takes precedence over the agent-home file (§5.1). The
++  launcher MUST NOT place, remove, or edit a
+   file-kind channel's file: those files are materialized exclusively by
+   Curator, and only under the per-profile × environment
+   `system_prompt_files` machine setting (environments.md §5.5, default
+   `off`). The opt-in for a file-kind channel happened at the
+   machine-setting level, not on this command line. The launcher's duty
+-  is §5.1: detect an active file-kind channel and warn.
++  is §5.1: detect managed-home file presence and warn within that bound.
+ 
+-### 5.1 File-kind channels: detection, orthogonality, warning
++### 5.1 File-kind channels: detection, native precedence, warning
+ 
+ The file-kind probe is keyed on the **environment**, not the fragment.
+ For an env-id whose environments.md §7.3 adapter registry declares
+@@ -739,48 +744,56 @@ MUST probe, on **every** launch, immediately before the handoff or exec
+ of §4.6, the path `<home>/<filename>` for each filename in that closed
+ registry set, where `<home>` is the managed home the fragment's `env`
+ map points the tool at. The probe runs whether or not the fragment
+-carries a `system_prompt` section: the tool applies a present file
+-unconditionally (environments.md §7.3), so which channels the fragment
+-happens to name has no bearing on which files the tool will read. The
++carries a `system_prompt` section: native file discovery does not depend
++on the fragment's descriptor list. Presence in the managed home does not
++prove that the tool selects that file; the precedence below applies. The
+ registry set is closed and versioned with the environments protocol, and
+ the launcher already owns the §4.2 environment mapping, so keying the
+ probe on the registry adds no new knowledge edge. The probe has exactly
+ three outcomes, and they are three different facts:
+ 
+-- **Absent** — no file exists at the path. The channel is inactive. This
++- **Absent** — no file exists at the probed managed-home path. This
+   is the legitimate default: `system_prompt_files` defaults to `off` and
+   §5.5 keeps both files unwritten under it. No warning, no diagnostic,
+-  no launch change. Absence of a file-kind file is never an error,
+-  because the registry declares what channels *exist*, not which are
+-  engaged: an inactive channel is the normal state of a managed home.
++  no launch change follows from this probe. Absence here is never an
++  error and does not establish absence of native project-local files or
++  other native prompt inputs.
+ - **Present and readable** — a regular file the launcher can open for
+-  reading. The channel is **active**: the tool will apply it. The
+-  launcher MUST print the §5.2 warning naming this channel, even when
+-  `--system-prompt` was not given, and even when the fragment carries no
+-  `system_prompt` section or no descriptor for this filename. A plain
+-  launch into such a home is a customized run regardless of how the file
+-  got there: when the machine setting materialized it, the opt-in
+-  happened at the machine-setting level; when something else wrote it,
+-  no one opted in at all, and the warning is the only thing standing
+-  between the operator and a silently customized run.
++  reading. The launcher MUST print the §5.2 warning naming this observed
++  managed-home file, even without `--system-prompt`, a `system_prompt`
++  section, or a descriptor for this filename. Presence is not proof of
++  application: the warning states the native precedence below. When the
++  machine setting materialized the file, that was the materialization
++  opt-in; a stray file has no such recorded opt-in.
+ - **Anything else** — the path exists but cannot be read (permission,
+   I/O error), or is not a regular file (a directory, a dangling
+   symlink). The launch fails with `sysprompt_file_unreadable`. A failed
+-  probe is a read failure, never an absence: the tool itself will
+-  attempt the file at startup, so exec'ing past an indeterminate probe
+-  would start a run whose customization state the launcher cannot
+-  state — and the warning contract of §5.2 would be unsatisfiable.
+-
+-File-kind presence is **orthogonal and additive** to the flag-class
+-opt-in. The `--system-prompt <semantics>` opt-in selects among the
+-fragment's non-`file` channels only; a `file`-kind descriptor never
+-satisfies the opt-in, and the opt-in never suppresses, removes, or
+-substitutes for an active file-kind channel. On a `pi` launch with
+-`--system-prompt append` into a home where `APPEND_SYSTEM.md` is present,
+-both channels engage — the launcher appends the flag, the tool applies
+-the file — and the warning enumerates both. The launcher MUST NOT try to
+-deduplicate the two applications: which one the tool honors, and in what
+-order, is the tool's documented behavior, not the launcher's to arbitrate.
++  probe is a read failure, never an absence. This existing managed-home
++  validation remains mandatory even when native precedence could keep
++  the tool from selecting the file; it does not attest which source the
++  tool will apply.
++
++The `--system-prompt <semantics>` opt-in still selects only the fragment's
++non-`file` channels; a `file` descriptor never satisfies it. Native Pi
++0.84.2 source selection is separate: a native `--system-prompt` value
++suppresses `SYSTEM.md` discovery, and native `--append-system-prompt`
++values suppress `APPEND_SYSTEM.md` discovery. A flag and a discovered
++file of the same semantics are alternatives, not additive. Thus launcher
++`--system-prompt append` spells the declared append flag, which suppresses
++`APPEND_SYSTEM.md` discovery even if the managed-home probe finds that
++file. The warning names the flag as applied and the observed file as
++suppressed, not as a second application. This adds no replace flag to
++the adapter registry and does not inspect or alter native arguments (§3).
++
++When discovery applies, an existing `<cwd>/.pi/SYSTEM.md` or
++`<cwd>/.pi/APPEND_SYSTEM.md` in a trusted project wins over the
++corresponding `<agentDir>` file (`agentDir` is the home selected by
++`PI_CODING_AGENT_DIR`). These project files are outside the managed-home
++probe set. Without an applied launcher flag establishing suppression,
++the warning reports a home file as a native-discovery candidate subject
++to flag and trusted-project precedence, not as a verified selected source.
++The accepted E5 loader evidence cited above establishes these semantics;
++no project probe or new channel is introduced.
+ 
+ Detection is the launcher's whole authority here; removal is not. The
+ launcher MUST NOT remove or edit a file the probe finds, whatever put it
+@@ -807,34 +820,34 @@ every launcher-mediated launch into that home warns.
+   error, not a silent no-op: the operator asked for a customized run
+   and MUST NOT get an uncustomized one without noticing.
+ - Without the opt-in the launcher applies no channel, adds no flag, sets
+-  no key, and exports no variable. Managed homes carry no active
+-  system-prompt file by default (environments.md §5.5), so a plain launch
+-  runs the tool's built-in behavior — except where a file-kind
+-  channel's file is present in the home, which §5.1 detects and warns
+-  about without altering the launch.
+-
+-**Warnings.** Every activation — a flag-class, config-key, or
+-variable-class channel the launcher applied under the opt-in, and every
+-active file-kind channel detected by the §5.1 probe — MUST be covered by
+-a warning printed to stderr, before the §4.6 handoff or exec, that
+-states all three of:
+-
+-1. this run's system prompt is customized, enumerating **every** active
+-   channel: for each, the profile, the descriptor kind (and, for
+-   file-kind, the filename), and the semantics applied;
+-2. for `replace` semantics on any active channel, that replacement
+-   discards the tool's built-in system behavior entirely;
++  no key, and exports no variable. Managed homes carry no materialized
++  system-prompt file by default (environments.md §5.5). Native inputs,
++  including trusted project-local files, may still customize the run;
++  §5.1 detects and warns about managed-home files only.
++
++**Warnings.** Every flag-class, config-key, or variable-class channel the
++launcher applied under the opt-in, and every present readable managed-home
++file detected by §5.1, MUST be covered by a warning on stderr before the
++§4.6 handoff or exec. It states:
++
++1. the profile, descriptor kind (and filename for a probed file), and
++   semantics of each applied launcher channel and observed home file,
++   distinguishing application from suppression or conditional native
++   discovery as required by §5.1; it MUST NOT claim to enumerate all
++   native sources or infer an uncustomized run from home-file absence;
++2. for `replace` semantics, that replacement discards the tool's built-in
++   system behavior entirely, conditional on selection when the observed
++   home file is only a discovery candidate;
+ 3. that a custom system prefix can change how requests are cached and
+    therefore billed — a tool's default system prompt may participate in
+    shared prompt caching, while a custom one forms its own cache prefix
+    (exact per-tool behavior is Decision 0010 open question 7's research).
+ 
+-The warning set is identical whether a channel was engaged by the
+-command-line opt-in or by machine-setting materialization: the operator
+-at the keyboard may not be the operator who configured the machine, and
+-the warning exists for the one at the keyboard. The warning is not
+-suppressible in revision 1, and the absence of `--system-prompt` on the
+-command line MUST NOT suppress it for file-kind channels.
++Warnings cover both command-line application and observed machine-setting
++materialization: the operator at the keyboard may not be the operator
++who configured the machine. They are not suppressible in revision 1;
++absence of `--system-prompt` MUST NOT suppress a home-file warning.
++
+ Reproducibility over silence: the cost of the warning is one stderr
+ line-group; the cost of a silent customized run is an operator
+ misattributing behavior to the tool.
+@@ -856,12 +869,12 @@ contract. Usage errors exit 2; every operational failure exits 1.
+ | exec | `exec_provider_missing` | §4.6: the plan's binary does not exist — reported with the executable name and installation guidance |
+ | ax | `ax_handoff_failed` | §4.6: the configured `ax` could not take the launch — `ax` not startable, or `ax start` exited non-zero, its Structured Error passed through; no untracked fallback |
+ | mcp | `mcp_layer_missing`, `mcp_layer_unreadable` | §4.5: the composed argv carries `-p curator-mcp` and the pre-launch stat of the fragment's `mcp.path` finds no file, or finds something it cannot read as a regular file — codex would silently launch without the profile's MCP set, so neither degrades to a launch without `-p`; the two are distinct facts and are reported as such |
+-| system prompt | `sysprompt_channel_unavailable`, `sysprompt_file_unreadable` | §5.2: opt-in given but the fragment carries no non-`file` channel with the requested semantics; §5.1: a registry-declared file-kind channel's file exists but cannot be read (or is not a regular file) at the pre-exec probe — an absent file is not this diagnostic, it is the channel's legitimate inactive state |
++| system prompt | `sysprompt_channel_unavailable`, `sysprompt_file_unreadable` | §5.2: opt-in given but the fragment carries no non-`file` channel with the requested semantics; §5.1: a registry-declared file-kind channel's file exists but cannot be read (or is not a regular file) at the pre-exec probe — an absent managed-home file is not this diagnostic and says nothing about other native sources |
+ 
+ Two invariants hold across every family. First, an absence and a failure
+ to read are different facts: a fallback defined for absence (no
+-`system_prompt` section means no channel to select; an absent file-kind
+-file means an inactive channel; an absent defaults file means the next
++`system_prompt` section means no channel to select; an absent managed-home
++file means no warning from that probe; an absent defaults file means the next
+ level) never fires on a failed or malformed read
+ (`resolve_fragment_invalid`, `sysprompt_file_unreadable`,
+ `defaults_config_invalid`, `mcp_layer_unreadable`); and where absence is
+@@ -912,7 +925,7 @@ reordered.
+ | `0.2.1-draft` | Follow-ups against environments.md 1.1 and the cycle-2 review. §4.1: the resolve invocation always passes `--repair`, with the read-only/fail-closed semantics of environments.md §10.1 stated, `resolve_repair_failed` kept, `resolve_lock_unavailable` added for `environment_lock_unavailable`, and `environment_home_stale` declared unreachable. §4.5: the codex layer file `<home>/curator-mcp.config.toml` MUST be stat-ed immediately before handoff or exec whenever the argv carries `-p curator-mcp` (a missing layer is silently ignored by codex, under `--strict-config` too), with `mcp_layer_missing` / `mcp_layer_unreadable`; `-p` takes exactly one value, so an operator `-p` after `--` fails the launch (Decision 0012 open question 3 closed). §4.6: `ax.json` `enabled: false` is not configured; the machine-over-operator precedence explained; the configuration read fires before a usage error. New §4.7 names the `defaults.json`/`ax.json` file family as launcher-owned knobs against the environments.md §12.1 manager knob table. §6: `defaults` row names §4.6/`ax.json`, `mcp` family added, invariant 1 extended. §9: docs-confidence item covers both files; codex `-p` item closed; residual-window item added. |
+ | `0.2.0-draft` | Decision 0013 D6 applied. §4 reordered fragment-first and grown to six steps: the managed home from the fragment is `LaunchRequest.Home` (D6.1, M7); the plan is requested as `LaunchModeInteractive` with an empty `Composition` and the launcher spells no provider flag (D5, M2); launcher-owned model/effort default precedence — flags, lockable `defaults.json` machine configuration, lineup fallback — with the resolved pair printed every launch (D6.2, M8); the composition rule with argv order as contract, the MCP channel applied by the launcher, the four-layer environment, and the literal-versus-lookup `env_names` collision rule (D6.3, F5); tracked mode specified as `ax start <name> --provider <id> --launch-plan - [--profile] --workspace <cwd>` with the request document, the four `works.relux.curator.*` extension keys, the `profile-pin` as the lock hash, session-name derivation, and Structured Error pass-through (D6.4). §3 gains `--name` and `--ax-profile`; §4.2 gains the `ax` provider-id column; §6 gains the `defaults` family; §7 requires the interactive-mode module release; §1 non-goals restated (D6.5). §5 unchanged apart from renumbered cross-references. |
+ | `0.1.2-draft` | §5.1 probe re-keyed from the fragment's descriptor list to the environment adapter's closed file-channel filename set, run on every launch into a managed home regardless of the fragment's `system_prompt` section; false stray-file drift-and-repair claim removed — a stray file at a registry filename is unmanaged, no automated contract removes it, and every launcher-mediated launch warns until the operator removes it; native/hand-launch and probe-to-exec race residuals recorded in §9. |
+-| `0.1.1-draft` | §5 restructured (§5.1/§5.2): file-kind channel semantics specified — launcher never places, removes, or edits the files; pre-exec presence probe; warnings mandatory for an active file-kind channel without the `--system-prompt` opt-in; orthogonal-and-additive selection when flag-class and file-kind coexist; `sysprompt_file_unreadable` diagnostic added. |
++| `0.1.1-draft` | §5 restructured (§5.1/§5.2): file-kind channel semantics specified — launcher never places, removes, or edits the files; pre-exec presence probe; warnings mandatory for an active file-kind channel without the `--system-prompt` opt-in; orthogonal-and-additive selection when flag-class and file-kind coexist (historical claim corrected by E5 in §5.1); `sysprompt_file_unreadable` diagnostic added. |
+ | `0.1.0-draft` | Initial in-repository draft. |
+ 
+ ## 9. Open items
+@@ -926,15 +939,17 @@ reordered.
+   session refusal. Whether `ax` independently filters these values is
+   unknown here. This is a recorded limit, not a new `ax` field, schema,
+   implementation, or permission bypass (Decision 0013 open question 6).
+-- The §5.1 warning contract is complete only for launcher-mediated
+-  launches, and the probe is a point-in-time check. Two residuals are
+-  known and accepted in this revision: a tool started by hand in a
+-  managed home applies a present file-kind file with no probe and no
+-  warning (§1: the launcher is never mandatory), and a file written
+-  between the §5.1 probe and the tool's own startup read goes
+-  undetected. Neither residual is closable from the launcher's seat;
+-  closing the first would require the tool or Curator to warn, which
+-  the cited protocol does not provide.
++- The §5.1 probe observes only the two registry-named managed-home
++  paths at one point in time, not all native prompt sources. Three
++  residuals are accepted: native/hand launches have no launcher probe or
++  warning and follow native precedence; files changed between the probe
++  and startup read go undetected; and trusted project-local
++  `<cwd>/.pi/SYSTEM.md` / `APPEND_SYSTEM.md` are not probed and win over
++  home files when same-semantics flags have not suppressed discovery.
++  Native arguments remain uninspected (§3). Home-file absence therefore
++  cannot attest absence of native customization, even on a
++  launcher-mediated run. No project probe, home writer, or tool-side
++  warning is added by this revision.
+ - **Implementability.** The behavioral contract of this revision is
+   implementable only once two upstream changes land: the
+   `ax start --launch-plan` operation (Decision 0013 D3, carried by the
+diff --git a/go.mod b/go.mod
+index 07105c4..6300aeb 100644
+--- a/go.mod
++++ b/go.mod
+@@ -1,3 +1,7 @@
+ module github.com/relux-works/curator-agent-launcher
+ 
+-go 1.23
++go 1.25.5
++
++require github.com/relux-works/skill-agents-management v0.5.10
++
++require github.com/pelletier/go-toml/v2 v2.4.3 // indirect
+diff --git a/go.sum b/go.sum
+new file mode 100644
+index 0000000..cb11879
+--- /dev/null
++++ b/go.sum
+@@ -0,0 +1,4 @@
++github.com/pelletier/go-toml/v2 v2.4.3 h1:GTRvJQutkOSftxIFD5xw9aepkYNuPWmVJpffdDPYVpY=
++github.com/pelletier/go-toml/v2 v2.4.3/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
++github.com/relux-works/skill-agents-management v0.5.10 h1:mrpOOLcW+YaNvwdsQldULZ7H5WLTSoZoUVgFvLdinAQ=
++github.com/relux-works/skill-agents-management v0.5.10/go.mod h1:wi+oH6fVUBF0bBOPs2bU7iyUhJveSAFh369CQB91ryk=
+diff --git a/internal/axconfig/config.go b/internal/axconfig/config.go
+new file mode 100644
+index 0000000..7b2ef90
+--- /dev/null
++++ b/internal/axconfig/config.go
+@@ -0,0 +1,121 @@
++// Package axconfig reads SPEC §4.6 machine-first tracking policy without writes.
++package axconfig
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++)
++
++const CodeInvalid = "defaults_config_invalid"
++
++type Error struct {
++	Path string
++	Err  error
++}
++
++func (e *Error) Error() string { return fmt.Sprintf("%s: %s: %v", CodeInvalid, e.Path, e.Err) }
++func (e *Error) Unwrap() error { return e.Err }
++
++// Load takes explicit configuration directories. Call before cli.Parse and pass
++// the returned fact as cli.Options.AxConfigured. Machine policy wins even when
++// false: the ignored operator path is never inspected. Missing directories are
++// absence; dangling symlinks, non-directory ancestors and failed reads are not.
++func Load(machineDir, operatorDir string) (bool, error) {
++	for _, dir := range []string{machineDir, operatorDir} {
++		path := filepath.Join(dir, "ax.json")
++		present, err := exists(path)
++		if err != nil {
++			return false, &Error{path, err}
++		}
++		if !present {
++			continue
++		}
++		data, err := os.ReadFile(path)
++		if err != nil {
++			return false, &Error{path, err}
++		}
++		enabled, err := parse(data)
++		if err != nil {
++			return false, &Error{path, err}
++		}
++		return enabled, nil
++	}
++	return false, nil
++}
++
++func exists(path string) (bool, error) {
++	// Walk ancestors first so ENOENT through a dangling link cannot become absence.
++	parent := filepath.Dir(path)
++	if parent != path {
++		present, err := directory(parent)
++		if err != nil || !present {
++			return false, err
++		}
++	}
++	info, err := os.Lstat(path)
++	if os.IsNotExist(err) {
++		return false, nil
++	}
++	if err != nil {
++		return false, err
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		info, err = os.Stat(path)
++	}
++	if err != nil {
++		return false, err
++	}
++	if !info.Mode().IsRegular() {
++		return false, fmt.Errorf("not a regular file")
++	}
++	return true, nil
++}
++
++func directory(path string) (bool, error) {
++	parent := filepath.Dir(path)
++	if parent != path {
++		present, err := directory(parent)
++		if err != nil || !present {
++			return false, err
++		}
++	}
++	info, err := os.Lstat(path)
++	if os.IsNotExist(err) {
++		return false, nil
++	}
++	if err != nil {
++		return false, err
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		info, err = os.Stat(path)
++	}
++	if err != nil {
++		return false, err
++	}
++	if !info.IsDir() {
++		return false, fmt.Errorf("ancestor %s is not a directory", path)
++	}
++	return true, nil
++}
++
++func parse(data []byte) (bool, error) {
++	v, err := fragment.ParseJSON(data)
++	if err != nil {
++		return false, err
++	}
++	if v.Kind != fragment.KindObject || len(v.Obj) != 2 {
++		return false, fmt.Errorf("expected exactly schema and enabled")
++	}
++	schema, _ := v.Get("schema")
++	enabled, _ := v.Get("enabled")
++	if schema.Kind != fragment.KindString || schema.Str != "curator-run-ax-v1" {
++		return false, fmt.Errorf("invalid schema")
++	}
++	if enabled.Kind != fragment.KindBool {
++		return false, fmt.Errorf("enabled must be a boolean")
++	}
++	return enabled.Bool, nil
++}
+diff --git a/internal/axconfig/config_test.go b/internal/axconfig/config_test.go
+new file mode 100644
+index 0000000..b61982b
+--- /dev/null
++++ b/internal/axconfig/config_test.go
+@@ -0,0 +1,145 @@
++package axconfig_test
++
++import (
++	"errors"
++	"os"
++	"path/filepath"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/axconfig"
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++)
++
++func put(t *testing.T, dir, data string) {
++	t.Helper()
++	if err := os.MkdirAll(dir, 0700); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "ax.json"), []byte(data), 0600); err != nil {
++		t.Fatal(err)
++	}
++}
++
++const yes = `{"schema":"curator-run-ax-v1","enabled":true}`
++const no = `{"schema":"curator-run-ax-v1","enabled":false}`
++
++func TestLoadPrecedenceBeforeParse(t *testing.T) {
++	root := t.TempDir()
++	machine := filepath.Join(root, "machine")
++	operator := filepath.Join(root, "operator")
++	enabled, err := axconfig.Load(machine, operator)
++	if err != nil || enabled {
++		t.Fatalf("absent: %v %v", enabled, err)
++	}
++	put(t, operator, yes)
++	enabled, err = axconfig.Load(machine, operator)
++	if err != nil || !enabled {
++		t.Fatalf("operator: %v %v", enabled, err)
++	}
++	inv, err := cli.Parse([]string{"codex_cli", "--ax-profile", "yolo"}, cli.Options{AxConfigured: enabled})
++	if err != nil || !inv.Tracked {
++		t.Fatal(inv, err)
++	}
++	put(t, machine, no)
++	put(t, operator, "broken")
++	enabled, err = axconfig.Load(machine, operator)
++	if err != nil || enabled {
++		t.Fatalf("machine false ignores invalid operator: %v %v", enabled, err)
++	}
++	if _, err = cli.Parse([]string{"codex_cli", "--ax-profile", "yolo"}, cli.Options{AxConfigured: enabled}); !cli.IsUsage(err) {
++		t.Fatal(err)
++	}
++	// The ignored operator isn't even traversed: a dangling directory is harmless.
++	ignored := filepath.Join(root, "ignored")
++	if err = os.Symlink(filepath.Join(root, "missing"), ignored); err != nil {
++		t.Fatal(err)
++	}
++	put(t, machine, yes)
++	enabled, err = axconfig.Load(machine, ignored)
++	if err != nil || !enabled {
++		t.Fatal(enabled, err)
++	}
++}
++func TestLoadClosedSchema(t *testing.T) {
++	cases := map[string]string{
++		"unknown":          `{"schema":"curator-run-ax-v1","enabled":true,"locked":false}`,
++		"duplicate":        `{"schema":"curator-run-ax-v1","enabled":false,"enabled":true}`,
++		"schema_duplicate": `{"schema":"bad","schema":"curator-run-ax-v1","enabled":true}`,
++		"missing_enabled":  `{"schema":"curator-run-ax-v1"}`,
++		"missing_schema":   `{"enabled":true}`, "bad_schema": `{"schema":"other","enabled":true}`,
++		"schema_type": `{"schema":true,"enabled":true}`,
++		"string":      `{"schema":"curator-run-ax-v1","enabled":"true"}`,
++		"null":        `{"schema":"curator-run-ax-v1","enabled":null}`,
++		"number":      `{"schema":"curator-run-ax-v1","enabled":1}`,
++		"array":       `[]`, "trailing": yes + `{}`, "malformed": `{`,
++	}
++	for name, data := range cases {
++		t.Run(name, func(t *testing.T) {
++			root := t.TempDir()
++			m := filepath.Join(root, "m")
++			o := filepath.Join(root, "o")
++			put(t, m, data)
++			put(t, o, yes)
++			_, err := axconfig.Load(m, o)
++			var invalid *axconfig.Error
++			if !errors.As(err, &invalid) || invalid.Path != filepath.Join(m, "ax.json") {
++				t.Fatalf("admitted invalid machine: %v", err)
++			}
++			if err = os.Remove(filepath.Join(m, "ax.json")); err != nil {
++				t.Fatal(err)
++			}
++			put(t, o, data)
++			if _, err = axconfig.Load(m, o); !errors.As(err, &invalid) {
++				t.Fatalf("admitted invalid operator: %v", err)
++			}
++		})
++	}
++}
++func TestLoadFilesystemFailures(t *testing.T) {
++	for _, kind := range []string{"directory", "fifo", "dangling_file", "dangling_ancestor", "file_ancestor", "unreadable_file", "unreadable_ancestor"} {
++		t.Run(kind, func(t *testing.T) {
++			root := t.TempDir()
++			m := filepath.Join(root, "m")
++			o := filepath.Join(root, "o")
++			put(t, o, yes)
++			put(t, m, yes)
++			path := filepath.Join(m, "ax.json")
++			switch kind {
++			case "directory":
++				os.Remove(path)
++				os.Mkdir(path, 0700)
++			case "fifo":
++				os.Remove(path)
++				makeFIFO(t, path)
++			case "dangling_file":
++				os.Remove(path)
++				os.Symlink(filepath.Join(root, "missing"), path)
++			case "dangling_ancestor":
++				os.Remove(path)
++				os.Remove(m)
++				os.Symlink(filepath.Join(root, "missing"), m)
++			case "file_ancestor":
++				os.Remove(path)
++				os.Remove(m)
++				os.WriteFile(m, []byte("file"), 0600)
++			case "unreadable_file":
++				if os.Geteuid() == 0 {
++					t.Skip("root bypasses permission refusal")
++				}
++				os.Chmod(path, 0000)
++				defer os.Chmod(path, 0600)
++			case "unreadable_ancestor":
++				if os.Geteuid() == 0 {
++					t.Skip("root bypasses permission refusal")
++				}
++				os.Chmod(m, 0000)
++				defer os.Chmod(m, 0700)
++			}
++			_, err := axconfig.Load(m, o)
++			var invalid *axconfig.Error
++			if !errors.As(err, &invalid) {
++				t.Fatalf("failure became fallback: %v", err)
++			}
++		})
++	}
++}
+diff --git a/internal/axconfig/fifo_test.go b/internal/axconfig/fifo_test.go
+new file mode 100644
+index 0000000..27787dd
+--- /dev/null
++++ b/internal/axconfig/fifo_test.go
+@@ -0,0 +1,13 @@
++package axconfig_test
++
++import (
++	"syscall"
++	"testing"
++)
++
++func makeFIFO(t *testing.T, path string) {
++	t.Helper()
++	if err := syscall.Mkfifo(path, 0600); err != nil {
++		t.Fatal(err)
++	}
++}
+diff --git a/internal/composition/composition.go b/internal/composition/composition.go
+new file mode 100644
+index 0000000..779a73e
+--- /dev/null
++++ b/internal/composition/composition.go
+@@ -0,0 +1,152 @@
++// Package composition implements SPEC §4.5 over an already admitted plan.
++// It does not build plans, select prompt policy, admit providers, or execute.
++package composition
++
++import (
++	"encoding/base64"
++	"fmt"
++	"maps"
++	"slices"
++	"sort"
++	"strings"
++	"unicode/utf8"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++// ChildEnvironment is the ownership surface of agentic.System. Pass the same
++// system and request used to obtain Plan. A second BuildPlan is neither needed
++// nor permitted: only ChildEnv over a nil parent defines owned literals.
++type ChildEnvironment interface {
++	ChildEnv(parent []string, req agentic.LaunchRequest) ([]string, error)
++}
++
++// PromptApplication is the already selected and encoded §5 channel application.
++// Its Env contains only engaged variable-channel literals. File channels have
++// no argv/env contribution. Selection, reading, encoding and file checks belong
++// to §5; this API does not invent a policy for them.
++type PromptApplication struct {
++	Argv []string
++	Env  map[string]string
++}
++
++// Stdin is the D4 wire representation. A nil pointer means unattached.
++type Stdin struct {
++	Encoding string `json:"encoding"`
++	Bytes    string `json:"bytes"`
++}
++
++// Value carries direct execution data and tracked transport data separately.
++// JSON contains only the composition-owned subset of a tracked document; the
++// execution layer must add schema_version and extensions before handing to ax.
++// Binary is never an argv element. Env is the FULL direct-execution environment
++// and must never be serialized into a tracked request.
++type Value struct {
++	Binary      string               `json:"-"`
++	WorkDir     string               `json:"-"`
++	Argv        []string             `json:"argv_suffix"`
++	Env         []string             `json:"-"`
++	RawStdin    agentic.StdinPayload `json:"-"`
++	EnvLiterals map[string]string    `json:"env_literals"`
++	EnvNames    []string             `json:"env_names"`
++	Stdin       *Stdin               `json:"stdin"`
++	// Warnings are mode-independent and name variables only. Both execution
++	// paths must print them to stderr before launch.
++	Warnings []string `json:"-"`
++	mcpLayer string
++}
++
++// Compose consumes a validated fragment, an admitted single-process plan, and
++// the same system/request that produced that plan. Native is appended verbatim,
++// including duplicate provider flags. Inputs are not modified or retained.
++func Compose(plan agentic.Plan, system ChildEnvironment, req agentic.LaunchRequest, frag fragment.Fragment, prompt PromptApplication, native []string) (Value, error) {
++	ownEnv, err := system.ChildEnv(nil, req)
++	if err != nil {
++		return Value{}, fmt.Errorf("composition child environment: %w", err)
++	}
++	own := envMap(ownEnv)
++	env := envMap(plan.Env)
++	literals := maps.Clone(own)
++	v := Value{Binary: plan.Binary, WorkDir: plan.WorkDir, Argv: append([]string{}, plan.Argv...), EnvNames: []string{}, EnvLiterals: literals,
++		RawStdin: agentic.StdinPayload{Attached: plan.Stdin.Attached, Bytes: slices.Clone(plan.Stdin.Bytes)}}
++	warned := map[string]bool{}
++	overlay := func(layer map[string]string) {
++		for _, name := range sortedKeys(layer) {
++			if _, ok := own[name]; ok && !warned[name] {
++				v.Warnings = append(v.Warnings, "environment override: "+name)
++				warned[name] = true
++			}
++			env[name], literals[name] = layer[name], layer[name]
++		}
++	}
++	overlay(frag.Env)
++	v.Argv = append(v.Argv, prompt.Argv...)
++	overlay(prompt.Env)
++	if frag.MCP != nil {
++		for _, ch := range frag.MCP.Channels {
++			switch ch.Kind {
++			case fragment.KindFlag:
++				arg := frag.MCP.Path
++				if ch.Argument == fragment.ArgumentName {
++					arg = ch.Name
++				}
++				v.Argv = append(v.Argv, ch.Flag, arg)
++				v.Argv = append(v.Argv, ch.With...)
++			case fragment.KindVariable:
++				overlay(map[string]string{ch.Variable: frag.MCP.Path})
++			}
++		}
++		if frag.Environment == fragment.EnvCodexCLI {
++			v.mcpLayer = frag.MCP.Path
++		}
++		seen := map[string]bool{}
++		for _, name := range frag.MCP.EnvNames {
++			if seen[name] {
++				continue
++			}
++			seen[name] = true
++			if _, collision := literals[name]; collision {
++				v.Warnings = append(v.Warnings, "environment literal replaces lookup: "+name)
++			} else {
++				v.EnvNames = append(v.EnvNames, name)
++			}
++		}
++	}
++	sort.Strings(v.EnvNames)
++	v.Argv = append(v.Argv, native...)
++	for _, name := range sortedKeys(env) {
++		v.Env = append(v.Env, name+"="+env[name])
++	}
++	// A non-nil empty environment must remain distinct from os/exec's nil inherit.
++	if v.Env == nil {
++		v.Env = []string{}
++	}
++	if plan.Stdin.Attached {
++		v.Stdin = &Stdin{Encoding: "utf-8", Bytes: string(plan.Stdin.Bytes)}
++		if !utf8.Valid(plan.Stdin.Bytes) {
++			v.Stdin.Encoding = "base64url"
++			v.Stdin.Bytes = base64.RawURLEncoding.EncodeToString(plan.Stdin.Bytes)
++		}
++	}
++	return v, nil
++}
++
++func envMap(values []string) map[string]string {
++	out := map[string]string{}
++	for _, entry := range values {
++		if name, value, ok := strings.Cut(entry, "="); ok {
++			out[name] = value
++		}
++	}
++	return out
++}
++
++func sortedKeys(m map[string]string) []string {
++	names := make([]string, 0, len(m))
++	for name := range m {
++		names = append(names, name)
++	}
++	sort.Strings(names)
++	return names
++}
+diff --git a/internal/composition/composition_test.go b/internal/composition/composition_test.go
+new file mode 100644
+index 0000000..843007f
+--- /dev/null
++++ b/internal/composition/composition_test.go
+@@ -0,0 +1,302 @@
++package composition_test
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++)
++
++type owner struct {
++	t     *testing.T
++	req   agentic.LaunchRequest
++	env   []string
++	err   error
++	calls int
++}
++
++func (o *owner) ChildEnv(parent []string, req agentic.LaunchRequest) ([]string, error) {
++	o.t.Helper()
++	o.calls++
++	if parent != nil || !reflect.DeepEqual(req, o.req) {
++		o.t.Fatal("ownership must use nil parent and exact request")
++	}
++	return o.env, o.err
++}
++func equal(t *testing.T, got, want any) {
++	t.Helper()
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("got %#v; want %#v", got, want)
++	}
++}
++func parsed(t *testing.T, env, path string, names []string) fragment.Fragment {
++	t.Helper()
++	home := filepath.Dir(path)
++	f := map[string]any{"fragment": fragment.Identity, "environment": env, "profile": map[string]any{"name": "default", "lock_sha256": strings.Repeat("a", 64)}, "precedence": map[string]string{"winner": "higher-weight", "placement": "winner-last"}, "env": map[string]string{fragment.HomeVariable(env): home}}
++	if env != "pi" {
++		ch := map[string]any{"kind": "flag", "flag": "--mcp-config", "argument": "path", "with": []string{"--strict-mcp-config"}}
++		if env == "codex_cli" {
++			ch = map[string]any{"kind": "flag", "flag": "-p", "argument": "name", "name": "curator-mcp"}
++		}
++		if env == "opencode" {
++			ch = map[string]any{"kind": "variable", "variable": "OPENCODE_CONFIG"}
++		}
++		if names == nil {
++			names = []string{}
++		}
++		f["mcp"] = map[string]any{"path": path, "env_names": names, "channels": []any{ch}}
++	}
++	b, err := json.Marshal(f)
++	if err != nil {
++		t.Fatal(err)
++	}
++	frag, err := fragment.Parse(b)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return *frag
++}
++func TestComposeOrderAndChannels(t *testing.T) {
++	for _, env := range []string{"claude_code", "codex_cli", "opencode", "pi"} {
++		t.Run(env, func(t *testing.T) {
++			f := parsed(t, env, "/managed/default/tool/mcp.json", nil)
++			p := agentic.Plan{System: "pi-native", Binary: "/exact/bin", WorkDir: "/exact/work", Argv: []string{"--model", "model with spaces", "--effort", "medium"}, Env: []string{"PATH=/sanitized"}}
++			native := []string{"", "-p", "operator", "--dangerously-skip-permissions", "a\nb", "--", "--model=literal"}
++			prompt := composition.PromptApplication{Argv: []string{"--selected-prompt", "verbatim content"}, Env: map[string]string{"PROMPT_CHANNEL": "selected"}}
++			o := &owner{t: t}
++			v, err := composition.Compose(p, o, agentic.LaunchRequest{}, f, prompt, native)
++			if err != nil {
++				t.Fatal(err)
++			}
++			want := []string{"--model", "model with spaces", "--effort", "medium", "--selected-prompt", "verbatim content"}
++			switch env {
++			case "claude_code":
++				want = append(want, "--mcp-config", f.MCP.Path, "--strict-mcp-config")
++			case "codex_cli":
++				want = append(want, "-p", "curator-mcp")
++			case "opencode":
++				equal(t, v.EnvLiterals["OPENCODE_CONFIG"], f.MCP.Path)
++			}
++			want = append(want, native...)
++			equal(t, v.Argv, want)
++			equal(t, v.Binary, p.Binary)
++			equal(t, v.WorkDir, p.WorkDir)
++			equal(t, o.calls, 1)
++			equal(t, v.EnvLiterals["PROMPT_CHANNEL"], "selected")
++			p.Argv[0] = "changed"
++			native[0] = "changed"
++			prompt.Argv[0] = "changed"
++			prompt.Env["PROMPT_CHANNEL"] = "changed"
++			f.Env[fragment.HomeVariable(env)] = "changed"
++			equal(t, v.Argv, want)
++			equal(t, v.EnvLiterals["PROMPT_CHANNEL"], "selected")
++		})
++	}
++}
++func TestComposeEnvironmentBoundary(t *testing.T) {
++	req := agentic.LaunchRequest{Env: []string{"REMOVED=must-not-return", "PATH=/unsafe", "SECRET=inherited-secret"}, Home: "/same/request"}
++	p := agentic.Plan{Env: []string{"HOME=/parent", "PATH=/sanitized", "SECRET=inherited-secret", "FIGMA_API_KEY=source-secret", "OWN=old=literal", "EMPTY="}}
++	f := parsed(t, "opencode", "/managed/default/tool/mcp.json", []string{"CHANNEL", "FIGMA_API_KEY", "OWN"})
++	o := &owner{t: t, req: req, env: []string{"OWN=owned-value", "XDG_CONFIG_HOME=owned-home", "CHANNEL=owned-channel"}}
++	v, err := composition.Compose(p, o, req, f, composition.PromptApplication{Env: map[string]string{"CHANNEL": "channel-value"}}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	equal(t, v.EnvNames, []string{"FIGMA_API_KEY"})
++	equal(t, v.EnvLiterals, map[string]string{"OWN": "owned-value", "CHANNEL": "channel-value", "XDG_CONFIG_HOME": "/managed/default/tool", "OPENCODE_CONFIG": f.MCP.Path})
++	equal(t, v.Env, []string{"CHANNEL=channel-value", "EMPTY=", "FIGMA_API_KEY=source-secret", "HOME=/parent", "OPENCODE_CONFIG=" + f.MCP.Path, "OWN=old=literal", "PATH=/sanitized", "SECRET=inherited-secret", "XDG_CONFIG_HOME=/managed/default/tool"})
++	equal(t, v.Warnings, []string{"environment override: XDG_CONFIG_HOME", "environment override: CHANNEL", "environment literal replaces lookup: CHANNEL", "environment literal replaces lookup: OWN"})
++	b, err := json.Marshal(v)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, secret := range []string{"inherited-secret", "source-secret", "/parent", "/sanitized", "REMOVED"} {
++		if strings.Contains(string(b), secret) {
++			t.Fatalf("serialized inherited data: %s", secret)
++		}
++	}
++	equal(t, o.calls, 1)
++}
++func TestComposeUnownedOverrideNoWarning(t *testing.T) {
++	f := parsed(t, "pi", "/managed/default/pi/prompt", nil)
++	v, err := composition.Compose(agentic.Plan{Env: []string{"PI_CODING_AGENT_DIR=/inherited"}}, &owner{t: t}, agentic.LaunchRequest{}, f, composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	equal(t, len(v.Warnings), 0)
++}
++func TestComposeStdin(t *testing.T) {
++	for _, tc := range []struct {
++		name     string
++		attached bool
++		data     []byte
++		wire     string
++	}{
++		{"unattached", false, []byte("ignored"), "null"}, {"empty", true, nil, `{"encoding":"utf-8","bytes":""}`}, {"utf8", true, []byte("hello 日本語\n"), `{"encoding":"utf-8","bytes":"hello 日本語\n"}`}, {"binary", true, []byte{255, 254}, `{"encoding":"base64url","bytes":"__4"}`},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			data := append([]byte(nil), tc.data...)
++			v, err := composition.Compose(agentic.Plan{Stdin: agentic.StdinPayload{Attached: tc.attached, Bytes: data}}, &owner{t: t}, agentic.LaunchRequest{}, parsed(t, "pi", "/managed/default/pi/prompt", nil), composition.PromptApplication{}, nil)
++			if err != nil {
++				t.Fatal(err)
++			}
++			b, err := json.Marshal(v.Stdin)
++			if err != nil {
++				t.Fatal(err)
++			}
++			equal(t, string(b), tc.wire)
++			equal(t, v.RawStdin, agentic.StdinPayload{Attached: tc.attached, Bytes: tc.data})
++			if len(data) > 0 {
++				data[0] = 0
++				equal(t, v.RawStdin.Bytes, tc.data)
++			}
++		})
++	}
++}
++func TestComposeOwnershipFailure(t *testing.T) {
++	sentinel := errors.New("ownership failed")
++	v, err := composition.Compose(agentic.Plan{}, &owner{t: t, err: sentinel}, agentic.LaunchRequest{}, fragment.Fragment{}, composition.PromptApplication{}, nil)
++	if !errors.Is(err, sentinel) {
++		t.Fatalf("lost failure: %v", err)
++	}
++	equal(t, v, composition.Value{})
++}
++func TestComposeEmptyEnvironment(t *testing.T) {
++	v, err := composition.Compose(agentic.Plan{}, &owner{t: t}, agentic.LaunchRequest{}, fragment.Fragment{}, composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if v.Env == nil {
++		t.Fatal("nil environment would inherit parent in os/exec")
++	}
++}
++func TestLaunchBoundaryFilesystem(t *testing.T) {
++	for _, kind := range []string{"missing", "regular", "directory", "dangling", "symlink", "unreadable", "parent-file"} {
++		t.Run(kind, func(t *testing.T) {
++			dir := t.TempDir()
++			path := filepath.Join(dir, "layer.toml")
++			write := func(p string) {
++				t.Helper()
++				if err := os.WriteFile(p, []byte("mcp"), 0600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			switch kind {
++			case "regular":
++				write(path)
++			case "directory":
++				if err := os.Mkdir(path, 0700); err != nil {
++					t.Fatal(err)
++				}
++			case "dangling":
++				if err := os.Symlink(filepath.Join(dir, "absent"), path); err != nil {
++					t.Fatal(err)
++				}
++			case "symlink":
++				target := filepath.Join(dir, "target")
++				write(target)
++				if err := os.Symlink(target, path); err != nil {
++					t.Fatal(err)
++				}
++			case "unreadable":
++				write(path)
++				if err := os.Chmod(path, 0); err != nil {
++					t.Fatal(err)
++				}
++				t.Cleanup(func() { _ = os.Chmod(path, 0600) })
++				if os.Geteuid() == 0 {
++					t.Skip("root bypasses Unix file permissions")
++				}
++			case "parent-file":
++				write(path)
++				path = filepath.Join(path, "child")
++			}
++			f := parsed(t, "codex_cli", path, nil)
++			v, err := composition.Compose(agentic.Plan{}, &owner{t: t}, agentic.LaunchRequest{}, f, composition.PromptApplication{}, []string{"-p", "operator"})
++			if err != nil {
++				t.Fatal("composition must not probe early", err)
++			}
++			err = v.CheckLaunchBoundary()
++			if kind == "regular" || kind == "symlink" {
++				if err != nil {
++					t.Fatal(err)
++				}
++			} else {
++				code := composition.CodeMCPLayerUnreadable
++				if kind == "missing" {
++					code = composition.CodeMCPLayerMissing
++				}
++				var layer *composition.LayerError
++				if !errors.As(err, &layer) {
++					t.Fatalf("expected %s, got %v", code, err)
++				}
++				equal(t, layer.Code, code)
++				equal(t, layer.Path, path)
++			}
++			equal(t, v.Argv, []string{"-p", "curator-mcp", "-p", "operator"})
++		})
++	}
++}
++func TestLaunchBoundaryLateReplacement(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "layer.toml")
++	v, err := composition.Compose(agentic.Plan{}, &owner{t: t}, agentic.LaunchRequest{}, parsed(t, "codex_cli", path, nil), composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(path, nil, 0600); err != nil {
++		t.Fatal(err)
++	}
++	if err := v.CheckLaunchBoundary(); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(path); err != nil {
++		t.Fatal(err)
++	}
++	var layer *composition.LayerError
++	if !errors.As(v.CheckLaunchBoundary(), &layer) || layer.Code != composition.CodeMCPLayerMissing {
++		t.Fatal("late deletion admitted")
++	}
++	if err := os.Mkdir(path, 0700); err != nil {
++		t.Fatal(err)
++	}
++	if !errors.As(v.CheckLaunchBoundary(), &layer) || layer.Code != composition.CodeMCPLayerUnreadable {
++		t.Fatal("late replacement admitted")
++	}
++}
++func TestLaunchBoundaryUnengaged(t *testing.T) {
++	f := parsed(t, "codex_cli", "/missing/layer", nil)
++	f.MCP = nil
++	v, err := composition.Compose(agentic.Plan{}, &owner{t: t}, agentic.LaunchRequest{}, f, composition.PromptApplication{}, []string{"-p", "operator"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := v.CheckLaunchBoundary(); err != nil {
++		t.Fatal(err)
++	}
++	equal(t, v.Argv, []string{"-p", "operator"})
++}
++
++// This exercises the real released ownership surface, not native Pi admission.
++func TestComposeReleasedChildEnvironment(t *testing.T) {
++	sys := codex.New()
++	req := agentic.LaunchRequest{Env: []string{"PATH=/usr/bin:/tmp/codex-path", "HOME=/parent", "SECRET=inherited-secret", "CODEX_THREAD_ID=removed", "TASK_BOARD_RUN_ID=removed", "FIGMA_API_KEY=local-secret"}}
++	env, err := sys.ChildEnv(req.Env, req)
++	if err != nil {
++		t.Fatal(err)
++	}
++	v, err := composition.Compose(agentic.Plan{Env: env}, sys, req, parsed(t, "codex_cli", "/managed/default/codex/layer.toml", []string{"FIGMA_API_KEY"}), composition.PromptApplication{}, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	equal(t, v.Env, []string{"CODEX_HOME=/managed/default/codex", "FIGMA_API_KEY=local-secret", "HOME=/parent", "PATH=/usr/bin", "SECRET=inherited-secret"})
++	equal(t, v.EnvLiterals, map[string]string{"CODEX_HOME": "/managed/default/codex"})
++	equal(t, v.EnvNames, []string{"FIGMA_API_KEY"})
++}
+diff --git a/internal/composition/probe.go b/internal/composition/probe.go
+new file mode 100644
+index 0000000..9423c8d
+--- /dev/null
++++ b/internal/composition/probe.go
+@@ -0,0 +1,64 @@
++package composition
++
++import (
++	"errors"
++	"fmt"
++	"os"
++)
++
++const (
++	CodeMCPLayerMissing    = "mcp_layer_missing"
++	CodeMCPLayerUnreadable = "mcp_layer_unreadable"
++)
++
++// LayerError distinguishes actual absence from a failed or nonregular read.
++type LayerError struct {
++	Code string
++	Path string
++	Err  error
++}
++
++func (e *LayerError) Error() string { return fmt.Sprintf("%s: %s: %v", e.Code, e.Path, e.Err) }
++func (e *LayerError) Unwrap() error { return e.Err }
++
++// CheckLaunchBoundary probes the codex MCP layer afresh on every invocation.
++// The execution Story MUST call this immediately before BOTH direct process
++// creation and ax handoff, alongside binary and §5 file-kind checks. Compose
++// deliberately never calls it: a successful early check is stale evidence.
++// This read-only check never removes flags, repairs files, or falls back.
++// As with any pathname probe, a replacement after this check remains a TOCTOU
++// bound; execution must minimize that window, not treat this as an open handle.
++func (v Value) CheckLaunchBoundary() error {
++	if v.mcpLayer == "" {
++		return nil
++	}
++	path := v.mcpLayer
++	fail := func(code string, err error) error { return &LayerError{Code: code, Path: path, Err: err} }
++	_, err := os.Lstat(path)
++	if err != nil {
++		if errors.Is(err, os.ErrNotExist) {
++			return fail(CodeMCPLayerMissing, err)
++		}
++		return fail(CodeMCPLayerUnreadable, err)
++	}
++	info, err := os.Stat(path)
++	if err != nil {
++		return fail(CodeMCPLayerUnreadable, err)
++	}
++	if !info.Mode().IsRegular() {
++		return fail(CodeMCPLayerUnreadable, errors.New("not a regular file"))
++	}
++	f, err := os.Open(path)
++	if err != nil {
++		return fail(CodeMCPLayerUnreadable, err)
++	}
++	defer f.Close()
++	info, err = f.Stat()
++	if err != nil {
++		return fail(CodeMCPLayerUnreadable, err)
++	}
++	if !info.Mode().IsRegular() {
++		return fail(CodeMCPLayerUnreadable, errors.New("opened file is not regular"))
++	}
++	return nil
++}
+diff --git a/internal/execution/execution.go b/internal/execution/execution.go
+new file mode 100644
+index 0000000..2c8e3a2
+--- /dev/null
++++ b/internal/execution/execution.go
+@@ -0,0 +1,207 @@
++// Package execution implements the SPEC §4.6 process API over admitted inputs.
++// It does not select defaults, admit plans, or implement §5 prompt policy.
++package execution
++
++import (
++	"bytes"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"strings"
++	"time"
++
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/curator-agent-launcher/internal/mapping"
++)
++
++// Boundary is REQUIRED on every Run, including launches without an engaged
++// prompt. Integration must bind the real §5 file-kind probe here. Errors are
++// terminal and emitted before any process; there is no success default.
++type Boundary func() error
++
++type IO struct {
++	Stdin          io.Reader
++	Stdout, Stderr io.Writer
++}
++
++// Options controls transport, not admission. AxBinary is an optional explicit
++// executable path; empty resolves ax on the launcher's PATH. Tests always set
++// it to a fake helper. Ax inherits the launcher environment, never Value.Env.
++type Options struct {
++	IO       IO
++	AxBinary string
++	Boundary Boundary
++}
++
++type document struct {
++	Schema        string             `json:"schema"`
++	SchemaVersion string             `json:"schema_version"`
++	Argv          []string           `json:"argv_suffix"`
++	EnvNames      []string           `json:"env_names"`
++	EnvLiterals   map[string]string  `json:"env_literals"`
++	Stdin         *composition.Stdin `json:"stdin"`
++	Extensions    extensions         `json:"extensions"`
++}
++type extensions struct {
++	ProfileName    string `json:"works.relux.curator.profile-name"`
++	ProfilePin     string `json:"works.relux.curator.profile-pin"`
++	FragmentDigest string `json:"works.relux.curator.fragment-digest"`
++	SystemModules  bool   `json:"works.relux.curator.system-modules"`
++}
++
++// Launch is a prepared snapshot. Prepare belongs at composition time, so the
++// default UTC name does not drift while the launch waits. Run rechecks files.
++type Launch struct {
++	value    composition.Value
++	tracked  bool
++	argv     []string
++	document []byte
++}
++
++// Prepare consumes the actual Compose result, validated fragment and parsed
++// invocation with its mapped target. These are trusted typed pipeline inputs;
++// this layer does not reimplement fragment/CLI/admission validation.
++func Prepare(v composition.Value, f fragment.Fragment, inv cli.Invocation, target mapping.Target, at time.Time) (Launch, error) {
++	// Marshal now both snapshots the tracked transport and prevents later input
++	// mutations changing it. Copy direct slices separately for the same reason.
++	doc, err := json.Marshal(document{"urn:ax:schema:launch-plan-request", "1.0.0", v.Argv, v.EnvNames, v.EnvLiterals, v.Stdin,
++		extensions{f.Profile.Name, "sha256:" + f.Profile.LockSHA256, f.Digest, f.SystemPrompt != nil}})
++	if err != nil {
++		return Launch{}, err
++	}
++	v.Argv = append([]string{}, v.Argv...)
++	v.Env = append([]string{}, v.Env...)
++	v.RawStdin.Bytes = bytes.Clone(v.RawStdin.Bytes)
++	v.Warnings = append([]string{}, v.Warnings...)
++	name := inv.Name
++	if !inv.NameSet {
++		name = inv.EnvID + "-" + at.UTC().Format("20060102T150405Z")
++	}
++	argv := []string{"start", name, "--provider", target.Provider, "--launch-plan", "-"}
++	if inv.AxProfile != cli.AxProfileNone {
++		argv = append(argv, "--profile", string(inv.AxProfile))
++	}
++	argv = append(argv, "--workspace", v.WorkDir)
++	return Launch{v, inv.Tracked, argv, doc}, nil
++}
++
++// Run waits for the actual child. Direct mode shares supplied terminal file
++// descriptors (defaults: os.Stdin/out/err), never allocates a PTY or replaces the
++// launcher. Attached stdin uses exactly the plan bytes. Exit status is preserved,
++// with signal exits returned as 128+signal. The caller must exit with this code.
++// The child owns a separate foreground process group when a controlling terminal
++// is available. Parent-only signals are relayed to that group. Child stops
++// suspend the launcher, and continuation restores the child terminal ownership.
++func (l Launch) Run(opts Options) int {
++	streams := opts.IO
++	if streams.Stdin == nil {
++		streams.Stdin = os.Stdin
++	}
++	if streams.Stdout == nil {
++		streams.Stdout = os.Stdout
++	}
++	if streams.Stderr == nil {
++		streams.Stderr = os.Stderr
++	}
++	fail := func(err error) int { fmt.Fprintln(streams.Stderr, "curator-run: "+err.Error()); return 1 }
++	for _, warning := range l.value.Warnings {
++		fmt.Fprintln(streams.Stderr, "curator-run: "+warning)
++	}
++	if opts.Boundary == nil {
++		return fail(errors.New("launch_boundary_required: §5 boundary callback is required"))
++	}
++	// Build transport before the late checks to minimize the pathname race.
++	var cmd *exec.Cmd
++	var axStderr bytes.Buffer
++	if l.tracked {
++		binary := opts.AxBinary
++		if binary == "" {
++			binary = "ax"
++		}
++		cmd = exec.Command(binary, l.argv...)
++		cmd.Stdin = bytes.NewReader(l.document)
++		cmd.Stderr = &axStderr
++	} else {
++		cmd = &exec.Cmd{Args: append([]string{l.value.Binary}, l.value.Argv...), Env: append([]string{}, l.value.Env...), Stdin: streams.Stdin, Stderr: streams.Stderr}
++		if l.value.RawStdin.Attached {
++			cmd.Stdin = bytes.NewReader(l.value.RawStdin.Bytes)
++		}
++	}
++	cmd.Dir = l.value.WorkDir
++	cmd.Stdout = streams.Stdout
++	if err := opts.Boundary(); err != nil {
++		return fail(err)
++	}
++	binary, err := executable(l.value.Binary, l.value.WorkDir, l.value.Env)
++	if err != nil {
++		return fail(fmt.Errorf("exec_provider_missing: %s: install the provider executable and make it available on the launch PATH: %w", l.value.Binary, err))
++	}
++	if err := l.value.CheckLaunchBoundary(); err != nil {
++		return fail(err)
++	}
++	if !l.tracked {
++		cmd.Path = binary
++	}
++	err = run(cmd)
++	if l.tracked {
++		if err != nil {
++			fail(errors.New("ax_handoff_failed: ax could not take the launch"))
++			_, _ = streams.Stderr.Write(axStderr.Bytes())
++			return 1
++		}
++		_, _ = streams.Stderr.Write(axStderr.Bytes())
++		return 0
++	}
++	if err == nil {
++		return 0
++	}
++	var exit *processExit
++	if errors.As(err, &exit) {
++		if status := exit.status; status.Signaled() {
++			return 128 + int(status.Signal())
++		}
++		return exit.ExitCode()
++	}
++	return fail(fmt.Errorf("exec_provider_missing: %s: cannot execute provider: %w", l.value.Binary, err))
++}
++
++// Resolve a bare name against the FULL composed environment, not an unrelated
++// parent PATH. Relative entries and explicit paths are relative to WorkDir.
++func executable(binary, workdir string, env []string) (string, error) {
++	check := func(path string) (string, error) {
++		if !filepath.IsAbs(path) {
++			path = filepath.Join(workdir, path)
++		}
++		path, err := filepath.Abs(path)
++		if err != nil {
++			return "", err
++		}
++		info, err := os.Stat(path)
++		if err != nil {
++			return "", err
++		}
++		if !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
++			return "", os.ErrPermission
++		}
++		return path, nil
++	}
++	if strings.ContainsRune(binary, '/') {
++		return check(binary)
++	}
++	for _, entry := range env {
++		if path, ok := strings.CutPrefix(entry, "PATH="); ok {
++			for _, dir := range filepath.SplitList(path) {
++				if found, err := check(filepath.Join(dir, binary)); err == nil {
++					return found, nil
++				}
++			}
++		}
++	}
++	return "", exec.ErrNotFound
++}
+diff --git a/internal/execution/execution_test.go b/internal/execution/execution_test.go
+new file mode 100644
+index 0000000..dee2a5d
+--- /dev/null
++++ b/internal/execution/execution_test.go
+@@ -0,0 +1,510 @@
++package execution_test
++
++import (
++	"bufio"
++	"bytes"
++	"context"
++	"encoding/base64"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"reflect"
++	"sort"
++	"strings"
++	"syscall"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/execution"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/curator-agent-launcher/internal/mapping"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++)
++
++var helper, driver, python string
++
++func TestMain(m *testing.M) {
++	python, _ = exec.LookPath("python3")
++	dir, err := os.MkdirTemp("", "execution-helpers-")
++	if err != nil {
++		panic(err)
++	}
++	helper = filepath.Join(dir, "fake-ax-provider")
++	cmd := exec.Command("go", "build", "-o", helper, "./testdata/helper")
++	cmd.Stdout = os.Stdout
++	cmd.Stderr = os.Stderr
++	if err = cmd.Run(); err != nil {
++		os.RemoveAll(dir)
++		panic(err)
++	}
++	driver = filepath.Join(dir, "api-driver")
++	build := exec.Command("go", "build", "-o", driver, "./testdata/driver")
++	build.Stdout, build.Stderr = os.Stdout, os.Stderr
++	if err = build.Run(); err != nil {
++		os.RemoveAll(dir)
++		panic(err)
++	}
++	// All subprocess environment assertions use synthetic data only.
++	os.Clearenv()
++	os.Setenv("PATH", dir)
++	os.Setenv("AX_PARENT", "synthetic-parent")
++	code := m.Run()
++	os.RemoveAll(dir)
++	os.Exit(code)
++}
++
++type owner []string
++
++func (o owner) ChildEnv([]string, agentic.LaunchRequest) ([]string, error) { return o, nil }
++func equal(t *testing.T, got, want any) {
++	t.Helper()
++	if !reflect.DeepEqual(got, want) {
++		t.Fatalf("got %#v\nwant %#v", got, want)
++	}
++}
++func write(t *testing.T, path string, data []byte) {
++	t.Helper()
++	if err := os.WriteFile(path, data, 0600); err != nil {
++		t.Fatal(err)
++	}
++}
++func fixture(t *testing.T, env string, modules bool) (fragment.Fragment, string) {
++	t.Helper()
++	dir, err := filepath.EvalSymlinks(t.TempDir())
++	if err != nil {
++		t.Fatal(err)
++	}
++	path := filepath.Join(dir, "mcp.json")
++	write(t, path, []byte("{}"))
++	obj := map[string]any{"fragment": fragment.Identity, "environment": env, "profile": map[string]any{"name": "test-profile", "lock_sha256": strings.Repeat("b", 64)}, "precedence": map[string]any{"winner": "higher-weight", "placement": "winner-last"}, "env": map[string]string{fragment.HomeVariable(env): dir}}
++	if env != "pi" {
++		ch := map[string]any{"kind": "flag", "flag": "--mcp-config", "argument": "path", "with": []string{"--strict-mcp-config"}}
++		if env == "codex_cli" {
++			ch = map[string]any{"kind": "flag", "flag": "-p", "argument": "name", "name": "curator-mcp"}
++		}
++		obj["mcp"] = map[string]any{"path": path, "env_names": []string{"FIGMA_API_KEY"}, "channels": []any{ch}}
++	}
++	if modules {
++		channels := []any{map[string]any{"kind": "flag", "semantics": "append", "flag": "--append-system-prompt-file", "argument": "path"}, map[string]any{"kind": "flag", "semantics": "replace", "flag": "--system-prompt-file", "argument": "path"}}
++		if env == "codex_cli" {
++			channels = []any{map[string]any{"kind": "config-key", "semantics": "replace", "key": "model_instructions_file"}}
++		}
++		if env == "pi" {
++			channels = []any{map[string]any{"kind": "flag", "semantics": "append", "flag": "--append-system-prompt", "argument": "path"}, map[string]any{"kind": "file", "semantics": "append", "filename": "APPEND_SYSTEM.md"}, map[string]any{"kind": "file", "semantics": "replace", "filename": "SYSTEM.md"}}
++		}
++		obj["system_prompt"] = map[string]any{"path": filepath.Join(dir, "prompt.md"), "channels": channels}
++	}
++	data, err := json.Marshal(obj)
++	if err != nil {
++		t.Fatal(err)
++	}
++	f, err := fragment.Parse(data)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return *f, dir
++}
++
++var at = time.Date(2026, 9, 5, 10, 32, 54, 0, time.FixedZone("UTC+3", 10800))
++
++func prepare(t *testing.T, v composition.Value, f fragment.Fragment, tracked, explicit bool) execution.Launch {
++	t.Helper()
++	args := []string{f.Environment}
++	if explicit {
++		args = append(args, "--name", "chosen.name")
++		if tracked {
++			args = append(args, "--ax-profile", "yolo")
++		}
++	}
++	inv, err := cli.Parse(args, cli.Options{AxConfigured: tracked})
++	if err != nil {
++		t.Fatal(err)
++	}
++	target, err := mapping.Resolve(f.Environment)
++	if err != nil {
++		t.Fatal(err)
++	}
++	l, err := execution.Prepare(v, f, inv, target, at)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return l
++}
++
++type capture struct {
++	Argv, Env []string
++	Stdin     []byte
++	WorkDir   string
++}
++
++func run(t *testing.T, l execution.Launch, b execution.Boundary) (int, capture, string) {
++	t.Helper()
++	var out, stderr bytes.Buffer
++	code := l.Run(execution.Options{AxBinary: helper, Boundary: b, IO: execution.IO{Stdin: strings.NewReader("terminal input"), Stdout: &out, Stderr: &stderr}})
++	var c capture
++	if out.Len() > 0 {
++		if err := json.Unmarshal(out.Bytes(), &c); err != nil {
++			t.Fatalf("child output: %q: %v", out.Bytes(), err)
++		}
++	}
++	return code, c, stderr.String()
++}
++func compose(t *testing.T, f fragment.Fragment, dir string, stdin agentic.StdinPayload) composition.Value {
++	t.Helper()
++	v, err := composition.Compose(agentic.Plan{Binary: helper, WorkDir: dir, Argv: []string{"first plugin argument", "--model", "model with spaces"}, Env: []string{"FIGMA_API_KEY=inherited-secret", "OWN=old", "PARENT=only-direct"}, Stdin: stdin}, owner{"OWN=old"}, agentic.LaunchRequest{}, f, composition.PromptApplication{Argv: []string{"prompt channel"}, Env: map[string]string{"OWN": "override"}}, []string{"", "-p", "native", "--dangerously-skip-permissions", "a\nb"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return v
++}
++func TestRealProcessMatrix(t *testing.T) {
++	for _, env := range []string{"claude_code", "codex_cli", "pi"} {
++		for _, tracked := range []bool{false, true} {
++			for _, payload := range []struct {
++				name     string
++				attached bool
++				data     []byte
++			}{{"unattached", false, nil}, {"empty", true, []byte{}}, {"utf8", true, []byte("բարեւ\n")}, {"binary", true, []byte{0, 255, 128}}} {
++				for _, explicit := range []bool{false, true} {
++					t.Run(fmt.Sprintf("%s/tracked=%v/%s/explicit=%v", env, tracked, payload.name, explicit), func(t *testing.T) {
++						f, dir := fixture(t, env, explicit)
++						v := compose(t, f, dir, agentic.StdinPayload{Attached: payload.attached, Bytes: payload.data})
++						l := prepare(t, v, f, tracked, explicit)
++						calls := 0
++						code, c, stderr := run(t, l, func() error { calls++; return nil })
++						equal(t, code, 0)
++						equal(t, calls, 1)
++						equal(t, c.WorkDir, dir)
++						equal(t, stderr, "curator-run: environment override: OWN\nhelper stderr\n")
++						wantArgs := []string{"first plugin argument", "--model", "model with spaces", "prompt channel"}
++						if env == "claude_code" {
++							wantArgs = append(wantArgs, "--mcp-config", f.MCP.Path, "--strict-mcp-config")
++						}
++						if env == "codex_cli" {
++							wantArgs = append(wantArgs, "-p", "curator-mcp")
++						}
++						wantArgs = append(wantArgs, "", "-p", "native", "--dangerously-skip-permissions", "a\nb")
++						if !tracked {
++							equal(t, c.Argv, wantArgs)
++							sort.Strings(c.Env)
++							wantEnv := []string{fragment.HomeVariable(env) + "=" + dir, "FIGMA_API_KEY=inherited-secret", "OWN=override", "PARENT=only-direct"}
++							sort.Strings(wantEnv)
++							equal(t, c.Env, wantEnv)
++							input := payload.data
++							if !payload.attached {
++								input = []byte("terminal input")
++							}
++							if len(input) == 0 {
++								input = []byte{}
++							}
++							equal(t, c.Stdin, input)
++						} else {
++							name := env + "-20260905T073254Z"
++							if explicit {
++								name = "chosen.name"
++							}
++							provider := map[string]string{"claude_code": "claude", "codex_cli": "codex", "pi": "pi"}[env]
++							args := []string{"start", name, "--provider", provider, "--launch-plan", "-"}
++							if explicit {
++								args = append(args, "--profile", "yolo")
++							}
++							args = append(args, "--workspace", dir)
++							equal(t, c.Argv, args)
++							var stdin any
++							if payload.attached {
++								encoding, value := "utf-8", string(payload.data)
++								if payload.name == "binary" {
++									encoding, value = "base64url", base64.RawURLEncoding.EncodeToString(payload.data)
++								}
++								stdin = map[string]string{"encoding": encoding, "bytes": value}
++							}
++							names := []string{}
++							if env != "pi" {
++								names = []string{"FIGMA_API_KEY"}
++							}
++							// Independent exact closed D3.2 object, not execution's document type.
++							want := map[string]any{"schema": "urn:ax:schema:launch-plan-request", "schema_version": "1.0.0", "argv_suffix": wantArgs, "env_names": names, "env_literals": map[string]string{fragment.HomeVariable(env): dir, "OWN": "override"}, "stdin": stdin, "extensions": map[string]any{"works.relux.curator.profile-name": "test-profile", "works.relux.curator.profile-pin": "sha256:" + strings.Repeat("b", 64), "works.relux.curator.fragment-digest": f.Digest, "works.relux.curator.system-modules": explicit}}
++							expected, _ := json.Marshal(want)
++							var actual, expectedJSON any
++							if err := json.Unmarshal(c.Stdin, &actual); err != nil {
++								t.Fatal(err)
++							}
++							json.Unmarshal(expected, &expectedJSON)
++							equal(t, actual, expectedJSON)
++							parent := append(os.Environ(), "PWD="+dir)
++							sort.Strings(parent)
++							sort.Strings(c.Env)
++							equal(t, c.Env, parent)
++						}
++					})
++				}
++			}
++		}
++	}
++}
++func TestEmptyEnvironmentAndLaunchPATH(t *testing.T) {
++	f, dir := fixture(t, "pi", false)
++	for _, kind := range []string{"empty", "nil", "path", "relative"} {
++		t.Run(kind, func(t *testing.T) {
++			v := composition.Value{Binary: helper, WorkDir: dir, Argv: []string{}, Env: []string{}, RawStdin: agentic.StdinPayload{Attached: true}}
++			if kind == "nil" {
++				v.Env = nil
++			}
++			if kind == "path" {
++				v.Binary = filepath.Base(helper)
++				v.Env = []string{"PATH=" + filepath.Dir(helper)}
++			}
++			if kind == "relative" {
++				if err := os.Symlink(helper, filepath.Join(dir, "local-provider")); err != nil {
++					t.Fatal(err)
++				}
++				v.Binary = "./local-provider"
++			}
++			code, c, stderr := run(t, prepare(t, v, f, false, false), func() error { return nil })
++			equal(t, code, 0)
++			equal(t, stderr, "helper stderr\n")
++			expected := v.Env
++			if expected == nil {
++				expected = []string{}
++			}
++			equal(t, c.Env, expected)
++		})
++	}
++}
++func TestLateChecksBothModes(t *testing.T) {
++	for _, tracked := range []bool{false, true} {
++		for _, kind := range []string{"nil_boundary", "boundary_refusal", "provider_removed", "provider_nonexec", "provider_PATH_missing", "mcp_removed", "mcp_dangling", "mcp_directory", "mcp_unreadable"} {
++			t.Run(fmt.Sprintf("tracked=%v/%s", tracked, kind), func(t *testing.T) {
++				f, dir := fixture(t, "codex_cli", false)
++				v := compose(t, f, dir, agentic.StdinPayload{})
++				copyPath := filepath.Join(dir, "provider")
++				data, err := os.ReadFile(helper)
++				if err != nil {
++					t.Fatal(err)
++				}
++				write(t, copyPath, data)
++				os.Chmod(copyPath, 0700)
++				v.Binary = copyPath
++				if kind == "provider_PATH_missing" {
++					v.Binary = "fake-provider-not-on-PATH"
++				}
++				l := prepare(t, v, f, tracked, false)
++				boundary := execution.Boundary(func() error { return nil })
++				want := ""
++				switch kind {
++				case "nil_boundary":
++					boundary = nil
++					want = "launch_boundary_required"
++				case "boundary_refusal":
++					boundary = func() error { return errors.New("prompt_file_detected: late file") }
++					want = "prompt_file_detected"
++				case "provider_removed":
++					os.Remove(copyPath)
++					want = "exec_provider_missing"
++				case "provider_nonexec":
++					os.Chmod(copyPath, 0600)
++					want = "exec_provider_missing"
++				case "provider_PATH_missing":
++					want = "exec_provider_missing"
++				case "mcp_removed":
++					os.Remove(f.MCP.Path)
++					want = "mcp_layer_missing"
++				case "mcp_dangling":
++					os.Remove(f.MCP.Path)
++					os.Symlink(filepath.Join(dir, "missing"), f.MCP.Path)
++					want = "mcp_layer_unreadable"
++				case "mcp_directory":
++					os.Remove(f.MCP.Path)
++					os.Mkdir(f.MCP.Path, 0700)
++					want = "mcp_layer_unreadable"
++				case "mcp_unreadable":
++					if os.Geteuid() == 0 {
++						t.Skip("root bypasses permission refusal")
++					}
++					os.Chmod(f.MCP.Path, 0000)
++					defer os.Chmod(f.MCP.Path, 0600)
++					want = "mcp_layer_unreadable"
++				}
++				code, c, stderr := run(t, l, boundary)
++				equal(t, code, 1)
++				equal(t, c, capture{})
++				if !strings.Contains(stderr, want) {
++					t.Fatalf("missing %s: %q", want, stderr)
++				}
++			})
++		}
++	}
++}
++func TestAxFailureNoFallback(t *testing.T) {
++	for _, kind := range []string{"nonzero", "missing", "nonexec", "bad_format"} {
++		t.Run(kind, func(t *testing.T) {
++			f, dir := fixture(t, "pi", false)
++			v := compose(t, f, dir, agentic.StdinPayload{})
++			l := prepare(t, v, f, true, false)
++			ax := helper
++			if kind == "nonzero" {
++				write(t, filepath.Join(dir, "behavior"), []byte("exit:16"))
++			} else {
++				ax = filepath.Join(dir, "fake-ax")
++				if kind != "missing" {
++					write(t, ax, []byte("not executable content"))
++					if kind == "bad_format" {
++						os.Chmod(ax, 0700)
++					}
++				}
++			}
++			var out, stderr bytes.Buffer
++			code := l.Run(execution.Options{AxBinary: ax, Boundary: func() error { return nil }, IO: execution.IO{Stdin: strings.NewReader(""), Stdout: &out, Stderr: &stderr}})
++			equal(t, code, 1)
++			want := "curator-run: environment override: OWN\ncurator-run: ax_handoff_failed: ax could not take the launch\n"
++			if kind == "nonzero" {
++				want += "{\"code\":\"launch_plan_invalid\"}\n\x00raw\xff"
++				var c capture
++				if err := json.Unmarshal(out.Bytes(), &c); err != nil {
++					t.Fatalf("fallback/multiple processes: %q", out.Bytes())
++				}
++				equal(t, c.Argv[0], "start")
++			} else {
++				equal(t, out.Len(), 0)
++			}
++			equal(t, stderr.String(), want)
++		})
++	}
++}
++func TestDirectExitAndSignal(t *testing.T) {
++	for _, behavior := range []string{"exit:23", "signal"} {
++		t.Run(behavior, func(t *testing.T) {
++			f, dir := fixture(t, "pi", false)
++			write(t, filepath.Join(dir, "behavior"), []byte(behavior))
++			v := compose(t, f, dir, agentic.StdinPayload{})
++			code, _, stderr := run(t, prepare(t, v, f, false, false), func() error { return nil })
++			want := 23
++			if behavior == "signal" {
++				want = 143
++				equal(t, stderr, "curator-run: environment override: OWN\n")
++			} else {
++				equal(t, stderr, "curator-run: environment override: OWN\n{\"code\":\"launch_plan_invalid\"}\n\x00raw\xff")
++			}
++			equal(t, code, want)
++		})
++	}
++}
++
++func TestForwardedSignalBothModes(t *testing.T) {
++	for _, tracked := range []bool{false, true} {
++		t.Run(fmt.Sprint(tracked), func(t *testing.T) {
++			dir := t.TempDir()
++			write(t, filepath.Join(dir, "behavior"), []byte("waitsignal"))
++			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++			defer cancel()
++			cmd := exec.CommandContext(ctx, driver, helper, dir, fmt.Sprint(tracked))
++			cmd.Env = []string{}
++			stdout, err := cmd.StdoutPipe()
++			if err != nil {
++				t.Fatal(err)
++			}
++			var stderr bytes.Buffer
++			cmd.Stderr = &stderr
++			if err = cmd.Start(); err != nil {
++				t.Fatal(err)
++			}
++			defer func() { _ = cmd.Process.Kill() }()
++			reader := bufio.NewReader(stdout)
++			if _, err = reader.ReadString('\n'); err != nil {
++				t.Fatal(err)
++			}
++			ready, err := reader.ReadString('\n')
++			if err != nil || ready != "READY\n" {
++				t.Fatal(ready, err)
++			}
++			if err = cmd.Process.Signal(syscall.SIGTERM); err != nil {
++				t.Fatal(err)
++			}
++			err = cmd.Wait()
++			var exit *exec.ExitError
++			if !errors.As(err, &exit) {
++				t.Fatal(err)
++			}
++			want := 143
++			message := ""
++			if tracked {
++				want = 1
++				message = "curator-run: ax_handoff_failed: ax could not take the launch\n"
++			}
++			equal(t, exit.ExitCode(), want)
++			equal(t, stderr.String(), message)
++		})
++	}
++}
++
++func TestStandardProfileAndSnapshot(t *testing.T) {
++	f, dir := fixture(t, "claude_code", false)
++	v := compose(t, f, dir, agentic.StdinPayload{Attached: true, Bytes: []byte("original")})
++	inv, err := cli.Parse([]string{"claude_code", "--name", "named", "--ax-profile", "standard"}, cli.Options{AxConfigured: true})
++	if err != nil {
++		t.Fatal(err)
++	}
++	target, err := mapping.Resolve(f.Environment)
++	if err != nil {
++		t.Fatal(err)
++	}
++	l, err := execution.Prepare(v, f, inv, target, at)
++	if err != nil {
++		t.Fatal(err)
++	}
++	v.Argv[0] = "changed"
++	v.Env[0] = "CHANGED=yes"
++	v.EnvLiterals["OWN"] = "changed"
++	v.RawStdin.Bytes[0] = 'X'
++	v.Stdin.Bytes = "changed"
++	v.Warnings[0] = "changed"
++	code, c, stderr := run(t, l, func() error { return nil })
++	equal(t, code, 0)
++	equal(t, c.Argv, []string{"start", "named", "--provider", "claude", "--launch-plan", "-", "--profile", "standard", "--workspace", dir})
++	equal(t, stderr, "curator-run: environment override: OWN\nhelper stderr\n")
++	if bytes.Contains(c.Stdin, []byte("changed")) {
++		t.Fatal("prepared document retained input mutations")
++	}
++}
++
++func TestLookupCollisionWarningsBothModes(t *testing.T) {
++	for _, tracked := range []bool{false, true} {
++		t.Run(fmt.Sprint(tracked), func(t *testing.T) {
++			f, dir := fixture(t, "claude_code", false)
++			data := bytes.Replace(f.Canonical, []byte(`"FIGMA_API_KEY"`), []byte(`"OWN"`), 1)
++			parsed, err := fragment.Parse(data)
++			if err != nil {
++				t.Fatal(err)
++			}
++			f = *parsed
++			v := compose(t, f, dir, agentic.StdinPayload{})
++			code, _, stderr := run(t, prepare(t, v, f, tracked, false), func() error { return nil })
++			equal(t, code, 0)
++			equal(t, stderr, "curator-run: environment override: OWN\ncurator-run: environment literal replaces lookup: OWN\nhelper stderr\n")
++		})
++	}
++}
++
++// TestRealPTYOwnershipBothModes exercises the actual terminal line discipline,
++// not a PID-only signal or an injected executor. Python supplies POSIX PTYs.
++func TestRealPTYOwnershipBothModes(t *testing.T) {
++	if python == "" {
++		t.Fatal("python3 required for real PTY regression")
++	}
++	for _, mode := range []string{"false", "true"} {
++		t.Run("tracked="+mode, func(t *testing.T) {
++			cmd := exec.Command(python, "testdata/terminal_probe.py", driver, mode)
++			cmd.Env = []string{"PATH=/usr/bin:/bin"}
++			out, err := cmd.CombinedOutput()
++			if err != nil {
++				t.Fatalf("PTY regression: %v\n%s", err, out)
++			}
++			t.Log(string(out))
++		})
++	}
++}
+diff --git a/internal/execution/process.go b/internal/execution/process.go
+new file mode 100644
+index 0000000..849da72
+--- /dev/null
++++ b/internal/execution/process.go
+@@ -0,0 +1,98 @@
++package execution
++
++import (
++	"fmt"
++	"os"
++	"os/exec"
++	"os/signal"
++	"syscall"
++	"unsafe"
++)
++
++type processExit struct{ status syscall.WaitStatus }
++
++func (e *processExit) Error() string { return fmt.Sprintf("child status: %d", e.status) }
++func (e *processExit) ExitCode() int { return e.status.ExitStatus() }
++
++func terminalGroup(fd uintptr, request uintptr, group *int32) error {
++	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, request, uintptr(unsafe.Pointer(group)))
++	if errno != 0 {
++		return errno
++	}
++	return nil
++}
++
++// One waited child group owns the terminal. The launcher never receives the
++// child's terminal-generated signals, so forwarding cannot duplicate them.
++func run(cmd *exec.Cmd) error {
++	signals := make(chan os.Signal, 8)
++	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGCONT)
++	defer signal.Stop(signals)
++	tty, _ := os.OpenFile("/dev/tty", os.O_RDWR, 0)
++	var original int32
++	if tty != nil {
++		defer tty.Close()
++		if terminalGroup(tty.Fd(), syscall.TIOCGPGRP, &original) != nil || original != int32(syscall.Getpgrp()) {
++			tty = nil
++		}
++	}
++	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
++	if tty != nil {
++		cmd.SysProcAttr.Foreground = true
++		cmd.SysProcAttr.Ctty = int(tty.Fd())
++		// The launcher is in the background while restoring ownership. Ignore the
++		// terminal's SIGTTOU for these ioctls, as a job-control shell does.
++		signal.Ignore(syscall.SIGTTOU)
++		defer signal.Reset(syscall.SIGTTOU)
++		defer terminalGroup(tty.Fd(), syscall.TIOCSPGRP, &original)
++	}
++	if err := cmd.Start(); err != nil {
++		return err
++	}
++	group := int32(cmd.Process.Pid)
++	done := make(chan struct{})
++	stopped := make(chan struct{})
++	go func() {
++		defer close(stopped)
++		for {
++			select {
++			case s := <-signals:
++				if s == syscall.SIGCONT && tty != nil {
++					_ = terminalGroup(tty.Fd(), syscall.TIOCSPGRP, &group)
++				}
++				_ = syscall.Kill(-int(group), s.(syscall.Signal))
++			case <-done:
++				return
++			}
++		}
++	}()
++	var status syscall.WaitStatus
++	var err error
++	for {
++		_, err = syscall.Wait4(cmd.Process.Pid, &status, syscall.WUNTRACED, nil)
++		if err == syscall.EINTR {
++			continue
++		}
++		if err != nil || !status.Stopped() {
++			break
++		}
++		if tty != nil {
++			_ = terminalGroup(tty.Fd(), syscall.TIOCSPGRP, &original)
++		}
++		// SIGSTOP cannot be caught or inherited as ignored. The caller's shell can
++		// now observe a stopped launcher and resume it with fg or SIGCONT.
++		_ = syscall.Kill(os.Getpid(), syscall.SIGSTOP)
++	}
++	close(done)
++	<-stopped
++	// Wait4 owns reaping; Cmd.Wait still closes descriptors and joins its I/O
++	// copying goroutines. Its ECHILD is expected after the explicit wait above.
++	_ = cmd.Wait()
++	if err != nil {
++		return err
++	}
++	if status != 0 {
++		return &processExit{status}
++	}
++	return nil
++}
+diff --git a/internal/execution/testdata/driver/main.go b/internal/execution/testdata/driver/main.go
+new file mode 100644
+index 0000000..95c66e7
+--- /dev/null
++++ b/internal/execution/testdata/driver/main.go
+@@ -0,0 +1,39 @@
++// A process-level caller of the API, for signal forwarding and default stdio.
++package main
++
++import (
++	"fmt"
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/execution"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/curator-agent-launcher/internal/mapping"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"os"
++	"syscall"
++	"time"
++	"unsafe"
++)
++
++func main() {
++	value := composition.Value{Binary: os.Args[1], WorkDir: os.Args[2], Env: []string{}, RawStdin: agentic.StdinPayload{Attached: true}}
++	if len(os.Args) > 4 {
++		value.RawStdin.Attached = false
++	}
++	launch, err := execution.Prepare(value, fragment.Fragment{}, cli.Invocation{EnvID: "pi", Tracked: os.Args[3] == "true"}, mapping.Target{System: "pi-native", Provider: "pi"}, time.Now())
++	if err != nil {
++		panic(err)
++	}
++	code := launch.Run(execution.Options{AxBinary: os.Args[1], Boundary: func() error { return nil }})
++	if len(os.Args) > 4 {
++		tty, err := os.Open("/dev/tty")
++		if err != nil {
++			panic(err)
++		}
++		defer tty.Close()
++		var group int32
++		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, tty.Fd(), syscall.TIOCGPGRP, uintptr(unsafe.Pointer(&group)))
++		fmt.Printf("RESTORED=%t\n", errno == 0 && group == int32(syscall.Getpgrp()))
++	}
++	os.Exit(code)
++}
+diff --git a/internal/execution/testdata/helper/main.go b/internal/execution/testdata/helper/main.go
+new file mode 100644
+index 0000000..d1d188f
+--- /dev/null
++++ b/internal/execution/testdata/helper/main.go
+@@ -0,0 +1,43 @@
++// Fake provider and fake ax. Never invokes an installed model or ax.
++package main
++
++import (
++	"encoding/json"
++	"io"
++	"os"
++	"strconv"
++	"strings"
++	"syscall"
++	"time"
++)
++
++func main() {
++	data, _ := io.ReadAll(os.Stdin)
++	cwd, _ := os.Getwd()
++	env := os.Environ()
++	if env == nil {
++		env = []string{}
++	}
++	_ = json.NewEncoder(os.Stdout).Encode(struct {
++		Argv, Env []string
++		Stdin     []byte
++		WorkDir   string
++	}{os.Args[1:], env, data, cwd})
++	behavior, _ := os.ReadFile("behavior")
++	if string(behavior) == "waitsignal" {
++		os.Stdout.Write([]byte("READY\n"))
++		for {
++			time.Sleep(time.Hour)
++		}
++	}
++	if string(behavior) == "signal" {
++		_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
++		select {}
++	}
++	if strings.HasPrefix(string(behavior), "exit:") {
++		code, _ := strconv.Atoi(strings.TrimPrefix(string(behavior), "exit:"))
++		os.Stderr.Write([]byte("{\"code\":\"launch_plan_invalid\"}\n\x00raw\xff"))
++		os.Exit(code)
++	}
++	os.Stderr.Write([]byte("helper stderr\n"))
++}
+diff --git a/internal/execution/testdata/terminal_probe.py b/internal/execution/testdata/terminal_probe.py
+new file mode 100644
+index 0000000..473a958
+--- /dev/null
++++ b/internal/execution/testdata/terminal_probe.py
+@@ -0,0 +1,91 @@
++"""Real controlling-terminal regression; only synthetic fake ax/provider."""
++import os, sys, pty, signal, select, time, tempfile, pathlib, re
++
++with tempfile.TemporaryDirectory(prefix='execution-pty-') as directory:
++    helper = pathlib.Path(directory) / 'fake-ax'
++    helper.write_text('#!' + sys.executable + '\n' + '''import os, signal, sys
++count = 0
++def hit(sig, frame):
++ global count
++ count += 1
++ os.write(1, b'INT\\n')
++signal.signal(signal.SIGINT, hit)
++signal.signal(signal.SIGTSTP, signal.SIG_DFL)
++# Ax stdin is a document; terminal interaction uses its controlling tty.
++tty = open('/dev/tty', 'r') if len(sys.argv) > 1 else sys.stdin
++os.write(1, ('READY child=%d\\n' % os.getpid()).encode())
++while True:
++ line = tty.readline().strip()
++ if line == 'check': os.write(1, ('COUNT=%d\\n' % count).encode())
++ elif line == 'read': os.write(1, b'READ_OK\\n')
++ elif line == 'quit': break
++''')
++    helper.chmod(0o700)
++    for trial in range(5):
++        pid, fd = pty.fork()
++        if pid == 0:
++            os.execve(sys.argv[1], [sys.argv[1], str(helper), directory, sys.argv[2], 'pty'], {'PATH': '/usr/bin:/bin'})
++        data = b''
++        reaped = False
++        helper_group = None
++        def until(token):
++            global data
++            deadline = time.monotonic() + 5
++            while token not in data and time.monotonic() < deadline:
++                if select.select([fd], [], [], .05)[0]:
++                    try: block = os.read(fd, 4096)
++                    except OSError: break
++                    if not block: break
++                    data += block
++            assert token in data, (token, data)
++        try:
++            until(b'READY child=')
++            helper_group = int(re.search(rb'READY child=(\d+)', data).group(1))
++            child_group = os.tcgetpgrp(fd)
++            assert child_group == helper_group and child_group != pid, ('child lacks separate foreground ownership', data)
++            os.write(fd, b'\x03')
++            until(b'INT\r\n')
++            time.sleep(.15)  # Allow any erroneous duplicate relay to arrive.
++            os.write(fd, b'check\n')
++            until(b'COUNT=1\r\n')
++            assert data.count(b'INT\r\n') == 1, data
++            os.kill(pid, signal.SIGINT)  # Parent-PID-only delivery must still relay.
++            time.sleep(.15)
++            os.write(fd, b'check\n')
++            until(b'COUNT=2\r\n')
++            assert data.count(b'INT\r\n') == 2, data
++            os.write(fd, b'read\n')
++            until(b'READ_OK')
++            os.write(fd, b'\x1a')  # Real terminal VSUSP to foreground child.
++            deadline = time.monotonic() + 5
++            stopped = False
++            while time.monotonic() < deadline:
++                got, status = os.waitpid(pid, os.WNOHANG | os.WUNTRACED)
++                if got:
++                    stopped = os.WIFSTOPPED(status)
++                    break
++                time.sleep(.01)
++            assert stopped, ('launcher did not stop with child', data)
++            assert os.tcgetpgrp(fd) == pid, 'terminal not restored on stop'
++            os.kill(pid, signal.SIGCONT)
++            data = b''
++            os.write(fd, b'read\n')
++            until(b'READ_OK')
++            assert os.tcgetpgrp(fd) == child_group, 'child not foreground after resume'
++            os.write(fd, b'quit\n')
++            until(b'RESTORED=true')
++            _, status = os.waitpid(pid, 0)
++            reaped = True
++            assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0, status
++            print('trial=%d: one terminal INT + one parent-only INT, foreground read, stop/resume/read, restored terminal, exit=0' % (trial+1), flush=True)
++        finally:
++            if not reaped:
++                # Kill both isolated groups; never touch the host terminal group.
++                if helper_group is not None and helper_group > 0 and helper_group not in (pid, os.getpgrp()):
++                    try: os.killpg(helper_group, signal.SIGKILL)
++                    except ProcessLookupError: pass
++                try: os.kill(pid, signal.SIGKILL)
++                except ProcessLookupError: pass
++                try: os.waitpid(pid, 0)
++                except ChildProcessError: pass
++            os.close(fd)
+diff --git a/internal/systemprompt/systemprompt.go b/internal/systemprompt/systemprompt.go
+new file mode 100644
+index 0000000..8bd5774
+--- /dev/null
++++ b/internal/systemprompt/systemprompt.go
+@@ -0,0 +1,216 @@
++// Package systemprompt implements SPEC §5 policy for validated fragments.
++// Execution must call PrepareLaunch immediately before EVERY handoff or exec.
++// It does not compose a plan, inspect native arguments, print, or write files.
++package systemprompt
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++)
++
++const (
++	CodeUnavailable = "sysprompt_channel_unavailable"
++	CodeUnreadable  = "sysprompt_file_unreadable"
++)
++
++// Refusal is a terminal launch diagnostic. Cause preserves filesystem errors.
++type Refusal struct {
++	Code, Path string
++	Cause      error
++}
++
++func (e *Refusal) Error() string { return fmt.Sprintf("%s: %q: %v", e.Code, e.Path, e.Cause) }
++func (e *Refusal) Unwrap() error { return e.Cause }
++
++// Selection contains only the launcher-applied channel, never native inputs.
++// Its argv and environment are copied out for later composition.
++type Selection struct {
++	channel fragment.Channel
++	path    string
++	argv    []string
++}
++
++func (s Selection) Argv() []string { return append([]string(nil), s.argv...) }
++
++// Env is empty in registry revision 1: no system-prompt variable is declared.
++func (s Selection) Env() map[string]string { return nil }
++
++// Select accepts a fragment from fragment.Parse and an explicit append/replace
++// opt-in, or "" for no opt-in. It performs no I/O. File channels cannot opt in.
++func Select(f *fragment.Fragment, opt fragment.Semantics) (Selection, error) {
++	if opt == "" {
++		return Selection{}, nil
++	}
++	if f != nil && f.SystemPrompt != nil && (opt == fragment.SemanticsAppend || opt == fragment.SemanticsReplace) {
++		for _, c := range f.SystemPrompt.Channels {
++			if c.Semantics != opt || c.Kind == fragment.KindFile {
++				continue
++			}
++			s := Selection{channel: c, path: f.SystemPrompt.Path}
++			switch c.Kind {
++			case fragment.KindFlag:
++				if c.Argument != fragment.ArgumentPath {
++					continue
++				}
++				s.argv = append([]string{c.Flag, s.path}, c.With...)
++			case fragment.KindConfigKey:
++				if f.Environment != fragment.EnvCodexCLI {
++					continue
++				}
++				s.argv = []string{"-c", c.Key + "=" + tomlString(s.path)}
++			default:
++				// No variable channel or contents/name prompt flag exists in the closed
++				// registry. New adapters require a protocol revision, not a fallback.
++				continue
++			}
++			return s, nil
++		}
++	}
++	return Selection{}, &Refusal{Code: CodeUnavailable, Cause: fmt.Errorf("no non-file system-prompt channel for %q", opt)}
++}
++
++// Codex -c parses a TOML value, not shell text. Go's \x escapes are not TOML.
++func tomlString(s string) string {
++	var b strings.Builder
++	b.WriteByte('"')
++	for _, r := range s {
++		switch {
++		case r == '"' || r == '\\':
++			b.WriteByte('\\')
++			b.WriteRune(r)
++		case r < 0x20 || r == 0x7f:
++			fmt.Fprintf(&b, "\\u%04X", r)
++		default:
++			b.WriteRune(r)
++		}
++	}
++	b.WriteByte('"')
++	return b.String()
++}
++
++// Observation records a readable regular managed-home file, not application.
++type Observation struct {
++	Filename  string
++	Semantics fragment.Semantics
++}
++
++// ProbeFiles probes the closed registry set regardless of SystemPrompt presence.
++// Absence returns no observation; errors (including dangling links) refuse.
++// Symlinks to readable regular files are accepted. No contents are consumed.
++func ProbeFiles(f *fragment.Fragment) ([]Observation, error) {
++	if f.Environment != fragment.EnvPi {
++		return nil, nil
++	}
++	files := []Observation{
++		{Filename: "APPEND_SYSTEM.md", Semantics: fragment.SemanticsAppend},
++		{Filename: "SYSTEM.md", Semantics: fragment.SemanticsReplace},
++	}
++	var observed []Observation
++	for _, file := range files {
++		present, err := readable(filepath.Join(f.Home(), file.Filename), true)
++		if err != nil {
++			return nil, err
++		}
++		if present {
++			observed = append(observed, file)
++		}
++	}
++	return observed, nil
++}
++
++func readable(path string, allowAbsent bool) (bool, error) {
++	fail := func(err error) (bool, error) { return false, &Refusal{Code: CodeUnreadable, Path: path, Cause: err} }
++	_, err := os.Lstat(path)
++	if err != nil {
++		if allowAbsent && errors.Is(err, os.ErrNotExist) {
++			return false, nil
++		}
++		return fail(err)
++	}
++	info, err := os.Stat(path)
++	if err != nil {
++		return fail(err)
++	}
++	if !info.Mode().IsRegular() {
++		return fail(fmt.Errorf("not a regular file"))
++	}
++	// Open only after the regular-file check, so stable FIFOs cannot block.
++	file, err := os.Open(path)
++	if err != nil {
++		return fail(err)
++	}
++	defer file.Close()
++	info, err = file.Stat()
++	if err != nil {
++		return fail(err)
++	}
++	if !info.Mode().IsRegular() {
++		return fail(fmt.Errorf("opened object is not a regular file"))
++	}
++	return true, nil
++}
++
++// Launch contains composition inputs and warning lines (without a trailing LF).
++// Both tracked and untracked execution must emit every line before launching.
++type Launch struct {
++	Selection Selection
++	Warnings  []string
++}
++
++// PrepareLaunch is the execution boundary operation: select, freshly validate
++// Pi's polymorphic flag path and managed-home files, then format warnings.
++// Do not cache its result across launches. It does not attest project discovery
++// or prevent changes between this probe and the native tool's subsequent open.
++func PrepareLaunch(f *fragment.Fragment, opt fragment.Semantics) (Launch, error) {
++	s, err := Select(f, opt)
++	if err != nil {
++		return Launch{}, err
++	}
++	if f.Environment == fragment.EnvPi && s.channel.Kind == fragment.KindFlag {
++		if _, err = readable(s.path, false); err != nil {
++			return Launch{}, err
++		}
++	}
++	observed, err := ProbeFiles(f)
++	if err != nil {
++		return Launch{}, err
++	}
++	return Launch{Selection: s, Warnings: FormatWarnings(f.Profile.Name, s, observed)}, nil
++}
++
++const cacheWarning = " A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix."
++
++// FormatWarnings is pure and shared by both execution modes. Native arguments
++// remain opaque, so only the selected launcher flag establishes suppression.
++func FormatWarnings(profile string, s Selection, observed []Observation) []string {
++	var lines []string
++	if s.channel.Kind != "" {
++		line := fmt.Sprintf("warning: profile %q: applied %s/%s system-prompt channel", profile, s.channel.Kind, s.channel.Semantics)
++		if s.channel.Kind == fragment.KindFlag {
++			line += fmt.Sprintf(" %q", s.channel.Flag)
++		}
++		line += "."
++		if s.channel.Semantics == fragment.SemanticsReplace {
++			line += " Replacement discards the tool's built-in system behavior entirely."
++		}
++		lines = append(lines, line+cacheWarning)
++	}
++	for _, file := range observed {
++		line := fmt.Sprintf("warning: profile %q: observed file/%s %q in managed home; ", profile, file.Semantics, file.Filename)
++		if s.channel.Kind == fragment.KindFlag && s.channel.Semantics == file.Semantics {
++			line += fmt.Sprintf("discovery suppressed by applied launcher flag %q.", s.channel.Flag)
++		} else {
++			line += "conditional native-discovery candidate, subject to native flags and trusted-project precedence."
++			if file.Semantics == fragment.SemanticsReplace {
++				line += " If selected, replacement discards the tool's built-in system behavior entirely."
++			}
++		}
++		lines = append(lines, line+cacheWarning)
++	}
++	return lines
++}
+diff --git a/internal/systemprompt/systemprompt_test.go b/internal/systemprompt/systemprompt_test.go
+new file mode 100644
+index 0000000..26ff432
+--- /dev/null
++++ b/internal/systemprompt/systemprompt_test.go
+@@ -0,0 +1,347 @@
++package systemprompt_test
++
++import (
++	"encoding/json"
++	"errors"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"syscall"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	sp "github.com/relux-works/curator-agent-launcher/internal/systemprompt"
++)
++
++// Fixtures come from the independently pinned conformance corpus; mutate only
++// paths, keeping registry descriptors validated through the production parser.
++func fixture(t *testing.T, env, home, path string, section bool) *fragment.Fragment {
++	t.Helper()
++	name := map[string]string{"claude_code": "valid-system-prompt-only.json", "codex_cli": "valid-codex-config-key-and-name-channel.json", "pi": "valid-pi-file-channels.json", "opencode": "valid-minimal.json"}[env]
++	raw, err := os.ReadFile("../fragment/testdata/schema-cases/" + name)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var v map[string]any
++	if err = json.Unmarshal(raw, &v); err != nil {
++		t.Fatal(err)
++	}
++	v["environment"] = env
++	v["env"] = map[string]string{fragment.HomeVariable(env): home}
++	delete(v, "mcp")
++	if section {
++		if env == "opencode" {
++			v["system_prompt"] = map[string]any{"path": path, "channels": []any{}}
++		} else {
++			v["system_prompt"].(map[string]any)["path"] = path
++		}
++	} else {
++		delete(v, "system_prompt")
++	}
++	raw, err = json.Marshal(v)
++	if err != nil {
++		t.Fatal(err)
++	}
++	f, err := fragment.Parse(raw)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return f
++}
++func refusal(t *testing.T, err error, code string) *sp.Refusal {
++	t.Helper()
++	var r *sp.Refusal
++	if !errors.As(err, &r) || r.Code != code {
++		t.Fatalf("want %s refusal, got %v", code, err)
++	}
++	return r
++}
++func write(t *testing.T, path string) {
++	t.Helper()
++	if err := os.WriteFile(path, []byte("unchanged prompt"), 0600); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestSelectExactArgv(t *testing.T) {
++	path := "/tmp/a \"quote\" \\ ' $()`\n\t\x01\x7f—.md"
++	for _, tc := range []struct {
++		env  string
++		opt  fragment.Semantics
++		want []string
++	}{
++		{"claude_code", fragment.SemanticsAppend, []string{"--append-system-prompt-file", path}},
++		{"claude_code", fragment.SemanticsReplace, []string{"--system-prompt-file", path}},
++		{"pi", fragment.SemanticsAppend, []string{"--append-system-prompt", path}},
++		{"codex_cli", fragment.SemanticsReplace, []string{"-c", "model_instructions_file=\"/tmp/a \\\"quote\\\" \\\\ ' $()`\\u000A\\u0009\\u0001\\u007F—.md\""}},
++	} {
++		t.Run(tc.env+"/"+string(tc.opt), func(t *testing.T) {
++			f := fixture(t, tc.env, t.TempDir(), path, true)
++			s, err := sp.Select(f, tc.opt)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if !reflect.DeepEqual(s.Argv(), tc.want) || len(s.Env()) != 0 {
++				t.Fatalf("argv=%q env=%v", s.Argv(), s.Env())
++			}
++			args := s.Argv()
++			args[0] = "mutated"
++			if !reflect.DeepEqual(s.Argv(), tc.want) {
++				t.Fatal("aliased argv")
++			}
++		})
++	}
++}
++
++func TestSelectRefusalsAndNoOptIn(t *testing.T) {
++	for _, env := range []string{"claude_code", "codex_cli", "pi", "opencode"} {
++		for _, section := range []bool{false, true} {
++			for _, opt := range []fragment.Semantics{"", fragment.SemanticsAppend, fragment.SemanticsReplace, "bogus"} {
++				t.Run(env+"/"+map[bool]string{true: "section", false: "absent"}[section]+"/"+string(opt), func(t *testing.T) {
++					f := fixture(t, env, t.TempDir(), "/missing/prompt.md", section)
++					s, err := sp.Select(f, opt)
++					supported := section && (env == "claude_code" || env == "codex_cli" && opt == fragment.SemanticsReplace || env == "pi" && opt == fragment.SemanticsAppend) && opt != "bogus"
++					if opt != "" && !supported {
++						refusal(t, err, sp.CodeUnavailable)
++						return
++					}
++					if err != nil {
++						t.Fatal(err)
++					}
++					if opt == "" && (len(s.Argv()) != 0 || len(s.Env()) != 0) {
++						t.Fatal("applied without opt-in")
++					}
++				})
++			}
++		}
++	}
++}
++
++func TestPrepareLaunchLateFilesAndWarnings(t *testing.T) {
++	for _, section := range []bool{false, true} {
++		t.Run(map[bool]string{true: "section", false: "no-section"}[section], func(t *testing.T) {
++			home := t.TempDir()
++			prompt := filepath.Join(home, "inert.md")
++			write(t, prompt)
++			f := fixture(t, "pi", home, prompt, section)
++			launch, err := sp.PrepareLaunch(f, "")
++			if err != nil || len(launch.Warnings) != 0 {
++				t.Fatalf("absent: %+v %v", launch, err)
++			}
++			for _, name := range []string{"APPEND_SYSTEM.md", "SYSTEM.md"} {
++				write(t, filepath.Join(home, name))
++			}
++			launch, err = sp.PrepareLaunch(f, "")
++			if err != nil {
++				t.Fatal(err)
++			}
++			if len(launch.Warnings) != 2 {
++				t.Fatalf("warnings=%q", launch.Warnings)
++			}
++			for i, name := range []string{"APPEND_SYSTEM.md", "SYSTEM.md"} {
++				line := launch.Warnings[i]
++				for _, want := range []string{f.Profile.Name, name, "file/", "conditional native-discovery candidate", "native flags and trusted-project precedence", "caching and billing", "own cache prefix"} {
++					if !strings.Contains(line, want) {
++						t.Fatalf("missing %q in %q", want, line)
++					}
++				}
++			}
++			if !strings.Contains(launch.Warnings[1], "If selected, replacement discards the tool's built-in system behavior entirely.") {
++				t.Fatal(launch.Warnings)
++			}
++			if section {
++				launch, err = sp.PrepareLaunch(f, fragment.SemanticsAppend)
++				if err != nil {
++					t.Fatal(err)
++				}
++				if len(launch.Warnings) != 3 {
++					t.Fatal(launch.Warnings)
++				}
++				want := "warning: profile \"" + f.Profile.Name + "\": observed file/append \"APPEND_SYSTEM.md\" in managed home; discovery suppressed by applied launcher flag \"--append-system-prompt\". A custom system prefix can change request caching and billing: the default may use shared prompt caching; a custom prefix forms its own cache prefix."
++				if launch.Warnings[1] != want {
++					t.Fatalf("got %q want %q", launch.Warnings[1], want)
++				}
++				if !strings.Contains(launch.Warnings[0], "applied flag/append") || !strings.Contains(launch.Warnings[2], "conditional native-discovery candidate") {
++					t.Fatal(launch.Warnings)
++				}
++			}
++			for _, name := range []string{"APPEND_SYSTEM.md", "SYSTEM.md", "inert.md"} {
++				raw, err := os.ReadFile(filepath.Join(home, name))
++				if err != nil || string(raw) != "unchanged prompt" {
++					t.Fatalf("file changed %s", name)
++				}
++			}
++			if err := os.Remove(filepath.Join(home, "APPEND_SYSTEM.md")); err != nil {
++				t.Fatal(err)
++			}
++			launch, err = sp.PrepareLaunch(f, "")
++			if err != nil || len(launch.Warnings) != 1 {
++				t.Fatalf("late removal: %+v %v", launch, err)
++			}
++			if err := os.Mkdir(filepath.Join(home, "APPEND_SYSTEM.md"), 0700); err != nil {
++				t.Fatal(err)
++			}
++			_, err = sp.PrepareLaunch(f, "")
++			refusal(t, err, sp.CodeUnreadable)
++		})
++	}
++}
++
++func TestPrepareLaunchFileFailures(t *testing.T) {
++	for _, which := range []string{"APPEND_SYSTEM.md", "SYSTEM.md", "selected"} {
++		for _, kind := range []string{"missing", "directory", "dangling", "symlink", "permissions", "fifo", "loop"} {
++			t.Run(which+"/"+kind, func(t *testing.T) {
++				home := t.TempDir()
++				prompt := filepath.Join(home, "prompt.md")
++				write(t, prompt)
++				path := filepath.Join(home, which)
++				if which == "selected" {
++					path = prompt
++					if err := os.Remove(prompt); err != nil {
++						t.Fatal(err)
++					}
++				}
++				switch kind {
++				case "directory":
++					if err := os.Mkdir(path, 0700); err != nil {
++						t.Fatal(err)
++					}
++				case "dangling":
++					if err := os.Symlink(filepath.Join(home, "missing-target"), path); err != nil {
++						t.Fatal(err)
++					}
++				case "symlink":
++					target := filepath.Join(home, "target")
++					write(t, target)
++					if err := os.Symlink(target, path); err != nil {
++						t.Fatal(err)
++					}
++				case "permissions":
++					write(t, path)
++					if err := os.Chmod(path, 0000); err != nil {
++						t.Fatal(err)
++					}
++					t.Cleanup(func() { _ = os.Chmod(path, 0600) })
++					if os.Geteuid() == 0 {
++						t.Skip("root bypasses mode permissions; permission denial not proven")
++					}
++				case "fifo":
++					if err := syscall.Mkfifo(path, 0600); err != nil {
++						t.Fatal(err)
++					}
++				case "loop":
++					if err := os.Symlink(path, path); err != nil {
++						t.Fatal(err)
++					}
++				}
++				f := fixture(t, "pi", home, prompt, true)
++				// Opt-in must not bypass a suppressed APPEND_SYSTEM.md failure.
++				launch, err := sp.PrepareLaunch(f, fragment.SemanticsAppend)
++				good := kind == "symlink" || kind == "missing" && which != "selected"
++				if good {
++					if err != nil {
++						t.Fatal(err)
++					}
++					return
++				}
++				r := refusal(t, err, sp.CodeUnreadable)
++				if r.Path != path {
++					t.Fatalf("path=%q want %q", r.Path, path)
++				}
++				if len(launch.Selection.Argv()) != 0 {
++					t.Fatal("partial launch leaked on refusal")
++				}
++			})
++		}
++	}
++}
++
++func TestProbeIndependentAndNoWrites(t *testing.T) {
++	home := t.TempDir()
++	f := fixture(t, "pi", home, "/absent", false)
++	for _, name := range []string{"APPEND_SYSTEM.md", "SYSTEM.md"} {
++		write(t, filepath.Join(home, name))
++	}
++	observed, err := sp.ProbeFiles(f)
++	if err != nil || len(observed) != 2 {
++		t.Fatalf("%v %v", observed, err)
++	}
++	// A descriptor-less section cannot disable the environment registry probe.
++	f.SystemPrompt = &fragment.SystemPrompt{Path: "/absent"}
++	observed, err = sp.ProbeFiles(f)
++	if err != nil || len(observed) != 2 {
++		t.Fatalf("%v %v", observed, err)
++	}
++	for _, env := range []string{"claude_code", "codex_cli", "opencode"} {
++		f := fixture(t, env, home, "/absent", false)
++		observed, err := sp.ProbeFiles(f)
++		if err != nil || len(observed) != 0 {
++			t.Fatalf("non-Pi probe: %v %v", observed, err)
++		}
++	}
++	entries, err := os.ReadDir(home)
++	if err != nil || len(entries) != 2 {
++		t.Fatalf("unexpected write: %v %v", entries, err)
++	}
++}
++
++func TestAppliedReplacementWarning(t *testing.T) {
++	for _, env := range []string{"claude_code", "codex_cli"} {
++		f := fixture(t, env, t.TempDir(), "/prompt", true)
++		launch, err := sp.PrepareLaunch(f, fragment.SemanticsReplace)
++		if err != nil {
++			t.Fatal(err)
++		}
++		kind := map[string]string{"claude_code": "flag", "codex_cli": "config-key"}[env]
++		prefix := "warning: profile \"" + f.Profile.Name + "\": applied " + kind + "/replace system-prompt channel"
++		if len(launch.Warnings) != 1 || !strings.HasPrefix(launch.Warnings[0], prefix) || !strings.Contains(launch.Warnings[0], "Replacement discards the tool's built-in system behavior entirely.") || !strings.Contains(launch.Warnings[0], "caching and billing") {
++			t.Fatal(launch.Warnings)
++		}
++	}
++}
++
++func TestPrepareLaunchSelectedPathChangesLate(t *testing.T) {
++	home := t.TempDir()
++	path := filepath.Join(home, "prompt.md")
++	write(t, path)
++	f := fixture(t, "pi", home, path, true)
++	if _, err := sp.Select(f, fragment.SemanticsAppend); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := sp.PrepareLaunch(f, fragment.SemanticsAppend); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.Remove(path); err != nil {
++		t.Fatal(err)
++	}
++	_, err := sp.PrepareLaunch(f, fragment.SemanticsAppend)
++	refusal(t, err, sp.CodeUnreadable)
++	// Missing inert data is not a refusal when no channel was requested.
++	if _, err = sp.PrepareLaunch(f, ""); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestProbeParentFailures(t *testing.T) {
++	for _, kind := range []string{"permissions", "non-directory"} {
++		t.Run(kind, func(t *testing.T) {
++			root := t.TempDir()
++			home := filepath.Join(root, "home")
++			if kind == "permissions" {
++				if os.Geteuid() == 0 {
++					t.Skip("root bypasses directory permissions")
++				}
++				if err := os.Mkdir(home, 0000); err != nil {
++					t.Fatal(err)
++				}
++				t.Cleanup(func() { _ = os.Chmod(home, 0700) })
++			} else {
++				write(t, home)
++			}
++			f := fixture(t, "pi", home, "/prompt", false)
++			_, err := sp.PrepareLaunch(f, "")
++			refusal(t, err, sp.CodeUnreadable)
++		})
++	}
++}
