@@ -1,7 +1,7 @@
 # TASK-260908-2so46q: a1-plan-delivery
 
 ## Description
-SPEC section 4.4: tagged agents-management BuildPlan interactive request with managed Home and empty Composition.
+Implement accepted SPEC 0.3.0-draft section 4.4 through real tagged vendorplugin.BuildLaunch(ctx, registry, request, agentic.LaunchModeInteractive), with managed Home, explicit resolved model/effort, current WorkDir and inherited Env in both modes, empty Composition and zero Run. Independently invoke providerlimits.Store.AvailabilityFor for the same Runtime/Model/managed Home; only a serviceable verdict admits launch. Preserve refusal evidence and --effort guidance, never retry or downgrade. Verify all three environments at the actual operator-created native-Pi tag; no pseudo-version or committed replace.
 
 ## Scope
 (define task scope)

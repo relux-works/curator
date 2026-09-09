@@ -27,6 +27,7 @@ code
 - [ongoing-delivery-policy.md](file://EPIC-260908-2wp8wn/ongoing-delivery-policy.md) — Ongoing operator policy: local tests, no hosted CI
 - [operator-astra-medium-policy.md](file://EPIC-260908-2wp8wn/operator-astra-medium-policy.md) — Urgent operator override: every producer/reviewer Codex gpt-6-astra medium; preserve WIP
 - [goal-launcher-and-infra-resume-2026-09-09.md](file://EPIC-260908-2wp8wn/goal-launcher-and-infra-resume-2026-09-09.md) — Final parked continuation and revision11 receipt; exact states, backups and remaining DoD
+- [operator-tags-releases-override-2026-09-09.md](file://EPIC-260908-2wp8wn/operator-tags-releases-override-2026-09-09.md)
 
 ## Outcome Resources
 - [orchestration-state.md](file://EPIC-260908-2wp8wn/orchestration-state.md) — Current delivered evidence, active runs, roots and remaining scope
@@ -46,9 +47,10 @@ code
 - [checkpoint-f2-rework-active.md](file://EPIC-260908-2wp8wn/checkpoint-f2-rework-active.md) — CR2 F2 changes requested and current Muse rework
 - [checkpoint-f2-runtime-validation.md](file://EPIC-260908-2wp8wn/checkpoint-f2-runtime-validation.md) — F2 connected regression handoff and in-progress full validation
 - [checkpoint-f2-cr3-review-started.md](file://EPIC-260908-2wp8wn/checkpoint-f2-cr3-review-started.md) — F2 CR3 local validation complete and independent Astra review active
+- [launcher-tag-blocker-2026-09-09.md](file://EPIC-260908-2wp8wn/launcher-tag-blocker-2026-09-09.md)
 
 ## Created
 2026-09-07T23:04:44Z
 
 ## Last Update
-2026-09-09T16:51:30Z
+2026-09-09T19:07:19Z

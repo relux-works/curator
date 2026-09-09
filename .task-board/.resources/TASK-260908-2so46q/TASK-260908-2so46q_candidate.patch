@@ -1,0 +1,747 @@
+diff --git a/README.md b/README.md
+index 72584b5..8e23039 100644
+--- a/README.md
++++ b/README.md
+@@ -99,6 +99,34 @@ Reserved `path_prepend` parsing and hashing remain unchanged. Composition does
+ not transform PATH for that reserved field or claim managed command-root
+ support; environments §9.4 and the future skill-command-roots proposal bound it.
+ 
++## Plan and provider-limit API boundary
++
++`internal/plan.Build(ctx, plan.DefaultDeps(store), request)` accepts an
++explicitly resolved Runtime/Model/Effort, managed fragment Home, current WorkDir
++and inherited Env. Integration must supply `os.Environ()` in both modes.
++The API calls the real tagged `vendorplugin.BuildLaunch` with the named
++`LaunchModeInteractive`, empty Composition, zero Run, and no goal, budget,
++service tier or assignment. It then calls `store.AvailabilityFor` with the exact
++Runtime/Model/Home and admits only `Serviceable()` verdicts. Missing managed
++Home or WorkDir and missing dependencies refuse before module calls.
++
++`RefusedError` preserves module errors through `Unwrap` and adds `--effort`
++guidance for missing required effort. `LimitedError.Verdict` preserves the
++complete non-serviceable verdict; its text includes state, Until, Checked,
++Observed (including timestamps) and Failures. `Code()` selects `plan_refused`
++or `plan_provider_limited` for the integration call site. Neither error retries,
++changes the pair, or provides an executable plan. A real store over a temporary
++layout verifies absent versus corrupt state and isolation by managed Home and
++module-owned model group. Tests never run an installed provider or real ax.
++
++This is an unintegrated API candidate on `v0.5.10`: real Claude/Codex plan
++values are covered by exact argv goldens. Native Pi admission remains blocked
++on the operator-created `v0.5.11` tag; no legacy Pi wrapper is registered here.
++All-three-runtime validation, both main routes and independent acceptance are
++pending. `TestPiReleaseBound` proves only an unavailable runtime refusal.
++Main wiring remains TASK-260908-1o7i8y and the executable still refuses
++`not_implemented` after mapping.
++
+ ## System-prompt API boundary
+ 
+ The reusable `internal/systemprompt` API implements §5 selection and encoding,
+@@ -221,9 +249,10 @@ exit through `ExitForCode`, with no fallback to a weaker launch shape:
+    `ax_handoff_failed` line (already owned by `execution.Launch.Run`;
+    no untracked fallback) — preserved, not re-implemented here.
+ 
+-`defaults_unresolvable`, `plan_refused`, and `plan_provider_limited`
+-have no producer in this build; they are declared bounds, not dropped
+-rows. `.scripts/diagnostics-mutants.sh` carries 21 mutants for the new
++`defaults_unresolvable` still has no producer in this build. The plan API
++now produces `plan_refused` and `plan_provider_limited`, with main call-site
++classification still pending; these are declared bounds, not dropped rows.
++`.scripts/diagnostics-mutants.sh` carries 21 mutants for the new
+ gates: 14 narrowing probes (single-member exit/classifier/framing
+ weakenings, each requiring its named single-member assertion in the
+ log) plus 7 retained broad, drop-one, token-preserving-broad, and
+@@ -271,6 +300,7 @@ or tag workflow yet.
+ | `.scripts/systemprompt-mutants.py` | SPEC §5 narrowing probes through exported production APIs; exact source bytes restored after every mutation | `python3 .scripts/systemprompt-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/systemprompt-mutants/`) |
+ | `.scripts/execution-mutants.py` | narrowing probes at tracking-policy Load and execution Launch.Run, using actual fake subprocesses; restores candidate bytes | `python3 .scripts/execution-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv`, default `.temp/execution-mutants/`; permission tests require non-root |
+ | `.scripts/diagnostics-mutants.sh` | narrowing mutants for the §6 gates (exit mapping, closed membership, no-invention classification, anchored code-line parsing, entry exits, owner/form registry, exact-Detail framing exemption); restores candidate bytes after every mutant | `.scripts/diagnostics-mutants.sh [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/diagnostics-mutants/`) |
++| `.scripts/plan-mutants.py` | SPEC §4.4 behavioral narrowing probes at `plan.Build`, restoring exact candidate bytes | `python3 .scripts/plan-mutants.py [evidence-dir]`; narrow validation: `go test ./internal/plan -count=1 -race`, `go vet ./internal/plan`, `go build ./internal/plan` | per-mutant logs and `summary.tsv`, default `.temp/plan-mutants/` |
+ | execution process helpers | exact document/argv/env/stdin/exit and late-check tests; compiles disposable fake provider/ax and API signal driver; Python 3 supplies isolated POSIX PTY regression | `go test ./internal/axconfig ./internal/execution -count=1` | test stdout; helper binaries use temporary directories and are removed |
+ | fragment test corpus | `internal/fragment/testdata/schema-cases` is the `launch-env-fragment-v1` slice of curator-spec `conformance/v1/schema-cases` (index rows copied with their verdicts, source commit recorded in `index.json`); `testdata/a0` holds the three fragments and digests the installed Curator printed during A0 verification | `go test ./internal/fragment` | none; 49 indexed names/verdicts and fixture bytes are pinned by an independently upstream-derived manifest hash in `TestConformanceCorpus`; refresh requires reviewing the upstream rows and updating that pin as well as `index.json` |
+ 
+diff --git a/.scripts/plan-mutants.py b/.scripts/plan-mutants.py
+new file mode 100644
+index 0000000..797a8d4
+--- /dev/null
++++ b/.scripts/plan-mutants.py
+@@ -0,0 +1,49 @@
++#!/usr/bin/env python3
++"""SPEC 4.4 narrowing probes at plan.Build; restore exact uncommitted bytes."""
++import pathlib
++import subprocess
++import sys
++
++root = pathlib.Path(__file__).resolve().parents[1]
++out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / '.temp/plan-mutants').resolve()
++out.mkdir(parents=True, exist_ok=True)
++path = root / 'internal/plan/plan.go'
++mutants = [
++ ('P1', 'strings.TrimSpace(req.Home) == ""', 'req.Home == ""', 'TestRequiredInputs/home_whitespace', 'admit whitespace-only home'),
++ ('P2', 'strings.TrimSpace(req.WorkDir) == ""', 'req.WorkDir == ""', 'TestRequiredInputs/workdir_whitespace', 'admit whitespace-only workdir'),
++ ('P3', 'if d.BuildLaunch == nil {', 'if d.BuildLaunch == nil && req.Runtime == "codex" { d.BuildLaunch = vendorplugin.BuildLaunch }; if d.BuildLaunch == nil {', 'TestRequiredInputs/build_nil', 'default missing launch dependency for Codex only'),
++ ('P4', 'if d.Availability == nil {', 'if d.Availability == nil && req.Runtime == "codex" { d.Availability = func(providerlimits.VerdictQuery) (vendorplugin.Availability, error) { return vendorplugin.Availability{State: vendorplugin.AvailabilityHealthy}, nil } }; if d.Availability == nil {', 'TestRequiredInputs/availability_nil', 'admit missing limits reader for Codex only'),
++ ('P5', 'if err != nil {\n\t\treturn agentic.Plan{}, &RefusedError{Detail: "spawn plane refused', 'if err != nil && !errors.Is(err, vendorplugin.ErrEffortMissing) {\n\t\treturn agentic.Plan{}, &RefusedError{Detail: "spawn plane refused', 'TestTaggedAdmissionRefusals/missing_effort', 'admit required-effort refusal only'),
++ ('P6', 'if !verdict.Serviceable() {', 'if !verdict.Serviceable() && verdict.State != vendorplugin.AvailabilityUnknown {', 'TestProviderVerdicts/unknown', 'admit unknown state only'),
++ ('P7', 'if err != nil {\n\t\t// Failure to produce', 'if err != nil && err.Error() != "module read failure" {\n\t\t// Failure to produce', 'TestProviderReadError', 'admit one read-error value while keeping error gate'),
++ ('P8', 'Home:    req.Home,\n\t})', 'Home:    "",\n\t})', 'TestTaggedInteractivePlans/claude_code', 'substitute native home for limits query'),
++ ('P9', 'Model:   req.Model,\n\t\tHome:', 'Model:   "claude-fable-5",\n\t\tHome:', 'TestTaggedInteractivePlans/claude_code', 'check a different model group'),
++ ('P10', 'Runtime: req.Runtime,\n\t\tModel:', 'Runtime: "codex",\n\t\tModel:', 'TestTaggedInteractivePlans/claude_code', 'check Codex state for Claude request'),
++ ('P11', 'spawn := SpawnRequest(req)', 'spawn := SpawnRequest(req)\n if spawn.Effort == "" && spawn.Model == "claude-opus-5" { spawn.Effort = "medium" }', 'TestTaggedAdmissionRefusals/missing_effort', 'default effort only for one required model'),
++ ('P12', 'spawn := SpawnRequest(req)', 'spawn := SpawnRequest(req)\n if spawn.Effort == "bogus" { spawn.Effort = "medium" }', 'TestTaggedAdmissionRefusals/invalid_effort', 'downgrade one invalid effort word'),
++]
++original = path.read_bytes()
++rows = ['mutant\tbound\ttest\texit\tverdict']
++failed = False
++for ident, old, new, test, bound in mutants:
++    try:
++        source = original.decode()
++        if source.count(old) != 1:
++            raise RuntimeError(f'{ident}: anchor is not unique')
++        path.write_text(source.replace(old, new, 1))
++        command = ['go', 'test', './internal/plan', '-count=1', '-v']
++        with (out / f'{ident}.log').open('w') as log:
++            log.write('COMMAND: ' + ' '.join(command) + '\n')
++            log.flush()
++            result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=90)
++            log.write(f'\nEXIT: {result.returncode}\n')
++        killed = result.returncode == 1 and f'--- FAIL: {test} ' in (out / f'{ident}.log').read_text()
++        rows.append(f'{ident}\t{bound}\t{test}\t{result.returncode}\t' + ('killed' if killed else 'SURVIVOR/unverified'))
++        failed |= not killed
++    finally:
++        path.write_bytes(original)
++        if path.read_bytes() != original:
++            raise RuntimeError(f'{ident}: restore mismatch')
++(out / 'summary.tsv').write_text('\n'.join(rows) + '\n')
++print('\n'.join(rows))
++sys.exit(1 if failed else 0)
+diff --git a/internal/plan/plan.go b/internal/plan/plan.go
+new file mode 100644
+index 0000000..cdd86ad
+--- /dev/null
++++ b/internal/plan/plan.go
+@@ -0,0 +1,243 @@
++// Package plan implements SPEC §4.4, the spawn-plane step of the launcher:
++// an explicitly resolved runtime/model/effort triple is admitted through
++// the real tagged vendorplugin.BuildLaunch in agentic.LaunchModeInteractive,
++// then gated on a separate explicit providerlimits.Store.AvailabilityFor
++// read over the same runtime/model/managed home.
++//
++// Inputs are explicitly resolved; this package owns no defaults engine
++// (defaults are TASK-260909-2vy977). The request it builds carries the
++// managed fragment home, the current working directory, and the inherited
++// environment in both tracked and untracked modes, with an empty
++// Composition, a zero Run, and goal/budget/service-tier/assignment unset.
++// The mode is requested by name (agentic.LaunchModeInteractive); no
++// permission bypass or yolo is spelled, and plan building starts no child.
++//
++// Provider-limit admission is a separate read keyed by the exact
++// runtime/model/managed home. Only a Serviceable (Healthy) verdict admits
++// launch; a determinate no-record Healthy follows the module's fail-open
++// contract, while an unknown or failed read never implies healthy. Refusal
++// evidence (state/Until/Checked/Observed/Failures and module errors) is
++// preserved verbatim; there is no retry, fallback, or model downgrade.
++// Required-effort refusals carry the launcher --effort guidance in addition
++// to the module's model/vocabulary/recommendation text.
++//
++// An empty managed home is refused before any module call: letting
++// AvailabilityFor fall back to DefaultProviderHome would substitute an
++// empty/native home for the managed one, which §4.4 forbids. An empty
++// workdir is refused the same way. A blank runtime/model is passed through
++// to BuildLaunch so the refusal evidence names the module's verdict.
++//
++// The native-Pi system (pi-native) is declared by the §4.2 mapping but has
++// no tagged provider at agents-management v0.5.10: BuildLaunch honestly
++// refuses it there. No pseudo-version, replace, workspace override, or
++// synthetic admission is used to paper over that; three-runtime validation
++// waits on the operator-only v0.5.11 tag.
++package plan
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"strings"
++	"time"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/providerlimits"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++
++	// Production plugin registrations: the systems and vendors behind the
++	// §4.2 runtimes. Each import runs the plugin's own init into the
++	// package-level defaults, which is the production registration path.
++	// local-models has no init registration (it needs explicit config) and
++	// is intentionally absent: nothing here invents a vendor for a runtime
++	// whose broker was never established.
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
++	_ "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	_ "github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic"
++	_ "github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/openai"
++)
++
++// Stable diagnostic codes of SPEC §6 owned here. Main chooses them at the
++// plan call site; diagnostics.CodeOf does not classify them (they are
++// call-site-selected, like env_unsupported and the exec/ax sentinels).
++const (
++	CodeRefused = "plan_refused"
++	CodeLimited = "plan_provider_limited"
++)
++
++// Request carries the explicitly resolved launch inputs. Runtime matches
++// the §4.2 mapping, Model/Effort are the §4.3 resolved pair, Home is the
++// managed fragment home, WorkDir is the launcher's current directory, and
++// Env is os.Environ() in production in both modes. There is deliberately
++// no Composition, Run, goal, budget, service-tier, profile, prompt, or
++// engine member: those stay zero/unset by construction and no caller can
++// supply them.
++type Request struct {
++	Runtime string
++	Model   string
++	Effort  string
++	Home    string
++	WorkDir string
++	Env     []string
++}
++
++// BuildLaunchFunc is vendorplugin.BuildLaunch's shape, injectable so tests
++// can capture the exact SpawnRequest while still driving the real tagged
++// admission. Production passes vendorplugin.BuildLaunch.
++type BuildLaunchFunc func(ctx context.Context, r *vendorplugin.Registry, req vendorplugin.SpawnRequest, mode agentic.LaunchMode) (agentic.Plan, error)
++
++// AvailabilityFunc is providerlimits.Store.AvailabilityFor's shape.
++// Production passes a real store's method; tests pass fakes or a real
++// store over a temp layout.
++type AvailabilityFunc func(q providerlimits.VerdictQuery) (vendorplugin.Availability, error)
++
++// Deps wires the module boundaries. Registry is the vendorplugin registry
++// (production: vendorplugin.Default, populated by the blank imports above).
++type Deps struct {
++	Registry     *vendorplugin.Registry
++	BuildLaunch  BuildLaunchFunc
++	Availability AvailabilityFunc
++}
++
++// DefaultDeps wires the real tagged contracts: the default registry, the
++// real vendorplugin.BuildLaunch, and the given store's AvailabilityFor.
++func DefaultDeps(store *providerlimits.Store) Deps {
++	d := Deps{Registry: vendorplugin.Default, BuildLaunch: vendorplugin.BuildLaunch}
++	if store != nil {
++		d.Availability = store.AvailabilityFor
++	}
++	return d
++}
++
++// RefusedError is the plan_refused family: the spawn plane refused the
++// request, the limits read produced no verdict, or the caller left a
++// load-bearing input empty. Cause preserves the module error; when the
++// cause is a required-effort refusal the message additionally carries the
++// launcher's --effort spelling.
++type RefusedError struct {
++	Detail string
++	Cause  error
++}
++
++func (e *RefusedError) Error() string {
++	if e == nil {
++		return CodeRefused + ": <nil>"
++	}
++	msg := CodeRefused + ": " + e.Detail
++	if e.Cause != nil {
++		msg += ": " + e.Cause.Error()
++		if isEffortMissing(e.Cause) {
++			msg += "; supply the required effort with --effort <effort>"
++		}
++	}
++	return msg
++}
++
++// Unwrap preserves the module refusal evidence.
++func (e *RefusedError) Unwrap() error {
++	if e == nil {
++		return nil
++	}
++	return e.Cause
++}
++
++// Code is the stable §6 diagnostic code for this family.
++func (e *RefusedError) Code() string { return CodeRefused }
++
++func isEffortMissing(err error) bool {
++	return errors.Is(err, vendorplugin.ErrEffortMissing) || errors.Is(err, agentic.ErrEffortMissing)
++}
++
++// LimitedError is the plan_provider_limited family: the explicit limits
++// read produced a non-serviceable verdict. Verdict is preserved verbatim:
++// state, Until, Checked, Observed, and Failures.
++type LimitedError struct {
++	Verdict vendorplugin.Availability
++}
++
++func (e *LimitedError) Error() string {
++	if e == nil {
++		return CodeLimited + ": <nil>"
++	}
++	var b strings.Builder
++	fmt.Fprintf(&b, "%s: provider limits do not admit this launch (state %s)", CodeLimited, e.Verdict.State)
++	if !e.Verdict.Until.IsZero() {
++		fmt.Fprintf(&b, " until %s", e.Verdict.Until.Format(time.RFC3339Nano))
++	}
++	if len(e.Verdict.Checked) > 0 {
++		fmt.Fprintf(&b, "; checked %s", strings.Join(e.Verdict.Checked, ", "))
++	}
++	for _, o := range e.Verdict.Observed {
++		fmt.Fprintf(&b, "; observed %s: %s", o.Source, o.Detail)
++		if !o.At.IsZero() {
++			fmt.Fprintf(&b, " at %s", o.At.Format(time.RFC3339Nano))
++		}
++	}
++	for _, f := range e.Verdict.Failures {
++		fmt.Fprintf(&b, "; %s unreadable: %s", f.Source, f.Reason)
++	}
++	return b.String()
++}
++
++// Code is the stable §6 diagnostic code for this family.
++func (e *LimitedError) Code() string { return CodeLimited }
++
++// SpawnRequest builds the exact vendorplugin.SpawnRequest §4.4 requires:
++// runtime/model/effort from the resolved triple, managed home, current
++// workdir, inherited env, empty composition, zero run, and everything else
++// unset. It calls nothing and starts no child.
++func SpawnRequest(req Request) vendorplugin.SpawnRequest {
++	return vendorplugin.SpawnRequest{
++		Runtime: vendorplugin.RuntimeID(req.Runtime),
++		Model:   vendorplugin.ModelID(req.Model),
++		Effort:  req.Effort,
++		Home:    req.Home,
++		WorkDir: req.WorkDir,
++		Env:     req.Env,
++	}
++}
++
++// Build obtains the interactive plan and enforces provider-limit admission.
++// Exactly one BuildLaunch call in agentic.LaunchModeInteractive (by name),
++// then exactly one AvailabilityFor read over the same runtime/model/managed
++// home. No retry, no fallback, no model downgrade: any refusal is terminal
++// for this invocation.
++//
++// A nil BuildLaunch/Availability in Deps is a caller bug and is refused as
++// plan_refused without touching the other boundary.
++func Build(ctx context.Context, d Deps, req Request) (agentic.Plan, error) {
++	if strings.TrimSpace(req.Home) == "" {
++		return agentic.Plan{}, &RefusedError{Detail: "managed home is required; an empty home must not fall back to a native default"}
++	}
++	if strings.TrimSpace(req.WorkDir) == "" {
++		return agentic.Plan{}, &RefusedError{Detail: "working directory is required"}
++	}
++	if d.BuildLaunch == nil {
++		return agentic.Plan{}, &RefusedError{Detail: "no BuildLaunch implementation wired"}
++	}
++	if d.Availability == nil {
++		return agentic.Plan{}, &RefusedError{Detail: "no provider-limits read wired"}
++	}
++	spawn := SpawnRequest(req)
++	// The mode is spelled by name. Never a numeric literal, never a bare
++	// agentic.BuildPlan call: admission (runtime/vendor/model/effort) owns
++	// this path and must not be bypassed.
++	built, err := d.BuildLaunch(ctx, d.Registry, spawn, agentic.LaunchModeInteractive)
++	if err != nil {
++		return agentic.Plan{}, &RefusedError{Detail: "spawn plane refused the launch", Cause: err}
++	}
++	verdict, err := d.Availability(providerlimits.VerdictQuery{
++		Runtime: req.Runtime,
++		Model:   req.Model,
++		Home:    req.Home,
++	})
++	if err != nil {
++		// Failure to produce a verdict is terminal plan_refused with the
++		// module error, never healthy by inference.
++		return agentic.Plan{}, &RefusedError{Detail: "provider-limits read produced no verdict", Cause: err}
++	}
++	if !verdict.Serviceable() {
++		return agentic.Plan{}, &LimitedError{Verdict: verdict}
++	}
++	return built, nil
++}
+diff --git a/internal/plan/plan_test.go b/internal/plan/plan_test.go
+new file mode 100644
+index 0000000..c22b5d5
+--- /dev/null
++++ b/internal/plan/plan_test.go
+@@ -0,0 +1,376 @@
++package plan_test
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator-agent-launcher/internal/mapping"
++	"github.com/relux-works/curator-agent-launcher/internal/plan"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/providerlimits"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++)
++
++// capture records one BuildLaunch call.
++type capture struct {
++	count int
++	req   vendorplugin.SpawnRequest
++	mode  agentic.LaunchMode
++	reg   *vendorplugin.Registry
++}
++
++type availStub struct {
++	count   int
++	query   providerlimits.VerdictQuery
++	verdict vendorplugin.Availability
++	err     error
++}
++
++func healthyVerdict() vendorplugin.Availability {
++	return vendorplugin.Availability{
++		State:    vendorplugin.AvailabilityHealthy,
++		Checked:  []string{"test-source"},
++		Observed: []vendorplugin.Observation{{Source: "test-source", Detail: "test read"}},
++	}
++}
++
++// realBuild delegates to the real tagged vendorplugin.BuildLaunch after
++// recording the exact request. Production call site: plan.Build.
++func (c *capture) realBuild(ctx context.Context, r *vendorplugin.Registry, req vendorplugin.SpawnRequest, mode agentic.LaunchMode) (agentic.Plan, error) {
++	c.count++
++	c.req = req
++	c.mode = mode
++	c.reg = r
++	return vendorplugin.BuildLaunch(ctx, r, req, mode)
++}
++
++func (a *availStub) read(q providerlimits.VerdictQuery) (vendorplugin.Availability, error) {
++	a.count++
++	a.query = q
++	return a.verdict, a.err
++}
++
++func testHome(t *testing.T) string {
++	t.Helper()
++	home := filepath.Join(t.TempDir(), "managed-home")
++	if err := os.MkdirAll(home, 0o755); err != nil {
++		t.Fatal(err)
++	}
++	return home
++}
++
++// TestSpawnRequestShape pins the exact §4.4 request: resolved triple,
++// managed home, workdir, inherited env verbatim, empty composition, zero
++// run, everything else unset. Production call site: plan.SpawnRequest via
++// plan.Build.
++func TestSpawnRequestShape(t *testing.T) {
++	req, store, _ := fixture(t, "codex")
++	env := req.Env
++	c := &capture{}
++	a := &availStub{verdict: healthyVerdict()}
++	d := plan.DefaultDeps(store)
++	d.BuildLaunch = c.realBuild
++	d.Availability = a.read
++	if _, err := plan.Build(context.Background(), d, req); err != nil {
++		t.Fatal(err)
++	}
++	got := c.req
++	if string(got.Runtime) != "codex" || string(got.Model) != req.Model || got.Effort != req.Effort {
++		t.Fatalf("resolved triple = %q/%q/%q, want the resolved input triple", got.Runtime, got.Model, got.Effort)
++	}
++	if got.Home != req.Home || got.WorkDir != req.WorkDir {
++		t.Fatalf("home/workdir = %q/%q, want managed home and current workdir", got.Home, got.WorkDir)
++	}
++	if !reflect.DeepEqual(got.Env, env) {
++		t.Fatalf("env = %#v, want verbatim inherited environment", got.Env)
++	}
++	if !got.Composition.IsZero() {
++		t.Fatalf("composition = %#v, want zero (MCP belongs to the composer, §4.5)", got.Composition)
++	}
++	if !got.Run.IsZero() {
++		t.Fatalf("run = %#v, want zero (terminal launch supplies no run context)", got.Run)
++	}
++	if got.Goal != nil || got.Budget != nil || got.ServiceTier != "" || got.PromptPath != "" || len(got.Prompt) != 0 {
++		t.Fatalf("goal/budget/tier/assignment must stay unset: %#v", got)
++	}
++	if !reflect.ValueOf(got.Engine).IsZero() || got.Profile != "" {
++		t.Fatalf("profile = %q, want empty (no harness profile selected)", got.Profile)
++	}
++}
++
++// All behavioral tests enter plan.Build; DefaultDeps binds the tagged APIs.
++func fixture(t *testing.T, runtime string) (plan.Request, *providerlimits.Store, providerlimits.Layout) {
++	t.Helper()
++	root := t.TempDir()
++	for _, name := range []string{"claude", "codex"} {
++		// Any accidental process creation leaves evidence; real providers never run.
++		script := fmt.Sprintf("#!/bin/sh\necho started > '%s'\nexit 91\n", filepath.Join(root, "started"))
++		if err := os.WriteFile(filepath.Join(root, name), []byte(script), 0700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	model := "gpt-6-astra"
++	if runtime == "claude" {
++		model = "claude-opus-5"
++	}
++	req := plan.Request{Runtime: runtime, Model: model, Effort: "medium", Home: testHome(t), WorkDir: root,
++		Env: []string{"PATH=" + root, "HOME=" + root, "PLAN_INHERITED=kept", "CLAUDECODE=nested", "CODEX_HOME=/foreign"}}
++	layout := providerlimits.LayoutAt(root)
++	store, err := providerlimits.NewStore(providerlimits.Options{Layout: layout, Now: func() time.Time { return time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC) }})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return req, store, layout
++}
++
++func TestTaggedInteractivePlans(t *testing.T) {
++	for _, tc := range []struct {
++		env, runtime, system string
++		argv                 []string
++	}{
++		{"claude_code", "claude", "claude-code", []string{"--model", "claude-opus-5", "--effort", "medium"}},
++		{"codex_cli", "codex", "codex", []string{"-m", "gpt-6-astra", "-c", `model_reasoning_effort="medium"`}},
++	} {
++		t.Run(tc.env, func(t *testing.T) {
++			req, store, _ := fixture(t, tc.runtime)
++			target, err := mapping.Resolve(tc.env)
++			if err != nil || target.System != tc.system {
++				t.Fatalf("mapping: %+v %v", target, err)
++			}
++			c := &capture{}
++			count := 0
++			d := plan.DefaultDeps(store)
++			d.BuildLaunch = c.realBuild
++			d.Availability = func(q providerlimits.VerdictQuery) (vendorplugin.Availability, error) {
++				count++
++				if q.Runtime != req.Runtime || q.Model != req.Model || q.Home != req.Home {
++					t.Fatalf("query changed: %+v", q)
++				}
++				return store.AvailabilityFor(q)
++			}
++			got, err := plan.Build(context.Background(), d, req)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if c.count != 1 || count != 1 || c.mode != agentic.LaunchModeInteractive || !reflect.DeepEqual(c.req.Env, req.Env) {
++				t.Fatalf("calls/mode/env: %+v %d", c, count)
++			}
++			if got.System != agentic.SystemID(tc.system) || got.Mode != agentic.LaunchModeInteractive || got.Home != req.Home || got.WorkDir != req.WorkDir || got.Binary != filepath.Join(req.WorkDir, tc.runtime) || got.Stdin.Attached {
++				t.Fatalf("plan shape: %+v", got)
++			}
++			if !reflect.DeepEqual(got.Argv, tc.argv) {
++				t.Fatalf("argv golden: %q != %q", got.Argv, tc.argv)
++			}
++			if !strings.Contains(strings.Join(got.Env, "\n"), "PLAN_INHERITED=kept") {
++				t.Fatalf("inherited env lost: %q", got.Env)
++			}
++			if _, err := os.Stat(filepath.Join(req.WorkDir, "started")); !errors.Is(err, os.ErrNotExist) {
++				t.Fatalf("plan started child or observation failed: %v", err)
++			}
++		})
++	}
++}
++
++func TestTaggedAdmissionRefusals(t *testing.T) {
++	for _, tc := range []struct {
++		name, runtime, model, effort string
++		want                         error
++	}{
++		{"missing_effort", "claude", "claude-opus-5", "", vendorplugin.ErrEffortMissing},
++		{"invalid_effort", "codex", "gpt-6-astra", "bogus", vendorplugin.ErrEffortNotInVocabulary},
++		{"unknown_model", "codex", "no-such-model", "medium", vendorplugin.ErrUnknownModel},
++		{"empty_model", "codex", "", "medium", nil},
++		{"unknown_runtime", "no-such-runtime", "gpt-6-astra", "medium", nil},
++		{"empty_runtime", "", "gpt-6-astra", "medium", nil},
++		{"nil_registry", "codex", "gpt-6-astra", "medium", nil},
++		{"cancelled", "codex", "gpt-6-astra", "medium", context.Canceled},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			req, store, _ := fixture(t, "codex")
++			req.Runtime, req.Model, req.Effort = tc.runtime, tc.model, tc.effort
++			c := &capture{}
++			a := &availStub{verdict: healthyVerdict()}
++			d := plan.DefaultDeps(store)
++			d.BuildLaunch = c.realBuild
++			d.Availability = a.read
++			if tc.name == "nil_registry" {
++				d.Registry = nil
++			}
++			ctx, cancel := context.WithCancel(context.Background())
++			defer cancel()
++			if tc.name == "cancelled" {
++				cancel()
++			}
++			got, err := plan.Build(ctx, d, req)
++			var refused *plan.RefusedError
++			if !errors.As(err, &refused) || (tc.want != nil && !errors.Is(err, tc.want)) || !reflect.DeepEqual(got, agentic.Plan{}) || c.count != 1 || a.count != 0 {
++				t.Fatalf("refusal: plan=%+v err=%v calls=%d/%d", got, err, c.count, a.count)
++			}
++			if refused.Cause == nil || !strings.Contains(err.Error(), refused.Cause.Error()) {
++				t.Fatalf("module evidence lost: %v", err)
++			}
++			if tc.name == "missing_effort" {
++				for _, word := range []string{"--effort", "claude-opus-5", "medium"} {
++					if !strings.Contains(err.Error(), word) {
++						t.Fatalf("guidance lost %q: %v", word, err)
++					}
++				}
++			}
++		})
++	}
++}
++
++func TestRequiredInputs(t *testing.T) {
++	for _, name := range []string{"home_empty", "home_whitespace", "workdir_empty", "workdir_whitespace", "build_nil", "availability_nil", "store_nil"} {
++		t.Run(name, func(t *testing.T) {
++			req, store, _ := fixture(t, "codex")
++			c := &capture{}
++			a := &availStub{verdict: healthyVerdict()}
++			d := plan.DefaultDeps(store)
++			d.BuildLaunch = c.realBuild
++			d.Availability = a.read
++			switch name {
++			case "home_empty":
++				req.Home = ""
++			case "home_whitespace":
++				req.Home = " \t"
++			case "workdir_empty":
++				req.WorkDir = ""
++			case "workdir_whitespace":
++				req.WorkDir = " \t"
++			case "build_nil":
++				d.BuildLaunch = nil
++			case "availability_nil":
++				d.Availability = nil
++			case "store_nil":
++				d = plan.DefaultDeps(nil)
++			}
++			got, err := plan.Build(context.Background(), d, req)
++			var refused *plan.RefusedError
++			if !errors.As(err, &refused) || !reflect.DeepEqual(got, agentic.Plan{}) || c.count != 0 || a.count != 0 {
++				t.Fatalf("required input admitted: %+v %v calls=%d/%d", got, err, c.count, a.count)
++			}
++		})
++	}
++}
++
++func TestProviderVerdicts(t *testing.T) {
++	for _, state := range []vendorplugin.AvailabilityState{vendorplugin.AvailabilityUnknown, vendorplugin.AvailabilityLimited, vendorplugin.AvailabilityUnreachable, vendorplugin.AvailabilityState(99)} {
++		t.Run(state.String(), func(t *testing.T) {
++			req, store, _ := fixture(t, "codex")
++			d := plan.DefaultDeps(store)
++			c := &capture{}
++			d.BuildLaunch = c.realBuild
++			at := time.Date(2026, 9, 9, 10, 0, 0, 123, time.UTC)
++			verdict := vendorplugin.Availability{State: state, Checked: []string{"source-a", "source-b"}, Observed: []vendorplugin.Observation{{Source: "observed-source", Detail: "quota evidence", At: at}}, Failures: []vendorplugin.ReadFailure{{Source: "failed-source", Reason: "read denied"}}}
++			if state == vendorplugin.AvailabilityLimited {
++				verdict.Until = at.Add(time.Hour)
++			}
++			a := &availStub{verdict: verdict}
++			d.Availability = a.read
++			got, err := plan.Build(context.Background(), d, req)
++			var limited *plan.LimitedError
++			if !errors.As(err, &limited) || !reflect.DeepEqual(limited.Verdict, verdict) || !reflect.DeepEqual(got, agentic.Plan{}) || c.count != 1 || a.count != 1 {
++				t.Fatalf("verdict admitted/lost: %+v %v calls=%d/%d", got, err, c.count, a.count)
++			}
++			for _, word := range []string{state.String(), "source-a", "source-b", "observed-source", "quota evidence", at.Format(time.RFC3339Nano), "failed-source", "read denied"} {
++				if !strings.Contains(err.Error(), word) {
++					t.Fatalf("evidence lost %q: %v", word, err)
++				}
++			}
++			if !verdict.Until.IsZero() && !strings.Contains(err.Error(), verdict.Until.Format(time.RFC3339Nano)) {
++				t.Fatalf("until lost: %v", err)
++			}
++		})
++	}
++}
++
++func TestProviderReadError(t *testing.T) {
++	req, store, _ := fixture(t, "codex")
++	d := plan.DefaultDeps(store)
++	c := &capture{}
++	d.BuildLaunch = c.realBuild
++	sentinel := errors.New("module read failure")
++	a := &availStub{verdict: healthyVerdict(), err: sentinel}
++	d.Availability = a.read
++	got, err := plan.Build(context.Background(), d, req)
++	var refused *plan.RefusedError
++	if !errors.As(err, &refused) || !errors.Is(err, sentinel) || !strings.Contains(err.Error(), sentinel.Error()) || !reflect.DeepEqual(got, agentic.Plan{}) || c.count != 1 || a.count != 1 {
++		t.Fatalf("read failure admitted/retried: %+v %v calls=%d/%d", got, err, c.count, a.count)
++	}
++}
++
++// Real Store reads fixture files only. Profile B and another model group
++// cannot borrow A's suppression. Corruption is unknown, never absence.
++func TestRealStoreIsolation(t *testing.T) {
++	req, store, layout := fixture(t, "claude")
++	id, err := providerlimits.IdentityFor(req.Runtime, req.Home)
++	if err != nil {
++		t.Fatal(err)
++	}
++	d := plan.DefaultDeps(store)
++	if _, err = plan.Build(context.Background(), d, req); err != nil {
++		t.Fatalf("determinate absent: %v", err)
++	}
++	if err = os.MkdirAll(layout.Root, 0700); err != nil {
++		t.Fatal(err)
++	}
++	at := time.Date(2026, 9, 9, 11, 59, 0, 0, time.UTC)
++	until := at.Add(5 * time.Minute)
++	record := providerlimits.GroupRecord{Provider: "claude", State: providerlimits.StateSuppressed, BackoffStep: 1, SuppressedSince: &at, NextProbeAt: &until, LastObservationAt: &at, ConsecutiveLimitObservations: 1}
++	// Public module schema fixture, not a replacement state interpreter.
++	raw, err := json.Marshal(map[string]any{"version": providerlimits.SchemaVersion, "identity": id.Key, "provider": id.Provider, "home_display": id.HomeDisplay, "groups": map[string]any{providerlimits.MustGroupTable().Group(req.Runtime, req.Model): record}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	path := layout.StateFile(id.Key)
++	if err = os.WriteFile(path, raw, 0600); err != nil {
++		t.Fatal(err)
++	}
++	_, err = plan.Build(context.Background(), d, req)
++	var limited *plan.LimitedError
++	if !errors.As(err, &limited) || limited.Verdict.State != vendorplugin.AvailabilityLimited || !limited.Verdict.Until.Equal(until) {
++		t.Fatalf("suppression not enforced: %v", err)
++	}
++	profileB := req
++	profileB.Home = testHome(t)
++	if _, err = plan.Build(context.Background(), d, profileB); err != nil {
++		t.Fatalf("profile A gated B: %v", err)
++	}
++	otherModel := req
++	otherModel.Model = "claude-fable-5"
++	otherModel.Effort = "medium"
++	if _, err = plan.Build(context.Background(), d, otherModel); err != nil {
++		t.Fatalf("plan group gated usage credits: %v", err)
++	}
++	if err = os.WriteFile(path, []byte("{broken"), 0600); err != nil {
++		t.Fatal(err)
++	}
++	_, err = plan.Build(context.Background(), d, req)
++	if !errors.As(err, &limited) || limited.Verdict.State != vendorplugin.AvailabilityUnknown || len(limited.Verdict.Failures) == 0 {
++		t.Fatalf("corrupt state treated as absent: %v", err)
++	}
++}
++
++func TestPiReleaseBound(t *testing.T) {
++	// v0.5.10 declares no native Pi runtime. This is refusal evidence only;
++	// actual Pi runtime/model/effort validation must be added at the real tag.
++	req, store, _ := fixture(t, "codex")
++	req.Runtime = "pi-native"
++	d := plan.DefaultDeps(store)
++	a := &availStub{verdict: healthyVerdict()}
++	d.Availability = a.read
++	got, err := plan.Build(context.Background(), d, req)
++	if err == nil || !reflect.DeepEqual(got, agentic.Plan{}) || a.count != 0 {
++		t.Fatalf("synthetic Pi admission: %+v %v", got, err)
++	}
++	t.Logf("v0.5.10 bound, not native-Pi validation: %v", err)
++}
