@@ -1,5 +1,5 @@
 ## Status
-development
+integrating
 
 ## Review
 required
@@ -26,13 +26,15 @@ code
 - [pi-mcp-scope-decision.md](file://EPIC-260908-2wp8wn/pi-mcp-scope-decision.md) — Concrete Pi MCP channel conflict between full DoD and current protocol; operator scope decision
 - [ongoing-delivery-policy.md](file://EPIC-260908-2wp8wn/ongoing-delivery-policy.md) — Ongoing operator policy: local tests, no hosted CI
 - [operator-astra-medium-policy.md](file://EPIC-260908-2wp8wn/operator-astra-medium-policy.md) — Urgent operator override: every producer/reviewer Codex gpt-6-astra medium; preserve WIP
+- [goal-launcher-and-infra-resume-2026-09-09.md](file://EPIC-260908-2wp8wn/goal-launcher-and-infra-resume-2026-09-09.md) — Final parked continuation and revision11 receipt; exact states, backups and remaining DoD
 
 ## Outcome Resources
 - [orchestration-state.md](file://EPIC-260908-2wp8wn/orchestration-state.md) — Current delivered evidence, active runs, roots and remaining scope
 - [task-board-cross-repository-decision.md](file://EPIC-260908-2wp8wn/task-board-cross-repository-decision.md)
+- [resume-2026-09-09-evidence.md](file://EPIC-260908-2wp8wn/resume-2026-09-09-evidence.md) — Authorized resume, worker policy, preserved-source recovery and honest delivery state
 
 ## Created
 2026-09-07T23:04:44Z
 
 ## Last Update
-2026-09-08T22:58:59Z
+2026-09-09T09:30:05Z
