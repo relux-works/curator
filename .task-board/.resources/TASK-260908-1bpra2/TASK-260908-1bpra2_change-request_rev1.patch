@@ -1,0 +1,316 @@
+diff --git a/.gitignore b/.gitignore
+index 1ac89fa..fd4d2b0 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1 +1,3 @@
+ .temp/
++
++__pycache__/
+diff --git a/README.md b/README.md
+index b4bb99a..fb0feb9 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,61 @@
+ # relux-mcp
+ 
+-Curator MCP declaration packages (`agent-mcp.json`) for Relux agent environments. Packages live under `packages/<name>/`.
++Private MCP declaration packages, version **1.0.0**, for Curator's
++agent-environments protocol. No tags are created by this delivery; the
++orchestrator cuts reviewed release tags.
++
++| Package | Transport | Declaration |
++| --- | --- | --- |
++| figma | HTTP | https://mcp.figma.com/mcp |
++| safari | stdio | safaridriver-mcp --mcp |
++
++Source: agents-infra commit
++`459742ea67e3c6b84169520b92d74fe7f73e3002`,
++`.configs/codex-mcp-servers.toml`. There is no shared LLDB definition at
++that pin: upstream dropped lldb-mcp, so this repository has **no LLDB package**.
++
++## Machine policy and credentials
++
++Source URL: `git@github.com:relux-works/relux-mcp.git`, addressed at
++`packages/figma` and `packages/safari`. The canonical network source
++identity is `github.com/relux-works/relux-mcp`; operators must permit this
++identity in the machine MCP package allowlist (segment-aware source matching).
++The allowlist authorizes package sources, not executable names. Network
++acquisition policy must also permit that repository. No machine policy or home
++files are changed here.
++
++Both declarations carry `env_names: []`: the pinned source declares no bearer
++token. Authentication is handled by the client's remote MCP authentication
++flow. If an integration later needs a bearer token, declare only its environment
++variable name through `env_names` and supply the value from the operator's
++environment; never put values in arguments, URLs, headers, or package files.
++That change requires revising the release gate and validating client support.
++
++## Safari wrapper and PATH
++
++`bin/safaridriver-mcp` is a POSIX sh wrapper that forwards every argument with
++`exec` to Safari Technology Preview's safaridriver. Requires macOS, Safari
++Technology Preview 247+, Web Developer features and remote automation/external
++agents enabled. A missing or non-executable driver produces a diagnostic and
++exit 127.
++
++The deployment owner must expose this wrapper through a command in the
++machine-current profile's skill command set: its machine forwarding shim in
++the manager's user-bin directory must resolve `safaridriver-mcp`, and that
++directory must be on PATH. MCP declarations do not install commands themselves.
++Shipping this wrapper is not an installation of that shim. Revision 1 inherits
++machine-current shims even for launches of another profile; profile-local
++`path_prepend` is reserved and is not used here. For checkout-only validation,
++an operator can put this repository's `bin` directory on PATH.
++
++## Validation
++
++Run `scripts/validate.sh` (Python 3 required), then
++`python3 -m unittest discover -s tests -v`.
++The gate checks exactly the two pinned release declarations, strict JSON keys,
++identity/version, bare command, and exact credential-free URL/arguments.
++It is intentionally a release inventory gate, not a general protocol parser
++or arbitrary-secret detector. Tests drive the shell entry point and narrow
++three guard classes to measure test sensitivity. The producer evidence includes
++an independent Curator `internal/contextpkg.ParseMCP` oracle (the declaration
++parser; `internal/mcp` checks already-configured servers).
+diff --git a/bin/safaridriver-mcp b/bin/safaridriver-mcp
+new file mode 100755
+index 0000000..597dc91
+--- /dev/null
++++ b/bin/safaridriver-mcp
+@@ -0,0 +1,7 @@
++#!/bin/sh
++driver='/Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver'
++if [ ! -x "$driver" ]; then
++    echo 'safaridriver-mcp: Safari Technology Preview safaridriver is missing or not executable; install Safari Technology Preview 247+.' >&2
++    exit 127
++fi
++exec "$driver" "$@"
+diff --git a/packages/figma/agent-mcp.json b/packages/figma/agent-mcp.json
+new file mode 100644
+index 0000000..2246993
+--- /dev/null
++++ b/packages/figma/agent-mcp.json
+@@ -0,0 +1,10 @@
++{
++  "schema_version": 1,
++  "name": "figma",
++  "version": "1.0.0",
++  "server": {
++    "transport": "http",
++    "url": "https://mcp.figma.com/mcp",
++    "env_names": []
++  }
++}
+diff --git a/packages/safari/agent-mcp.json b/packages/safari/agent-mcp.json
+new file mode 100644
+index 0000000..9699ff4
+--- /dev/null
++++ b/packages/safari/agent-mcp.json
+@@ -0,0 +1,11 @@
++{
++  "schema_version": 1,
++  "name": "safari",
++  "version": "1.0.0",
++  "server": {
++    "transport": "stdio",
++    "command": "safaridriver-mcp",
++    "args": ["--mcp"],
++    "env_names": []
++  }
++}
+diff --git a/scripts/validate.py b/scripts/validate.py
+new file mode 100644
+index 0000000..552e52d
+--- /dev/null
++++ b/scripts/validate.py
+@@ -0,0 +1,56 @@
++"""Validate the pinned release inventory, not arbitrary MCP declarations."""
++import json
++import re
++import sys
++from pathlib import Path
++
++
++def unique_object(pairs):
++    result = {}
++    for key, value in pairs:
++        if key in result:
++            raise ValueError("duplicate JSON key")
++        result[key] = value
++    return result
++
++
++def validate(root):
++    paths = sorted((root / "packages").glob("*/agent-mcp.json"))
++    if {p.parent.name for p in paths} != {"figma", "safari"}:
++        raise ValueError("expected exactly figma and safari manifests")
++    for path in paths:
++        data = json.loads(path.read_text(), object_pairs_hook=unique_object)
++        if set(data) != {"schema_version", "name", "version", "server"}:
++            raise ValueError("unknown or missing manifest field")
++        if type(data["schema_version"]) is not int or data["schema_version"] != 1:
++            raise ValueError("schema_version must be 1")
++        if data["name"] != path.parent.name or data["version"] != "1.0.0":
++            raise ValueError("release identity must match package at version 1.0.0")
++        server = data["server"]
++        expected = ({"transport", "url", "env_names"} if data["name"] == "figma"
++                    else {"transport", "command", "args", "env_names"})
++        if set(server) != expected:
++            raise ValueError("unknown or missing server field")
++        # Upstream declares no environment credentials. Empty names are deliberate.
++        if server["env_names"] != []:
++            raise ValueError("pinned declarations have no credential environment names")
++        if data["name"] == "figma":
++            if server["transport"] != "http" or server["url"] != "https://mcp.figma.com/mcp":
++                raise ValueError("only the pinned credential-free HTTPS URL is allowed")
++        else:
++            command = server["command"]
++            if not isinstance(command, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", command):
++                raise ValueError("command must be bare, without paths")
++            if command != "safaridriver-mcp" or server["transport"] != "stdio":
++                raise ValueError("expected safaridriver-mcp stdio")
++            if server["args"] != ["--mcp"]:
++                raise ValueError("only --mcp is allowed; no paths or literal credentials")
++        print(f"{path.relative_to(root)}: valid")
++
++
++if __name__ == "__main__":
++    try:
++        validate(Path(sys.argv[1]))
++    except (ValueError, OSError, TypeError, KeyError) as error:
++        print(f"validation failed: {error}", file=sys.stderr)
++        sys.exit(1)
+diff --git a/scripts/validate.sh b/scripts/validate.sh
+new file mode 100755
+index 0000000..f27f3ff
+--- /dev/null
++++ b/scripts/validate.sh
+@@ -0,0 +1,4 @@
++#!/bin/sh
++set -eu
++root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
++exec python3 "$root/scripts/validate.py" "${1:-$root}"
+diff --git a/tests/test_delivery.py b/tests/test_delivery.py
+new file mode 100644
+index 0000000..9d0f3df
+--- /dev/null
++++ b/tests/test_delivery.py
+@@ -0,0 +1,117 @@
++import json
++import shutil
++import subprocess
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[1]
++
++
++class DeliveryTests(unittest.TestCase):
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory()
++        self.addCleanup(self.temp.cleanup)
++        self.root = Path(self.temp.name)
++        for directory in ("packages", "scripts"):
++            shutil.copytree(ROOT / directory, self.root / directory)
++
++    def gate(self):
++        return subprocess.run([str(self.root / "scripts/validate.sh")],
++                              text=True, capture_output=True)
++
++    def change(self, package, edit):
++        path = self.root / "packages" / package / "agent-mcp.json"
++        value = json.loads(path.read_text())
++        edit(value)
++        path.write_text(json.dumps(value))
++
++    def test_release(self):
++        self.assertEqual(self.gate().returncode, 0)
++
++    def test_refusals(self):
++        cases = [
++            ("safari", lambda d: d["server"].update(command="/tmp/driver")),
++            ("safari", lambda d: d["server"].update(command="dir/driver")),
++            ("safari", lambda d: d["server"].update(args=["--mcp", "--token=literal"])),
++            ("figma", lambda d: d["server"].update(url="https://mcp.figma.com/mcp?token=literal")),
++            ("figma", lambda d: d["server"].update(token="literal")),
++            ("figma", lambda d: d.update(unknown=True)),
++            ("figma", lambda d: d["server"].update(env_names=["HOME"])),
++            ("figma", lambda d: d.update(schema_version=True)),
++            ("figma", lambda d: d.pop("version")),
++        ]
++        for package, edit in cases:
++            with self.subTest(package=package, edit=edit):
++                shutil.rmtree(self.root / "packages")
++                shutil.copytree(ROOT / "packages", self.root / "packages")
++                self.change(package, edit)
++                self.assertEqual(self.gate().returncode, 1)
++
++    def test_missing_and_malformed(self):
++        path = self.root / "packages/figma/agent-mcp.json"
++        for content in ('{', '{"name":"figma","name":"safari"}', 'null'):
++            path.write_text(content)
++            self.assertEqual(self.gate().returncode, 1)
++        path.unlink()
++        self.assertEqual(self.gate().returncode, 1)
++
++    def test_narrowing_mutants(self):
++        # Each narrowed guard must admit its attack; the normal refusal assertion
++        # would then fail. Mutate copies only, never the candidate source.
++        cases = [
++            ("absolute command",
++             'if command != "safaridriver-mcp" or server["transport"] != "stdio":',
++             'if server["transport"] != "stdio":',
++             'if not isinstance(command, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", command):',
++             'if not isinstance(command, str) or command.startswith("./"):',
++             "safari", lambda d: d["server"].update(command="/tmp/driver")),
++            ("literal token",
++             'if server["args"] != ["--mcp"]:',
++             'if not server["args"] or server["args"][0] != "--mcp":',
++             None, None,
++             "safari", lambda d: d["server"].update(args=["--mcp", "--token=literal"])),
++            ("unknown field",
++             'if set(server) != expected:',
++             'if not expected.issubset(server):',
++             None, None,
++             "figma", lambda d: d["server"].update(token="literal")),
++        ]
++        original = (ROOT / "scripts/validate.py").read_text()
++        for name, old, new, old2, new2, package, edit in cases:
++            with self.subTest(mutant=name):
++                shutil.rmtree(self.root / "packages")
++                shutil.copytree(ROOT / "packages", self.root / "packages")
++                self.change(package, edit)
++                (self.root / "scripts/validate.py").write_text(original)
++                self.assertEqual(self.gate().returncode, 1)
++                mutated = original.replace(old, new)
++                if old2:
++                    mutated = mutated.replace(old2, new2)
++                (self.root / "scripts/validate.py").write_text(mutated)
++                self.assertEqual(self.gate().returncode, 0)
++                print(f"narrowing mutant killed: {name} (normal=1, narrowed=0)")
++
++    def test_wrapper_missing(self):
++        # Sandbox copy changes only the fixed installation path, never /Applications.
++        wrapper = (ROOT / "bin/safaridriver-mcp").read_text()
++        path = self.root / "wrapper"
++        path.write_text(wrapper.replace(
++            "/Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver",
++            str(self.root / "absent")))
++        result = subprocess.run(["sh", str(path)], capture_output=True, text=True)
++        self.assertEqual(result.returncode, 127)
++        self.assertIn("missing or not executable", result.stderr)
++
++    def test_wrapper_forwarding(self):
++        fake = self.root / "fake driver"
++        fake.write_text('#!/bin/sh\nprintf "<%s>\\n" "$@"\nexit 23\n')
++        fake.chmod(0o755)
++        wrapper = (ROOT / "bin/safaridriver-mcp").read_text()
++        path = self.root / "wrapper"
++        path.write_text(wrapper.replace(
++            "/Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver", str(fake)))
++        result = subprocess.run(["sh", str(path), "--mcp", "two words", ""],
++                                capture_output=True, text=True)
++        self.assertEqual(result.returncode, 23)
++        self.assertEqual(result.stdout, "<--mcp>\n<two words>\n<>\n")
