@@ -1,0 +1,11 @@
+# Brief — TASK-260908-1o7i8y a2-installed-integration-delivery (production main wiring; host e11-1)
+
+Precondition: STORY-260908-1wxjbs (defaults + lineup) is landed on launcher main; read its landed code (internal/defaults) rather than the old patches.
+
+Deliver the real `cmd/curator-run` pipeline per SPEC 0.3.0-draft and `production-main-obligations.md` (precondition resource on this task):
+1. `axconfig.Load` BEFORE `cli.Parse` (ax.json absent or `enabled:false` on this host → untracked mode; tracked mode only against the fake ax in tests).
+2. §4.1 fragment resolve (existing), §4.2 mapping (existing), §4.3 defaults/lineup with the stderr origin line-group (landed), §4.4 real tagged `BuildLaunch(LaunchModeInteractive)` admission with the separate provider-limits verdict (internal/plan, landed API), §5 `systemprompt.PrepareLaunch` with warnings, §4.5 composition (internal/composition, landed API), all THREE late checks in BOTH modes, then §4.6 direct exec (internal/execution) or the tracked handoff document exercised only against the fake ax.
+3. Remove the interim `not_implemented` success path. Preserve child exit/signal status instead of `ExitForCode`; preserve forwarded child/provider verdict/ax structured error bytes; render every diagnostic through internal/diagnostics at the real call sites.
+4. Tests at the production entry (`run(...)`) per environment and mode with goldens (argv, env layers, stdin bytes, side effects), negative goldens for forbidden flags, and the fake-ax handoff document test. No real launches in tests.
+5. Do NOT install to ~/.local/bin and do NOT launch real tools from this task: installation and the real launches of claude_code, codex_cli and pi from Curator-managed homes are the orchestrator's verification step after landing (recorded on this task as outcome resources). Do not invent a Pi MCP channel; Pi launches native without MCP (explicit decision on the epic).
+Evidence: `TASK-260908-1o7i8y_results.md` with the production-entry coverage table (rows = obligations in production-main-obligations.md), narrow test exits from a `set -o pipefail` shell, mutants for the three late checks and mode selection. The landing suite (`make check`) runs once through the runtime at handoff.
