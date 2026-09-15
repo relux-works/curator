@@ -1,0 +1,374 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+new file mode 100644
+index 0000000..b26123e
+--- /dev/null
++++ b/CHANGELOG.md
+@@ -0,0 +1,10 @@
++# Changelog
++
++## Unreleased — v0.5.13
++
++- Add `vendorplugin.BuildLaunchWithEnvironment` and
++  `agentic.BuildPlanWithEnvironment` to expose sorted owned environment literals
++  from the same prepared, alias-projected request used to build the plan.
++  Existing planning APIs, Plan values and JSON contracts remain unchanged.
++- Make Codex golden binary-path expectations architecture-neutral using the
++  running Go toolchain, preserving captured fixtures and exact path comparisons.
+diff --git a/pkg/agentic/doc.go b/pkg/agentic/doc.go
+new file mode 100644
+index 0000000..7c8f6b8
+--- /dev/null
++++ b/pkg/agentic/doc.go
+@@ -0,0 +1,7 @@
++// Package agentic defines system contracts and launch planning.
++// BuildPlanWithEnvironment returns a PlanWithEnvironment whose OwnedEnv is a
++// sorted, independently owned snapshot of ChildEnv(nil, effectiveRequest) after
++// request preparation and model alias projection. Consumers must not diff this
++// snapshot against a parent environment. BuildPlan retains its existing Plan
++// and JSON contract and does not request the additional snapshot.
++package agentic
+diff --git a/pkg/agentic/owned_environment_test.go b/pkg/agentic/owned_environment_test.go
+new file mode 100644
+index 0000000..ba80598
+--- /dev/null
++++ b/pkg/agentic/owned_environment_test.go
+@@ -0,0 +1,59 @@
++package agentic
++
++import (
++	"errors"
++	"reflect"
++	"testing"
++)
++
++type ownedEnvironmentSystem struct {
++	*pangolinSystem
++	snapshot []string
++	fail     bool
++}
++
++func (s *ownedEnvironmentSystem) PrepareLaunchRequest(req LaunchRequest, mode LaunchMode) (LaunchRequestPreparation, error) {
++	return LaunchRequestPreparation{Prompt: []byte("prepared")}, nil
++}
++func (s *ownedEnvironmentSystem) ChildEnv(parent []string, req LaunchRequest) ([]string, error) {
++	if parent != nil {
++		return s.pangolinSystem.ChildEnv(parent, req)
++	}
++	if s.fail {
++		return nil, errors.New("owned snapshot refused")
++	}
++	s.snapshot = []string{"Z_PROMPT=" + string(req.Prompt), "A_MODEL=" + req.Model.ID, "B_ALIAS=" + req.Model.AliasOf}
++	return s.snapshot, nil
++}
++func TestBuildPlanWithEnvironmentPreparedAlias(t *testing.T) {
++	s := &ownedEnvironmentSystem{pangolinSystem: newPangolin()}
++	r := NewRegistry()
++	if err := r.Register(s); err != nil {
++		t.Fatal(err)
++	}
++	req := pangolinRequest()
++	req.Model.AliasOf = "launch-identity"
++	got, err := BuildPlanWithEnvironment(r, req, LaunchModeExec)
++	if err != nil {
++		t.Fatal(err)
++	}
++	want := []string{"A_MODEL=launch-identity", "B_ALIAS=", "Z_PROMPT=prepared"}
++	if !reflect.DeepEqual(got.OwnedEnv, want) {
++		t.Fatalf("snapshot = %v, want %v", got.OwnedEnv, want)
++	}
++	if s.snapshot[0] != "Z_PROMPT=prepared" {
++		t.Fatal("sorting mutated plugin storage")
++	}
++	s.snapshot[0] = "mutated"
++	if !reflect.DeepEqual(got.OwnedEnv, want) {
++		t.Fatal("snapshot aliases plugin storage")
++	}
++	s.fail = true
++	failed, err := BuildPlanWithEnvironment(r, req, LaunchModeExec)
++	if err == nil || !reflect.DeepEqual(failed, PlanWithEnvironment{}) {
++		t.Fatalf("snapshot failure admitted: %+v, %v", failed, err)
++	}
++	if _, err := BuildPlan(r, req, LaunchModeExec); err != nil {
++		t.Fatalf("legacy unexpectedly requests owned env: %v", err)
++	}
++}
+diff --git a/pkg/agentic/plan.go b/pkg/agentic/plan.go
+index e884aa4..5fcdc61 100644
+--- a/pkg/agentic/plan.go
++++ b/pkg/agentic/plan.go
+@@ -3,6 +3,7 @@ package agentic
+ import (
+ 	"errors"
+ 	"fmt"
++	"sort"
+ 	"strings"
+ 
+ 	"github.com/relux-works/skill-agents-management/pkg/plugin"
+@@ -172,6 +173,27 @@ func refuseNonInteractiveParameters(id SystemID, req LaunchRequest) error {
+ 	return nil
+ }
+ 
++// PlanWithEnvironment pairs a plan with its owned environment snapshot.
++type PlanWithEnvironment struct {
++	Plan Plan
++	// OwnedEnv contains sorted owned environment literals from ChildEnv(nil,
++	// effectiveRequest), after preparation and alias projection. It excludes the
++	// parent environment. Consumers must not diff it against a parent. The slice
++	// is independently owned by the result; an empty snapshot is nil.
++	OwnedEnv []string
++}
++
++// BuildPlanWithEnvironment builds once and captures the owned environment of
++// that same effective request. On error it returns a zero result.
++func BuildPlanWithEnvironment(r *Registry, req LaunchRequest, mode LaunchMode) (PlanWithEnvironment, error) {
++	var owned []string
++	plan, err := buildPlan(r, req, mode, &owned)
++	if err != nil {
++		return PlanWithEnvironment{}, err
++	}
++	return PlanWithEnvironment{Plan: plan, OwnedEnv: owned}, nil
++}
++
+ // BuildPlan resolves one launch through the registry.
+ //
+ // It is the single dispatch site for the System contract: every surface the
+@@ -185,6 +207,10 @@ func refuseNonInteractiveParameters(id SystemID, req LaunchRequest) error {
+ // later layer and deliberately absent: BuildPlan answers "is this launch
+ // expressible", not "is this launch allowed right now".
+ func BuildPlan(r *Registry, req LaunchRequest, mode LaunchMode) (Plan, error) {
++	return buildPlan(r, req, mode, nil)
++}
++
++func buildPlan(r *Registry, req LaunchRequest, mode LaunchMode, owned *[]string) (Plan, error) {
+ 	if r == nil {
+ 		return Plan{}, errors.New("agentic: cannot build a plan without a registry")
+ 	}
+@@ -297,6 +323,15 @@ func BuildPlan(r *Registry, req LaunchRequest, mode LaunchMode) (Plan, error) {
+ 		return Plan{}, fmt.Errorf("%w: %s attached %d stdin bytes to an interactive launch under effort transport %s", ErrPluginContract, id, len(stdin.Bytes), caps.EffortTransport)
+ 	}
+ 
++	if owned != nil {
++		snapshot, err := sys.ChildEnv(nil, req)
++		if err != nil {
++			return Plan{}, fmt.Errorf("agentic: %s could not build the owned environment: %w", id, err)
++		}
++		*owned = append([]string(nil), snapshot...)
++		sort.Strings(*owned)
++	}
++
+ 	home := strings.TrimSpace(req.Home)
+ 	if home == "" {
+ 		home = caps.DefaultHome
+diff --git a/pkg/agentic/systems/codex/parity_test.go b/pkg/agentic/systems/codex/parity_test.go
+index c3ff6d6..e05b773 100644
+--- a/pkg/agentic/systems/codex/parity_test.go
++++ b/pkg/agentic/systems/codex/parity_test.go
+@@ -3,6 +3,7 @@ package codex
+ import (
+ 	"os"
+ 	"path/filepath"
++	"runtime"
+ 	"strings"
+ 	"testing"
+ 
+@@ -301,6 +302,21 @@ func prepareParityCase(t *testing.T, c parityCase) (parity.Golden, parityDirs, a
+ 	if err != nil {
+ 		t.Fatalf("Load(%q): %v", c.goldenID, err)
+ 	}
++	// Captures retain their original Darwin ARM64 bytes. Derive only the
++	// expected platform path from the toolchain, independently of the resolver.
++	arch, npmArch := "x86_64", "x64"
++	if runtime.GOARCH == "arm64" {
++		arch, npmArch = "aarch64", "arm64"
++	}
++	osName, suffix := "darwin", "apple-darwin"
++	switch runtime.GOOS {
++	case "linux":
++		osName, suffix = "linux", "unknown-linux-musl"
++	case "windows":
++		osName, suffix = "win32", "pc-windows-msvc"
++	}
++	g.Surface.Binary = strings.ReplaceAll(g.Surface.Binary, "@openai/codex-darwin-arm64", "@openai/codex-"+osName+"-"+npmArch)
++	g.Surface.Binary = strings.ReplaceAll(g.Surface.Binary, "aarch64-apple-darwin", arch+"-"+suffix)
+ 	dirs := makeParityDirs(t, c)
+ 	req, pathDirs := c.build(t, dirs)
+ 	env := withPathEntry(g.Capture.ParentEnv, strings.Join(pathDirs, string(os.PathListSeparator)))
+@@ -475,3 +491,28 @@ func (m mutatedStdinSystem) Stdin(req agentic.LaunchRequest) (agentic.StdinPaylo
+ 	mutated[len(mutated)-1] = 'X'
+ 	return agentic.StdinPayload{Attached: true, Bytes: mutated}, nil
+ }
++
++// A wrong architecture must still fail the exact binary-path comparison.
++func TestCodexGoldenRejectsWrongArchitecture(t *testing.T) {
++	for _, id := range []string{"codex/exec-managed-npm-path", "codex/exec-native-shim"} {
++		t.Run(id, func(t *testing.T) {
++			c := parityCaseFor(t, id)
++			g, dirs, req := prepareParityCase(t, c)
++			plan := buildParityPlan(t, New(), req, c.mode)
++			if diffs := parity.ComparePlan(g, plan, dirs.substitutions()); len(diffs) != 0 {
++				t.Fatalf("clean plan differs: %v", diffs)
++			}
++			correct, wrong := "x86_64", "aarch64"
++			if runtime.GOARCH == "arm64" {
++				correct, wrong = wrong, correct
++			}
++			plan.Binary = strings.ReplaceAll(plan.Binary, correct, wrong)
++			for _, diff := range parity.ComparePlan(g, plan, dirs.substitutions()) {
++				if diff.Field == "Binary" {
++					return
++				}
++			}
++			t.Fatal("wrong architecture escaped the binary-path comparison")
++		})
++	}
++}
+diff --git a/pkg/vendorplugin/doc.go b/pkg/vendorplugin/doc.go
+new file mode 100644
+index 0000000..a0d5502
+--- /dev/null
++++ b/pkg/vendorplugin/doc.go
+@@ -0,0 +1,7 @@
++// Package vendorplugin resolves vendor models and runtime launch requests.
++// BuildLaunchWithEnvironment returns the admitted Plan and sorted owned
++// environment literals from the same effective request, including vendor
++// translation, authoritative runtime/vendor assignment, preparation and alias
++// projection. It builds the plan once; consumers must not reconstruct the
++// request or diff the snapshot against a parent. BuildLaunch remains compatible.
++package vendorplugin
+diff --git a/pkg/vendorplugin/owned_environment_test.go b/pkg/vendorplugin/owned_environment_test.go
+new file mode 100644
+index 0000000..b6e1dd5
+--- /dev/null
++++ b/pkg/vendorplugin/owned_environment_test.go
+@@ -0,0 +1,83 @@
++package vendorplugin_test
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"reflect"
++	"sort"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++)
++
++func TestBuildLaunchWithEnvironmentSystemsAndModes(t *testing.T) {
++	registry := isolatedRegistry(t, nil)
++	for _, tc := range []struct {
++		runtime vendorplugin.RuntimeID
++		model   vendorplugin.ModelID
++		binary  string
++	}{
++		{"claude", "claude-opus-5", "claude"}, {"codex", "astra", "codex"}, {"pi-anthropic", "claude-opus-5", "pi"},
++	} {
++		t.Run(string(tc.runtime), func(t *testing.T) {
++			dir := t.TempDir()
++			writeStubBinary(t, dir, tc.binary)
++			req := vendorplugin.SpawnRequest{Runtime: tc.runtime, Model: tc.model, Effort: "high", Env: []string{"PATH=" + dir, "UNOWNED=parent"}, Home: dir, Run: agentic.RunContext{RunID: "owned-test"}}
++			binding, err := registry.ResolveRuntime(tc.runtime)
++			if err != nil {
++				t.Fatal(err)
++			}
++			var model vendorplugin.Model
++			for _, m := range binding.Vendor.Models() {
++				if m.ID == tc.model {
++					model = m
++				}
++			}
++			for _, mode := range []agentic.LaunchMode{agentic.LaunchModeExec, agentic.LaunchModeDryRun, agentic.LaunchModeManagedSession, agentic.LaunchModeInteractive} {
++				t.Run(mode.String(), func(t *testing.T) {
++					got, err := vendorplugin.BuildLaunchWithEnvironment(context.Background(), registry, req, mode)
++					if !binding.System.Capabilities().SupportsMode(mode) {
++						if !errors.Is(err, agentic.ErrUnsupportedLaunchMode) {
++							t.Fatalf("unsupported mode: %v", err)
++						}
++						return
++					}
++					if err != nil {
++						t.Fatal(err)
++					}
++					effective, err := binding.Vendor.Spawn(vendorplugin.SpawnContext{Runtime: binding, Model: model, Effort: req.Effort, Request: req})
++					if err != nil {
++						t.Fatal(err)
++					}
++					effective.Runtime = string(req.Runtime)
++					effective.Vendor = string(binding.VendorID)
++					effective, err = agentic.PrepareLaunchRequest(binding.System, effective, mode)
++					if err != nil {
++						t.Fatal(err)
++					}
++					effective.Model.ID = effective.Model.LaunchIdentity()
++					effective.Model.AliasOf = ""
++					want, err := binding.System.ChildEnv(nil, effective)
++					if err != nil {
++						t.Fatal(err)
++					}
++					sort.Strings(want)
++					if !reflect.DeepEqual(got.OwnedEnv, want) {
++						t.Fatalf("owned = %v; want %v", got.OwnedEnv, want)
++					}
++					legacy, err := vendorplugin.BuildLaunch(context.Background(), registry, req, mode)
++					if err != nil {
++						t.Fatal(err)
++					}
++					a, _ := json.Marshal(legacy)
++					b, _ := json.Marshal(got.Plan)
++					if string(a) != string(b) {
++						t.Fatalf("legacy JSON changed: %s != %s", a, b)
++					}
++				})
++			}
++		})
++	}
++}
+diff --git a/pkg/vendorplugin/spawn.go b/pkg/vendorplugin/spawn.go
+index 765ace6..45df2c1 100644
+--- a/pkg/vendorplugin/spawn.go
++++ b/pkg/vendorplugin/spawn.go
+@@ -138,6 +138,27 @@ type SpawnRequest struct {
+ // launch attempt is a different question from either of those and belongs at
+ // the one place every launch already passes through.
+ func BuildLaunch(ctx context.Context, r *Registry, req SpawnRequest, mode agentic.LaunchMode) (agentic.Plan, error) {
++	return buildLaunch(ctx, r, req, mode, nil)
++}
++
++// BuildLaunchResult exposes the admitted plan and its owned environment.
++type BuildLaunchResult = agentic.PlanWithEnvironment
++
++// BuildLaunchWithEnvironment performs the same admission as BuildLaunch and
++// captures sorted ChildEnv(nil, effectiveRequest) literals in the same planning
++// pass, after preparation and alias projection. Consumers must not diff the
++// snapshot against a parent. Errors return a zero result.
++func BuildLaunchWithEnvironment(ctx context.Context, r *Registry, req SpawnRequest, mode agentic.LaunchMode) (BuildLaunchResult, error) {
++	var result BuildLaunchResult
++	plan, err := buildLaunch(ctx, r, req, mode, &result)
++	if err != nil {
++		return BuildLaunchResult{}, err
++	}
++	result.Plan = plan
++	return result, nil
++}
++
++func buildLaunch(ctx context.Context, r *Registry, req SpawnRequest, mode agentic.LaunchMode, result *BuildLaunchResult) (agentic.Plan, error) {
+ 	if r == nil {
+ 		return agentic.Plan{}, errors.New("vendorplugin: cannot build a launch without a registry")
+ 	}
+@@ -251,7 +272,14 @@ func BuildLaunch(ctx context.Context, r *Registry, req SpawnRequest, mode agenti
+ 		}
+ 	}
+ 
+-	plan, err := agentic.BuildPlan(r.systems, launch, mode)
++	var plan agentic.Plan
++	if result != nil {
++		captured, captureErr := agentic.BuildPlanWithEnvironment(r.systems, launch, mode)
++		plan, err = captured.Plan, captureErr
++		*result = captured
++	} else {
++		plan, err = agentic.BuildPlan(r.systems, launch, mode)
++	}
+ 	if err != nil {
+ 		return agentic.Plan{}, err
+ 	}

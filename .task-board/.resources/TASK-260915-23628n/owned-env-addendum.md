@@ -1,0 +1,6 @@
+# Addendum (orchestrator, 2026-09-16) — host architecture and the Codex goldens
+
+Your results resource established that `TestPlansMatchTheCodexGoldens` (pkg/agentic/systems/codex) fails on pristine HEAD on this amd64 host because two goldens hard-code `aarch64-apple-darwin` paths while the host produces `x86_64-apple-darwin`. This repository has no hosted CI, so the landing suite (`go build ./... && go test ./... -count=1`) runs on this host and must be green here.
+
+Scope extension (bounded, reviewable): make that golden test architecture-neutral — derive the architecture triple from the running toolchain (runtime.GOARCH → aarch64/x86_64) when building the expected paths, or template the goldens with a placeholder substituted at test time — so the goldens encode the same expectation on arm64 and amd64 without weakening what they assert. Do not delete or loosen the goldens; keep the other goldens byte-unchanged; add a narrowing mutant that hard-codes the wrong triple and prove it is killed. Note the change in CHANGELOG under the same Unreleased entry.
+Then resume: keep the preserved candidate, run the narrow package tests, and hand off with `task-board handoff TASK-260915-23628n --role developer` (the runtime runs the full suite once).
