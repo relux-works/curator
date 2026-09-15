@@ -1,0 +1,917 @@
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..617e216
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,2 @@
++.temp/
++__pycache__/
+diff --git a/README.md b/README.md
+index 3008ffc..4dcea93 100644
+--- a/README.md
++++ b/README.md
+@@ -3,9 +3,9 @@
+ Curator context packages carrying the relux root-instruction modules.
+ 
+ Source of the module bytes: `relux-agents-infra`
+-`dee5403eaf1ba7dbeddd8dc33d45e3b0ad0f5e59` (`.instructions/*.md`).
++`459742ea67e3c6b84169520b92d74fe7f73e3002` (`.instructions/*.md`).
+ Module files under `packages/*/context/` are byte-exact copies of that
+-commit, except as recorded in the package README. Do not reword them here;
++commit. Do not reword them here;
+ change them at the source and re-cut.
+ 
+ ## Packages
+@@ -14,7 +14,7 @@ change them at the source and re-cut.
+ | --- | --- | ---: |
+ | `relux-root-context-core` | STRUCTURE, TOOLS, SKILLS, SKILL_TRIGGERS, DOCS, DIAGRAMS, PLATFORM, BROWSER_AUTOMATION, index | 100 |
+ | `relux-root-context-workflow` | WORKFLOW, TESTING | 70 |
+-| `relux-root-context-claude` | EXTERNAL_RESOURCES, REMOTE_AGENTS (`environments: ["claude_code"]`) | 50 |
++| `relux-root-context-claude` | REMOTE_AGENTS (`environments: ["claude_code"]`) | 50 |
+ | `relux-root-context-attachments` | ATTACHMENTS | 40 |
+ | `relux-root-context-style` | STYLE (lowest weight; personal overlay candidate) | 10 |
+ | `relux-root-context-ivan` | umbrella: requires the five above, no modules of its own | 0 |
+@@ -30,7 +30,13 @@ Each package ships a strict schema-1 `agent-context.json`
+ scripts/validate.sh
+ ```
+ 
+-Checks: manifests parse under the strict schema, every declared module
++Checks: manifest JSON and the local contract subset, every declared module
+ exists with valid §3 bytes, `environments` selectors name registered
+ adapters, weights agree between leaf manifests and the umbrella map, and
+ every umbrella range admits the required package's version.
++
++`SOURCES.sha256` pins all 14 module digests for offline drift detection. It is a reviewed baseline, not a signature: coordinated edits to modules and hashes require source re-verification.
++
++Run `python3 -m unittest discover -s tests -v` for behavioral gate tests and `python3 tests/mutants.py` for narrowing mutations.
++
++Full manifest-schema validation additionally uses Curator `internal/contextpkg.LoadManifest` and `ValidateModules`; the local shell gate is not a replacement for that parser.
+diff --git a/SOURCES.sha256 b/SOURCES.sha256
+new file mode 100644
+index 0000000..e8a4c93
+--- /dev/null
++++ b/SOURCES.sha256
+@@ -0,0 +1,14 @@
++1ce362adb54d612cd6c0a465fe105f878b3b70ca6db0583fccbd242b1db283ec  packages/relux-root-context-core/context/INSTRUCTIONS.md
++261475bf17cc210bac8b850efb458357a155d62d29291b00a94f7e3cbc014cd9  packages/relux-root-context-core/context/INSTRUCTIONS_PLATFORM.md
++43f0f117bdb96dfb2d62c3ce036dfdece46ced7aceb7ced4c0910cffbf292eb2  packages/relux-root-context-core/context/INSTRUCTIONS_TOOLS.md
++4dcfbed5b38cd15f241fd973915b7dc8aac8c61405a3cb67246392817a31f03f  packages/relux-root-context-claude/context/INSTRUCTIONS_REMOTE_AGENTS.md
++5b7539e1af4d44a4391d9fe7e0f4d3da09ec74bedc34a77703587240b499eb5a  packages/relux-root-context-workflow/context/INSTRUCTIONS_WORKFLOW.md
++655e2960311de5d31f96e1561f7d949ee1b4d0f8ec19fb99faf53872b523aa4c  packages/relux-root-context-core/context/INSTRUCTIONS_SKILLS.md
++6bd6def53361fa5d1b26bb8baced60a1f5b56db565f216efcf838a59cdb02378  packages/relux-root-context-core/context/INSTRUCTIONS_STRUCTURE.md
++73ddf3882a7260393998da77d4502623bd81473d483de71e6e5418facda69077  packages/relux-root-context-attachments/context/INSTRUCTIONS_ATTACHMENTS.md
++7c17ffa77d1393969d8cece10c85ef4e95b4471f7af1227746b7e186fde2a26a  packages/relux-root-context-style/context/INSTRUCTIONS_STYLE.md
++8cef94d9ffc2a5534a22d0b8b31a21eb87de35b4bc43ede1e64b89b1178ab082  packages/relux-root-context-workflow/context/INSTRUCTIONS_TESTING.md
++b9cba5fc6818c4e157e507ba7b9f3c4d57c2927929a5170c9b1abb91d2761f02  packages/relux-root-context-core/context/INSTRUCTIONS_DOCS.md
++be152470a9744d047d1a8b198900a67fc0c8a9e1b01fb6151b54bc7c48103748  packages/relux-root-context-core/context/INSTRUCTIONS_BROWSER_AUTOMATION.md
++dbb373fc1fc0b86e0277712cbbcaefd6a57e48cc455206b188102be0c8d2b08b  packages/relux-root-context-core/context/INSTRUCTIONS_SKILL_TRIGGERS.md
++ffae7f515787fb8e141f39328c044808eec082bb1b88d3a53ec672ae4b0d793b  packages/relux-root-context-core/context/INSTRUCTIONS_DIAGRAMS.md
+diff --git a/packages/relux-root-context-attachments/README.md b/packages/relux-root-context-attachments/README.md
+index 42ea3ab..f1c07a9 100644
+--- a/packages/relux-root-context-attachments/README.md
++++ b/packages/relux-root-context-attachments/README.md
+@@ -1,8 +1,7 @@
+ # relux-root-context-attachments
+ 
+-Attachments contract: `INSTRUCTIONS_ATTACHMENTS.md` (byte-exact copy of
+-relux-agents-infra `dee5403` `.instructions/`). Weight `40`.
++Version `1.0.0`; weight `40`. Modules are byte-exact:
+ 
+-Known gap: the mapping split puts a `requires.skills` edge on the
+-attachments CLI skill here. That skill gets its Curator manifest in
+-workstream B2; the edge lands with it, not before.
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_ATTACHMENTS.md
++
++Requires the agents-attachments CLI skill at `^0.1`.
+diff --git a/packages/relux-root-context-attachments/agent-context.json b/packages/relux-root-context-attachments/agent-context.json
+index fa922a1..2ae3a59 100644
+--- a/packages/relux-root-context-attachments/agent-context.json
++++ b/packages/relux-root-context-attachments/agent-context.json
+@@ -1 +1,21 @@
+-{"context":{"modules":[{"path":"INSTRUCTIONS_ATTACHMENTS.md"}]},"name":"relux-root-context-attachments","schema_version":1,"version":"1.0.0","weight":40}
+\ No newline at end of file
++{
++  "context": {
++    "modules": [
++      {
++        "path": "INSTRUCTIONS_ATTACHMENTS.md"
++      }
++    ]
++  },
++  "name": "relux-root-context-attachments",
++  "schema_version": 1,
++  "version": "1.0.0",
++  "weight": 40,
++  "requires": {
++    "skills": {
++      "agents-attachments": {
++        "git": "git@github.com:relux-works/skill-agents-attachments.git",
++        "range": "^0.1"
++      }
++    }
++  }
++}
+diff --git a/packages/relux-root-context-claude/README.md b/packages/relux-root-context-claude/README.md
+index adcba6c..3997f29 100644
+--- a/packages/relux-root-context-claude/README.md
++++ b/packages/relux-root-context-claude/README.md
+@@ -1,7 +1,7 @@
+ # relux-root-context-claude
+ 
+-Claude-scoped modules: `INSTRUCTIONS_REMOTE_AGENTS.md`,
+-`INSTRUCTIONS_EXTERNAL_RESOURCES.md` (byte-exact copies of
+-relux-agents-infra `dee5403` `.instructions/`). Every module carries
+-`environments: ["claude_code"]`, so other adapters materialize no chapters
+-from this package. Weight `50`.
++Version `1.0.0`; weight `50`. Modules are byte-exact:
++
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_REMOTE_AGENTS.md
++
++Every module selects only `claude_code`. EXTERNAL_RESOURCES was removed upstream and is no longer shipped.
+diff --git a/packages/relux-root-context-claude/agent-context.json b/packages/relux-root-context-claude/agent-context.json
+index e07cd2a..cf1a2f4 100644
+--- a/packages/relux-root-context-claude/agent-context.json
++++ b/packages/relux-root-context-claude/agent-context.json
+@@ -1 +1,16 @@
+-{"context":{"modules":[{"environments":["claude_code"],"path":"INSTRUCTIONS_REMOTE_AGENTS.md"},{"environments":["claude_code"],"path":"INSTRUCTIONS_EXTERNAL_RESOURCES.md"}]},"name":"relux-root-context-claude","schema_version":1,"version":"1.0.0","weight":50}
+\ No newline at end of file
++{
++  "context": {
++    "modules": [
++      {
++        "environments": [
++          "claude_code"
++        ],
++        "path": "INSTRUCTIONS_REMOTE_AGENTS.md"
++      }
++    ]
++  },
++  "name": "relux-root-context-claude",
++  "schema_version": 1,
++  "version": "1.0.0",
++  "weight": 50
++}
+diff --git a/packages/relux-root-context-claude/context/INSTRUCTIONS_EXTERNAL_RESOURCES.md b/packages/relux-root-context-claude/context/INSTRUCTIONS_EXTERNAL_RESOURCES.md
+deleted file mode 100644
+index 59845b1..0000000
+--- a/packages/relux-root-context-claude/context/INSTRUCTIONS_EXTERNAL_RESOURCES.md
++++ /dev/null
+@@ -1,133 +0,0 @@
+-# External Resource Ownership
+-
+-Mandatory. Applies whenever an agent creates any resource that outlives a
+-single tool call and lives outside the git working tree it is editing.
+-
+-## 1. What Counts As An Owned External Resource
+-
+-An owned external resource is anything an agent starts, boots, mounts, opens,
+-or binds that keeps existing and keeps consuming host or network capacity
+-after the command that created it returns. This includes, at minimum:
+-
+-* a VM (`limactl`, `multipass`, cloud instance, etc.)
+-* a container (`docker run`, `podman run`, compose stacks)
+-* an emulator or simulator (`simctl boot`, Android emulator, etc.)
+-* a mounted disk image (`hdiutil attach`, loopback mounts)
+-* a tunnel (`ssh -L`/`-R`, `ngrok`, Tailscale funnels)
+-* a background service or long-lived process (dev server, watcher, daemon)
+-* remote-host state created for the task (files, directories, git refs, run
+-  roots on a remote machine per `INSTRUCTIONS_REMOTE_AGENTS.md`)
+-* a listening port bound by the agent's own process
+-
+-If a command leaves something alive after it exits, it created an owned
+-external resource, whether or not that was the point of the command.
+-
+-## 2. Ownership Is An Obligation, Not A Permission
+-
+-The agent that creates an owned external resource owns tearing it down, and
+-owes that teardown **before handing off** — before ending the turn, closing
+-the task, or reporting the work as complete — not "eventually," not "in a
+-follow-up," and not "when someone notices." A resource an agent forgets to
+-tear down is not somebody else's problem to discover later; it is this
+-agent's unfinished task.
+-
+-## 3. Task-Scoped Naming Is Mandatory, Because A Name Nothing Reads Helps Nobody
+-
+-Every owned external resource must be named with its task ID
+-(`task-<TASK-ID>`, `<TASK-ID>-worktree`, etc.) so it can be attributed if it
+-survives. Naming alone does not satisfy this contract: an incident VM was
+-already named `task-260819-1e1387` and it still went undetected for weeks,
+-because nothing ever read the name back. A name is only useful paired with
+-the ledger in §4 and something that actually reads it — today that is a
+-human or the agent itself doing the independent verification in §5; see §4
+-for the enumeration tooling planned to read this ledger automatically. Name
+-every resource, but do not treat naming as the control; the ledger and
+-verified teardown are the control.
+-
+-## 4. Declare Before You Create
+-
+-Before creating an owned external resource, append a declaration to a
+-task-scoped ledger at:
+-
+-```
+-.temp/<TASK-ID>/resources.ndjson
+-```
+-
+-Write the declaration line **before** running the create command, not after
+-it succeeds. A crashed or killed run must still leave a trace of what it was
+-about to start; a ledger written only on success proves nothing when the
+-process never reaches "success."
+-
+-Each ledger line is one JSON object (newline-delimited JSON), minimally:
+-
+-```json
+-{"ts":"2026-09-03T12:00:00Z","task_id":"TASK-260903-1ve4cu","kind":"vm","name":"task-260903-1ve4cu-vm","state":"declared","create_cmd":"limactl start ..."}
+-```
+-
+-On successful creation, append a second line updating `state` to `"created"`
+-(carry the same `name`/`kind`/`task_id` so records join). On teardown, append
+-a third line with `state":"torn_down"` only after the independent verification
+-in §5 passes; if verification fails, append `state":"teardown_failed"` instead
+-and do not report the resource as gone.
+-
+-Required fields per line: `ts`, `task_id`, `kind`, `name`, `state`
+-(`declared` | `created` | `torn_down` | `teardown_failed`). `create_cmd` is
+-required on `declared` lines; a `verify_cmd`/`verify_result` pair is required
+-on `torn_down` and `teardown_failed` lines.
+-
+-No automated reader of this ledger exists today. Right now it is read by
+-humans and by the agent itself, and "verification" means the independent
+-read described in §5 — nothing currently reconciles the ledger against live
+-resources for you. The format above is a pinned contract for planned
+-consumers that will do that reconciliation automatically:
+-
+-* an `agents-infra resources` enumeration/reap command —
+-  relux-agents-infra `TASK-260903-2mfpon`
+-* a board `resource_ack` done-gate that blocks handoff on an unresolved
+-  ledger line — skill-project-management `TASK-260903-a8lcn5`
+-
+-Until those land, an undeclared or unverified resource is caught only by
+-whoever actually reads the ledger and runs the checks in §5 — not by
+-tooling.
+-
+-## 5. Teardown Truth: Verify Absence, Never Trust The Delete Command's Exit Code
+-
+-Running the delete/stop/unmount command is not teardown. Teardown is
+-confirming, by an independent read, that the resource is actually gone.
+-
+-This is not a hypothetical caution. In this project's own history,
+-`limactl delete` failed with exit code 99 and the calling code still reported
+-`status: ok, residualResources: 0` — the aggregate success path trusted the
+-delete command instead of checking what was actually left running. The
+-resource stayed alive under a success report until it was found by hand.
+-
+-The rule this defect forces:
+-
+-* After running a teardown command, re-list or re-query the resource by an
+-  independent read (`limactl list`, `docker ps`, `simctl list devices`,
+-  `hdiutil info`, a port scan, a remote `ls`/`test -e`) — never by re-checking
+-  the teardown command's own exit code or stdout.
+-* Report per-resource outcome, not a single aggregate "ok." A batch teardown
+-  where one of three resources fails to disappear is a partial failure, not a
+-  success.
+-* An unreadable or failed verification read is not evidence of absence.
+-  Absence and "I could not check" are different facts — report the latter as
+-  unknown/blocked, never silently as torn down.
+-
+-## 6. No Handoff While An Undeclared Owned Resource Is Live
+-
+-An agent must not hand off a task — change board status, end a spawned run,
+-report completion — while any owned external resource it created is still
+-running and either (a) undeclared in the task's `resources.ndjson`, or
+-(b) declared but not yet verified torn down. Discovering a leftover resource
+-at handoff time means finishing the teardown and verification first, not
+-noting it as a follow-up.
+-
+-See also:
+-
+-* `INSTRUCTIONS_REMOTE_AGENTS.md` Cleanup.
+-* `INSTRUCTIONS_TOOLS.md` Resource Release Check — the before-handoff check
+-  that this contract's teardown-verification rules feed.
+-* `INSTRUCTIONS_TESTING.md` Ephemeral Test Infrastructure Teardown — the same
+-  ownership and verification obligation applied to VMs, emulators, simulators,
+-  containers, and test servers created to run a test.
+diff --git a/packages/relux-root-context-claude/context/INSTRUCTIONS_REMOTE_AGENTS.md b/packages/relux-root-context-claude/context/INSTRUCTIONS_REMOTE_AGENTS.md
+index 0323350..6617b2c 100644
+--- a/packages/relux-root-context-claude/context/INSTRUCTIONS_REMOTE_AGENTS.md
++++ b/packages/relux-root-context-claude/context/INSTRUCTIONS_REMOTE_AGENTS.md
+@@ -206,34 +206,13 @@ The local host remains responsible for final acceptance, commit, and push.
+ 
+ ## Cleanup
+ 
+-The remote run root and the local worktree are owned external resources
+-under `INSTRUCTIONS_EXTERNAL_RESOURCES.md` — that module's declare/verify/
+-handoff rules apply here in full; this section does not restate them. Tearing
+-them down is this agent's obligation, not something to do only if convenient:
+-an agent that never reaches this step has not completed the task, regardless
+-of what it reports.
+-
+-Capture the patch and logs first — cleanup must never run before that capture
+-completes:
++Clean up only after the patch and logs are captured:
+ 
+ ```bash
+ ssh "$REMOTE_SSH" "rm -rf '$REMOTE_RUN_ROOT/$RUN_ID'"
+ git worktree remove "$LOCAL_RUN_DIR/source"
+ ```
+ 
+-Running the delete commands above is not teardown by itself. Verify absence by
+-an independent read before reporting cleanup done, per
+-`INSTRUCTIONS_EXTERNAL_RESOURCES.md` §5:
+-
+-```bash
+-ssh "$REMOTE_SSH" "test -e '$REMOTE_RUN_ROOT/$RUN_ID' && echo STILL_PRESENT || echo GONE"
+-git worktree list | grep -F "$LOCAL_RUN_DIR/source" && echo STILL_PRESENT || echo GONE
+-```
+-
+-Do not hand off the task — change board status, end a spawned run, report
+-completion — while either check reports `STILL_PRESENT`, and do not treat a
+-failed or inconclusive check as evidence of absence.
+-
+ Keep local `.temp/remote-agent/$RUN_ID/` logs until the task is complete.
+ 
+ ## Failure Modes
+diff --git a/packages/relux-root-context-core/README.md b/packages/relux-root-context-core/README.md
+index 66e7309..b7218fd 100644
+--- a/packages/relux-root-context-core/README.md
++++ b/packages/relux-root-context-core/README.md
+@@ -1,17 +1,15 @@
+ # relux-root-context-core
+ 
+-Core root-context modules. Weight `100` (highest: foundational chapters).
++Version `1.0.0`; weight `100`. Modules are byte-exact:
+ 
+-Modules (byte-exact copies of relux-agents-infra `dee5403`
+-`.instructions/`):
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_PLATFORM.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_STRUCTURE.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_BROWSER_AUTOMATION.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_TOOLS.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_SKILLS.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_SKILL_TRIGGERS.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_DIAGRAMS.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_DOCS.md
+ 
+-- `INSTRUCTIONS.md` — the source loader index, kept as the entry map.
+-  Curator materialization supersedes its `@~/.agents/...` include lines;
+-  they are preserved inert, not followed.
+-- `INSTRUCTIONS_PLATFORM.md`, `INSTRUCTIONS_STRUCTURE.md`,
+-  `INSTRUCTIONS_TOOLS.md`, `INSTRUCTIONS_SKILLS.md`,
+-  `INSTRUCTIONS_SKILL_TRIGGERS.md`, `INSTRUCTIONS_DOCS.md`,
+-  `INSTRUCTIONS_DIAGRAMS.md`
+-- `INSTRUCTIONS_BROWSER_AUTOMATION.md` — not assigned to a package by the
+-  mapping split; carried here because it is a tool-capability module and
+-  this package owns TOOLS.
++BROWSER_AUTOMATION is a tool-capability module, assigned to core. INSTRUCTIONS.md preserves the upstream loader index; AGENTS.md is its byte-identical alias and is not duplicated as a chapter. Include lines remain source bytes; this package does not resolve native-home includes.
+diff --git a/packages/relux-root-context-core/agent-context.json b/packages/relux-root-context-core/agent-context.json
+index 75fe4a3..6208735 100644
+--- a/packages/relux-root-context-core/agent-context.json
++++ b/packages/relux-root-context-core/agent-context.json
+@@ -1 +1,37 @@
+-{"context":{"modules":[{"path":"INSTRUCTIONS.md"},{"path":"INSTRUCTIONS_PLATFORM.md"},{"path":"INSTRUCTIONS_STRUCTURE.md"},{"path":"INSTRUCTIONS_BROWSER_AUTOMATION.md"},{"path":"INSTRUCTIONS_TOOLS.md"},{"path":"INSTRUCTIONS_SKILLS.md"},{"path":"INSTRUCTIONS_SKILL_TRIGGERS.md"},{"path":"INSTRUCTIONS_DIAGRAMS.md"},{"path":"INSTRUCTIONS_DOCS.md"}]},"name":"relux-root-context-core","schema_version":1,"version":"1.0.0","weight":100}
+\ No newline at end of file
++{
++  "context": {
++    "modules": [
++      {
++        "path": "INSTRUCTIONS.md"
++      },
++      {
++        "path": "INSTRUCTIONS_PLATFORM.md"
++      },
++      {
++        "path": "INSTRUCTIONS_STRUCTURE.md"
++      },
++      {
++        "path": "INSTRUCTIONS_BROWSER_AUTOMATION.md"
++      },
++      {
++        "path": "INSTRUCTIONS_TOOLS.md"
++      },
++      {
++        "path": "INSTRUCTIONS_SKILLS.md"
++      },
++      {
++        "path": "INSTRUCTIONS_SKILL_TRIGGERS.md"
++      },
++      {
++        "path": "INSTRUCTIONS_DIAGRAMS.md"
++      },
++      {
++        "path": "INSTRUCTIONS_DOCS.md"
++      }
++    ]
++  },
++  "name": "relux-root-context-core",
++  "schema_version": 1,
++  "version": "1.0.0",
++  "weight": 100
++}
+diff --git a/packages/relux-root-context-core/context/INSTRUCTIONS.md b/packages/relux-root-context-core/context/INSTRUCTIONS.md
+index 290fe56..09242ff 100644
+--- a/packages/relux-root-context-core/context/INSTRUCTIONS.md
++++ b/packages/relux-root-context-core/context/INSTRUCTIONS.md
+@@ -10,7 +10,6 @@ This document loads all instruction modules automatically.
+ @~/.agents/.instructions/INSTRUCTIONS_BROWSER_AUTOMATION.md
+ @~/.agents/.instructions/INSTRUCTIONS_REMOTE_AGENTS.md
+ @~/.agents/.instructions/INSTRUCTIONS_TOOLS.md
+-@~/.agents/.instructions/INSTRUCTIONS_EXTERNAL_RESOURCES.md
+ @~/.agents/.instructions/INSTRUCTIONS_SKILLS.md
+ @~/.agents/.instructions/INSTRUCTIONS_SKILL_TRIGGERS.md
+ @~/.agents/.instructions/INSTRUCTIONS_DIAGRAMS.md
+diff --git a/packages/relux-root-context-core/context/INSTRUCTIONS_TOOLS.md b/packages/relux-root-context-core/context/INSTRUCTIONS_TOOLS.md
+index d03e85c..4a70d7c 100644
+--- a/packages/relux-root-context-core/context/INSTRUCTIONS_TOOLS.md
++++ b/packages/relux-root-context-core/context/INSTRUCTIONS_TOOLS.md
+@@ -38,14 +38,13 @@ Supported shared MCP server definitions:
+ | Server | Use | Enablement |
+ |--------|-----|------------|
+ | `figma` | Figma Dev Mode / design context | Add `figma` to `.agents/.configs/project-config.toml` |
+-| `lldb` | LLDB debugging through `lldb-mcp` stdio bridge | Add `lldb` to `.agents/.configs/project-config.toml`; macOS `./setup.sh` installs Homebrew `llvm` and an `lldb-mcp` wrapper when needed |
+ | `safari` | Safari Technology Preview web inspection through `safaridriver --mcp` | Add `safari` to `.agents/.configs/project-config.toml`; requires Safari Technology Preview with web developer features, remote automation, and external agents enabled |
+ 
+ Project opt-in example:
+ 
+ ```toml
+ [mcp]
+-enabled_servers = ["figma", "lldb", "safari"]
++enabled_servers = ["figma", "safari"]
+ ```
+ 
+ `enabled_servers` is one agent-agnostic list per project — there is a single
+@@ -71,15 +70,6 @@ server enables it for whichever agent you launch.
+   * minimal (avoid tool bloat),
+   * reproducible (include exact commands),
+   * and safe (no hidden side effects).
+-* The same justified-need, documented, minimal, reproducible, safe bar applies
+-  to **starting a long-lived service** (a VM, container, emulator/simulator,
+-  mount, tunnel, dev server, watcher, daemon, or any other process the agent
+-  starts that keeps running after the command returns) — not only to
+-  installing a binary. Starting a service is the more dangerous act: an
+-  installed binary sits idle, a running service consumes host or network
+-  capacity until something stops it. Follow `INSTRUCTIONS_EXTERNAL_RESOURCES.md`
+-  for the ownership, ledger, and teardown-verification contract that governs
+-  every such resource.
+ 
+ ---
+ 
+@@ -90,22 +80,3 @@ server enables it for whichever agent you launch.
+ * If a tool cannot be used successfully:
+   * document the failure (what command failed + error) in `.temp/` logs and/or `.temp/tasks.md`;
+   * do not proceed with workflows that assume the tool works.
+-
+----
+-
+-## Resource Release Check (mandatory)
+-
+-* Tool Readiness Check asks whether a tool **can run**, before it is used.
+-  Resource Release Check asks whether a tool **left anything running**, before
+-  the task hands off. The two checks are symmetric in force: neither is
+-  optional, and a task is not ready to hand off just because it produced the
+-  right output — it must also not have left an owned external resource alive
+-  and unverified.
+-* Before ending a turn, closing a task, or reporting work as complete, the
+-  agent must verify — not merely attempt — that every external resource it
+-  started during the task is either still legitimately needed and declared,
+-  or actually torn down.
+-* Follow `INSTRUCTIONS_EXTERNAL_RESOURCES.md` for what counts as an owned
+-  external resource, the declare-before-create ledger, and the teardown
+-  verification this check requires. Do not hand off while it reports an
+-  undeclared or unverified resource still live.
+diff --git a/packages/relux-root-context-ivan/README.md b/packages/relux-root-context-ivan/README.md
+index 618da7a..5568a2b 100644
+--- a/packages/relux-root-context-ivan/README.md
++++ b/packages/relux-root-context-ivan/README.md
+@@ -1,10 +1,9 @@
+ # relux-root-context-ivan
+ 
+-Pure umbrella (no `context/` member): requires the five context packages
+-of this repository by `^1.0` ranges over per-package `v`-tags, with the
+-effective weights in the `weights` map. Leaf manifest `weight` values and
+-the map agree by construction; there are no per-edge weights.
+-
+-Known gaps (workstreams B2/B3): `requires.skills` (pdf, skill-creator,
+-agents-attachments) and `requires.mcp` (figma, lldb, safari) land once
+-those packages exist in their own repositories.
++Pure umbrella, version `1.0.0`, with five context requirements at `^1.0` and the leaf weights in its weights map (no edge weights).
++
++Requires pdf, skill-creator and agents-attachments from their relux-works repositories at `^0.1` (B2 source contract). Live tag resolution is deferred to integration; no tags are created here.
++
++`requires.mcp` remains deferred until B3 creates relux-mcp.
++
++Source modules and their exact upstream pins are documented in the five leaf READMEs and SOURCES.sha256.
+diff --git a/packages/relux-root-context-ivan/agent-context.json b/packages/relux-root-context-ivan/agent-context.json
+index a612b20..9f04906 100644
+--- a/packages/relux-root-context-ivan/agent-context.json
++++ b/packages/relux-root-context-ivan/agent-context.json
+@@ -1 +1,56 @@
+-{"name":"relux-root-context-ivan","requires":{"contexts":{"relux-root-context-attachments":{"directory":"packages/relux-root-context-attachments","git":"https://github.com/relux-works/relux-root-context.git","range":"^1.0"},"relux-root-context-claude":{"directory":"packages/relux-root-context-claude","git":"https://github.com/relux-works/relux-root-context.git","range":"^1.0"},"relux-root-context-core":{"directory":"packages/relux-root-context-core","git":"https://github.com/relux-works/relux-root-context.git","range":"^1.0"},"relux-root-context-style":{"directory":"packages/relux-root-context-style","git":"https://github.com/relux-works/relux-root-context.git","range":"^1.0"},"relux-root-context-workflow":{"directory":"packages/relux-root-context-workflow","git":"https://github.com/relux-works/relux-root-context.git","range":"^1.0"}}},"schema_version":1,"version":"1.0.0","weight":0,"weights":{"relux-root-context-attachments":40,"relux-root-context-claude":50,"relux-root-context-core":100,"relux-root-context-style":10,"relux-root-context-workflow":70}}
+\ No newline at end of file
++{
++  "name": "relux-root-context-ivan",
++  "requires": {
++    "contexts": {
++      "relux-root-context-attachments": {
++        "directory": "packages/relux-root-context-attachments",
++        "git": "https://github.com/relux-works/relux-root-context.git",
++        "range": "^1.0"
++      },
++      "relux-root-context-claude": {
++        "directory": "packages/relux-root-context-claude",
++        "git": "https://github.com/relux-works/relux-root-context.git",
++        "range": "^1.0"
++      },
++      "relux-root-context-core": {
++        "directory": "packages/relux-root-context-core",
++        "git": "https://github.com/relux-works/relux-root-context.git",
++        "range": "^1.0"
++      },
++      "relux-root-context-style": {
++        "directory": "packages/relux-root-context-style",
++        "git": "https://github.com/relux-works/relux-root-context.git",
++        "range": "^1.0"
++      },
++      "relux-root-context-workflow": {
++        "directory": "packages/relux-root-context-workflow",
++        "git": "https://github.com/relux-works/relux-root-context.git",
++        "range": "^1.0"
++      }
++    },
++    "skills": {
++      "pdf": {
++        "git": "git@github.com:relux-works/skill-pdf.git",
++        "range": "^0.1"
++      },
++      "skill-creator": {
++        "git": "git@github.com:relux-works/skill-creator.git",
++        "range": "^0.1"
++      },
++      "agents-attachments": {
++        "git": "git@github.com:relux-works/skill-agents-attachments.git",
++        "range": "^0.1"
++      }
++    }
++  },
++  "schema_version": 1,
++  "version": "1.0.0",
++  "weight": 0,
++  "weights": {
++    "relux-root-context-attachments": 40,
++    "relux-root-context-claude": 50,
++    "relux-root-context-core": 100,
++    "relux-root-context-style": 10,
++    "relux-root-context-workflow": 70
++  }
++}
+diff --git a/packages/relux-root-context-style/README.md b/packages/relux-root-context-style/README.md
+index bce5f91..053932a 100644
+--- a/packages/relux-root-context-style/README.md
++++ b/packages/relux-root-context-style/README.md
+@@ -1,5 +1,5 @@
+ # relux-root-context-style
+ 
+-Personal style overlay: `INSTRUCTIONS_STYLE.md` (byte-exact copy of
+-relux-agents-infra `dee5403` `.instructions/`). Weight `10` (lowest, per
+-the mapping split: personal overlay candidate).
++Version `1.0.0`; weight `10`. Modules are byte-exact:
++
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_STYLE.md
+diff --git a/packages/relux-root-context-style/agent-context.json b/packages/relux-root-context-style/agent-context.json
+index cee22a7..124aa53 100644
+--- a/packages/relux-root-context-style/agent-context.json
++++ b/packages/relux-root-context-style/agent-context.json
+@@ -1 +1,13 @@
+-{"context":{"modules":[{"path":"INSTRUCTIONS_STYLE.md"}]},"name":"relux-root-context-style","schema_version":1,"version":"1.0.0","weight":10}
+\ No newline at end of file
++{
++  "context": {
++    "modules": [
++      {
++        "path": "INSTRUCTIONS_STYLE.md"
++      }
++    ]
++  },
++  "name": "relux-root-context-style",
++  "schema_version": 1,
++  "version": "1.0.0",
++  "weight": 10
++}
+diff --git a/packages/relux-root-context-workflow/README.md b/packages/relux-root-context-workflow/README.md
+index 3ef356c..680aadd 100644
+--- a/packages/relux-root-context-workflow/README.md
++++ b/packages/relux-root-context-workflow/README.md
+@@ -1,5 +1,6 @@
+ # relux-root-context-workflow
+ 
+-Process modules: `INSTRUCTIONS_WORKFLOW.md`, `INSTRUCTIONS_TESTING.md`
+-(byte-exact copies of relux-agents-infra `dee5403` `.instructions/`).
+-Weight `70`.
++Version `1.0.0`; weight `70`. Modules are byte-exact:
++
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_TESTING.md
++- source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_WORKFLOW.md
+diff --git a/packages/relux-root-context-workflow/agent-context.json b/packages/relux-root-context-workflow/agent-context.json
+index 62a3a6c..4c7276e 100644
+--- a/packages/relux-root-context-workflow/agent-context.json
++++ b/packages/relux-root-context-workflow/agent-context.json
+@@ -1 +1,16 @@
+-{"context":{"modules":[{"path":"INSTRUCTIONS_TESTING.md"},{"path":"INSTRUCTIONS_WORKFLOW.md"}]},"name":"relux-root-context-workflow","schema_version":1,"version":"1.0.0","weight":70}
+\ No newline at end of file
++{
++  "context": {
++    "modules": [
++      {
++        "path": "INSTRUCTIONS_TESTING.md"
++      },
++      {
++        "path": "INSTRUCTIONS_WORKFLOW.md"
++      }
++    ]
++  },
++  "name": "relux-root-context-workflow",
++  "schema_version": 1,
++  "version": "1.0.0",
++  "weight": 70
++}
+diff --git a/packages/relux-root-context-workflow/context/INSTRUCTIONS_TESTING.md b/packages/relux-root-context-workflow/context/INSTRUCTIONS_TESTING.md
+index b280076..3ec9f91 100644
+--- a/packages/relux-root-context-workflow/context/INSTRUCTIONS_TESTING.md
++++ b/packages/relux-root-context-workflow/context/INSTRUCTIONS_TESTING.md
+@@ -5,6 +5,60 @@
+ * Use **Swift Testing** framework, not XCTest.
+ * Tests must be in **Swift**, not ObjC.
+ 
++## State What Each Test Proves
++
++* Add a brief comment beside each test stating the specific claim it proves.
++  One shared comment is sufficient for a cohesive group or table of tests that
++  checks the same claim; do not repeat it for every case.
++* State materially different per-case claims and important limits separately.
++  The claim must match the actual assertions, exercised path, inputs, and
++  environment; a passing example must not be described as a universal proof.
++* Keep this to a concise claim, plus a limitation when needed, not a mandatory
++  questionnaire or a narration of the test code. Update the comment when the
++  test changes. This applies to positive and negative tests alike.
++
++## Negative Tests Are A Development Baseline
++
++* Every development change must consider both required behavior and forbidden
++  outcomes. Add or preserve relevant executable negative tests for affected
++  contracts in features, bug fixes, refactoring, and integration. This is not
++  limited to security, validators, or explicit rejection gates.
++* Define negative expectations while specifying the change, before treating
++  happy-path success as completion. Derive cases from requirements and realistic
++  failure modes: invalid inputs, boundary values, forbidden transitions, missing
++  authority or dependencies, and interruption, retry, or concurrency where
++  relevant. Carry these expectations into implementation and review handoffs.
++* Assert the intended rejection or invariant, not merely any error, crash, or
++  timeout. Check post-failure state and observable effects against the contract:
++  no forbidden partial writes, leaked information, duplicate effects, or lost
++  recovery guarantees. Permitted rejection telemetry is not a forbidden effect.
++* Pair negative cases with nearby valid positive controls. An implementation
++  that rejects everything must not satisfy the tests. Two implementations
++  agreeing is not proof of correctness: ground expected verdicts in an
++  independent requirement and probe both disagreement directions when
++  equivalence is required. Document intentional asymmetry instead of demanding
++  identical behavior across different contracts.
++* For bug fixes, retain a regression witness and test relevant neighboring
++  variants so that the fix addresses the failure class, not just one input.
++  Preserve existing negative guarantees when refactoring.
++* Scale depth to risk and the changed contract, not a universal test quota.
++  Existing applicable coverage may be reused with evidence. For non-executable
++  changes, use meaningful contract fixtures or counterexamples where applicable.
++  Record a specific rationale for an inapplicable check and distinguish checks
++  that could not run from passing evidence. Silence or a small diff is not a
++  waiver; superficial tests written only to satisfy a checklist are not evidence.
++* When acceptance relies on a checker, scanner, gate, or test harness, establish
++  that it detects a known violation of the claimed property using a bounded
++  control plant where applicable. Require the intended failure: a skipped or
++  not-applied plant, unrelated setup failure, or crash is not a successful
++  control. Instrument controls supplement product negative tests; they do not
++  mandate exhaustive mutation testing for every edit. Reassess reused control
++  evidence when the relevant instrument, configuration, or contract changes.
++* Run fault injection and destructive negative cases in isolated fixtures or
++  explicitly authorized test environments. Negative-testing obligations never
++  authorize damaging user data, resetting live devices, weakening permissions,
++  or violating the state-preservation rules below.
++
+ ## Android App State Preservation
+ 
+ * Preserve the currently installed app, its data, granted permissions, active
+@@ -38,35 +92,6 @@
+   interaction is not already authorized, stop and request direction instead of
+   destroying the working state.
+ 
+-## Ephemeral Test Infrastructure Teardown
+-
+-* A VM, emulator, simulator, container, or test server booted to run a test is
+-  an owned external resource for as long as it exists — the same obligation
+-  `INSTRUCTIONS_EXTERNAL_RESOURCES.md` defines for any other owned resource
+-  applies to it, not just to infrastructure started outside a test context.
+-* Preservation and teardown point in opposite directions but come from the
+-  same discipline: preserve state you found already running (Android App
+-  State Preservation above), tear down state you brought into existence to
+-  run the test. Leaving a fixture-scoped emulator alive "just in case," and
+-  wiping a device that was already there, are the same underlying mistake —
+-  treating what you did not create as disposable, or what you did create as
+-  permanent.
+-* Booting infrastructure to run a test does not by itself authorize leaving it
+-  running once that test's verification is done. Tear it down as part of
+-  finishing the test, not as a separate cleanup step for someone else to
+-  notice later.
+-* A test run is not complete on a green result alone. It is complete only once
+-  every piece of ephemeral test infrastructure it created has been verified
+-  absent by an independent read, never by trusting the shutdown command's exit
+-  code — see `INSTRUCTIONS_EXTERNAL_RESOURCES.md` §5 for why the exit code is
+-  not sufficient, and §4 for the declare-before-create ledger this verification
+-  feeds.
+-* When spawning a tester or device worker to run tests, carry this teardown
+-  obligation into the task instructions explicitly, the same way the Android
+-  state-preservation contract above must be carried into worker instructions.
+-  Do not delegate "run the tests" in a way that lets the worker boot
+-  infrastructure and hand off without proving it is gone.
+-
+ ---
+ 
+ ## Refactoring workflow
+diff --git a/packages/relux-root-context-workflow/context/INSTRUCTIONS_WORKFLOW.md b/packages/relux-root-context-workflow/context/INSTRUCTIONS_WORKFLOW.md
+index 8998bd5..9b8aee3 100644
+--- a/packages/relux-root-context-workflow/context/INSTRUCTIONS_WORKFLOW.md
++++ b/packages/relux-root-context-workflow/context/INSTRUCTIONS_WORKFLOW.md
+@@ -16,6 +16,16 @@
+ * Re-evaluate the workflow whenever scope narrows. Do not carry forward earlier research, review, rendering, or validation gates unless they still protect against a plausible failure in the current delta.
+ * Skills and workflow systems are constraints, not deliverables. If a mandatory repository or skill contract requires a heavier process, follow it, but do not add extra layers beyond that contract. Ceremony that costs more than the work without increasing confidence is a process failure.
+ 
++## Hold Focus Across Mid-Turn Messages
++
++* A message that arrives while you are working is **input, not an interrupt**. Default to finishing the committed unit of work and answering it afterwards. Switch immediately only when the message says to stop, contradicts what you are currently doing, or reports that the current work is built on a wrong premise.
++* Once work is committed to — a task moved to in-progress, a worktree provisioned, an edit begun — that unit is what you finish. Park everything else explicitly ("noted, doing X first") instead of silently reprioritizing.
++* When a request is ambiguous, let the conversation settle before acting on it. Do not implement, file, or rewrite an artifact after each partial clarification. Two wrong readings in a row means **stop guessing and ask one direct question**, in plain conversation.
++* Never re-specify the same artifact repeatedly as clarifications arrive. Wait for the complete thought, then write it once. Repeated renaming, re-scoping, or rewriting of one tracker entry within a single exchange is churn, and it reads as flailing.
++* Ambiguity about placement, naming, or design belongs to the human. Record your objection once, in one or two sentences, and then implement their decision; do not relitigate it on the next message.
++* Answering a side question does not license starting side work. A question gets an answer; new work gets tracked and queued behind the current unit.
++* Prefer few, substantial turns over many reactive ones. If several messages arrive in quick succession, read them together and respond once to the resolved intent rather than once per message.
++
+ ## Model Availability and Fallback
+ 
+ * Treat temporary model unavailability as an operational condition, not as a decision to hand back to the human.
+diff --git a/scripts/check_sources.py b/scripts/check_sources.py
+new file mode 100644
+index 0000000..6a4c167
+--- /dev/null
++++ b/scripts/check_sources.py
+@@ -0,0 +1,25 @@
++"""Check the reviewed offline source baseline; not an authenticity proof."""
++import hashlib
++import json
++from pathlib import Path
++import re
++
++root = Path(__file__).resolve().parent.parent
++expected = {}
++for line in (root / 'SOURCES.sha256').read_text().splitlines():
++    match = re.fullmatch(r'([0-9a-f]{64})  (packages/[^/]+/context/[^/]+\.md)', line)
++    if not match or match[2] in expected:
++        raise SystemExit('sources: malformed or duplicate checksum row')
++    expected[match[2]] = match[1]
++actual = {p.relative_to(root).as_posix() for p in (root / 'packages').glob('*/context/*')}
++declared = set()
++for manifest in (root / 'packages').glob('*/agent-context.json'):
++    for mod in json.loads(manifest.read_text()).get('context', {}).get('modules', []):
++        declared.add((manifest.parent / 'context' / mod['path']).relative_to(root).as_posix())
++if set(expected) != actual or set(expected) != declared:
++    raise SystemExit('sources: checksum, disk and manifest inventories differ')
++for path, digest in expected.items():
++    raw = (root / path).read_bytes()
++    if hashlib.sha256(raw).hexdigest() != digest:
++        raise SystemExit('sources: byte drift: ' + path)
++print(f'sources: {len(expected)} module digests OK')
+diff --git a/scripts/validate.sh b/scripts/validate.sh
+index d9db23e..ca63836 100755
+--- a/scripts/validate.sh
++++ b/scripts/validate.sh
+@@ -163,5 +163,7 @@ for pkg in relux-root-context-core relux-root-context-workflow relux-root-contex
+   done
+ done
+ 
++python3 "$ROOT/scripts/check_sources.py"
++
+ echo "validate: module bytes: OK"
+ echo "validate: PASS"
+diff --git a/tests/mutants.py b/tests/mutants.py
+new file mode 100644
+index 0000000..3fc46c0
+--- /dev/null
++++ b/tests/mutants.py
+@@ -0,0 +1,36 @@
++"""Narrow gates in disposable copies, then execute the behavioral suite."""
++from pathlib import Path
++import shutil
++import subprocess
++import tempfile
++
++root = Path(__file__).resolve().parents[1]
++cases = [
++ ('trailing-lf', 'scripts/validate.sh', 'or raw.endswith(b"\\n\\n"):', 'or (raw.endswith(b"\\n\\n") and not raw.endswith(b".\\n\\n")):', 'test_trailing_lf'),
++ ('unknown-env', 'scripts/validate.sh', 'if env not in envs:', 'if env not in envs and env != "future_env":', 'test_unknown_env'),
++ ('weight', 'scripts/validate.sh', 'if weight != leaf_weights[name]:', 'if weight != leaf_weights[name] and leaf_weights[name] != 101:', 'test_weight_drift'),
++ ('digest', 'scripts/check_sources.py', 'if hashlib.sha256(raw).hexdigest() != digest:', 'if hashlib.sha256(raw).hexdigest() != digest and not raw.startswith(b"changed\\n"):', 'test_source_drift'),
++ ('sources-digest', 'scripts/check_sources.py', 'if hashlib.sha256(raw).hexdigest() != digest:', 'if hashlib.sha256(raw).hexdigest() != digest and digest != "0" * 64:', 'test_sources_drift'),
++ ('inventory', 'scripts/check_sources.py', 'if set(expected) != actual or set(expected) != declared:', 'if (set(expected) != actual or set(expected) != declared) and len(expected) != 13:', 'test_missing_row'),
++ ('duplicate', 'scripts/check_sources.py', 'if not match or match[2] in expected:', 'if not match or (match[2] in expected and match[2] != "packages/relux-root-context-style/context/INSTRUCTIONS_STYLE.md"):', 'test_duplicate_row'),
++]
++(root / ".temp").mkdir(exist_ok=True)
++for name, file, before, after, test in cases:
++    with tempfile.TemporaryDirectory(dir=root / '.temp') as tmp:
++        target = Path(tmp)
++        for folder in ('scripts', 'packages', 'tests'):
++            shutil.copytree(root / folder, target / folder)
++        shutil.copy(root / 'SOURCES.sha256', target)
++        (target / '.temp').mkdir()
++        p = target / file; text = p.read_text(); assert text.count(before) == 1
++        p.write_text(text.replace(before, after))
++        # Duplicate probe repeats the first checksum row; choose the corresponding path.
++        if name == 'duplicate':
++            first = (target / 'SOURCES.sha256').read_text().splitlines()[0][66:]
++            p.write_text(p.read_text().replace('packages/relux-root-context-style/context/INSTRUCTIONS_STYLE.md', first))
++        result = subprocess.run(['python3', '-m', 'unittest', 'discover', '-s', 'tests', '-v'], cwd=target, capture_output=True, text=True)
++        print(f'{name}: behavioral suite exit {result.returncode}; expected failing probe {test}', flush=True)
++        if result.returncode != 1 or f'FAIL: {test} ' not in result.stderr:
++            print(result.stdout + result.stderr)
++            raise SystemExit('mutant survived or failed for the wrong reason')
++print('all narrowing mutants killed')
+diff --git a/tests/test_validate.py b/tests/test_validate.py
+new file mode 100644
+index 0000000..4fa5019
+--- /dev/null
++++ b/tests/test_validate.py
+@@ -0,0 +1,69 @@
++"""Behavioral probes execute the shipped shell entry point in isolated copies."""
++import json
++import hashlib
++from pathlib import Path
++import shutil
++import subprocess
++import tempfile
++import unittest
++
++ROOT = Path(__file__).resolve().parents[1]
++
++class Validation(unittest.TestCase):
++    def setUp(self):
++        (ROOT / ".temp").mkdir(exist_ok=True)
++        self.tmp = tempfile.TemporaryDirectory(dir=ROOT / '.temp')
++        self.addCleanup(self.tmp.cleanup)
++        self.root = Path(self.tmp.name)
++        for name in ('packages', 'scripts'):
++            shutil.copytree(ROOT / name, self.root / name)
++        shutil.copy(ROOT / 'SOURCES.sha256', self.root)
++
++    def gate(self, expected):
++        result = subprocess.run(['bash', 'scripts/validate.sh'], cwd=self.root, capture_output=True, text=True)
++        self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
++
++    def manifest(self, name, change):
++        p = self.root / 'packages' / ('relux-root-context-' + name) / 'agent-context.json'
++        obj = json.loads(p.read_text()); change(obj); p.write_text(json.dumps(obj))
++
++    def test_valid(self):
++        self.gate(0)
++
++    def test_trailing_lf(self):
++        p = self.root / 'packages/relux-root-context-style/context/INSTRUCTIONS_STYLE.md'
++        p.write_bytes(p.read_bytes() + b'\n')
++        # Isolate byte-format validation from the independent digest gate.
++        sums = self.root / 'SOURCES.sha256'
++        rows = sums.read_text().splitlines()
++        rel = p.relative_to(self.root).as_posix()
++        sums.write_text('\n'.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + rel if row[66:] == rel else row for row in rows) + '\n')
++        self.gate(1)
++
++    def test_unknown_env(self):
++        self.manifest('claude', lambda m: m['context']['modules'][0].update(environments=['future_env']))
++        self.gate(1)
++
++    def test_weight_drift(self):
++        self.manifest('core', lambda m: m.update(weight=101)); self.gate(1)
++
++    def test_source_drift(self):
++        p = self.root / 'packages/relux-root-context-style/context/INSTRUCTIONS_STYLE.md'
++        p.write_bytes(b'changed\n' + p.read_bytes()); self.gate(1)
++
++    def test_sources_drift(self):
++        p = self.root / 'SOURCES.sha256'
++        rows = p.read_text().splitlines(); rows[0] = '0' * 64 + rows[0][64:]
++        p.write_text('\n'.join(rows) + '\n'); self.gate(1)
++
++    def test_missing_sources(self):
++        (self.root / 'SOURCES.sha256').unlink(); self.gate(1)
++
++    def test_missing_row(self):
++        p = self.root / 'SOURCES.sha256'; p.write_text('\n'.join(p.read_text().splitlines()[1:]) + '\n'); self.gate(1)
++
++    def test_duplicate_row(self):
++        p = self.root / 'SOURCES.sha256'; p.write_text(p.read_text() + p.read_text().splitlines()[0] + '\n'); self.gate(1)
++
++if __name__ == '__main__':
++    unittest.main()

@@ -1,5 +1,5 @@
 ## Status
-to-review
+development
 
 ## Review
 required
@@ -17,6 +17,8 @@ code
 (empty)
 
 ## Notes
+2026-09-15 (host e11-1, unified delivery goal): Pi MCP scope resolved explicitly, see precondition resource pi-mcp-scope-decision-2026-09-15.md: adapter requirement narrowed to the MCP capability each adapter declares in environments 1.1 section 7.8 (claude_code/codex_cli deliver MCP; native Pi launches without MCP; a Pi MCP channel is deferred as separate scope). Operator may override to option (b).
+2026-09-15: Pi MCP scope resolved explicitly (resource pi-mcp-scope-decision-2026-09-15.md): adapter requirement narrowed; native Pi without MCP; Pi MCP channel deferred. 2026-09-16: operator decided that managed commits and tags are signed by Relux Bot <bot@relux.works> for the remainder of this campaign (the human signing key is not kept on the host); earlier commits remain signed by Ivan Oparin.
 
 ## Precondition Resources
 - [goal-launcher-and-infra-migration.md](file://EPIC-260908-2wp8wn/goal-launcher-and-infra-migration.md)
@@ -28,6 +30,7 @@ code
 - [operator-astra-medium-policy.md](file://EPIC-260908-2wp8wn/operator-astra-medium-policy.md) — Urgent operator override: every producer/reviewer Codex gpt-6-astra medium; preserve WIP
 - [goal-launcher-and-infra-resume-2026-09-09.md](file://EPIC-260908-2wp8wn/goal-launcher-and-infra-resume-2026-09-09.md) — Final parked continuation and revision11 receipt; exact states, backups and remaining DoD
 - [operator-tags-releases-override-2026-09-09.md](file://EPIC-260908-2wp8wn/operator-tags-releases-override-2026-09-09.md)
+- [pi-mcp-scope-decision-2026-09-15.md](file://EPIC-260908-2wp8wn/pi-mcp-scope-decision-2026-09-15.md) — Explicit resolution: MCP delivered for claude_code/codex_cli; native Pi without MCP; Pi MCP channel deferred
 
 ## Outcome Resources
 - [orchestration-state.md](file://EPIC-260908-2wp8wn/orchestration-state.md) — Current delivered evidence, active runs, roots and remaining scope
@@ -53,4 +56,4 @@ code
 2026-09-07T23:04:44Z
 
 ## Last Update
-2026-09-10T19:57:46Z
+2026-09-15T20:10:21Z

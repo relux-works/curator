@@ -1,0 +1,13 @@
+# Review brief — TASK-260908-3jux68 b1-context-packages-delivery (independent review of delivered repository content)
+
+The producer's candidate is NOT a Change Request in this board's repository: it is the private repository https://github.com/relux-works/relux-root-context at main `9a6025d169a49b4cd692486bf8808f4dfc2d3044` (single signed bootstrap commit). Review that exact commit; do not review a later head if one appears. Clone it read-only under your worktree's `.temp/` (bot SSH access is configured on this host).
+
+Verify against the producer evidence resource `TASK-260908-3jux68_producer-evidence.md` and the B1 brief `b1-producer-brief.md`:
+1. Layout and manifests: packages core/workflow/style/claude/attachments carry `agent-context.json` + `context/*.md`; umbrella `relux-root-context-ivan` is a pure umbrella. Load every manifest with the installed `curator skill check` or the curator source parser (`internal/contextpkg.LoadManifest`) from /Users/administrator/Developer/ReluxWorks/curator/curator — do not trust the producer's oracle output.
+2. Module bytes are byte-exact from relux-agents-infra @ `dee5403` (`git -C /Users/administrator/Developer/ReluxWorks/relux-agents-infra show dee5403:<path>` — that commit is present locally): recompute sha256 for all 15 modules yourself.
+3. Per-environment selectors (`environments: ["claude_code"]` on EXTERNAL_RESOURCES and REMOTE_AGENTS), weights per Decision 0012 (core 100 / workflow 70 / claude 50 / attachments 40 / style 10; umbrella weights map equals leaf weights; no edge weights), ranges `^1.0` admit `1.0.0`.
+4. `scripts/validate.sh` passes and actually bites: run at least three of the producer's narrowing mutants yourself (trailing LF, unknown env, weight drift) and one of your own.
+5. Bounded rows: tags NOT created (correct: the orchestrator creates the six signed tags on the reviewed head after acceptance); `requires.skills`/`requires.mcp` deferred to B2/B3 — check the umbrella documents the gap and nothing invents unverifiable sources.
+6. Signature: `git log --show-signature -1` reports a good signature by Ivan Oparin <ivan@relux.works> (allowed signer key SHA256:Ng99…; the public key is at /Users/administrator/.ssh/ivan-relux.pub — build a temporary allowed_signers file).
+
+Record exactly one verdict as a task-scoped outcome resource `TASK-260908-3jux68_review-verdict.md` (ACCEPT or CHANGES_REQUESTED with the exact commit, commands and exit codes). There is no Change Request revision to `accept_cr`; on ACCEPT set the task to `done` with `set_status(TASK-260908-3jux68, status=done, commit_ack=scope_committed)`; on CHANGES_REQUESTED route to `to-dev` and list the required changes.
