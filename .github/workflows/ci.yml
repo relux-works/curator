@@ -153,6 +153,70 @@ jobs:
           if-no-files-found: warn
 
   # ---------------------------------------------------------------------------
+  # The same default lane on the organisation's self-hosted macOS ARM64
+  # runner (rose-air). Hosted macos-latest stays authoritative for the
+  # platform claim; this lane adds an Apple-silicon execution host the
+  # operator controls, so a hosted-image regression and a real-machine
+  # regression are distinguishable. It runs the identical gate scripts and
+  # uploads its own evidence under a distinct name.
+  # ---------------------------------------------------------------------------
+  test-self-hosted:
+    name: Test (rose-air)
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Checkout authoritative protocol suite
+        uses: actions/checkout@v4
+        with:
+          repository: relux-works/curator-spec
+          ref: ${{ env.SPEC_PIN }}
+          path: protocol-spec
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify Go toolchain identity
+        shell: bash
+        run: bash .github/ci/toolchain-identity.sh
+
+      - name: gofmt check
+        shell: bash
+        run: |
+          unformatted="$(gofmt -l cmd internal)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt: files need formatting:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Ledger consistency
+        shell: bash
+        run: bash .github/ci/ledger-consistency.sh .temp/ci-evidence/ledger
+
+      - name: go test + platform-case gate
+        shell: bash
+        env:
+          CURATOR_CONFORMANCE_ROOT: ${{ github.workspace }}/protocol-spec/conformance/v1
+          GO_TEST_TIMEOUT: 30m
+        run: bash .github/ci/test-gate.sh .temp/ci-evidence/test
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-evidence-rose-air
+          path: .temp/ci-evidence/
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
   # Race.
   #
   # macos-latest is an inventory platform, so `-race` there covers the whole

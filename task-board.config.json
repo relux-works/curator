@@ -32,19 +32,35 @@
         "entries": [
           {
             "criterion": "equal",
-            "model": "gpt-5.6-sol",
-            "reasoning_effort": "medium"
+            "model": "gpt-6-astra",
+            "reasoning_effort": "low"
           }
         ],
         "adjustment_confirmation": "required",
         "roles": {
           "developer": {
-            "default_model": "gpt-5.6-sol",
-            "default_reasoning_effort": "medium"
+            "default_model": "gpt-6-astra",
+            "default_reasoning_effort": "low"
           },
           "reviewer": {
-            "default_model": "gpt-5.6-sol",
-            "default_reasoning_effort": "medium"
+            "default_model": "gpt-6-astra",
+            "default_reasoning_effort": "low"
+          },
+          "doc-writer": {
+            "default_model": "gpt-6-astra",
+            "default_reasoning_effort": "low"
+          },
+          "tester": {
+            "default_model": "gpt-6-astra",
+            "default_reasoning_effort": "low"
+          },
+          "researcher": {
+            "default_model": "gpt-6-astra",
+            "default_reasoning_effort": "low"
+          },
+          "solution-architect": {
+            "default_model": "gpt-6-astra",
+            "default_reasoning_effort": "low"
           }
         }
       },
@@ -52,35 +68,35 @@
         "entries": [
           {
             "criterion": "equal",
-            "model": "claude-opus-5",
-            "reasoning_effort": "xhigh"
+            "model": "claude-fable-5-1",
+            "reasoning_effort": "low"
           }
         ],
         "adjustment_confirmation": "required",
         "roles": {
           "developer": {
-            "default_model": "claude-opus-5",
-            "default_reasoning_effort": "xhigh"
+            "default_model": "claude-fable-5-1",
+            "default_reasoning_effort": "low"
           },
           "reviewer": {
-            "default_model": "claude-opus-5",
-            "default_reasoning_effort": "xhigh"
+            "default_model": "claude-fable-5-1",
+            "default_reasoning_effort": "low"
           },
           "solution-architect": {
-            "default_model": "claude-opus-5",
-            "default_reasoning_effort": "xhigh"
+            "default_model": "claude-fable-5-1",
+            "default_reasoning_effort": "low"
           },
           "technical-writer": {
-            "default_model": "claude-opus-5",
-            "default_reasoning_effort": "xhigh"
+            "default_model": "claude-fable-5-1",
+            "default_reasoning_effort": "low"
           },
           "researcher": {
-            "default_model": "claude-opus-5",
-            "default_reasoning_effort": "xhigh"
+            "default_model": "claude-fable-5-1",
+            "default_reasoning_effort": "low"
           },
           "tester": {
-            "default_model": "claude-opus-5",
-            "default_reasoning_effort": "xhigh"
+            "default_model": "claude-fable-5-1",
+            "default_reasoning_effort": "low"
           }
         }
       },
