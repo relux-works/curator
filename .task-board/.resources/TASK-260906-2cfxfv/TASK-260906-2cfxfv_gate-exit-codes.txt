@@ -1,0 +1,40 @@
+TASK-260906-2cfxfv observed exit codes -- RUN-260907-3a87ba, worktree curator-interop-coverage
+branch feat/interop-root-artifacts, HEAD 31106aa8
+
+go build ./...                                                       exit=0
+go vet ./...                                                         exit=0
+gofmt -l cmd internal                                                exit=0  (0 files)
+golangci-lint run ./...                                              exit=0  (0 issues)
+bash .github/ci/no-broad-suppression.sh                              exit=0
+bash .github/ci/ledger-consistency.sh <ev>                           exit=0  (228 rows / 3 GOOS)
+bash .github/ci/gate-selftest.sh                                     exit=0  (125 passed, 0 failed)
+go test -count=1 ./internal/interop/...                              exit=0
+go test ./internal/interop/environments -run '^Test(TheLedgerToleration|EveryFamily|NoCaseHere)' -v
+                                                                     exit=0  (3 === RUN, 3 --- PASS)
+bash .github/ci/suite-plan.sh <pin>                                  exit=0  served=69 deferred=4
+
+--- the two lanes, sequentially, GO_TEST_TIMEOUT=30m (CI's unix budget) ---
+test-gate.sh  DEFAULT   lane, SPEC_PIN root                          exit=0
+test-gate.sh  CANDIDATE lane, intact candidate root, FULL_ROOT=1     exit=0
+
+--- negative candidate lane, one declared artefact removed ---
+test-gate.sh  CANDIDATE lane, root less vectors/environments.json    exit=1  EXPECTED RED
+              FAIL  internal/interop/environments was deferred, but this lane requires
+                    a root that serves the whole module
+                    missing: vectors/environments.json
+
+--- one red run worth naming ---
+test-gate.sh  CANDIDATE lane at GO_TEST_TIMEOUT=8m                   exit=1
+              internal/install: panic: test timed out after 8m0s (483.4s).
+              Budget artefact, not a regression: the same package took 443.6s in the
+              previous run at the same artificial 8m budget, and CI's real per-package
+              budget is 30m on unix (ci.yml:135,413; test-gate.sh default 30m).
+              Re-run at the CI budget the identical lane is exit=0.
+
+--- mutant harness, re-run first-hand this session at the CI 30m lane budget ---
+python3 .temp/TASK-260906-2cfxfv/mutants.py                          exit=0
+              22 checks; 14 killed, 6 SURVIVED; tree restored (clean)
+              survivors: M1 plan-level (the mutant's own effect), M2 plan-level for the
+              ONE artefact it admits (the other is still rejected), and the four M6
+              probes -- M6 is a stated bound, not a gap: these gates measure run SHAPE,
+              not the conformance assertions inside the cases.

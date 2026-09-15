@@ -1,0 +1,139 @@
+<div id="curator-cli-explorer">
+  <style>
+    #curator-cli-explorer .steps { list-style: none; padding: 0; margin: 18px 0; }
+    #curator-cli-explorer .step { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(100px, 0.7fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    #curator-cli-explorer .step-name { font-weight: 500; }
+    #curator-cli-explorer .outcome { margin-top: 16px; font-weight: 500; }
+    #curator-cli-explorer .state-detail { margin-top: 8px; }
+    #curator-cli-explorer .model-label { margin-bottom: 12px; }
+    #curator-cli-explorer [hidden] { display: none; }
+    @media (max-width: 480px) { #curator-cli-explorer .step { grid-template-columns: 22px minmax(0, 1fr); gap: 4px 8px; } #curator-cli-explorer .step-status { grid-column: 2; } }
+  </style>
+  <div class="text-small model-label">CLI, необходимый skill · модель выбора, не диагностика этой машины</div>
+  <div class="viz-controls">
+    <label class="form-label">Способ получения
+      <select class="form-select" id="cli-mode">
+        <option value="prefer">Предложение: prefer prebuilt</option>
+        <option value="only">Предложение: prebuilt only</option>
+        <option value="current">Сейчас: source build / cache</option>
+      </select>
+    </label>
+    <label class="form-label">Локальный Go toolchain
+      <select class="form-select" id="cli-toolchain">
+        <option value="missing">Отсутствует</option>
+        <option value="trusted">Есть, прошёл проверки Curator</option>
+        <option value="rejected">Есть, но wrapper / вне allowlist</option>
+      </select>
+    </label>
+    <label class="form-label">Prebuilt для выбранного target
+      <select class="form-select" id="cli-artifact">
+        <option value="trusted">Есть, exact pin и trust checks проходят</option>
+        <option value="missing">Нет совместимого артефакта</option>
+        <option value="digest">Digest не совпал</option>
+        <option value="signer">Signer не доверен</option>
+        <option value="revoked">Артефакт отозван</option>
+        <option value="stale">Revocation metadata просрочены</option>
+      </select>
+    </label>
+    <label class="form-label">ОС / runtime compatibility
+      <select class="form-select" id="cli-os">
+        <option value="mac-ok">macOS: native проверки проходят</option>
+        <option value="mac-deny">macOS: Gatekeeper блокирует</option>
+        <option value="win-ok">Windows: native проверки проходят</option>
+        <option value="win-deny">Windows: policy блокирует</option>
+        <option value="linux-ok">Linux: ABI и окружение совместимы</option>
+        <option value="linux-deny">Linux: нет нужной runtime library</option>
+      </select>
+    </label>
+  </div>
+  <label class="form-check">
+    <input class="form-check-input" id="cli-fallback" type="checkbox" checked>
+    <span class="form-check-label">Source recipe объявлен, fallback разрешён локальной политикой</span>
+  </label>
+  <ol class="steps" id="cli-steps" aria-label="План получения CLI"></ol>
+  <div class="outcome" id="cli-outcome" aria-live="polite"></div>
+  <div class="text-small state-detail" id="cli-detail"></div>
+  <script>
+    (() => {
+      const root = document.getElementById('curator-cli-explorer');
+      const mode = root.querySelector('#cli-mode');
+      const toolchain = root.querySelector('#cli-toolchain');
+      const artifact = root.querySelector('#cli-artifact');
+      const os = root.querySelector('#cli-os');
+      const fallback = root.querySelector('#cli-fallback');
+      const steps = root.querySelector('#cli-steps');
+      const outcome = root.querySelector('#cli-outcome');
+      const detail = root.querySelector('#cli-detail');
+      function render() {
+        const current = mode.value === 'current';
+        artifact.disabled = current;
+        fallback.disabled = mode.value !== 'prefer';
+        toolchain.disabled = mode.value === 'only';
+        const rows = [];
+        const add = (name, status) => rows.push([name, status]);
+        let result = '', note = '', blocked = false;
+        add('Package, closure, точные pins', 'В сценарии уже проверены');
+        let sourceBranch = current;
+        if (!current) {
+          add('Выбор по OS / arch / ABI / min OS', artifact.value === 'missing' ? 'Совместимого prebuilt нет' : 'Артефакт выбран');
+          if (artifact.value === 'missing') {
+            sourceBranch = mode.value === 'prefer' && fallback.checked;
+            if (!sourceBranch) {
+              blocked = true;
+              result = 'Остановка: нет допустимого способа получить CLI';
+              note = 'Наличие компилятора само по себе не разрешает source fallback.';
+            } else add('Разрешённый fallback', 'Переход к source recipe');
+          } else if (artifact.value !== 'trusted') {
+            const failures = { digest: 'Integrity failure', signer: 'Untrusted signer', revoked: 'Revoked', stale: 'Freshness policy failed' };
+            add('Digest, signer, provenance, revocation', failures[artifact.value]);
+            blocked = true;
+            result = 'Остановка: доверие к prebuilt не установлено';
+            note = 'Source fallback не маскирует отказ проверки. Freshness показана в strict policy.';
+          } else {
+            add('Digest, signer, provenance, revocation', 'Допущен политикой Curator');
+            add('Локальный компилятор', 'Не нужен для prebuilt');
+          }
+        }
+        if (sourceBranch && !blocked) {
+          const ready = toolchain.value === 'trusted';
+          add('Trusted toolchain → fingerprint', ready ? 'Проверен до build cache' : toolchain.value === 'missing' ? 'go_toolchain_missing' : 'Toolchain rejected');
+          if (!ready) {
+            blocked = true;
+            result = 'Остановка: source build / cache недоступны';
+            note = 'Текущий build cache тоже требует toolchain identity. Установленный ранее CLI — отдельный случай.';
+          } else add('Source preflight → cache / build', 'В сценарии успешно; без загрузки toolchain');
+        }
+        if (!blocked) {
+          const nativeBlocked = os.value.endsWith('deny');
+          if (current) {
+            add('Build receipt → store → shim', 'Артефакт опубликован');
+            add('Запуск под native policy ОС', nativeBlocked ? 'Запуск заблокирован' : 'ОС разрешает запуск');
+          } else {
+            add('Native admission / runtime checks', nativeBlocked ? 'ОС или runtime не допускает' : 'Проходят в этом сценарии');
+            if (!nativeBlocked) add('Receipt → protected store → shim', sourceBranch ? 'Source-build receipt' : 'Prebuilt receipt: exact artifact digest');
+          }
+          blocked = nativeBlocked;
+          result = nativeBlocked ? (current ? 'Сборка готова, запуск блокирует ОС / runtime' : 'Остановка: Curator trust не заменяет native policy') : (sourceBranch ? 'CLI готов через source build / cache' : 'CLI готов; компилятор на машине не требуется');
+          note = nativeBlocked ? 'Без обхода Gatekeeper / Windows policy и без скрытого переключения способа установки.' : 'Проверки ОС зависят от платформы; этот сценарий не обещает успешный запуск любого бинаря.';
+        }
+        steps.replaceChildren();
+        rows.forEach(([name, status], index) => {
+          const item = document.createElement('li');
+          item.className = 'step';
+          for (const [className, value] of [['tabular-nums', String(index + 1)], ['step-name', name], ['step-status', status]]) {
+            const span = document.createElement('span');
+            span.className = className;
+            span.textContent = value;
+            item.appendChild(span);
+          }
+          steps.appendChild(item);
+        });
+        outcome.textContent = result;
+        outcome.classList.toggle('text-destructive', blocked);
+        detail.textContent = note;
+      }
+      for (const input of [mode, toolchain, artifact, os, fallback]) input.addEventListener('change', render);
+      render();
+    })();
+  </script>
+</div>

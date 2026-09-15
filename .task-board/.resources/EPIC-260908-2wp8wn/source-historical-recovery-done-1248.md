@@ -1,0 +1,9 @@
+# Historical source recovery is complete
+
+BUG-260908-1awn50 / STORY-260908-2f6ulf are DONE through bound Complete RUN-260909-e52553, after NEW CR3 acceptance by Astra RUN-260909-3f9ffb. Board-only signed commit294c58f58dac7a0d76c25d442fdae037e7e37a6b is published to owning source main, parent a8c6abdcf1dc1f5347ccf22d2cd44c77007775e5. Parent independently verified good configured-human ECDSA signature (oparin@me.com) and empty diff outside .task-board. Complete receipt source resource BUG-260908-1awn50_complete-outcome_RUN-260909-e52553.md records actual execution around12:48Z and explicit configured-policy commit metadata2026-09-08T21:30:00+03:00.
+
+Required git pull--ff-only refused on foreign dirty source checkout, preserved at64bbf490; public fresh-authority/temp-index publication succeeded, local convergence NOT claimed. No historical lost cards reconstructed/closed; no foreign unsigned history rewritten. First commit-time refusal honored and retried with explicit input, no guard bypass.
+
+This completes the original source historical recovery and composition historical recovery (already done), as well as delivered/installed PR197. The new separate-owner checkpoint-readiness BUG-260909-3trykk still runs full configured validation under Muse RUN-260909-df567b (last observed command6/15); its code is neither reviewed nor installed yet. Gate STORY-260909-1cw05m remains accepted-artifacts/integrating pending that fix and strict public new-review recovery. Reviewer focus precondition is attached. Fresh source protected main now includes this board-only commit; later candidate/delivery must preserve it and re-observe authority, not silently replace reviewed tree.
+
+Launcher diagnostics and execution remain landed/done. Defaults/Lineup, BuildLaunch/provider limits, complete main, installation and infra migration remain. Native Pi tag and Pi MCP operator inputs unresolved. Full goal remains active.

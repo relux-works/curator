@@ -71,6 +71,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260908-c070c8, max_parallel=3)
 spawn run started: [implementer] developer (codex) (run=RUN-260908-c070c8)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260908-c070c8, pid=99829, exit=0)
 
 ## Precondition Resources
 - [system-prompt-producer.md](file://TASK-260908-fdg3gn/system-prompt-producer.md) — SPEC5 implementation with accepted Pi E5 semantics
@@ -91,12 +93,14 @@ spawn run started: [implementer] developer (codex) (run=RUN-260908-c070c8)
 - [TASK-260908-fdg3gn_review-evidence-rev1.zip](file://TASK-260908-fdg3gn/TASK-260908-fdg3gn_review-evidence-rev1.zip) — Independent exact-tree API tests, eight expected-red narrowing mutants and identity verification
 - [TASK-260908-fdg3gn_review-verdict-rev1.md](file://TASK-260908-fdg3gn/TASK-260908-fdg3gn_review-verdict-rev1.md) — Accepted CR1 API scope: AC coverage, independent negative evidence, preserved hashes and explicit main/delivery bounds
 - [TASK-260908-fdg3gn_spawn-log_-implementer--developer--codex-_RUN-260908-c070c8.log](file://TASK-260908-fdg3gn/TASK-260908-fdg3gn_spawn-log_-implementer--developer--codex-_RUN-260908-c070c8.log) — System spawn log captured by task-board
+- [TASK-260908-fdg3gn_completion-eb366939.md](file://TASK-260908-fdg3gn/TASK-260908-fdg3gn_completion-eb366939.md) — Completion transaction and signed scoped publication verification
+- [TASK-260908-fdg3gn_completion-eb366939.json](file://TASK-260908-fdg3gn/TASK-260908-fdg3gn_completion-eb366939.json) — Exact completion output and verification exit codes
 
 ## Created
 2026-09-07T23:11:09Z
 
 ## Last Update
-2026-09-08T18:30:00Z
+2026-09-08T22:38:38Z
 
 ## Assigned To
 [implementer] developer (codex)

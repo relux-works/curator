@@ -111,6 +111,8 @@ spawn agent resolution: Agent selection: muse via explicit_override (preferred_a
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [implementer] developer (muse) (run=RUN-260909-6ae164, max_parallel=3)
 spawn run started: [implementer] developer (muse) (run=RUN-260909-6ae164)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260909-6ae164, pid=28020, exit=0)
 
 ## Precondition Resources
 - [composition-producer.md](file://TASK-260908-1wmb40/composition-producer.md)
@@ -150,12 +152,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260909-6ae164)
 - [TASK-260908-1wmb40_review-evidence-rev2.zip](file://TASK-260908-1wmb40/TASK-260908-1wmb40_review-evidence-rev2.zip) — CR2 exact-tree provenance, focused tests, runtime validation and prior negative evidence
 - [TASK-260908-1wmb40_review-verdict-rev2.md](file://TASK-260908-1wmb40/TASK-260908-1wmb40_review-verdict-rev2.md) — Independent ACCEPT CR2 ff61be4: 10/12 rows, 10/10 API scope; main and Pi bounds retained
 - [TASK-260908-1wmb40_spawn-log_-implementer--developer--muse-_RUN-260909-6ae164.log](file://TASK-260908-1wmb40/TASK-260908-1wmb40_spawn-log_-implementer--developer--muse-_RUN-260909-6ae164.log) — System spawn log captured by task-board
+- [TASK-260908-1wmb40_integration-RUN-260909-6ae164.md](file://TASK-260908-1wmb40/TASK-260908-1wmb40_integration-RUN-260909-6ae164.md) — Bound complete receipt for accepted CR2
 
 ## Created
 2026-09-07T23:11:03Z
 
 ## Last Update
-2026-09-09T11:51:53Z
+2026-09-09T11:53:38Z
 
 ## Assigned To
 [implementer] developer (muse)

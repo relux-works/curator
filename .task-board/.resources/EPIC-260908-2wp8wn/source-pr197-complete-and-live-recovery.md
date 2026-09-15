@@ -1,0 +1,9 @@
+# Recovery checkpoint: 2026-09-09
+
+Source task-board PR197 is MERGED at signed ac72ed99be2712d898aebbe0243168d9448bd3df, accepted CR2 tree 4a73f8b4962da5bc97ad81f5319c4f86a5260c9a; 15/15 configured local validation commands passed and independent Astra review accepted. Parent normal source setup installed 0.24.3-332-gac72ed99 without daemon restarts (four PIDs unchanged). BUG-260909-24mm7l and STORY-260909-3ue5iq are done through public Complete RUN-260909-08c3ae, signed board commit a8c6abdcf1dc1f5347ccf22d2cd44c77007775e5. Original source checkout remains dirty and behind; pull refusal preserved, no foreign work discarded.
+
+Actual historical recovery now running: composition TASK-260908-1wmb40 RUN-260909-f405fe; source PR194 BUG-260908-1awn50 RUN-260909-2c123e. Both same developer/implementer Muse Spark xhigh owner bindings. New installed prepare/start-landed-rework, fresh authority/export, normal new CR and independent review required; old acceptance never transferred. Neither historical Story is done yet.
+
+Diagnostics original CR2 remains changes_requested. Gate completeness TASK-260909-3d1589 producer RUN-260909-961d4c handed off artifact-only CR1; independent Astra medium reviewer RUN-260909-5ac00f is active. Original gate TASK-260909-xtvqf3 still needs accepted successor package routing before diagnostics rework. No diagnostics code has landed.
+
+Launcher execution PR11 signed 3ff66a9421ff6ddf675a49fc0c2868309f6e3de3 is landed and Story done. Main remains incomplete: defaults, plan/limits, diagnostics, production wiring, installation and three real launches remain. Migration has not started. Fresh remote tag read still finds no agents-management v0.5.11; operator tag and Pi MCP product decision remain unresolved. Full original objective and no-hosted-CI, Muse producer/Astra reviewer policies remain unchanged. This checkpoint is evidence, not product completion or parking.

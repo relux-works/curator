@@ -1,0 +1,5 @@
+# Checkpoint accepted non-final defaults leaf
+
+Codex gpt-6-astra medium. Developer/implementer owner for TASK-260908-25z3wj CR1, task_delta, accepted by reviewer3b7cbf. Candidate tree5b154a523b71ec5daabb97a55e81d9af1d3a5c86, base13b28c9. This is the first leaf; TASK-260909-2vy977 retains lineup/production scope. Do not close the Story or invent a new handoff.
+
+From frozen launcher-control with inherited config, run the supported `task-board --no-update-check --board-dir /Users/iv/Developer/ReluxWorks/curator/.task-board worktree checkpoint TASK-260908-25z3wj --json`. Only this bound developer owner is authorized by the CLI. Verify the resulting internal checkpoint is signed, the workspace branch/index/record agree, and the leaf remains integrating (nothing landed on main). Preserve source WIP until the tool owns its transition. No manual Story commit, reset, private record edit, install/daemon/CI/tag/ax/home or LOGBOOK/control-root write. No retests or new source changes. Capture exact outcome/refusal through resource CRUD and stop; parent owns the next leaf and final Story delivery.

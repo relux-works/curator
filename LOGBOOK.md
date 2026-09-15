@@ -4538,3 +4538,81 @@ What did not land with it: the candidate lane against curator-spec main is red o
 *after* this stage's authority was frozen — a gap I created by landing that spec fix
 mid-flight. It is filed, and stage (c) is not reported complete against curator-spec main
 until it closes.
+
+## 2026-09-08 — SPEC_PIN promoted to rc.11 and landed; the brief was wrong about nineteen
+
+PR #66 is on main (`04550e28`, two signed commits, fast-forward over `2d090144`).
+Review cycle 1 ACCEPTED with the key requirement discharged the hard way: the reviewer
+read all five uploaded gate artifacts from hosted run 34163836478 and confirmed the
+environments families were SERVED on every default Test and Race lane (14/14 promoted
+cases observed passing, deferred=0, no `root-unset` skips) — not merely green. The
+counterfactual reproduces the leaf's whole point: SPEC_PIN reverted plus the default
+lane gives 26 named FAILs, all 13 cases FATAL-not-tolerated, while `go test` exits 0.
+Four narrowing mutants, all killed, including a token-preserving one through the
+behavioural suite. PR #63 fail-closed re-proved per artefact, 7/7.
+
+Two corrections worth keeping. First, the brief said nineteen removed tolerances; the
+tree says thirteen, in exactly the four newly-served packages, and the producer's
+report was right — I wrote the nineteen from the plan, not from a count, and the
+reviewer caught it. Count from the tree before writing a number into a brief. Second,
+the empty CR delta is now a recorded pattern, not an incident: a curator leaf under a
+curator-spec workspace cannot carry paths, so acceptance lives on the branch and the
+landing is the orchestrator's push. The reviewer wrote that consequence into the
+verdict explicitly, which is exactly where it belongs.
+
+Non-blocking findings F1–F4: F1 (platform-exclusions.tsv:11 claims the pin publishes
+no qualification vector — false for both pins) is filed as TASK-260908-1bfk8y. F4
+confirms the scoping call I made on the four retained rows: already unreachable under
+the old pin, documented where the reader meets them.
+
+PR #65 (`chore/rc-stays-out-of-install-channels`) rebased onto the new main with -S
+(range-diff identical, signature intact) at `d1bb0a4e`; own story STORY-260908-g7o5zw
+and review task TASK-260908-1jv1h3 with brief attached. Review spawns once its lanes
+go green on the new head. Main's automatic Test and Race on the landed pin are running;
+Windows decides the wait.
+
+## 2026-09-08 — install channels closed to release candidates; three review cycles to prove `auto`
+
+PR #65 is on main (`d1bb0a4e`, one signed commit over `04550e28`). The review took
+three cycles, and the arc is worth recording because the first two ACCEPTs were not
+enough to land on. Cycle 1 read the predicate from docs; cycle 2 re-derived it; cycle
+3 finally *drove* it — real `goreleaser release` runs against local tap/bucket repos
+with the observable a landed commit, not a log line. The drive caught what reading
+could not: the reviewer's own first three fixtures reported NO COMMIT for every case
+including the controls that must publish — a fixture failing before the publish leg is
+indistinguishable from a working guard, the failed-read-as-absence shape again. The
+control that publishes (stable + `auto` → COMMIT) is what makes the rc row mean
+anything. Demand the publishing control in any future fixture review.
+
+Two facts that change the release procedure. First, there is no GoReleaser pin:
+`release.yml` floats `~> v2`, so the predicate is proven at 2.17.0/2.18.1 and uncovered
+for anything newer at tag time. Second, nothing in-repo reads `.goreleaser.yml` and
+`goreleaser check` discriminates 0 of 6 wrong-value mutants — a one-letter typo (`Auto`)
+silently restores the August incident with every lane green. Filed as
+TASK-260908-2kqa77 (with a note: it needs its own story when worked; the move is
+currently refused by an unrelated pre-existing board dependency cycle).
+
+Board mechanics note: `accept_cr` is structurally unreachable for these leaves — the
+reviewed work lives in curator, the Story workspace is a curator-spec checkout, so no
+Change Request record exists and the runner refuses every revision. Cycle 3 proved it
+from both sides (rev 1 unauthorized, rev 0 invalid) and recorded `done` via set_status
+instead. A fourth cycle would hit the identical refusal; the runner's
+reviewer-satisfaction predicate needs the same lesson. Landing stays the
+orchestrator's verdict-comment plus fast-forward push, as with #66.
+
+## 2026-09-08 — v0.15.0-rc.1 cut and proven: the guard holds in production
+
+Signed tag `v0.15.0-rc.1` on the exact main head `d1bb0a4e`, pushed on explicit
+operator command. Release run 34237988048 green. Post-tag checks, all clean: the
+GitHub release reads `prerelease=true`, `latest` still points at `v0.14.0`, and
+neither `homebrew-tap` nor `scoop-bucket` gained a commit (both stand at their
+v0.14.0 updates). That is the first real proof the cycle-3 review named — `auto`
+holds on the production path, not just in fixtures.
+
+One unknown closed for free: the release log shows the runner resolved GoReleaser
+**v2.18.1** — exactly the version the reviewer read the predicate from, inside the
+proven 2.17.0/2.18.1 bound. The `~> v2` float did not drift past the evidence.
+
+What remains on the road to stable: stage (d) still waits on the ax spec update;
+the eight open follow-ups stand, none rc-blocking; the next proof point is the
+v0.15.0 stable tag publishing into all three channels again.

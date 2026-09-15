@@ -1,0 +1,1980 @@
+diff --git a/.scripts/defaults-mutants.py b/.scripts/defaults-mutants.py
+new file mode 100644
+index 0000000..2619afb
+--- /dev/null
++++ b/.scripts/defaults-mutants.py
+@@ -0,0 +1,95 @@
++#!/usr/bin/env python3
++"""SPEC 4.3 defaults and lineup narrowing probes; restores candidate bytes.
++
++Each mutant weakens one gate to admit exactly one member of the class the
++gate must reject, and the named test must fail. A delete-only mutant is not
++accepted as evidence. Optional env DEFAULTS_MUTANT_IDS limits the run to a
++comma-separated subset of mutant ids, for bounded sequential execution.
++"""
++import os
++import pathlib
++import subprocess
++import sys
++
++root = pathlib.Path(__file__).resolve().parents[1]
++out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else root / '.temp/defaults-mutants').resolve()
++out.mkdir(parents=True, exist_ok=True)
++source = root / 'internal/defaults/defaults.go'
++lineup = root / 'internal/defaults/lineup.go'
++main = root / 'cmd/curator-run/main.go'
++json = root / 'internal/fragment/json.go'
++pkg_defaults = './internal/defaults'
++pkg_main = './cmd/curator-run'
++mutants = [
++ ('schema-version', source, 'm.Value.Str != Schema', '(m.Value.Str != Schema && m.Value.Str != "v2")', 'TestLoadRejectsInvalid/wrong-schema', 'admit schema v2 only'),
++ ('locked-null', source, 'm.Value.Kind != fragment.KindBool', 'm.Value.Kind != fragment.KindBool && m.Value.Kind != fragment.KindNull', 'TestLoadRejectsInvalid/locked-null', 'admit null lock only'),
++ ('defaults-null', source, 'm.Value.Kind != fragment.KindObject', 'm.Value.Kind != fragment.KindObject && m.Value.Kind != fragment.KindNull', 'TestLoadRejectsInvalid/defaults-null', 'admit null defaults only'),
++ ('unknown-env', source, 'fragment.HomeVariable(env.Key) == ""', 'fragment.HomeVariable(env.Key) == "" && env.Key != "future"', 'TestLoadRejectsInvalid/unknown-env', 'admit future env only'),
++ ('empty-entry', source, 'len(env.Value.Obj) == 0', '(len(env.Value.Obj) == 0 && env.Key != "pi")', 'TestLoadRejectsInvalid/empty-entry', 'admit empty pi entry only'),
++ ('entry-null', source, 'env.Value.Kind != fragment.KindObject || len(env.Value.Obj) == 0', '(env.Value.Kind != fragment.KindObject || len(env.Value.Obj) == 0) && env.Value.Kind != fragment.KindNull', 'TestLoadRejectsInvalid/null-entry', 'admit null env entry only'),
++ ('member-null', source, 'member.Value.Kind != fragment.KindString', 'member.Value.Kind != fragment.KindString && member.Value.Kind != fragment.KindNull', 'TestLoadRejectsInvalid/model-null', 'admit null string members only'),
++ ('extra-member', source, 'return file{}, fmt.Errorf("unknown member %s.%s", env.Key, member.Key)', 'if member.Key != "extra" { return file{}, fmt.Errorf("unknown member %s.%s", env.Key, member.Key) }', 'TestLoadRejectsInvalid/unknown-member', 'admit extra entry member only'),
++ ('sig', source, 'return file{}, fmt.Errorf("unknown member %q", m.Key)', 'if m.Key != "sig" { return file{}, fmt.Errorf("unknown member %q", m.Key) }', 'TestLoadRejectsInvalid/unknown-sig', 'admit top-level sig only; token retained'),
++ ('required-schema', source, 'if _, ok := root.Get(key); !ok {', 'if _, ok := root.Get(key); !ok && key != "schema" {', 'TestLoadRejectsInvalid/missing-schema', 'allow absent schema only'),
++ ('required-defaults', source, 'if _, ok := root.Get(key); !ok {', 'if _, ok := root.Get(key); !ok && key != "defaults" {', 'TestLoadRejectsInvalid/missing-defaults', 'allow absent defaults only'),
++ ('duplicate', json, 'if seen[key] {', 'if seen[key] && key != "model" {', 'TestLoadRejectsInvalid/duplicate-model', 'admit duplicate model only in strict JSON reader'),
++ ('broken-link', source, 'return fmt.Errorf("unreadable symlink %s: %v", path, err)', 'if os.IsNotExist(err) { return err }; return fmt.Errorf("unreadable symlink %s: %v", path, err)', 'TestLoadFilesystem/broken-link', 'misclassify ENOENT symlink targets only as absence'),
++ ('permission', source, 'data, err := os.ReadFile(path)\n\tif err != nil {', 'data, err := os.ReadFile(path)\n\tif os.IsPermission(err) { return file{}, nil }; if err != nil {', 'TestLoadFilesystem/read-permission', 'treat permission-denied reads only as absence'),
++ ('directory', source, 'if !info.Mode().IsRegular() {', 'if info.IsDir() { return file{}, nil }; if !info.Mode().IsRegular() {', 'TestLoadFilesystem/directory', 'treat directories only as absence'),
++ ('resolve-env', source, 'fragment.HomeVariable(environment) == ""', 'fragment.HomeVariable(environment) == "" && environment != "future"', 'TestLoadKnownEnvironmentsAndPresence', 'admit future resolve environment only'),
++ ('model-lock', source, 'locked && row.flag.Present && row.machine.Present', 'locked && row.flag.Present && row.machine.Present && row.name != "model"', 'TestResolveLocks/model', 'enforce locks only for effort'),
++ ('effort-lock', source, 'locked && row.flag.Present && row.machine.Present', 'locked && row.flag.Present && row.machine.Present && row.name != "effort"', 'TestResolveLocks/effort', 'enforce locks only for model'),
++ ('operator-ignore', source, 'if locked {\n\t\toperator = Pair{}', 'if locked && machine.Effort.Present {\n\t\toperator = Pair{}', 'TestResolveLocks/model', 'ignore operator only when machine sets effort'),
++ ('presence', source, 'if candidate.Present {', 'if candidate.Present && !(candidate.Origin == OriginFlag && candidate.Value == "") {', pkg_defaults, 'TestResolveExplicitEmptyOverrides', 'ignore explicitly empty flags only'),
++ ('lineup-bottom', lineup, 'top := ranked[0].Model', 'top := ranked[len(ranked)-1].Model', pkg_defaults, 'TestCompleteLineupTops', 'supply bottom row only'),
++ ('effort-none-fill', lineup, 'if row.Effort.Support != agentic.EffortSupportRequired {', 'if row.Effort.Support == agentic.EffortSupportRequired {', pkg_defaults, 'TestCompleteNoEffortSemantics', 'fill effortless rows and drop required ones'),
++ ('effort-overwrite-explicit', lineup, 'if partial.Model.Present && partial.Effort.Present {', 'if partial.Model.Present && !partial.Effort.Present {', pkg_defaults, 'TestCompletePerMemberFill', 'resolve full pairs through the row effort'),
++ ('top-effort-overwrite', lineup, 'if partial.Effort.Present {\n\t\treturn out, nil\n\t}', 'if partial.Effort.Present && false {\n\t\treturn out, nil\n\t}', pkg_defaults, 'TestCompletePerMemberFill', 'overwrite explicit effort with the lineup top effort'),
++ ('unresolvable-admit-empty', lineup, 'if !ok {\n\t\treturn Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q)", environment, target.System)}', 'if !ok {\n\t\treturn Resolved{}, nil', pkg_defaults, 'TestCompleteUnresolvable', 'admit empty resolution'),
++ ('ambiguity-first-wins', lineup, 'return found, matches == 1', 'return found, matches >= 1', pkg_defaults, 'TestCompleteAmbiguousRuntime', 'admit first of several runtimes'),
++ ('fire-past-resolve-error', lineup, '\tpartial, err := f.Resolve(environment, flags)\n\tif err != nil {\n\t\treturn Resolved{}, err\n\t}', '\tpartial, _ := f.Resolve(environment, flags)', pkg_defaults, 'TestCompleteNoFirePastFailure', 'complete past a lock refusal'),
++ ('mapping-skip', lineup, '\ttarget, err := mapping.Resolve(environment)\n\tif err != nil {\n\t\treturn Resolved{}, err\n\t}', '\ttarget, _ := mapping.Resolve(environment)', pkg_defaults, 'TestCompleteMappingRefusal', 'admit unmapped environments'),
++ ('findrow-fuzzy', lineup, 'if string(driven[i].ID) == id {', 'if string(driven[i].ID) != id {', pkg_defaults, 'TestCompletePerMemberFill', 'take another row effort'),
++ ('origin-mislabel', lineup, 'out.Model = ResolvedMember{Member: Member{Value: string(top.ID), Present: true}, Origin: OriginLineup}', 'out.Model = ResolvedMember{Member: Member{Value: string(top.ID), Present: true}, Origin: OriginFlag}', pkg_defaults, 'TestCompleteLineupTops', 'label lineup values as flags'),
++ ('runtime-drop', lineup, '\t\t// empty Runtime leaves the unknown runtime to the plan stage.\n\t\tif id, ok := selectDecl(target.System, reg.RuntimeDeclarations()); ok {\n\t\t\tout.Runtime = string(id)\n\t\t}', '\t\t// empty Runtime leaves the unknown runtime to the plan stage.\n\t\tif _, ok := selectDecl(target.System, reg.RuntimeDeclarations()); ok {\n\t\t\tout.Runtime = ""\n\t\t}', pkg_defaults, 'TestCompletePerMemberFill', 'drop the recorded binding'),
++ ('exit-usage-downgrade', main, 'return diagnostics.ExitForCode(derr.Code)', 'return diagnostics.ExitOperational', pkg_main, 'TestRunDiagnosticsContract/usage_locked_flag', 'downgrade usage to exit 1'),
++ ('resolution-failure-admit', lineup, '\truntime, err := reg.ResolveRuntime(id)\n\tif err != nil {\n\t\treturn Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q): %v", environment, target.System, err)}\n\t}', '\truntime, err := reg.ResolveRuntime(id)\n\tif err != nil {\n\t\treturn Resolved{Runtime: string(id)}, nil\n\t}', pkg_defaults, 'TestCompleteRuntimeResolutionFailure', 'admit failed resolution as success'),
++ ('empty-lineup-admit', lineup, '\tranked := vendorplugin.Lineup(driven)\n\tif len(ranked) == 0 {\n\t\treturn Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q)", environment, target.System)}\n\t}', '\tranked := vendorplugin.Lineup(driven)\n\tif len(ranked) == 0 {\n\t\treturn Resolved{Runtime: string(id)}, nil\n\t}', pkg_defaults, 'TestCompleteWrongVendorModels', 'admit empty lineup as success'),
++]
++rows = ['mutant\tnarrows_to\ttest\texit\tverdict\tsurvival_bound']
++failed = False
++wanted = os.environ.get('DEFAULTS_MUTANT_IDS')
++if wanted:
++    keep = {ident.strip() for ident in wanted.split(',') if ident.strip()}
++    mutants = [mutant for mutant in mutants if mutant[0] in keep]
++    if not mutants:
++        raise RuntimeError(f'no mutant matches DEFAULTS_MUTANT_IDS={wanted!r}')
++for mutant in mutants:
++    # Original file/flag probes predate the per-mutant package field and
++    # always ran the defaults suite; normalize them to the same shape.
++    if len(mutant) == 6:
++        ident, path, old, new, test, bound = mutant
++        pkg = pkg_defaults
++    else:
++        ident, path, old, new, pkg, test, bound = mutant
++    original = path.read_bytes()
++    try:
++        text = original.decode()
++        if text.count(old) != 1:
++            raise RuntimeError(f'{ident}: anchor is not unique')
++        path.write_text(text.replace(old, new, 1))
++        command = ['go', 'test', pkg, '-count=1', '-v']
++        with (out / f'{ident}.log').open('w') as log:
++            log.write('COMMAND: ' + ' '.join(command) + '\n')
++            log.flush()
++            result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=120)
++            log.write(f'\nEXIT: {result.returncode}\n')
++        killed = result.returncode == 1 and f'--- FAIL: {test} ' in (out / f'{ident}.log').read_text()
++        rows.append(f'{ident}\t{bound}\t{test}\t{result.returncode}\t' + ('killed\tnone' if killed else f'SURVIVOR/unverified\t{bound} is not proven'))
++        failed |= not killed
++    finally:
++        path.write_bytes(original)
++        assert path.read_bytes() == original
++(out / 'summary.tsv').write_text('\n'.join(rows) + '\n')
++print('\n'.join(rows))
++sys.exit(1 if failed else 0)
+diff --git a/README.md b/README.md
+index 72584b5..42e6454 100644
+--- a/README.md
++++ b/README.md
+@@ -42,6 +42,29 @@ managed home when Curator finds it stale), maps its supported system/provider pa
+ and a `not_implemented` line that reports the mapping, home and fragment digest,
+ launching nothing. A resolve failure is reported as its `resolve_*` code
+ with exit 1.
++An internal partial milestone for §4.3 is available in `internal/defaults`:
++`ConfigPaths` derives launcher file locations from explicit process XDG/home
++inputs, `Load` strictly reads the machine and operator files, and `Files.Resolve`
++resolves flags/operator/machine values per member with presence, origins, and
++machine locks. `schema` and `defaults` are required; omitted `locked` means false.
++Known `opencode` entries are valid configuration even though launch mapping
++refuses that environment. Explicit empty strings are passed through. Missing
++files contribute nothing; invalid or unreadable files (including dangling links)
++fail. Both files are validated even when a machine lock suppresses an operator
++entry. `Files.Complete` finishes the section against the real tagged
++`agents-management` module (`v0.5.10` in `go.mod`): the `Lineup` leader
++supplies only unset members with its declared `Effort.Recommended` (or no
++effort for effortless rows), and an admittable nothing is
++`defaults_unresolvable` — the launcher never invents a model. The
++executable reads both files after mapping, refuses locked flags with
++`usage`, and prints the resolved pair with per-member origins on stderr
++before the plan request. The `pi-native` runtime is not declared by the
++pinned module yet, so `pi` without fully supplied files refuses; model
++admission and the plan request belong to the next milestone. Run
++`go test ./internal/defaults -count=1 -cover` for the filesystem,
++strict-schema, presence, lock, precedence, lineup, and line-group suite.
++Tests use temporary paths.
++
+ Because no `ax.json` is read yet, the binary always parses as an untracked
+ machine, so `--ax-profile` is currently always a usage error and `--name`
+ is accepted without effect.
+@@ -263,6 +286,7 @@ or tag workflow yet.
+ | Tool | Purpose | Entry point | Output |
+ |---|---|---|---|
+ | `go` (build, vet, test, race) | build and behavioral suite | `make check` and the targets above | stdout; nothing written to the tree |
++| `python3` defaults mutant harness | weaken defaults gates individually and run the behavioral suite; restore exact candidate bytes | `python3 .scripts/defaults-mutants.py [evidence-dir]` | per-mutant logs and `summary.tsv` (default `.temp/defaults-mutants/`) |
+ | CLI goldens | frozen accepted/rejected §3 shapes | `go test ./internal/cli -run TestGolden -update` to regenerate, then review the diff | `internal/cli/testdata/cases.golden` |
+ | `.scripts/cli-mutants.sh` | narrowing-mutant harness for the §3 gates: each mutant weakens one gate to admit one rejected shape and the named test must fail | `.scripts/cli-mutants.sh [evidence-dir]` | per-mutant logs and `summary.tsv` under the evidence dir (default `.temp/cli-mutants/`); the source tree is restored on exit |
+ | `.scripts/fragment-mutants.sh` | narrowing-mutant harness for the §4.1 gates (argv, exit mapping, stderr transport, reader rules, schema closure, CCJ-1 emission, entry-point wiring); the behavioral suite runs against every mutant | `.scripts/fragment-mutants.sh [evidence-dir]` (optional `FRAGMENT_MUTANT_IDS="M27 M28" FRAGMENT_TEST_PATTERN="TestExecutableUnicodePathBoundary|TestConformanceCorpus"` for focused rework) | `mutants.log` under the evidence dir (default `.temp/fragment-mutants/`); sources are restored from byte copies on exit |
+diff --git a/cmd/curator-run/gate_framing_test.go b/cmd/curator-run/gate_framing_test.go
+index ece75cb..5cf061c 100644
+--- a/cmd/curator-run/gate_framing_test.go
++++ b/cmd/curator-run/gate_framing_test.go
+@@ -63,7 +63,7 @@ func TestGateFramingSingleDetailAtRealResolver(t *testing.T) {
+ 	var out, errOut strings.Builder
+ 	resolver := fragment.NewWithRunner(gateFixedBinary, fragment.ExecRunner{})
+ 	got := run(context.Background(),
+-		[]string{"pi", "--profile", gateInjectedProfile}, &out, &errOut, resolver)
++		[]string{"pi", "--profile", gateInjectedProfile}, &out, &errOut, testDeps(t, resolver))
+ 	if got != 1 {
+ 		t.Fatalf("exit = %d, want 1 (stderr %q)", got, errOut.String())
+ 	}
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index f2a2374..3ecbf66 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -20,7 +20,10 @@ import (
+ 	"io"
+ 	"os"
+ 
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++
+ 	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
+ 	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
+ 	"github.com/relux-works/curator-agent-launcher/internal/mapping"
+@@ -35,7 +38,22 @@ const (
+ )
+ 
+ func main() {
+-	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, fragment.New()))
++	home, err := os.UserHomeDir()
++	if err != nil {
++		_ = diagnostics.Emit(os.Stderr, diagnostics.CodeDefaultsInvalid, fmt.Sprintf("cannot locate the operator configuration directory: %v", err))
++		os.Exit(diagnostics.ExitForCode(diagnostics.CodeDefaultsInvalid))
++	}
++	registry, err := defaults.NewRegistry()
++	if err != nil {
++		_ = diagnostics.Emit(os.Stderr, diagnostics.CodePlanRefused, fmt.Sprintf("cannot build the spawn-plane registry: %v", err))
++		os.Exit(diagnostics.ExitForCode(diagnostics.CodePlanRefused))
++	}
++	deps := launchDeps{
++		resolver: fragment.New(),
++		defaults: defaults.ConfigPaths(os.Getenv("XDG_CONFIG_HOME"), home),
++		registry: registry,
++	}
++	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, deps))
+ }
+ 
+ // fragmentResolver is the context-plane boundary; main uses fragment.New.
+@@ -43,23 +61,39 @@ type fragmentResolver interface {
+ 	Resolve(context.Context, fragment.Request) (*fragment.Fragment, error)
+ }
+ 
++// launchDeps carries the production boundaries run dispatches through.
++// Tests inject scripted resolvers, temporary configuration paths, and
++// registries built from the real module; main builds them from process
++// state.
++type launchDeps struct {
++	resolver fragmentResolver
++	defaults defaults.Paths
++	registry *vendorplugin.Registry
++}
++
+ // run is the production entry point behind main. It reads the ax
+ // configuration fact (not yet: §4.6 ax.json is owned by a later section,
+ // so this build parses against an unconfigured integration), parses argv
+ // under §3, prints informational output, and reports usage errors as the
+ // §6 usage family on stderr with exit 2. A launch invocation that parses
+-// goes to §4.1: the fragment is resolved through resolver — always with
+-// --repair, Curator's stderr forwarded verbatim — and a resolve failure is
+-// printed as its §6 resolve-family code line with exit 1. A resolved
+-// fragment is mapped under §4.2 (unsupported IDs refuse env_unsupported),
+-// then refused with exit 1 because no later composition stage
+-// exists in this build; nothing is launched.
++// goes to §4.1: the fragment is resolved through the resolver — always
++// with --repair, Curator's stderr forwarded verbatim — and a resolve
++// failure is printed as its §6 resolve-family code line with exit 1. A
++// resolved fragment is mapped under §4.2 (unsupported IDs refuse
++// env_unsupported), then completed under §4.3: the launcher-owned files
++// are read (a locked flag is a usage refusal, an unreadable file is
++// defaults_config_invalid), the tagged module lineup supplies only the
++// members left unset (nothing admittable is defaults_unresolvable), and
++// the resolved pair with its per-member origins is printed on stderr
++// before anything downstream. The plan request of §4.4 belongs to a later
++// stage, so a completed launch is refused with exit 1; nothing is
++// launched.
+ //
+ // Every failure renders through internal/diagnostics: one deterministic
+ // `curator-run: <code>: <detail>` line and the SPEC §6 exit for that code
+ // (2 for usage, 1 for every operational failure). The rendering is
+ // byte-identical to the stage-owned formats it replaces.
+-func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver fragmentResolver) int {
++func run(ctx context.Context, args []string, stdout, stderr io.Writer, deps launchDeps) int {
+ 	opts := cli.Options{AxConfigured: false}
+ 	inv, err := cli.Parse(args, opts)
+ 	if err != nil {
+@@ -88,7 +122,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver
+ 	// SPEC §4.1: obtain the fragment. The subprocess inherits the
+ 	// launcher's working directory and environment; Curator's stderr goes
+ 	// to the operator unchanged.
+-	frag, err := resolver.Resolve(ctx, fragment.Request{
++	frag, err := deps.resolver.Resolve(ctx, fragment.Request{
+ 		EnvID:      inv.EnvID,
+ 		Profile:    inv.Profile,
+ 		ProfileSet: inv.ProfileSet,
+@@ -109,7 +143,33 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver
+ 		return diagnostics.ExitForCode(mapping.CodeUnsupported)
+ 	}
+ 
+-	fmt.Fprintf(stderr, "%s: not_implemented: resolved environment %q (profile %q, home %s, fragment digest %s), mapped system %q / provider %q, but composition beyond SPEC §4.2 is not delivered in this build; nothing was launched\n",
+-		name, frag.Environment, frag.Profile.Name, frag.Home(), frag.Digest, target.System, target.Provider)
+-	return 1
++	// SPEC §4.3: resolve model and effort defaults. A locked flag is a
++	// usage refusal, an unreadable file is defaults_config_invalid, and
++	// a system the lineup admits nothing for is defaults_unresolvable —
++	// every one terminal with nothing launched. The resolved pair and
++	// its per-member origins print on stderr before the plan request.
++	files, err := defaults.Load(deps.defaults)
++	if err == nil {
++		var flags defaults.Pair
++		if inv.ModelSet {
++			flags.Model = defaults.Member{Value: inv.Model, Present: true}
++		}
++		if inv.EffortSet {
++			flags.Effort = defaults.Member{Value: inv.Effort, Present: true}
++		}
++		var resolved defaults.Resolved
++		resolved, err = files.Complete(frag.Environment, flags, deps.registry)
++		if err == nil {
++			_ = defaults.EmitGroup(stderr, resolved)
++			fmt.Fprintf(stderr, "%s: not_implemented: resolved environment %q (profile %q, home %s, fragment digest %s), mapped system %q / provider %q, %s; the plan request beyond SPEC §4.3 is not delivered in this build; nothing was launched\n",
++				name, frag.Environment, frag.Profile.Name, frag.Home(), frag.Digest, target.System, target.Provider, resolved.Describe())
++			return 1
++		}
++	}
++	if derr := (&defaults.Error{}); errors.As(err, &derr) {
++		_ = diagnostics.Emit(stderr, derr.Code, derr.Err.Error())
++		return diagnostics.ExitForCode(derr.Code)
++	}
++	_ = diagnostics.Emit(stderr, mapping.CodeUnsupported, err.Error())
++	return diagnostics.ExitForCode(mapping.CodeUnsupported)
+ }
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index 849e6aa..eb52c62 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -13,6 +13,7 @@ import (
+ 	"strings"
+ 	"testing"
+ 
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
+ 	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
+ )
+@@ -20,8 +21,9 @@ import (
+ // run is the production dispatch site: main exits with its return value.
+ // These tests drive SPEC §3 shapes through it end to end: informational
+ // flags exit 0 on stdout, usage errors exit 2 with the "usage" code line
+-// and the usage text on stderr, and a parsed launch is refused with exit 1
+-// because this build carries no composition stage.
++// and the usage text on stderr, and a parsed launch resolves its §4.1
++// fragment, completes its §4.3 pair, and is refused with exit 1 because
++// the plan request belongs to a later stage.
+ 
+ func TestRunInformationalFlags(t *testing.T) {
+ 	for _, args := range [][]string{{"--help"}, {"-h"}, {"--version"}, {"codex_cli", "--profile", "p", "--help"}, {"--version", "--", "x"}} {
+@@ -104,22 +106,47 @@ func (f forbiddenRunner) Run(context.Context, string, []string, string, []string
+ 	return nil, 1, nil
+ }
+ 
++// testDeps builds production-shaped dependencies with isolated
++// configuration paths (absent files) and a registry from the real tagged
++// module. No test reads ambient /etc or home configuration.
++func testDeps(t *testing.T, resolver fragmentResolver) launchDeps {
++	t.Helper()
++	reg, err := defaults.NewRegistry()
++	if err != nil {
++		t.Fatal(err)
++	}
++	dir := t.TempDir()
++	return launchDeps{
++		resolver: resolver,
++		defaults: defaults.Paths{Machine: filepath.Join(dir, "machine.json"), Operator: filepath.Join(dir, "operator.json")},
++		registry: reg,
++	}
++}
++
+ func runNoResolve(t *testing.T, args []string, stdout, stderr io.Writer) int {
+ 	t.Helper()
+-	return run(context.Background(), args, stdout, stderr, fragment.NewWithRunner("curator", forbiddenRunner{t}))
++	return run(context.Background(), args, stdout, stderr, testDeps(t, fragment.NewWithRunner("curator", forbiddenRunner{t})))
++}
++
++// fragmentLineFor replays the pi fragment fixture for another known
++// environment, swapping the env-id and its home variable together.
++func fragmentLineFor(env string) string {
++	line := strings.ReplaceAll(piFragmentLine, `"environment":"pi"`, `"environment":"`+env+`"`)
++	return strings.ReplaceAll(line, "PI_CODING_AGENT_DIR", fragment.HomeVariable(env))
+ }
+ 
+ const piFragmentLine = `{"env":{"PI_CODING_AGENT_DIR":"/Users/iv/.curator/environments/default/pi"},"environment":"pi","fragment":"launch-env-fragment-v1","precedence":{"placement":"winner-last","winner":"higher-weight"},"profile":{"lock_sha256":"726310f80f442428a9a640d2d49ad9b635f22857fb4ad22167832c7c6ff30e19","name":"default"}}` + "\n"
+ 
+ const piDigest = "sha256:c0512f558f8dc93780288db597a1a8250c0403a175c95fe988e0e8c0991701bf"
+ 
+-// TestRunParsedLaunchResolvesThenRefuses: a well-formed launch, including a
+-// native tail that collides with launcher flags, parses, resolves its
+-// fragment exactly once through SPEC §4.1 with the exact argv, and is then
+-// refused with exit 1 — never 2 (not a usage error) and never 0 (nothing
+-// launched). Curator's stderr warning is forwarded verbatim before the
+-// refusal line.
+-func TestRunParsedLaunchResolvesThenRefuses(t *testing.T) {
++// TestRunPiUnresolvable: a well-formed pi launch, including a native tail
++// that collides with launcher flags, parses, resolves its fragment
++// exactly once through SPEC §4.1 with the exact argv, and is then refused
++// with defaults_unresolvable and exit 1 — the pinned module declares no
++// pi-native runtime, so the lineup admits no model and none is invented.
++// Curator's stderr warning is forwarded verbatim before the refusal line,
++// and no origin line-group prints for an unresolved pair.
++func TestRunPiUnresolvable(t *testing.T) {
+ 	warn := "warning: environment_tool_version_unverified: pi detected 0.84.3, recorded 0.84.2\n"
+ 	cases := []struct {
+ 		args     []string
+@@ -132,19 +159,85 @@ func TestRunParsedLaunchResolvesThenRefuses(t *testing.T) {
+ 	for _, c := range cases {
+ 		sr := &scriptedRunner{stdout: piFragmentLine, stderr: warn}
+ 		var out, errOut strings.Builder
+-		if got := run(context.Background(), c.args, &out, &errOut, fragment.NewWithRunner("curator", sr)); got != 1 {
++		if got := run(context.Background(), c.args, &out, &errOut, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
+ 			t.Errorf("run(%v) = %d, want 1 (stderr %q)", c.args, got, errOut.String())
+ 		}
+ 		if sr.calls != 1 || strings.Join(sr.argv, " ") != strings.Join(c.wantArgv, " ") {
+ 			t.Errorf("run(%v) resolved %d times with argv %q, want once with %q", c.args, sr.calls, sr.argv, c.wantArgv)
+ 		}
+-		if !strings.HasPrefix(errOut.String(), warn+name+": not_implemented: ") || !strings.Contains(errOut.String(), piDigest) || !strings.Contains(errOut.String(), "/Users/iv/.curator/environments/default/pi") {
+-			t.Errorf("run(%v) stderr %q: want forwarded warning, then not_implemented with digest and home", c.args, errOut.String())
+-		}
+ 		if out.Len() != 0 {
+ 			t.Errorf("run(%v) wrote to stdout: %q", c.args, out.String())
+ 		}
+ 	}
++	// Without flags a member is missing and the lineup admits nothing.
++	for _, args := range [][]string{{"pi"}, {"pi", "--system-prompt", "append", "--name", "ok-name", "--", "--help", "", "--ax-profile", "yolo", "--profile", "x"}} {
++		sr := &scriptedRunner{stdout: piFragmentLine, stderr: warn}
++		var out, errOut strings.Builder
++		if got := run(context.Background(), args, &out, &errOut, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
++			t.Errorf("run(%v) = %d, want 1 (stderr %q)", args, got, errOut.String())
++		}
++		if !strings.HasPrefix(errOut.String(), warn+name+": defaults_unresolvable: ") || !strings.Contains(errOut.String(), `"pi-native"`) {
++			t.Errorf("run(%v) stderr %q: want forwarded warning, then defaults_unresolvable naming the system", args, errOut.String())
++		}
++		if strings.Contains(errOut.String(), "defaults: ") || strings.Contains(errOut.String(), "not_implemented") {
++			t.Errorf("run(%v) stderr %q: no line-group and no later stage past the refusal", args, errOut.String())
++		}
++		if out.Len() != 0 {
++			t.Errorf("run(%v) wrote to stdout: %q", args, out.String())
++		}
++	}
++	// Fully flag-supplied, the pair resolves from level 1 with no lineup:
++	// the group prints and the pending plan stage refuses.
++	{
++		sr := &scriptedRunner{stdout: piFragmentLine, stderr: warn}
++		var out, errOut strings.Builder
++		args := []string{"pi", "--profile", "default", "--model", "m", "--effort", "high", "--", "resume", "--last"}
++		if got := run(context.Background(), args, &out, &errOut, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
++			t.Errorf("run(%v) = %d, want 1 (stderr %q)", args, got, errOut.String())
++		}
++		want := warn + name + ": defaults: model=m (flag) effort=high (flag)\n" + name + ": not_implemented: "
++		if !strings.HasPrefix(errOut.String(), want) || !strings.Contains(errOut.String(), piDigest) {
++			t.Errorf("run(%v) stderr %q: want group then not_implemented with digest", args, errOut.String())
++		}
++		if out.Len() != 0 {
++			t.Errorf("run(%v) wrote to stdout: %q", args, out.String())
++		}
++	}
++}
++
++// TestRunLineupEnvsPrintGroupBeforeRefusal drives the two environments the
++// real module admits: with no files the lineup completes the pair, the
++// origin line-group prints on stderr, and only then does the pending plan
++// stage refuse with exit 1. The group precedes the refusal line.
++func TestRunLineupEnvsPrintGroupBeforeRefusal(t *testing.T) {
++	cases := []struct {
++		env, group string
++	}{
++		{"claude_code", name + ": defaults: model=claude-fable-5-1 (lineup) effort=high (lineup)"},
++		{"codex_cli", name + ": defaults: model=gpt-6-astra (lineup) effort=max (lineup)"},
++	}
++	for _, c := range cases {
++		sr := &scriptedRunner{stdout: fragmentLineFor(c.env)}
++		var out, errOut strings.Builder
++		args := []string{c.env, "--", "resume", "--last"}
++		if got := run(context.Background(), args, &out, &errOut, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
++			t.Errorf("run(%v) = %d, want 1 (stderr %q)", args, got, errOut.String())
++		}
++		if sr.calls != 1 {
++			t.Errorf("run(%v) resolved %d times, want once", args, sr.calls)
++		}
++		stderr := errOut.String()
++		group, refusal, _ := strings.Cut(stderr, name+": not_implemented: ")
++		if refusal == "" || !strings.Contains(group, c.group+"\n") {
++			t.Errorf("run(%v) stderr %q: want the origin group before the refusal", args, stderr)
++		}
++		if !strings.Contains(refusal, c.group[strings.Index(c.group, "model="):]) {
++			t.Errorf("run(%v) refusal %q does not restate the resolved pair", args, refusal)
++		}
++		if out.Len() != 0 {
++			t.Errorf("run(%v) wrote to stdout: %q", args, out.String())
++		}
++	}
+ }
+ 
+ // TestRunResolveFailuresExit1: every §6 resolve-family outcome reaches the
+@@ -168,7 +261,7 @@ func TestRunResolveFailuresExit1(t *testing.T) {
+ 	for _, c := range cases {
+ 		sr := &scriptedRunner{stdout: c.stdout, stderr: c.stderr, exit: c.exit}
+ 		var out, errOut strings.Builder
+-		if got := run(context.Background(), []string{"pi"}, &out, &errOut, fragment.NewWithRunner("curator", sr)); got != 1 {
++		if got := run(context.Background(), []string{"pi"}, &out, &errOut, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
+ 			t.Errorf("%s: exit %d, want 1", c.name, got)
+ 		}
+ 		if sr.calls != 1 {
+@@ -204,7 +297,7 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+ 	t.Setenv("PATH", dir)
+ 
+ 	var out, errOut strings.Builder
+-	if got := run(context.Background(), []string{"pi", "--profile", "default", "--", "x"}, &out, &errOut, fragment.New()); got != 1 {
++	if got := run(context.Background(), []string{"pi", "--profile", "default", "--", "x"}, &out, &errOut, testDeps(t, fragment.New())); got != 1 {
+ 		t.Fatalf("exit %d, want 1 (stderr %q)", got, errOut.String())
+ 	}
+ 	argv, err := os.ReadFile(filepath.Join(dir, "argv.txt"))
+@@ -214,14 +307,14 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+ 	if string(argv) != "env\nresolve\npi\n--profile\ndefault\n--repair\n--format\njson\n" {
+ 		t.Errorf("subprocess argv %q", argv)
+ 	}
+-	if !strings.HasPrefix(errOut.String(), "warning: environment_tool_version_unverified: pi\n"+name+": not_implemented: ") || !strings.Contains(errOut.String(), piDigest) {
++	if !strings.HasPrefix(errOut.String(), "warning: environment_tool_version_unverified: pi\n"+name+": defaults_unresolvable: ") || !strings.Contains(errOut.String(), `"pi-native"`) {
+ 		t.Errorf("stderr %q", errOut.String())
+ 	}
+ 
+ 	// Without curator on PATH the launch fails as resolve_invocation_failed.
+ 	t.Setenv("PATH", t.TempDir())
+ 	errOut.Reset()
+-	if got := run(context.Background(), []string{"pi"}, &out, &errOut, fragment.New()); got != 1 || !strings.HasPrefix(errOut.String(), name+": resolve_invocation_failed: ") {
++	if got := run(context.Background(), []string{"pi"}, &out, &errOut, testDeps(t, fragment.New())); got != 1 || !strings.HasPrefix(errOut.String(), name+": resolve_invocation_failed: ") {
+ 		t.Errorf("missing curator: exit %d stderr %q", got, errOut.String())
+ 	}
+ }
+@@ -262,7 +355,7 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
+ 		count int
+ 		code  string
+ 	}{
+-		{"accept4096", 4096, "not_implemented"},
++		{"accept4096", 4096, "defaults_unresolvable"},
+ 		{"reject4097", 4097, "resolve_fragment_invalid"},
+ 	} {
+ 		t.Run(tc.name, func(t *testing.T) {
+@@ -279,7 +372,11 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
+ 				t.Fatal(err)
+ 			}
+ 			cmd := exec.Command(binary, "pi")
+-			cmd.Env = append(os.Environ(), "PATH="+dir)
++			// Hermetic configuration: the built binary reads process
++			// XDG/home inputs, so point both at empty temp dirs rather
++			// than the operator's real configuration.
++			emptyHome := t.TempDir()
++			cmd.Env = append(os.Environ(), "PATH="+dir, "HOME="+emptyHome, "XDG_CONFIG_HOME="+filepath.Join(emptyHome, ".config"))
+ 			var out, stderr strings.Builder
+ 			cmd.Stdout, cmd.Stderr = &out, &stderr
+ 			err = cmd.Run()
+@@ -294,22 +391,24 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
+ }
+ 
+ // TestRunMapping drives the production entry point with the real fragment
+-// parser. Unsupported mappings must not reach the later-stage stub.
++// parser. Unsupported mappings must not reach the defaults stage; mapped
++// environments resolve their §4.3 pair (or refuse it for pi) before the
++// pending plan stage.
+ func TestRunMapping(t *testing.T) {
+-	for _, tc := range []struct{ env, system, provider string }{
+-		{"claude_code", "claude-code", "claude"},
+-		{"codex_cli", "codex", "codex"},
+-		{"pi", "pi-native", "pi"},
+-		{"opencode", "", ""},
++	for _, tc := range []struct {
++		env, system, provider, group string
++	}{
++		{"claude_code", "claude-code", "claude", "model=claude-fable-5-1 (lineup) effort=high (lineup)"},
++		{"codex_cli", "codex", "codex", "model=gpt-6-astra (lineup) effort=max (lineup)"},
++		{"pi", "pi-native", "pi", ""},
++		{"opencode", "", "", ""},
+ 	} {
+ 		t.Run(tc.env, func(t *testing.T) {
+-			line := strings.ReplaceAll(piFragmentLine, `"environment":"pi"`, `"environment":"`+tc.env+`"`)
+-			line = strings.ReplaceAll(line, "PI_CODING_AGENT_DIR", fragment.HomeVariable(tc.env))
+-			sr := &scriptedRunner{stdout: line}
++			sr := &scriptedRunner{stdout: fragmentLineFor(tc.env)}
+ 			var out, stderr strings.Builder
+ 			args := []string{tc.env, "--", "", "--help", "--profile", "native", "--"}
+ 			before := append([]string(nil), args...)
+-			code := run(context.Background(), args, &out, &stderr, fragment.NewWithRunner("curator", sr))
++			code := run(context.Background(), args, &out, &stderr, testDeps(t, fragment.NewWithRunner("curator", sr)))
+ 			if code != 1 || out.Len() != 0 || sr.calls != 1 {
+ 				t.Fatalf("exit=%d stdout=%q resolves=%d", code, out.String(), sr.calls)
+ 			}
+@@ -317,10 +416,14 @@ func TestRunMapping(t *testing.T) {
+ 				t.Fatalf("native argv changed: %q", args)
+ 			}
+ 			if tc.system == "" {
+-				if !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "not_implemented") {
++				if !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "not_implemented") || strings.Contains(stderr.String(), "defaults: ") {
++					t.Fatalf("refusal: %q", stderr.String())
++				}
++			} else if tc.group == "" {
++				if !strings.HasPrefix(stderr.String(), name+": defaults_unresolvable: ") || strings.Contains(stderr.String(), "not_implemented") {
+ 					t.Fatalf("refusal: %q", stderr.String())
+ 				}
+-			} else if !strings.HasPrefix(stderr.String(), name+": not_implemented: ") || !strings.Contains(stderr.String(), fmt.Sprintf("mapped system %q / provider %q", tc.system, tc.provider)) {
++			} else if !strings.Contains(stderr.String(), name+": defaults: "+tc.group+"\n") || !strings.Contains(stderr.String(), fmt.Sprintf("mapped system %q / provider %q", tc.system, tc.provider)) || !strings.Contains(stderr.String(), name+": not_implemented: ") {
+ 				t.Fatalf("mapping: %q", stderr.String())
+ 			}
+ 		})
+@@ -336,7 +439,7 @@ func (resolvedUnknown) Resolve(context.Context, fragment.Request) (*fragment.Fra
+ }
+ func TestRunUnknownResolvedMapping(t *testing.T) {
+ 	var out, stderr strings.Builder
+-	if got := run(context.Background(), []string{"future_env"}, &out, &stderr, resolvedUnknown{}); got != 1 {
++	if got := run(context.Background(), []string{"future_env"}, &out, &stderr, testDeps(t, resolvedUnknown{})); got != 1 {
+ 		t.Fatalf("exit=%d", got)
+ 	}
+ 	if out.Len() != 0 || !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "not_implemented") {
+@@ -347,7 +450,7 @@ func TestRunUnknownResolvedMapping(t *testing.T) {
+ func TestRunUnknownFragmentStillRefusesResolution(t *testing.T) {
+ 	sr := &scriptedRunner{stdout: strings.ReplaceAll(piFragmentLine, `"environment":"pi"`, `"environment":"future_env"`)}
+ 	var out, stderr strings.Builder
+-	if got := run(context.Background(), []string{"future_env"}, &out, &stderr, fragment.NewWithRunner("curator", sr)); got != 1 {
++	if got := run(context.Background(), []string{"future_env"}, &out, &stderr, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
+ 		t.Fatalf("exit=%d", got)
+ 	}
+ 	if sr.calls != 1 || out.Len() != 0 || !strings.HasPrefix(stderr.String(), name+": resolve_fragment_invalid: ") {
+@@ -360,43 +463,58 @@ func TestRunUnknownFragmentStillRefusesResolution(t *testing.T) {
+ // the exit status for the code, exactly one launcher diagnostic code
+ // line on stderr carrying that code, Curator's stderr forwarded verbatim
+ // ahead of it (never parsed as a launcher diagnostic), and nothing on
+-// stdout. Later pipeline families (defaults, plan, exec, ax, mcp,
+-// sysprompt) are covered at their own production APIs in
+-// internal/diagnostics; their main call sites are stated obligations,
+-// not claimed here.
++// stdout. The defaults family is produced here; the plan, exec, ax, mcp,
++// and sysprompt families are covered at their own production APIs in
++// internal/diagnostics, and their main call sites remain stated
++// obligations, not claims.
+ func TestRunDiagnosticsContract(t *testing.T) {
+ 	opencodeLine := strings.ReplaceAll(piFragmentLine, `"environment":"pi"`, `"environment":"opencode"`)
+ 	opencodeLine = strings.ReplaceAll(opencodeLine, "PI_CODING_AGENT_DIR", fragment.HomeVariable("opencode"))
++	const lockedMachine = `{"schema":"curator-run-defaults-v1","locked":true,"defaults":{"pi":{"model":"machine"}}}`
+ 	cases := []struct {
+ 		name     string
+ 		args     []string
+ 		stdout   string
+ 		stderr   string
+ 		exit     int
++		machine  string
++		operator string
+ 		wantCode string
+ 		wantExit int
+ 	}{
+-		{"usage missing env", []string{}, "", "", 0, "usage", 2},
+-		{"usage stray operand", []string{"codex_cli", "resume"}, "", "", 0, "usage", 2},
+-		{"usage unknown flag", []string{"codex_cli", "--unknown"}, "", "", 0, "usage", 2},
+-		{"usage ax-profile untracked", []string{"codex_cli", "--ax-profile", "yolo"}, "", "", 0, "usage", 2},
+-		{"resolve environment unknown", []string{"pi"}, "", "curator: environment_unknown: unregistered\n", 1, "resolve_environment_unknown", 1},
+-		{"resolve profile unknown", []string{"pi"}, "", "curator: profile_unknown: none current\n", 1, "resolve_profile_unknown", 1},
+-		{"resolve repair failed", []string{"pi"}, "", "curator: environment_repair_failed: store\n", 1, "resolve_repair_failed", 1},
+-		{"resolve lock unavailable", []string{"pi"}, "", "curator: environment_lock_unavailable: busy\n", 1, "resolve_lock_unavailable", 1},
+-		{"resolve invocation failed", []string{"pi"}, "", "boom\n", 3, "resolve_invocation_failed", 1},
+-		{"resolve fragment invalid", []string{"pi"}, "{}\n", "", 0, "resolve_fragment_invalid", 1},
+-		{"env unsupported", []string{"opencode"}, opencodeLine, "", 0, "env_unsupported", 1},
++		{"usage missing env", []string{}, "", "", 0, "", "", "usage", 2},
++		{"usage stray operand", []string{"codex_cli", "resume"}, "", "", 0, "", "", "usage", 2},
++		{"usage unknown flag", []string{"codex_cli", "--unknown"}, "", "", 0, "", "", "usage", 2},
++		{"usage ax-profile untracked", []string{"codex_cli", "--ax-profile", "yolo"}, "", "", 0, "", "", "usage", 2},
++		{"usage locked flag", []string{"pi", "--model", "flag"}, piFragmentLine, "", 0, lockedMachine, "", "usage", 2},
++		{"resolve environment unknown", []string{"pi"}, "", "curator: environment_unknown: unregistered\n", 1, "", "", "resolve_environment_unknown", 1},
++		{"resolve profile unknown", []string{"pi"}, "", "curator: profile_unknown: none current\n", 1, "", "", "resolve_profile_unknown", 1},
++		{"resolve repair failed", []string{"pi"}, "", "curator: environment_repair_failed: store\n", 1, "", "", "resolve_repair_failed", 1},
++		{"resolve lock unavailable", []string{"pi"}, "", "curator: environment_lock_unavailable: busy\n", 1, "", "", "resolve_lock_unavailable", 1},
++		{"resolve invocation failed", []string{"pi"}, "", "boom\n", 3, "", "", "resolve_invocation_failed", 1},
++		{"resolve fragment invalid", []string{"pi"}, "{}\n", "", 0, "", "", "resolve_fragment_invalid", 1},
++		{"env unsupported", []string{"opencode"}, opencodeLine, "", 0, "", "", "env_unsupported", 1},
++		{"defaults config invalid", []string{"pi"}, piFragmentLine, "", 0, "", "{", "defaults_config_invalid", 1},
++		{"defaults unresolvable", []string{"pi"}, piFragmentLine, "", 0, "", "", "defaults_unresolvable", 1},
+ 	}
+ 	for _, c := range cases {
+ 		t.Run(c.name, func(t *testing.T) {
+ 			sr := &scriptedRunner{stdout: c.stdout, stderr: c.stderr, exit: c.exit}
+ 			var out, errOut strings.Builder
+ 			resolver := fragment.NewWithRunner("curator", sr)
+-			if diagnostics.CodeUsage == c.wantCode {
++			if diagnostics.CodeUsage == c.wantCode && c.machine == "" {
+ 				resolver = fragment.NewWithRunner("curator", forbiddenRunner{t})
+ 			}
+-			got := run(context.Background(), c.args, &out, &errOut, resolver)
++			deps := testDeps(t, resolver)
++			for path, data := range map[string]string{deps.defaults.Machine: c.machine, deps.defaults.Operator: c.operator} {
++				if data == "" {
++					continue
++				}
++				if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
++					t.Fatal(err)
++				}
++			}
++			got := run(context.Background(), c.args, &out, &errOut, deps)
+ 			if got != c.wantExit {
+ 				t.Fatalf("exit = %d, want %d (stderr %q)", got, c.wantExit, errOut.String())
+ 			}
+@@ -440,7 +558,7 @@ func TestRunDetailInjectionCannotForgeLine(t *testing.T) {
+ 		resolver := fragment.NewWithRunner(
+ 			filepath.Join(t.TempDir(), "missing-curator"), fragment.ExecRunner{})
+ 		got := run(context.Background(),
+-			[]string{"pi", "--profile", injected}, &out, &errOut, resolver)
++			[]string{"pi", "--profile", injected}, &out, &errOut, testDeps(t, resolver))
+ 		if got != 1 {
+ 			t.Fatalf("exit = %d, want 1 (stderr %q)", got, errOut.String())
+ 		}
+@@ -486,7 +604,7 @@ func assertSingleDiagnostic(t *testing.T, stderr, wantCode string) {
+ func TestRunResolveFailurePrecedesMapping(t *testing.T) {
+ 	sr := &scriptedRunner{exit: 1, stderr: "curator: environment_unknown: missing\n"}
+ 	var out, stderr strings.Builder
+-	if got := run(context.Background(), []string{"opencode"}, &out, &stderr, fragment.NewWithRunner("curator", sr)); got != 1 {
++	if got := run(context.Background(), []string{"opencode"}, &out, &stderr, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
+ 		t.Fatalf("exit=%d", got)
+ 	}
+ 	if sr.calls != 1 || out.Len() != 0 || !strings.Contains(stderr.String(), name+": resolve_environment_unknown: ") || strings.Contains(stderr.String(), "env_unsupported") || strings.Contains(stderr.String(), "not_implemented") {
+diff --git a/internal/defaults/defaults.go b/internal/defaults/defaults.go
+new file mode 100644
+index 0000000..ab81568
+--- /dev/null
++++ b/internal/defaults/defaults.go
+@@ -0,0 +1,229 @@
++// Package defaults loads launcher-owned defaults.json files and resolves the
++// flags/operator/machine portion of SPEC §4.3. Unset members await lineup;
++// this package performs no model admission and writes no configuration.
++package defaults
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++)
++
++const Schema = "curator-run-defaults-v1"
++const CodeInvalid = "defaults_config_invalid"
++const CodeUsage = "usage"
++
++// Error preserves the diagnostic family and underlying filesystem/parser error.
++type Error struct {
++	Code string
++	Err  error
++}
++
++func (e *Error) Error() string { return e.Code + ": " + e.Err.Error() }
++func (e *Error) Unwrap() error { return e.Err }
++func invalid(err error) error  { return &Error{CodeInvalid, err} }
++
++// Member distinguishes an explicitly supplied empty string from absence.
++type Member struct {
++	Value   string
++	Present bool
++}
++type Pair struct{ Model, Effort Member }
++
++// Files is validated configuration. Its zero value represents absent files.
++// Keeping entries private prevents callers bypassing schema validation.
++type Files struct{ machine, operator file }
++type file struct {
++	locked  bool
++	entries map[string]Pair
++}
++
++// Paths names explicit files; no empty-path or ambient fallback is performed.
++type Paths struct{ Machine, Operator string }
++
++// ConfigPaths uses process inputs, never the fragment-applied child environment.
++// Pass os.Getenv("XDG_CONFIG_HOME") and the process user's home directory.
++// Empty XDG_CONFIG_HOME follows the XDG default. It does not create directories.
++func ConfigPaths(xdgConfigHome, userHome string) Paths {
++	if xdgConfigHome == "" {
++		xdgConfigHome = filepath.Join(userHome, ".config")
++	}
++	return Paths{Machine: "/etc/curator-run/defaults.json", Operator: filepath.Join(xdgConfigHome, "curator-run", "defaults.json")}
++}
++
++// Load reads and validates both files, including ignored operator entries.
++// Only a missing path is optional: dangling links and existing unreadable files
++// are errors. No partial configuration is returned on failure.
++func Load(paths Paths) (Files, error) {
++	machine, err := loadFile(paths.Machine)
++	if err != nil {
++		return Files{}, err
++	}
++	operator, err := loadFile(paths.Operator)
++	if err != nil {
++		return Files{}, err
++	}
++	return Files{machine, operator}, nil
++}
++
++func loadFile(path string) (file, error) {
++	if path == "" {
++		return file{}, invalid(fmt.Errorf("empty defaults path"))
++	}
++	// Inspect each component without following symlinks when classifying absence.
++	// Lstat on only the final path would misclassify a dangling parent link.
++	if err := inspect(path); err != nil {
++		if os.IsNotExist(err) {
++			return file{}, nil
++		}
++		return file{}, invalid(fmt.Errorf("%s: %w", path, err))
++	}
++	info, err := os.Stat(path)
++	if err != nil {
++		return file{}, invalid(fmt.Errorf("%s: %w", path, err))
++	}
++	if !info.Mode().IsRegular() {
++		return file{}, invalid(fmt.Errorf("%s: defaults must be a regular file", path))
++	}
++	data, err := os.ReadFile(path)
++	if err != nil {
++		return file{}, invalid(fmt.Errorf("%s: %w", path, err))
++	}
++	f, err := parse(data)
++	if err != nil {
++		return file{}, invalid(fmt.Errorf("%s: %w", path, err))
++	}
++	return f, nil
++}
++
++func inspect(path string) error {
++	parent := filepath.Dir(path)
++	if parent != path && parent != "." {
++		if err := inspect(parent); err != nil {
++			return err
++		}
++	}
++	info, err := os.Lstat(path)
++	if err != nil {
++		return err
++	}
++	if info.Mode()&os.ModeSymlink != 0 {
++		if _, err := os.Stat(path); err != nil {
++			// Deliberately do not wrap ENOENT: the link exists, so this is not absence.
++			return fmt.Errorf("unreadable symlink %s: %v", path, err)
++		}
++	}
++	return nil
++}
++
++func parse(data []byte) (file, error) {
++	root, err := fragment.ParseJSON(data)
++	if err != nil {
++		return file{}, err
++	}
++	if root.Kind != fragment.KindObject {
++		return file{}, fmt.Errorf("root must be an object")
++	}
++	f := file{entries: map[string]Pair{}}
++	for _, m := range root.Obj {
++		switch m.Key {
++		case "schema":
++			if m.Value.Kind != fragment.KindString || m.Value.Str != Schema {
++				return file{}, fmt.Errorf("invalid schema")
++			}
++		case "locked":
++			if m.Value.Kind != fragment.KindBool {
++				return file{}, fmt.Errorf("locked must be boolean")
++			}
++			f.locked = m.Value.Bool
++		case "defaults":
++			if m.Value.Kind != fragment.KindObject {
++				return file{}, fmt.Errorf("defaults must be an object")
++			}
++			for _, env := range m.Value.Obj {
++				if fragment.HomeVariable(env.Key) == "" {
++					return file{}, fmt.Errorf("unknown environment %q", env.Key)
++				}
++				if env.Value.Kind != fragment.KindObject || len(env.Value.Obj) == 0 {
++					return file{}, fmt.Errorf("%s must contain model or effort", env.Key)
++				}
++				var pair Pair
++				for _, member := range env.Value.Obj {
++					if member.Value.Kind != fragment.KindString {
++						return file{}, fmt.Errorf("%s.%s must be a string", env.Key, member.Key)
++					}
++					value := Member{member.Value.Str, true}
++					switch member.Key {
++					case "model":
++						pair.Model = value
++					case "effort":
++						pair.Effort = value
++					default:
++						return file{}, fmt.Errorf("unknown member %s.%s", env.Key, member.Key)
++					}
++				}
++				f.entries[env.Key] = pair
++			}
++		default:
++			return file{}, fmt.Errorf("unknown member %q", m.Key)
++		}
++	}
++	for _, key := range []string{"schema", "defaults"} {
++		if _, ok := root.Get(key); !ok {
++			return file{}, fmt.Errorf("missing %s", key)
++		}
++	}
++	return f, nil
++}
++
++type Origin string
++
++const (
++	OriginFlag     Origin = "flag"
++	OriginOperator Origin = "operator"
++	OriginMachine  Origin = "machine"
++)
++
++// ResolvedMember has an empty origin exactly when the member is absent.
++type ResolvedMember struct {
++	Member
++	Origin Origin
++}
++type Partial struct{ Model, Effort ResolvedMember }
++
++// Resolve applies per-member precedence and refuses flags for locked members,
++// even if the flag repeats the machine value. Operator locked has no effect.
++// An ignored operator entry still must be valid at Load time.
++func (f Files) Resolve(environment string, flags Pair) (Partial, error) {
++	if fragment.HomeVariable(environment) == "" {
++		return Partial{}, invalid(fmt.Errorf("unknown environment %q", environment))
++	}
++	machine, named := f.machine.entries[environment]
++	operator := f.operator.entries[environment]
++	locked := f.machine.locked && named
++	if locked {
++		operator = Pair{}
++	}
++	var result Partial
++	for _, row := range []struct {
++		name                    string
++		flag, operator, machine Member
++		out                     *ResolvedMember
++	}{
++		{"model", flags.Model, operator.Model, machine.Model, &result.Model},
++		{"effort", flags.Effort, operator.Effort, machine.Effort, &result.Effort},
++	} {
++		if locked && row.flag.Present && row.machine.Present {
++			return Partial{}, &Error{CodeUsage, fmt.Errorf("--%s overrides locked %s for %s", row.name, row.name, environment)}
++		}
++		for _, candidate := range []ResolvedMember{{row.flag, OriginFlag}, {row.operator, OriginOperator}, {row.machine, OriginMachine}} {
++			if candidate.Present {
++				*row.out = candidate
++				break
++			}
++		}
++	}
++	return result, nil
++}
+diff --git a/internal/defaults/defaults_test.go b/internal/defaults/defaults_test.go
+new file mode 100644
+index 0000000..1f7ac38
+--- /dev/null
++++ b/internal/defaults/defaults_test.go
+@@ -0,0 +1,313 @@
++package defaults_test
++
++import (
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
++)
++
++func paths(t *testing.T) defaults.Paths {
++	t.Helper()
++	dir := t.TempDir()
++	return defaults.Paths{Machine: filepath.Join(dir, "machine.json"), Operator: filepath.Join(dir, "operator.json")}
++}
++func write(t *testing.T, path, data string) {
++	t.Helper()
++	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
++		t.Fatal(err)
++	}
++}
++func doc(entries string, locked bool) string {
++	return fmt.Sprintf(`{"schema":"curator-run-defaults-v1","locked":%t,"defaults":%s}`, locked, entries)
++}
++func member(s string) defaults.Member { return defaults.Member{Value: s, Present: true} }
++func resolved(s string, origin defaults.Origin) defaults.ResolvedMember {
++	return defaults.ResolvedMember{Member: member(s), Origin: origin}
++}
++func code(t *testing.T, err error, want string) {
++	t.Helper()
++	var e *defaults.Error
++	if !errors.As(err, &e) || e.Code != want {
++		t.Fatalf("error = %v, want %s", err, want)
++	}
++}
++
++func TestLoadRejectsInvalid(t *testing.T) {
++	cases := map[string]string{
++		"syntax": `{`, "trailing": `{} {}`, "root-null": `null`, "root-array": `[]`,
++		"missing-schema": `{"defaults":{}}`, "wrong-schema": `{"schema":"v2","defaults":{}}`,
++		"schema-null": `{"schema":null,"defaults":{}}`, "missing-defaults": `{"schema":"curator-run-defaults-v1"}`,
++		"defaults-null": doc(`null`, false), "defaults-array": doc(`[]`, false),
++		"unknown-env": doc(`{"future":{"model":"m"}}`, false),
++		"empty-entry": doc(`{"pi":{}}`, false), "null-entry": doc(`{"pi":null}`, false), "array-entry": doc(`{"pi":[]}`, false),
++		"unknown-member": doc(`{"pi":{"model":"m","extra":"x"}}`, false),
++		"model-null":     doc(`{"pi":{"model":null}}`, false), "effort-null": doc(`{"pi":{"effort":null}}`, false),
++		"model-number": doc(`{"pi":{"model":1}}`, false), "effort-bool": doc(`{"pi":{"effort":false}}`, false),
++		"duplicate-model":   doc(`{"pi":{"model":"a","model":"b"}}`, false),
++		"escaped-duplicate": doc(`{"pi":{"model":"a","\u006dodel":"b"}}`, false),
++		"duplicate-env":     doc(`{"pi":{"model":"a"},"pi":{"model":"b"}}`, false),
++		"duplicate-root":    `{"schema":"curator-run-defaults-v1","defaults":{},"defaults":{}}`,
++		"unknown-sig":       `{"schema":"curator-run-defaults-v1","defaults":{},"sig":"x"}`,
++		"locked-null":       `{"schema":"curator-run-defaults-v1","defaults":{},"locked":null}`,
++		"locked-string":     `{"schema":"curator-run-defaults-v1","defaults":{},"locked":"true"}`,
++		"surrogate":         doc(`{"pi":{"model":"\ud800"}}`, false),
++		"utf8":              doc("{\"pi\":{\"model\":\"\xff\"}}", false),
++	}
++	for name, data := range cases {
++		t.Run(name, func(t *testing.T) {
++			for _, operator := range []bool{false, true} {
++				p := paths(t)
++				target := p.Machine
++				if operator {
++					target = p.Operator
++					write(t, p.Machine, doc(`{"pi":{"model":"locked"}}`, true))
++				}
++				write(t, target, data)
++				f, err := defaults.Load(p)
++				code(t, err, defaults.CodeInvalid)
++				got, err := f.Resolve("pi", defaults.Pair{})
++				if err != nil || got != (defaults.Partial{}) {
++					t.Fatalf("partial leaked after load failure: %+v %v", got, err)
++				}
++			}
++		})
++	}
++}
++
++func TestLoadKnownEnvironmentsAndPresence(t *testing.T) {
++	p := paths(t)
++	// Normative registry set from SPEC §4.2, including the known unsupported ID.
++	write(t, p.Operator, `{"schema":"curator-run-defaults-v1","defaults":{"claude_code":{"model":""},"codex_cli":{"effort":""},"pi":{"model":"future-model","effort":"future-effort"},"opencode":{"model":"unadmitted"}}}`)
++	f, err := defaults.Load(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for env, want := range map[string]defaults.Partial{
++		"claude_code": {Model: resolved("", defaults.OriginOperator)},
++		"codex_cli":   {Effort: resolved("", defaults.OriginOperator)},
++		"pi":          {Model: resolved("future-model", defaults.OriginOperator), Effort: resolved("future-effort", defaults.OriginOperator)},
++		"opencode":    {Model: resolved("unadmitted", defaults.OriginOperator)},
++	} {
++		got, err := f.Resolve(env, defaults.Pair{})
++		if err != nil || got != want {
++			t.Errorf("%s: %+v %v want %+v", env, got, err, want)
++		}
++	}
++	_, err = f.Resolve("future", defaults.Pair{})
++	code(t, err, defaults.CodeInvalid)
++}
++
++func TestResolvePrecedence(t *testing.T) {
++	// All 64 member-presence combinations independently select each source.
++	for mask := 0; mask < 64; mask++ {
++		t.Run(fmt.Sprint(mask), func(t *testing.T) {
++			pairs := [3]defaults.Pair{}
++			for source := 0; source < 3; source++ {
++				if mask&(1<<(source*2)) != 0 {
++					pairs[source].Model = member(fmt.Sprintf("m%d", source))
++				}
++				if mask&(1<<(source*2+1)) != 0 {
++					pairs[source].Effort = member(fmt.Sprintf("e%d", source))
++				}
++			}
++			p := paths(t)
++			for i, path := range []string{p.Operator, p.Machine} {
++				pair := pairs[i+1]
++				members := []string{}
++				if pair.Model.Present {
++					members = append(members, fmt.Sprintf(`"model":%q`, pair.Model.Value))
++				}
++				if pair.Effort.Present {
++					members = append(members, fmt.Sprintf(`"effort":%q`, pair.Effort.Value))
++				}
++				entries := `{}`
++				if len(members) > 0 {
++					entries = `{"pi":{` + strings.Join(members, ",") + `}}`
++				}
++				write(t, path, doc(entries, false))
++			}
++			f, err := defaults.Load(p)
++			if err != nil {
++				t.Fatal(err)
++			}
++			got, err := f.Resolve("pi", pairs[0])
++			if err != nil {
++				t.Fatal(err)
++			}
++			var want defaults.Partial
++			for i, origin := range []defaults.Origin{defaults.OriginFlag, defaults.OriginOperator, defaults.OriginMachine} {
++				if !want.Model.Present && pairs[i].Model.Present {
++					want.Model = resolved(pairs[i].Model.Value, origin)
++				}
++				if !want.Effort.Present && pairs[i].Effort.Present {
++					want.Effort = resolved(pairs[i].Effort.Value, origin)
++				}
++			}
++			if got != want {
++				t.Fatalf("got %+v want %+v", got, want)
++			}
++		})
++	}
++}
++
++func TestResolveLocks(t *testing.T) {
++	for _, name := range []string{"model", "effort"} {
++		t.Run(name, func(t *testing.T) {
++			p := paths(t)
++			write(t, p.Machine, doc(fmt.Sprintf(`{"pi":{%q:""}}`, name), true))
++			write(t, p.Operator, doc(`{"pi":{"model":"operator","effort":"operator"},"opencode":{"model":"other"}}`, true))
++			f, err := defaults.Load(p)
++			if err != nil {
++				t.Fatal(err)
++			}
++			flags := defaults.Pair{}
++			want := defaults.Partial{}
++			if name == "model" {
++				flags.Effort = member("")
++				want.Model = resolved("", defaults.OriginMachine)
++				want.Effort = resolved("", defaults.OriginFlag)
++			} else {
++				flags.Model = member("")
++				want.Effort = resolved("", defaults.OriginMachine)
++				want.Model = resolved("", defaults.OriginFlag)
++			}
++			got, err := f.Resolve("pi", flags)
++			if err != nil || got != want {
++				t.Fatalf("unset locked member: %+v %v", got, err)
++			}
++			got, err = f.Resolve("pi", defaults.Pair{})
++			if err != nil {
++				t.Fatal(err)
++			}
++			if name == "model" {
++				want.Effort = defaults.ResolvedMember{}
++			} else {
++				want.Model = defaults.ResolvedMember{}
++			}
++			if got != want {
++				t.Fatalf("ignored operator supplied value: %+v", got)
++			}
++			for _, v := range []string{"", "different"} {
++				if name == "model" {
++					flags.Model = member(v)
++				} else {
++					flags.Effort = member(v)
++				}
++				got, err = f.Resolve("pi", flags)
++				code(t, err, defaults.CodeUsage)
++				if !strings.Contains(err.Error(), "--"+name) || got != (defaults.Partial{}) {
++					t.Fatalf("lock refusal: %+v %v", got, err)
++				}
++			}
++			got, err = f.Resolve("opencode", defaults.Pair{Model: member("flag")})
++			if err != nil || got.Model != resolved("flag", defaults.OriginFlag) {
++				t.Fatalf("lock spread to unnamed env/operator lock: %+v %v", got, err)
++			}
++		})
++	}
++}
++
++func TestLoadFilesystem(t *testing.T) {
++	t.Run("absent", func(t *testing.T) {
++		p := paths(t)
++		p.Operator = filepath.Join(p.Operator, "nested", "defaults.json")
++		f, err := defaults.Load(p)
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := f.Resolve("pi", defaults.Pair{})
++		if err != nil || got != (defaults.Partial{}) {
++			t.Fatalf("%+v %v", got, err)
++		}
++	})
++	for _, kind := range []string{"directory", "broken-link", "broken-parent-link", "link-loop", "read-permission", "parent-not-directory"} {
++		t.Run(kind, func(t *testing.T) {
++			p := paths(t)
++			switch kind {
++			case "directory":
++				if err := os.Mkdir(p.Operator, 0700); err != nil {
++					t.Fatal(err)
++				}
++			case "broken-link", "broken-parent-link":
++				if err := os.Symlink(filepath.Join(t.TempDir(), "missing"), p.Operator); err != nil {
++					t.Fatal(err)
++				}
++				if kind == "broken-parent-link" {
++					p.Operator = filepath.Join(p.Operator, "defaults.json")
++				}
++			case "link-loop":
++				if err := os.Symlink(p.Operator, p.Operator); err != nil {
++					t.Fatal(err)
++				}
++			case "read-permission":
++				write(t, p.Operator, doc(`{}`, false))
++				if err := os.Chmod(p.Operator, 0); err != nil {
++					t.Fatal(err)
++				}
++				t.Cleanup(func() { _ = os.Chmod(p.Operator, 0600) })
++				if os.Geteuid() == 0 {
++					t.Skip("root bypasses permission bits")
++				}
++			case "parent-not-directory":
++				write(t, p.Operator, "x")
++				p.Operator = filepath.Join(p.Operator, "defaults.json")
++			}
++			_, err := defaults.Load(p)
++			code(t, err, defaults.CodeInvalid)
++		})
++	}
++	t.Run("valid-link", func(t *testing.T) {
++		p := paths(t)
++		write(t, p.Machine, doc(`{"pi":{"model":"m"}}`, false))
++		if err := os.Symlink(p.Machine, p.Operator); err != nil {
++			t.Fatal(err)
++		}
++		f, err := defaults.Load(p)
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := f.Resolve("pi", defaults.Pair{})
++		if err != nil || got.Model != resolved("m", defaults.OriginOperator) {
++			t.Fatalf("%+v %v", got, err)
++		}
++	})
++	t.Run("empty-path", func(t *testing.T) { _, err := defaults.Load(defaults.Paths{}); code(t, err, defaults.CodeInvalid) })
++}
++
++func TestConfigPaths(t *testing.T) {
++	for _, xdg := range []string{"", "/explicit/config"} {
++		got := defaults.ConfigPaths(xdg, "/explicit/home")
++		operator := "/explicit/config/curator-run/defaults.json"
++		if xdg == "" {
++			operator = "/explicit/home/.config/curator-run/defaults.json"
++		}
++		if got.Machine != "/etc/curator-run/defaults.json" || got.Operator != operator {
++			t.Fatalf("%+v", got)
++		}
++	}
++}
++
++func TestResolveExplicitEmptyOverrides(t *testing.T) {
++	p := paths(t)
++	write(t, p.Machine, doc(`{"pi":{"model":"machine","effort":"machine"}}`, false))
++	write(t, p.Operator, doc(`{"pi":{"model":"","effort":""}}`, true))
++	f, err := defaults.Load(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := f.Resolve("pi", defaults.Pair{})
++	want := defaults.Partial{Model: resolved("", defaults.OriginOperator), Effort: resolved("", defaults.OriginOperator)}
++	if err != nil || got != want {
++		t.Fatalf("operator empty: %+v %v", got, err)
++	}
++	got, err = f.Resolve("pi", defaults.Pair{Model: member(""), Effort: member("")})
++	want = defaults.Partial{Model: resolved("", defaults.OriginFlag), Effort: resolved("", defaults.OriginFlag)}
++	if err != nil || got != want {
++		t.Fatalf("flag empty: %+v %v", got, err)
++	}
++}
+diff --git a/internal/defaults/lineup.go b/internal/defaults/lineup.go
+new file mode 100644
+index 0000000..92e2f8a
+--- /dev/null
++++ b/internal/defaults/lineup.go
+@@ -0,0 +1,238 @@
++// Lineup fallback for SPEC §4.3 level 3.
++//
++// Files.Resolve (defaults.go) covers levels 1-2: flags, then the machine
++// and operator files with presence, origins, and machine locks. Complete
++// below supplies only the members those levels left unset, from the real
++// tagged agents-management module: the highest-ranked model of
++// vendorplugin.Lineup among the models the registry admits for the mapped
++// system, with that model's declared Effort.Recommended as the effort, or
++// no effort when its EffortSupport is EffortSupportNone.
++//
++// The module is the authority for ranking, recommendation, and admission:
++// the launcher never invents a model name, never substitutes one row's
++// effort for another's, and never retries past a refusal. A configured
++// model with no configured effort takes the lineup's effort for THAT
++// model; an unknown configured model leaves the effort unset so the spawn
++// plane's admission (a later stage) refuses it. When the lineup admits no
++// model for the system — including the pi-native system, whose runtime
++// the pinned module does not declare yet — the launch fails with
++// defaults_unresolvable.
++//
++// Only absence reaches the lineup: Complete propagates a Resolve failure
++// (locked flags, unreadable files) without consulting the registry, so
++// the fallback never fires past a read failure.
++package defaults
++
++import (
++	"fmt"
++	"io"
++	"strings"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	claudeSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
++	codexSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/openai"
++
++	"github.com/relux-works/curator-agent-launcher/internal/cli"
++	"github.com/relux-works/curator-agent-launcher/internal/mapping"
++)
++
++// CodeUnresolvable is the SPEC §6 defaults diagnostic for a system the
++// lineup admits no model for. It is owned here; diagnostics transcribes it.
++const CodeUnresolvable = "defaults_unresolvable"
++
++// OriginLineup marks a member the level-3 fallback supplied.
++const OriginLineup Origin = "lineup"
++
++// Resolved is the §4.3 resolved pair plus the module runtime binding the
++// lineup completed it against. Runtime is empty exactly when the registry
++// admitted no runtime for the mapped system: the pair is then fully
++// file-supplied and the plan stage refuses the unknown runtime.
++type Resolved struct {
++	Model, Effort ResolvedMember
++	Runtime       string
++}
++
++// NewRegistry builds the production compatibility registry from the real
++// tagged module: the claude-code and codex system plugins, the frozen
++// runtime declarations, and the anthropic and openai vendor plugins.
++//
++// The legacy pi system plugin is deliberately not registered: at the
++// pinned module version it drives the agents-infra wrapper, which
++// replaces the managed home, and it backs no declared runtime. The
++// pi-native system arrives with the pending module release; mapping never
++// yields the legacy id, so nothing here can admit a Pi launch through it.
++func NewRegistry() (*vendorplugin.Registry, error) {
++	systems := agentic.NewRegistry()
++	if err := systems.Register(claudeSystem.New()); err != nil {
++		return nil, fmt.Errorf("register claude-code system: %w", err)
++	}
++	if err := systems.Register(codexSystem.New()); err != nil {
++		return nil, fmt.Errorf("register codex system: %w", err)
++	}
++	registry := vendorplugin.NewRegistry(systems)
++	if err := vendorplugin.SeedFrozenRuntimes(registry); err != nil {
++		return nil, fmt.Errorf("seed frozen runtimes: %w", err)
++	}
++	if err := registry.Register(anthropic.New()); err != nil {
++		return nil, fmt.Errorf("register anthropic vendor: %w", err)
++	}
++	if err := registry.Register(openai.New()); err != nil {
++		return nil, fmt.Errorf("register openai vendor: %w", err)
++	}
++	return registry, nil
++}
++
++// Complete applies levels 1-2 through Resolve, then level 3 for each
++// member left unset. A Resolve error is returned unchanged and the lineup
++// is not consulted. An environment mapping.Resolve refuses (for example
++// opencode, which has no launchable system/provider pair) is returned
++// unchanged: configuration for it never reaches a launch.
++func (f Files) Complete(environment string, flags Pair, reg *vendorplugin.Registry) (Resolved, error) {
++	target, err := mapping.Resolve(environment)
++	if err != nil {
++		return Resolved{}, err
++	}
++	partial, err := f.Resolve(environment, flags)
++	if err != nil {
++		return Resolved{}, err
++	}
++	if reg == nil {
++		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("no compatibility registry completes %s defaults", environment)}
++	}
++	out := Resolved{Model: partial.Model, Effort: partial.Effort}
++	if partial.Model.Present && partial.Effort.Present {
++		// Nothing missing: the lineup supplies nothing. Record the
++		// binding when the registry admits exactly one runtime; an
++		// empty Runtime leaves the unknown runtime to the plan stage.
++		if id, ok := selectDecl(target.System, reg.RuntimeDeclarations()); ok {
++			out.Runtime = string(id)
++		}
++		return out, nil
++	}
++	id, ok := selectDecl(target.System, reg.RuntimeDeclarations())
++	if !ok {
++		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q)", environment, target.System)}
++	}
++	runtime, err := reg.ResolveRuntime(id)
++	if err != nil {
++		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q): %v", environment, target.System, err)}
++	}
++	driven := drivenModels(runtime, agentic.SystemID(target.System))
++	ranked := vendorplugin.Lineup(driven)
++	if len(ranked) == 0 {
++		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q)", environment, target.System)}
++	}
++	out.Runtime = string(id)
++	if partial.Model.Present {
++		// The effort is missing here: a full pair returned above, so
++		// this fill cannot overwrite an explicit value.
++		if row := findRow(driven, partial.Model.Value); row != nil {
++			if effort, ok := effortForRow(*row); ok {
++				out.Effort = ResolvedMember{Member: effort, Origin: OriginLineup}
++			}
++		}
++		return out, nil
++	}
++	top := ranked[0].Model
++	out.Model = ResolvedMember{Member: Member{Value: string(top.ID), Present: true}, Origin: OriginLineup}
++	if partial.Effort.Present {
++		return out, nil
++	}
++	if effort, ok := effortForRow(top); ok {
++		out.Effort = ResolvedMember{Member: effort, Origin: OriginLineup}
++	}
++	return out, nil
++}
++
++// selectDecl finds the single runtime declaration for a mapped system.
++// Capability scores are per-vendor and never comparable across vendors,
++// so zero matches and several matches both admit nothing: the first is
++// absence, the second is ambiguity, and the launcher guesses in neither.
++func selectDecl(system string, decls []vendorplugin.RuntimeDeclaration) (vendorplugin.RuntimeID, bool) {
++	var found vendorplugin.RuntimeID
++	matches := 0
++	for _, decl := range decls {
++		if string(decl.System) != system {
++			continue
++		}
++		matches++
++		if matches == 1 {
++			found = decl.ID
++		}
++	}
++	return found, matches == 1
++}
++
++// drivenModels lists the binding's vendor rows the mapped system can
++// drive. Rows for other systems are not candidates: a launch on an
++// undeclared harness is a run nobody has evidence works.
++func drivenModels(runtime vendorplugin.Runtime, system agentic.SystemID) []vendorplugin.Model {
++	var driven []vendorplugin.Model
++	for _, model := range runtime.Vendor.Models() {
++		if model.DrivenBy(system) {
++			driven = append(driven, model)
++		}
++	}
++	return driven
++}
++
++// findRow looks a configured model up among the driven rows by exact id.
++// Names are never normalized, prefixed, or otherwise derived: a spelling
++// the vendor never issued is unknown, and the plan stage refuses it.
++func findRow(driven []vendorplugin.Model, id string) *vendorplugin.Model {
++	for i := range driven {
++		if string(driven[i].ID) == id {
++			return &driven[i]
++		}
++	}
++	return nil
++}
++
++// effortForRow renders a row's effort declaration as a member: the
++// vendor's Recommended word for a required-effort model, nothing for a
++// model with no effort axis. The display Recommended flag on the row is
++// never consulted: it steers listings, not launches.
++func effortForRow(row vendorplugin.Model) (Member, bool) {
++	if row.Effort.Support != agentic.EffortSupportRequired {
++		return Member{}, false
++	}
++	return Member{Value: row.Effort.Recommended, Present: true}, true
++}
++
++// Describe renders the resolved pair with the level that produced each
++// member, for the stderr origin line-group and the refusal detail. Values
++// are folded the way diagnostics.Line frames detail, so an embedded
++// newline stays a whitespace-led continuation and never a second line.
++func (r Resolved) Describe() string {
++	effort := "effort unset"
++	if r.Effort.Present {
++		effort = "effort=" + foldValue(r.Effort.Value) + " (" + string(r.Effort.Origin) + ")"
++	}
++	return "model=" + foldValue(r.Model.Value) + " (" + string(r.Model.Origin) + ") " + effort
++}
++
++// Line is the stderr origin line-group body: one line naming each
++// resolved value and its origin.
++func (r Resolved) Line() string {
++	return cli.Name + ": defaults: " + r.Describe()
++}
++
++// EmitGroup writes the origin line-group to stderr. It runs at every
++// launch after resolution and before the plan request, so an operator
++// always sees which model is about to run and why.
++func EmitGroup(stderr io.Writer, r Resolved) error {
++	_, err := fmt.Fprintln(stderr, r.Line())
++	return err
++}
++
++// foldValue keeps one value to one logical line: the same framing rule
++// diagnostics.Line applies to detail, so a hostile value never splits
++// the line-group into a second parseable line.
++func foldValue(value string) string {
++	value = strings.ReplaceAll(value, "\r\n", "\n")
++	value = strings.ReplaceAll(value, "\r", "\n")
++	return strings.ReplaceAll(value, "\n", "\n  ")
++}
+diff --git a/internal/defaults/lineup_test.go b/internal/defaults/lineup_test.go
+new file mode 100644
+index 0000000..eb2c09f
+--- /dev/null
++++ b/internal/defaults/lineup_test.go
+@@ -0,0 +1,431 @@
++package defaults_test
++
++import (
++	"errors"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	claudeSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
++	codexSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/openai"
++
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
++	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
++)
++
++func mustRegistry(t *testing.T) *vendorplugin.Registry {
++	t.Helper()
++	reg, err := defaults.NewRegistry()
++	if err != nil {
++		t.Fatal(err)
++	}
++	return reg
++}
++
++func lineupOrigin(t *testing.T, got defaults.ResolvedMember, value string) {
++	t.Helper()
++	if !got.Present || got.Value != value || got.Origin != defaults.OriginLineup {
++		t.Fatalf("member = %+v, want value %q with lineup origin", got, value)
++	}
++}
++
++// TestNewRegistryResolvesLaunchableSystems builds the production registry
++// from the real tagged module: both launchable systems resolve with their
++// vendor, and no pi-native (or legacy pi) runtime exists to fake native Pi
++// admission through.
++func TestNewRegistryResolvesLaunchableSystems(t *testing.T) {
++	reg := mustRegistry(t)
++	for runtime, system := range map[string]string{"claude": "claude-code", "codex": "codex"} {
++		resolved, err := reg.ResolveRuntime(vendorplugin.RuntimeID(runtime))
++		if err != nil {
++			t.Fatalf("ResolveRuntime(%q): %v", runtime, err)
++		}
++		if string(resolved.SystemID) != system || resolved.Vendor == nil {
++			t.Fatalf("ResolveRuntime(%q) = system %q vendor %v", runtime, resolved.SystemID, resolved.Vendor)
++		}
++		if len(resolved.Vendor.Models()) == 0 {
++			t.Fatalf("ResolveRuntime(%q) vendor declares no models", runtime)
++		}
++	}
++	for _, runtime := range []string{"pi", "pi-native"} {
++		if _, err := reg.ResolveRuntime(vendorplugin.RuntimeID(runtime)); err == nil {
++			t.Fatalf("ResolveRuntime(%q) succeeded: no Pi runtime may resolve", runtime)
++		}
++	}
++}
++
++// TestCompleteLineupTops pins the observed v0.5.10 fallback values. The
++// model is the Lineup leader by capability score, not the vendor's
++// display Recommended row (claude-opus-5 for anthropic); re-verify these
++// pins when the module pin changes.
++func TestCompleteLineupTops(t *testing.T) {
++	reg := mustRegistry(t)
++	for env, want := range map[string][3]string{
++		"claude_code": {"claude-fable-5-1", "high", "claude"},
++		"codex_cli":   {"gpt-6-astra", "max", "codex"},
++	} {
++		t.Run(env, func(t *testing.T) {
++			files, err := defaults.Load(paths(t))
++			if err != nil {
++				t.Fatal(err)
++			}
++			got, err := files.Complete(env, defaults.Pair{}, reg)
++			if err != nil {
++				t.Fatal(err)
++			}
++			lineupOrigin(t, got.Model, want[0])
++			lineupOrigin(t, got.Effort, want[1])
++			if got.Runtime != want[2] {
++				t.Fatalf("runtime = %q, want %q", got.Runtime, want[2])
++			}
++		})
++	}
++}
++
++// TestCompletePerMemberFill proves each level supplies only the member
++// every earlier level left unset: a configured model takes the lineup's
++// effort for THAT model (claude-opus-4-8 recommends xhigh, not the top
++// row's high), a configured effort keeps its value unvalidated, and a
++// full pair records the runtime without consulting the lineup.
++func TestCompletePerMemberFill(t *testing.T) {
++	reg := mustRegistry(t)
++	t.Run("model-takes-own-row-effort", func(t *testing.T) {
++		p := paths(t)
++		write(t, p.Machine, doc(`{"claude_code":{"model":"claude-opus-4-8"}}`, false))
++		files, err := defaults.Load(p)
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("claude_code", defaults.Pair{}, reg)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got.Model != resolved("claude-opus-4-8", defaults.OriginMachine) {
++			t.Fatalf("model = %+v", got.Model)
++		}
++		lineupOrigin(t, got.Effort, "xhigh")
++	})
++	t.Run("effort-kept-unvalidated", func(t *testing.T) {
++		files, err := defaults.Load(paths(t))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("codex_cli", defaults.Pair{Effort: member("not-a-real-effort")}, reg)
++		if err != nil {
++			t.Fatal(err)
++		}
++		lineupOrigin(t, got.Model, "gpt-6-astra")
++		if got.Effort != resolved("not-a-real-effort", defaults.OriginFlag) {
++			t.Fatalf("effort = %+v, want the explicit flag value untouched", got.Effort)
++		}
++	})
++	t.Run("full-pair-records-runtime", func(t *testing.T) {
++		p := paths(t)
++		write(t, p.Operator, doc(`{"codex_cli":{"model":"gpt-6-astra","effort":"low"}}`, false))
++		files, err := defaults.Load(p)
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("codex_cli", defaults.Pair{}, reg)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got.Model != resolved("gpt-6-astra", defaults.OriginOperator) || got.Effort != resolved("low", defaults.OriginOperator) {
++			t.Fatalf("pair = %+v %+v, want the explicit values even past the row recommendation", got.Model, got.Effort)
++		}
++		if got.Runtime != "codex" {
++			t.Fatalf("runtime = %q, want codex", got.Runtime)
++		}
++	})
++}
++
++// TestCompleteNoEffortSemantics proves a model with no effort axis gets
++// no effort — never an empty or invented one — and an unknown configured
++// model leaves the effort unset for the spawn plane to refuse.
++func TestCompleteNoEffortSemantics(t *testing.T) {
++	reg := mustRegistry(t)
++	t.Run("none-axis", func(t *testing.T) {
++		files, err := defaults.Load(paths(t))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("claude_code", defaults.Pair{Model: member("claude-haiku-4-5")}, reg)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got.Model != resolved("claude-haiku-4-5", defaults.OriginFlag) {
++			t.Fatalf("model = %+v", got.Model)
++		}
++		if got.Effort != (defaults.ResolvedMember{}) {
++			t.Fatalf("effort = %+v, want unset for an effortless model", got.Effort)
++		}
++	})
++	t.Run("unknown-model", func(t *testing.T) {
++		files, err := defaults.Load(paths(t))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("claude_code", defaults.Pair{Model: member("nope-not-a-model")}, reg)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got.Model != resolved("nope-not-a-model", defaults.OriginFlag) {
++			t.Fatalf("model = %+v", got.Model)
++		}
++		if got.Effort != (defaults.ResolvedMember{}) {
++			t.Fatalf("effort = %+v, want unset so admission refuses the unknown model", got.Effort)
++		}
++	})
++}
++
++// TestCompleteUnresolvable proves the pi system — whose pi-native runtime
++// the pinned module does not declare — fails with the typed diagnostic
++// and no invented model, while a fully file-supplied pi pair still
++// resolves (with no runtime for the plan stage to refuse).
++func TestCompleteUnresolvable(t *testing.T) {
++	reg := mustRegistry(t)
++	t.Run("bare", func(t *testing.T) {
++		files, err := defaults.Load(paths(t))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("pi", defaults.Pair{}, reg)
++		code(t, err, defaults.CodeUnresolvable)
++		if got != (defaults.Resolved{}) {
++			t.Fatalf("resolution leaked: %+v", got)
++		}
++		if !strings.Contains(err.Error(), `"pi-native"`) {
++			t.Fatalf("error %q does not name the unadmitted system", err)
++		}
++	})
++	t.Run("file-supplied-pair", func(t *testing.T) {
++		p := paths(t)
++		write(t, p.Operator, doc(`{"pi":{"model":"m","effort":"e"}}`, false))
++		files, err := defaults.Load(p)
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("pi", defaults.Pair{}, reg)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got.Model != resolved("m", defaults.OriginOperator) || got.Effort != resolved("e", defaults.OriginOperator) {
++			t.Fatalf("pair = %+v %+v", got.Model, got.Effort)
++		}
++		if got.Runtime != "" {
++			t.Fatalf("runtime = %q, want empty for the undeclared Pi binding", got.Runtime)
++		}
++	})
++}
++
++// TestCompleteNoFirePastFailure proves the lineup never supplies a member
++// past a levels-1-2 refusal: locked flags stay a usage error even with a
++// registry that could complete the pair.
++func TestCompleteNoFirePastFailure(t *testing.T) {
++	reg := mustRegistry(t)
++	p := paths(t)
++	write(t, p.Machine, doc(`{"pi":{"model":"machine"}}`, true))
++	write(t, p.Operator, doc(`{"pi":{"model":"operator","effort":"operator"}}`, false))
++	files, err := defaults.Load(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := files.Complete("pi", defaults.Pair{Model: member("flag")}, reg)
++	code(t, err, defaults.CodeUsage)
++	if got != (defaults.Resolved{}) {
++		t.Fatalf("resolution leaked past the lock refusal: %+v", got)
++	}
++}
++
++// TestCompletePreservesLocks proves unset locked members still accept
++// flags and operator entries stay ignored under a lock, through the full
++// completion path.
++func TestCompletePreservesLocks(t *testing.T) {
++	reg := mustRegistry(t)
++	p := paths(t)
++	write(t, p.Machine, doc(`{"pi":{"model":"machine"}}`, true))
++	write(t, p.Operator, doc(`{"pi":{"model":"operator","effort":"operator"}}`, false))
++	files, err := defaults.Load(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := files.Complete("pi", defaults.Pair{Effort: member("flag-effort")}, reg)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got.Model != resolved("machine", defaults.OriginMachine) {
++		t.Fatalf("model = %+v", got.Model)
++	}
++	if got.Effort != resolved("flag-effort", defaults.OriginFlag) {
++		t.Fatalf("effort = %+v, want the flag on the unset locked member", got.Effort)
++	}
++}
++
++// TestCompleteMappingRefusal proves configuration for an environment with
++// no launchable mapping never reaches the lineup, even fully supplied.
++func TestCompleteMappingRefusal(t *testing.T) {
++	reg := mustRegistry(t)
++	p := paths(t)
++	write(t, p.Operator, doc(`{"opencode":{"model":"m","effort":"e"}}`, false))
++	files, err := defaults.Load(p)
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, env := range []string{"opencode", "future"} {
++		if _, err := files.Complete(env, defaults.Pair{}, reg); err == nil || !strings.Contains(err.Error(), "no supported system/provider pair") {
++			t.Fatalf("%s: err = %v, want the mapping refusal", env, err)
++		}
++	}
++}
++
++// TestCompleteNilRegistry fails closed: no registry is not a source of models.
++func TestCompleteNilRegistry(t *testing.T) {
++	files, err := defaults.Load(paths(t))
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := files.Complete("claude_code", defaults.Pair{}, nil)
++	code(t, err, defaults.CodeUnresolvable)
++	if got != (defaults.Resolved{}) {
++		t.Fatalf("resolution leaked: %+v", got)
++	}
++}
++
++// TestCompleteRuntimeResolutionFailure proves a declared-but-unmaterialized
++// runtime admits nothing: the declaration names claude, but no system
++// plugin is registered, so ResolveRuntime fails and the cause is refused
++// as unresolvable rather than guessed past.
++func TestCompleteRuntimeResolutionFailure(t *testing.T) {
++	reg := vendorplugin.NewRegistry(agentic.NewRegistry())
++	if err := vendorplugin.SeedFrozenRuntimes(reg); err != nil {
++		t.Fatal(err)
++	}
++	files, err := defaults.Load(paths(t))
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := files.Complete("claude_code", defaults.Pair{}, reg)
++	code(t, err, defaults.CodeUnresolvable)
++	if got != (defaults.Resolved{}) {
++		t.Fatalf("resolution leaked: %+v", got)
++	}
++}
++
++// TestCompleteWrongVendorModels proves rows for other systems are not
++// candidates: the claude runtime is bound to the openai vendor, whose
++// models all drive codex, so the lineup for claude-code is empty and the
++// launch fails instead of cross-driving a model.
++func TestCompleteWrongVendorModels(t *testing.T) {
++	systems := agentic.NewRegistry()
++	if err := systems.Register(claudeSystem.New()); err != nil {
++		t.Fatal(err)
++	}
++	if err := systems.Register(codexSystem.New()); err != nil {
++		t.Fatal(err)
++	}
++	reg := vendorplugin.NewRegistry(systems)
++	err := reg.DeclareRuntime(vendorplugin.RuntimeDeclaration{
++		ID:     "claude",
++		System: "claude-code",
++		Vendor: "openai",
++		Broker: vendorplugin.BrokerProvenance{
++			Checked: []string{"test: a binding no vendor pair supports"},
++			Found:   "test: the frozen table binds claude to anthropic",
++		},
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := reg.Register(openai.New()); err != nil {
++		t.Fatal(err)
++	}
++	files, err := defaults.Load(paths(t))
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := files.Complete("claude_code", defaults.Pair{}, reg)
++	code(t, err, defaults.CodeUnresolvable)
++	if got != (defaults.Resolved{}) {
++		t.Fatalf("resolution leaked: %+v", got)
++	}
++}
++
++// TestCompleteAmbiguousRuntime proves two runtimes on one system admit
++// nothing: capability scores are per-vendor and never comparable across
++// vendors, so the launcher refuses rather than merging lineups. The
++// registry is built from the real module with a second declaration on
++// the claude-code system.
++func TestCompleteAmbiguousRuntime(t *testing.T) {
++	systems := agentic.NewRegistry()
++	if err := systems.Register(claudeSystem.New()); err != nil {
++		t.Fatal(err)
++	}
++	reg := vendorplugin.NewRegistry(systems)
++	for _, id := range []vendorplugin.RuntimeID{"claude", "claudesecond"} {
++		err := reg.DeclareRuntime(vendorplugin.RuntimeDeclaration{
++			ID:     id,
++			System: "claude-code",
++			Vendor: "anthropic",
++			Broker: vendorplugin.BrokerProvenance{
++				Checked: []string{"test: two declarations on one system"},
++				Found:   "test: the frozen table binds claude to anthropic",
++			},
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++	}
++	if err := reg.Register(anthropic.New()); err != nil {
++		t.Fatal(err)
++	}
++	files, err := defaults.Load(paths(t))
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := files.Complete("claude_code", defaults.Pair{}, reg)
++	code(t, err, defaults.CodeUnresolvable)
++	if got != (defaults.Resolved{}) {
++		t.Fatalf("ambiguity resolved: %+v", got)
++	}
++}
++
++// TestResolvedLine pins the origin line-group rendering: each resolved
++// value with its level, unset effort without an origin, hostile values
++// folded to whitespace-led continuations, and never a diagnostic line.
++func TestResolvedLine(t *testing.T) {
++	full := defaults.Resolved{
++		Model:  resolved("claude-fable-5-1", defaults.OriginLineup),
++		Effort: resolved("high", defaults.OriginLineup),
++	}
++	if got := full.Line(); got != "curator-run: defaults: model=claude-fable-5-1 (lineup) effort=high (lineup)" {
++		t.Fatalf("line = %q", got)
++	}
++	mixed := defaults.Resolved{Model: resolved("m", defaults.OriginFlag), Effort: resolved("e", defaults.OriginMachine)}
++	if got := mixed.Line(); got != "curator-run: defaults: model=m (flag) effort=e (machine)" {
++		t.Fatalf("line = %q", got)
++	}
++	unset := defaults.Resolved{Model: resolved("claude-haiku-4-5", defaults.OriginOperator)}
++	if got := unset.Line(); got != "curator-run: defaults: model=claude-haiku-4-5 (operator) effort unset" {
++		t.Fatalf("line = %q", got)
++	}
++	hostile := defaults.Resolved{Model: resolved("a\ncurator-run: usage: forged", defaults.OriginFlag)}
++	for _, line := range strings.Split(strings.TrimSuffix(hostile.Line(), "\n"), "\n") {
++		if diagnostics.IsDiagnosticLine(line) && strings.Contains(line, "usage") {
++			t.Fatalf("hostile value forged a diagnostic line: %q", hostile.Line())
++		}
++	}
++	if diagnostics.IsDiagnosticLine("curator-run: defaults: model=m (flag) effort unset") {
++		t.Fatal("the origin line-group parses as a diagnostic line")
++	}
++	var sb strings.Builder
++	if err := defaults.EmitGroup(&sb, full); err != nil {
++		t.Fatal(err)
++	}
++	if sb.String() != full.Line()+"\n" {
++		t.Fatalf("group = %q", sb.String())
++	}
++	var _ = errors.Is
++}
+diff --git a/internal/diagnostics/diagnostics.go b/internal/diagnostics/diagnostics.go
+index 4baf919..c77f69b 100644
+--- a/internal/diagnostics/diagnostics.go
++++ b/internal/diagnostics/diagnostics.go
+@@ -19,7 +19,7 @@
+ //	resolve_lock_unavailable       fragment.ResolveError       fragment.Resolver.Resolve (exit 1)
+ //	resolve_fragment_invalid       fragment.ResolveError       fragment.Resolver.Resolve (exit 1)
+ //	defaults_config_invalid        axconfig.Error              axconfig.Load (exit 1)
+-//	defaults_unresolvable          (no producer in this build) separately owned (exit 1)
++//	defaults_unresolvable          defaults.Error              defaults.Files.Complete (exit 1)
+ //	plan_refused                   (no producer in this build) separately owned (exit 1)
+ //	plan_provider_limited          (no producer in this build) separately owned (exit 1)
+ //	env_unsupported                mapping (constant)          mapping.Resolve (exit 1)
+@@ -78,8 +78,8 @@ const (
+ )
+ 
+ // Stable diagnostic codes of SPEC §6, in table order. Owned literals are
+-// pinned to their owners in tests; the three separately-owned codes have
+-// no producer in this build and name their pending call site in
++// pinned to their owners in tests; the two separately-owned plan codes
++// have no producer in this build and name their pending call site in
+ // RemainingObligations.
+ const (
+ 	CodeUsage = "usage"
+@@ -309,7 +309,6 @@ func IsDiagnosticLine(line string) bool {
+ func RemainingObligations() []string {
+ 	return []string{
+ 		"axconfig.Load before cli.Parse, so a present-but-unreadable ax.json reports defaults_config_invalid even when argv is also a usage error (TASK-260908-1o7i8y)",
+-		"defaults.json read, locked-member usage refusal, lineup fallback, defaults_unresolvable, and the per-member stderr line-group (TASK-260909-2vy977)",
+ 		"vendorplugin.BuildLaunch admission and providerlimits.Store.AvailabilityFor verdict enforcement as plan_refused / plan_provider_limited with verbatim verdict evidence (TASK-260908-2so46q)",
+ 		"composition.Value.CheckLaunchBoundary immediately before both ax handoff and direct exec, with the binary check and systemprompt.PrepareLaunch as the execution Boundary (TASK-260908-1o7i8y)",
+ 		"systemprompt.PrepareLaunch selection, file-kind probe, and warning emission on every launch (TASK-260908-1o7i8y)",
+diff --git a/internal/diagnostics/diagnostics_test.go b/internal/diagnostics/diagnostics_test.go
+index 579c927..52f363e 100644
+--- a/internal/diagnostics/diagnostics_test.go
++++ b/internal/diagnostics/diagnostics_test.go
+@@ -14,6 +14,7 @@ import (
+ 	"github.com/relux-works/curator-agent-launcher/internal/axconfig"
+ 	"github.com/relux-works/curator-agent-launcher/internal/cli"
+ 	"github.com/relux-works/curator-agent-launcher/internal/composition"
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
+ 	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
+ 	"github.com/relux-works/curator-agent-launcher/internal/fragment"
+ 	sp "github.com/relux-works/curator-agent-launcher/internal/systemprompt"
+@@ -128,6 +129,7 @@ func TestOwnedCodesMatchOwners(t *testing.T) {
+ 		{diagnostics.CodeResolveLockUnavailable, fragment.CodeLockUnavailable},
+ 		{diagnostics.CodeResolveFragmentInvalid, fragment.CodeFragmentInvalid},
+ 		{diagnostics.CodeDefaultsInvalid, axconfig.CodeInvalid},
++		{diagnostics.CodeDefaultsUnresolvable, defaults.CodeUnresolvable},
+ 		{diagnostics.CodeEnvUnsupported, "env_unsupported"},
+ 		{diagnostics.CodeMCPLayerMissing, composition.CodeMCPLayerMissing},
+ 		{diagnostics.CodeMCPLayerUnreadable, composition.CodeMCPLayerUnreadable},
+@@ -432,9 +434,12 @@ func TestDiagnosticLineDistinguishesTransport(t *testing.T) {
+ 
+ // TestRemainingObligationsAreStated bounds the contract: families without
+ // a producer in this build are declared, not silently dropped.
++// defaults_unresolvable graduated from this list when defaults.Complete
++// became its producer; its ownership is pinned by
++// TestOwnedCodesMatchOwners and the entry-point contract instead.
+ func TestRemainingObligationsAreStated(t *testing.T) {
+ 	joined := strings.Join(diagnostics.RemainingObligations(), "\n")
+-	for _, need := range []string{"axconfig.Load", "defaults_unresolvable", "plan_refused", "plan_provider_limited", "CheckLaunchBoundary", "PrepareLaunch"} {
++	for _, need := range []string{"axconfig.Load", "plan_refused", "plan_provider_limited", "CheckLaunchBoundary", "PrepareLaunch"} {
+ 		if !strings.Contains(joined, need) {
+ 			t.Errorf("obligations missing %q:\n%s", need, joined)
+ 		}

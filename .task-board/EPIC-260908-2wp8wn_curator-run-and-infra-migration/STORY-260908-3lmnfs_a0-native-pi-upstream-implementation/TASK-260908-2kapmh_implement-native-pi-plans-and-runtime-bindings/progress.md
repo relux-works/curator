@@ -90,6 +90,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260908-7239c1, max_parallel=3)
 spawn run started: [implementer] developer (codex) (run=RUN-260908-7239c1)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260908-7239c1, pid=82597, exit=0)
 
 ## Precondition Resources
 - [native-pi-producer-brief.md](file://TASK-260908-2kapmh/native-pi-producer-brief.md)
@@ -121,12 +123,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260908-7239c1)
 - [TASK-260908-2kapmh_review-verdict-rev2.md](file://TASK-260908-2kapmh/TASK-260908-2kapmh_review-verdict-rev2.md) — Accepted CR rev2: R1 closed, 7/7 behavioral rows, 142 mode/pair calls, exact candidate and explicit bounds
 - [TASK-260908-2kapmh_operator-tag-handoff.md](file://TASK-260908-2kapmh/TASK-260908-2kapmh_operator-tag-handoff.md) — Merged signed native Pi head; operator-only v0.5.11 handoff
 - [TASK-260908-2kapmh_spawn-log_-implementer--developer--codex-_RUN-260908-7239c1.log](file://TASK-260908-2kapmh/TASK-260908-2kapmh_spawn-log_-implementer--developer--codex-_RUN-260908-7239c1.log) — System spawn log captured by task-board
+- [TASK-260908-2kapmh_completion-7239c1.md](file://TASK-260908-2kapmh/TASK-260908-2kapmh_completion-7239c1.md) — Accepted CR2 completion: signed Curator board publication, done states, and operator tag handoff
 
 ## Created
 2026-09-08T14:48:49Z
 
 ## Last Update
-2026-09-07T18:30:00Z
+2026-09-08T16:20:56Z
 
 ## Assigned To
 [implementer] developer (codex)

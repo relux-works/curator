@@ -1,0 +1,7 @@
+# Urgent operator model override — 2026-09-08
+
+All producers and reviewers MUST now run as Codex gpt-6-astra with medium reasoning. This supersedes every earlier Claude/Fable/model/effort instruction in the goal, skills-derived briefs and task resources. Do not start Claude or delegate work to a different model. Parent has cancelled the active Claude runs and preserved their working trees and evidence; do not restart implementation from scratch.
+
+Resume the existing task and role at its actual current state. Inspect the existing WIP, latest CR and prior findings before editing. The cancelled run may have finished some changes or left a temporary review probe/mutant: compare to the frozen candidate before treating differences as product code. The backups in .temp/model-switch-astra-medium record the interrupted state and are read-only evidence, not permission to overwrite newer work. No hand edits to private board/CR/workspace/transaction records. Use normal producer handoff or reviewer verdict as appropriate.
+
+All other goal requirements remain: no hosted CI (necessary local tests), signed exact-head PR delivery owned by parent, no tags/releases, no real ax, no runtime-home hand edits, no LOGBOOK/control-root writes, and independent review. Continue the latest focused task brief, with ONLY its obsolete model policy replaced. Do not re-run completed broad suites unless changed code or a real uncertainty justifies it.

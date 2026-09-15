@@ -84,6 +84,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260908-ff0bf3, max_parallel=3)
 spawn run started: [implementer] developer (codex) (run=RUN-260908-ff0bf3)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260908-ff0bf3, pid=46741, exit=0)
 
 ## Precondition Resources
 - [mapping-producer.md](file://TASK-260908-450rqz/mapping-producer.md)
@@ -111,12 +113,14 @@ spawn run started: [implementer] developer (codex) (run=RUN-260908-ff0bf3)
 - [TASK-260908-450rqz_review-evidence-rev2.tar.gz](file://TASK-260908-450rqz/TASK-260908-450rqz_review-evidence-rev2.tar.gz) — CR2 exact scope, original goal, independent focused tests and version/help outputs
 - [TASK-260908-450rqz_review-verdict-rev2.md](file://TASK-260908-450rqz/TASK-260908-450rqz_review-verdict-rev2.md) — Accepted CR2: F1 closed by exactly six version substitutions; retained mapping attacks
 - [TASK-260908-450rqz_spawn-log_-implementer--developer--codex-_RUN-260908-ff0bf3.log](file://TASK-260908-450rqz/TASK-260908-450rqz_spawn-log_-implementer--developer--codex-_RUN-260908-ff0bf3.log) — System spawn log captured by task-board
+- [TASK-260908-450rqz_completion-023f6e26.json](file://TASK-260908-450rqz/TASK-260908-450rqz_completion-023f6e26.json) — Successful completion transaction and scoped board publication manifest
+- [TASK-260908-450rqz_completion-023f6e26.md](file://TASK-260908-450rqz/TASK-260908-450rqz_completion-023f6e26.md) — Integration result, actual command exits, signatures and remote containment
 
 ## Created
 2026-09-07T23:10:53Z
 
 ## Last Update
-2026-09-08T18:30:00Z
+2026-09-08T21:01:09Z
 
 ## Assigned To
 [implementer] developer (codex)

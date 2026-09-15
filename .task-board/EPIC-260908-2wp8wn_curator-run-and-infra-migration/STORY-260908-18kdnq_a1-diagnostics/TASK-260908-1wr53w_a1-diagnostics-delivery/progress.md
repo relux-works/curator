@@ -101,6 +101,8 @@ spawn agent resolution: Agent selection: muse via explicit_override (preferred_a
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [implementer] developer (muse) (run=RUN-260909-11483f, max_parallel=3)
 spawn run started: [implementer] developer (muse) (run=RUN-260909-11483f)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260909-11483f, pid=32383, exit=0)
 
 ## Precondition Resources
 - [diagnostics-producer.md](file://TASK-260908-1wr53w/diagnostics-producer.md) — SPEC6 production diagnostics with truthful integration boundaries
@@ -137,12 +139,13 @@ spawn run started: [implementer] developer (muse) (run=RUN-260909-11483f)
 - [TASK-260908-1wr53w_review-evidence-rev3.txt](file://TASK-260908-1wr53w/TASK-260908-1wr53w_review-evidence-rev3.txt) — Exact CR3 hashes, independent negative overlays, producer mutant diffs and runtime checks
 - [TASK-260908-1wr53w_review-verdict-rev3.md](file://TASK-260908-1wr53w/TASK-260908-1wr53w_review-verdict-rev3.md) — Accepted exact CR3; acceptance receipt and configured reviewer handoff refusal
 - [TASK-260908-1wr53w_spawn-log_-implementer--developer--muse-_RUN-260909-11483f.log](file://TASK-260908-1wr53w/TASK-260908-1wr53w_spawn-log_-implementer--developer--muse-_RUN-260909-11483f.log) — System spawn log captured by task-board
+- [TASK-260908-1wr53w_integration-complete.md](file://TASK-260908-1wr53w/TASK-260908-1wr53w_integration-complete.md) — Integration handoff evidence
 
 ## Created
 2026-09-07T23:11:12Z
 
 ## Last Update
-2026-09-09T12:26:32Z
+2026-09-09T12:28:39Z
 
 ## Assigned To
 [implementer] developer (muse)

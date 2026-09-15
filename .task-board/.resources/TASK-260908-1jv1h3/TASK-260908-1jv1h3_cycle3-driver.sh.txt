@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Cycle-3 live differential: does skip_upload:"auto" actually stop a commit
+# landing in a real install channel? Drives the production path
+# Pipe.Publish -> publishAll -> doPublish -> NewGitUploadClient.CreateFile
+# against local bare git repos. Observable = a landed commit, not a log line.
+set -u
+ROOT=/tmp/grl-cycle3
+rm -rf "$ROOT"; mkdir -p "$ROOT/proj"
+TAP="$ROOT/tap.git"; BUCKET="$ROOT/bucket.git"
+
+init_channel() { # $1 = bare repo path
+  rm -rf "$1" "$1.seed"
+  git init -q --bare "$1"
+  git init -q "$1.seed"; cd "$1.seed"
+  git config user.email r@example.com; git config user.name R
+  echo seed > README.md; git add -A; git commit -q -m root
+  git branch -M main; git remote add origin "$1"; git push -q origin main
+  cd "$ROOT"
+}
+
+cd "$ROOT"
+cat > proj/go.mod <<'EOF'
+module example.com/probe
+
+go 1.24
+EOF
+mkdir -p proj/cmd/probe
+cat > proj/cmd/probe/main.go <<'EOF'
+package main
+
+func main() { println("probe") }
+EOF
+
+gen_cfg() { # $1 = skip_upload literal or __ABSENT__
+  local su_line=""
+  [ "$1" = "__ABSENT__" ] || su_line="    skip_upload: \"$1\""
+  cat > proj/.goreleaser.yml <<EOF
+version: 2
+project_name: probe
+builds:
+  - id: probe
+    main: ./cmd/probe
+    binary: probe
+    goos: [darwin, windows]
+    goarch: [amd64]
+archives:
+  - id: probe
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+release:
+  disable: true
+homebrew_casks:
+  - name: probe
+    url:
+      template: "https://example.com/{{ .ArtifactName }}"
+$su_line
+    repository:
+      owner: o
+      name: tap
+      git:
+        url: "$TAP"
+        private_key: /tmp/grl-key
+    directory: Casks
+scoops:
+  - name: probe
+    url_template: "https://example.com/{{ .ArtifactName }}"
+$su_line
+    repository:
+      owner: o
+      name: bucket
+      git:
+        url: "$BUCKET"
+        private_key: /tmp/grl-key
+    directory: bucket
+EOF
+}
+
+run_case() { # $1 label  $2 skip_upload  $3 tag  $4 expectation
+  init_channel "$TAP"; init_channel "$BUCKET"
+  gen_cfg "$2"
+  cd "$ROOT/proj"
+  rm -rf .git dist
+  git init -q; git config user.email r@example.com; git config user.name R
+  git remote add origin https://github.com/o/probe.git
+  git add -A; git commit -q -m probe
+  git tag "$3"
+  echo "----------------------------------------------------------------"
+  echo "CASE $1 | skip_upload=$2 | tag=$3 | expect: $4"
+  goreleaser check -f .goreleaser.yml >/dev/null 2>&1
+  echo "  goreleaser check exit=$?"
+  goreleaser release --clean > "$ROOT/$1.log" 2>&1
+  echo "  goreleaser release exit=$?"
+  tapn=$(git --git-dir="$TAP" rev-list --count main 2>/dev/null || echo ERR)
+  bucn=$(git --git-dir="$BUCKET" rev-list --count main 2>/dev/null || echo ERR)
+  # root commit = 1; a published channel has 2
+  tapv=$([ "$tapn" = "1" ] && echo "NO COMMIT" || echo "COMMIT LANDED")
+  bucv=$([ "$bucn" = "1" ] && echo "NO COMMIT" || echo "COMMIT LANDED")
+  echo "  TAP    (commits=$tapn) -> $tapv"
+  echo "  BUCKET (commits=$bucn) -> $bucv"
+  grep -iE "prerelease detected|release is prerelease|skipping homebrew" "$ROOT/$1.log" | sed 's/^/    goreleaser: /' | head -4
+  cd "$ROOT"
+}
+
+echo "goreleaser: $(goreleaser --version 2>&1 | grep GitVersion | tr -s ' ')"
+run_case A auto        v0.15.0-rc.1 "NO COMMIT (the guard fires)"
+run_case B auto        v0.15.0      "COMMIT (guard is conditional, not a kill switch)"
+run_case C __ABSENT__  v0.15.0-rc.1 "COMMIT (reproduces the v0.14.0-rc.1 incident)"
+run_case E Auto        v0.15.0-rc.1 "COMMIT (narrowing mutant: gate is case-sensitive)"
+echo "----------------------------------------------------------------"

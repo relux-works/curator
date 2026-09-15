@@ -1,0 +1,52 @@
+#!/bin/bash
+# Live differential: does GoReleaser's `skip_upload: "auto"` actually keep a
+# prerelease out of a Homebrew tap and a Scoop bucket?
+#
+# The two "install channels" are real local bare git repos. The cask/scoop
+# publishers reach them through the production path
+# publishAll -> doPublish -> client.NewGitUploadClient(...).CreateFile,
+# i.e. the same call site a hosted run uses when repository.git.url is set.
+# A landed commit in tap.git / bucket.git is the observable.
+set -u
+BASE="$(cd "$(dirname "$0")" && pwd)"
+SRC="$BASE/src"
+SEED=0006d38
+
+emit() { # $1 = skip_upload literal ("" = field absent), $2 = tag
+  python3 - "$SRC/.goreleaser.yml.tmpl" "$SRC/.goreleaser.yml" "$1" <<'PY'
+import sys
+tmpl, out, val = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(tmpl).read()
+s = s.replace("@@SKIP@@\n", '    skip_upload: "%s"\n' % val if val else "")
+open(out, "w").write(s)
+PY
+}
+
+run() { # $1 = skip_upload literal, $2 = tag, $3 = label
+  echo
+  echo "############################################################"
+  echo "# $3"
+  echo "#   skip_upload = ${1:-<field absent>}   tag = $2"
+  echo "############################################################"
+  for r in tap bucket; do git -C "$BASE/$r.git" update-ref refs/heads/main "$SEED"; done
+  emit "$1"
+  git -C "$SRC" add -A >/dev/null
+  git -C "$SRC" -c user.email=t@t -c user.name=t commit -qm "case: $3" >/dev/null 2>&1
+  git -C "$SRC" tag -d v0.15.0 v0.15.0-rc.1 >/dev/null 2>&1
+  git -C "$SRC" tag "$2"
+  ( cd "$SRC" && GITHUB_TOKEN=dummy goreleaser release --clean 2>&1 ) \
+    | grep -E "homebrew cask|scoop manifests|pipe skipped|pushing|release succeeded|release failed" \
+    | sed 's/^/    /'
+  echo "  OBSERVED:"
+  echo "    tap.git    HEAD: $(git -C "$BASE/tap.git" log --oneline -1)"
+  echo "    bucket.git HEAD: $(git -C "$BASE/bucket.git" log --oneline -1)"
+  local landed="NO"
+  [ "$(git -C "$BASE/tap.git" rev-parse --short HEAD)" != "$SEED" ] && landed="YES"
+  echo "    -> commit landed in install channel: $landed"
+}
+
+goreleaser --version | sed -n '8,10p'
+run "auto"      v0.15.0-rc.1 "A. SHIPPED CONFIG, prerelease tag  -> must NOT publish"
+run "auto"      v0.15.0      "B. SHIPPED CONFIG, stable tag      -> must publish"
+run ""          v0.15.0-rc.1 "C. MUTANT: field removed (pre-change state), prerelease tag"
+run "sometimes" v0.15.0-rc.1 "D. MUTANT: narrowed to a bogus literal, prerelease tag"

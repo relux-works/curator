@@ -1,0 +1,9 @@
+# Diagnostics complete and source follow-up runs
+
+Launcher diagnostics STORY-260908-18kdnq / TASK-260908-1wr53w is now DONE. Exact CR3 tree 489e695df7ada7598347233c6553b791dacebb60 landed as signed launcher commit 289ff42f037b9f86411fe7852000c466b3fe970d in PR12 (MERGED). Complete RUN-260909-11483f published signed Curator board commit c37ff76229f280fbea81294f6d85a18bdbd06b4f; parent independently verified the good configured human signature. Required git pull --ff-only was attempted before board publication and refused on unrelated dirty activity; the public fresh-authority/temp-index Complete preserved it and reported checkout convergence separately. Full receipt is TASK-260908-1wr53w_integration-complete.md.
+
+Source historical recovery BUG-260908-1awn50 RUN-260909-ebc75e completed all 15 configured local commands and published actual CR3, 103 changed paths, at 12:25:45Z. Independent Astra medium review RUN-260909-3f9ffb is running. Producer provenance contains inconsistent path-count prose and admits a forbidden add -A on a throwaway index; the reviewer brief explicitly requires independent counts/provenance and recording the deviation without repeating it. No new acceptance or source Story completion is claimed yet.
+
+Source checkpoint ownership defect BUG-260909-3trykk / STORY-260909-1jgjf5 producer RUN-260909-df567b is running on Muse Spark xhigh. This blocks truthful closure of accepted gate STORY-260909-1cw05m; no private history/status bypass. Detailed precondition identifies board-parent versus frozen code-control CR lookup and strict authority/regression obligations.
+
+Fresh remote check of agents-management v0.5.11 returned no tag. Native Pi tag and Pi MCP scope decisions remain operator inputs. Defaults/Lineup, plan/limits, full main, installation and infra migration remain outstanding. Goal remains active; this is not parking or completion.

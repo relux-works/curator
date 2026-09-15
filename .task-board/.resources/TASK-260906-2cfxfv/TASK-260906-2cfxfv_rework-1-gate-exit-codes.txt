@@ -1,0 +1,70 @@
+TASK-260906-2cfxfv rework 1 -- raw observed exit codes
+tree: feat/interop-root-artifacts @ e3a97d7b (2 signed commits on 31106aa8)
+host: darwin. Every command below ran as its own process, unpiped.
+
+=== gates on the delivered tree (after the mutant harness restored it) ===
+go build ./...                                              exit=0
+go vet ./...                                                exit=0
+gofmt -l cmd internal                                       exit=0   (0 files listed)
+golangci-lint run ./...                                     exit=0   (0 issues)
+bash .github/ci/no-broad-suppression.sh                     exit=0
+bash .github/ci/ledger-consistency.sh                       exit=0   (231 rows, linux darwin windows)
+bash .github/ci/gate-selftest.sh                            exit=0   (130 passed, 0 failed)
+go test ./internal/interop/environments/  (candidate root)  exit=0   (12 cases, 0 skip, 0 fail)
+
+=== history is green at every commit ===
+bash .github/ci/gate-selftest.sh  @ 5b3d69fc                exit=0   (128 passed, 0 failed)
+go build ./...                    @ 5b3d69fc                exit=0
+go vet ./...                      @ 5b3d69fc                exit=0
+
+=== lanes, sequential, never alongside a -race suite ===
+test-gate.sh CANDIDATE, intact root, run 1                  exit=1   internal/install ::
+                                                                     TestStrictRegistryPolicyFailsUnknown
+                                                                     (registry snapshot clock race; see report section 8)
+                                                                     platform-case gate itself: exit=0, 20 skips, 0 root-unset
+test-gate.sh CANDIDATE, intact root, run 2                  exit=0   served=73 deferred=0; 12/12 environments cases ok;
+                                                                     20 skips, 0 root-unset; that install case: pass
+test-gate.sh DEFAULT, SPEC_PIN root                         exit=0   served=69 deferred=4; 33 skips;
+                                                                     all 13 root-unset skips in deferred packages
+
+=== negative candidate lanes: one declared artefact removed, nothing else ===
+test-gate.sh, root less vectors/environments.json           exit=1   FAIL internal/interop/environments was deferred
+                                                                     missing: vectors/environments.json
+test-gate.sh, root less expected/byte-exact-snapshot_sha256.txt
+                                                            exit=1   FAIL internal/interop/environments was deferred
+                                                                     missing: expected/byte-exact-snapshot_sha256.txt
+  the same doctored root with the row as committed at 31106aa8:
+  suite-plan.sh CI_REQUIRE_FULL_ROOT=1                       exit=0   served=73 deferred=0  <- the F2 hole
+  go test -run ^TestConformanceSnapshotAcquisition$          exit=1   --- FAIL mid-case, open(): no such file
+
+=== roots: plain checkouts, git archive NOT used, verified against manifest.json ===
+verify-root.py roots/candidate  (curator-spec 87a0d006)     exit=0   1047 declared / 1047 verified / 0 missing /
+                                                                     0 mismatched / 0 undeclared extra
+verify-root.py roots/pin        (curator-spec 0ed5c691)     exit=0   691 / 691 / 0 / 0 / 0
+verify-root.py roots/neg-env    (candidate minus one file)  exit=1   missing 1: vectors/environments.json
+diff -rq candidate neg-env                                  exit=1   "Only in candidate/vectors: environments.json"
+
+=== F1b blast radius: real streams, old gate vs new gate, same ledger ===
+old gate, pin lane stream         -> skips-observed.tsv
+new gate, pin lane stream         -> skips-observed.tsv    diff: IDENTICAL (32 skips)
+old gate, candidate lane stream   -> skips-observed.tsv
+new gate, candidate lane stream   -> skips-observed.tsv    diff: IDENTICAL (20 skips)
+  (both replays exit 1 on a Tier-1 "never ran" for cases the older recorded streams predate;
+   the exit is identical under both gates and is an artefact of the replay, not a verdict change)
+
+=== mutants: 11 run, every -run anchored at ONE top-level name, === RUN lines counted ===
+M1  plain t.Skipf                        TestNoCaseHereSkips...       exit=1 RUN=1  KILLED   (case really skips)
+M2  guard := t; guard.Skipf              TestNoCaseHereSkips...       exit=1 RUN=1  KILLED   (case really skips)
+M3  h.t.Skipf  -- selector chain         TestNoCaseHereSkips...       exit=1 RUN=1  KILLED   (case really skips)
+M4  skip := t.Skipf; skip(...)           TestNoCaseHereSkips...       exit=1 RUN=1  KILLED   (case really skips)
+M5  drop the expected file from the row  TestConformanceEveryPath...  exit=1 RUN=1  KILLED
+M6  over-declare a real root path        TestConformanceEveryPath...  exit=1 RUN=1  KILLED
+M7  raw filepath.Join(root, ...)         TestNoRootReadHere...        exit=1 RUN=1  KILLED
+M8  bind the root to a second name       TestTheRootIsAlwaysBound...  exit=1 RUN=1  KILLED
+M10 read an undeclared root vector       rootPath via TestConformanceContextDetectors
+                                                                      exit=1 RUN=1 fail=1  KILLED
+M11 narrow coveringArtefact to vectors/  same                         exit=0 RUN=1 fail=0  SURVIVES BY DESIGN
+                                                                      (states the bound M10 measures)
+M9  keep deferred-only, exempt root-unset  gate-selftest.sh           exit=1  129 passed, 1 failed  KILLED
+
+git status --short after the harness: exactly the 11 intended files, nothing else.

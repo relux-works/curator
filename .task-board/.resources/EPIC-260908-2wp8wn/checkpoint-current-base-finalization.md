@@ -1,0 +1,9 @@
+# F1 rework preserved; current-base finalization routed
+
+Muse RUN-260909-7347d3 completed implementation and developer handoff. Latest BUG-260909-3trykk_results.md reports F1 production manifest binding repair, nine source/test/doc paths, shipped real runSpawn/LoadGoalBoard/startup/Runtime.Execute regressions, narrowing mutants and documented recovery. These remain producer claims pending independent Astra review. No CR2 was published.
+
+The producer's public refresh-candidate refused because current CR1 was still ready after the prior non-goal-bound review changed board status to-dev. The installed public lifecycle admits aborted revisions for refresh. Parent cancelled obsolete-base runtime validation around command 3/15 using applied directive RUN-260909-7347d3:cancel:263402. This is not test failure or a passing suite. Confirmed terminal cancellation and observer closure. All nine files remain; SHA-256 snapshot is in source precondition checkpoint-refresh-finalize.md and local launcher .temp/resume-2026-09-09/checkpoint-refresh-finalize.md.
+
+Parent used public withdraw_cr revision 1, with explicit reason citing independent changes-requested verdict and never-integrated old base. CR1 is now aborted; immutable historical evidence remains. Public task routing is to-dev. New tracked Muse Spark xhigh developer RUN-260909-1bd9f4 owns supported fresh-authority refresh/preservation/publication; full 15-command runtime validation follows only on the refreshed candidate, then new Astra medium review. No direct private-record edits, source PR, install, or real gate recovery has occurred.
+
+Current observer log: .temp/resume-2026-09-09/observe-1bd9f4-terminal.json. Previous observer 7347d3 is closed. Full launcher/migration objective and pending native-Pi tag/MCP decisions remain unchanged.

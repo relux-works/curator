@@ -1,0 +1,55 @@
+#!/bin/bash
+# Cycle-2 extension of the live differential: two NARROWING mutants cycle 1 did
+# not cover, plus the shipped control, against the same real local install
+# channels (bare git repos reached through the production
+# publishAll -> doPublish -> NewGitUploadClient.CreateFile path).
+set -u
+BASE="$(cd "$(dirname "$0")" && pwd)"
+SRC="$BASE/src"
+SEED=$(git -C "$BASE/tap.git" rev-list --max-parents=0 HEAD | head -1)
+SEED=${SEED:0:7}
+
+emit() {
+  python3 - "$SRC/.goreleaser.yml.tmpl" "$SRC/.goreleaser.yml" "$1" <<'PY'
+import sys
+tmpl, out, val = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(tmpl).read()
+s = s.replace("@@SKIP@@\n", '    skip_upload: "%s"\n' % val if val else "")
+open(out, "w").write(s)
+PY
+}
+
+run() { # $1 = skip_upload literal, $2 = tag, $3 = label, $4 = expectation
+  echo
+  echo "############################################################"
+  echo "# $3"
+  echo "#   skip_upload = ${1:-<field absent>}   tag = $2"
+  echo "#   expectation: $4"
+  echo "############################################################"
+  for r in tap bucket; do
+    seedref=$(git -C "$BASE/$r.git" rev-list --max-parents=0 HEAD | head -1)
+    git -C "$BASE/$r.git" update-ref refs/heads/main "$seedref"
+  done
+  before_tap=$(git -C "$BASE/tap.git" rev-parse --short HEAD)
+  emit "$1"
+  echo -n "  goreleaser check on this config: exit="
+  ( cd "$SRC" && goreleaser check >/dev/null 2>&1; echo $? )
+  git -C "$SRC" add -A >/dev/null
+  git -C "$SRC" -c user.email=t@t -c user.name=t commit -qm "case: $3" >/dev/null 2>&1
+  git -C "$SRC" tag -d "$2" >/dev/null 2>&1
+  git -C "$SRC" tag "$2" || { echo "  TAG REFUSED BY GIT"; return; }
+  ( cd "$SRC" && GITHUB_TOKEN=dummy goreleaser release --clean 2>&1 ) \
+    | grep -E "homebrew cask|scoop manifests|pipe skipped|pushing|release succeeded|release failed|failed to parse" \
+    | sed 's/^/    /'
+  echo "  OBSERVED:"
+  echo "    tap.git    HEAD: $(git -C "$BASE/tap.git" log --oneline -1)"
+  echo "    bucket.git HEAD: $(git -C "$BASE/bucket.git" log --oneline -1)"
+  after_tap=$(git -C "$BASE/tap.git" rev-parse --short HEAD)
+  if [ "$before_tap" != "$after_tap" ]; then echo "    -> commit landed in install channel: YES"; else echo "    -> commit landed in install channel: NO"; fi
+}
+
+goreleaser --version | sed -n '8,10p'
+echo "seed(tap) = $SEED"
+run "auto" v0.15.0-rc.1 "A2. CONTROL: shipped config, prerelease tag" "must NOT publish"
+run "Auto" v0.15.0-rc.1 "E. MUTANT: capitalised literal (gate NARROWED, not deleted)" "gate is case-sensitive -> expect PUBLISH"
+run "auto" 'v0.15.0+rc1' "F. MUTANT: shipped config, rc spelled as SemVer BUILD METADATA" "Prerelease=='' -> expect PUBLISH"

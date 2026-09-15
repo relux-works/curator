@@ -1,0 +1,190 @@
+===== gr-2.17.0/internal/pipe/cask/zz_review_probe_test.go =====
+package cask
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/goreleaser/goreleaser/v2/internal/artifact"
+	"github.com/goreleaser/goreleaser/v2/internal/client"
+	"github.com/goreleaser/goreleaser/v2/internal/testctx"
+	"github.com/goreleaser/goreleaser/v2/internal/testlib"
+	"github.com/goreleaser/goreleaser/v2/pkg/config"
+	"github.com/stretchr/testify/require"
+)
+
+// Review probe for TASK-260908-1jv1h3: drives the real cask publish decision
+// with the exact config values under review, in both tag directions, plus the
+// pre-change (unset) state that let v0.14.0-rc.1 reach the tap.
+func TestReviewProbeCaskSkipUpload(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		skipUpload  string
+		prerelease  string
+		wantPublish bool
+	}{
+		{"under review: auto + rc tag must skip", "auto", "rc.1", false},
+		{"under review: auto + stable tag must publish", "auto", "", true},
+		{"pre-change: unset + rc tag publishes (the incident)", "", "rc.1", true},
+		{"pre-change: unset + stable tag publishes", "", "", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			folder := t.TempDir()
+			ctx := testctx.WrapWithCfg(t.Context(), config.Project{
+				Dist:        folder,
+				ProjectName: "curator",
+				Release:     config.Release{},
+				Casks: []config.HomebrewCask{
+					{
+						Name:       "curator",
+						SkipUpload: tt.skipUpload,
+						Repository: config.RepoRef{Owner: "relux-works", Name: "homebrew-tap"},
+					},
+				},
+			}, testctx.WithCurrentTag("v0.15.0"), testctx.GitHubTokenType)
+			ctx.Semver.Prerelease = tt.prerelease
+
+			path := filepath.Join(folder, "curator_Darwin_arm64.tar.gz")
+			f, err := os.Create(path)
+			require.NoError(t, err)
+			require.NoError(t, f.Close())
+			ctx.Artifacts.Add(&artifact.Artifact{
+				Name:    "curator_Darwin_arm64.tar.gz",
+				Path:    path,
+				Goos:    "darwin",
+				Goarch:  "arm64",
+				Type:    artifact.UploadableArchive,
+				Extra: map[string]any{
+					artifact.ExtraID:       "curator",
+					artifact.ExtraFormat:   "tar.gz",
+					artifact.ExtraBinaries: []string{"curator"},
+				},
+			})
+
+			cli := client.NewMock()
+			require.NoError(t, runAll(ctx, cli))
+			err = publishAll(ctx, cli)
+			if tt.wantPublish {
+				require.NoError(t, err)
+				require.True(t, cli.CreatedFile, "expected a tap commit to be attempted")
+			} else {
+				testlib.AssertSkipped(t, err)
+				require.False(t, cli.CreatedFile, "expected no tap commit")
+			}
+		})
+	}
+}
+
+===== gr-2.17.0/internal/pipe/scoop/zz_review_probe_test.go =====
+package scoop
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/goreleaser/goreleaser/v2/internal/artifact"
+	"github.com/goreleaser/goreleaser/v2/internal/client"
+	"github.com/goreleaser/goreleaser/v2/internal/testctx"
+	"github.com/goreleaser/goreleaser/v2/internal/testlib"
+	"github.com/goreleaser/goreleaser/v2/pkg/config"
+	"github.com/stretchr/testify/require"
+)
+
+// Review probe for TASK-260908-1jv1h3: same 2x2 as the cask probe, for scoops.
+func TestReviewProbeScoopSkipUpload(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		skipUpload  string
+		tag         string
+		version     string
+		prerelease  string
+		wantPublish bool
+	}{
+		{"under review: auto + rc tag must skip", "auto", "v0.15.0-rc.1", "0.15.0-rc.1", "rc.1", false},
+		{"under review: auto + stable tag must publish", "auto", "v0.15.0", "0.15.0", "", true},
+		{"pre-change: unset + rc tag publishes (the incident)", "", "v0.15.0-rc.1", "0.15.0-rc.1", "rc.1", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			folder := t.TempDir()
+			path := filepath.Join(folder, "curator.tar.gz")
+			f, err := os.Create(path)
+			require.NoError(t, err)
+			require.NoError(t, f.Close())
+
+			ctx := testctx.WrapWithCfg(t.Context(), config.Project{
+				Dist:        folder,
+				ProjectName: "curator",
+				Scoops: []config.Scoop{
+					{
+						Name:        "curator",
+						SkipUpload:  tt.skipUpload,
+						Repository:  config.RepoRef{Owner: "relux-works", Name: "scoop-bucket"},
+						Description: "Agent environment manager",
+						Homepage:    "https://github.com/relux-works/curator",
+					},
+				},
+			},
+				testctx.GitHubTokenType,
+				testctx.WithCurrentTag(tt.tag),
+				testctx.WithVersion(tt.version),
+				testctx.WithSemver(0, 15, 0, tt.prerelease))
+
+			ctx.Artifacts.Add(&artifact.Artifact{
+				Name:    "curator_" + tt.version + "_windows_amd64.tar.gz",
+				Path:    path,
+				Goos:    "windows",
+				Goarch:  "amd64",
+				Goamd64: "v1",
+				Type:    artifact.UploadableArchive,
+				Extra:   map[string]any{artifact.ExtraBinaries: []string{"curator.exe"}},
+			})
+
+			cli := client.NewMock()
+			require.NoError(t, Pipe{}.Default(ctx))
+			require.NoError(t, runAll(ctx, cli))
+			err = publishAll(ctx, cli)
+			if tt.wantPublish {
+				require.NoError(t, err)
+				require.True(t, cli.CreatedFile, "expected a bucket commit to be attempted")
+			} else {
+				testlib.AssertSkipped(t, err)
+				require.False(t, cli.CreatedFile, "expected no bucket commit")
+			}
+		})
+	}
+}
+
+===== gr-2.17.0/internal/pipe/semver/zz_review_probe_test.go =====
+package semver
+
+import (
+	"testing"
+
+	"github.com/goreleaser/goreleaser/v2/internal/testctx"
+	"github.com/stretchr/testify/require"
+)
+
+// Review probe for TASK-260908-1jv1h3: the target tag must produce a non-empty
+// Semver.Prerelease, and a stable tag must produce an empty one.
+func TestReviewProbeSemverFromTag(t *testing.T) {
+	for _, tt := range []struct {
+		tag  string
+		want string
+	}{
+		{"v0.15.0-rc.1", "rc.1"},
+		{"v0.14.0-rc.1", "rc.1"},
+		{"v0.15.0", ""},
+		{"v0.14.0", ""},
+		{"v0.15.0-rc1", "rc1"},
+		{"v0.15.0+build.5", ""},
+	} {
+		t.Run(tt.tag, func(t *testing.T) {
+			ctx := testctx.Wrap(t.Context(), testctx.WithCurrentTag(tt.tag))
+			require.NoError(t, Pipe{}.Run(ctx))
+			require.Equal(t, tt.want, ctx.Semver.Prerelease)
+		})
+	}
+}
+

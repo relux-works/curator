@@ -1,0 +1,142 @@
+<div id="curator-context-explorer">
+  <style>
+    #curator-context-explorer .file-pair { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 24px; margin-top: 16px; }
+    #curator-context-explorer .file-pair > section { min-width: 0; }
+    #curator-context-explorer pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0 0; }
+    #curator-context-explorer pre code { display: block; white-space: inherit; overflow-wrap: anywhere; }
+    #curator-context-explorer .result-files { margin-top: 16px; }
+    #curator-context-explorer .state-line { margin: 12px 0; }
+    #curator-context-explorer .output-label { font-weight: 500; }
+    #curator-context-explorer [hidden] { display: none; }
+    @media (max-width: 580px) { #curator-context-explorer .file-pair { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+  </style>
+  <div class="nav nav-pills" role="tablist" aria-label="Часть предложения">
+    <button class="nav-link active" id="ctx-skills-tab" role="tab" aria-controls="ctx-skills-panel" aria-selected="true" type="button" data-case="skills">Локальные skills</button>
+    <button class="nav-link" id="ctx-context-tab" role="tab" aria-controls="ctx-context-panel" aria-selected="false" type="button" data-case="context">Rules + knowledge</button>
+    <button class="nav-link" id="ctx-mcp-tab" role="tab" aria-controls="ctx-mcp-panel" aria-selected="false" type="button" data-case="mcp">MCP</button>
+    <button class="nav-link" id="ctx-private-tab" role="tab" aria-controls="ctx-private-panel" aria-selected="false" type="button" data-case="private">Приватный слой</button>
+  </div>
+  <div class="viz-controls">
+    <label class="form-label" id="ctx-source-field">Источник
+      <select class="form-select" id="ctx-source">
+        <option value="relative">Относительный путь</option>
+        <option value="absolute">Абсолютный путь</option>
+        <option value="git">Git repository</option>
+        <option value="endpoint" id="ctx-endpoint-option" disabled hidden>Metadata endpoint</option>
+      </select>
+    </label>
+    <label class="form-label">Агент
+      <select class="form-select" id="ctx-agent">
+        <option value="claude">Claude Code</option>
+        <option value="codex">Codex</option>
+      </select>
+    </label>
+  </div>
+  <div id="ctx-skills-panel" role="tabpanel" aria-labelledby="ctx-skills-tab"></div>
+  <div id="ctx-context-panel" role="tabpanel" aria-labelledby="ctx-context-tab" hidden></div>
+  <div id="ctx-mcp-panel" role="tabpanel" aria-labelledby="ctx-mcp-tab" hidden></div>
+  <div id="ctx-private-panel" role="tabpanel" aria-labelledby="ctx-private-tab" hidden></div>
+  <div class="text-small state-line" id="ctx-detail" aria-live="polite"></div>
+  <script>
+    (() => {
+      const root = document.getElementById('curator-context-explorer');
+      const source = root.querySelector('#ctx-source');
+      const agent = root.querySelector('#ctx-agent');
+      const sourceField = root.querySelector('#ctx-source-field');
+      const endpointOption = root.querySelector('#ctx-endpoint-option');
+      const detail = root.querySelector('#ctx-detail');
+      let active = 'skills';
+      const panels = {};
+      for (const name of ['skills', 'context', 'mcp', 'private']) {
+        const panel = root.querySelector('#ctx-' + name + '-panel');
+        panel.innerHTML = '<div class="state-line"><span class="viz-badge"></span></div><div class="file-pair"><section><div class="output-label">1 · Входные файлы</div><pre><code data-input></code></pre></section><section><div class="output-label" data-manifest-label></div><pre><code data-manifest></code></pre></section></div><hr><section class="result-files"><div class="output-label" data-output-label></div><pre><code data-output></code></pre></section>';
+        panels[name] = panel;
+      }
+      const declarations = {
+        relative: { path: './agents' },
+        absolute: { path: '/work/shared/agents' },
+        git: { git: 'https://example.org/toolkit.git', tag: 'v1.2.0' }
+      };
+      const roots = {
+        relative: 'project/agents/',
+        absolute: '/work/shared/agents/',
+        git: 'toolkit.git @ v1.2.0 /'
+      };
+      function formatJson(value, depth = 0) {
+        if (value === null || typeof value !== 'object') return JSON.stringify(value);
+        const primitive = item => item === null || typeof item !== 'object';
+        if (Array.isArray(value) && value.every(primitive)) return JSON.stringify(value);
+        if (!Array.isArray(value) && Object.values(value).every(primitive)) return JSON.stringify(value);
+        const indent = '  '.repeat(depth + 1);
+        const end = '  '.repeat(depth);
+        if (Array.isArray(value)) return '[\n' + value.map(item => indent + formatJson(item, depth + 1)).join(',\n') + '\n' + end + ']';
+        return '{\n' + Object.entries(value).map(([key, item]) => indent + JSON.stringify(key) + ': ' + formatJson(item, depth + 1)).join(',\n') + '\n' + end + '}';
+      }
+      function render() {
+        sourceField.hidden = active === 'private';
+        endpointOption.disabled = active !== 'mcp';
+        endpointOption.hidden = active !== 'mcp';
+        if (source.value === 'endpoint' && active !== 'mcp') source.value = 'relative';
+        const kind = source.value;
+        const selected = panels[active];
+        const isClaude = agent.value === 'claude';
+        let input, manifest, output, badge, note;
+        let manifestLabel = '2 · Skillfile.json — предложенный фрагмент';
+        let outputLabel = '3 · Результат установки — предложение';
+        const shared = { sources: { toolkit: declarations[kind] } };
+        if (active === 'skills') {
+          badge = 'P1 · Контракт можно специфицировать';
+          input = roots[kind] + '\n└── skills/\n    ├── review/\n    │   └── SKILL.md\n    └── docs/\n        └── SKILL.md';
+          manifest = { ...shared, skills: [{ from: 'toolkit', directory: 'skills', include: ['*'] }] };
+          const adapter = isClaude ? '.claude' : '.codex';
+          output = 'project/.agents/skills/\n├── review/SKILL.md\n└── docs/SKILL.md\n\n' + adapter + '/skills/{review,docs}\n  → соответствующие .agents/skills/…\n\nProject lock: review + docs, точные content hashes';
+          note = kind === 'git' ? 'Tag закрепляется на commit; состав коллекции фиксируется в lock.' : kind === 'absolute' ? 'Читаем указанный путь; snapshot включает локальные правки. Машинный override можно хранить приватно.' : 'Относительный путь считается от Skillfile.json; snapshot включает локальные правки. Обновление — явное.';
+        } else if (active === 'context') {
+          badge = 'P2 · Типы ясны; ownership ещё проектируем';
+          input = roots[kind] + '\n├── rules/\n│   └── testing.md\n└── knowledge/\n    └── architecture.md';
+          manifest = { ...shared,
+            rules: [{ from: 'toolkit', files: ['rules/*.md'], activation: { mode: 'always' } }],
+            knowledge: [{ from: 'toolkit', files: ['knowledge/*.md'], activation: { mode: 'on-demand' } }]
+          };
+          output = 'project/.agents/context/knowledge/architecture.md\n\n' + (isClaude
+            ? '.claude/rules/curator-testing.md\n  ← testing.md\n.claude/rules/curator-knowledge-index.md\n  ← описание + путь к architecture.md'
+            : 'AGENTS.md · управляемая композиция\n  ← testing.md\n  ← описание + путь к architecture.md');
+          note = 'Rule загружается сразу; knowledge — по ссылке при необходимости. kind, activation и root/system — разные оси.';
+        } else if (active === 'mcp') {
+          badge = 'P3 · Managed wiring уже есть; импорт — расширение';
+          if (kind === 'endpoint') {
+            input = 'https://catalog.example.org/\n  mcp/docs.json\n\nДокумент конфигурации\n  → server: docs\n  → transport: http\n  → url: https://docs.example.org/mcp';
+            manifest = { mcp: [{ metadata: { url: 'https://catalog.example.org/mcp/docs.json', format: 'curator-mcp' } }] };
+          } else {
+            input = roots[kind] + '\n└── agent-mcp.json\n\nserver: docs\ntransport: http\nurl: https://docs.example.org/mcp';
+            manifest = { ...shared, mcp: [{ from: 'toolkit', file: 'agent-mcp.json' }] };
+          }
+          output = isClaude
+            ? '<managed-home>/.agent-context/mcp/claude_code.json\n{"mcpServers":{"docs":{"type":"http",\n "url":"https://docs.example.org/mcp"}}}\n\nLaunch: --mcp-config <file> --strict-mcp-config'
+            : '<managed-home>/curator-mcp.config.toml\n[mcp_servers.docs]\nurl = "https://docs.example.org/mcp"\n\nLaunch layer: -p curator-mcp';
+          outputLabel = '3 · Существующий managed-home канал после импорта';
+          note = 'Metadata endpoint и runtime MCP URL различаются. Native project config — отдельный контракт записи.';
+        } else {
+          badge = 'P2b · Эскиз; жизненный цикл пока открыт';
+          input = 'project/\n├── agents/context/project.md\n├── agents.private.md   [ignored]\n└── .gitignore';
+          manifestLabel = '2 · Порядок композиции — не JSON schema';
+          manifest = 'Shared project context\n  + agents/context/project.md\n  + agents.private.md\n  = project instruction output\n\nGlobal profile: отдельный scope';
+          const file = isClaude ? 'CLAUDE.md' : 'AGENTS.md';
+          output = file + ' [generated, ignored]\n  ← public + private, каждый один раз\n\nLocal state: private paths + hashes\nPublic lock: только public inputs';
+          note = 'Первый вариант — явный sync. Генерация на каждый launch требует решения гонок между профилями.';
+        }
+        selected.querySelector('.viz-badge').textContent = badge;
+        selected.querySelector('[data-input]').textContent = input;
+        selected.querySelector('[data-manifest-label]').textContent = manifestLabel;
+        selected.querySelector('[data-manifest]').textContent = typeof manifest === 'string' ? manifest : formatJson(manifest);
+        selected.querySelector('[data-output-label]').textContent = outputLabel;
+        selected.querySelector('[data-output]').textContent = output;
+        detail.textContent = note;
+      }
+      root.querySelectorAll('[data-case]').forEach(button => button.addEventListener('click', () => { active = button.dataset.case; render(); }));
+      source.addEventListener('change', render);
+      agent.addEventListener('change', render);
+      render();
+    })();
+  </script>
+</div>

@@ -56,6 +56,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] doc-writer (codex) (run=RUN-260908-6f2694, max_parallel=3)
 spawn run started: [implementer] doc-writer (codex) (run=RUN-260908-6f2694)
+agent completed: [implementer] doc-writer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260908-6f2694, pid=2608, exit=0)
 
 ## Precondition Resources
 - [launcher-plan-errata.md](file://TASK-260909-zg440c/launcher-plan-errata.md)
@@ -74,12 +76,14 @@ spawn run started: [implementer] doc-writer (codex) (run=RUN-260908-6f2694)
 - [TASK-260909-zg440c_review-validation-rev1.log](file://TASK-260909-zg440c/TASK-260909-zg440c_review-validation-rev1.log) — Reviewer make check at exact CR1 candidate: build, formatting, vet, test, race passed
 - [TASK-260909-zg440c_review-verdict-rev1.md](file://TASK-260909-zg440c/TASK-260909-zg440c_review-verdict-rev1.md) — Accepted CR1: exact-tree semantic errata review, counterexamples, scope and validation bounds
 - [TASK-260909-zg440c_spawn-log_-implementer--doc-writer--codex-_RUN-260908-6f2694.log](file://TASK-260909-zg440c/TASK-260909-zg440c_spawn-log_-implementer--doc-writer--codex-_RUN-260908-6f2694.log) — System spawn log captured by task-board
+- [TASK-260909-zg440c_completion-887fdb30.json](file://TASK-260909-zg440c/TASK-260909-zg440c_completion-887fdb30.json) — Exact completion transaction and signed board publication verification
+- [TASK-260909-zg440c_completion-887fdb30.md](file://TASK-260909-zg440c/TASK-260909-zg440c_completion-887fdb30.md) — Completion evidence: task and Story done, signed board commit published
 
 ## Created
 2026-09-08T20:49:25Z
 
 ## Last Update
-2026-09-08T18:30:00Z
+2026-09-08T21:30:20Z
 
 ## Assigned To
 [implementer] doc-writer (codex)

@@ -1,0 +1,9 @@
+# F2 handed off; runtime validation active
+
+Muse Spark xhigh RUN-260909-fa4cdb finished producer handoff for BUG-260909-3trykk. Actual public state is running/finalizing; configured validation command5/15 was observed. Do NOT label the suite green or claim a new CR before terminal publication.
+
+Outcome BUG-260909-3trykk_f2-results.md records the four connected tests (six subtests), final publication through Runtime.Execute, public acceptance and Complete, and public stranded task_delta recovery with immutable previous revision bytes. All four passed together in47.640s; M1 exact separate-owner checkpoint narrowing mutant is killed by the shipped command regression while same-owner tests remain green. M2 old hydration selection is killed by connected publication. These are producer claims/evidence pending fresh independent review, not acceptance.
+
+Parent independently compared the nine CR2 changed-path blobs against candidate788204f7a4288cc1dc150a4fc189e1150b3cc68f: nine compared, zero mismatches. F2 adds tools/board-cli/cmd/worktree_checkpoint_separate_lifecycle_test.go (934 lines). Base remains294c58f58dac7a0d76c25d442fdae037e7e37a6b, independently re-observed on remote. No source changes beyond preserved F1 files, no source publication or install in this step.
+
+The temporary test-lease wait was diagnosed and corrected as a fixture lifecycle issue; two earlier10-minute test timeouts are not passing evidence. Normal full15 validation runs only once after handoff. Observer remains launcher .temp/resume-2026-09-09/observe-fa4cdb-terminal.log. Next: inspect actual terminal CR and all validation exits, then fresh Astra-medium exact-tree review, signed source delivery/install and real product gate recovery. Native Pi operator tag/MCP decision and the remaining launcher/migration scope are unchanged.

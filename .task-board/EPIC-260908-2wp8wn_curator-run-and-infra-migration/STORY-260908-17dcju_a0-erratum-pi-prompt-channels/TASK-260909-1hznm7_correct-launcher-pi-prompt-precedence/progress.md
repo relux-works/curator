@@ -56,6 +56,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] doc-writer (codex) (run=RUN-260908-aef902, max_parallel=3)
 spawn run started: [implementer] doc-writer (codex) (run=RUN-260908-aef902)
+agent completed: [implementer] doc-writer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260908-aef902, pid=25528, exit=0)
 
 ## Precondition Resources
 - [pi-prompt-errata.md](file://TASK-260909-1hznm7/pi-prompt-errata.md)
@@ -72,12 +74,13 @@ spawn run started: [implementer] doc-writer (codex) (run=RUN-260908-aef902)
 - [TASK-260909-1hznm7_review-make-check-rev1.log](file://TASK-260909-1hznm7/TASK-260909-1hznm7_review-make-check-rev1.log) — Independent make check on exact CR1 candidate tree; exit 0
 - [TASK-260909-1hznm7_review-verdict-rev1.md](file://TASK-260909-1hznm7/TASK-260909-1hznm7_review-verdict-rev1.md) — Accepted CR1: source-backed semantic counterexample review and exact-tree validation
 - [TASK-260909-1hznm7_spawn-log_-implementer--doc-writer--codex-_RUN-260908-aef902.log](file://TASK-260909-1hznm7/TASK-260909-1hznm7_spawn-log_-implementer--doc-writer--codex-_RUN-260908-aef902.log) — System spawn log captured by task-board
+- [TASK-260909-1hznm7_completion-c285e21e.md](file://TASK-260909-1hznm7/TASK-260909-1hznm7_completion-c285e21e.md) — Completion transaction, signed remote publication and status verification; diagnostic discrepancy recorded
 
 ## Created
 2026-09-08T21:30:23Z
 
 ## Last Update
-2026-09-08T18:30:00Z
+2026-09-08T22:08:18Z
 
 ## Assigned To
 [implementer] doc-writer (codex)

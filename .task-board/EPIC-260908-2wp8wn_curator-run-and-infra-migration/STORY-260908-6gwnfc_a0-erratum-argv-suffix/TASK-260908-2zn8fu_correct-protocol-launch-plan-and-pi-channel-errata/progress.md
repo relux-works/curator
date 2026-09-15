@@ -76,6 +76,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] doc-writer (codex) (run=RUN-260908-2f16af, max_parallel=3)
 spawn run started: [implementer] doc-writer (codex) (run=RUN-260908-2f16af)
+agent completed: [implementer] doc-writer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260908-2f16af, pid=80618, exit=0)
 
 ## Precondition Resources
 - [protocol-errata-brief.md](file://TASK-260908-2zn8fu/protocol-errata-brief.md)
@@ -115,12 +117,14 @@ spawn run started: [implementer] doc-writer (codex) (run=RUN-260908-2f16af)
 - [TASK-260908-2zn8fu_spawn-log_-reviewer--reviewer--codex-_RUN-260908-7b135b.log](file://TASK-260908-2zn8fu/TASK-260908-2zn8fu_spawn-log_-reviewer--reviewer--codex-_RUN-260908-7b135b.log) — System spawn log captured by task-board
 - [TASK-260908-2zn8fu_review-verdict-rev4.md](file://TASK-260908-2zn8fu/TASK-260908-2zn8fu_review-verdict-rev4.md) — Accepted CR4: seven semantic counterexample checks, exact source/evidence mapping and runtime publication validation
 - [TASK-260908-2zn8fu_spawn-log_-implementer--doc-writer--codex-_RUN-260908-2f16af.log](file://TASK-260908-2zn8fu/TASK-260908-2zn8fu_spawn-log_-implementer--doc-writer--codex-_RUN-260908-2f16af.log) — System spawn log captured by task-board
+- [TASK-260908-2zn8fu_completion-2f16af.md](file://TASK-260908-2zn8fu/TASK-260908-2zn8fu_completion-2f16af.md) — Signed landed CR4 and board publication verification; task and Story done
+- [TASK-260908-2zn8fu_completion-2f16af.json](file://TASK-260908-2zn8fu/TASK-260908-2zn8fu_completion-2f16af.json) — worktree complete raw output, exit 0
 
 ## Created
 2026-09-08T15:07:55Z
 
 ## Last Update
-2026-09-08T18:30:00Z
+2026-09-08T20:32:39Z
 
 ## Assigned To
 [implementer] doc-writer (codex)

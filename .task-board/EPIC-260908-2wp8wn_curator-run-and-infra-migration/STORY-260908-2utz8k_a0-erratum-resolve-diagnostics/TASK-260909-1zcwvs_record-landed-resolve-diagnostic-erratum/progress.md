@@ -55,6 +55,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=v1.6.1-128-gab60e0d; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [analyst] researcher (codex) (run=RUN-260908-531325, max_parallel=3)
 spawn run started: [analyst] researcher (codex) (run=RUN-260908-531325)
+agent completed: [analyst] researcher (codex) (exit=0)
+spawn run completed: codex (run=RUN-260908-531325, pid=41462, exit=0)
 
 ## Precondition Resources
 - [e6-reconcile.md](file://TASK-260909-1zcwvs/e6-reconcile.md) — Evidence-only reconciliation of E6 already delivered in PR5
@@ -72,12 +74,13 @@ spawn run started: [analyst] researcher (codex) (run=RUN-260908-531325)
 - [TASK-260909-1zcwvs_spawn-log_-reviewer--reviewer--codex-_RUN-260908-70381b.log](file://TASK-260909-1zcwvs/TASK-260909-1zcwvs_spawn-log_-reviewer--reviewer--codex-_RUN-260908-70381b.log) — System spawn log captured by task-board
 - [TASK-260909-1zcwvs_review-verdict-rev1.md](file://TASK-260909-1zcwvs/TASK-260909-1zcwvs_review-verdict-rev1.md) — Independent accepted E6 rev1 verdict: empty delta justified, exact sources and stderr verified, eight existing test results accepted with bounds
 - [TASK-260909-1zcwvs_spawn-log_-analyst--researcher--codex-_RUN-260908-531325.log](file://TASK-260909-1zcwvs/TASK-260909-1zcwvs_spawn-log_-analyst--researcher--codex-_RUN-260908-531325.log) — System spawn log captured by task-board
+- [TASK-260909-1zcwvs_completion-evidence.md](file://TASK-260909-1zcwvs/TASK-260909-1zcwvs_completion-evidence.md) — Signed evidence-only completion and remote publication verification
 
 ## Created
 2026-09-08T22:47:32Z
 
 ## Last Update
-2026-09-08T18:30:00Z
+2026-09-08T23:01:05Z
 
 ## Assigned To
 [analyst] researcher (codex)
