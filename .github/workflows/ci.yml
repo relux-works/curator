@@ -168,7 +168,8 @@ jobs:
   # self-hosted label would leave the job queued forever.
   test-self-hosted:
     name: Test (rose-air)
-    # Gate snapshots (gate/**) are validated on the hosted matrix only: the
+    # Runs on main pushes only: every landing gets self-hosted evidence, while
+    # pull requests and gate snapshots stay on the hosted matrix, because the
     # single self-hosted slot is shared with other repositories and would
     # serialise every candidate behind unrelated 90-minute runs.
     if: ${{ vars.ROSE_AIR_RUNNER == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -189,6 +190,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      # The hosted macOS image ships Node; the self-hosted runner does not.
+      # internal/npmsource's real-npm cases skip with "npm unavailable"
+      # otherwise, a reason the skip classes do not tolerate on darwin.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
       - name: Verify Go toolchain identity
         shell: bash
