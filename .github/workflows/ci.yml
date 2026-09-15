@@ -171,7 +171,7 @@ jobs:
     # Gate snapshots (gate/**) are validated on the hosted matrix only: the
     # single self-hosted slot is shared with other repositories and would
     # serialise every candidate behind unrelated 90-minute runs.
-    if: ${{ vars.ROSE_AIR_RUNNER == 'true' && !startsWith(github.ref, 'refs/heads/gate/') }}
+    if: ${{ vars.ROSE_AIR_RUNNER == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
     steps:
