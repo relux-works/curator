@@ -185,6 +185,13 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The hosted macOS image ships Node; the self-hosted runner does not.
+      # internal/npmsource's real-npm cases are required on darwin by the
+      # platform-case ledger, and "npm unavailable" is not a tolerated skip.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Verify Go toolchain identity
         shell: bash
         run: bash .github/ci/toolchain-identity.sh
