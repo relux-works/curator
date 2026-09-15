@@ -1,0 +1,5 @@
+# Resume — TASK-260908-3bxxzi after the launcher landing gate moved to CI (2026-09-16)
+
+Your previous candidate (tree 2d98f088be06a9dfeab3724252d627de5bcf9331; README, CHANGELOG, --help/golden, ci.yml rose-air job, main.go/cli.go) was demoted only because the local `make check` timed out under host load. The gate is now `sh scripts/remote-gate.sh` (landed on launcher main 1cb41aa via PR #16: it pushes a gate/** snapshot and waits for the hosted CI matrix). The orchestrator preserved your candidate as the precondition resource `TASK-260908-3bxxzi_a3-candidate-rev1.patch` and cleaned the worktree so this spawn's final-leaf refresh replays the Story branch onto main 1cb41aa (which contains scripts/remote-gate.sh).
+
+Do: confirm `git log --oneline -2` shows main 1cb41aa (scripts/remote-gate.sh present); `git apply --check` then `git apply` the patch resource; when editing ci.yml keep the gate/** trigger from main and merge your rose-air job into it (ci.yml conflicts are expected — resolve by keeping both); rerun narrow `make test`, `make fmt-check`; attach results; hand off (the runtime runs the remote gate once; it takes ~10–15 minutes on hosted runners).

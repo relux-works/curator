@@ -1,0 +1,9 @@
+# Brief — TASK-260908-3bxxzi a3-release-readiness-delivery (curator-agent-launcher)
+
+Launcher main now carries the complete pipeline (3cd1304, PR #15). Deliver release readiness for 0.1.0 without creating a tag or release:
+1. README: installation (build from source; the binary must live on a trusted PATH directory, NOT the Curator user-bin shim directory ~/.local/bin, because `curator run` refuses providers there per environments.md §11 — document /usr/local/bin or a dedicated directory), umbrella discovery (`curator run <env> --profile <p> -- <args>`), the defaults.json family (§4.3, operator ~/.config/curator-run/defaults.json over machine /etc/curator-run/defaults.json, `locked`), the Pi runtime preference convention, the explicit "Pi has no MCP channel" note, the ax.json tracked mode with fake-ax-only testing, and the diagnostics/exit-code table.
+2. `--help` output complete and consistent with the README and SPEC 0.3.0-draft.
+3. CHANGELOG.md with a 0.1.0 section summarising the landed PRs 4–15 (CLI, fragment, mapping, errata, composition, system prompt, execution, diagnostics, plan/limits, defaults/lineup, production main) and the upstream agents-management v0.5.13 dependency.
+4. CI: keep the hosted lint/test/race/golden matrix and add a `Test (rose-air)` job on `[self-hosted, macOS, ARM64]` gated by `if: ${{ vars.ROSE_AIR_RUNNER == 'true' }}` (mirror the curator workflow: setup-go, make check; setup-node not needed). Do not add release/tag jobs.
+5. Bump `buildVersion` in cmd/curator-run/main.go to "0.1.0-dev" only if the README/CHANGELOG reference it; do not tag.
+Validation: `make check` runs once through the handoff runtime; narrow `make test` for goldens locally. Evidence: `TASK-260908-3bxxzi_results.md`. Hand off with `task-board handoff TASK-260908-3bxxzi --role developer`.

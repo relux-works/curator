@@ -1,0 +1,430 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 851fc91..9e22c0a 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -63,3 +63,19 @@ jobs:
+ 
+       - name: go test -race
+         run: make race
++
++  # Enable only after a matching runner is registered for this repository.
++  test-self-hosted:
++    name: Test (rose-air)
++    if: ${{ vars.ROSE_AIR_RUNNER == 'true' }}
++    runs-on: [self-hosted, macOS, ARM64]
++    timeout-minutes: 15
++    steps:
++      - uses: actions/checkout@v4
++
++      - uses: actions/setup-go@v5
++        with:
++          go-version-file: go.mod
++
++      - name: Build, lint, test, race and goldens
++        run: make check
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+new file mode 100644
+index 0000000..5ce99f2
+--- /dev/null
++++ b/CHANGELOG.md
+@@ -0,0 +1,40 @@
++# Changelog
++
++## 0.1.0 — unreleased
++
++Release-readiness candidate; source builds report `0.1.0-dev`, against
++SPEC `0.3.0-draft`. No tag or release is created by this work.
++
++### Added
++
++- Closed launcher CLI parsing, opaque native arguments, usage diagnostics and
++  initial hosted CI (PR #4).
++- Curator fragment resolution with repair, closed validation, CCJ-1 digest and
++  pinned conformance corpus (PR #5).
++- Explicit environment/system/provider mapping for Claude Code, Codex CLI and
++  native Pi; unsupported environments refuse (PR #6).
++- Composition of admitted argv, owned environment and stdin, including MCP
++  transport and collision handling (PR #9).
++- Explicit system-prompt opt-in and fresh Pi managed-home file checks (PR #10).
++- Direct child execution, signal/terminal handling and tracked launch-plan
++  transport verified with fake ax only (PR #11).
++- Stable diagnostic families and conformance gates (PR #12).
++- Interactive plan admission and separate managed-home provider-limit checks
++  (PR #13).
++- Per-member flags/operator/machine/lineup defaults with machine locks and
++  ordered Pi runtime preference (PR #14).
++- Production main pipeline connecting resolution, defaults, admission,
++  composition and direct/tracked execution, with entry-point goldens (PR #15).
++- Installation/configuration help and an opt-in `Test (rose-air)` ARM64 CI lane;
++  hosted build, formatting, vet, tests, race and goldens remain enabled.
++
++### Corrected
++
++- Plan/environment value-contract errata (PR #7) and Pi prompt precedence
++  errata (PR #8). Pi has no MCP channel.
++
++### Dependencies
++
++- `github.com/relux-works/skill-agents-management v0.5.13`, the upstream
++  agents-management module, with no replace directive or workspace override.
++  Curator and ax remain CLI contracts.
+diff --git a/README.md b/README.md
+index 151afdd..5999336 100644
+--- a/README.md
++++ b/README.md
+@@ -78,13 +78,134 @@ made from this host's tests.
+ 
+ ## Install and discovery
+ 
+-The launcher ships the `curator-run` executable. Curator dispatches
+-umbrella subcommands by the established external-subcommand convention
+-(the `git`/`kubectl`/`docker` plugin model): a subcommand Curator does not
+-implement resolves to an executable named `curator-<name>` on `PATH`.
+-Installing `curator-run` on `PATH` therefore makes `curator run …` work;
+-the binary is equally invocable directly as `curator-run …`. Curator
+-carries no knowledge of the launcher beyond that discovery rule.
++Build from source with the Go toolchain specified by `go.mod`:
++
++```bash
++git clone https://github.com/relux-works/curator-agent-launcher.git
++cd curator-agent-launcher
++go build -o curator-run ./cmd/curator-run
++sudo install -m 0755 curator-run /usr/local/bin/curator-run
++curator-run --version
++```
++
++This development build reports `0.1.0-dev` (specification `0.3.0-draft`).
++Ensure `/usr/local/bin` is on `PATH`, or install into a dedicated trusted
++operator-owned directory on `PATH`. Do **not** install into Curator's user-bin
++shim directory (`~/.local/bin`), a managed skill bin directory, or beneath the
++environments root: umbrella discovery refuses these locations with
++`subcommand_provider_untrusted` (environments.md §11).
++
++Install Curator and the desired provider separately and make them available on
++`PATH`; configure the provider's credentials and a Curator profile before launch.
++The launcher installs neither providers nor profiles. When tracking is enabled,
++`ax` must also be available and support the launch-plan contract.
++
++Curator discovers unknown subcommands as `curator-<name>` on trusted `PATH`.
++The two invocation forms pass the same launcher arguments:
++
++```bash
++curator run codex_cli --profile companyA -- resume --last
++curator-run codex_cli --profile companyA -- resume --last
++curator run pi --profile companyA --system-prompt append
++curator-run --help
++```
++
++The general umbrella form is `curator run <env> --profile <p> -- <args>`.
++Supported environments are `claude_code`, `codex_cli`, and `pi`; `opencode`
++is currently refused with `env_unsupported`. Without `--profile`, Curator uses
++the current profile for the applicable scope. Resolution always requests repair.
++
++### Launcher options
++
++| Option | Meaning |
++|---|---|
++| `--profile <name>` | Curator profile, forwarded to environment resolution |
++| `--system-prompt <append\|replace>` | Explicit prompt-channel opt-in; unavailable semantics refuse the launch |
++| `--model <model>`, `--effort <effort>` | Explicit spawn-plane selection, subject to admission and machine locks |
++| `--name <session-name>` | Tracked session name; `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`; accepted without effect when untracked |
++| `--ax-profile <standard\|yolo>` | Tracked execution profile; usage error when untracked; absent uses ax's default |
++| `--help`, `-h`, `--version` | Print information and exit, after reading tracking configuration |
++| `--` | End launcher parsing; all following arguments pass through verbatim |
++
++Value flags accept `--flag value` or `--flag=value`. Repeated flags, unknown
++flags, missing values, and extra operands before `--` are usage errors.
++Prompt-file discovery can still apply without the prompt opt-in; see the warnings
++and Pi precedence described above. Pi has no MCP channel.
++
++### Configuration family
++
++The launcher owns `defaults.json` and `ax.json` in the operator directory
++`$XDG_CONFIG_HOME/curator-run` (default `~/.config/curator-run`) and machine
++directory `/etc/curator-run`. These are separate from Curator's configuration.
++Both use closed schemas: unknown members, malformed data and unreadable files
++refuse the invocation; absence alone permits fallback.
++
++Model and effort resolve independently: flags, then operator defaults over
++machine defaults per member, then the admitted lineup. For example, a file
++can select only an effort, leaving model selection to the lineup:
++
++```json
++{
++  "schema": "curator-run-defaults-v1",
++  "locked": false,
++  "defaults": {
++    "codex_cli": { "effort": "high" }
++  }
++}
++```
++
++Each environment entry contains `model`, `effort`, or both; values are passed
++to spawn-plane admission. With `"locked": true` in the machine file, the
++operator entry is ignored for every environment named by that machine file.
++Flags attempting to override a member set by that machine entry are usage
++errors, even if the value matches. Members left unset still use later fallback.
++The selected model, effort and their origins are printed before admission.
++
++Pi fallback uses the ordered convention `pi-anthropic`, `pi-openai`,
++`pi-google`, selecting the first runtime with a driven model and ranking only
++within that runtime. This is an operator convention, not a comparison of vendor
++scores. An explicit/configured model binds its own runtime independently.
++
++### Tracked mode
++
++Enable tracking with this `ax.json` document:
++
++```json
++{ "schema": "curator-run-ax-v1", "enabled": true }
++```
++
++Here **machine wins**: an existing `/etc/curator-run/ax.json` decides;
++the operator file is read only when the machine file is absent. Absence of
++both files or `enabled: false` selects direct execution. This read precedes
++argument validation, including help/version. Invalid configuration is
++`defaults_config_invalid`, never an untracked fallback.
++
++Tracked launches call `ax start <name> --provider <id> --launch-plan -
++[--profile <ax-profile>] --workspace <cwd>`. Without `--name`, the name is
++`<env-id>-<YYYYMMDDTHHMMSSZ>` in UTC. There is no per-launch tracking bypass.
++A failed handoff never starts a direct child. Repository tests use **fake ax
++only**; they do not demonstrate an installed ax integration.
++
++### Diagnostics and exit codes
++
++Launcher failures print a stable code line followed by human-readable detail
++on stderr. Foreign Curator/provider/ax output is forwarded unchanged.
++
++| Result / diagnostic codes | Exit |
++|---|---|
++| Help/version, successful direct execution or ax handoff | 0 |
++| `usage` (invalid arguments or locked-member override) | 2 |
++| `resolve_invocation_failed`, `resolve_environment_unknown`, `resolve_profile_unknown`, `resolve_repair_failed`, `resolve_lock_unavailable`, `resolve_fragment_invalid` | 1 |
++| `defaults_config_invalid`, `defaults_unresolvable` | 1 |
++| `plan_refused`, `plan_provider_limited`, `env_unsupported` | 1 |
++| `exec_provider_missing`, `ax_handoff_failed` | 1 |
++| `mcp_layer_missing`, `mcp_layer_unreadable` | 1 |
++| `sysprompt_channel_unavailable`, `sysprompt_file_unreadable` | 1 |
++| Direct child failure | Child's exit code unchanged |
++| Direct child terminated by signal | `128 + signal` |
++
++See [SPEC §6](SPEC.md#6-errors-and-diagnostics) for each refusal condition.
++No refusal retries with a different model or weaker launch.
+ 
+ ## Development
+ 
+@@ -98,8 +219,12 @@ make check      # all of the above
+ ```
+ 
+ CI (`.github/workflows/ci.yml`) runs the same targets on `ubuntu-latest`
+-and `macos-latest` with the toolchain from `go.mod`. There is no release
+-or tag workflow yet.
++and `macos-latest` with the toolchain from `go.mod`. The optional `Test (rose-air)` job runs `make check` on
++`[self-hosted, macOS, ARM64]` only when the repository variable
++`ROSE_AIR_RUNNER` is exactly `true`. Enable it after registering a matching
++runner. Goldens run as part of `make test` and `make race`. There are no
++release or tag jobs. Windows is not in this launcher's hosted matrix;
++platform execution evidence must come from the corresponding runner.
+ 
+ ### Tools
+ 
+diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
+index 5bfda2d..0db4a85 100644
+--- a/cmd/curator-run/main.go
++++ b/cmd/curator-run/main.go
+@@ -30,7 +30,7 @@ const (
+ 	specVersion = "0.3.0-draft"
+ 	// buildVersion is the launcher's own version; the specification
+ 	// version is reported beside it (SPEC §8).
+-	buildVersion = "0.0.0-dev"
++	buildVersion = "0.1.0-dev"
+ )
+ 
+ func main() {
+diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
+index bcb480c..782091a 100644
+--- a/cmd/curator-run/main_test.go
++++ b/cmd/curator-run/main_test.go
+@@ -43,6 +43,24 @@ func TestRunInformationalFlags(t *testing.T) {
+ 	}
+ }
+ 
++// Exercise the displayed help through production dispatch, with resolution
++// forbidden by runNoResolve. The fixture includes the public version header.
++func TestRunHelpGolden(t *testing.T) {
++	want, err := os.ReadFile("testdata/help.golden")
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, flag := range []string{"--help", "-h"} {
++		var out, errOut strings.Builder
++		if code := runNoResolve(t, []string{flag}, &out, &errOut); code != 0 {
++			t.Fatalf("%s: exit %d, stderr %q", flag, code, errOut.String())
++		}
++		if out.String() != string(want) || errOut.Len() != 0 {
++			t.Fatalf("%s: help differs from reviewed golden\nstdout: %s\nstderr: %s", flag, out.String(), errOut.String())
++		}
++	}
++}
++
+ func TestRunUsageErrorsExit2(t *testing.T) {
+ 	cases := []struct {
+ 		args []string
+diff --git a/cmd/curator-run/testdata/forbidden-assignment.golden b/cmd/curator-run/testdata/forbidden-assignment.golden
+index 1aa7ef4..a5d370d 100644
+--- a/cmd/curator-run/testdata/forbidden-assignment.golden
++++ b/cmd/curator-run/testdata/forbidden-assignment.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--assignment\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--assignment\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/forbidden-budget.golden b/cmd/curator-run/testdata/forbidden-budget.golden
+index a93c088..ff26eab 100644
+--- a/cmd/curator-run/testdata/forbidden-budget.golden
++++ b/cmd/curator-run/testdata/forbidden-budget.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--budget\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--budget\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/forbidden-dangerously-skip-permissions.golden b/cmd/curator-run/testdata/forbidden-dangerously-skip-permissions.golden
+index 47c83e0..d79a9a0 100644
+--- a/cmd/curator-run/testdata/forbidden-dangerously-skip-permissions.golden
++++ b/cmd/curator-run/testdata/forbidden-dangerously-skip-permissions.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--dangerously-skip-permissions\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--dangerously-skip-permissions\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/forbidden-engine.golden b/cmd/curator-run/testdata/forbidden-engine.golden
+index d1b1d2a..fdcf16a 100644
+--- a/cmd/curator-run/testdata/forbidden-engine.golden
++++ b/cmd/curator-run/testdata/forbidden-engine.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--engine\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--engine\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/forbidden-goal.golden b/cmd/curator-run/testdata/forbidden-goal.golden
+index 3aac351..5e6c5aa 100644
+--- a/cmd/curator-run/testdata/forbidden-goal.golden
++++ b/cmd/curator-run/testdata/forbidden-goal.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--goal\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--goal\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/forbidden-sandbox.golden b/cmd/curator-run/testdata/forbidden-sandbox.golden
+index 9e1ae3d..6eedbdb 100644
+--- a/cmd/curator-run/testdata/forbidden-sandbox.golden
++++ b/cmd/curator-run/testdata/forbidden-sandbox.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--sandbox\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--sandbox\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/forbidden-service-tier.golden b/cmd/curator-run/testdata/forbidden-service-tier.golden
+index a68cbd2..68b865c 100644
+--- a/cmd/curator-run/testdata/forbidden-service-tier.golden
++++ b/cmd/curator-run/testdata/forbidden-service-tier.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--service-tier\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--service-tier\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/forbidden-tracked.golden b/cmd/curator-run/testdata/forbidden-tracked.golden
+index 4578982..3bf7041 100644
+--- a/cmd/curator-run/testdata/forbidden-tracked.golden
++++ b/cmd/curator-run/testdata/forbidden-tracked.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--tracked\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--tracked\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/forbidden-yolo.golden b/cmd/curator-run/testdata/forbidden-yolo.golden
+index 1d1a52e..c6beec4 100644
+--- a/cmd/curator-run/testdata/forbidden-yolo.golden
++++ b/cmd/curator-run/testdata/forbidden-yolo.golden
+@@ -1 +1 @@
+-"curator-run: usage: unknown flag \"--yolo\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n"
++"curator-run: usage: unknown flag \"--yolo\" before --\n\nusage: curator-run \u003cenv-id\u003e [--profile \u003cname\u003e] [--system-prompt \u003cappend|replace\u003e]\n                   [--model \u003cmodel\u003e] [--effort \u003ceffort\u003e]\n                   [--name \u003csession-name\u003e] [--ax-profile \u003cstandard|yolo\u003e]\n                   [--] \u003cnative args...\u003e\n       curator-run --help | -h\n       curator-run --version\n\nLauncher flags are recognized only before \"--\". Everything after \"--\" is\nforwarded to the tool verbatim, in order, uninspected.\n\noptions:\n  --profile \u003cname\u003e                  Curator profile forwarded to env resolve\n  --system-prompt \u003cappend|replace\u003e  engage the fragment's system-prompt channel\n  --model \u003cmodel\u003e                   model passed to the spawn plane as declared\n  --effort \u003ceffort\u003e                 reasoning effort passed as declared\n  --name \u003csession-name\u003e             ax session name (tracked machines only)\n  --ax-profile \u003cstandard|yolo\u003e      ax execution profile (tracked machines only)\n  --help, -h                        print this usage text and exit 0\n  --version                         print the launcher name and version, exit 0\n\nEnvironments: claude_code, codex_cli, pi. opencode is currently unsupported.\nOmitting --profile uses Curator's current profile; resolution always repairs.\nUse curator run \u003cenv\u003e --profile \u003cp\u003e -- \u003cargs\u003e for umbrella discovery.\nInstall curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's\n~/.local/bin shim directory or another managed directory.\n\nDefaults: flags \u003e operator \u003e machine \u003e admitted lineup, per model/effort.\nFiles: $XDG_CONFIG_HOME/curator-run/defaults.json (default\n~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.\nMachine locked:true ignores operator entries for its named environments and\nrejects flags overriding members it sets. Pi fallback preference is\npi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.\nPi has no MCP channel. Prompt opt-in defaults off; native prompt-file\ncandidates can still produce warnings without opt-in.\n\nTracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.\nAn existing machine ax.json wins; otherwise use the operator file.\nMissing files or enabled:false select direct execution. Invalid/unreadable\nconfiguration refuses even --help/--version. No direct fallback on ax failure.\n--name defaults to \u003cenv-id\u003e-\u003cYYYYMMDDTHHMMSSZ\u003e (UTC), accepts\n[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.\n--ax-profile is a usage error when untracked; absent uses ax's default.\nRepeated/unknown flags, missing values and extra operands before -- refuse.\n\nExit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes\npropagate unchanged; signal exits are 128 + signal. Stable diagnostic codes\nand details go to stderr; see README.md and SPEC.md section 6.\n"
+diff --git a/cmd/curator-run/testdata/help.golden b/cmd/curator-run/testdata/help.golden
+new file mode 100644
+index 0000000..7f0f99d
+--- /dev/null
++++ b/cmd/curator-run/testdata/help.golden
+@@ -0,0 +1,49 @@
++curator-run 0.1.0-dev (specification 0.3.0-draft)
++
++usage: curator-run <env-id> [--profile <name>] [--system-prompt <append|replace>]
++                   [--model <model>] [--effort <effort>]
++                   [--name <session-name>] [--ax-profile <standard|yolo>]
++                   [--] <native args...>
++       curator-run --help | -h
++       curator-run --version
++
++Launcher flags are recognized only before "--". Everything after "--" is
++forwarded to the tool verbatim, in order, uninspected.
++
++options:
++  --profile <name>                  Curator profile forwarded to env resolve
++  --system-prompt <append|replace>  engage the fragment's system-prompt channel
++  --model <model>                   model passed to the spawn plane as declared
++  --effort <effort>                 reasoning effort passed as declared
++  --name <session-name>             ax session name (tracked machines only)
++  --ax-profile <standard|yolo>      ax execution profile (tracked machines only)
++  --help, -h                        print this usage text and exit 0
++  --version                         print the launcher name and version, exit 0
++
++Environments: claude_code, codex_cli, pi. opencode is currently unsupported.
++Omitting --profile uses Curator's current profile; resolution always repairs.
++Use curator run <env> --profile <p> -- <args> for umbrella discovery.
++Install curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's
++~/.local/bin shim directory or another managed directory.
++
++Defaults: flags > operator > machine > admitted lineup, per model/effort.
++Files: $XDG_CONFIG_HOME/curator-run/defaults.json (default
++~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.
++Machine locked:true ignores operator entries for its named environments and
++rejects flags overriding members it sets. Pi fallback preference is
++pi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.
++Pi has no MCP channel. Prompt opt-in defaults off; native prompt-file
++candidates can still produce warnings without opt-in.
++
++Tracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.
++An existing machine ax.json wins; otherwise use the operator file.
++Missing files or enabled:false select direct execution. Invalid/unreadable
++configuration refuses even --help/--version. No direct fallback on ax failure.
++--name defaults to <env-id>-<YYYYMMDDTHHMMSSZ> (UTC), accepts
++[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.
++--ax-profile is a usage error when untracked; absent uses ax's default.
++Repeated/unknown flags, missing values and extra operands before -- refuse.
++
++Exit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes
++propagate unchanged; signal exits are 128 + signal. Stable diagnostic codes
++and details go to stderr; see README.md and SPEC.md section 6.
+diff --git a/internal/cli/cli.go b/internal/cli/cli.go
+index 36c9f09..8311bf0 100644
+--- a/internal/cli/cli.go
++++ b/internal/cli/cli.go
+@@ -45,6 +45,34 @@ options:
+   --ax-profile <standard|yolo>      ax execution profile (tracked machines only)
+   --help, -h                        print this usage text and exit 0
+   --version                         print the launcher name and version, exit 0
++
++Environments: claude_code, codex_cli, pi. opencode is currently unsupported.
++Omitting --profile uses Curator's current profile; resolution always repairs.
++Use curator run <env> --profile <p> -- <args> for umbrella discovery.
++Install curator-run on trusted PATH (e.g. /usr/local/bin), not Curator's
++~/.local/bin shim directory or another managed directory.
++
++Defaults: flags > operator > machine > admitted lineup, per model/effort.
++Files: $XDG_CONFIG_HOME/curator-run/defaults.json (default
++~/.config/curator-run/defaults.json) and /etc/curator-run/defaults.json.
++Machine locked:true ignores operator entries for its named environments and
++rejects flags overriding members it sets. Pi fallback preference is
++pi-anthropic, pi-openai, pi-google; explicit models bind their own runtime.
++Pi has no MCP channel. Prompt opt-in defaults off; native prompt-file
++candidates can still produce warnings without opt-in.
++
++Tracking: sibling ax.json, schema curator-run-ax-v1, enabled:true.
++An existing machine ax.json wins; otherwise use the operator file.
++Missing files or enabled:false select direct execution. Invalid/unreadable
++configuration refuses even --help/--version. No direct fallback on ax failure.
++--name defaults to <env-id>-<YYYYMMDDTHHMMSSZ> (UTC), accepts
++[A-Za-z0-9][A-Za-z0-9._-]{0,63}, and has no effect when untracked.
++--ax-profile is a usage error when untracked; absent uses ax's default.
++Repeated/unknown flags, missing values and extra operands before -- refuse.
++
++Exit codes: 0 success; 2 usage; 1 operational refusal. Direct child exit codes
++propagate unchanged; signal exits are 128 + signal. Stable diagnostic codes
++and details go to stderr; see README.md and SPEC.md section 6.
+ `
+ 
+ // Options carries the facts the parser needs from its caller.
