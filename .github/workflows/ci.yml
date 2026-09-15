@@ -168,7 +168,10 @@ jobs:
   # self-hosted label would leave the job queued forever.
   test-self-hosted:
     name: Test (rose-air)
-    if: ${{ vars.ROSE_AIR_RUNNER == 'true' }}
+    # Gate snapshots (gate/**) are validated on the hosted matrix only: the
+    # single self-hosted slot is shared with other repositories and would
+    # serialise every candidate behind unrelated 90-minute runs.
+    if: ${{ vars.ROSE_AIR_RUNNER == 'true' && !startsWith(github.ref, 'refs/heads/gate/') }}
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
     steps:
