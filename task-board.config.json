@@ -11,10 +11,7 @@
     "worktree_isolation": {
       "validation": {
         "commands": [
-          "git submodule update --init --recursive",
-          "go build ./...",
-          "go vet ./...",
-          "go test -count=1 -timeout 30m ./..."
+          "sh scripts/remote-gate.sh"
         ]
       },
       "integration_base_branch": "main"
