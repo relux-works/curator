@@ -160,8 +160,13 @@ jobs:
   # regression are distinguishable. It runs the identical gate scripts and
   # uploads its own evidence under a distinct name.
   # ---------------------------------------------------------------------------
+  # Gated on the repository variable ROSE_AIR_RUNNER=true: the runner is
+  # registered for the organisation's board repository only until an
+  # administrator registers it for this repository, and an unmatched
+  # self-hosted label would leave the job queued forever.
   test-self-hosted:
     name: Test (rose-air)
+    if: ${{ vars.ROSE_AIR_RUNNER == 'true' }}
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
     steps:
