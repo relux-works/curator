@@ -1,0 +1,8 @@
+# Brief — TASK-260908-s1fdvr (B4 launcher defaults: verification and closure evidence)
+
+The defaults file already exists and its provenance is recorded (precondition/outcome resource TASK-260908-s1fdvr_defaults-provenance.md): `~/.config/curator-run/defaults.json` (schema curator-run-defaults-v1) with codex_cli gpt-5.6-sol/xhigh and claude_code claude-fable-5-1/low, both traced to agents-infra source settings / the operator's live settings. B5 onboarding (TASK-260908-yl5x3k, resource TASK-260908-yl5x3k_onboarding-evidence-rev2.md) already captured real launches printing the origin lines, e.g. `curator-run: defaults: model=gpt-5.6-sol (operator) effort=xhigh (operator)` and `curator-run: defaults: model=claude-fable-5-1 (operator) effort=low (operator)`, and for pi `model=claude-fable-5 (lineup) effort=high (lineup)`.
+
+Do (evidence only, no code, no host changes):
+1. Read the defaults file and the provenance resource; confirm the file content matches the provenance table (quote it).
+2. Re-run, read-only, one launch per env that prints the origin line-group without needing a login: `curator run codex_cli -- --version`, `curator run claude_code -- --version`, `curator run pi -- --version` (working directory: your Story worktree). Quote stdout/stderr and exit codes. Note that `--version` may print the origin lines only when the launcher resolves defaults; if a command prints no origin lines, quote that fact and cite the B5 evidence lines instead.
+3. Attach `TASK-260908-s1fdvr_verification.md` with the above, tick the checklist, `task-board handoff TASK-260908-s1fdvr --role developer` in the foreground (the launcher's remote gate runs; ~10 minutes; do not background it).
