@@ -1,0 +1,28 @@
+# Verification of E1–E7 against the shipped implementations (2026-09-16)
+
+Scope: read-only review of `relux-works/curator` `main` @ `80483355` and
+`relux-works/curator-agent-launcher` `main` @ `b34e1e27`. Method: grep and
+source reading of non-test Go files; no tests executed, no dynamic
+reproduction (nothing was planted, launched, or updated). Verdicts are
+therefore **static**: "confirmed" means the code contains no mitigation,
+"mitigated" means the code closes the hole the specification leaves open.
+
+| Finding | Implementation site | Verdict | Evidence |
+|---|---|---|---|
+| E1 signer rule / update delta | `cmd/curator/profile.go`, `internal/contextresolve`, `internal/contextlock`, `internal/pkgversion` | **confirmed** | No signature or signer verification anywhere: `grep -rn 'verify-tag\|verify-commit\|allowed_signers\|gpg\|ssh-keygen\|Signature\|signer' internal cmd --include='*.go'` (non-test) returns nothing. `profile update` reports only `updated profile %s (lock %s)` (`cmd/curator/profile.go:81`): no resolved-version delta, no confirmation gate. `latest` is the spelling of `*` (`internal/pkgversion/pkgversion.go:286-289`). |
+| E2 transitive `class: system` | `internal/contextmaterialize/contextmaterialize.go`, `internal/contextaudit/contextaudit.go` | **confirmed** (as specified) | Materialization applies `Applicable(pkg, "system", environment)` over every package of the closure (`contextmaterialize.go:259`); the only control is the always-warn class `context-system-module-present` (`contextaudit.go:22`, `:93`); no direct-only or transitive restriction exists (`grep -rn 'transitiv\|directly\|context_system_module' internal cmd` returns nothing). |
+| E3 codex seed imports `mcp_servers` | `internal/envregistry/envregistry.go`, `internal/envprofile/managed.go` | **confirmed** | The codex adapter declares `Seeds: []string{"config.toml"}` (`envregistry.go:219`); `gatherSeeds` reads the native file whole and provisions its bytes (`managed.go:565-585`); no member is stripped (`grep -rn mcp_servers internal/envprofile internal/envregistry internal/envfiles internal/mcp` returns nothing). |
+| E4 umbrella discovery on ambient `PATH` | `cmd/curator/umbrella.go` | **confirmed** | `findProvider` resolves with `exec.LookPath("curator-"+name)` on the process `PATH` (`umbrella.go:30-37`); `providerUntrustedDir` refuses only directories the manager itself publishes (`globalbins.Select` + `underDir`, `umbrella.go:43-63`); no ownership or writability test of the resolved directory, so a project hook's `PATH` entry is accepted. |
+| E5 write-through-symlink on takeover | `internal/envprofile/switch.go` | **mitigated in code**; spec rule still absent | `replaceLink` removes the target before `os.Symlink` (`switch.go:694-697`); the `claude_code` copy path removes the target before `os.WriteFile`, with the comment naming the foreign-manager symlink case (`switch.go:520-531`); the copy fallback removes again (`switch.go:536-545`). Residual: remove-then-create is not atomic and not `O_NOFOLLOW`; the rule is implementation folklore, not specification text. |
+| E6 `path`-kind sources | `internal/contextpkg/contextpkg.go`, `internal/envprofile/envprofile.go`, `internal/envprofile/switch.go` | **partially confirmed** | Dependencies (`requires.contexts|skills|mcp`) accept only `git` with `range|tag|revision` (+`directory`, `weight`) (`contextpkg.go:289-302`), so a `path`-kind MCP declaration package cannot enter a closure as a dependency — **not applicable** for MCP. `path` exists only as a profile root/overlay kind (`envprofile.go:71-73`; `switch.go:761-780` record no source identity for non-git kinds; `:792-798` record the path as provenance). A `path`-kind root or overlay still carries `class: system` modules (module class parsing is kind-agnostic, `contextpkg.go:263`) and no ownership/permission/containment validation of the directory exists — **confirmed** for system modules and the boundary. |
+| E7 launcher configuration family | `internal/axconfig/config.go`, `internal/defaults/defaults.go`, `internal/fragment/resolve.go`, `internal/defaults/lineup.go` | **confirmed** | Both loaders `Lstat` the file and, on `ModeSymlink`, `os.Stat` the target and accept a regular file: symlinks are followed, not refused (`axconfig/config.go:58-75`, `defaults/defaults.go:100-118`). No uid/gid/permission check anywhere in the launcher (`grep -rn 'Sys()\|Uid\|Gid\|Perm()' --include='*.go'` finds only the executable-bit check in `execution/execution.go:197`). `--repair` is unconditional as specified (`fragment/resolve.go:73-80`). The stderr line-group covers model/effort origin only (`lineup.go:268-295`); the resolved provider path is not printed. |
+
+## Consequences for the sibling stories
+
+- `STORY-260916-ioemse` (E1): scope stands; the manager task starts from zero (no verification code to extend).
+- `STORY-260916-2d9coh` (E2): the warning class exists (`contextaudit.go:22`), so the admission rule slots in beside it.
+- `STORY-260916-1i1gfo` (E3): the strip-or-report choice is a registry-level change (`envregistry.go:219`) plus `gatherSeeds`.
+- `STORY-260916-2otjbn` (E4): the change is local to `findProvider`/`providerUntrustedDir`.
+- `STORY-260916-73a5zg` (E5): spec task only needs to write down what `switch.go:520-545` already does; the manager task becomes a conformance vector plus an `O_NOFOLLOW`/atomicity review.
+- `STORY-260916-wgt8vz` (E6): drop the MCP half (not applicable); keep the system-module admission and the directory boundary.
+- `STORY-260916-33vuzm` (E7): the ownership check is new code in both loaders; the symlink case must be refused, not followed.
