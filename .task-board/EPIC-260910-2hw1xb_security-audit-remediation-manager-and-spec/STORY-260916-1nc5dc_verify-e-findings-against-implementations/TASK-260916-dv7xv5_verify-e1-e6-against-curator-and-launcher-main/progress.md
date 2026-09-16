@@ -1,5 +1,5 @@
 ## Status
-analysis
+to-review
 
 ## Review
 required
@@ -43,12 +43,13 @@ spawn run completed: codex (run=RUN-260916-aab7c1, pid=82747, exit=0)
 - [TASK-260916-dv7xv5_spawn-log_-reviewer--reviewer--codex-_RUN-260916-aab7c1.log](file://TASK-260916-dv7xv5/TASK-260916-dv7xv5_spawn-log_-reviewer--reviewer--codex-_RUN-260916-aab7c1.log) — System spawn log captured by task-board
 - [TASK-260916-dv7xv5_review-verdict-rev1.md](file://TASK-260916-dv7xv5/TASK-260916-dv7xv5_review-verdict-rev1.md) — Rework: inaccurate grep evidence, incomplete E7 coverage, missing sibling verdict updates
 - [TASK-260916-dv7xv5_logbook.md](file://TASK-260916-dv7xv5/TASK-260916-dv7xv5_logbook.md) — Review discoveries logbook
+- [verify-e-findings-rev2.md](file://TASK-260916-dv7xv5/verify-e-findings-rev2.md) — Rev2 of the E1-E7 implementation verification: corrected E1 entry point, reproducible grep outputs with each match classified, E7 strict-MCP verdict, explicit E5/E6 limits
 
 ## Created
 2026-09-16T10:50:11Z
 
 ## Last Update
-2026-09-16T13:46:32Z
+2026-09-16T18:53:51Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

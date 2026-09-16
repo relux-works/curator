@@ -3,6 +3,8 @@
 ## Description
 Finding E1 (High): semver-range resolution (Decision 0012) trusts every future v-tag of a source; the lock is a record, not a signature, and no signer or provenance rule exists. profile update re-resolves ranges and re-materializes in-place surfaces (~/.claude/CLAUDE.md, ~/.codex/AGENTS.md) and managed homes, so whoever can push an in-range tag ships new system-prompt, root-context and MCP command bytes with only strict audit in the way. Strict-tag policy covers a moved tag, not a new one.
 
+Implementation verification (TASK-260916-dv7xv5 rev2, curator main 80483355, launcher main b34e1e27, static): confirmed. profile update (cmd/curator/profile.go:260 -> envprofile.UpdateWithPolicy :887 -> updateLocked :897) reports only updated/unchanged (:301-305); contextresolve selects the highest peeled version tag (contextresolve.go:79-94, :511-515) with no signature step; the signature code that exists (registry record/snapshot envelopes, build-repository signer policy, swiftpm cat-file existence probe) is outside this path. The manager task starts from zero.
+
 ## Scope
 curator-spec decisions/0012 + environments §4/§8/§12; curator contextresolve/contextlock/profile update
 
