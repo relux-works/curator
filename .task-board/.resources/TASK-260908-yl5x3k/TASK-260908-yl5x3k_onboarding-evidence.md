@@ -1,0 +1,264 @@
+# Onboarding evidence — TASK-260908-yl5x3k (B5 profile onboarding, host e11-1)
+
+Umbrella: `relux-root-context-ivan` from `git@github.com:relux-works/relux-root-context.git`,
+directory `packages/relux-root-context-ivan`, range `^1.0`, `--use --takeover`.
+Binaries: `curator` = `/Users/administrator/.local/bin/curator` (`main-04550e2`),
+`curator-run` = `/usr/local/bin/curator-run`. Shell: `bash` (macOS).
+Git-over-ssh env for every network command:
+`SSH_AUTH_SOCK=/private/tmp/com.apple.launchd.PXt8w1CCF2/Listeners`
+(+ `GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=20"` for inspection clones).
+
+Outcome: **install REFUSED by the resolver** (verbatim diagnostic below, exit 1).
+Per brief step 3 no config was edited to work around it; host state is unchanged
+(env status after == before, byte-identical). Steps 4–5 (managed-home inventory,
+real launches) could not run — recorded as not-run with reason.
+
+## 1. BEFORE snapshots (re-run 2026-09-15 ~23:25 UTC)
+
+### agents-infra doctor global — exit 0
+
+```text
+mode: global
+agents_dir: /Users/administrator/.agents
+claude_dir: /Users/administrator/.claude
+codex_dir: /Users/administrator/.codex
+bin_dir: /Users/administrator/.local/bin
+git_free: true
+claude_linked: false
+codex_linked: false
+codex_rendered: false
+codex_config_present: true
+codex_config_linked: false
+codex_config_generated: false
+codex_config_effective: global
+helpers_linked: false
+infra_skill_link: false
+```
+
+Matches precondition resource `b5-agents-infra-doctor-before.txt` exactly.
+
+### curator --version — exit 0
+
+```text
+curator main-04550e2
+```
+
+### curator env status (BEFORE) — exit 0
+
+```text
+default claude_code: non-current, unprovisioned, mode managed-home, form , lock sha256:726310f80f44…
+  finding: home unprovisioned
+default codex_cli: non-current, unprovisioned, mode managed-home, form , lock sha256:726310f80f44…
+  finding: home unprovisioned
+default opencode: non-current, unprovisioned, mode managed-home, form , lock sha256:726310f80f44…
+  finding: home unprovisioned
+default pi: non-current, unprovisioned, mode managed-home, form , lock sha256:726310f80f44…
+  finding: home unprovisioned
+tool claude_code: recorded 2.1.261 detected 2.1.273
+tool codex_cli: recorded 0.153.2 detected 0.153.4
+tool opencode: recorded unrecorded detected unknown
+tool pi: recorded 0.84.2 detected 0.84.2
+target xcode-coding-assistant (claude_code): participating=false (auto: probe path absent, nothing materialized); the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability
+target xcode-coding-assistant (codex_cli): participating=false (auto: probe path absent, nothing materialized); the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability
+profile default: lock sha256:726310f80f44…, precedence winner=higher-weight placement=winner-last
+  member context default weight 0
+note: opencode skills come from the machine-current profile, split-brain by construction (§7.1)
+```
+
+Matches precondition resource `b5-env-status-before.txt` exactly.
+
+### curator profile list (BEFORE) — exit 0
+
+```text
+default	default	local	-	local -	0.0.0	sha256:726310f80f442428a9a640d2d49ad9b635f22857fb4ad22167832c7c6ff30e19	
+```
+
+Matches precondition resource `b5-profile-list-before.txt` exactly.
+
+### curator config show (BEFORE) — exit 0
+
+```json
+{
+  "Path": "/Users/administrator/.curator/config.json",
+  "Schema": 1,
+  "Env": {
+    "CurrentProfile": null,
+    "ScopedCurrent": {},
+    "Overlays": {},
+    "OverlayDefaultWeight": 1000,
+    "OverlaysAllowed": true,
+    "Precedence": { "Winner": "higher-weight", "Placement": "winner-last" },
+    "Forms": {},
+    "SystemPromptFiles": {},
+    "Targets": {},
+    "Isolation": {},
+    "XDGSeedAllowlist": ["git", "gh", "ssh"],
+    "PassableEnvNames": null,
+    "MCPPackageAllowlist": [],
+    "ShadowAcknowledged": [],
+    "SecretWaivers": [],
+    "BackupRetention": 5,
+    "RequireCurrent": null,
+    "InPlaceMode": {}
+  },
+  "Locked": {},
+  "SystemConfigPath": "",
+  "SkillsRoot": "/Users/administrator/.curator/sources",
+  "PreferredLocale": "",
+  "DefaultAgents": ["codex_cli"],
+  "AdapterMode": "auto",
+  "WorktreeAliasPattern": "[A-Z]+-[0-9]+",
+  "Projects": {},
+  "Audit": {
+    "Enabled": false, "Mode": "advisory", "FailOn": "high", "Backend": "null",
+    "Model": "", "AllowCloud": false, "Backends": null, "Grants": null,
+    "Revocations": null, "SourcePolicyClass": "internal", "SourcePolicyRules": null,
+    "RegistryPolicy": "advisory", "MaxRequestBytes": 1048576,
+    "SnapshotMaxAgeSeconds": 604800, "SnapshotClockSkewSeconds": 300,
+    "CacheTTLSeconds": 3600, "OfflineGraceSeconds": 604800
+  },
+  "Execution": {
+    "Mode": "portable", "ProviderID": "", "ProviderVersion": "",
+    "ProviderBinarySHA256": "", "ProviderTrustEvidence": ""
+  },
+  "AllowedSources": null,
+  "AuditRegistries": null,
+  "DisableBuiltinRegistries": false,
+  "BuildSSH": null,
+  "BuildHTTPS": null
+}
+```
+
+## 2. Native-homes backup (BEFORE install)
+
+Presence probe (all `cd ~`, exit 0):
+
+```text
+ABSENT  .claude/CLAUDE.md
+PRESENT .claude/settings.json
+ABSENT  .claude/settings.local.json
+PRESENT .claude/skills
+ABSENT  .claude/agents
+ABSENT  .claude/commands
+ABSENT  .claude/.mcp.json
+PRESENT .codex/config.toml
+ABSENT  .codex/AGENTS.md
+PRESENT .codex/skills
+ABSENT  .pi/agent
+ABSENT  .config/opencode
+```
+
+Command (exit 0):
+
+```bash
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)   # -> 20260915T232622Z
+mkdir -p ~/.curator/backups
+tar -czf ~/.curator/backups/native-homes-$STAMP.tar.gz \
+  .claude/settings.json .claude/skills .codex/config.toml .codex/skills
+```
+
+No `--exclude` needed: only the four present allow-listed paths were archived;
+no credentials files (`.claude/.credentials.json`, `.codex/auth.json`) were included.
+
+- File: `/Users/administrator/.curator/backups/native-homes-20260915T232622Z.tar.gz`
+- `tar tzf | wc -l` → **120** entries; tar exit 0
+- `shasum -a 256` → `449a14ff3f4221213ba4968d96e6ba8808c171fe4ad5858b1589edd515ef852d`
+- Size 128326 bytes; pre-existing `~/.curator/backups/` siblings untouched.
+
+## 3. Install + activate — REFUSED, exit 1
+
+Command:
+
+```bash
+curator profile install git@github.com:relux-works/relux-root-context.git \
+  --directory packages/relux-root-context-ivan --range '^1.0' --use --takeover
+```
+
+Exact output (verbatim, exit code **1**):
+
+```text
+curator: profile_source_invalid: mcp_declaration_invalid: agent-mcp.json is absent at /var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/curator-profile-manifest-2491066654
+```
+
+Per brief step 3 the run stopped here for install purposes: no config edit,
+no retry-with-different-flags, no workaround. Read-only diagnosis follows.
+
+### Read-only diagnosis (no host state touched; clones under /tmp)
+
+`git ls-remote git@github.com:relux-works/relux-root-context.git` (exit 0):
+
+```text
+66d86a5287cc82b8aa6a48b3d13fd71ddbf65bd7	refs/heads/b1/refresh-459742e
+abaadf43772341d0196e72a4ca9914017dc8f512	refs/heads/b3/umbrella-requires-mcp
+abaadf43772341d0196e72a4ca9914017dc8f512	refs/heads/main
+40971d1f0228351f8de6abcb18d3d87e385a4ef2	refs/tags/v1.0.0
+```
+
+- `refs/tags/v1.0.0` → `40971d1f` (annotated **tag** object, `git cat-file -t` = `tag`).
+  It does NOT point at commit `abaadf43` (that is `main` / `b3/umbrella-requires-mcp`);
+  the brief's "`v1.0.0` (commit abaadf43)" conflates the tag with the main head.
+- Sparse read-only clones of tag `v1.0.0` and of `main`, `find` on
+  `packages/relux-root-context-ivan` (both, clone+checkout exits 0):
+
+```text
+packages/relux-root-context-ivan
+packages/relux-root-context-ivan/README.md
+packages/relux-root-context-ivan/agent-context.json
+```
+
+- `diff` of tag vs main `agent-context.json`: **IDENTICAL**. The manifest declares
+  `requires.contexts` (5 siblings over https), `requires.skills` (pdf, skill-creator,
+  agents-attachments over ssh), and `requires.mcp` (figma, safari from
+  `git@github.com:relux-works/relux-mcp.git` at `^1.0`).
+- `git ls-tree -r --name-only HEAD | grep -E 'agent-mcp|agent-skills|agent-context'`
+  on main shows only the six `agent-context.json` files — **no `agent-mcp.json`
+  exists anywhere in the repo**, so no sibling package demonstrates the expected shape.
+
+Conclusion: the published umbrella package declares MCP requirements but ships no
+`agent-mcp.json` declaration file, and curator `main-04550e2` treats that as a hard
+`profile_source_invalid` refusal. Deterministic packaging/resolver mismatch, not a
+transient fetch failure (ssh transport to the repo works; tag resolves).
+
+## 4. AFTER state — unchanged (verified, not assumed)
+
+`curator env status` after the refusal: exit 0, output **byte-identical to BEFORE**
+(all four envs still `non-current, unprovisioned`; Xcode targets still
+`participating=false`; lock still `sha256:726310f80f44…`).
+`curator profile list` after: exit 0, still only the `default` local profile.
+`ls ~/.curator/environments/`: no such directory (nothing materialized).
+(The trailing `ls` exit 1 is the expected "absent" signal, not a gate.)
+
+Managed-home inventory and `head -20` excerpts: **not run** — nothing was
+materialized because the install was refused.
+
+## 5. Real launches — not run
+
+`curator run … -- --version`, headless prompts, and `mcp list` for
+claude_code / codex_cli / pi: **not run** — there is no installed profile whose
+managed homes could be launched. Running the tools outside managed homes would be
+evidence about native state, not about this onboarding, so it was deliberately
+not substituted.
+
+## 6. Escalations (human/product decision needed)
+
+1. **Publish a fixed umbrella package or relax the resolver.** Options:
+   (a) add `agent-mcp.json` to `packages/relux-root-context-ivan`, cut a new signed
+   tag satisfying `^1.0`, re-run this task; (b) change curator so a package whose
+   `requires.mcp` is declared only in `agent-context.json` does not hard-refuse.
+   Note branch `b3/umbrella-requires-mcp` exists at `abaadf43` (= main) — it may
+   already relate to this gap; the tag `v1.0.0` predates/includes neither it nor any
+   `agent-mcp.json`.
+2. **Brief erratum:** tag `v1.0.0` (tag object `40971d1f`) is not commit `abaadf43`;
+   reissue criteria should name the exact expected tag object/commit. The
+   `requires.mcp` git source form also still needs live verification (blocked behind
+   item 1).
+3. **Scope note:** `campaign-producer-rules.md` forbids host writes (`~/.curator`,
+   no LOGBOOK.md edits), but this task's brief — authoritative for product scope per
+   those same rules — orders host-state backup + install as the entire deliverable.
+   Taken literally together the task is unimplementable, so host-state steps were
+   executed per the brief while code/config workarounds and LOGBOOK.md edits were
+   not. Findings therefore live here and in board notes only.
+
+No daemons restarted, no task-board self-update, no permission prompts bypassed,
+no `~/.claude` / `~/.codex` / `~/.pi` / `~/.config/opencode` contents modified
+(backup read them only).

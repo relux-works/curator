@@ -1,0 +1,17 @@
+default claude_code: non-current, unprovisioned, mode managed-home, form , lock sha256:726310f80f44…
+  finding: home unprovisioned
+default codex_cli: non-current, unprovisioned, mode managed-home, form , lock sha256:726310f80f44…
+  finding: home unprovisioned
+default opencode: non-current, unprovisioned, mode managed-home, form , lock sha256:726310f80f44…
+  finding: home unprovisioned
+default pi: non-current, unprovisioned, mode managed-home, form , lock sha256:726310f80f44…
+  finding: home unprovisioned
+tool claude_code: recorded 2.1.261 detected 2.1.273
+tool codex_cli: recorded 0.153.2 detected 0.153.4
+tool opencode: recorded unrecorded detected unknown
+tool pi: recorded 0.84.2 detected 0.84.2
+target xcode-coding-assistant (claude_code): participating=false (auto: probe path absent, nothing materialized); the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability
+target xcode-coding-assistant (codex_cli): participating=false (auto: probe path absent, nothing materialized); the embedded host's MCP configuration and commands/ are present, unaudited, and outside this capability
+profile default: lock sha256:726310f80f44…, precedence winner=higher-weight placement=winner-last
+  member context default weight 0
+note: opencode skills come from the machine-current profile, split-brain by construction (§7.1)

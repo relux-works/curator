@@ -19,6 +19,7 @@ code
 ## Notes
 2026-09-15 (host e11-1, unified delivery goal): Pi MCP scope resolved explicitly, see precondition resource pi-mcp-scope-decision-2026-09-15.md: adapter requirement narrowed to the MCP capability each adapter declares in environments 1.1 section 7.8 (claude_code/codex_cli deliver MCP; native Pi launches without MCP; a Pi MCP channel is deferred as separate scope). Operator may override to option (b).
 2026-09-15: Pi MCP scope resolved explicitly (resource pi-mcp-scope-decision-2026-09-15.md): adapter requirement narrowed; native Pi without MCP; Pi MCP channel deferred. 2026-09-16: operator decided that managed commits and tags are signed by Relux Bot <bot@relux.works> for the remainder of this campaign (the human signing key is not kept on the host); earlier commits remain signed by Ivan Oparin.
+2026-09-16 operator: managed-home logins done by hand for claude_code, codex_cli and pi (curator run <env> then /login). figma MCP OAuth and the safari MCP command (safaridriver-mcp not on PATH) are deferred by the operator — no real logins, carried as follow-ups; B5/B6 evidence must not require them.
 
 ## Precondition Resources
 - [goal-launcher-and-infra-migration.md](file://EPIC-260908-2wp8wn/goal-launcher-and-infra-migration.md)
@@ -56,4 +57,4 @@ code
 2026-09-07T23:04:44Z
 
 ## Last Update
-2026-09-16T00:09:35Z
+2026-09-16T01:13:04Z

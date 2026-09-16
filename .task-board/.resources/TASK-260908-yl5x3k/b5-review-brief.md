@@ -1,0 +1,9 @@
+# Review brief — TASK-260908-yl5x3k rev 3 (B5 onboarding, evidence-only, empty repository delta)
+
+Verify the onboarding evidence independently on this host (read-only host commands are fine; no installs, no logins, no config edits):
+1. `curator profile list` shows relux-root-context-ivan (v1.0.1, lock sha256 as in evidence) and it is current; `curator env status` shows claude_code, codex_cli and pi provisioned+current for that profile, opencode unprovisioned (tool absent), Xcode targets participating=false.
+2. The managed homes exist under ~/.curator/environments/relux-root-context-ivan/{claude_code,codex_cli,pi} with the surfaces the evidence lists (skills, MCP config with figma and safari entries); do not print credential files.
+3. `curator run codex_cli -- --version` and `curator run claude_code -- --version` and `curator run pi -- --version` exit 0 from your Story worktree; the defaults origin lines match the evidence. (The operator has since logged in inside the managed homes; a headless prompt is optional — if you run `curator run codex_cli -- exec 'Reply with exactly OK'` quote it, but do not attempt any login or OAuth.)
+4. The backup tarball ~/.curator/backups/native-homes-20260915T232622Z.tar.gz exists with the recorded entry count/sha256.
+5. Evidence resources (onboarding-evidence-rev2.md, post-PR72 recheck) are consistent with what you observe; anomalies (figma OAuth, safari command absent, skill-creator broken-skill fixture) are recorded as follow-ups, not hidden. figma/safari logins are explicitly out of scope by operator decision.
+Verdict resource TASK-260908-yl5x3k_review-verdict.md; on ACCEPT run `task-board m 'accept_cr(TASK-260908-yl5x3k, revision=3, evidence=TASK-260908-yl5x3k_review-verdict.md)'`; otherwise CHANGES_REQUESTED + `task-board handoff TASK-260908-yl5x3k --role reviewer`.
