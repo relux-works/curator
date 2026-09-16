@@ -1,0 +1,233 @@
+diff --git a/README.md b/README.md
+index 4dcea93..b2b7085 100644
+--- a/README.md
++++ b/README.md
+@@ -20,9 +20,11 @@ change them at the source and re-cut.
+ | `relux-root-context-ivan` | umbrella: requires the five above, no modules of its own | 0 |
+ 
+ Each package ships a strict schema-1 `agent-context.json`
+-(Curator Decision 0012 §1). Version tags are strict and per-package:
+-`<short>/v<major>.<minor>.<patch>` (for example `core/v1.0.0`,
+-`ivan/v1.0.0`). Never retag or move a published tag.
++(Curator Decision 0012 §1). Releases use one repository-wide tag
++`v<major>.<minor>.<patch>` that Curator's resolver consumes: all six
++packages are released together at one version, and per-package
++`<short>/v<major>.<minor>.<patch>` tags are not read by Curator.
++Never retag or move a published tag.
+ 
+ ## Validation
+ 
+diff --git a/packages/relux-root-context-attachments/README.md b/packages/relux-root-context-attachments/README.md
+index f1c07a9..164b506 100644
+--- a/packages/relux-root-context-attachments/README.md
++++ b/packages/relux-root-context-attachments/README.md
+@@ -1,6 +1,6 @@
+ # relux-root-context-attachments
+ 
+-Version `1.0.0`; weight `40`. Modules are byte-exact:
++Version `1.0.1`; weight `40`. Modules are byte-exact:
+ 
+ - source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_ATTACHMENTS.md
+ 
+diff --git a/packages/relux-root-context-attachments/agent-context.json b/packages/relux-root-context-attachments/agent-context.json
+index 2ae3a59..1509f00 100644
+--- a/packages/relux-root-context-attachments/agent-context.json
++++ b/packages/relux-root-context-attachments/agent-context.json
+@@ -8,7 +8,7 @@
+   },
+   "name": "relux-root-context-attachments",
+   "schema_version": 1,
+-  "version": "1.0.0",
++  "version": "1.0.1",
+   "weight": 40,
+   "requires": {
+     "skills": {
+diff --git a/packages/relux-root-context-claude/README.md b/packages/relux-root-context-claude/README.md
+index 3997f29..9edc62c 100644
+--- a/packages/relux-root-context-claude/README.md
++++ b/packages/relux-root-context-claude/README.md
+@@ -1,6 +1,6 @@
+ # relux-root-context-claude
+ 
+-Version `1.0.0`; weight `50`. Modules are byte-exact:
++Version `1.0.1`; weight `50`. Modules are byte-exact:
+ 
+ - source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_REMOTE_AGENTS.md
+ 
+diff --git a/packages/relux-root-context-claude/agent-context.json b/packages/relux-root-context-claude/agent-context.json
+index cf1a2f4..10cf902 100644
+--- a/packages/relux-root-context-claude/agent-context.json
++++ b/packages/relux-root-context-claude/agent-context.json
+@@ -11,6 +11,6 @@
+   },
+   "name": "relux-root-context-claude",
+   "schema_version": 1,
+-  "version": "1.0.0",
++  "version": "1.0.1",
+   "weight": 50
+ }
+diff --git a/packages/relux-root-context-core/README.md b/packages/relux-root-context-core/README.md
+index b7218fd..a86823a 100644
+--- a/packages/relux-root-context-core/README.md
++++ b/packages/relux-root-context-core/README.md
+@@ -1,6 +1,6 @@
+ # relux-root-context-core
+ 
+-Version `1.0.0`; weight `100`. Modules are byte-exact:
++Version `1.0.1`; weight `100`. Modules are byte-exact:
+ 
+ - source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS.md
+ - source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_PLATFORM.md
+diff --git a/packages/relux-root-context-core/agent-context.json b/packages/relux-root-context-core/agent-context.json
+index 6208735..938e221 100644
+--- a/packages/relux-root-context-core/agent-context.json
++++ b/packages/relux-root-context-core/agent-context.json
+@@ -32,6 +32,6 @@
+   },
+   "name": "relux-root-context-core",
+   "schema_version": 1,
+-  "version": "1.0.0",
++  "version": "1.0.1",
+   "weight": 100
+ }
+diff --git a/packages/relux-root-context-ivan/README.md b/packages/relux-root-context-ivan/README.md
+index 362f418..8f1356a 100644
+--- a/packages/relux-root-context-ivan/README.md
++++ b/packages/relux-root-context-ivan/README.md
+@@ -1,9 +1,9 @@
+ # relux-root-context-ivan
+ 
+-Pure umbrella, version `1.0.0`, with five context requirements at `^1.0` and the leaf weights in its weights map (no edge weights).
++Pure umbrella, version `1.0.1`, with five context requirements at `^1.0` and the leaf weights in its weights map (no edge weights).
+ 
+ Requires pdf, skill-creator and agents-attachments from their relux-works repositories at `^0.1` (B2 source contract). Live tag resolution is deferred to integration; no tags are created here.
+ 
+-`requires.mcp` declares figma and safari from `git@github.com:relux-works/relux-mcp.git` at `^1.0`, using the same Git source form as `requires.skills` (Decision 0012 D6). Published package tags `figma/v1.0.0` and `safari/v1.0.0` satisfy these ranges.
++`requires.mcp` declares figma and safari from `git@github.com:relux-works/relux-mcp.git` at `^1.0`, with `directory` `packages/figma` and `packages/safari` respectively (Decision 0012 D6; Curator reads `agent-mcp.json` inside `directory`). The satisfying relux-mcp tag is the repository-wide `v1.0.0`.
+ 
+ Source modules and their exact upstream pins are documented in the five leaf READMEs and SOURCES.sha256.
+diff --git a/packages/relux-root-context-ivan/agent-context.json b/packages/relux-root-context-ivan/agent-context.json
+index 5c52892..0d1a9e7 100644
+--- a/packages/relux-root-context-ivan/agent-context.json
++++ b/packages/relux-root-context-ivan/agent-context.json
+@@ -44,17 +44,19 @@
+     },
+     "mcp": {
+       "figma": {
++        "directory": "packages/figma",
+         "git": "git@github.com:relux-works/relux-mcp.git",
+         "range": "^1.0"
+       },
+       "safari": {
++        "directory": "packages/safari",
+         "git": "git@github.com:relux-works/relux-mcp.git",
+         "range": "^1.0"
+       }
+     }
+   },
+   "schema_version": 1,
+-  "version": "1.0.0",
++  "version": "1.0.1",
+   "weight": 0,
+   "weights": {
+     "relux-root-context-attachments": 40,
+diff --git a/packages/relux-root-context-style/README.md b/packages/relux-root-context-style/README.md
+index 053932a..94017d5 100644
+--- a/packages/relux-root-context-style/README.md
++++ b/packages/relux-root-context-style/README.md
+@@ -1,5 +1,5 @@
+ # relux-root-context-style
+ 
+-Version `1.0.0`; weight `10`. Modules are byte-exact:
++Version `1.0.1`; weight `10`. Modules are byte-exact:
+ 
+ - source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_STYLE.md
+diff --git a/packages/relux-root-context-style/agent-context.json b/packages/relux-root-context-style/agent-context.json
+index 124aa53..16bb753 100644
+--- a/packages/relux-root-context-style/agent-context.json
++++ b/packages/relux-root-context-style/agent-context.json
+@@ -8,6 +8,6 @@
+   },
+   "name": "relux-root-context-style",
+   "schema_version": 1,
+-  "version": "1.0.0",
++  "version": "1.0.1",
+   "weight": 10
+ }
+diff --git a/packages/relux-root-context-workflow/README.md b/packages/relux-root-context-workflow/README.md
+index 680aadd..860d583 100644
+--- a/packages/relux-root-context-workflow/README.md
++++ b/packages/relux-root-context-workflow/README.md
+@@ -1,6 +1,6 @@
+ # relux-root-context-workflow
+ 
+-Version `1.0.0`; weight `70`. Modules are byte-exact:
++Version `1.0.1`; weight `70`. Modules are byte-exact:
+ 
+ - source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_TESTING.md
+ - source: relux-works/relux-agents-infra@459742ea67e3c6b84169520b92d74fe7f73e3002 .instructions/INSTRUCTIONS_WORKFLOW.md
+diff --git a/packages/relux-root-context-workflow/agent-context.json b/packages/relux-root-context-workflow/agent-context.json
+index 4c7276e..04cd030 100644
+--- a/packages/relux-root-context-workflow/agent-context.json
++++ b/packages/relux-root-context-workflow/agent-context.json
+@@ -11,6 +11,6 @@
+   },
+   "name": "relux-root-context-workflow",
+   "schema_version": 1,
+-  "version": "1.0.0",
++  "version": "1.0.1",
+   "weight": 70
+ }
+diff --git a/scripts/validate.sh b/scripts/validate.sh
+index ae092f6..f1dd222 100755
+--- a/scripts/validate.sh
++++ b/scripts/validate.sh
+@@ -137,9 +137,13 @@ umbrella = json.load(open(os.path.join(root, "packages/relux-root-context-ivan/a
+ mcp_req = umbrella.get("requires", {}).get("mcp", {})
+ if set(mcp_req) != {"figma", "safari"}:
+     die("umbrella requires.mcp must name exactly figma and safari")
++expected_mcp = {
++    "figma": {"directory": "packages/figma", "git": "git@github.com:relux-works/relux-mcp.git", "range": "^1.0"},
++    "safari": {"directory": "packages/safari", "git": "git@github.com:relux-works/relux-mcp.git", "range": "^1.0"},
++}
+ for name, entry in mcp_req.items():
+-    if entry != {"git": "git@github.com:relux-works/relux-mcp.git", "range": "^1.0"}:
+-        die("umbrella requires.mcp.%s must use relux-mcp Git source with range ^1.0" % name)
++    if entry != expected_mcp[name]:
++        die("umbrella requires.mcp.%s must use relux-mcp Git source with range ^1.0 and its package directory" % name)
+ ctx_req = umbrella.get("requires", {}).get("contexts", {})
+ if set(ctx_req) != set(pkgs) - {"relux-root-context-ivan"}:
+     die("umbrella requires.contexts must name exactly the five leaf packages")
+diff --git a/tests/mutants.py b/tests/mutants.py
+index 5ff0864..9ea34f2 100644
+--- a/tests/mutants.py
++++ b/tests/mutants.py
+@@ -7,7 +7,8 @@ import tempfile
+ root = Path(__file__).resolve().parents[1]
+ cases = [
+  ('mcp-inventory', 'scripts/validate.sh', 'if set(mcp_req) != {"figma", "safari"}:', 'if set(mcp_req) not in ({"figma", "safari"}, {"figma"}):', 'test_mcp_inventory'),
+- ('mcp-source', 'scripts/validate.sh', 'if entry != {"git": "git@github.com:relux-works/relux-mcp.git", "range": "^1.0"}:', 'if name == "figma" and entry != {"git": "git@github.com:relux-works/relux-mcp.git", "range": "^1.0"}:', 'test_mcp_source'),
++ ('mcp-source', 'scripts/validate.sh', 'if entry != expected_mcp[name]:', 'if name == "figma" and entry != expected_mcp[name]:', 'test_mcp_source'),
++ ('mcp-directory', 'scripts/validate.sh', 'if entry != expected_mcp[name]:', 'if entry.get("git") != expected_mcp[name]["git"] or entry.get("range") != expected_mcp[name]["range"]:', 'test_mcp_directory'),
+  ('trailing-lf', 'scripts/validate.sh', 'or raw.endswith(b"\\n\\n"):', 'or (raw.endswith(b"\\n\\n") and not raw.endswith(b".\\n\\n")):', 'test_trailing_lf'),
+  ('unknown-env', 'scripts/validate.sh', 'if env not in envs:', 'if env not in envs and env != "future_env":', 'test_unknown_env'),
+  ('weight', 'scripts/validate.sh', 'if weight != leaf_weights[name]:', 'if weight != leaf_weights[name] and leaf_weights[name] != 101:', 'test_weight_drift'),
+diff --git a/tests/test_validate.py b/tests/test_validate.py
+index 418f7dc..2796b20 100644
+--- a/tests/test_validate.py
++++ b/tests/test_validate.py
+@@ -59,6 +59,14 @@ class Validation(unittest.TestCase):
+                 self.gate(1)
+                 self.manifest('ivan', lambda m: m['requires']['mcp'][name].update(range='^1.0'))
+ 
++    def test_mcp_directory(self):
++        for name in ('figma', 'safari'):
++            with self.subTest(name=name):
++                self.manifest('ivan', lambda m: m['requires']['mcp'][name].update(directory='packages/wrong'))
++                self.gate(1)
++                self.manifest('ivan', lambda m: m['requires']['mcp'][name].update(
++                    directory='packages/' + name))
++
+     def test_trailing_lf(self):
+         p = self.root / 'packages/relux-root-context-style/context/INSTRUCTIONS_STYLE.md'
+         p.write_bytes(p.read_bytes() + b'\n')
