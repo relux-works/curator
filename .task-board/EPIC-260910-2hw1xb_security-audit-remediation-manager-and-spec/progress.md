@@ -22,6 +22,7 @@ code
 - [security-audit-2026-09-manager.md](file://EPIC-260910-2hw1xb/security-audit-2026-09-manager.md) — Architectural security audit of the Curator manager implementation, 2026-09-10
 - [security-audit-2026-09-spec.md](file://EPIC-260910-2hw1xb/security-audit-2026-09-spec.md) — Architectural security audit of the Curator Protocol specification, 2026-09-10
 - [security-audit-2026-09-spec-supplement.md](file://EPIC-260910-2hw1xb/security-audit-2026-09-spec-supplement.md) — E1-E6 supplement to the spec audit (environments / launch plane), source of STORY-260916-*
+- [goal-security-remediation.md](file://EPIC-260910-2hw1xb/goal-security-remediation.md) — Goal for implementing every audit finding: links, priority waves, per-story tasks, user-visible impact and warn-first rollout, rules, DoD
 
 ## Outcome Resources
 (none)
@@ -30,4 +31,4 @@ code
 2026-09-10T14:41:53Z
 
 ## Last Update
-2026-09-16T11:09:38Z
+2026-09-16T11:29:38Z
