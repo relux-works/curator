@@ -1,0 +1,5 @@
+# Re-apply and hand off — TASK-260910-5nrmtt revision 2
+
+Your rework (RUN-260916-4214eb) finished and handed off, but the Change Request construction refused `change_request_base_authority_mismatch` because trunk moved (board-state commits only) while the workspace held the uncommitted candidate. The orchestrator captured the complete uncommitted candidate as precondition resource TASK-260910-5nrmtt_rev2-candidate.patch (git diff --binary, 12 paths: internal/buildrepo/{admission.go,httpsbroker_test.go,process_unix.go,process_windows.go,sshbroker.go,sshbroker_test.go,transport.go,transport_test.go}, internal/gitcred/{gitcred.go,provider.go,provider_test.go}, docs/draft-transport-resolution.md) and cleaned the workspace; this spawn replays the story checkpoint onto the current trunk.
+
+Steps: `git apply --binary <patch>` in the Story worktree (the tree must end up with exactly those 12 paths changed/added; verify with `git status --short`), run the narrow tests you ran before (internal/buildrepo, internal/gitcred; -run filters, -p 1), confirm results.md still describes this candidate (update the run id line), then handoff. No new scope.

@@ -1,5 +1,5 @@
 ## Status
-development
+backlog
 
 ## Review
 required
@@ -8,7 +8,7 @@ required
 code
 
 ## Blocked By
-- (none)
+- STORY-260910-1bhj0g
 
 ## Blocks
 - (none)
@@ -25,7 +25,7 @@ code
 (none)
 
 ## Created
-2026-09-16T01:11:28Z
+2026-09-16T11:46:54Z
 
 ## Last Update
-2026-09-16T12:45:25Z
+2026-09-16T11:46:55Z

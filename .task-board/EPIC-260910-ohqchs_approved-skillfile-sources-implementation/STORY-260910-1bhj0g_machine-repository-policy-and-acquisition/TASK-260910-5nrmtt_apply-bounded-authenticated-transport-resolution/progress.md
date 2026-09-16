@@ -26,10 +26,10 @@ estimated(fibonacci(8))
 - [x] Relevant build/validation commands run after changes and build not broken
 - [x] New outcome artifact attached on the board with a task-scoped name when the work produces notes, logs, screenshots, or other deliverables
 - [x] Important findings, decisions, anomalies, or regressions recorded in logbook when relevant
-- [ ] Implementation matches AC
-- [ ] Solution fits project architecture
-- [ ] Tests green
-- [ ] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
+- [x] Implementation matches AC
+- [x] Solution fits project architecture
+- [x] Tests green
+- [x] If review does not accept the work — verdict evidence added and status routed by the explicit verdict branches
 
 ## Notes
 spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"Skillfile wave 2b (transport resolution on the checkpointed policy leaf); muse-spark:max"}
@@ -56,6 +56,24 @@ spawn agent resolution: Agent selection: muse via explicit_override (preferred_a
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [implementer] developer (muse) (run=RUN-260916-bfaa3e, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260916-bfaa3e)
+agent completed: [implementer] developer (muse) (exit=1)
+spawn run completed: muse (run=RUN-260916-bfaa3e, pid=30110, exit=1)
+spawn autonomous recovery: run RUN-260916-bfaa3e queued successor RUN-260916-4214eb (attempt 1/3, model=muse-spark-1.3-contributor): spawned agent exited with code 1
+spawn run started: [implementer] developer (muse) (run=RUN-260916-4214eb)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-4214eb, pid=35064, exit=0)
+spawn autonomous recovery: run RUN-260916-4214eb queued successor RUN-260916-96b496 (attempt 2/3, model=muse-spark-1.3-contributor): Change Request construction for TASK-260910-5nrmtt failed: delivery failure [stale-anchor]: change_request_base_authority_mismatch: the STORY-260910-1bhj0g candidate provenance disagrees: checkpoint 41901ffd3b44bf0a21ab57e604ad5be02c249ce9 does not descend from selected authority 81fd85b2f721a81e4bd00f499834967f3779be73 while branch=41901ffd3b44bf0a21ab57e604ad5be02c249ce9 and head=41901ffd3b44bf0a21ab57e604ad5be02c249ce9
+spawn run started: [implementer] developer (muse) (run=RUN-260916-96b496)
+spawn run RUN-260916-96b496 cancelled by operator; operator action required; reason: no operator reason supplied
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run completed: muse (run=RUN-260916-96b496, pid=47047, exit=143)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"re-apply captured rev2 candidate after base refresh and hand off; muse-spark:max"}
+STORY-260910-1bhj0g base refresh: the Story branch was replayed onto trunk f38ee3946110 before this final-leaf producer started; the reviewed trunk OID is f38ee3946110
+spawn selection rationale for muse-spark-1.3-contributor/max: re-apply captured rev2 candidate after base refresh and hand off; muse-spark:max
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-1fcc19, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-1fcc19)
 
 ## Precondition Resources
 - [TASK-260910-5nrmtt_source-contract.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -65,10 +83,12 @@ spawn run started: [implementer] developer (muse) (run=RUN-260916-bfaa3e)
 - [campaign-producer-rules.md](file://TASK-260910-5nrmtt/campaign-producer-rules.md)
 - [skillfile-wave2-review-brief.md](file://TASK-260910-5nrmtt/skillfile-wave2-review-brief.md)
 - [5nrmtt-rework-1.md](file://TASK-260910-5nrmtt/5nrmtt-rework-1.md)
+- [TASK-260910-5nrmtt_rev2-candidate.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_rev2-candidate.patch)
+- [5nrmtt-reapply.md](file://TASK-260910-5nrmtt/5nrmtt-reapply.md)
 
 ## Outcome Resources
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96d008.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96d008.log) — System spawn log captured by task-board
-- [TASK-260910-5nrmtt_results.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_results.md) — Developer evidence: bounded transport resolution, narrow gates, 4/4 mutants killed
+- [TASK-260910-5nrmtt_results.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_results.md) — Rework 1 (rev2) evidence: admission+binding, positive classification, process-tree deadline
 - [TASK-260910-5nrmtt_change-request_rev1.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev1.patch) — Change Request CR-TASK-260910-5nrmtt-1 revision 1 candidate patch (repository_delta=present, 18 changed paths)
 - [TASK-260910-5nrmtt_change-request_rev1-validation.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev1-validation.log) — Change Request CR-TASK-260910-5nrmtt-1 revision 1 bounded validation log
 - [TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-3e6665.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-3e6665.log) — System spawn log captured by task-board
@@ -76,12 +96,15 @@ spawn run started: [implementer] developer (muse) (run=RUN-260916-bfaa3e)
 - [TASK-260910-5nrmtt_review-checks.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-checks.md) — Independent attack and narrowing-mutant logs
 - [TASK-260910-5nrmtt_review-verdict-rev1.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-verdict-rev1.md) — CHANGES_REQUESTED: strict admission bypass, unsafe fallback classification, total deadline escape
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-bfaa3e.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-bfaa3e.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-4214eb.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-4214eb.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96b496.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96b496.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-1fcc19.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-1fcc19.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-10T13:56:21Z
 
 ## Last Update
-2026-09-16T11:39:24Z
+2026-09-16T12:52:11Z
 
 ## Assigned To
 [implementer] developer (muse)

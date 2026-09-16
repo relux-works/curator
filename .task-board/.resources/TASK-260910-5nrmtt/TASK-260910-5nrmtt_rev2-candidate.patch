@@ -1,0 +1,3669 @@
+diff --git a/docs/draft-transport-resolution.md b/docs/draft-transport-resolution.md
+new file mode 100644
+index 0000000..b20ea24
+--- /dev/null
++++ b/docs/draft-transport-resolution.md
+@@ -0,0 +1,63 @@
++# Draft bounded transport resolution boundary
++
++This is an internal implementation of unreleased `repository-transport-v1`
++revision 1 §2 (bounded authenticated endpoint resolution) on the strict
++external-repository lane, not an enabled fetch path. Frozen v1 and release
++qualification are unchanged.
++
++`buildrepo.AcquireNetworkResolved` applies a `TransportPlan` — one or two
++closed-grammar endpoints for one canonical identity, an opaque operator
++provider reference per endpoint, and an effective fallback mode — to the
++existing strict acquisition: trusted Git, clean configuration/environment,
++closed process graph, per-attempt SSH wrapper policy, per-fetch HTTPS
++credential broker, exact-ref fetch, and raw-object proof of the locked
++content. Pin is already applied when the plan is built (one attempt, no
++fallback), so the executor needs no pin logic.
++
++At most one fetch per listed endpoint, no implicit retry, never a
++synthesized URL, and one total deadline shared by both attempts. Every
++fetching attempt runs the same admission checks as a direct lane call
++under the shared deadline, so resolved acquisition refuses exactly what
++the lane refuses. Every SSH attempt additionally binds its endpoint and
++its selected credentials into a real wrapper policy through the existing
++`SSHPolicyFor` builder; the fetch then runs behind a per-attempt wrapper
++copy pinned to that policy, and a selection that cannot form a policy
++(an identity without pinned host keys, unresolvable paths, no manager
++base) refuses before any traffic. The second endpoint is attempted only
++under `availability-auth` after a positively classified availability or
++authentication failure (DNS, refused/timeout, HTTP 502/503/504, missing
++auth method, explicit rejection). TLS, host-key, ref, identity,
++integrity, audit, unknown, truncated, and ambiguous-404 failures fail
++closed: the lane's own diagnostic is returned unchanged, with no
++alternate traffic and no cache shortcut. SSH authentication rejection
++requires the daemon's parenthesized method list; a bare "Permission
++denied" is a local failure and stays unknown. Exhaustion returns
++`repository_endpoint_unavailable` with sanitized classifications built
++from a closed vocabulary; fetch output, secrets, and full endpoint URLs
++never enter errors. Sanitized per-endpoint records reach only the
++machine-private trace callback. A legacy-shape plan (one attempt, no
++provider, no fallback) behaves exactly like `AcquireNetwork`.
++
++Provider references resolve only through operator configuration:
++`gitcred.Access.ReadProvider` reads HTTPS secrets from the operator's own
++credential machinery under a provider namespace disjoint from scope and
++host entries, and SSH selections admit absolute operator paths through
++the existing validator. Identifiers are never commands or paths. A
++provider with no usable material records an auth failure with no fetch
++traffic.
++
++The total deadline bounds the whole fetch process graph: each lane Git
++child leads its own process group where the platform allows,
++cancellation kills the group, and pipe draining past the deadline is
++bounded. On Windows there is no group kill; the bound still returns on
++time while an orphaned helper may linger.
++
++The wiring task converts `config.Resolution` to `TransportPlan`
++field-for-field, populates the manager SSH wrapper base beside the
++per-repository credential selection, adds the one-line SSH wrapper
++dispatch to the manager binary, and routes policy plans here; no
++acquisition caller is wired yet. Until then a resolved SSH attempt with
++a zero manager base refuses. Revision 2 ports, mirrors, and aliases
++need a revision-2 reader and are a separate leaf. `buildsource` was
++inspected and needs no change: locked-content verification for network
++acquisition is the lane's raw-object proof, reused per attempt.
+diff --git a/internal/buildrepo/admission.go b/internal/buildrepo/admission.go
+index 4b965fe..4eb5a81 100644
+--- a/internal/buildrepo/admission.go
++++ b/internal/buildrepo/admission.go
+@@ -103,6 +103,12 @@ type GitTool struct {
+ 	// so a closure that spans two hosts cannot offer either host the other's
+ 	// key (Spec §12.2).
+ 	SSHCredentials OperatorSSHCredentials
++	// SSHBase is the manager-owned base of per-attempt SSH wrapper
++	// policies. Bounded transport resolution completes it per SSH attempt
++	// with the endpoint source and the attempt's credential selection; a
++	// zero base binds no policy and every resolved SSH attempt refuses.
++	// Direct acquisition ignores it and keeps the static wrapper.
++	SSHBase SSHWrapperBase
+ }
+ 
+ // SSHPolicy contains the manager-owned inputs for the fixed SSH wrapper.
+@@ -196,7 +202,7 @@ func ValidateGitTool(ctx context.Context, tool GitTool) error {
+ 			return admissionError(CodeIdentityInvalid, "%s is not an admitted absolute regular file", name)
+ 		}
+ 	}
+-	cmd := exec.CommandContext(ctx, tool.Executable, "--version") // #nosec G204 -- operator-selected absolute executable.
++	cmd := newBoundedGitCommand(ctx, tool.Executable, "--version")
+ 	cmd.Env = cleanDiscoveryEnvironment()
+ 	out, err := cmd.Output()
+ 	if err != nil || len(out) > 256 {
+@@ -223,6 +229,12 @@ type NetworkRequest struct {
+ 	RefValue string
+ 	Tool     GitTool
+ 	Limits   Limits
++	// sshPolicy is the bound per-attempt SSH wrapper policy. Only bounded
++	// transport resolution sets it: the fetch then runs behind a
++	// per-attempt wrapper pinned to this endpoint and its credentials
++	// instead of the tool's static wrapper. Direct acquisition leaves it
++	// nil and keeps the legacy static-wrapper behavior.
++	sshPolicy *SSHPolicy
+ }
+ 
+ // File is one normalized regular file in an admitted snapshot.
+@@ -245,45 +257,87 @@ type Snapshot struct {
+ // AcquireNetwork fetches exactly one locked object or exact tag into a fresh
+ // private bare repository and proves the snapshot from raw objects.
+ func AcquireNetwork(ctx context.Context, request NetworkRequest) (*Snapshot, error) {
+-	if err := ValidateGitTool(ctx, request.Tool); err != nil {
++	if err := admitNetworkRequest(ctx, request); err != nil {
+ 		return nil, err
+ 	}
++	limits := normalizedLimits(request.Limits)
++	ctx, cancel := context.WithTimeout(ctx, limits.Timeout)
++	defer cancel()
++	snapshot, err := acquireNetworkFormat(ctx, request, limits)
++	if err != nil {
++		return nil, laneDiagnostic(err)
++	}
++	return snapshot, nil
++}
++
++// admitNetworkRequest runs the strict-lane admission checks shared by direct
++// acquisition and bounded transport resolution: trusted Git, canonical
++// source, broker/wrapper presence, SSH credential selection, and
++// locked-commit, tag, and substitution-ref validation. The bounded resolver
++// runs the same checks per attempt under its shared deadline, so a resolved
++// acquisition refuses exactly what the lane refuses.
++func admitNetworkRequest(ctx context.Context, request NetworkRequest) error {
++	if err := ValidateGitTool(ctx, request.Tool); err != nil {
++		return err
++	}
+ 	parsedSource, err := ParseSource(request.Source.Git)
+ 	if err != nil || parsedSource != request.Source {
+-		return nil, admissionError(CodeIdentityInvalid, "network source is not canonical parsed input")
++		return admissionError(CodeIdentityInvalid, "network source is not canonical parsed input")
+ 	}
+ 	if request.Source.Transport != "https" && request.Source.Transport != "ssh" {
+-		return nil, admissionError(CodeIdentityInvalid, "unsupported transport")
++		return admissionError(CodeIdentityInvalid, "unsupported transport")
+ 	}
+ 	if request.Source.Transport == "https" && request.Tool.AskPass == "" {
+-		return nil, admissionError(CodeIdentityInvalid, "HTTPS requires a manager credential broker")
++		return admissionError(CodeIdentityInvalid, "HTTPS requires a manager credential broker")
+ 	}
+ 	if request.Source.Transport == "ssh" && request.Tool.SSHWrapper == "" {
+-		return nil, admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
++		return admissionError(CodeIdentityInvalid, "SSH requires the exact manager wrapper")
+ 	}
+ 	// The admission boundary refuses an unselected SSH repository even when a
+ 	// caller forgot to resolve credentials, so no fetch can quietly fall back
+ 	// to whatever the operator's ambient SSH state happens to offer.
+ 	if request.Source.Transport == "ssh" && !request.Tool.SSHCredentials.Selected() {
+-		return nil, admissionError(CodeSSHCredentialMissing,
++		return admissionError(CodeSSHCredentialMissing,
+ 			"SSH build repositories require an operator identity or agent")
+ 	}
+ 	if _, err := ParseLockedCommit(map[string]any{"object_format": request.Lock.ObjectFormat, "hex": request.Lock.Hex}, "lock"); err != nil {
+-		return nil, admissionError(CodeIdentityInvalid, "invalid immutable lock")
++		return admissionError(CodeIdentityInvalid, "invalid immutable lock")
+ 	}
+ 	if request.Tag != "" && !ValidRefName(request.Tag) {
+-		return nil, admissionError(CodeIdentityInvalid, "invalid exact tag")
++		return admissionError(CodeIdentityInvalid, "invalid exact tag")
+ 	}
+ 	if request.RefKind != "" && request.RefKind != "revision" && request.RefKind != "branch" && request.RefKind != "tag" {
+-		return nil, admissionError(CodeIdentityInvalid, "invalid substitution ref kind")
++		return admissionError(CodeIdentityInvalid, "invalid substitution ref kind")
+ 	}
+ 	if request.RefKind != "" && !ValidRefName(request.RefValue) {
+-		return nil, admissionError(CodeIdentityInvalid, "invalid substitution ref")
++		return admissionError(CodeIdentityInvalid, "invalid substitution ref")
+ 	}
+-	limits := normalizedLimits(request.Limits)
+-	ctx, cancel := context.WithTimeout(ctx, limits.Timeout)
+-	defer cancel()
+-	return acquireNetworkFormat(ctx, request, limits)
++	return nil
++}
++
++// fetchError is a failed exact-ref fetch with its bounded stderr retained
++// for transport failure classification. The message never carries the
++// output: AcquireNetwork maps it to the legacy lane diagnostic, and the
++// bounded resolver classifies from the field without interpolating it.
++// truncated reports that stderr overflowed the bound, so the retained
++// prefix is incomplete and must never authorize a fallback.
++type fetchError struct {
++	stderr    string
++	truncated bool
++}
++
++func (e *fetchError) Error() string { return "exact source fetch failed" }
++
++// laneDiagnostic maps an internal acquisition failure to the lane's own
++// diagnostic: a fetch failure becomes the legacy CodeSourceUnavailable
++// error, which never carries fetch output. Every other error already is
++// a lane diagnostic and passes through unchanged.
++func laneDiagnostic(err error) error {
++	var fetch *fetchError
++	if errors.As(err, &fetch) {
++		return admissionError(CodeSourceUnavailable, "exact source fetch failed")
++	}
++	return err
+ }
+ 
+ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Limits) (*Snapshot, error) {
+@@ -342,9 +396,17 @@ func acquireNetworkFormat(ctx context.Context, request NetworkRequest, limits Li
+ 			EnvHTTPSBrokerState+"="+state,
+ 			EnvHTTPSBrokerSecret+"="+request.Tool.HTTPSCredentials.secret)
+ 	}
++	if request.Source.Transport == "ssh" && request.sshPolicy != nil {
++		wrapper, state, err := materializeSSHWrapper(root, request.Tool.SSHWrapper, *request.sshPolicy)
++		if err != nil {
++			return nil, admissionError(CodeSourceUnavailable, "cannot materialize SSH wrapper")
++		}
++		fetchEnv = setEnvironmentValue(fetchEnv, "GIT_SSH", wrapper)
++		fetchEnv = append(fetchEnv, EnvSSHWrapperState+"="+state)
++	}
+ 	fetchArgs := strictFetchArgs(paths.repo, paths.hooks, askPass, request.Source.Transport, request.Source.Git, refspec)
+-	if err := runGit(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...); err != nil {
+-		return nil, admissionError(CodeSourceUnavailable, "exact source fetch failed")
++	if stderr, truncated, err := runGitCapture(ctx, request.Tool.Executable, paths.work, fetchEnv, fetchArgs...); err != nil {
++		return nil, &fetchError{stderr: stderr, truncated: truncated}
+ 	}
+ 	if err := validatePrivateRepository(paths.repo, request.Lock.ObjectFormat); err != nil {
+ 		return nil, err
+@@ -439,22 +501,56 @@ func cleanGitEnvironment(p privatePaths, tool GitTool, transport string) []strin
+ }
+ 
+ func runGit(ctx context.Context, executable, dir string, env []string, args ...string) error {
++	_, _, err := runGitCapture(ctx, executable, dir, env, args...)
++	return err
++}
++
++// gitPipeDrainBound caps how long a Git invocation may linger after its
++// context fires or its process exits while helpers still hold the stdio
++// pipes. Group cancellation normally ends the whole tree at once; the
++// bound covers a kill that cannot land and, on Windows, an orphaned
++// helper outside the killed process.
++const gitPipeDrainBound = 5 * time.Second
++
++// newBoundedGitCommand builds one lane Git invocation whose lifetime the
++// context bounds over the whole process graph: the child leads its own
++// group where the platform allows, cancellation kills the group, and pipe
++// draining past the deadline is bounded.
++func newBoundedGitCommand(ctx context.Context, executable string, args ...string) *exec.Cmd {
+ 	cmd := exec.CommandContext(ctx, executable, args...) // #nosec G204 -- absolute trusted executable; closed argument construction.
++	setChildProcessGroup(cmd)
++	cmd.Cancel = func() error { return killProcessTree(cmd.Process) }
++	cmd.WaitDelay = gitPipeDrainBound
++	return cmd
++}
++
++// runGitCapture runs one Git invocation and returns its bounded stderr
++// alongside the failure, plus whether stderr overflowed the bound. Success
++// returns no output: only a failed fetch needs classification, and only
++// the classifier reads the field.
++func runGitCapture(ctx context.Context, executable, dir string, env []string, args ...string) (string, bool, error) {
++	cmd := newBoundedGitCommand(ctx, executable, args...)
+ 	cmd.Dir, cmd.Env, cmd.Stdin = dir, env, bytes.NewReader(nil)
+ 	var stderr bytes.Buffer
+-	cmd.Stdout, cmd.Stderr = io.Discard, &boundedWriter{writer: &stderr, remaining: 64 << 10}
+-	return cmd.Run()
++	capture := &boundedWriter{writer: &stderr, remaining: 64 << 10}
++	cmd.Stdout, cmd.Stderr = io.Discard, capture
++	if err := cmd.Run(); err != nil {
++		return stderr.String(), capture.truncated, err
++	}
++	return "", false, nil
+ }
+ 
+ type boundedWriter struct {
+ 	writer    io.Writer
+ 	remaining int
++	truncated bool
+ }
+ 
+ func (w *boundedWriter) Write(payload []byte) (int, error) {
+ 	original := len(payload)
+ 	if len(payload) > w.remaining {
+ 		payload = payload[:w.remaining]
++		w.truncated = true
+ 	}
+ 	if len(payload) > 0 {
+ 		if _, err := w.writer.Write(payload); err != nil {
+diff --git a/internal/buildrepo/httpsbroker_test.go b/internal/buildrepo/httpsbroker_test.go
+index e29dae9..2bb29ae 100644
+--- a/internal/buildrepo/httpsbroker_test.go
++++ b/internal/buildrepo/httpsbroker_test.go
+@@ -21,6 +21,12 @@ func TestMain(m *testing.M) {
+ 	if IsHTTPSBrokerInvocation(os.Args[0]) {
+ 		os.Exit(RunHTTPSCredentialBroker(os.Args[1:], os.Getenv, os.Stdout))
+ 	}
++	if IsSSHWrapperInvocation(os.Args[0]) {
++		os.Exit(RunSSHWrapper(os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr))
++	}
++	if isTestFakeSSH(os.Args[0]) {
++		os.Exit(testFakeSSHMain(os.Args))
++	}
+ 	os.Exit(m.Run())
+ }
+ 
+diff --git a/internal/buildrepo/process_unix.go b/internal/buildrepo/process_unix.go
+new file mode 100644
+index 0000000..4a4e99d
+--- /dev/null
++++ b/internal/buildrepo/process_unix.go
+@@ -0,0 +1,33 @@
++//go:build !windows
++
++package buildrepo
++
++import (
++	"os"
++	"os/exec"
++	"syscall"
++)
++
++// setChildProcessGroup makes one Git child the leader of its own process
++// group, so cancelling the fetch can reach the whole process graph: Git's
++// SSH/helper grandchildren otherwise keep the stdio pipes open and the
++// caller waits past the total deadline.
++func setChildProcessGroup(cmd *exec.Cmd) {
++	if cmd.SysProcAttr == nil {
++		cmd.SysProcAttr = &syscall.SysProcAttr{}
++	}
++	cmd.SysProcAttr.Setpgid = true
++}
++
++// killProcessTree terminates the whole group led by p. A group kill that
++// reports the group already gone still succeeds: the tree is down either
++// way. Anything else falls back to killing the leader alone.
++func killProcessTree(p *os.Process) error {
++	if p == nil {
++		return nil
++	}
++	if err := syscall.Kill(-p.Pid, syscall.SIGKILL); err == nil || err == syscall.ESRCH {
++		return nil
++	}
++	return p.Kill()
++}
+diff --git a/internal/buildrepo/process_windows.go b/internal/buildrepo/process_windows.go
+new file mode 100644
+index 0000000..d2606c3
+--- /dev/null
++++ b/internal/buildrepo/process_windows.go
+@@ -0,0 +1,21 @@
++package buildrepo
++
++import (
++	"os"
++	"os/exec"
++)
++
++// setChildProcessGroup has no Windows process-group equivalent in this
++// lane: the child keeps the caller's group and cancellation kills the Git
++// process itself, while WaitDelay still bounds pipe draining past the
++// deadline when an orphaned helper holds the pipes open.
++func setChildProcessGroup(_ *exec.Cmd) {}
++
++// killProcessTree terminates the Git child. An orphaned helper that
++// survives still cannot hold the caller past WaitDelay.
++func killProcessTree(p *os.Process) error {
++	if p == nil {
++		return nil
++	}
++	return p.Kill()
++}
+diff --git a/internal/buildrepo/sshbroker.go b/internal/buildrepo/sshbroker.go
+new file mode 100644
+index 0000000..ddeaa93
+--- /dev/null
++++ b/internal/buildrepo/sshbroker.go
+@@ -0,0 +1,213 @@
++package buildrepo
++
++// Per-attempt SSH wrapper policies for bounded transport resolution.
++//
++// The strict lane admits one static SSH wrapper per tool, but a resolved
++// acquisition may attempt two endpoints with two different credential
++// selections. Each SSH attempt therefore binds its endpoint and its
++// selected credentials into a real wrapper policy through the existing
++// SSHPolicyFor builder and runs the fetch behind a private wrapper copy
++// pinned to that policy, mirroring the per-fetch HTTPS credential broker:
++// the manager executable is copied under a private basename the manager
++// binary dispatches, and the policy travels in a secret-free state file.
++// Paths name authentication material; no secret is copied or written.
++
++import (
++	"encoding/json"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"unicode"
++)
++
++const (
++	// SSHWrapperName is the basename of the manager-owned per-attempt SSH
++	// wrapper copy. The manager binary dispatches this basename before its
++	// public CLI.
++	SSHWrapperName = "curator-build-ssh-wrapper"
++	// EnvSSHWrapperState names the manager-owned, secret-free wrapper-state
++	// file for one fetch.
++	EnvSSHWrapperState = "CURATOR_BUILD_SSH_WRAPPER_STATE"
++)
++
++// SSHWrapperBase is the manager-owned base of every per-attempt SSH wrapper
++// policy: the SSH executable and the empty configuration the fixed argv
++// pins, plus the single connection timeout. It carries no endpoint and no
++// credentials; the resolved executor completes it per attempt with the
++// endpoint source and the attempt's operator credential selection. The
++// wiring task populates it beside the per-repository credential selection;
++// a zero base binds no SSH policy and every SSH attempt refuses.
++type SSHWrapperBase struct {
++	SSH             string
++	EmptyConfig     string
++	EmptyKnownHosts string
++	ConnectTimeout  int
++}
++
++// bindSSHWrapperPolicy completes the real per-attempt wrapper policy for
++// one SSH source from the manager base and the attempt's bound credential
++// selection. A selection that cannot form a policy — unknown endpoint,
++// unresolvable paths, or no pinned host keys — refuses here, before any
++// fetch traffic, instead of authenticating against ambient SSH state.
++func bindSSHWrapperPolicy(tool GitTool, source Source) (SSHPolicy, error) {
++	for name, value := range map[string]string{
++		"SSH executable":        tool.SSHBase.SSH,
++		"SSH empty config":      tool.SSHBase.EmptyConfig,
++		"SSH empty known hosts": tool.SSHBase.EmptyKnownHosts,
++	} {
++		if !filepath.IsAbs(value) {
++			return SSHPolicy{}, admissionError(CodeIdentityInvalid, "SSH wrapper policy %s is not configured", name)
++		}
++		info, err := os.Lstat(value)
++		if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
++			return SSHPolicy{}, admissionError(CodeIdentityInvalid, "SSH wrapper policy %s is not an admitted absolute regular file", name)
++		}
++	}
++	if tool.SSHBase.ConnectTimeout <= 0 {
++		return SSHPolicy{}, admissionError(CodeIdentityInvalid, "SSH wrapper policy has no connection timeout")
++	}
++	return SSHPolicyFor(SSHPolicy{
++		SSH:             tool.SSHBase.SSH,
++		EmptyConfig:     tool.SSHBase.EmptyConfig,
++		EmptyKnownHosts: tool.SSHBase.EmptyKnownHosts,
++		ConnectTimeout:  tool.SSHBase.ConnectTimeout,
++	}, source, tool.SSHCredentials)
++}
++
++// IsSSHWrapperInvocation reports whether argv0 names the private per-attempt
++// SSH wrapper copy.
++func IsSSHWrapperInvocation(argv0 string) bool {
++	name := filepath.Base(argv0)
++	if runtime.GOOS == "windows" {
++		name = strings.TrimSuffix(strings.ToLower(name), ".exe")
++	}
++	return name == SSHWrapperName
++}
++
++// RunSSHWrapper executes one Git SSH-wrapper invocation against the bound
++// per-attempt policy: it answers only Git's exact wrapper tuple for the
++// pinned endpoint and otherwise fails silently. The SSH child inherits the
++// wrapper's environment — the fetch environment, already clean — and its
++// exit code is reported back to Git.
++func RunSSHWrapper(args []string, getenv func(string) string, stdin io.Reader, stdout, stderr io.Writer) int {
++	if len(args) != 2 || getenv == nil || stdin == nil || stdout == nil || stderr == nil {
++		return 1
++	}
++	policy, ok := readSSHWrapperState(getenv(EnvSSHWrapperState))
++	if !ok {
++		return 1
++	}
++	command, err := ExactSSHCommand(policy, []string{policy.Wrapper, args[0], args[1]})
++	if err != nil {
++		return 1
++	}
++	child := exec.Command(command[0], command[1:]...) // #nosec G204 -- absolute manager-admitted SSH executable; fixed policy argv.
++	child.Stdin, child.Stdout, child.Stderr = stdin, stdout, stderr
++	if err := child.Run(); err != nil {
++		if exit, ok := err.(*exec.ExitError); ok {
++			return exit.ExitCode()
++		}
++		return 1
++	}
++	return 0
++}
++
++// materializeSSHWrapper copies the manager executable under the private
++// wrapper basename and writes the bound per-attempt policy beside it. The
++// state file carries paths only, never secrets.
++func materializeSSHWrapper(root, executable string, policy SSHPolicy) (string, string, error) {
++	if !filepath.IsAbs(executable) {
++		return "", "", admissionError(CodeIdentityInvalid, "SSH wrapper source is not absolute")
++	}
++	managerRoot := filepath.Join(root, "manager-wrappers")
++	if err := os.Mkdir(managerRoot, 0o700); err != nil {
++		return "", "", err
++	}
++	name := SSHWrapperName
++	if runtime.GOOS == "windows" {
++		name += ".exe"
++	}
++	wrapper := filepath.Join(managerRoot, name)
++	if err := copyBrokerExecutable(executable, wrapper); err != nil {
++		return "", "", err
++	}
++	policy.Wrapper = wrapper
++	payload, err := json.Marshal(policy)
++	if err != nil {
++		return "", "", err
++	}
++	payload = append(payload, '\n')
++	statePath := filepath.Join(managerRoot, "ssh-wrapper-state.json")
++	if err := os.WriteFile(statePath, payload, 0o600); err != nil {
++		return "", "", err
++	}
++	return wrapper, statePath, nil
++}
++
++// readSSHWrapperState loads one bound wrapper policy. Every malformed,
++// unreadable, or unadmitted state fails silently: the wrapper answers
++// nothing without a complete policy.
++func readSSHWrapperState(path string) (SSHPolicy, bool) {
++	if !filepath.IsAbs(path) {
++		return SSHPolicy{}, false
++	}
++	info, err := os.Lstat(path)
++	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() > 8192 {
++		return SSHPolicy{}, false
++	}
++	payload, err := os.ReadFile(path) // #nosec G304 -- absolute manager-owned path supplied only to the fetch child.
++	if err != nil {
++		return SSHPolicy{}, false
++	}
++	var policy SSHPolicy
++	decoder := json.NewDecoder(strings.NewReader(string(payload)))
++	decoder.DisallowUnknownFields()
++	if err := decoder.Decode(&policy); err != nil {
++		return SSHPolicy{}, false
++	}
++	if decoder.Decode(&struct{}{}) != io.EOF {
++		return SSHPolicy{}, false
++	}
++	for _, value := range []string{policy.Wrapper, policy.SSH, policy.EmptyConfig, policy.KnownHosts, policy.EmptyKnownHosts} {
++		if !validSSHWrapperPath(value) {
++			return SSHPolicy{}, false
++		}
++	}
++	if !IsSSHWrapperInvocation(policy.Wrapper) {
++		return SSHPolicy{}, false
++	}
++	for _, value := range []string{policy.Identity, policy.AgentSocket} {
++		if value != "" && !validSSHWrapperPath(value) {
++			return SSHPolicy{}, false
++		}
++	}
++	if policy.ExpectedHost == "" || policy.RepositoryPath == "" || policy.ConnectTimeout <= 0 {
++		return SSHPolicy{}, false
++	}
++	for _, value := range []string{policy.ExpectedHost, policy.RepositoryPath} {
++		for _, r := range value {
++			if unicode.IsControl(r) {
++				return SSHPolicy{}, false
++			}
++		}
++	}
++	return policy, true
++}
++
++// validSSHWrapperPath admits one absolute wrapper-state path. Spaces stay
++// admissible — operator paths legitimately contain them — but control
++// characters never reach an argv.
++func validSSHWrapperPath(value string) bool {
++	if value == "" || !filepath.IsAbs(value) {
++		return false
++	}
++	for _, r := range value {
++		if unicode.IsControl(r) {
++			return false
++		}
++	}
++	return true
++}
+diff --git a/internal/buildrepo/sshbroker_test.go b/internal/buildrepo/sshbroker_test.go
+new file mode 100644
+index 0000000..dec7070
+--- /dev/null
++++ b/internal/buildrepo/sshbroker_test.go
+@@ -0,0 +1,424 @@
++package buildrepo
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strconv"
++	"strings"
++	"testing"
++)
++
++// testFakeSSHBase names the test-binary copies that stand in for the SSH
++// executable in wrapper tests. A "-fail<N>" suffix exits N instead of
++// echoing argv, proving exit-code mapping.
++const testFakeSSHBase = "curator-test-fake-ssh"
++
++func isTestFakeSSH(argv0 string) bool {
++	name := filepath.Base(argv0)
++	if runtime.GOOS == "windows" {
++		name = strings.TrimSuffix(strings.ToLower(name), ".exe")
++	}
++	return name == testFakeSSHBase || strings.HasPrefix(name, testFakeSSHBase+"-fail")
++}
++
++func testFakeSSHMain(argv []string) int {
++	name := filepath.Base(argv[0])
++	if runtime.GOOS == "windows" {
++		name = strings.TrimSuffix(strings.ToLower(name), ".exe")
++	}
++	if rest, ok := strings.CutPrefix(name, testFakeSSHBase+"-fail"); ok {
++		code, err := strconv.Atoi(rest)
++		if err != nil {
++			return 1
++		}
++		return code
++	}
++	for _, arg := range argv {
++		fmt.Println(arg)
++	}
++	return 0
++}
++
++func testFakeSSH(t *testing.T, suffix string) string {
++	t.Helper()
++	executable, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	name := testFakeSSHBase + suffix
++	if runtime.GOOS == "windows" {
++		name += ".exe"
++	}
++	destination := filepath.Join(t.TempDir(), name)
++	if err := copyBrokerExecutable(executable, destination); err != nil {
++		t.Fatal(err)
++	}
++	return destination
++}
++
++func testSSHBase(t *testing.T, ssh string) SSHWrapperBase {
++	t.Helper()
++	dir := t.TempDir()
++	write := func(name string) string {
++		t.Helper()
++		path := filepath.Join(dir, name)
++		if err := os.WriteFile(path, nil, 0o600); err != nil {
++			t.Fatal(err)
++		}
++		return path
++	}
++	return SSHWrapperBase{SSH: ssh, EmptyConfig: write("ssh.config"), EmptyKnownHosts: write("empty_known_hosts"), ConnectTimeout: 15}
++}
++
++func testSSHMaterial(t *testing.T) (identity, knownHosts string) {
++	t.Helper()
++	identity = filepath.Join(t.TempDir(), "id_example")
++	knownHosts = filepath.Join(t.TempDir(), "known_hosts")
++	if err := os.WriteFile(identity, []byte("key"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(knownHosts, []byte("hosts"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return identity, knownHosts
++}
++
++func TestBindSSHWrapperPolicy(t *testing.T) {
++	identity, knownHosts := testSSHMaterial(t)
++	resolve := func(path string) string {
++		t.Helper()
++		resolved, err := filepath.EvalSymlinks(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		return resolved
++	}
++	identity, knownHosts = resolve(identity), resolve(knownHosts)
++	ssh := testFakeSSH(t, "")
++
++	t.Run("scp-like endpoint", func(t *testing.T) {
++		source, err := ParseSource("git@example.test:skills/tool.git")
++		if err != nil {
++			t.Fatal(err)
++		}
++		tool := GitTool{
++			SSHCredentials: OperatorSSHCredentials{Identity: identity, KnownHosts: knownHosts},
++			SSHBase:        testSSHBase(t, ssh),
++		}
++		policy, err := bindSSHWrapperPolicy(tool, source)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if policy.ExpectedHost != "git@example.test" || policy.RepositoryPath != "skills/tool.git" {
++			t.Fatalf("endpoint = %q %q", policy.ExpectedHost, policy.RepositoryPath)
++		}
++		if policy.Identity != identity || policy.KnownHosts != knownHosts || policy.SSH != ssh || policy.ConnectTimeout != 15 {
++			t.Fatalf("policy = %+v", policy)
++		}
++	})
++
++	t.Run("ssh url keeps its leading slash", func(t *testing.T) {
++		source, err := ParseSource("ssh://git@example.test/skills/tool.git")
++		if err != nil {
++			t.Fatal(err)
++		}
++		tool := GitTool{
++			SSHCredentials: OperatorSSHCredentials{Identity: identity, KnownHosts: knownHosts},
++			SSHBase:        testSSHBase(t, ssh),
++		}
++		policy, err := bindSSHWrapperPolicy(tool, source)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if policy.RepositoryPath != "/skills/tool.git" {
++			t.Fatalf("repository path = %q", policy.RepositoryPath)
++		}
++	})
++
++	source, err := ParseSource("git@example.test:skills/tool.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	valid := GitTool{
++		SSHCredentials: OperatorSSHCredentials{Identity: identity, KnownHosts: knownHosts},
++		SSHBase:        testSSHBase(t, ssh),
++	}
++	for _, testCase := range []struct {
++		name string
++		tool GitTool
++		code string
++	}{
++		{"zero base", GitTool{SSHCredentials: valid.SSHCredentials}, CodeIdentityInvalid},
++		{"relative ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: "ssh", EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeIdentityInvalid},
++		{"dangling ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: filepath.Join(t.TempDir(), "absent"), EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeIdentityInvalid},
++		{"directory ssh", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: t.TempDir(), EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts, ConnectTimeout: 15}}, CodeIdentityInvalid},
++		{"zero timeout", GitTool{SSHCredentials: valid.SSHCredentials, SSHBase: SSHWrapperBase{SSH: ssh, EmptyConfig: valid.SSHBase.EmptyConfig, EmptyKnownHosts: valid.SSHBase.EmptyKnownHosts}}, CodeIdentityInvalid},
++		{"unselected credentials", GitTool{SSHBase: valid.SSHBase}, CodeSSHCredentialMissing},
++		{"known hosts alone select nothing", GitTool{SSHCredentials: OperatorSSHCredentials{KnownHosts: knownHosts}, SSHBase: valid.SSHBase}, CodeSSHCredentialMissing},
++		{"identity without pinned host keys", GitTool{SSHCredentials: OperatorSSHCredentials{Identity: identity}, SSHBase: valid.SSHBase}, CodeSSHCredentialMissing},
++		{"dangling identity", GitTool{SSHCredentials: OperatorSSHCredentials{Identity: filepath.Join(t.TempDir(), "absent"), KnownHosts: knownHosts}, SSHBase: valid.SSHBase}, CodeIdentityInvalid},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			if _, err := bindSSHWrapperPolicy(testCase.tool, source); ErrorCode(err) != testCase.code {
++				t.Fatalf("error = %v, want %s", err, testCase.code)
++			}
++		})
++	}
++}
++
++func TestMaterializeSSHWrapperRoundTrip(t *testing.T) {
++	identity, knownHosts := testSSHMaterial(t)
++	source, err := ParseSource("git@example.test:skills/tool.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	tool := GitTool{
++		SSHCredentials: OperatorSSHCredentials{Identity: identity, KnownHosts: knownHosts},
++		SSHBase:        testSSHBase(t, testFakeSSH(t, "")),
++	}
++	policy, err := bindSSHWrapperPolicy(tool, source)
++	if err != nil {
++		t.Fatal(err)
++	}
++	executable, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	wrapper, state, err := materializeSSHWrapper(t.TempDir(), executable, policy)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !IsSSHWrapperInvocation(wrapper) {
++		t.Fatalf("materialized wrapper %q does not dispatch", wrapper)
++	}
++	loaded, ok := readSSHWrapperState(state)
++	if !ok {
++		t.Fatal("materialized state does not read back")
++	}
++	if loaded != policyWithWrapper(policy, wrapper) {
++		t.Fatalf("state = %+v", loaded)
++	}
++	// The state carries the policy shape only: paths, endpoint, and
++	// timeout, with no secret field to smuggle one through.
++	payload, err := os.ReadFile(state)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var keys map[string]any
++	if err := json.Unmarshal(payload, &keys); err != nil {
++		t.Fatal(err)
++	}
++	want := map[string]bool{"Wrapper": true, "SSH": true, "ExpectedHost": true, "RepositoryPath": true,
++		"EmptyConfig": true, "KnownHosts": true, "EmptyKnownHosts": true, "Identity": true,
++		"AgentSocket": true, "ConnectTimeout": true}
++	if len(keys) != len(want) {
++		t.Fatalf("state keys = %v", keys)
++	}
++	for key := range keys {
++		if !want[key] {
++			t.Fatalf("state carries %q", key)
++		}
++	}
++	if _, _, err := materializeSSHWrapper(t.TempDir(), "relative/curator", policy); ErrorCode(err) != CodeIdentityInvalid {
++		t.Fatalf("relative wrapper source error = %v, want %s", err, CodeIdentityInvalid)
++	}
++}
++
++func policyWithWrapper(policy SSHPolicy, wrapper string) SSHPolicy {
++	policy.Wrapper = wrapper
++	return policy
++}
++
++func TestRunSSHWrapperAnswersOnlyTheBoundTuple(t *testing.T) {
++	identity, knownHosts := testSSHMaterial(t)
++	resolve := func(path string) string {
++		t.Helper()
++		resolved, err := filepath.EvalSymlinks(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		return resolved
++	}
++	identity, knownHosts = resolve(identity), resolve(knownHosts)
++	source, err := ParseSource("git@example.test:skills/tool.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	ssh := testFakeSSH(t, "")
++	tool := GitTool{
++		SSHCredentials: OperatorSSHCredentials{Identity: identity, KnownHosts: knownHosts},
++		SSHBase:        testSSHBase(t, ssh),
++	}
++	policy, err := bindSSHWrapperPolicy(tool, source)
++	if err != nil {
++		t.Fatal(err)
++	}
++	executable, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, state, err := materializeSSHWrapper(t.TempDir(), executable, policy)
++	if err != nil {
++		t.Fatal(err)
++	}
++	getenv := func(name string) string {
++		if name == EnvSSHWrapperState {
++			return state
++		}
++		return ""
++	}
++	tuple := []string{"git@example.test", "git-upload-pack 'skills/tool.git'"}
++
++	t.Run("pinned argv reaches ssh", func(t *testing.T) {
++		var stdout, stderr bytes.Buffer
++		if code := RunSSHWrapper(tuple, getenv, strings.NewReader("stdin-probe"), &stdout, &stderr); code != 0 {
++			t.Fatalf("code = %d, stderr = %q", code, stderr.String())
++		}
++		argv := strings.Split(strings.TrimSpace(stdout.String()), "\n")
++		joined := strings.Join(argv, " ")
++		// The fake echoes exactly what the wrapper execed: the fixed
++		// argv, the pinned material, and the bound tuple.
++		for _, marker := range []string{ssh, "-F", "BatchMode=yes", "StrictHostKeyChecking=yes",
++			"PasswordAuthentication=no", "ProxyCommand=none", "IdentitiesOnly=yes", "IdentityAgent=none",
++			"-i " + identity, "UserKnownHostsFile=" + knownHosts, "git@example.test", tuple[1]} {
++			if !strings.Contains(joined, marker) {
++				t.Errorf("ssh argv lacks %q:\n%s", marker, joined)
++			}
++		}
++		if argv[0] != ssh || argv[len(argv)-2] != "git@example.test" || argv[len(argv)-1] != tuple[1] {
++			t.Errorf("ssh argv endpoints wrong:\n%s", joined)
++		}
++	})
++
++	t.Run("exit code maps through", func(t *testing.T) {
++		failing := policy
++		failing.SSH = testFakeSSH(t, "-fail3")
++		_, failingState, err := materializeSSHWrapper(t.TempDir(), executable, failing)
++		if err != nil {
++			t.Fatal(err)
++		}
++		failingGetenv := func(name string) string {
++			if name == EnvSSHWrapperState {
++				return failingState
++			}
++			return ""
++		}
++		var stdout, stderr bytes.Buffer
++		if code := RunSSHWrapper(tuple, failingGetenv, strings.NewReader(""), &stdout, &stderr); code != 3 {
++			t.Fatalf("code = %d, want 3", code)
++		}
++	})
++
++	for _, testCase := range []struct {
++		name string
++		args []string
++	}{
++		{"foreign host", []string{"other@example.test", tuple[1]}},
++		{"foreign path", []string{tuple[0], "git-upload-pack 'other/repo.git'"}},
++		{"bare command", []string{tuple[0], "git-upload-pack skills/tool.git"}},
++		{"extra argument", []string{tuple[0], tuple[1], "extra"}},
++		{"missing command", []string{tuple[0]}},
++		{"no arguments", nil},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			var stdout, stderr bytes.Buffer
++			if code := RunSSHWrapper(testCase.args, getenv, strings.NewReader(""), &stdout, &stderr); code != 1 {
++				t.Fatalf("code = %d, want 1", code)
++			}
++			if stdout.Len() != 0 {
++				t.Fatalf("refused tuple produced %q", stdout.String())
++			}
++		})
++	}
++
++	for _, testCase := range []struct {
++		name  string
++		state func() string
++	}{
++		{"absent state", func() string { return filepath.Join(t.TempDir(), "absent") }},
++		{"directory state", func() string { return t.TempDir() }},
++		{"empty state variable", func() string { return "" }},
++		{"garbage state", func() string { return writeSSHStateFile(t, "not json") }},
++		{"unknown field", func() string {
++			return writeSSHStateFile(t, `{"Wrapper":"/abs/w","SSH":"/abs/ssh","ExpectedHost":"h","RepositoryPath":"r","EmptyConfig":"/abs/c","KnownHosts":"/abs/k","EmptyKnownHosts":"/abs/e","Identity":"/abs/i","AgentSocket":"","ConnectTimeout":15,"Secret":"x"}`)
++		}},
++		{"relative ssh", func() string {
++			mutated := policy
++			mutated.SSH = "ssh"
++			return writeSSHStatePolicy(t, mutated)
++		}},
++		{"empty endpoint", func() string {
++			mutated := policy
++			mutated.ExpectedHost = ""
++			return writeSSHStatePolicy(t, mutated)
++		}},
++		{"zero timeout", func() string {
++			mutated := policy
++			mutated.ConnectTimeout = 0
++			return writeSSHStatePolicy(t, mutated)
++		}},
++		{"foreign wrapper name", func() string {
++			mutated := policy
++			mutated.Wrapper = filepath.Join(t.TempDir(), "something-else")
++			return writeSSHStatePolicy(t, mutated)
++		}},
++		{"control character in path", func() string {
++			mutated := policy
++			mutated.Identity = "/abs/id\ninjected"
++			return writeSSHStatePolicy(t, mutated)
++		}},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			broken := func(name string) string {
++				if name == EnvSSHWrapperState {
++					return testCase.state()
++				}
++				return ""
++			}
++			var stdout, stderr bytes.Buffer
++			if code := RunSSHWrapper(tuple, broken, strings.NewReader(""), &stdout, &stderr); code != 1 {
++				t.Fatalf("code = %d, want 1", code)
++			}
++		})
++	}
++}
++
++func writeSSHStateFile(t *testing.T, content string) string {
++	t.Helper()
++	path := filepath.Join(t.TempDir(), "ssh-wrapper-state.json")
++	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func writeSSHStatePolicy(t *testing.T, policy SSHPolicy) string {
++	t.Helper()
++	payload, err := json.Marshal(policy)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return writeSSHStateFile(t, string(payload)+"\n")
++}
++
++func TestIsSSHWrapperInvocation(t *testing.T) {
++	if !IsSSHWrapperInvocation(filepath.Join("manager-wrappers", SSHWrapperName)) {
++		t.Fatal("private wrapper copy does not dispatch")
++	}
++	abs, err := filepath.Abs(filepath.Join("manager-wrappers", SSHWrapperName))
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !IsSSHWrapperInvocation(abs) {
++		t.Fatal("absolute wrapper copy does not dispatch")
++	}
++	for _, argv0 := range []string{HTTPSBrokerName, "ssh", "curator", SSHWrapperName + ".bak", "x" + SSHWrapperName} {
++		if IsSSHWrapperInvocation(argv0) {
++			t.Fatalf("%q dispatches as the SSH wrapper", argv0)
++		}
++	}
++}
+diff --git a/internal/buildrepo/transport.go b/internal/buildrepo/transport.go
+new file mode 100644
+index 0000000..8d94f02
+--- /dev/null
++++ b/internal/buildrepo/transport.go
+@@ -0,0 +1,722 @@
++package buildrepo
++
++// Bounded authenticated transport resolution (repository-transport-v1,
++// revision 1, §2): apply a machine policy attempt plan to the strict
++// external-repository lane.
++//
++// A TransportPlan is the validated form of one declaration's ordered
++// endpoints: one or two closed-grammar URLs that canonicalize to one
++// identity, an opaque operator provider reference per endpoint, and an
++// effective fallback mode. The sibling policy loader produces the same
++// shape as config.Resolution; this package cannot import config (config
++// imports buildrepo for the lane grammar), so the wiring task converts
++// field-for-field and this executor revalidates everything before any
++// network I/O.
++//
++// Every endpoint attempt is a full strict-lane acquisition: trusted Git,
++// clean configuration/environment, closed process graph, the same
++// admission checks as a direct lane call, a per-attempt SSH wrapper
++// policy bound from the attempt's credentials, the existing per-fetch
++// HTTPS credential broker, exact-ref fetch, and raw-object proof of the
++// locked content. There is
++// at most one attempt per listed endpoint (maximum two total), no implicit
++// retry, never a synthesized URL, and one total deadline shared by both
++// attempts. The second endpoint is attempted only under
++// `availability-auth` after a positively classified availability or
++// authentication failure. Every other class fails closed: the lane's own
++// diagnostic is returned unchanged, with no alternate network traffic and
++// no cache shortcut.
++//
++// Errors and trace records never carry fetch stderr, secrets, or full
++// endpoint URLs. Exhaustion diagnostics are built from a closed
++// class/reason vocabulary; URLs reach only the machine-private trace
++// callback, never portable errors.
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"regexp"
++	"strings"
++
++	"github.com/relux-works/curator/internal/gitcred"
++)
++
++// CodeRepositoryEndpointUnavailable reports exhausted bounded resolution:
++// every planned endpoint failed with a fallback-eligible class and no
++// attempt remains (repository-transport §2). It shares its spelling with
++// the policy loader's diagnostic; both name the same published class.
++const CodeRepositoryEndpointUnavailable = "repository_endpoint_unavailable"
++
++// Effective fallback modes (repository-transport §2). Pin is already
++// applied when a plan is built: a pinned plan holds one attempt with
++// TransportFallbackNone, so the executor needs no pin logic.
++const (
++	TransportFallbackNone             = "none"
++	TransportFallbackAvailabilityAuth = "availability-auth"
++)
++
++// FailureClass is one §2 failure row. Only FailureAvailability and
++// FailureAuth ever permit a second endpoint attempt, and only under
++// TransportFallbackAvailabilityAuth.
++type FailureClass string
++
++// Transport failure classes. The string values reuse the conformance
++// vocabulary where it names the class (tls, host-key, ref-moved,
++// identity, integrity, audit, unknown, http-404, policy-unreadable);
++// availability and auth are the two fallback-eligible rows.
++const (
++	FailureAvailability FailureClass = "availability"
++	FailureAuth         FailureClass = "auth"
++	FailureTLS          FailureClass = "tls"
++	FailureHostKey      FailureClass = "host-key"
++	FailureRef          FailureClass = "ref-moved"
++	FailureIdentity     FailureClass = "identity"
++	FailureIntegrity    FailureClass = "integrity"
++	FailureAudit        FailureClass = "audit"
++	FailureUnknown      FailureClass = "unknown"
++	FailureHTTP404      FailureClass = "http-404"
++	FailurePolicy       FailureClass = "policy-unreadable"
++)
++
++// failureReason is the closed per-class reason used in exhaustion
++// diagnostics. Raw fetch output is never interpolated: the class alone
++// determines the text, so a hostile or confused remote cannot inject
++// secrets or misleading detail into errors.
++func (c FailureClass) failureReason() string {
++	switch c {
++	case FailureAvailability:
++		return "endpoint unavailable (DNS, connection, or HTTP 502/503/504 failure)"
++	case FailureAuth:
++		return "endpoint authentication unavailable or rejected"
++	case FailureTLS:
++		return "TLS certificate validation failed"
++	case FailureHostKey:
++		return "SSH host-key validation failed"
++	case FailureRef:
++		return "missing or moved ref"
++	case FailureIdentity:
++		return "wrong repository identity"
++	case FailureIntegrity:
++		return "object or integrity mismatch"
++	case FailureAudit:
++		return "audit denial"
++	case FailureHTTP404:
++		return "ambiguous HTTP 404"
++	case FailurePolicy:
++		return "unreadable machine policy"
++	default:
++		return "unclassified failure"
++	}
++}
++
++// AllowSecondAttempt is the §2 fallback gate: only `availability-auth`
++// plans advance past a positively classified availability or
++// authentication failure. Attempts remaining, the shared deadline, and
++// plan shape are enforced by the executor; this predicate decides the
++// class row only.
++func AllowSecondAttempt(fallback string, class FailureClass) bool {
++	if fallback != TransportFallbackAvailabilityAuth {
++		return false
++	}
++	return class == FailureAvailability || class == FailureAuth
++}
++
++// SemanticFailureClass maps a draft-sources-v1 semantic-case first_failure
++// token to the failure class the gate decides on. `dns` stands for the
++// whole availability row (refused/timeout/502/503/504 classify the same);
++// `auth-rejected` stands for the auth row.
++func SemanticFailureClass(token string) (FailureClass, bool) {
++	switch token {
++	case "dns":
++		return FailureAvailability, true
++	case "auth-rejected":
++		return FailureAuth, true
++	case "tls":
++		return FailureTLS, true
++	case "host-key":
++		return FailureHostKey, true
++	case "integrity":
++		return FailureIntegrity, true
++	case "identity":
++		return FailureIdentity, true
++	case "ref-moved":
++		return FailureRef, true
++	case "audit":
++		return FailureAudit, true
++	case "unknown":
++		return FailureUnknown, true
++	case "policy-unreadable":
++		return FailurePolicy, true
++	case "http-404":
++		return FailureHTTP404, true
++	default:
++		return FailureUnknown, false
++	}
++}
++
++// httpErrorCode matches an HTTP status only with error context (git's
++// "returned error: NNN", "status code NNN" and equivalents). A bare
++// number is never a classification: byte counts and object tallies in
++// fetch output must not read as server statuses.
++var httpErrorCode = regexp.MustCompile(`(?i)(error|status|code|returned|received)[^0-9a-z]{0,10}(50[234]|40[134])\b`)
++
++// deniedTo matches a forge warning that names the denied repository and
++// the rejected identity ("Permission to acme/kit denied to deploy-key").
++// Looser grants ("permission to view", "access denied") stay unknown:
++// the classifier earns the auth row only for explicit rejection.
++var deniedTo = regexp.MustCompile(`(?i)permission to \S+ denied`)
++
++// sshPermissionDenied matches an SSH daemon's authentication rejection: a
++// parenthesized method list ("Permission denied (publickey)"). A bare
++// "Permission denied" names no authentication — a local filesystem error
++// reads exactly that way — and stays unknown.
++var sshPermissionDenied = regexp.MustCompile(`permission denied \([a-z,\-]+\)`)
++
++// ClassifyFetchOutput maps bounded fetch stderr to a §2 failure class.
++// Classification is positive and conservative: a signal earns the
++// availability or auth row only when it unambiguously names that row.
++// Anything else — empty output, truncated output, mixed signals, an
++// unfamiliar diagnostic, a status without error context — is
++// FailureUnknown and fails closed. Fail-closed rows are checked before
++// fallback-eligible rows so a mixed diagnostic (for example integrity
++// details beside a connection note, or an audit denial beside a timeout)
++// never permits an alternate attempt.
++func ClassifyFetchOutput(stderr string) FailureClass {
++	lowered := strings.ToLower(stderr)
++	switch {
++	case containsAny(lowered, "certificate", "ssl", "tls", "schannel", "self-signed", "self signed", "issuer"):
++		return FailureTLS
++	case containsAny(lowered, "host key", "hostkey", "remote host identification", "identification has changed"):
++		return FailureHostKey
++	case strings.Contains(lowered, "redirect"):
++		return FailureIdentity
++	case containsAny(lowered, "remote ref", "couldn't find remote", "could not find remote"):
++		return FailureRef
++	case httpErrorCode.MatchString(stderr) && isHTTPCode(stderr, "404") ||
++		containsAny(lowered, "repository not found", "remote: not found"):
++		return FailureHTTP404
++	case containsAny(lowered, "mismatch", "integrity", "corrupt", "fsck", "checksum"):
++		return FailureIntegrity
++	case containsAny(lowered, "audit", "revok", "canary", "assurance", "capabilit"):
++		return FailureAudit
++	case httpErrorCode.MatchString(stderr) && (isHTTPCode(stderr, "401") || isHTTPCode(stderr, "403")) ||
++		containsAny(lowered, "authentication failed", "authentication failure",
++			"invalid username or password", "invalid credentials", "unauthorized",
++			"could not read username", "could not read password") ||
++		sshPermissionDenied.MatchString(lowered) ||
++		deniedTo.MatchString(stderr):
++		return FailureAuth
++	case containsAny(lowered, "could not resolve host", "couldn't resolve host", "could not resolve hostname",
++		"temporary failure in name resolution", "name or service not known", "name resolution",
++		"nodename nor servname", "no address associated with hostname", "host not found",
++		"connection refused", "connection timed out", "failed to connect", "couldn't connect",
++		"unable to connect", "network is unreachable", "no route to host",
++		"operation timed out", "timed out", "timeout was reached") ||
++		httpErrorCode.MatchString(stderr) && (isHTTPCode(stderr, "502") || isHTTPCode(stderr, "503") || isHTTPCode(stderr, "504")):
++		return FailureAvailability
++	default:
++		return FailureUnknown
++	}
++}
++
++func containsAny(value string, needles ...string) bool {
++	for _, needle := range needles {
++		if strings.Contains(value, needle) {
++			return true
++		}
++	}
++	return false
++}
++
++// isHTTPCode reports whether an error-context status match names code.
++// It re-scans the httpErrorCode matches instead of trusting a bare
++// substring, so "1502 objects" never reads as a 502.
++func isHTTPCode(stderr, code string) bool {
++	for _, match := range httpErrorCode.FindAllStringSubmatch(stderr, -1) {
++		if len(match) == 3 && match[2] == code {
++			return true
++		}
++	}
++	return false
++}
++
++// ClassifyAdmissionCode maps a strict-lane admission code produced after
++// the fetch phase to a §2 failure class. Post-fetch lane failures are
++// deterministic (the lane proved what went wrong), so the mapping is by
++// code, never by stderr. CodeSourceUnavailable here means a non-fetch
++// lane failure (private-state initialization); fetch failures carry
++// stderr and classify through ClassifyFetchOutput instead.
++func ClassifyAdmissionCode(code string) FailureClass {
++	switch code {
++	case CodeRefMoved:
++		return FailureRef
++	case CodeIncompleteSource, CodeObjectSemanticsInvalid, CodeLFSUnsupported:
++		return FailureIntegrity
++	case CodeIdentityInvalid, CodeLocalGitfileUnsupported, CodeLocalBareUnsupported,
++		CodeLocalLinkedUnsupported, CodeLocalLayoutUnsafe, CodeLocalFormatUnsupported,
++		CodeLocalObjectFormatUnsupported:
++		return FailureIdentity
++	case CodeSSHCredentialMissing:
++		return FailureAuth
++	case CodeAuditBlocked:
++		return FailureAudit
++	case CodeDescriptorInvalid, CodeReceiptInvalid, CodeArtifactInvalid,
++		CodeProtectedBoundaryUntrusted, CodeUnverifiedOffline, CodeSignerPolicyUnsupported,
++		CodePackageSigningForbidden:
++		return FailureIntegrity
++	default:
++		return FailureUnknown
++	}
++}
++
++// TransportAttempt is one planned endpoint attempt: a closed-grammar URL
++// and the opaque operator provider reference that authenticates it. An
++// empty Authentication names no policy provider: the attempt uses the
++// existing lane credentials from the base request, which is the only
++// shape a URL declaration without a policy entry produces.
++type TransportAttempt struct {
++	URL            string
++	Authentication string
++}
++
++// TransportPlan is the ordered attempt plan for one declaration: one or
++// two attempts that canonicalize to Identity, and the effective fallback
++// mode after pin is applied.
++type TransportPlan struct {
++	Identity string
++	Attempts []TransportAttempt
++	Fallback string
++}
++
++// isLegacyShape reports the no-policy-entry shape: the declared URL once,
++// existing lane credentials, no fallback. A legacy failure keeps the
++// lane's own diagnostic exactly as a direct strict-lane call would.
++func (p TransportPlan) isLegacyShape() bool {
++	return len(p.Attempts) == 1 && p.Attempts[0].Authentication == "" && p.Fallback == TransportFallbackNone
++}
++
++// ValidateTransportPlan checks plan shape before any network I/O: one or
++// two attempts, distinct closed-grammar URLs that canonicalize to one
++// identity, a closed fallback mode, and opaque provider references that
++// are never commands or paths. Violations fail repository_policy_invalid:
++// a plan always derives from machine policy, so a malformed plan is a
++// malformed policy.
++func ValidateTransportPlan(plan TransportPlan) error {
++	_, err := parseTransportPlan(plan)
++	return err
++}
++
++// parseTransportPlan validates the plan and returns the parsed lane
++// sources in attempt order.
++func parseTransportPlan(plan TransportPlan) ([]Source, error) {
++	if len(plan.Attempts) < 1 || len(plan.Attempts) > 2 {
++		return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan requires one or two attempts")
++	}
++	if plan.Fallback != TransportFallbackNone && plan.Fallback != TransportFallbackAvailabilityAuth {
++		return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan requires fallback %q or %q", TransportFallbackNone, TransportFallbackAvailabilityAuth)
++	}
++	if plan.Identity == "" {
++		return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan requires a canonical identity")
++	}
++	sources := make([]Source, 0, len(plan.Attempts))
++	seen := map[string]bool{}
++	for index, attempt := range plan.Attempts {
++		parsed, err := ParseSource(attempt.URL)
++		if err != nil {
++			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d is outside the closed repository grammar", index+1)
++		}
++		if parsed.Identity != plan.Identity {
++			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d canonicalizes to %q, want %q", index+1, parsed.Identity, plan.Identity)
++		}
++		if seen[attempt.URL] {
++			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoints must be distinct URLs")
++		}
++		seen[attempt.URL] = true
++		if attempt.Authentication != "" && !gitcred.ValidProvider(attempt.Authentication) {
++			return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan endpoint %d authentication is not an opaque operator provider identifier", index+1)
++		}
++		sources = append(sources, parsed)
++	}
++	return sources, nil
++}
++
++// CodeRepositoryPolicyInvalid names the published malformed-policy class
++// for plan-shape violations. It shares its spelling with the policy
++// loader's diagnostic; both name the same §2 class.
++const CodeRepositoryPolicyInvalid = "repository_policy_invalid"
++
++// AuthProvider resolves one opaque policy provider reference to fetch
++// material for a single attempt. It is operator-owned: identifiers
++// resolve only through operator configuration, never through package
++// input, and never as commands or executable paths.
++//
++// ResolveHTTPS returns the credential the per-fetch broker answers with,
++// ErrProviderAnonymous when the provider is explicitly anonymous (offer
++// nothing), or ErrProviderUnavailable when the provider is unconfigured
++// or holds no usable HTTPS material. ResolveSSH returns the operator SSH
++// selection for the attempt, or ErrProviderUnavailable when the provider
++// holds none; SSH has no anonymous transport in this lane, so an
++// explicitly anonymous provider is unavailable for SSH. A nil error with
++// unselected credentials is treated as unavailable: a named provider
++// must yield material, name anonymity explicitly, or stay silent.
++type AuthProvider interface {
++	ResolveHTTPS(ctx context.Context, provider, host string) (HTTPSCredentials, error)
++	ResolveSSH(provider string) (OperatorSSHCredentials, error)
++}
++
++// Provider resolution outcomes.
++var (
++	ErrProviderAnonymous   = errors.New("authentication provider is explicitly anonymous")
++	ErrProviderUnavailable = errors.New("authentication provider holds no usable material")
++)
++
++// ProviderHTTPS is the operator's HTTPS configuration for one provider:
++// explicit anonymity, or a broker-held secret with an optional username.
++type ProviderHTTPS struct {
++	Username  string
++	Anonymous bool
++}
++
++// ProviderSSH is the operator's SSH configuration for one provider:
++// absolute identity, agent-socket, and known-hosts paths, admitted by
++// the existing SSH credential validator. Paths are validated, never
++// executed.
++type ProviderSSH struct {
++	Identity    string
++	AgentSocket string
++	KnownHosts  string
++}
++
++// Provider is one operator-configured authentication provider. A nil
++// transport entry means the provider offers no material for that
++// transport.
++type Provider struct {
++	HTTPS *ProviderHTTPS
++	SSH   *ProviderSSH
++}
++
++// ProviderSet is the operator-owned provider table, keyed by opaque
++// provider identifier. The manager populates it from operator
++// configuration; package input can neither add providers nor select
++// them, since plans carry only the identifier the policy named.
++type ProviderSet map[string]Provider
++
++func (s ProviderSet) get(provider string) (Provider, bool) {
++	if !gitcred.ValidProvider(provider) {
++		return Provider{}, false
++	}
++	entry, ok := s[provider]
++	return entry, ok
++}
++
++// ProviderSecretReader is the trusted-broker surface provider HTTPS
++// resolution reads through. gitcred.Access is its production
++// implementation: provider secrets stay in the existing broker.
++type ProviderSecretReader interface {
++	ReadProvider(ctx context.Context, provider, host string) (gitcred.HostCredential, bool)
++}
++
++// CredentialProviders resolves policy provider references against an
++// operator provider table, reading HTTPS secrets through the existing
++// trusted broker. A nil Reader or a nil Set resolves nothing: every
++// named provider is unavailable rather than ambient.
++type CredentialProviders struct {
++	Set    ProviderSet
++	Reader ProviderSecretReader
++}
++
++// ResolveHTTPS implements AuthProvider.
++func (c CredentialProviders) ResolveHTTPS(ctx context.Context, provider, host string) (HTTPSCredentials, error) {
++	entry, ok := c.Set.get(provider)
++	if !ok || entry.HTTPS == nil {
++		return HTTPSCredentials{}, ErrProviderUnavailable
++	}
++	if entry.HTTPS.Anonymous {
++		return HTTPSCredentials{}, ErrProviderAnonymous
++	}
++	if c.Reader == nil {
++		return HTTPSCredentials{}, ErrProviderUnavailable
++	}
++	material, ok := c.Reader.ReadProvider(ctx, provider, host)
++	if !ok {
++		return HTTPSCredentials{}, ErrProviderUnavailable
++	}
++	username := entry.HTTPS.Username
++	if username == "" {
++		username = material.Username
++	}
++	credentials := NewHTTPSCredentials(host, username, material.Secret)
++	if !credentials.Selected() {
++		return HTTPSCredentials{}, ErrProviderUnavailable
++	}
++	return credentials, nil
++}
++
++// ResolveSSH implements AuthProvider.
++func (c CredentialProviders) ResolveSSH(provider string) (OperatorSSHCredentials, error) {
++	entry, ok := c.Set.get(provider)
++	if !ok || entry.SSH == nil {
++		return OperatorSSHCredentials{}, ErrProviderUnavailable
++	}
++	admitted, err := ValidateOperatorSSHCredentials(OperatorSSHCredentials{
++		Identity: entry.SSH.Identity, AgentSocket: entry.SSH.AgentSocket, KnownHosts: entry.SSH.KnownHosts,
++	})
++	if err != nil || !admitted.Selected() {
++		return OperatorSSHCredentials{}, ErrProviderUnavailable
++	}
++	return admitted, nil
++}
++
++// AttemptRecord is the sanitized machine-private record of one planned
++// endpoint: which URL was attempted with which provider, what class it
++// failed with (empty on success), and whether any network traffic went
++// out. Records never carry stderr or secrets.
++type AttemptRecord struct {
++	Index int
++	URL   string
++	// Transport is the lane transport of the attempt ("https" or "ssh").
++	Transport string
++	// Provider is the opaque operator provider identifier, "" when the
++	// attempt used existing lane credentials.
++	Provider string
++	// Class is the §2 failure class, "" when the attempt succeeded.
++	Class FailureClass
++	// NetworkAttempted reports whether a fetch went out. A provider
++	// with no usable material records its auth failure with no traffic.
++	NetworkAttempted bool
++	Succeeded        bool
++}
++
++// TransportTrace receives one AttemptRecord per planned endpoint, in
++// attempt order, including the successful attempt. The caller stores
++// records in machine-private operation diagnostics, separately from
++// portable identity. A nil trace records nothing.
++type TransportTrace func(AttemptRecord)
++
++// AcquireNetworkResolved acquires one locked source through a bounded
++// transport plan: at most one strict-lane fetch per listed endpoint
++// within the lane's single total deadline.
++//
++// base carries the lock, exact tag, substitution refs, limits, and — for
++// attempts without a policy provider — the existing lane credentials.
++// The plan's identity must equal the base source identity: the alternate
++// endpoint proves the same repository, never another one. providers
++// resolves named provider references; it may be nil when no attempt
++// names a provider. trace receives the sanitized per-endpoint records.
++//
++// Every fetching attempt runs the same strict-lane admission as
++// AcquireNetwork under the shared deadline, so a resolved acquisition
++// refuses exactly what the lane refuses. Every SSH attempt additionally
++// binds its endpoint and its selected credentials into a real wrapper
++// policy; the fetch then runs behind a per-attempt wrapper pinned to
++// that policy instead of the tool's static wrapper.
++//
++// Success returns the proved snapshot: full locked object, exact tag
++// when declared, objects, and snapshot, verified independently of which
++// endpoint served them. A policy-plan exhaustion returns
++// repository_endpoint_unavailable with sanitized classifications and
++// remediation. Any fail-closed class returns the lane's own diagnostic
++// unchanged, with no further network traffic. A legacy-shape plan (one
++// attempt, no provider, no fallback) behaves exactly like AcquireNetwork.
++func AcquireNetworkResolved(ctx context.Context, base NetworkRequest, plan TransportPlan, providers AuthProvider, trace TransportTrace) (*Snapshot, error) {
++	sources, err := parseTransportPlan(plan)
++	if err != nil {
++		return nil, err
++	}
++	if plan.Identity != base.Source.Identity {
++		return nil, admissionError(CodeRepositoryPolicyInvalid, "transport plan identity %q does not match acquisition identity %q", plan.Identity, base.Source.Identity)
++	}
++	limits := normalizedLimits(base.Limits)
++	ctx, cancel := context.WithTimeout(ctx, limits.Timeout)
++	defer cancel()
++
++	records := make([]AttemptRecord, 0, len(plan.Attempts))
++	emit := func(record AttemptRecord) {
++		records = append(records, record)
++		if trace != nil {
++			trace(record)
++		}
++	}
++	// refuse records one attempt that ended before any fetch traffic —
++	// a lane admission refusal or an unbindable SSH policy — and gates
++	// the plan on its class.
++	refuse := func(record *AttemptRecord, err error) (bool, error) {
++		record.Class, record.NetworkAttempted = classifyAttemptError(ctx, err), false
++		emit(*record)
++		return gateTransportAttempt(ctx, plan, records, record.Class, laneDiagnostic(err))
++	}
++	for index, attempt := range plan.Attempts {
++		record := AttemptRecord{Index: index + 1, URL: attempt.URL, Transport: sources[index].Transport, Provider: attempt.Authentication}
++		request := base
++		request.Source = sources[index]
++		request.sshPolicy = nil
++		if attempt.Authentication != "" {
++			bound, skip := bindProviderAttempt(ctx, request.Tool, sources[index], attempt.Authentication, providers)
++			if skip != nil {
++				record.Class, record.NetworkAttempted = skip.class, false
++				emit(record)
++				if done, terminal := gateTransportAttempt(ctx, plan, records, record.Class, nil); done {
++					return nil, terminal
++				}
++				continue
++			}
++			request.Tool = bound
++		}
++		if err := admitNetworkRequest(ctx, request); err != nil {
++			if done, terminal := refuse(&record, err); done {
++				return nil, terminal
++			}
++			continue
++		}
++		if sources[index].Transport == "ssh" {
++			policy, err := bindSSHWrapperPolicy(request.Tool, sources[index])
++			if err != nil {
++				if done, terminal := refuse(&record, err); done {
++					return nil, terminal
++				}
++				continue
++			}
++			request.sshPolicy = &policy
++		}
++		snapshot, attemptErr := acquireNetworkFormat(ctx, request, limits)
++		if attemptErr == nil {
++			record.NetworkAttempted, record.Succeeded = true, true
++			emit(record)
++			return snapshot, nil
++		}
++		record.NetworkAttempted = true
++		record.Class = classifyAttemptError(ctx, attemptErr)
++		emit(record)
++		if done, terminal := gateTransportAttempt(ctx, plan, records, record.Class, laneDiagnostic(attemptErr)); done {
++			return nil, terminal
++		}
++	}
++	// The loop always returns: a one-attempt plan terminates on its
++	// attempt, and a two-attempt plan terminates on its second.
++	return nil, admissionError(CodeSourceUnavailable, "exact source fetch failed")
++}
++
++// providerSkip records an endpoint whose provider yielded no usable
++// material: an auth-method failure with no network traffic.
++type providerSkip struct {
++	class FailureClass
++}
++
++// bindProviderAttempt binds one named provider's material for one
++// endpoint attempt. It returns the bound tool, or a skip when the
++// provider offers nothing usable for the attempt's transport. Binding
++// replaces lane credentials rather than merging: a named provider is
++// the attempt's only authentication, and an explicitly anonymous HTTPS
++// provider offers nothing even when the base request carries a secret.
++func bindProviderAttempt(ctx context.Context, tool GitTool, source Source, provider string, providers AuthProvider) (GitTool, *providerSkip) {
++	skip := &providerSkip{class: FailureAuth}
++	if providers == nil {
++		return GitTool{}, skip
++	}
++	switch source.Transport {
++	case "https":
++		credentials, err := providers.ResolveHTTPS(ctx, provider, sourceHost(source))
++		if err != nil {
++			if errors.Is(err, ErrProviderAnonymous) {
++				tool.HTTPSCredentials = HTTPSCredentials{}
++				return tool, nil
++			}
++			return GitTool{}, skip
++		}
++		if !credentials.Selected() || credentials.Host != sourceHost(source) {
++			return GitTool{}, skip
++		}
++		tool.HTTPSCredentials = credentials
++		return tool, nil
++	case "ssh":
++		credentials, err := providers.ResolveSSH(provider)
++		if err != nil || !credentials.Selected() {
++			return GitTool{}, skip
++		}
++		tool.SSHCredentials = credentials
++		return tool, nil
++	default:
++		return GitTool{}, &providerSkip{class: FailureIdentity}
++	}
++}
++
++// sourceHost is the canonical host of a parsed lane source.
++func sourceHost(source Source) string {
++	host, _, _ := strings.Cut(source.Identity, "/")
++	return host
++}
++
++// classifyAttemptError maps one failed strict-lane attempt to its §2
++// class. A fetch failure classifies from its stderr unless the retained
++// output is incomplete or the shared deadline (or cancellation) fired: a
++// truncated diagnostic prefix and a locally expired clock are not
++// positive endpoint classifications, so both fail closed as unknown.
++// Post-fetch lane failures classify deterministically by admission code.
++func classifyAttemptError(ctx context.Context, attemptErr error) FailureClass {
++	var fetch *fetchError
++	if errors.As(attemptErr, &fetch) {
++		if fetch.truncated || ctx.Err() != nil {
++			return FailureUnknown
++		}
++		return ClassifyFetchOutput(fetch.stderr)
++	}
++	if code := ErrorCode(attemptErr); code != "" {
++		return ClassifyAdmissionCode(code)
++	}
++	return FailureUnknown
++}
++
++// gateTransportAttempt decides whether a failed attempt ends the plan.
++// It reports done with the terminal error when no further attempt is
++// allowed: exhaustion for a policy plan whose last failure is
++// fallback-eligible, otherwise the lane's own diagnostic unchanged.
++func gateTransportAttempt(ctx context.Context, plan TransportPlan, records []AttemptRecord, class FailureClass, laneErr error) (bool, error) {
++	if AllowSecondAttempt(plan.Fallback, class) && len(records) < len(plan.Attempts) && ctx.Err() == nil {
++		return false, nil
++	}
++	if !plan.isLegacyShape() && (class == FailureAvailability || class == FailureAuth) {
++		return true, exhaustionError(plan, records, ctx.Err() != nil)
++	}
++	if laneErr != nil {
++		return true, laneErr
++	}
++	// Unreachable through the executor: only provider skips record a
++	// failure without a lane error, and skips always carry the auth
++	// class, which exhausts above. Fail closed with the lane's fetch
++	// diagnostic rather than inventing one.
++	return true, admissionError(CodeSourceUnavailable, "exact source fetch failed")
++}
++
++// exhaustionError builds the sanitized repository_endpoint_unavailable
++// diagnostic: one closed-vocabulary clause per attempted endpoint, a
++// deadline note when the shared clock expired before the plan ran out,
++// and operator remediation. Attempt order, transports, provider
++// identifiers, and the stable identity are included; stderr, secrets,
++// and full URLs are not.
++func exhaustionError(plan TransportPlan, records []AttemptRecord, deadlineExpired bool) error {
++	clauses := make([]string, 0, len(plan.Attempts))
++	for _, record := range records {
++		clause := fmt.Sprintf("endpoint %d (%s", record.Index, record.Transport)
++		if record.Provider != "" {
++			clause += fmt.Sprintf(", provider %q", record.Provider)
++		}
++		clause += "): "
++		if !record.NetworkAttempted {
++			clause += "no fetch attempted: " + FailureAuth.failureReason()
++		} else {
++			clause += string(record.Class) + ": " + record.Class.failureReason()
++		}
++		clauses = append(clauses, clause)
++	}
++	for index := len(records); index < len(plan.Attempts); index++ {
++		note := "not attempted"
++		if deadlineExpired {
++			note += " (total deadline expired)"
++		}
++		clauses = append(clauses, fmt.Sprintf("endpoint %d: %s", index+1, note))
++	}
++	detail := strings.Join(clauses, "; ")
++	return admissionError(CodeRepositoryEndpointUnavailable,
++		"%s: %s; verify the network path and operator authentication for the listed endpoints, then retry with machine source-policy.json", plan.Identity, detail)
++}
+diff --git a/internal/buildrepo/transport_test.go b/internal/buildrepo/transport_test.go
+new file mode 100644
+index 0000000..9b21f5f
+--- /dev/null
++++ b/internal/buildrepo/transport_test.go
+@@ -0,0 +1,1720 @@
++package buildrepo
++
++import (
++	"bytes"
++	"context"
++	"errors"
++	"fmt"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/relux-works/curator/internal/gitcred"
++)
++
++// TestSemanticFallbackGateDecidesAllPublishedCases drives the §2 fallback
++// gate through every published fallback/pin semantic case: the two
++// fallback-eligible first failures advance, and every fail-closed row —
++// TLS, host-key, integrity, identity, ref, audit, unknown, unreadable
++// policy, ambiguous 404 — stops with no second attempt.
++func TestSemanticFallbackGateDecidesAllPublishedCases(t *testing.T) {
++	published := []struct {
++		id       string
++		expected string
++	}{
++		{"fallback-dns", "attempt-second"},
++		{"fallback-auth-rejected", "attempt-second"},
++		{"fallback-tls", "stop-no-second-attempt"},
++		{"fallback-host-key", "stop-no-second-attempt"},
++		{"fallback-integrity", "stop-no-second-attempt"},
++		{"fallback-identity", "stop-no-second-attempt"},
++		{"fallback-ref-moved", "stop-no-second-attempt"},
++		{"fallback-audit", "stop-no-second-attempt"},
++		{"fallback-unknown", "stop-no-second-attempt"},
++		{"fallback-policy-unreadable", "stop-no-second-attempt"},
++		{"fallback-http-404", "stop-no-second-attempt"},
++	}
++	for _, publishedCase := range published {
++		t.Run(publishedCase.id, func(t *testing.T) {
++			token := strings.TrimPrefix(publishedCase.id, "fallback-")
++			class, ok := SemanticFailureClass(token)
++			if !ok {
++				t.Fatalf("semantic token %q has no failure class", token)
++			}
++			advance := AllowSecondAttempt(TransportFallbackAvailabilityAuth, class)
++			want := publishedCase.expected == "attempt-second"
++			if advance != want {
++				t.Fatalf("gate(%q) advance = %v, want %v", token, advance, want)
++			}
++		})
++	}
++	// pinned-auth: pin forces FallbackNone at plan time, so even an
++	// auth rejection stops. fallback:none never advances by class.
++	if AllowSecondAttempt(TransportFallbackNone, FailureAuth) {
++		t.Fatal("fallback none advanced past an auth rejection")
++	}
++	if AllowSecondAttempt(TransportFallbackNone, FailureAvailability) {
++		t.Fatal("fallback none advanced past an availability failure")
++	}
++	if AllowSecondAttempt("sometimes", FailureAuth) {
++		t.Fatal("unknown fallback mode advanced past an auth rejection")
++	}
++	if _, ok := SemanticFailureClass("no-such-token"); ok {
++		t.Fatal("unknown semantic token mapped to a class")
++	}
++}
++
++func TestClassifyFetchOutput(t *testing.T) {
++	for _, testCase := range []struct {
++		name   string
++		stderr string
++		want   FailureClass
++	}{
++		{"dns", "fatal: unable to access 'https://git.example.org/kit.git/': Could not resolve host: git.example.org", FailureAvailability},
++		{"dns-temporary", "ssh: Could not resolve hostname git.example.org: Temporary failure in name resolution", FailureAvailability},
++		{"connection-refused", "ssh: connect to host git.example.org port 22: Connection refused", FailureAvailability},
++		{"connection-timeout", "fatal: unable to access 'https://git.example.org/kit.git/': Operation timed out after 30000 milliseconds with 0 bytes received", FailureAvailability},
++		{"network-unreachable", "fatal: unable to access 'https://git.example.org/kit.git/': Failed to connect to git.example.org: Network is unreachable", FailureAvailability},
++		{"http-502", "fatal: unable to access 'https://git.example.org/kit.git/': The requested URL returned error: 502", FailureAvailability},
++		{"http-503", "error: RPC failed; HTTP 503 curl 22 The requested URL returned error: 503", FailureAvailability},
++		{"http-504", "fatal: unable to access 'https://git.example.org/kit.git/': The requested URL returned error: 504", FailureAvailability},
++		{"http-401", "fatal: unable to access 'https://git.example.org/kit.git/': The requested URL returned error: 401", FailureAuth},
++		{"http-403", "fatal: unable to access 'https://git.example.org/kit.git/': The requested URL returned error: 403", FailureAuth},
++		{"https-auth-failed", "fatal: Authentication failed for 'https://git.example.org/kit.git/'", FailureAuth},
++		{"ssh-permission-denied", "git@git.example.org: Permission denied (publickey).", FailureAuth},
++		{"remote-invalid-password", "remote: Invalid username or password.", FailureAuth},
++		{"remote-permission-denied", "remote: Permission to acme/kit.git denied to deploy-key.", FailureAuth},
++		{"tls-issuer", "fatal: unable to access 'https://git.example.org/kit.git/': SSL certificate problem: unable to get local issuer certificate", FailureTLS},
++		{"tls-self-signed", "fatal: unable to access 'https://git.example.org/kit.git/': SSL certificate problem: self signed certificate", FailureTLS},
++		{"tls-schannel", "fatal: unable to access 'https://git.example.org/kit.git/': schannel: failed to receive handshake, SSL/TLS connection failed", FailureTLS},
++		{"tls-beats-timeout", "fatal: unable to access 'https://git.example.org/kit.git/': OpenSSL SSL_connect: Connection timed out", FailureTLS},
++		{"host-key", "Host key verification failed.", FailureHostKey},
++		{"host-key-changed", "WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!", FailureHostKey},
++		{"host-key-beats-auth", "Host key verification failed.\nPermission denied (publickey).", FailureHostKey},
++		{"redirect-forbidden", "fatal: unable to access 'https://git.example.org/kit.git/': Redirection from https://git.example.org/kit.git to https://evil.example.org/kit.git is forbidden", FailureIdentity},
++		{"remote-ref-missing", "fatal: couldn't find remote ref refs/heads/no-such-branch", FailureRef},
++		{"http-404", "fatal: unable to access 'https://git.example.org/kit.git/': The requested URL returned error: 404", FailureHTTP404},
++		{"github-repository-not-found", "remote: Repository not found.", FailureHTTP404},
++		{"empty", "", FailureUnknown},
++		{"unfamiliar", "fatal: something entirely new from a future git", FailureUnknown},
++		{"bare-numbers-are-not-statuses", "remote: Enumerating objects: 1502, done.\nremote: Total 502 (delta 0), reused 0", FailureUnknown},
++		{"reset-is-not-refused", "fatal: unable to access 'https://git.example.org/kit.git/': Recv failure: Connection reset by peer", FailureUnknown},
++		{"ambiguous-view-grant", "remote: The project you were looking for could not be found or you don't have permission to view it.", FailureUnknown},
++		{"access-denied-stays-unknown", "fatal: unable to access 'https://git.example.org/kit.git/': Access denied", FailureUnknown},
++		{"secret-bearing-still-classifies", "fatal: unable to access 'https://x/': Could not resolve host: x (saw SUPERSECRETPROVIDER9)", FailureAvailability},
++		{"bare-permission-denied-is-local", "fatal: cannot create temporary file: Permission denied", FailureUnknown},
++		{"os-error-paren-stays-unknown", "fatal: cannot create directory: Permission denied (os error 13)", FailureUnknown},
++		{"ssh-method-list-still-auth", "Permission denied (publickey,keyboard-interactive).", FailureAuth},
++		{"integrity-beats-timeout", "error: object hash mismatch\nfatal: connection timed out", FailureIntegrity},
++		{"integrity-corrupt", "fatal: fsck error: object abc is corrupted", FailureIntegrity},
++		{"integrity-checksum", "error: checksum mismatch for object 0123456789abcdef", FailureIntegrity},
++		{"audit-beats-timeout", "remote: audit denied: operation timed out", FailureAudit},
++		{"audit-revoked", "remote: key is revoked: access denied", FailureAudit},
++		{"audit-canary", "remote: canary check failed for this repository", FailureAudit},
++		{"audit-beats-auth", "remote: assurance failure: invalid credentials presented", FailureAudit},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			if got := ClassifyFetchOutput(testCase.stderr); got != testCase.want {
++				t.Fatalf("ClassifyFetchOutput = %q, want %q", got, testCase.want)
++			}
++		})
++	}
++}
++
++func TestClassifyAdmissionCode(t *testing.T) {
++	for code, want := range map[string]FailureClass{
++		CodeRefMoved:               FailureRef,
++		CodeIncompleteSource:       FailureIntegrity,
++		CodeObjectSemanticsInvalid: FailureIntegrity,
++		CodeLFSUnsupported:         FailureIntegrity,
++		CodeIdentityInvalid:        FailureIdentity,
++		CodeLocalLayoutUnsafe:      FailureIdentity,
++		CodeSSHCredentialMissing:   FailureAuth,
++		CodeAuditBlocked:           FailureAudit,
++		CodeDescriptorInvalid:      FailureIntegrity,
++		CodeSourceUnavailable:      FailureUnknown,
++		CodeUnverifiedOffline:      FailureIntegrity,
++		"no-such-code":             FailureUnknown,
++		"":                         FailureUnknown,
++	} {
++		if got := ClassifyAdmissionCode(code); got != want {
++			t.Errorf("ClassifyAdmissionCode(%q) = %q, want %q", code, got, want)
++		}
++	}
++}
++
++func TestValidateTransportPlan(t *testing.T) {
++	valid := []TransportPlan{
++		{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "https://fixture.test/repository.git"}}, Fallback: TransportFallbackNone},
++		{Identity: "fixture.test/repository", Attempts: []TransportAttempt{
++			{URL: "https://fixture.test/repository.git", Authentication: "https-prov"},
++			{URL: "ssh://git@fixture.test/repository.git", Authentication: "ssh-prov"},
++		}, Fallback: TransportFallbackAvailabilityAuth},
++		{Identity: "fixture.test/repository", Attempts: []TransportAttempt{
++			{URL: "git@fixture.test:repository.git", Authentication: "ssh-prov"},
++			{URL: "https://fixture.test/repository", Authentication: "https-prov"},
++		}, Fallback: TransportFallbackNone},
++	}
++	for index, plan := range valid {
++		if err := ValidateTransportPlan(plan); err != nil {
++			t.Errorf("valid plan %d: %v", index, err)
++		}
++	}
++	invalid := []struct {
++		name string
++		plan TransportPlan
++	}{
++		{"no-attempts", TransportPlan{Identity: "fixture.test/repository", Fallback: TransportFallbackNone}},
++		{"three-attempts", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{
++			{URL: "https://fixture.test/repository.git"},
++			{URL: "ssh://git@fixture.test/repository.git"},
++			{URL: "git@fixture.test:repository.git"},
++		}, Fallback: TransportFallbackNone}},
++		{"unknown-fallback", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "https://fixture.test/repository.git"}}, Fallback: "sometimes"}},
++		{"empty-fallback", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "https://fixture.test/repository.git"}}}},
++		{"empty-identity", TransportPlan{Attempts: []TransportAttempt{{URL: "https://fixture.test/repository.git"}}, Fallback: TransportFallbackNone}},
++		{"bad-grammar", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "https://fixture.test/has space.git"}}, Fallback: TransportFallbackNone}},
++		{"file-protocol", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "file:///tmp/repository.git"}}, Fallback: TransportFallbackNone}},
++		{"identity-mismatch", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "https://evil.test/repository.git"}}, Fallback: TransportFallbackNone}},
++		{"cross-identity-pair", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{
++			{URL: "https://fixture.test/repository.git"},
++			{URL: "https://fixture.test/other.git"},
++		}, Fallback: TransportFallbackAvailabilityAuth}},
++		{"duplicate-urls", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{
++			{URL: "https://fixture.test/repository.git", Authentication: "one"},
++			{URL: "https://fixture.test/repository.git", Authentication: "two"},
++		}, Fallback: TransportFallbackAvailabilityAuth}},
++		{"command-provider", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "https://fixture.test/repository.git", Authentication: "/bin/sh"}}, Fallback: TransportFallbackNone}},
++		{"path-provider", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "https://fixture.test/repository.git", Authentication: "../escape"}}, Fallback: TransportFallbackNone}},
++		{"space-provider", TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: "https://fixture.test/repository.git", Authentication: "team ssh"}}, Fallback: TransportFallbackNone}},
++	}
++	for _, testCase := range invalid {
++		t.Run(testCase.name, func(t *testing.T) {
++			err := ValidateTransportPlan(testCase.plan)
++			if err == nil {
++				t.Fatal("invalid plan validated")
++			}
++			if ErrorCode(err) != CodeRepositoryPolicyInvalid {
++				t.Fatalf("error = %v, want %s", err, CodeRepositoryPolicyInvalid)
++			}
++		})
++	}
++}
++
++// stubProviderReader is an in-memory trusted broker for provider tests.
++type stubProviderReader struct {
++	credentials map[string]gitcred.HostCredential
++	calls       int
++}
++
++func (s *stubProviderReader) ReadProvider(_ context.Context, provider, host string) (gitcred.HostCredential, bool) {
++	s.calls++
++	credential, ok := s.credentials[provider+"\x00"+host]
++	return credential, ok
++}
++
++func TestCredentialProvidersResolveHTTPS(t *testing.T) {
++	ctx := context.Background()
++	reader := &stubProviderReader{credentials: map[string]gitcred.HostCredential{
++		"team-https\x00git.example.org": {Username: "broker-user", Secret: "broker-secret"},
++	}}
++	set := ProviderSet{
++		"team-https": {HTTPS: &ProviderHTTPS{}},
++		"named-user": {HTTPS: &ProviderHTTPS{Username: "entry-user"}},
++		"anon":       {HTTPS: &ProviderHTTPS{Anonymous: true}},
++		"ssh-only":   {SSH: &ProviderSSH{}},
++	}
++	providers := CredentialProviders{Set: set, Reader: reader}
++
++	resolved, err := providers.ResolveHTTPS(ctx, "team-https", "git.example.org")
++	if err != nil {
++		t.Fatalf("ResolveHTTPS: %v", err)
++	}
++	if !resolved.Selected() || resolved.Host != "git.example.org" || resolved.Username != "broker-user" || resolved.secret != "broker-secret" {
++		t.Fatalf("ResolveHTTPS = %+v", resolved)
++	}
++	// The broker holds no named-user entry: the entry username alone
++	// authenticates nothing.
++	if _, err := providers.ResolveHTTPS(ctx, "named-user", "git.example.org"); !errors.Is(err, ErrProviderUnavailable) {
++		t.Fatalf("ResolveHTTPS without broker material = %v, want unavailable", err)
++	}
++	reader.credentials["named-user\x00git.example.org"] = gitcred.HostCredential{Username: "broker-user", Secret: "s"}
++	resolved, err = providers.ResolveHTTPS(ctx, "named-user", "git.example.org")
++	if err != nil || resolved.Username != "entry-user" {
++		t.Fatalf("ResolveHTTPS named-user = %+v, %v", resolved, err)
++	}
++
++	before := reader.calls
++	if _, err := providers.ResolveHTTPS(ctx, "anon", "git.example.org"); !errors.Is(err, ErrProviderAnonymous) {
++		t.Fatalf("anonymous provider = %v, want anonymous", err)
++	}
++	if reader.calls != before {
++		t.Fatal("anonymous resolution touched the credential broker")
++	}
++	for _, provider := range []string{"missing", "ssh-only", "../escape", ""} {
++		if _, err := providers.ResolveHTTPS(ctx, provider, "git.example.org"); !errors.Is(err, ErrProviderUnavailable) {
++			t.Fatalf("ResolveHTTPS(%q) = %v, want unavailable", provider, err)
++		}
++	}
++	brokerless := CredentialProviders{Set: set}
++	if _, err := brokerless.ResolveHTTPS(ctx, "team-https", "git.example.org"); !errors.Is(err, ErrProviderUnavailable) {
++		t.Fatalf("brokerless ResolveHTTPS = %v, want unavailable", err)
++	}
++	var nilSet CredentialProviders
++	if _, err := nilSet.ResolveHTTPS(ctx, "team-https", "git.example.org"); !errors.Is(err, ErrProviderUnavailable) {
++		t.Fatalf("nil-set ResolveHTTPS = %v, want unavailable", err)
++	}
++}
++
++func TestCredentialProvidersResolveSSH(t *testing.T) {
++	identity := filepath.Join(t.TempDir(), "id_example")
++	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
++	if err := os.WriteFile(identity, []byte("key"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(knownHosts, []byte("hosts"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	set := ProviderSet{
++		"team-ssh":   {SSH: &ProviderSSH{Identity: identity, KnownHosts: knownHosts}},
++		"dangling":   {SSH: &ProviderSSH{Identity: filepath.Join(t.TempDir(), "absent"), KnownHosts: knownHosts}},
++		"relative":   {SSH: &ProviderSSH{Identity: "relative/path", KnownHosts: knownHosts}},
++		"hosts-only": {SSH: &ProviderSSH{KnownHosts: knownHosts}},
++		"https-only": {HTTPS: &ProviderHTTPS{Anonymous: true}},
++	}
++	providers := CredentialProviders{Set: set}
++	resolved, err := providers.ResolveSSH("team-ssh")
++	if err != nil {
++		t.Fatalf("ResolveSSH: %v", err)
++	}
++	if !resolved.Selected() || resolved.Identity == "" || resolved.KnownHosts == "" {
++		t.Fatalf("ResolveSSH = %+v", resolved)
++	}
++	for _, provider := range []string{"missing", "dangling", "relative", "hosts-only", "https-only", "../escape", ""} {
++		if _, err := providers.ResolveSSH(provider); !errors.Is(err, ErrProviderUnavailable) {
++			t.Fatalf("ResolveSSH(%q) = %v, want unavailable", provider, err)
++		}
++	}
++}
++
++// stubAuthProvider is a scripted AuthProvider for executor binding tests.
++type stubAuthProvider struct {
++	https     map[string]HTTPSCredentials
++	httpsErr  map[string]error
++	ssh       map[string]OperatorSSHCredentials
++	sshErr    map[string]error
++	httpsCall []string
++	sshCall   []string
++}
++
++func (s *stubAuthProvider) ResolveHTTPS(_ context.Context, provider, host string) (HTTPSCredentials, error) {
++	s.httpsCall = append(s.httpsCall, provider+"\x00"+host)
++	if err, ok := s.httpsErr[provider]; ok {
++		return HTTPSCredentials{}, err
++	}
++	return s.https[provider], nil
++}
++
++func (s *stubAuthProvider) ResolveSSH(provider string) (OperatorSSHCredentials, error) {
++	s.sshCall = append(s.sshCall, provider)
++	if err, ok := s.sshErr[provider]; ok {
++		return OperatorSSHCredentials{}, err
++	}
++	return s.ssh[provider], nil
++}
++
++func TestBindProviderAttempt(t *testing.T) {
++	ctx := context.Background()
++	httpsSource, err := ParseSource("https://fixture.test/repository.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	sshSource, err := ParseSource("ssh://git@fixture.test/repository.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	decoy := GitTool{HTTPSCredentials: NewHTTPSCredentials("fixture.test", "decoy-user", "DECOY-SECRET")}
++
++	t.Run("https-binds-provider-material-over-lane-credentials", func(t *testing.T) {
++		stub := &stubAuthProvider{https: map[string]HTTPSCredentials{
++			"p": NewHTTPSCredentials("fixture.test", "prov-user", "PROVIDER-SECRET"),
++		}}
++		bound, skip := bindProviderAttempt(ctx, decoy, httpsSource, "p", stub)
++		if skip != nil {
++			t.Fatal("provider material skipped")
++		}
++		if bound.HTTPSCredentials.Username != "prov-user" {
++			t.Fatalf("bound username = %q", bound.HTTPSCredentials.Username)
++		}
++		if len(stub.httpsCall) != 1 || stub.httpsCall[0] != "p\x00fixture.test" {
++			t.Fatalf("resolve calls = %q", stub.httpsCall)
++		}
++	})
++
++	t.Run("https-anonymous-clears-lane-credentials", func(t *testing.T) {
++		stub := &stubAuthProvider{httpsErr: map[string]error{"anon": ErrProviderAnonymous}}
++		bound, skip := bindProviderAttempt(ctx, decoy, httpsSource, "anon", stub)
++		if skip != nil {
++			t.Fatal("anonymous provider skipped")
++		}
++		if bound.HTTPSCredentials.Selected() {
++			t.Fatalf("anonymous attempt kept credentials: %+v", bound.HTTPSCredentials)
++		}
++	})
++
++	t.Run("https-unavailable-skips-without-traffic", func(t *testing.T) {
++		stub := &stubAuthProvider{httpsErr: map[string]error{"p": ErrProviderUnavailable}}
++		_, skip := bindProviderAttempt(ctx, decoy, httpsSource, "p", stub)
++		if skip == nil || skip.class != FailureAuth {
++			t.Fatalf("skip = %+v, want auth", skip)
++		}
++		_, skip = bindProviderAttempt(ctx, decoy, httpsSource, "p", nil)
++		if skip == nil || skip.class != FailureAuth {
++			t.Fatalf("nil-provider skip = %+v, want auth", skip)
++		}
++	})
++
++	t.Run("https-unselected-or-foreign-host-skips", func(t *testing.T) {
++		stub := &stubAuthProvider{https: map[string]HTTPSCredentials{
++			"empty":   {},
++			"foreign": NewHTTPSCredentials("other.test", "u", "s"),
++		}}
++		for _, provider := range []string{"empty", "foreign"} {
++			if _, skip := bindProviderAttempt(ctx, decoy, httpsSource, provider, stub); skip == nil {
++				t.Fatalf("provider %q bound without usable material", provider)
++			}
++		}
++	})
++
++	t.Run("ssh-binds-selection", func(t *testing.T) {
++		stub := &stubAuthProvider{ssh: map[string]OperatorSSHCredentials{
++			"p": {Identity: "/abs/id", KnownHosts: "/abs/kh"},
++		}}
++		bound, skip := bindProviderAttempt(ctx, GitTool{}, sshSource, "p", stub)
++		if skip != nil {
++			t.Fatal("SSH selection skipped")
++		}
++		if !bound.SSHCredentials.Selected() || bound.SSHCredentials.Identity != "/abs/id" {
++			t.Fatalf("bound SSH = %+v", bound.SSHCredentials)
++		}
++	})
++
++	t.Run("ssh-unavailable-or-unselected-skips", func(t *testing.T) {
++		stub := &stubAuthProvider{
++			ssh:    map[string]OperatorSSHCredentials{"empty": {}},
++			sshErr: map[string]error{"missing": ErrProviderUnavailable},
++		}
++		for _, provider := range []string{"empty", "missing"} {
++			if _, skip := bindProviderAttempt(ctx, GitTool{}, sshSource, provider, stub); skip == nil || skip.class != FailureAuth {
++				t.Fatalf("provider %q skip = %+v, want auth", provider, skip)
++			}
++		}
++	})
++
++	t.Run("unknown-transport-fails-closed", func(t *testing.T) {
++		stub := &stubAuthProvider{}
++		_, skip := bindProviderAttempt(ctx, GitTool{}, Source{Git: "x", Identity: "fixture.test/repository", Transport: "file"}, "p", stub)
++		if skip == nil || skip.class != FailureIdentity {
++			t.Fatalf("skip = %+v, want identity", skip)
++		}
++	})
++}
++
++// blockingProvider never answers: resolution returns only when the
++// caller's context expires. It proves the shared deadline gates the
++// second attempt without any fetch traffic.
++type blockingProvider struct{}
++
++func (blockingProvider) ResolveHTTPS(ctx context.Context, _ string, _ string) (HTTPSCredentials, error) {
++	<-ctx.Done()
++	return HTTPSCredentials{}, ErrProviderUnavailable
++}
++
++func (blockingProvider) ResolveSSH(_ string) (OperatorSSHCredentials, error) {
++	return OperatorSSHCredentials{}, ErrProviderUnavailable
++}
++
++func TestResolvedTransportSharedDeadlineStopsSecondAttempt(t *testing.T) {
++	source, err := ParseSource("https://fixture.test/repository.git")
++	if err != nil {
++		t.Fatal(err)
++	}
++	plan := TransportPlan{
++		Identity: source.Identity,
++		Attempts: []TransportAttempt{
++			{URL: "https://fixture.test/repository.git", Authentication: "slow"},
++			{URL: "ssh://git@fixture.test/repository.git", Authentication: "slow"},
++		},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	base := NetworkRequest{
++		Source: source,
++		Lock:   LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)},
++		Limits: Limits{Timeout: 200 * time.Millisecond},
++	}
++	var records []AttemptRecord
++	start := time.Now()
++	_, err = AcquireNetworkResolved(context.Background(), base, plan, blockingProvider{}, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	elapsed := time.Since(start)
++	if err == nil {
++		t.Fatal("expired plan succeeded")
++	}
++	if ErrorCode(err) != CodeRepositoryEndpointUnavailable {
++		t.Fatalf("error = %v, want %s", err, CodeRepositoryEndpointUnavailable)
++	}
++	if !strings.Contains(err.Error(), "not attempted (total deadline expired)") {
++		t.Fatalf("error names no expired deadline: %v", err)
++	}
++	if len(records) != 1 || records[0].NetworkAttempted || records[0].Class != FailureAuth {
++		t.Fatalf("records = %+v, want one traffic-free auth record", records)
++	}
++	if elapsed > 10*time.Second {
++		t.Fatalf("elapsed %v exceeds any shared deadline", elapsed)
++	}
++}
++
++func TestExhaustionErrorIsClosedVocabulary(t *testing.T) {
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{
++			{URL: "https://fixture.test/repository.git", Authentication: "https-prov"},
++			{URL: "ssh://git@fixture.test/repository.git", Authentication: "ssh-prov"},
++		},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	records := []AttemptRecord{
++		{Index: 1, URL: plan.Attempts[0].URL, Transport: "https", Provider: "https-prov", Class: FailureAvailability, NetworkAttempted: true},
++		{Index: 2, URL: plan.Attempts[1].URL, Transport: "ssh", Provider: "ssh-prov", Class: FailureAuth, NetworkAttempted: true},
++	}
++	message := exhaustionError(plan, records, false).Error()
++	for _, want := range []string{
++		CodeRepositoryEndpointUnavailable, "fixture.test/repository",
++		"endpoint 1 (https", "availability", "endpoint 2 (ssh",
++		"provider \"ssh-prov\"", "auth", "source-policy.json",
++	} {
++		if !strings.Contains(message, want) {
++			t.Errorf("exhaustion %q lacks %q", message, want)
++		}
++	}
++	for _, forbidden := range []string{"https://", "ssh://", ".git", "\n"} {
++		if strings.Contains(message, forbidden) {
++			t.Errorf("exhaustion %q contains %q", message, forbidden)
++		}
++	}
++}
++
++// --- bounded-resolution executor tests ---
++//
++// The executor is driven through its production entry point,
++// AcquireNetworkResolved, against a stand-in git: a POSIX shell wrapper
++// around the real git that fails a fetch with fixture stderr or rewrites
++// it to a local fixture repository. Everything else — tool validation,
++// private-state initialization, strict fetch argv, clean environment,
++// broker materialization, raw-object proof — is the real lane.
++
++const (
++	transportHTTPS = "https://fixture.test/repository.git"
++	transportSSH   = "ssh://git@fixture.test/repository.git"
++)
++
++const transportDNSStderr = "fatal: unable to access 'https://fixture.test/repository.git/': Could not resolve host: fixture.test"
++
++// transportBehavior is what the fake transport git does when a fetch
++// names url.
++type transportBehavior struct {
++	// succeed rewrites the fetch to fileRepo; otherwise the fetch
++	// fails with stderr after sleep.
++	succeed  bool
++	fileRepo string
++	stderr   string
++	sleep    time.Duration
++	// hang replaces the wrapper with the sleep itself, so the lane's
++	// context kill lands on the sleeper directly. Without exec, the
++	// killed shell would orphan a grandchild sleep that holds Go's
++	// exec pipes open until it exits on its own.
++	hang bool
++	// leakSecret prints the live broker secret into the failing
++	// fetch's stderr, simulating a git that echoes its environment.
++	leakSecret bool
++	// flood prints more than the lane's 64KiB stderr capture bound
++	// before the configured stderr, overflowing the bound. The filler
++	// carries an availability signal, so only the truncation flag —
++	// never the retained content — may close the fallback.
++	flood bool
++}
++
++func failTransport(stderr string) transportBehavior { return transportBehavior{stderr: stderr} }
++
++func fakeTransportGitTool(t *testing.T, routes map[string]transportBehavior) (GitTool, string) {
++	t.Helper()
++	realTool := realGitTool(t)
++	root := t.TempDir()
++	wrapper := filepath.Join(root, "git-wrapper")
++	logPath := filepath.Join(root, "argv.log")
++	urls := make([]string, 0, len(routes))
++	for url := range routes {
++		urls = append(urls, url)
++	}
++	// Sorted, so one route set always generates one script.
++	for i := 1; i < len(urls); i++ {
++		for j := i; j > 0 && urls[j] < urls[j-1]; j-- {
++			urls[j], urls[j-1] = urls[j-1], urls[j]
++		}
++	}
++	var failArms, rewrites strings.Builder
++	for _, url := range urls {
++		route := routes[url]
++		if route.succeed {
++			fmt.Fprintf(&rewrites, "if [ \"$arg\" = %s ]; then arg=%s; fi\n", shellQuote(url), shellQuote("file://"+route.fileRepo))
++			continue
++		}
++		fmt.Fprintf(&failArms, "if [ \"$arg\" = %s ]; then\n", shellQuote(url))
++		if route.flood {
++			// Builtins only: the fetch environment carries an empty
++			// PATH by design. 1700 lines of 41 bytes to stderr
++			// overflow the 64KiB capture bound.
++			failArms.WriteString("i=0; while [ \"$i\" -lt 1700 ]; do printf 'Could not resolve host: fixture.test fill\\n' >&2; i=$((i+1)); done\n")
++		}
++		if route.sleep > 0 {
++			// Absolute path: the fetch environment carries an empty
++			// PATH by design, so only builtins and absolute paths run.
++			if route.hang {
++				fmt.Fprintf(&failArms, "exec /bin/sleep %d\n", int(route.sleep/time.Second))
++			} else {
++				fmt.Fprintf(&failArms, "/bin/sleep %d\n", int(route.sleep/time.Second))
++			}
++		}
++		if route.leakSecret {
++			failArms.WriteString("printf 'leaked-secret: %s\\n' \"${" + EnvHTTPSBrokerSecret + "-}\" >&2\n")
++		}
++		fmt.Fprintf(&failArms, "printf '%%s' %s >&2; exit 128\nfi\n", shellQuote(route.stderr))
++	}
++	script := fmt.Sprintf(`#!/bin/sh
++{
++printf 'argv:'
++for arg in "$@"; do printf ' <%%s>' "$arg"; done
++printf ' | env: HOME=%%s CFGGLOBAL=%%s CFGSYSTEM=%%s GIT_SSH=%%s askpass=%%s' "${HOME-}" "${GIT_CONFIG_GLOBAL-}" "${GIT_CONFIG_SYSTEM-}" "${GIT_SSH-}" "${GIT_ASKPASS-}"
++secret_present=0
++state_present=0
++[ -n "${%s-}" ] && secret_present=1
++[ -n "${%s-}" ] && state_present=1
++printf ' secret=%%s state=%%s\n' "$secret_present" "$state_present"
++if [ "$state_present" = 1 ] && [ -f "${%s-}" ]; then
++broker_state=""
++read -r broker_state < "${%s-}"
++printf 'broker-state: %%s\n' "$broker_state"
++fi
++} >> %s
++is_fetch=0
++for arg in "$@"; do
++if [ "$arg" = "fetch" ]; then is_fetch=1; fi
++done
++if [ "$is_fetch" = 1 ]; then
++for arg in "$@"; do
++:
++%s
++done
++fi
++args=""
++for arg in "$@"; do
++%s
++case "$arg" in
++protocol.https.allow=always|protocol.ssh.allow=always) arg=protocol.file.allow=always ;;
++esac
++args="$args
++$arg"
++done
++oldifs=$IFS
++IFS='
++'
++set -- $args
++IFS=$oldifs
++exec %s "$@"
++`, EnvHTTPSBrokerSecret, EnvHTTPSBrokerState, EnvHTTPSBrokerState, EnvHTTPSBrokerState,
++		shellQuote(logPath), failArms.String(), rewrites.String(), shellQuote(realTool.Executable))
++	if err := os.WriteFile(wrapper, []byte(script), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	realTool.Executable = wrapper
++	realTool.AskPass = "/usr/bin/false"
++	realTool.SSHWrapper = "/usr/bin/false"
++	return realTool, logPath
++}
++
++// transportFetchLines returns the logged fetch invocations in order.
++func transportFetchLines(t *testing.T, logPath string) []string {
++	t.Helper()
++	payload, err := os.ReadFile(logPath)
++	if err != nil {
++		t.Fatalf("reading git log: %v", err)
++	}
++	var fetches []string
++	for _, line := range strings.Split(string(payload), "\n") {
++		if strings.Contains(line, "<fetch>") {
++			fetches = append(fetches, line)
++		}
++	}
++	return fetches
++}
++
++func transportBase(t *testing.T, tool GitTool, fixture gitFixture) NetworkRequest {
++	t.Helper()
++	source, err := ParseSource(transportHTTPS)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return NetworkRequest{Source: source, Lock: LockedCommit{ObjectFormat: "sha1", Hex: fixture.commit}, Tool: tool}
++}
++
++func transportSSHMaterial(t *testing.T) (identity, knownHosts string) {
++	t.Helper()
++	identity = filepath.Join(t.TempDir(), "id_example")
++	knownHosts = filepath.Join(t.TempDir(), "known_hosts")
++	if err := os.WriteFile(identity, []byte("key"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(knownHosts, []byte("hosts"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return identity, knownHosts
++}
++
++// transportSSHBase builds the manager-owned base of per-attempt SSH
++// wrapper policies. The SSH executable never runs in fixture-rewritten
++// fetches; it must only be an admitted absolute regular file.
++func transportSSHBase(t *testing.T) SSHWrapperBase {
++	t.Helper()
++	dir := t.TempDir()
++	ssh := filepath.Join(dir, "ssh")
++	if err := os.WriteFile(ssh, []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	emptyConfig := filepath.Join(dir, "ssh.config")
++	if err := os.WriteFile(emptyConfig, nil, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	emptyKnownHosts := filepath.Join(dir, "empty_known_hosts")
++	if err := os.WriteFile(emptyKnownHosts, nil, 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return SSHWrapperBase{SSH: ssh, EmptyConfig: emptyConfig, EmptyKnownHosts: emptyKnownHosts, ConnectTimeout: 15}
++}
++
++// transportSSHBaseTool equips a fake-transport tool for SSH attempts:
++// base lane credentials plus the manager wrapper-policy base.
++func transportSSHBaseTool(t *testing.T, tool GitTool) GitTool {
++	t.Helper()
++	identity, knownHosts := transportSSHMaterial(t)
++	tool.SSHCredentials = OperatorSSHCredentials{Identity: identity, KnownHosts: knownHosts}
++	tool.SSHBase = transportSSHBase(t)
++	return tool
++}
++
++func requirePOSIXTransport(t *testing.T) {
++	t.Helper()
++	if runtime.GOOS == "windows" {
++		t.Skip("test transport wrapper is POSIX-only; production code is platform-neutral")
++	}
++}
++
++func TestResolvedTransportFallsBackOnAvailabilityThenVerifies(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: failTransport(transportDNSStderr),
++		transportSSH:   {succeed: true, fileRepo: fixture.bare},
++	})
++	identity, knownHosts := transportSSHMaterial(t)
++	reader := &stubProviderReader{credentials: map[string]gitcred.HostCredential{
++		"https-prov\x00fixture.test": {Username: "prov-user", Secret: "PROVIDER-SECRET"},
++	}}
++	providers := CredentialProviders{Set: ProviderSet{
++		"https-prov": {HTTPS: &ProviderHTTPS{}},
++		"ssh-prov":   {SSH: &ProviderSSH{Identity: identity, KnownHosts: knownHosts}},
++	}, Reader: reader}
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{
++			{URL: transportHTTPS, Authentication: "https-prov"},
++			{URL: transportSSH, Authentication: "ssh-prov"},
++		},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	var records []AttemptRecord
++	base := transportBase(t, tool, fixture)
++	base.Tool.SSHBase = transportSSHBase(t)
++	snapshot, err := AcquireNetworkResolved(context.Background(), base, plan, providers, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	if err != nil {
++		t.Fatalf("resolved acquisition: %v", err)
++	}
++	if snapshot.Commit != fixture.commit || snapshot.ObjectFormat != "sha1" {
++		t.Fatalf("snapshot = %+v, want sha1 %s", snapshot, fixture.commit)
++	}
++	want := frameSnapshot([]File{{Path: "README.md", Content: []byte("hello\x00world\n")}, {Path: "bin/tool", Content: []byte("tool\n"), Executable: true}, {Path: "empty", Content: nil}})
++	if !bytes.Equal(snapshot.CanonicalBytes, want) {
++		t.Fatalf("canonical bytes differ\ngot  %x\nwant %x", snapshot.CanonicalBytes, want)
++	}
++	fetches := transportFetchLines(t, logPath)
++	if len(fetches) != 2 {
++		t.Fatalf("fetch count = %d, want 2", len(fetches))
++	}
++	if !strings.Contains(fetches[0], transportHTTPS) || !strings.Contains(fetches[1], transportSSH) {
++		t.Fatalf("fetch order wrong:\n%s", strings.Join(fetches, "\n"))
++	}
++	if len(records) != 2 {
++		t.Fatalf("trace records = %+v, want 2", records)
++	}
++	if records[0].Class != FailureAvailability || !records[0].NetworkAttempted || records[0].Succeeded {
++		t.Fatalf("first record = %+v, want attempted availability failure", records[0])
++	}
++	if records[1].Class != "" || !records[1].NetworkAttempted || !records[1].Succeeded {
++		t.Fatalf("second record = %+v, want success", records[1])
++	}
++	payload, err := os.ReadFile(logPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !strings.Contains(string(payload), `"username":"prov-user"`) {
++		t.Fatalf("first fetch was not offered the provider credential:\n%s", payload)
++	}
++}
++
++func TestResolvedTransportFailClosedClassesStopAfterOneFetch(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	for _, testCase := range []struct {
++		name   string
++		stderr string
++		class  FailureClass
++	}{
++		{"tls", "fatal: unable to access 'https://fixture.test/repository.git/': SSL certificate problem: unable to get local issuer certificate", FailureTLS},
++		{"host-key", "Host key verification failed.", FailureHostKey},
++		{"http-404", "fatal: unable to access 'https://fixture.test/repository.git/': The requested URL returned error: 404", FailureHTTP404},
++		{"repository-not-found", "remote: Repository not found.", FailureHTTP404},
++		{"unknown", "fatal: remote error: something a future git invented", FailureUnknown},
++		{"empty", "", FailureUnknown},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++				transportHTTPS: failTransport(testCase.stderr),
++				transportSSH:   {succeed: true, fileRepo: fixture.bare},
++			})
++			plan := TransportPlan{
++				Identity: "fixture.test/repository",
++				Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}},
++				Fallback: TransportFallbackAvailabilityAuth,
++			}
++			var records []AttemptRecord
++			_, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, nil, func(record AttemptRecord) {
++				records = append(records, record)
++			})
++			if err == nil {
++				t.Fatal("fail-closed failure succeeded")
++			}
++			// Fail-closed classes retain the lane's specific diagnostic.
++			if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
++				t.Fatalf("error = %q, want the lane diagnostic", err)
++			}
++			if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
++				t.Fatalf("fetch count = %d, want 1 (no alternate traffic)", len(fetches))
++			}
++			if len(records) != 1 || records[0].Class != testCase.class || !records[0].NetworkAttempted {
++				t.Fatalf("records = %+v, want one %s record", records, testCase.class)
++			}
++		})
++	}
++}
++
++func TestResolvedTransportExhaustionListsSanitizedClasses(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	const secret = "SUPERSECRETPROVIDER9"
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: failTransport(transportDNSStderr),
++		transportSSH:   failTransport("git@fixture.test: Permission denied (publickey)."),
++	})
++	reader := &stubProviderReader{credentials: map[string]gitcred.HostCredential{
++		"https-prov\x00fixture.test": {Username: "prov-user", Secret: secret},
++	}}
++	identity, knownHosts := transportSSHMaterial(t)
++	providers := CredentialProviders{Set: ProviderSet{
++		"https-prov": {HTTPS: &ProviderHTTPS{}},
++		"ssh-prov":   {SSH: &ProviderSSH{Identity: identity, KnownHosts: knownHosts}},
++	}, Reader: reader}
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{
++			{URL: transportHTTPS, Authentication: "https-prov"},
++			{URL: transportSSH, Authentication: "ssh-prov"},
++		},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	var records []AttemptRecord
++	base := transportBase(t, tool, fixture)
++	base.Tool.SSHBase = transportSSHBase(t)
++	_, err := AcquireNetworkResolved(context.Background(), base, plan, providers, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	if err == nil {
++		t.Fatal("double failure succeeded")
++	}
++	if ErrorCode(err) != CodeRepositoryEndpointUnavailable {
++		t.Fatalf("error = %v, want %s", err, CodeRepositoryEndpointUnavailable)
++	}
++	message := err.Error()
++	for _, want := range []string{"fixture.test/repository", "availability", "auth", "provider \"https-prov\"", "provider \"ssh-prov\""} {
++		if !strings.Contains(message, want) {
++			t.Errorf("exhaustion %q lacks %q", message, want)
++		}
++	}
++	for _, forbidden := range []string{secret, "Could not resolve", "Permission denied", "https://", "ssh://"} {
++		if strings.Contains(message, forbidden) {
++			t.Errorf("exhaustion %q contains %q", message, forbidden)
++		}
++	}
++	if fetches := transportFetchLines(t, logPath); len(fetches) != 2 {
++		t.Fatalf("fetch count = %d, want exactly 2 (one per endpoint)", len(fetches))
++	}
++	if len(records) != 2 || records[0].Class != FailureAvailability || records[1].Class != FailureAuth {
++		t.Fatalf("records = %+v", records)
++	}
++}
++
++func TestResolvedTransportLegacyShapeMatchesLane(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	legacy := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS}},
++		Fallback: TransportFallbackNone,
++	}
++	t.Run("failure", func(t *testing.T) {
++		resolvedTool, _ := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: failTransport(transportDNSStderr)})
++		directTool, _ := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: failTransport(transportDNSStderr)})
++		_, resolvedErr := AcquireNetworkResolved(context.Background(), transportBase(t, resolvedTool, fixture), legacy, nil, nil)
++		_, directErr := AcquireNetwork(context.Background(), transportBase(t, directTool, fixture))
++		if resolvedErr == nil || directErr == nil {
++			t.Fatalf("resolved=%v direct=%v, want both failing", resolvedErr, directErr)
++		}
++		if resolvedErr.Error() != directErr.Error() {
++			t.Fatalf("resolved %q != lane %q", resolvedErr, directErr)
++		}
++	})
++	t.Run("success", func(t *testing.T) {
++		resolvedTool, _ := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: {succeed: true, fileRepo: fixture.bare}})
++		directTool, _ := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: {succeed: true, fileRepo: fixture.bare}})
++		resolved, resolvedErr := AcquireNetworkResolved(context.Background(), transportBase(t, resolvedTool, fixture), legacy, nil, nil)
++		direct, directErr := AcquireNetwork(context.Background(), transportBase(t, directTool, fixture))
++		if resolvedErr != nil || directErr != nil {
++			t.Fatalf("resolved=%v direct=%v", resolvedErr, directErr)
++		}
++		if resolved.Digest != direct.Digest || resolved.Commit != direct.Commit {
++			t.Fatalf("resolved %+v != lane %+v", resolved, direct)
++		}
++	})
++}
++
++func TestResolvedTransportSkipsUnconfiguredProviderWithoutTraffic(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: failTransport(transportDNSStderr),
++		transportSSH:   {succeed: true, fileRepo: fixture.bare},
++	})
++	identity, knownHosts := transportSSHMaterial(t)
++	providers := CredentialProviders{Set: ProviderSet{
++		"ssh-prov": {SSH: &ProviderSSH{Identity: identity, KnownHosts: knownHosts}},
++	}, Reader: &stubProviderReader{}}
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{
++			{URL: transportHTTPS, Authentication: "missing-prov"},
++			{URL: transportSSH, Authentication: "ssh-prov"},
++		},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	var records []AttemptRecord
++	base := transportBase(t, tool, fixture)
++	base.Tool.SSHBase = transportSSHBase(t)
++	snapshot, err := AcquireNetworkResolved(context.Background(), base, plan, providers, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	if err != nil {
++		t.Fatalf("resolved acquisition: %v", err)
++	}
++	if snapshot.Commit != fixture.commit {
++		t.Fatalf("snapshot commit = %s, want %s", snapshot.Commit, fixture.commit)
++	}
++	fetches := transportFetchLines(t, logPath)
++	if len(fetches) != 1 || !strings.Contains(fetches[0], transportSSH) {
++		t.Fatalf("fetches = %q, want only the SSH endpoint", fetches)
++	}
++	if len(records) != 2 || records[0].Class != FailureAuth || records[0].NetworkAttempted || !records[1].Succeeded {
++		t.Fatalf("records = %+v", records)
++	}
++}
++
++func TestResolvedTransportNilProvidersSkipWithoutTraffic(t *testing.T) {
++	source, err := ParseSource(transportHTTPS)
++	if err != nil {
++		t.Fatal(err)
++	}
++	plan := TransportPlan{
++		Identity: source.Identity,
++		Attempts: []TransportAttempt{{URL: transportHTTPS, Authentication: "p"}},
++		Fallback: TransportFallbackNone,
++	}
++	base := NetworkRequest{Source: source, Lock: LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)}}
++	var records []AttemptRecord
++	_, err = AcquireNetworkResolved(context.Background(), base, plan, nil, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	if ErrorCode(err) != CodeRepositoryEndpointUnavailable {
++		t.Fatalf("error = %v, want %s", err, CodeRepositoryEndpointUnavailable)
++	}
++	if len(records) != 1 || records[0].NetworkAttempted {
++		t.Fatalf("records = %+v, want one traffic-free record", records)
++	}
++}
++
++func TestResolvedTransportPinnedAuthStopsWithoutSecondAttempt(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: failTransport("fatal: unable to access 'https://fixture.test/repository.git/': The requested URL returned error: 403"),
++	})
++	providers := CredentialProviders{Set: ProviderSet{
++		"https-prov": {HTTPS: &ProviderHTTPS{}},
++	}, Reader: &stubProviderReader{credentials: map[string]gitcred.HostCredential{
++		"https-prov\x00fixture.test": {Username: "u", Secret: "s"},
++	}}}
++	// pinned-auth: one policy attempt with fallback none. The auth
++	// rejection is fallback-eligible but no second endpoint exists.
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS, Authentication: "https-prov"}},
++		Fallback: TransportFallbackNone,
++	}
++	_, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, providers, nil)
++	if ErrorCode(err) != CodeRepositoryEndpointUnavailable {
++		t.Fatalf("error = %v, want %s", err, CodeRepositoryEndpointUnavailable)
++	}
++	if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
++		t.Fatalf("fetch count = %d, want 1", len(fetches))
++	}
++}
++
++func TestResolvedTransportSecondEndpointMustProveLockedContent(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", true)
++	moved := makeGitFixture(t, "sha1", true)
++	git := realGitPath(t)
++	runTestGit(t, moved.work, git, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "commit", "--quiet", "--allow-empty", "-m", "second")
++	runTestGit(t, moved.work, git, "tag", "-d", "v1.4.0")
++	runTestGit(t, moved.work, git, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "tag", "-a", "v1.4.0", "-m", "moved")
++	_ = os.RemoveAll(moved.bare)
++	runTestGit(t, "", git, "clone", "--quiet", "--bare", "--", moved.work, moved.bare)
++
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: failTransport(transportDNSStderr),
++		transportSSH:   {succeed: true, fileRepo: moved.bare},
++	})
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	base := transportBase(t, tool, fixture)
++	base.Tag = "v1.4.0"
++	base.Tool = transportSSHBaseTool(t, base.Tool)
++	var records []AttemptRecord
++	_, err := AcquireNetworkResolved(context.Background(), base, plan, nil, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	// The alternate served bytes, but not the locked content: the exact
++	// tag disagrees with the lock, which fails closed.
++	if ErrorCode(err) != CodeRefMoved {
++		t.Fatalf("error = %v, want %s", err, CodeRefMoved)
++	}
++	if len(records) != 2 || records[0].Class != FailureAvailability || records[1].Class != FailureRef {
++		t.Fatalf("records = %+v", records)
++	}
++	_ = logPath
++}
++
++func TestResolvedTransportAnonymousProviderOffersNothing(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: {succeed: true, fileRepo: fixture.bare},
++	})
++	base := transportBase(t, tool, fixture)
++	base.Tool.HTTPSCredentials = NewHTTPSCredentials("fixture.test", "decoy-user", "DECOY-SECRET")
++	providers := CredentialProviders{Set: ProviderSet{"anon": {HTTPS: &ProviderHTTPS{Anonymous: true}}}}
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS, Authentication: "anon"}},
++		Fallback: TransportFallbackNone,
++	}
++	snapshot, err := AcquireNetworkResolved(context.Background(), base, plan, providers, nil)
++	if err != nil {
++		t.Fatalf("anonymous acquisition: %v", err)
++	}
++	if snapshot.Commit != fixture.commit {
++		t.Fatalf("snapshot commit = %s", snapshot.Commit)
++	}
++	fetches := transportFetchLines(t, logPath)
++	if len(fetches) != 1 {
++		t.Fatalf("fetch count = %d", len(fetches))
++	}
++	if !strings.Contains(fetches[0], "secret=0 state=0") {
++		t.Fatalf("anonymous fetch offered credentials: %s", fetches[0])
++	}
++	payload, err := os.ReadFile(logPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if strings.Contains(string(payload), "broker-state:") {
++		t.Fatalf("anonymous fetch materialized a broker:\n%s", payload)
++	}
++}
++
++func TestResolvedTransportRejectsPlanBeforeAnyGitCall(t *testing.T) {
++	source, err := ParseSource(transportHTTPS)
++	if err != nil {
++		t.Fatal(err)
++	}
++	base := NetworkRequest{
++		Source: source,
++		Lock:   LockedCommit{ObjectFormat: "sha1", Hex: strings.Repeat("1", 40)},
++		// A tool that cannot run: any process spawn fails loudly,
++		// proving plan validation precedes every Git call.
++		Tool: GitTool{Executable: filepath.Join(t.TempDir(), "no-such-git")},
++	}
++	invalid := []TransportPlan{
++		{Identity: source.Identity, Fallback: TransportFallbackNone},
++		{Identity: source.Identity, Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportHTTPS}}, Fallback: TransportFallbackAvailabilityAuth},
++		{Identity: "other.test/x", Attempts: []TransportAttempt{{URL: transportHTTPS}}, Fallback: TransportFallbackNone},
++		{Identity: source.Identity, Attempts: []TransportAttempt{{URL: "file:///tmp/x.git"}}, Fallback: TransportFallbackNone},
++		{Identity: source.Identity, Attempts: []TransportAttempt{{URL: transportHTTPS, Authentication: "/bin/sh"}}, Fallback: TransportFallbackNone},
++	}
++	for index, plan := range invalid {
++		if _, err := AcquireNetworkResolved(context.Background(), base, plan, nil, nil); ErrorCode(err) != CodeRepositoryPolicyInvalid {
++			t.Errorf("plan %d: error = %v, want %s", index, err, CodeRepositoryPolicyInvalid)
++		}
++	}
++	// A cross-identity plan (valid shape, wrong acquisition) fails the
++	// same way, before any Git call.
++	cross := TransportPlan{
++		Identity: "fixture.test/other",
++		Attempts: []TransportAttempt{{URL: "https://fixture.test/other.git"}},
++		Fallback: TransportFallbackNone,
++	}
++	if _, err := AcquireNetworkResolved(context.Background(), base, cross, nil, nil); ErrorCode(err) != CodeRepositoryPolicyInvalid {
++		t.Fatalf("cross-identity error = %v, want %s", err, CodeRepositoryPolicyInvalid)
++	}
++}
++
++func TestResolvedTransportTotalDeadlineBoundsSlowFetch(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: {stderr: transportDNSStderr, sleep: 3 * time.Second},
++		transportSSH:   {stderr: transportDNSStderr, sleep: 30 * time.Second, hang: true},
++	})
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	base := transportBase(t, tool, fixture)
++	base.Tool = transportSSHBaseTool(t, base.Tool)
++	base.Limits = Limits{Timeout: 6 * time.Second}
++	var records []AttemptRecord
++	start := time.Now()
++	_, err := AcquireNetworkResolved(context.Background(), base, plan, nil, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	elapsed := time.Since(start)
++	// A per-attempt clock would spend 3s + 6s = 9s minimum (both sleeps
++	// are lower bounds); the shared clock bounds the total near 6s.
++	if elapsed > 7500*time.Millisecond {
++		t.Fatalf("elapsed %v exceeds the shared total deadline", elapsed)
++	}
++	if err == nil || ErrorCode(err) != CodeSourceUnavailable {
++		t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
++	}
++	if fetches := transportFetchLines(t, logPath); len(fetches) != 2 {
++		t.Fatalf("fetch count = %d, want 2 (the second starts, then the shared clock stops it)", len(fetches))
++	}
++	if len(records) != 2 || records[0].Class != FailureAvailability || records[1].Class != FailureUnknown {
++		t.Fatalf("records = %+v, want availability then deadline-unknown", records)
++	}
++}
++
++func TestResolvedTransportLeaksNothingIntoErrors(t *testing.T) {
++	requirePOSIXTransport(t)
++	const secret = "SUPERSECRETPROVIDER9"
++	t.Run("exhaustion", func(t *testing.T) {
++		fixture := makeGitFixture(t, "sha1", false)
++		tool, _ := fakeTransportGitTool(t, map[string]transportBehavior{
++			transportHTTPS: {stderr: transportDNSStderr, leakSecret: true},
++			transportSSH:   {stderr: "git@fixture.test: Permission denied (publickey).", leakSecret: true},
++		})
++		identity, knownHosts := transportSSHMaterial(t)
++		reader := &stubProviderReader{credentials: map[string]gitcred.HostCredential{
++			"https-prov\x00fixture.test": {Username: "u", Secret: secret},
++		}}
++		providers := CredentialProviders{Set: ProviderSet{
++			"https-prov": {HTTPS: &ProviderHTTPS{}},
++			"ssh-prov":   {SSH: &ProviderSSH{Identity: identity, KnownHosts: knownHosts}},
++		}, Reader: reader}
++		plan := TransportPlan{
++			Identity: "fixture.test/repository",
++			Attempts: []TransportAttempt{
++				{URL: transportHTTPS, Authentication: "https-prov"},
++				{URL: transportSSH, Authentication: "ssh-prov"},
++			},
++			Fallback: TransportFallbackAvailabilityAuth,
++		}
++		var records []AttemptRecord
++		base := transportBase(t, tool, fixture)
++		base.Tool.SSHBase = transportSSHBase(t)
++		_, err := AcquireNetworkResolved(context.Background(), base, plan, providers, func(record AttemptRecord) {
++			records = append(records, record)
++		})
++		// The exhaustion itself proves the secret-bearing stderr was
++		// read and classified (availability, then auth).
++		if ErrorCode(err) != CodeRepositoryEndpointUnavailable {
++			t.Fatalf("error = %v, want %s", err, CodeRepositoryEndpointUnavailable)
++		}
++		if strings.Contains(err.Error(), secret) {
++			t.Fatalf("exhaustion leaked the broker secret: %v", err)
++		}
++		if dump := fmt.Sprintf("%+v", records); strings.Contains(dump, secret) {
++			t.Fatalf("trace leaked the broker secret: %s", dump)
++		}
++	})
++	t.Run("fail-closed", func(t *testing.T) {
++		fixture := makeGitFixture(t, "sha1", false)
++		tool, _ := fakeTransportGitTool(t, map[string]transportBehavior{
++			transportHTTPS: {stderr: "fatal: SSL certificate problem: unable to get local issuer certificate", leakSecret: true},
++		})
++		providers := CredentialProviders{Set: ProviderSet{
++			"https-prov": {HTTPS: &ProviderHTTPS{}},
++		}, Reader: &stubProviderReader{credentials: map[string]gitcred.HostCredential{
++			"https-prov\x00fixture.test": {Username: "u", Secret: secret},
++		}}}
++		plan := TransportPlan{
++			Identity: "fixture.test/repository",
++			Attempts: []TransportAttempt{{URL: transportHTTPS, Authentication: "https-prov"}},
++			Fallback: TransportFallbackAvailabilityAuth,
++		}
++		_, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, providers, nil)
++		if err == nil || strings.Contains(err.Error(), secret) {
++			t.Fatalf("fail-closed error leaked the broker secret: %v", err)
++		}
++	})
++}
++
++func TestResolvedTransportKeepsStrictLanePerAttempt(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: failTransport(transportDNSStderr),
++		transportSSH:   {succeed: true, fileRepo: fixture.bare},
++	})
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	base := transportBase(t, tool, fixture)
++	base.Tool = transportSSHBaseTool(t, base.Tool)
++	if _, err := AcquireNetworkResolved(context.Background(), base, plan, nil, nil); err != nil {
++		t.Fatalf("resolved acquisition: %v", err)
++	}
++	fetches := transportFetchLines(t, logPath)
++	if len(fetches) != 2 {
++		t.Fatalf("fetch count = %d", len(fetches))
++	}
++	for index, fetch := range fetches {
++		for _, marker := range []string{
++			"--git-dir=", "protocol.allow=never", "http.followRedirects=false",
++			"http.sslVerify=true", "credential.helper=", "core.askPass=", "core.hooksPath=",
++		} {
++			if !strings.Contains(fetch, marker) {
++				t.Errorf("fetch %d lacks %q:\n%s", index+1, marker, fetch)
++			}
++		}
++		if !strings.Contains(fetch, "HOME=") || !strings.Contains(fetch, "curator-buildrepo-") {
++			t.Errorf("fetch %d ran outside a private HOME:\n%s", index+1, fetch)
++		}
++		if !strings.Contains(fetch, "CFGGLOBAL=") || !strings.Contains(fetch, "global.gitconfig") {
++			t.Errorf("fetch %d ran without a pinned global config:\n%s", index+1, fetch)
++		}
++	}
++	if !strings.Contains(fetches[0], "protocol.https.allow=always") || !strings.Contains(fetches[1], "protocol.ssh.allow=always") {
++		t.Fatalf("per-attempt protocol allowlist wrong:\n%s", strings.Join(fetches, "\n"))
++	}
++	// The SSH attempt runs behind its own bound wrapper copy, not the
++	// tool's static wrapper; the HTTPS attempt carries no wrapper.
++	if !strings.Contains(fetches[1], "GIT_SSH=") || !strings.Contains(fetches[1], SSHWrapperName) {
++		t.Fatalf("SSH attempt did not use its bound per-attempt wrapper:\n%s", fetches[1])
++	}
++	if strings.Contains(fetches[0], SSHWrapperName) {
++		t.Fatalf("HTTPS attempt carried an SSH wrapper:\n%s", fetches[0])
++	}
++	payload, err := os.ReadFile(logPath)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if strings.Contains(string(payload), "insteadOf") {
++		t.Fatalf("ambient remapping reached a fetch:\n%s", payload)
++	}
++}
++
++func TestAcquireNetworkFetchFailureKeepsLaneDiagnostic(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	for _, stderr := range []string{
++		transportDNSStderr,
++		"fatal: unable to access 'https://fixture.test/repository.git/': SSL certificate problem: unable to get local issuer certificate",
++		"Host key verification failed.",
++	} {
++		tool, _ := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: failTransport(stderr)})
++		_, err := AcquireNetwork(context.Background(), transportBase(t, tool, fixture))
++		if err == nil {
++			t.Fatal("failing fetch succeeded")
++		}
++		// The fetchError refactor must not change the legacy lane:
++		// fetch stderr never surfaces, whatever it says.
++		if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
++			t.Fatalf("error = %q", err)
++		}
++	}
++}
++
++func TestReviewResolvedMustRetainAdmission(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	for _, mode := range []string{"missing-ssh-wrapper", "missing-ssh-credentials", "missing-https-broker", "invalid-ref-kind"} {
++		t.Run(mode, func(t *testing.T) {
++			tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: {succeed: true, fileRepo: fixture.bare}, transportSSH: {succeed: true, fileRepo: fixture.bare}})
++			base := transportBase(t, tool, fixture)
++			url := transportHTTPS
++			switch mode {
++			case "missing-ssh-wrapper":
++				url = transportSSH
++				base.Tool.SSHWrapper = ""
++			case "missing-ssh-credentials":
++				url = transportSSH
++				base.Tool.SSHCredentials = OperatorSSHCredentials{}
++			case "missing-https-broker":
++				base.Tool.AskPass = ""
++			case "invalid-ref-kind":
++				base.RefKind = "not-supported"
++				base.RefValue = fixture.commit
++			}
++			base.Source, _ = ParseSource(url)
++			_, direct := AcquireNetwork(context.Background(), base)
++			if direct == nil {
++				t.Fatal("control did not refuse")
++			}
++			plan := TransportPlan{Identity: base.Source.Identity, Attempts: []TransportAttempt{{URL: url}}, Fallback: TransportFallbackNone}
++			_, got := AcquireNetworkResolved(context.Background(), base, plan, nil, nil)
++			if got == nil {
++				t.Fatalf("resolved accepted %s; legacy refused %v; fetches=%d", mode, direct, len(transportFetchLines(t, logPath)))
++			}
++		})
++	}
++}
++
++func TestReviewAmbiguousFailureMustNotFallback(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	for _, msg := range []string{"fatal: cannot create temporary file: Permission denied", "remote: audit denied: operation timed out", "error: object hash mismatch\nfatal: connection timed out"} {
++		t.Run(msg, func(t *testing.T) {
++			tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: failTransport(msg), transportSSH: {succeed: true, fileRepo: fixture.bare}})
++			plan := TransportPlan{Identity: "fixture.test/repository", Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}}, Fallback: TransportFallbackAvailabilityAuth}
++			_, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, nil, nil)
++			if n := len(transportFetchLines(t, logPath)); n != 1 {
++				t.Fatalf("ambiguous/local/integrity error caused %d fetches (err=%v)", n, err)
++			}
++		})
++	}
++}
++
++func TestReviewDeadlineIncludesChildPipes(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, _ := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: {stderr: transportDNSStderr, sleep: 5 * time.Second}})
++	base := transportBase(t, tool, fixture)
++	base.Limits.Timeout = 2 * time.Second
++	plan := TransportPlan{Identity: base.Source.Identity, Attempts: []TransportAttempt{{URL: transportHTTPS}}, Fallback: TransportFallbackNone}
++	start := time.Now()
++	_, err := AcquireNetworkResolved(context.Background(), base, plan, nil, nil)
++	if elapsed := time.Since(start); elapsed > 4*time.Second {
++		t.Fatalf("2s total deadline returned after %s: %v", elapsed, err)
++	}
++}
++
++func TestResolvedTransportAmbiguousFailureMustNotFallbackWhenAlternateReady(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	for _, testCase := range []struct {
++		name   string
++		stderr string
++		class  FailureClass
++	}{
++		{"local-permission-denied", "fatal: cannot create temporary file: Permission denied", FailureUnknown},
++		{"audit-timeout", "remote: audit denied: operation timed out", FailureAudit},
++		{"integrity-timeout", "error: object hash mismatch\nfatal: connection timed out", FailureIntegrity},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++				transportHTTPS: failTransport(testCase.stderr),
++				transportSSH:   {succeed: true, fileRepo: fixture.bare},
++			})
++			// The alternate is fully fetchable: any fallback would
++			// reach it and succeed, so one fetch proves the
++			// classifier itself closed the plan.
++			tool = transportSSHBaseTool(t, tool)
++			plan := TransportPlan{
++				Identity: "fixture.test/repository",
++				Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}},
++				Fallback: TransportFallbackAvailabilityAuth,
++			}
++			var records []AttemptRecord
++			_, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, nil, func(record AttemptRecord) {
++				records = append(records, record)
++			})
++			if err == nil {
++				t.Fatal("ambiguous failure fell back to a ready alternate and succeeded")
++			}
++			if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
++				t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
++			}
++			if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
++				t.Fatalf("fetch count = %d, want 1", len(fetches))
++			}
++			if len(records) != 1 || records[0].Class != testCase.class || !records[0].NetworkAttempted {
++				t.Fatalf("records = %+v, want one attempted %s record", records, testCase.class)
++			}
++		})
++	}
++}
++
++func TestResolvedTransportFallbackIntoAdmissionRefusalExhausts(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: failTransport(transportDNSStderr),
++		transportSSH:   {succeed: true, fileRepo: fixture.bare},
++	})
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	// The base tool carries no SSH credentials and no manager base: the
++	// SSH attempt refuses in admission with no traffic, and the policy
++	// plan exhausts on auth without waiting out the deadline.
++	start := time.Now()
++	var records []AttemptRecord
++	_, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, nil, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	elapsed := time.Since(start)
++	if ErrorCode(err) != CodeRepositoryEndpointUnavailable {
++		t.Fatalf("error = %v, want %s", err, CodeRepositoryEndpointUnavailable)
++	}
++	if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
++		t.Fatalf("fetch count = %d, want 1", len(fetches))
++	}
++	if len(records) != 2 || records[0].Class != FailureAvailability || !records[0].NetworkAttempted ||
++		records[1].Class != FailureAuth || records[1].NetworkAttempted {
++		t.Fatalf("records = %+v, want attempted availability then traffic-free auth", records)
++	}
++	if elapsed > 30*time.Second {
++		t.Fatalf("elapsed %v: a refused attempt must not wait out the deadline", elapsed)
++	}
++}
++
++func TestResolvedTransportTruncatedStderrFailsClosed(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: {stderr: "fatal: trailing tail", flood: true},
++		transportSSH:   {succeed: true, fileRepo: fixture.bare},
++	})
++	// The alternate is fully fetchable: any fallback would reach it and
++	// succeed, so one fetch proves truncation itself closed the plan.
++	tool = transportSSHBaseTool(t, tool)
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS}, {URL: transportSSH}},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	var records []AttemptRecord
++	_, err := AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, nil, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	if err == nil {
++		t.Fatal("truncated evidence fell back to a ready alternate and succeeded")
++	}
++	if err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
++		t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
++	}
++	if fetches := transportFetchLines(t, logPath); len(fetches) != 1 {
++		t.Fatalf("fetch count = %d, want 1 (truncated evidence must not authorize fallback)", len(fetches))
++	}
++	if len(records) != 1 || records[0].Class != FailureUnknown || !records[0].NetworkAttempted {
++		t.Fatalf("records = %+v, want one attempted unknown record", records)
++	}
++	// The retained prefix alone would classify availability: only the
++	// truncation flag closed the fallback, never the content.
++	if got := ClassifyFetchOutput("Could not resolve host: fixture.test fill"); got != FailureAvailability {
++		t.Fatalf("flood prefix classifies %q, want availability", got)
++	}
++}
++
++func TestResolvedTransportSSHWithoutKnownHostsRefusesBeforeTraffic(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	identity := filepath.Join(t.TempDir(), "id_example")
++	if err := os.WriteFile(identity, []byte("key"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	t.Run("provider", func(t *testing.T) {
++		tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++			transportSSH: {succeed: true, fileRepo: fixture.bare},
++		})
++		providers := CredentialProviders{Set: ProviderSet{
++			"ssh-nohosts": {SSH: &ProviderSSH{Identity: identity}},
++		}}
++		base := transportBase(t, tool, fixture)
++		base.Tool.SSHBase = transportSSHBase(t)
++		base.Source, _ = ParseSource(transportSSH)
++		plan := TransportPlan{
++			Identity: base.Source.Identity,
++			Attempts: []TransportAttempt{{URL: transportSSH, Authentication: "ssh-nohosts"}},
++			Fallback: TransportFallbackNone,
++		}
++		var records []AttemptRecord
++		_, err := AcquireNetworkResolved(context.Background(), base, plan, providers, func(record AttemptRecord) {
++			records = append(records, record)
++		})
++		// An identity without pinned host keys cannot form a wrapper
++		// policy: the attempt records an unavailable auth method with
++		// no traffic and the policy plan exhausts.
++		if ErrorCode(err) != CodeRepositoryEndpointUnavailable {
++			t.Fatalf("error = %v, want %s", err, CodeRepositoryEndpointUnavailable)
++		}
++		if !strings.Contains(err.Error(), "no fetch attempted") {
++			t.Fatalf("exhaustion names traffic it never sent: %v", err)
++		}
++		if fetches := transportFetchLines(t, logPath); len(fetches) != 0 {
++			t.Fatalf("fetch count = %d, want 0", len(fetches))
++		}
++		if len(records) != 1 || records[0].Class != FailureAuth || records[0].NetworkAttempted {
++			t.Fatalf("records = %+v, want one traffic-free auth record", records)
++		}
++	})
++	t.Run("base-credentials", func(t *testing.T) {
++		tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++			transportSSH: {succeed: true, fileRepo: fixture.bare},
++		})
++		base := transportBase(t, tool, fixture)
++		base.Tool.SSHBase = transportSSHBase(t)
++		base.Tool.SSHCredentials = OperatorSSHCredentials{Identity: identity}
++		base.Source, _ = ParseSource(transportSSH)
++		plan := TransportPlan{
++			Identity: base.Source.Identity,
++			Attempts: []TransportAttempt{{URL: transportSSH}},
++			Fallback: TransportFallbackNone,
++		}
++		var records []AttemptRecord
++		_, err := AcquireNetworkResolved(context.Background(), base, plan, nil, func(record AttemptRecord) {
++			records = append(records, record)
++		})
++		// A legacy-shape plan keeps the lane's own diagnostic: the
++		// SSH refusal surfaces unchanged, with no fetch traffic.
++		if ErrorCode(err) != CodeSSHCredentialMissing {
++			t.Fatalf("error = %v, want %s", err, CodeSSHCredentialMissing)
++		}
++		if fetches := transportFetchLines(t, logPath); len(fetches) != 0 {
++			t.Fatalf("fetch count = %d, want 0", len(fetches))
++		}
++		if len(records) != 1 || records[0].Class != FailureAuth || records[0].NetworkAttempted {
++			t.Fatalf("records = %+v, want one traffic-free auth record", records)
++		}
++	})
++}
++
++func TestResolvedTransportCancelledContextFetchesNothing(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{
++		transportHTTPS: {succeed: true, fileRepo: fixture.bare},
++	})
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{{URL: transportHTTPS}},
++		Fallback: TransportFallbackNone,
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	cancel()
++	if _, err := AcquireNetworkResolved(ctx, transportBase(t, tool, fixture), plan, nil, nil); err == nil {
++		t.Fatal("cancelled acquisition succeeded")
++	}
++	// A missing log means the wrapper never ran at all: either way, no
++	// fetch went out.
++	if _, err := os.Stat(logPath); err == nil {
++		if fetches := transportFetchLines(t, logPath); len(fetches) != 0 {
++			t.Fatalf("fetch count = %d, want 0", len(fetches))
++		}
++	} else if !os.IsNotExist(err) {
++		t.Fatal(err)
++	}
++}
++
++// fakeSSHScript writes a logging stand-in for the SSH executable: every
++// invocation appends its argv to a sibling log file, then behaves per the
++// attempt it serves. The first attempt's identity path carries "first" and
++// fails refused (availability); the second attempt's carries "second" and
++// fails host-key verification (fail closed). It returns the script path
++// and the log path.
++func fakeSSHScript(t *testing.T) (script, logPath string) {
++	t.Helper()
++	dir := t.TempDir()
++	logPath = filepath.Join(dir, "ssh-argv.log")
++	script = filepath.Join(dir, "fake-ssh")
++	content := fmt.Sprintf(`#!/bin/sh
++{
++printf 'ssh-argv:'
++for arg in "$@"; do printf ' <%%s>' "$arg"; done
++printf '\n'
++} >> %s
++case "$*" in
++*first*) printf '%%s' 'ssh: connect to host git@fixture.test port 22: Connection refused' >&2; exit 128;;
++*) printf '%%s' 'Host key verification failed.' >&2; exit 128;;
++esac
++`, shellQuote(logPath))
++	if err := os.WriteFile(script, []byte(content), 0o700); err != nil {
++		t.Fatal(err)
++	}
++	return script, logPath
++}
++
++func TestResolvedTransportSSHAttemptBindsPerAttemptCredentials(t *testing.T) {
++	requirePOSIXTransport(t)
++	fixture := makeGitFixture(t, "sha1", false)
++	first := t.TempDir()
++	second := t.TempDir()
++	writeSSHFile := func(path, content string) {
++		t.Helper()
++		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
++			t.Fatal(err)
++		}
++	}
++	identityFirst := filepath.Join(first, "first", "id")
++	knownHostsFirst := filepath.Join(first, "first", "known_hosts")
++	identitySecond := filepath.Join(second, "second", "id")
++	knownHostsSecond := filepath.Join(second, "second", "known_hosts")
++	for _, path := range []string{identityFirst, knownHostsFirst, identitySecond, knownHostsSecond} {
++		writeSSHFile(path, "material\n")
++	}
++	// The wrapper policy carries resolved paths; resolve the markers
++	// the same way so the argv assertions compare equal spellings.
++	resolve := func(path string) string {
++		t.Helper()
++		resolved, err := filepath.EvalSymlinks(path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		return resolved
++	}
++	identityFirst, knownHostsFirst = resolve(identityFirst), resolve(knownHostsFirst)
++	identitySecond, knownHostsSecond = resolve(identitySecond), resolve(knownHostsSecond)
++	fakeSSH, sshLog := fakeSSHScript(t)
++	manager := t.TempDir()
++	emptyConfig := filepath.Join(manager, "ssh.config")
++	emptyKnownHosts := filepath.Join(manager, "empty_known_hosts")
++	for _, path := range []string{emptyConfig, emptyKnownHosts} {
++		writeSSHFile(path, "")
++	}
++	executable, err := os.Executable()
++	if err != nil {
++		t.Fatal(err)
++	}
++	tool := realGitTool(t)
++	tool.SSHWrapper = executable
++	tool.SSHBase = SSHWrapperBase{SSH: fakeSSH, EmptyConfig: emptyConfig, EmptyKnownHosts: emptyKnownHosts, ConnectTimeout: 15}
++	providers := CredentialProviders{Set: ProviderSet{
++		"ssh-first":  {SSH: &ProviderSSH{Identity: identityFirst, KnownHosts: knownHostsFirst}},
++		"ssh-second": {SSH: &ProviderSSH{Identity: identitySecond, KnownHosts: knownHostsSecond}},
++	}}
++	plan := TransportPlan{
++		Identity: "fixture.test/repository",
++		Attempts: []TransportAttempt{
++			{URL: "ssh://git@fixture.test/repository.git", Authentication: "ssh-first"},
++			{URL: "git@fixture.test:repository.git", Authentication: "ssh-second"},
++		},
++		Fallback: TransportFallbackAvailabilityAuth,
++	}
++	var records []AttemptRecord
++	_, err = AcquireNetworkResolved(context.Background(), transportBase(t, tool, fixture), plan, providers, func(record AttemptRecord) {
++		records = append(records, record)
++	})
++	// The first SSH attempt fails refused and the plan advances; the
++	// second fails host-key verification and closes with the lane's own
++	// diagnostic. Real git drove a real per-attempt wrapper on both.
++	if err == nil || err.Error() != CodeSourceUnavailable+": exact source fetch failed" {
++		t.Fatalf("error = %v, want the fail-closed lane diagnostic", err)
++	}
++	if len(records) != 2 || records[0].Class != FailureAvailability || !records[0].NetworkAttempted ||
++		records[1].Class != FailureHostKey || !records[1].NetworkAttempted {
++		t.Fatalf("records = %+v, want attempted availability then host-key", records)
++	}
++	payload, err := os.ReadFile(sshLog)
++	if err != nil {
++		t.Fatal(err)
++	}
++	invocations := strings.Split(strings.TrimSpace(string(payload)), "\n")
++	if len(invocations) != 2 {
++		t.Fatalf("ssh invocations = %d, want 2:\n%s", len(invocations), payload)
++	}
++	// Each attempt offered exactly its provider's material and endpoint:
++	// the pinned identity and host keys, the fixed argv, and the exact
++	// host/path tuple git hands to SSH — slash-prefixed for ssh://, bare
++	// for the scp-like form.
++	for _, marker := range []string{"<" + identityFirst + ">", "<UserKnownHostsFile=" + knownHostsFirst + ">",
++		"<git@fixture.test>", "<git-upload-pack '/repository.git'>", "<BatchMode=yes>", "<StrictHostKeyChecking=yes>"} {
++		if !strings.Contains(invocations[0], marker) {
++			t.Errorf("first ssh invocation lacks %s:\n%s", marker, invocations[0])
++		}
++	}
++	for _, marker := range []string{"<" + identitySecond + ">", "<UserKnownHostsFile=" + knownHostsSecond + ">",
++		"<git@fixture.test>", "<git-upload-pack 'repository.git'>", "<BatchMode=yes>", "<StrictHostKeyChecking=yes>"} {
++		if !strings.Contains(invocations[1], marker) {
++			t.Errorf("second ssh invocation lacks %s:\n%s", marker, invocations[1])
++		}
++	}
++	if strings.Contains(invocations[0], identitySecond) || strings.Contains(invocations[0], knownHostsSecond) {
++		t.Errorf("first attempt was offered the second attempt's material:\n%s", invocations[0])
++	}
++	if strings.Contains(invocations[1], identityFirst) || strings.Contains(invocations[1], knownHostsFirst) {
++		t.Errorf("second attempt was offered the first attempt's material:\n%s", invocations[1])
++	}
++}
+diff --git a/internal/gitcred/gitcred.go b/internal/gitcred/gitcred.go
+index 255610f..7e3cdf9 100644
+--- a/internal/gitcred/gitcred.go
++++ b/internal/gitcred/gitcred.go
+@@ -136,10 +136,11 @@ func (m HostMaterial) Empty() bool { return !m.HostCredential && len(m.Scopes) =
+ 
+ // ReadHost reads the operator's own HTTPS credential for host.
+ //
+-// A manager-namespaced entry is never reported as the operator's own: a
+-// helper asked for a host without a username answers with whatever record it
+-// holds for that host, which can be a manager entry, and reporting that back
+-// as the operator's own credential would make one record look like two.
++// A manager-namespaced or provider-namespaced entry is never reported as
++// the operator's own: a helper asked for a host without a username answers
++// with whatever record it holds for that host, which can be a manager
++// entry, and reporting that back as the operator's own credential would
++// make one record look like two.
+ func (a Access) ReadHost(ctx context.Context, host string) (HostCredential, bool) {
+ 	if !portableValue(host) {
+ 		return HostCredential{}, false
+@@ -149,7 +150,7 @@ func (a Access) ReadHost(ctx context.Context, host string) (HostCredential, bool
+ 		return HostCredential{}, false
+ 	}
+ 	username := answer["username"]
+-	if strings.HasPrefix(username, NamespacePrefix) {
++	if strings.HasPrefix(username, NamespacePrefix) || providerNamespaceOwns(username) {
+ 		return HostCredential{}, false
+ 	}
+ 	if username == "" {
+diff --git a/internal/gitcred/provider.go b/internal/gitcred/provider.go
+new file mode 100644
+index 0000000..f3aaba3
+--- /dev/null
++++ b/internal/gitcred/provider.go
+@@ -0,0 +1,68 @@
++package gitcred
++
++// Provider-addressed HTTPS secrets for repository-transport-v1 endpoints.
++//
++// A policy endpoint carries an opaque `authentication` provider identifier
++// (repository-transport §2). The secret for that provider on one host lives
++// in the operator's own Git credential machinery under a provider namespace,
++// exactly like manager-scoped entries: no new secret store, no secrets in
++// policy, manifests, locks, receipts, logs, or command arguments. The
++// namespace keeps provider entries disjoint from both the operator's own
++// host credential and manager scope entries, so none answers for another.
++
++import (
++	"context"
++	"strings"
++)
++
++// ProviderNamespacePrefix opens the username of every provider-held HTTPS
++// entry. A provider identifier cannot contain the "/" that separates a
++// scope's host from its path, and the distinct prefix keeps provider
++// entries disjoint from scope entries even for host-only scopes.
++const ProviderNamespacePrefix = "curator-provider-https:"
++
++// ProviderUsername is the username a provider-held credential for provider
++// lives under. It is "" unless provider is an admissible opaque identifier,
++// so a malformed reference never addresses the credential machinery.
++func ProviderUsername(provider string) string {
++	if !ValidProvider(provider) {
++		return ""
++	}
++	return ProviderNamespacePrefix + provider
++}
++
++// ReadProvider reads the provider-held HTTPS credential for provider on
++// host through the operator's Git credential machinery.
++//
++// The answer is accepted only when the helper answers for the username that
++// was asked about. A helper free to answer a near miss must not hand a
++// different record back as this provider's material. Like every other read
++// here, an absent credential degrades into "nothing here" rather than an
++// error; the transport layer classifies that as an unavailable
++// authentication method.
++func (a Access) ReadProvider(ctx context.Context, provider, host string) (HostCredential, bool) {
++	username := ProviderUsername(provider)
++	if username == "" || !portableValue(host) {
++		return HostCredential{}, false
++	}
++	answer, ok := a.call(ctx, "fill",
++		field{"protocol", "https"}, field{"host", host}, field{"username", username})
++	if !ok || answer["password"] == "" {
++		return HostCredential{}, false
++	}
++	if answered := answer["username"]; answered != "" && answered != username {
++		return HostCredential{}, false
++	}
++	name := answer["username"]
++	if name == "" {
++		name = DefaultUsername
++	}
++	return HostCredential{Username: name, Secret: answer["password"]}, true
++}
++
++// providerNamespaceOwns reports whether username names a provider-held
++// entry. ReadHost uses it to keep excluding namespaced records from the
++// operator's own credential view, the way scope entries are excluded.
++func providerNamespaceOwns(username string) bool {
++	return strings.HasPrefix(username, ProviderNamespacePrefix)
++}
+diff --git a/internal/gitcred/provider_test.go b/internal/gitcred/provider_test.go
+index f22afff..775ef8a 100644
+--- a/internal/gitcred/provider_test.go
++++ b/internal/gitcred/provider_test.go
+@@ -1,6 +1,7 @@
+ package gitcred
+ 
+ import (
++	"context"
+ 	"strings"
+ 	"testing"
+ )
+@@ -46,3 +47,78 @@ func TestValidProviderAdmitsOpaqueIdentifiersOnly(t *testing.T) {
+ 		}
+ 	}
+ }
++
++func TestProviderUsernameNamespacesOpaqueIdentifiersOnly(t *testing.T) {
++	if got, want := ProviderUsername("team-https"), "curator-provider-https:team-https"; got != want {
++		t.Fatalf("ProviderUsername = %q, want %q", got, want)
++	}
++	for _, id := range []string{"", "../escape", "/bin/sh", "team ssh", "team/ssh", "ssh://example.org/kit"} {
++		if got := ProviderUsername(id); got != "" {
++			t.Fatalf("ProviderUsername(%q) = %q, want empty", id, got)
++		}
++	}
++	if ProviderNamespacePrefix == NamespacePrefix {
++		t.Fatal("provider entries must live under their own namespace, disjoint from scope entries")
++	}
++}
++
++func TestReadProviderGoesThroughGitCredentialFill(t *testing.T) {
++	access, dir := fakeAccess(t, "")
++	seedStore(t, dir, credEntry{Host: "git.example.org", Username: ProviderUsername("team-https"), Password: "s3cret"})
++
++	credential, ok := access.ReadProvider(context.Background(), "team-https", "git.example.org")
++	if !ok {
++		t.Fatal("ReadProvider found nothing")
++	}
++	if credential.Username != ProviderUsername("team-https") || credential.Secret != "s3cret" {
++		t.Fatalf("ReadProvider = %+v", credential)
++	}
++	call := singleCall(t, dir)
++	if want := "protocol=https\nhost=git.example.org\nusername=" + ProviderUsername("team-https") + "\n\n"; call.Stdin != want {
++		t.Fatalf("request payload = %q, want %q", call.Stdin, want)
++	}
++}
++
++func TestReadProviderRejectsNearMissAnswers(t *testing.T) {
++	access, dir := fakeAccess(t, modeIgnoreUsername)
++	seedStore(t, dir, credEntry{Host: "git.example.org", Username: "oauth2", Password: "s3cret"})
++
++	if _, ok := access.ReadProvider(context.Background(), "team-https", "git.example.org"); ok {
++		t.Fatal("ReadProvider accepted a credential the helper answered for another username")
++	}
++}
++
++func TestReadProviderRefusesInvalidReferencesBeforeAnyCall(t *testing.T) {
++	access, dir := fakeAccess(t, "")
++	for _, refs := range [][2]string{
++		{"../escape", "git.example.org"},
++		{"team ssh", "git.example.org"},
++		{"", "git.example.org"},
++		{"team-https", ""},
++		{"team-https", "bad\nhost"},
++	} {
++		if _, ok := access.ReadProvider(context.Background(), refs[0], refs[1]); ok {
++			t.Fatalf("ReadProvider(%q, %q) accepted an invalid reference", refs[0], refs[1])
++		}
++	}
++	if calls := recordedCalls(t, dir); len(calls) != 0 {
++		t.Fatalf("invalid references reached the credential machinery %d times", len(calls))
++	}
++}
++
++func TestReadProviderFindsNothingWhenAbsent(t *testing.T) {
++	access, dir := fakeAccess(t, "")
++	seedStore(t, dir, credEntry{Host: "git.example.org", Username: "oauth2", Password: "s3cret"})
++	if _, ok := access.ReadProvider(context.Background(), "team-https", "git.example.org"); ok {
++		t.Fatal("ReadProvider reported material for an unconfigured provider")
++	}
++}
++
++func TestReadHostExcludesProviderEntries(t *testing.T) {
++	access, dir := fakeAccess(t, "")
++	seedStore(t, dir, credEntry{Host: "git.example.org", Username: ProviderUsername("team-https"), Password: "s3cret"})
++
++	if _, ok := access.ReadHost(context.Background(), "git.example.org"); ok {
++		t.Fatal("ReadHost reported a provider-held entry as the operator's own credential")
++	}
++}

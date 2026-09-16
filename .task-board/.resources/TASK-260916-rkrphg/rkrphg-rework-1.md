@@ -1,0 +1,7 @@
+# Rework 1 — TASK-260916-rkrphg (launcher aliases)
+
+Verdict rev1: CHANGES_REQUESTED, one finding (resource TASK-260916-rkrphg_review-verdict-rev1.md): the persisted-byte regression required by review brief item 2 is missing. TestProductionAliasEquivalence compares child payload/stderr but never reads the state the launcher persists after a launch; TestLoadRejectsAliasKeys only proves reader rejection.
+
+Add production-entry tests (through `run`, both aliases plus the canonical controls, tracked and untracked): snapshot every file the launcher itself writes or updates during the launch (managed-home fragments/config/markers/locks/ax session records — enumerate them from the code paths, not from memory), read them after the launch, assert no environment-id field contains `claude` or `codex` as an environment identifier (provider executable names are legitimate) and that the canonical bytes equal the canonical-run bytes. For state owned by Curator (not the launcher) bound the claim explicitly in the test comment: the fake resolver evidence does not prove Curator persistence. Fix the overstated comment on TestLoadRejectsAliasKeys.
+
+Keep everything else unchanged. Narrow tests only (`go test ./cmd/curator-run -run 'Alias|Persist' -count=1`, `./internal/cli`, `./internal/defaults`); the reviewer saw the fake-provider pipeline tests stall for minutes on this host, so keep the new test bounded (per-test timeout, no sleeps). Evidence with exit codes; tick the checklist; handoff rev2 from the Story worktree.

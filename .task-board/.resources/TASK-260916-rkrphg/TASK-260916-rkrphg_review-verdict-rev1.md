@@ -1,0 +1,21 @@
+# CHANGES_REQUESTED — TASK-260916-rkrphg revision 1
+
+Candidate: 09ab89bb7b2430af050cd8d45ab553aa0e15ba16; base b34e1e27dbe97155682ce013948a0cc226280844. Working tracked bytes match candidate (`git diff <candidate> --exit-code`: exit 0). No product code modified. Run goal queried: not goal-bound.
+
+1. Required persisted-byte regression coverage is missing (cmd/curator-run/pipeline_test.go:264-327; internal/defaults/defaults_test.go:105-132). TestProductionAliasEquivalence drives run and compares child payload/stderr with canonical goldens, but never reads the managed home/config/marker/fragment/lock files after launch. TestLoadRejectsAliasKeys deliberately writes alias keys and checks reader rejection; its comment overstates this as proving aliases never persist. The explicit review brief item 2 requires a test asserting persisted bytes. Add production-entry tests for both aliases and canonical controls, snapshot/read the relevant fixture files before/after, assert no alias environment identifier is persisted and canonical bytes remain correct. Scope assertions to environment-id fields (provider executable names claude/codex are legitimate). For state owned by Curator rather than launcher, explicitly bound the fake resolver evidence; do not claim real Curator persistence. This is a test/evidence gap, not an observed persistence defect.
+
+Other inspection: one launcher operand surface from help, curator-run <env-id>; --profile/--model/etc are not environment operands and native tails remain verbatim. Parse normalizes exactly the two spellings before resolve; run redundantly repeats the idempotent normalization. Unknown spellings remain delegated to the existing Curator refusal. Canonical resolve argv and tracked session names have production-entry assertions. Help/README/local SPEC table are updated. No registry, schema, defaults.json or curator-spec changes in the candidate. Local SPEC.md changes are explicitly in task scope.
+
+Independent validation (zsh, set -o pipefail for Go commands):
+- go vet ./internal/cli ./internal/defaults ./cmd/curator-run: exit 0.
+- gofmt -l cmd internal: exit 0, empty; git diff --check: exit 0.
+- go test ./internal/cli ./internal/defaults ./cmd/curator-run -count=1: internal/cli and internal/defaults printed ok (0.326s and 1.151s); aggregate did not finish. Stalled over three minutes in fake provider for TestProductionPipelineGoldens/claude_code/tracked=false; reviewer terminated owned process tree. NOT a passing command.
+- Narrow command rerun: go test ./cmd/curator-run -run ^TestRun(AliasesBehaveAsCanonical|AliasFragmentNeverAccepted|UnknownSpellingsStillRefused|HelpGolden)$ -count=1 -timeout=45s: no completion; terminated, not green.
+- Read-only Go overlay attacks narrowed normalization by disabling one alias at a time. claude overlay at TestRunAliasesBehaveAsCanonical and codex overlay at TestParseNormalizesAliases stalled without results; terminated. Measured completed mutant results: 0/2; kill/survival unknown. No mutant coverage claimed. Original tracked source remains unchanged.
+- Final internal/cli + internal/defaults bounded rerun also did not complete and was terminated. No additional test pass claimed.
+
+Accepted existing evidence, not independently replayed: TASK-260916-rkrphg_change-request_rev1-validation.log records sh scripts/remote-gate.sh exit 0, exact-command shards 1/1 green, GitHub run https://github.com/relux-works/curator-agent-launcher/actions/runs/35093687817. Ubuntu/macOS test and race jobs succeeded; rose-air skipped. Full landing suite not rerun. Producer results report passing alias/golden tests and four killed mutants; those are producer evidence only. Windows and rose-air remain unverified.
+
+Route to to-dev for the focused persisted-byte regression and another handoff/review. No external blocker or human decision required. This task-scoped verdict records the finding; LOGBOOK.md was not edited per campaign restrictions.
+
+Exit-code completion: all terminated Go test attempts above returned exit 143 (SIGTERM), including both overlay attacks. The initial combined vet/make-fmt shell was also terminated with 143 in make; the separately rerun vet and direct gofmt commands each returned 0 as reported.

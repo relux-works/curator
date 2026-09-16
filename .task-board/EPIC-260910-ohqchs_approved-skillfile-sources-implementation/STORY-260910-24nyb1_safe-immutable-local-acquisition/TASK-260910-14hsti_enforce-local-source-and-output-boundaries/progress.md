@@ -1,5 +1,5 @@
 ## Status
-to-review
+development
 
 ## Review
 required
@@ -77,6 +77,22 @@ rev4 (Windows gate fix): rev3 gate failed only TestRunCommitRecheckRefusesSwappe
 agent completed: [implementer] developer (muse) (exit=0)
 spawn run completed: muse (run=RUN-260916-36b978, pid=31075, exit=0)
 spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev3 (rework 2); astra:low per worker policy"}
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev4 (rework 2); astra:low per worker policy"}
+Story STORY-260910-24nyb1 stayed on base 12f1287ee0fb538f9ca004dd53b870e824e5baf2: 1 published Change Request revision(s) are still measured from it — CR-TASK-260910-14hsti-4 revision 4 (ready, element TASK-260910-14hsti, base 12f1287ee0fb538f9ca004dd53b870e824e5baf2). Carry them forward and the next spawn converges. carry the listed revision(s) forward: review one still awaiting a verdict, or task-board worktree checkpoint <ELEMENT-ID> an accepted one; when trunk has already advanced on paths the revision also changes, task-board worktree converge STORY-260910-24nyb1 is the sanctioned convergence; inspect with task-board worktree status STORY-260910-24nyb1, or task-board worktree abort STORY-260910-24nyb1
+spawn selection rationale for gpt-6-astra/low: independent review rev4 (rework 2); astra:low per worker policy
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260916-2a732a, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260916-2a732a)
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-2a732a, pid=48969, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"rework rev5 after CHANGES_REQUESTED (production wiring + per-write recheck); muse-spark:max per worker policy"}
+Story STORY-260910-24nyb1 stayed on base 12f1287ee0fb538f9ca004dd53b870e824e5baf2: 1 published Change Request revision(s) are still measured from it — CR-TASK-260910-14hsti-4 revision 4 (changes_requested, element TASK-260910-14hsti, base 12f1287ee0fb538f9ca004dd53b870e824e5baf2). Carry them forward and the next spawn converges. carry the listed revision(s) forward: review one still awaiting a verdict, or task-board worktree checkpoint <ELEMENT-ID> an accepted one; when trunk has already advanced on paths the revision also changes, task-board worktree converge STORY-260910-24nyb1 is the sanctioned convergence; inspect with task-board worktree status STORY-260910-24nyb1, or task-board worktree abort STORY-260910-24nyb1
+spawn selection rationale for muse-spark-1.3-contributor/max: rework rev5 after CHANGES_REQUESTED (production wiring + per-write recheck); muse-spark:max per worker policy
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-7fb858, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-7fb858)
 
 ## Precondition Resources
 - [TASK-260910-14hsti_source-contract.md](file://TASK-260910-14hsti/TASK-260910-14hsti_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -87,6 +103,7 @@ spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","te
 - [14hsti-gate-failure.md](file://TASK-260910-14hsti/14hsti-gate-failure.md)
 - [skillfile-wave2-review-brief.md](file://TASK-260910-14hsti/skillfile-wave2-review-brief.md)
 - [14hsti-rework-2.md](file://TASK-260910-14hsti/14hsti-rework-2.md)
+- [14hsti-rework-3.md](file://TASK-260910-14hsti/14hsti-rework-3.md)
 
 ## Outcome Resources
 - [TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-ef1f47.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-ef1f47.log) — System spawn log captured by task-board
@@ -107,12 +124,17 @@ spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","te
 - [TASK-260910-14hsti_change-request_rev3-validation.log](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev3-validation.log) — Change Request CR-TASK-260910-14hsti-3 revision 3 bounded validation log
 - [TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-36b978.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-36b978.log) — System spawn log captured by task-board
 - [TASK-260910-14hsti_results_rev4.md](file://TASK-260910-14hsti/TASK-260910-14hsti_results_rev4.md) — rev4 Windows gate fix: lazy SameFile pin, evidence and bounds
+- [TASK-260910-14hsti_change-request_rev4.patch](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev4.patch) — Change Request CR-TASK-260910-14hsti-4 revision 4 candidate patch (repository_delta=present, 12 changed paths)
+- [TASK-260910-14hsti_change-request_rev4-validation.log](file://TASK-260910-14hsti/TASK-260910-14hsti_change-request_rev4-validation.log) — Change Request CR-TASK-260910-14hsti-4 revision 4 bounded validation log
+- [TASK-260910-14hsti_spawn-log_-reviewer--reviewer--codex-_RUN-260916-2a732a.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-reviewer--reviewer--codex-_RUN-260916-2a732a.log) — System spawn log captured by task-board
+- [TASK-260910-14hsti_review-verdict-rev4.md](file://TASK-260910-14hsti/TASK-260910-14hsti_review-verdict-rev4.md) — CHANGES_REQUESTED: production wiring absent and per-write recheck missing; exact-tree focused tests and hosted evidence, mutant attempts inconclusive
+- [TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-7fb858.log](file://TASK-260910-14hsti/TASK-260910-14hsti_spawn-log_-implementer--developer--muse-_RUN-260916-7fb858.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-10T13:56:03Z
 
 ## Last Update
-2026-09-16T11:36:33Z
+2026-09-16T12:16:23Z
 
 ## Assigned To
 [implementer] developer (muse)

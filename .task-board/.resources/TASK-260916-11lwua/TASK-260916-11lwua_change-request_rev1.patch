@@ -1,0 +1,829 @@
+diff --git a/README.md b/README.md
+index 9ab747b..5ba663e 100644
+--- a/README.md
++++ b/README.md
+@@ -175,6 +175,11 @@ curator profile use <name> [--env <env-id>]  # linked switch with backups and ma
+ curator profile update [<name>|--all]  # re-resolve; blocking findings keep the old lock
+ curator profile remove <name> [--purge]  # refuse while current in any scope
+ curator profile sync    # re-materialize current profiles across adapters
++curator env resolve <env-id> [--profile <name>] [--repair] [--format json|env|shell]
++curator env status [--check] [--json]  # profile x environment x surface matrix
++curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
++# <env-id> accepts claude and codex as aliases of claude_code and codex_cli;
++# outputs, markers, fragments, and config keep the canonical id.
+ ```
+ 
+ </details>
+diff --git a/cmd/curator/env.go b/cmd/curator/env.go
+index a28fe7d..96a10b6 100644
+--- a/cmd/curator/env.go
++++ b/cmd/curator/env.go
+@@ -40,6 +40,7 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil || len(positional) != 1 {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair] [--takeover] [--format json|env|shell]")
++		_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
+ 		return exitUsage
+ 	}
+ 	// --takeover applies only with --repair (cli/curator.md): without a
+@@ -58,7 +59,7 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
+ 	result, err := envprofile.Resolve(envprofile.ResolveRequest{
+ 		Home:      cfg.Home(),
+ 		Profile:   *profile,
+-		EnvID:     positional[0],
++		EnvID:     envregistry.NormalizeEnvID(positional[0]),
+ 		LaunchDir: launchDir,
+ 		Machine:   envregistry.DefaultMachineConfig(),
+ 		Repair:    *repair,
+diff --git a/cmd/curator/envalias.go b/cmd/curator/envalias.go
+new file mode 100644
+index 0000000..7cc68da
+--- /dev/null
++++ b/cmd/curator/envalias.go
+@@ -0,0 +1,114 @@
++package main
++
++import (
++	"github.com/relux-works/curator/internal/envregistry"
++)
++
++// CLI environment aliases (manager profile §12.1): the command-line
++// environment operand accepts claude and codex as aliases of the
++// canonical claude_code and codex_cli registry ids. Every site below
++// normalizes with envregistry.NormalizeEnvID before any validation or
++// lookup, so an alias never reaches the environment_unknown refusal and
++// never persists: outputs, markers, fragments, configuration records,
++// and locks keep the canonical id.
++
++// envAliasUsage is printed beneath the usage rows that take an
++// environment operand. envKnobAliasUsage is its knob-path counterpart
++// for the env config rows.
++const (
++	envAliasUsage     = "curator: <env-id> accepts claude and codex as aliases of claude_code and codex_cli; outputs keep the canonical id"
++	envKnobAliasUsage = "curator: environment positions in <knob> accept claude and codex as aliases of claude_code and codex_cli; the file keeps the canonical id"
++)
++
++// normalizeEnvKnob rewrites alias spellings in the environment positions
++// of an environments knob path to their canonical ids: forms.<env>,
++// in_place_mode.<env>, scoped_current.<env-or-target>, and
++// isolation.<profile>.<env>. Target ids pass through unchanged — they
++// are never aliases — and every other knob passes through untouched.
++// The input slice is not modified.
++func normalizeEnvKnob(segments []string) []string {
++	rewritten := append([]string{}, segments...)
++	switch {
++	case len(rewritten) >= 2 && (rewritten[0] == "forms" ||
++		rewritten[0] == "in_place_mode" || rewritten[0] == "scoped_current"):
++		rewritten[1] = envregistry.NormalizeEnvID(rewritten[1])
++	case len(rewritten) >= 3 && rewritten[0] == "isolation":
++		rewritten[2] = envregistry.NormalizeEnvID(rewritten[2])
++	}
++	return rewritten
++}
++
++// normalizeEnvKnobValue rewrites alias spellings inside a wholesale value
++// set on an environment-keyed knob: the map keys of forms,
++// in_place_mode, scoped_current, and isolation.<profile>, the
++// profile-nested map keys of a whole isolation object, and the env
++// members of a shadow_acknowledged list. Any other knob or value shape
++// passes through untouched for the configuration grammar to accept or
++// refuse as today. Where an alias and its canonical id both name keys,
++// the explicit canonical spelling wins, so the rewrite is deterministic.
++func normalizeEnvKnobValue(segments []string, value any) any {
++	switch {
++	case len(segments) == 1 && (segments[0] == "forms" ||
++		segments[0] == "in_place_mode" || segments[0] == "scoped_current"):
++		return normalizeEnvKeyedMap(value)
++	case len(segments) == 2 && segments[0] == "isolation":
++		return normalizeEnvKeyedMap(value)
++	case len(segments) == 1 && segments[0] == "isolation":
++		obj, ok := value.(map[string]any)
++		if !ok {
++			return value
++		}
++		rewritten := make(map[string]any, len(obj))
++		for profile, nested := range obj {
++			rewritten[profile] = normalizeEnvKeyedMap(nested)
++		}
++		return rewritten
++	case len(segments) == 1 && segments[0] == "shadow_acknowledged":
++		list, ok := value.([]any)
++		if !ok {
++			return value
++		}
++		rewritten := make([]any, len(list))
++		for i, item := range list {
++			entry, ok := item.(map[string]any)
++			if !ok {
++				rewritten[i] = item
++				continue
++			}
++			next := make(map[string]any, len(entry))
++			for key, member := range entry {
++				next[key] = member
++			}
++			if env, ok := next["env"].(string); ok {
++				next["env"] = envregistry.NormalizeEnvID(env)
++			}
++			rewritten[i] = next
++		}
++		return rewritten
++	default:
++		return value
++	}
++}
++
++// normalizeEnvKeyedMap rewrites alias keys of one environment-keyed map
++// to their canonical ids. A non-map value passes through untouched.
++func normalizeEnvKeyedMap(value any) any {
++	obj, ok := value.(map[string]any)
++	if !ok {
++		return value
++	}
++	rewritten := make(map[string]any, len(obj))
++	for key, member := range obj {
++		if envregistry.NormalizeEnvID(key) == key {
++			rewritten[key] = member
++		}
++	}
++	for key, member := range obj {
++		if canonical := envregistry.NormalizeEnvID(key); canonical != key {
++			if _, present := rewritten[canonical]; !present {
++				rewritten[canonical] = member
++			}
++		}
++	}
++	return rewritten
++}
+diff --git a/cmd/curator/envalias_test.go b/cmd/curator/envalias_test.go
+new file mode 100644
+index 0000000..684d391
+--- /dev/null
++++ b/cmd/curator/envalias_test.go
+@@ -0,0 +1,368 @@
++package main
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++)
++
++// These tests drive the production run() entry point for the CLI alias
++// rule (manager profile §12.1): claude and codex normalize to claude_code
++// and codex_cli before validation, outputs keep the canonical id, aliases
++// are never persisted, and unknown spellings are still refused.
++
++// TestEnvResolveAcceptsAliases drives both spellings through env resolve:
++// the fragment carries the canonical environment, the bare resolve emits
++// bytes identical to the canonical spelling, and the env/shell formats
++// name the canonical home variable.
++func TestEnvResolveAcceptsAliases(t *testing.T) {
++	source, _ := profileHome(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("install stderr:\n%s", stderr)
++	}
++	cases := []struct{ alias, canonical, variable string }{
++		{"claude", "claude_code", "CLAUDE_CONFIG_DIR"},
++		{"codex", "codex_cli", "CODEX_HOME"},
++	}
++	for _, tc := range cases {
++		code, stdout, stderr := runProfile(t, source, "env", "resolve", tc.alias, "--repair")
++		if code != exitOK {
++			t.Fatalf("resolve %s --repair = %d\nstderr:\n%s", tc.alias, code, stderr)
++		}
++		var fragment map[string]any
++		if err := json.Unmarshal([]byte(stdout), &fragment); err != nil {
++			t.Fatalf("fragment is not JSON: %v\nstdout:\n%s", err, stdout)
++		}
++		if fragment["environment"] != tc.canonical {
++			t.Fatalf("resolve %s fragment environment = %v, want %s", tc.alias, fragment["environment"], tc.canonical)
++		}
++		if code, again, _ := runProfile(t, source, "env", "resolve", tc.alias); code != exitOK || again != stdout {
++			t.Fatalf("bare resolve %s = %d, identical bytes: %v", tc.alias, code, again == stdout)
++		}
++		if code, canonical, _ := runProfile(t, source, "env", "resolve", tc.canonical); code != exitOK || canonical != stdout {
++			t.Fatalf("resolve %s = %d, alias/canonical bytes identical: %v", tc.canonical, code, canonical == stdout)
++		}
++		if code, envOut, _ := runProfile(t, source, "env", "resolve", tc.alias, "--format", "env"); code != exitOK || !strings.HasPrefix(envOut, tc.variable+"=") {
++			t.Fatalf("env format %s = %d %q", tc.alias, code, envOut)
++		}
++		if code, shellOut, _ := runProfile(t, source, "env", "resolve", tc.alias, "--format", "shell"); code != exitOK || !strings.HasPrefix(shellOut, "export "+tc.variable+"='") {
++			t.Fatalf("shell format %s = %d %q", tc.alias, code, shellOut)
++		}
++	}
++}
++
++// TestEnvResolveAliasAdjacentUnknownsRefused narrows the refusal around
++// the aliases: near-miss spellings still fail with environment_unknown,
++// never by normalizing.
++func TestEnvResolveAliasAdjacentUnknownsRefused(t *testing.T) {
++	source, _ := profileHome(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("install stderr:\n%s", stderr)
++	}
++	for _, id := range []string{"Claude", "Codex", "claude-code", "codexcli", "claud", "CLAUDE"} {
++		code, _, stderr := runProfile(t, source, "env", "resolve", id)
++		if code != exitFail || !strings.Contains(stderr, "environment_unknown") {
++			t.Fatalf("resolve %s = %d\nstderr:\n%s", id, code, stderr)
++		}
++	}
++}
++
++// TestProfileUseEnvAliases drives both spellings through profile use
++// --env: the switch reports the canonical adapter, the scoped record is
++// filed under the canonical scope key, and the clear form accepts the
++// alias too.
++func TestProfileUseEnvAliases(t *testing.T) {
++	source, home := profileHome(t)
++	first := t.TempDir()
++	writeContextPackage(t, first, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", first); code != exitOK {
++		t.Fatalf("install stderr:\n%s", stderr)
++	}
++	second := t.TempDir()
++	writeContextPackage(t, second, "other", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", second, "--as", "other"); code != exitOK {
++		t.Fatalf("install other stderr:\n%s", stderr)
++	}
++	for alias, canonical := range map[string]string{"claude": "claude_code", "codex": "codex_cli"} {
++		code, stdout, stderr := runProfile(t, source, "profile", "use", "other", "--env", alias)
++		if code != exitOK {
++			t.Fatalf("use --env %s = %d\nstdout:\n%s\nstderr:\n%s", alias, code, stdout, stderr)
++		}
++		if !strings.Contains(stdout, canonical+": switched") {
++			t.Fatalf("use --env %s stdout:\n%s", alias, stdout)
++		}
++		if strings.Contains(stdout, alias+": switched") {
++			t.Fatalf("use --env %s printed the alias:\n%s", alias, stdout)
++		}
++		// A scoped switch to another profile records a scoped current;
++		// the record file must carry the canonical scope key.
++		entries, err := os.ReadDir(filepath.Join(home, "profiles", "scoped"))
++		if err != nil {
++			t.Fatal(err)
++		}
++		var names []string
++		for _, entry := range entries {
++			names = append(names, entry.Name())
++		}
++		if want := "env%3A" + canonical; !containsName(names, want) {
++			t.Fatalf("scoped records = %v, want %s", names, want)
++		}
++		if bad := "env%3A" + alias; containsName(names, bad) {
++			t.Fatalf("scoped records persist the alias: %v", names)
++		}
++		if code, _, stderr := runProfile(t, source, "profile", "use", "--clear", "--env", alias); code != exitOK {
++			t.Fatalf("clear --env %s = %d\nstderr:\n%s", alias, code, stderr)
++		}
++	}
++}
++
++// TestProfileUseUnknownEnvRefused narrows the --env gate: an unknown
++// spelling fails with environment_unknown without moving any current.
++func TestProfileUseUnknownEnvRefused(t *testing.T) {
++	source, home := profileHome(t)
++	pkg := t.TempDir()
++	writeContextPackage(t, pkg, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", pkg); code != exitOK {
++		t.Fatalf("install stderr:\n%s", stderr)
++	}
++	code, _, stderr := runProfile(t, source, "profile", "use", "acme", "--env", "cursor")
++	if code != exitFail || !strings.Contains(stderr, "environment_unknown") {
++		t.Fatalf("use --env cursor = %d\nstderr:\n%s", code, stderr)
++	}
++	if entries, err := os.ReadDir(filepath.Join(home, "profiles", "scoped")); err == nil && len(entries) != 0 {
++		t.Fatalf("a refused switch recorded scoped state: %v", entries)
++	} else if err != nil && !os.IsNotExist(err) {
++		t.Fatal(err)
++	}
++}
++
++// TestEnvStatusPrintsCanonicalAfterAliasUse drives an alias switch and
++// proves env status rows carry the canonical id only: the home rows, the
++// scope rows, and the tool rows.
++func TestEnvStatusPrintsCanonicalAfterAliasUse(t *testing.T) {
++	source, _ := profileHome(t)
++	first := t.TempDir()
++	writeContextPackage(t, first, "acme", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", first); code != exitOK {
++		t.Fatalf("install stderr:\n%s", stderr)
++	}
++	second := t.TempDir()
++	writeContextPackage(t, second, "other", "1.0.0", "hello\n")
++	if code, _, stderr := runProfile(t, source, "profile", "install", second, "--as", "other"); code != exitOK {
++		t.Fatalf("install other stderr:\n%s", stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "profile", "use", "other", "--env", "claude"); code != exitOK {
++		t.Fatalf("use --env claude = %d\nstderr:\n%s", code, stderr)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "resolve", "codex", "--repair"); code != exitOK {
++		t.Fatalf("resolve codex --repair = %d\nstderr:\n%s", code, stderr)
++	}
++	code, stdout, stderr := runProfile(t, source, "env", "status")
++	if code != exitOK {
++		t.Fatalf("status = %d\nstderr:\n%s", code, stderr)
++	}
++	for _, want := range []string{"other claude_code:", "acme codex_cli:", "scope env:claude_code:", "tool claude_code:", "tool codex_cli:"} {
++		if !strings.Contains(stdout, want) {
++			t.Fatalf("status misses %q:\n%s", want, stdout)
++		}
++	}
++	// The canonical spellings carry an underscore where the alias ends,
++	// so a bare " claude:"/" codex:" row is an alias leak, not a prefix
++	// of a canonical row.
++	for _, leaked := range []string{" claude:", " codex:", "scope env:claude:", "scope env:codex:", "tool claude:", "tool codex:"} {
++		if strings.Contains(stdout, leaked) {
++			t.Fatalf("status leaks the alias in %q:\n%s", leaked, stdout)
++		}
++	}
++}
++
++// TestEnvConfigSetNormalizesEnvKnobs drives alias knob paths through env
++// config set: the machine file persists the canonical id, show reads it
++// back through either spelling, and unset accepts the alias too.
++func TestEnvConfigSetNormalizesEnvKnobs(t *testing.T) {
++	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	type knobCase struct {
++		aliasKnob, canonicalKnob, value, want string
++	}
++	for _, tc := range []knobCase{
++		{"forms.claude", "forms.claude_code", "referenced", `"referenced"`},
++		{"isolation.acme.codex", "isolation.acme.codex_cli", "shared", `"shared"`},
++		{"in_place_mode.claude", "in_place_mode.claude_code", "linked", `"linked"`},
++		{"scoped_current.codex", "scoped_current.codex_cli", "acme", `"acme"`},
++	} {
++		if code, _, stderr := runProfile(t, source, "env", "config", "set", tc.aliasKnob, tc.value); code != exitOK {
++			t.Fatalf("set %s = %d\nstderr:\n%s", tc.aliasKnob, code, stderr)
++		}
++		source = reloadSource(t, source)
++		for _, spelling := range []string{tc.aliasKnob, tc.canonicalKnob} {
++			code, stdout, stderr := runProfile(t, source, "env", "config", "show", spelling)
++			if code != exitOK || strings.TrimSpace(stdout) != tc.want {
++				t.Fatalf("show %s = %d %q, want %s\nstderr:\n%s", spelling, code, stdout, tc.want, stderr)
++			}
++		}
++		raw, err := os.ReadFile(source.path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		var object map[string]any
++		if err := json.Unmarshal(raw, &object); err != nil {
++			t.Fatal(err)
++		}
++		serialized, _ := json.Marshal(object["environments"])
++		for _, leaked := range []string{`"claude":`, `"codex":`} {
++			if strings.Contains(string(serialized), leaked) {
++				t.Fatalf("machine file persists the alias after set %s: %s", tc.aliasKnob, serialized)
++			}
++		}
++		if code, _, stderr := runProfile(t, source, "env", "config", "unset", tc.aliasKnob); code != exitOK {
++			t.Fatalf("unset %s = %d\nstderr:\n%s", tc.aliasKnob, code, stderr)
++		}
++		source = reloadSource(t, source)
++	}
++}
++
++// TestEnvConfigSetNormalizesWholesaleValues drives wholesale values that
++// name environments: env-keyed map keys and shadow_acknowledged env
++// members normalize, and an explicit canonical key wins over its alias.
++func TestEnvConfigSetNormalizesWholesaleValues(t *testing.T) {
++	source := writeMachineConfig(t, `{"schema_version": 2, "skills_root": "x", "projects": {}}`)
++	if code, _, stderr := runProfile(t, source, "env", "config", "set", "forms", `{"codex": "monolithic"}`); code != exitOK {
++		t.Fatalf("set forms = %d\nstderr:\n%s", code, stderr)
++	}
++	source = reloadSource(t, source)
++	if got := source.cfg.Env.Forms["codex_cli"]; got != "monolithic" {
++		t.Fatalf("forms = %+v, want codex_cli normalized", source.cfg.Env.Forms)
++	}
++	if _, leaked := source.cfg.Env.Forms["codex"]; leaked {
++		t.Fatalf("forms persist the alias: %+v", source.cfg.Env.Forms)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "config", "set", "isolation", `{"acme": {"claude": "isolated"}}`); code != exitOK {
++		t.Fatalf("set isolation = %d\nstderr:\n%s", code, stderr)
++	}
++	source = reloadSource(t, source)
++	if got := source.cfg.Env.Isolation["acme"]["claude_code"]; got != "isolated" {
++		t.Fatalf("isolation = %+v, want claude_code normalized", source.cfg.Env.Isolation)
++	}
++	if code, _, stderr := runProfile(t, source, "env", "config", "set", "shadow_acknowledged", `[{"env": "codex", "path": "AGENTS.override.md"}]`); code != exitOK {
++		t.Fatalf("set shadow_acknowledged = %d\nstderr:\n%s", code, stderr)
++	}
++	source = reloadSource(t, source)
++	if len(source.cfg.Env.ShadowAcknowledged) != 1 || source.cfg.Env.ShadowAcknowledged[0].Env != "codex_cli" {
++		t.Fatalf("shadow_acknowledged = %+v, want codex_cli normalized", source.cfg.Env.ShadowAcknowledged)
++	}
++	// Both spellings at once: the explicit canonical key wins, so the
++	// rewrite is deterministic rather than map-ordered.
++	if code, _, stderr := runProfile(t, source, "env", "config", "set", "forms", `{"claude": "monolithic", "claude_code": "referenced"}`); code != exitOK {
++		t.Fatalf("set forms collision = %d\nstderr:\n%s", code, stderr)
++	}
++	source = reloadSource(t, source)
++	if got := source.cfg.Env.Forms["claude_code"]; got != "referenced" {
++		t.Fatalf("forms collision = %+v, want the canonical spelling to win", source.cfg.Env.Forms)
++	}
++}
++
++// TestRunDispatchNormalizesAliasOperand drives `run` through the umbrella
++// dispatch with a scripted provider: a leading alias arrives canonical,
++// while flag values and unknown spellings pass through verbatim for the
++// launcher to classify and refuse.
++func TestRunDispatchNormalizesAliasOperand(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("no sh on this platform")
++	}
++	source, _ := profileHome(t)
++	bin := t.TempDir()
++	script := "#!/bin/sh\necho \"provider got: $@\"\n"
++	if err := os.WriteFile(filepath.Join(bin, "curator-run"), []byte(script), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
++	for alias, canonical := range map[string]string{"claude": "claude_code", "codex": "codex_cli"} {
++		code, stdout, stderr := runProfile(t, source, "run", alias, "--beta")
++		if code != exitOK {
++			t.Fatalf("run %s = %d\nstderr:\n%s", alias, code, stderr)
++		}
++		if !strings.Contains(stdout, "provider got: "+canonical+" --beta") {
++			t.Fatalf("run %s did not normalize:\n%s", alias, stdout)
++		}
++	}
++	// A later alias is not in operand position: a profile literally named
++	// claude travels as a flag value, untouched.
++	code, stdout, stderr := runProfile(t, source, "run", "--profile", "claude")
++	if code != exitOK {
++		t.Fatalf("run --profile claude = %d\nstderr:\n%s", code, stderr)
++	}
++	if !strings.Contains(stdout, "provider got: --profile claude") {
++		t.Fatalf("flag values must pass through verbatim:\n%s", stdout)
++	}
++	// Unknown spellings pass through verbatim: the launcher owns the
++	// refusal, the manager rewrites only known aliases.
++	code, stdout, stderr = runProfile(t, source, "run", "cursor", "--beta")
++	if code != exitOK {
++		t.Fatalf("run cursor = %d\nstderr:\n%s", code, stderr)
++	}
++	if !strings.Contains(stdout, "provider got: cursor --beta") {
++		t.Fatalf("unknown spellings must pass through verbatim:\n%s", stdout)
++	}
++}
++
++// TestUsageListsAliases proves the help rows name the alias rule at every
++// environment-operand surface.
++func TestUsageListsAliases(t *testing.T) {
++	source, _ := profileHome(t)
++	for _, args := range [][]string{
++		{"env", "resolve"},
++		{"profile", "use"},
++		{"env", "config"},
++		{"env", "config", "set", "forms.claude"},
++	} {
++		_, _, stderr := runProfile(t, source, args...)
++		if !strings.Contains(stderr, "claude and codex as aliases of claude_code and codex_cli") {
++			t.Fatalf("%v help misses the alias rule:\n%s", args, stderr)
++		}
++	}
++	_, stdout, _ := runProfile(t, source, "help")
++	// The top-level paragraph wraps across lines; compare folded.
++	folded := strings.Join(strings.Fields(stdout), " ")
++	if !strings.Contains(folded, "claude and codex as aliases of claude_code and codex_cli") {
++		t.Fatalf("top-level help misses the alias rule:\n%s", stdout)
++	}
++}
++
++// TestNormalizeEnvKnobPositions pins the knob table without a config
++// file: only the documented environment positions rewrite, and target
++// knobs, bare heads, and deeper paths pass through untouched.
++func TestNormalizeEnvKnobPositions(t *testing.T) {
++	for knob, want := range map[string]string{
++		"forms.claude":            "forms.claude_code",
++		"in_place_mode.codex":     "in_place_mode.codex_cli",
++		"scoped_current.claude":   "scoped_current.claude_code",
++		"isolation.acme.codex":    "isolation.acme.codex_cli",
++		"forms.codex_cli":         "forms.codex_cli",
++		"isolation.acme.pi":       "isolation.acme.pi",
++		"targets.claude":          "targets.claude",
++		"system_prompt_files.a.b": "system_prompt_files.a.b",
++		"forms":                   "forms",
++		"isolation.acme":          "isolation.acme",
++	} {
++		got := strings.Join(normalizeEnvKnob(strings.Split(knob, ".")), ".")
++		if got != want {
++			t.Fatalf("normalizeEnvKnob(%q) = %q, want %q", knob, got, want)
++		}
++	}
++}
++
++func containsName(names []string, want string) bool {
++	for _, name := range names {
++		if name == want {
++			return true
++		}
++	}
++	return false
++}
+diff --git a/cmd/curator/envconfig.go b/cmd/curator/envconfig.go
+index f9155b5..2c796aa 100644
+--- a/cmd/curator/envconfig.go
++++ b/cmd/curator/envconfig.go
+@@ -15,6 +15,7 @@ import (
+ func (c cli) cmdEnvConfig(cfg *config.Config, args []string) int {
+ 	if len(args) == 0 {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env config show|set|unset [<knob> [<value>]]")
++		_, _ = fmt.Fprintln(c.stderr, envKnobAliasUsage)
+ 		return exitUsage
+ 	}
+ 	switch args[0] {
+@@ -32,6 +33,7 @@ func (c cli) cmdEnvConfig(cfg *config.Config, args []string) int {
+ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
+ 	if len(args) > 1 {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env config show [<knob>]")
++		_, _ = fmt.Fprintln(c.stderr, envKnobAliasUsage)
+ 		return exitUsage
+ 	}
+ 	rendered := cfg.EffectiveJSON()
+@@ -44,6 +46,7 @@ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitUsage
+ 	}
++	segments = normalizeEnvKnob(segments)
+ 	value, present := lookupKnob(env, segments)
+ 	if !present {
+ 		value = nil
+@@ -54,6 +57,7 @@ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
+ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
+ 	if len(args) != 2 {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env config set <knob> <value>")
++		_, _ = fmt.Fprintln(c.stderr, envKnobAliasUsage)
+ 		return exitUsage
+ 	}
+ 	knob, rawValue := args[0], args[1]
+@@ -62,6 +66,7 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitUsage
+ 	}
++	segments = normalizeEnvKnob(segments)
+ 	if lock := config.EnvLockKey(knob); lock != "" && cfg.LockedBySystem(lock) {
+ 		_, _ = fmt.Fprintf(c.stderr, "curator: environments knob %q is locked by %s; the system value wins\n", knob, cfg.SystemConfigPath)
+ 		return exitFail
+@@ -70,6 +75,7 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
+ 	if err := json.Unmarshal([]byte(rawValue), &value); err != nil {
+ 		value = rawValue
+ 	}
++	value = normalizeEnvKnobValue(segments, value)
+ 	object, err := config.ReadRaw(cfg.Path)
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+@@ -95,6 +101,7 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
+ func (c cli) cmdEnvConfigUnset(cfg *config.Config, args []string) int {
+ 	if len(args) != 1 {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator: env config unset <knob>")
++		_, _ = fmt.Fprintln(c.stderr, envKnobAliasUsage)
+ 		return exitUsage
+ 	}
+ 	knob := args[0]
+@@ -103,6 +110,7 @@ func (c cli) cmdEnvConfigUnset(cfg *config.Config, args []string) int {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+ 		return exitUsage
+ 	}
++	segments = normalizeEnvKnob(segments)
+ 	if lock := config.EnvLockKey(knob); lock != "" && cfg.LockedBySystem(lock) {
+ 		_, _ = fmt.Fprintf(c.stderr, "curator: environments knob %q is locked by %s; the system value wins\n", knob, cfg.SystemConfigPath)
+ 		return exitFail
+diff --git a/cmd/curator/main.go b/cmd/curator/main.go
+index 2123d18..3dd9ed2 100644
+--- a/cmd/curator/main.go
++++ b/cmd/curator/main.go
+@@ -73,7 +73,7 @@ Commands:
+   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
+   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
+   env <subcommand>         resolve | status | config (see env resolve -h)
+-  run ...                  umbrella dispatch to curator-run (see §11)
++  run <env-id> ...         umbrella dispatch to curator-run (see §11)
+   hybrid <subcommand>      add | remove | list | status
+   audit [target] [flags]   run audit, pin trust, or publish a signed record
+   gc                       remove unreferenced runtime entries
+@@ -81,6 +81,9 @@ Commands:
+   ui                       terminal view over installed state
+   config <subcommand>      show | build-ssh | build-https (see config build-ssh -h, config build-https -h)
+   --version                print the curator version
++
++Environment operands accept claude and codex as aliases of claude_code and
++codex_cli; every output keeps the canonical id.
+ `
+ 
+ func main() {
+diff --git a/cmd/curator/profile.go b/cmd/curator/profile.go
+index 267398d..81158d2 100644
+--- a/cmd/curator/profile.go
++++ b/cmd/curator/profile.go
+@@ -7,8 +7,16 @@ import (
+ 
+ 	"github.com/relux-works/curator/internal/config"
+ 	"github.com/relux-works/curator/internal/envprofile"
++	"github.com/relux-works/curator/internal/envregistry"
+ )
+ 
++// profileUseUsage prints the two defined profile-use forms with the
++// environment alias rule.
++func (c cli) profileUseUsage() {
++	_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
++	_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
++}
++
+ // cmdProfile dispatches the profile family (cli/curator.md): install,
+ // import, list, use, update, remove, sync, compose.
+ func (c cli) cmdProfile(args []string) int {
+@@ -189,13 +197,13 @@ func (c cli) cmdProfileList(cfg *config.Config, args []string) int {
+ 
+ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
+ 	flags := c.newFlagSet("profile use")
+-	env := flags.String("env", "", "narrow the switch to one environment")
++	env := flags.String("env", "", "narrow the switch to one environment (claude and codex alias claude_code and codex_cli)")
+ 	target := flags.String("target", "", "narrow the switch to one target")
+ 	clearScope := flags.Bool("clear", false, "drop the scoped current profile")
+ 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the switch would write")
+ 	positional, err := parseInterspersed(flags, args)
+ 	if err != nil {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
++		c.profileUseUsage()
+ 		return exitUsage
+ 	}
+ 	// cli/curator.md defines exactly two profile-use forms: a named
+@@ -206,11 +214,11 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
+ 	name := ""
+ 	if *clearScope {
+ 		if len(positional) != 0 || (*env == "" && *target == "") {
+-			_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
++			c.profileUseUsage()
+ 			return exitUsage
+ 		}
+ 	} else if len(positional) != 1 {
+-		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
++		c.profileUseUsage()
+ 		return exitUsage
+ 	} else {
+ 		name = positional[0]
+@@ -221,7 +229,7 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
+ 	// --use reach the same seam. A scoped switch is unaffected.
+ 	policy := envprofile.PolicyFromConfig(cfg)
+ 	policy.Takeover = *takeover
+-	results, err := envprofile.UseWithPolicy(cfg.Home(), name, *env, *target, *clearScope, policy)
++	results, err := envprofile.UseWithPolicy(cfg.Home(), name, envregistry.NormalizeEnvID(*env), *target, *clearScope, policy)
+ 	for _, result := range results {
+ 		printEntryResult(c, result)
+ 	}
+diff --git a/cmd/curator/umbrella.go b/cmd/curator/umbrella.go
+index 78c86b9..84d4c11 100644
+--- a/cmd/curator/umbrella.go
++++ b/cmd/curator/umbrella.go
+@@ -8,17 +8,20 @@ import (
+ 	"runtime"
+ 	"strings"
+ 
++	"github.com/relux-works/curator/internal/envregistry"
+ 	"github.com/relux-works/curator/internal/globalbins"
+ )
+ 
+ // Umbrella subcommand discovery (environments §11): a CLI subcommand the
+ // manager does not implement resolves to an executable named curator-<name>
+ // on PATH and is executed with the remaining arguments verbatim — the git,
+-// kubectl, and docker external-subcommand convention. The manager carries
+-// no knowledge of any provider: no provider registry, no provider-specific
+-// flags, no version coupling. The first providers are curator-run (the
+-// launcher, its own specification) and curator-session (a shim to the
+-// agent session manager); neither ships here.
++// kubectl, and docker external-subcommand convention — except that the run
++// row rewrites a leading claude/codex alias to its canonical environment
++// id first (manager profile §12.1). The manager carries no knowledge of
++// any provider: no provider registry, no provider-specific flags, no
++// version coupling. The first providers are curator-run (the launcher,
++// its own specification) and curator-session (a shim to the agent
++// session manager); neither ships here.
+ 
+ // findProvider resolves curator-<name> on PATH. Profile, marker, and
+ // fragment data never influence the dispatched name, the resolved path,
+@@ -76,9 +79,33 @@ func underDir(path, root string) bool {
+ 	return path == clean || strings.HasPrefix(path, clean+string(filepath.Separator))
+ }
+ 
++// normalizeRunEnvOperand rewrites the launcher environment operand of
++// `curator run <env-id> ...` from an alias to its canonical id. Only the
++// first token after run is an operand position the manager may read: the
++// launcher grammar puts <env-id> at the first non-flag token, and the
++// manager knows no provider flags, so a later alias — a flag value such
++// as a profile literally named claude — passes through untouched for the
++// launcher to classify. Unknown spellings pass through as well: the
++// launcher owns the refusal. The rewrite is a pure function of operator
++// argv, so no profile, marker, fragment, or configuration data influences
++// the dispatch.
++func normalizeRunEnvOperand(args []string) []string {
++	if len(args) < 2 || args[0] != "run" {
++		return args
++	}
++	normalized := envregistry.NormalizeEnvID(args[1])
++	if normalized == args[1] {
++		return args
++	}
++	rewritten := append([]string{}, args...)
++	rewritten[1] = normalized
++	return rewritten
++}
++
+ // cmdUmbrella executes the resolved provider with the remaining arguments
+ // verbatim and propagates its exit code.
+ func (c cli) cmdUmbrella(home string, args []string) int {
++	args = normalizeRunEnvOperand(args)
+ 	path, err := findProvider(home, args[0])
+ 	if err != nil {
+ 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
+diff --git a/internal/envregistry/envregistry.go b/internal/envregistry/envregistry.go
+index 6894719..d5281bc 100644
+--- a/internal/envregistry/envregistry.go
++++ b/internal/envregistry/envregistry.go
+@@ -24,6 +24,28 @@ const (
+ 	Pi         = "pi"
+ )
+ 
++// EnvAliases maps the CLI-only short spellings to their canonical
++// registry ids (manager profile §12.1). The aliases exist only at the
++// command-line boundary: the CLI normalizes them before any validation
++// or lookup, and every output, diagnostic, marker, fragment,
++// configuration record, and lock carries the canonical id. The wire
++// identifiers, schemas, and vectors are unchanged.
++var EnvAliases = map[string]string{
++	"claude": ClaudeCode,
++	"codex":  CodexCLI,
++}
++
++// NormalizeEnvID maps a command-line environment operand to its
++// canonical registry id. An alias returns its canonical id; every other
++// spelling — canonical, target, or unknown — passes through unchanged,
++// so the existing unknown-identifier refusal still owns what it rejects.
++func NormalizeEnvID(id string) string {
++	if canonical, ok := EnvAliases[id]; ok {
++		return canonical
++	}
++	return id
++}
++
+ // Diagnostics (environments §7.7, §10.4, §11.1).
+ const (
+ 	DiagUnknown              = "environment_unknown"
+@@ -299,7 +321,9 @@ var Targets = []Target{
+ 
+ // ByID resolves a registered environment or reports environment_unknown
+ // (§7.7, §10.4). An explicit operand naming an unregistered environment is
+-// an error, never a warning.
++// an error, never a warning. The CLI aliases never reach this lookup:
++// the CLI normalizes them with NormalizeEnvID first, so a raw alias here
++// is still environment_unknown.
+ func ByID(id string) (Adapter, error) {
+ 	for _, adapter := range Registry {
+ 		if adapter.ID == id {
+diff --git a/internal/envregistry/envregistry_test.go b/internal/envregistry/envregistry_test.go
+index f813004..b1ed448 100644
+--- a/internal/envregistry/envregistry_test.go
++++ b/internal/envregistry/envregistry_test.go
+@@ -45,6 +45,34 @@ func TestUnknownEnvironment(t *testing.T) {
+ 	}
+ }
+ 
++// TestNormalizeEnvID narrows the CLI alias rule: exactly claude and codex
++// map to their canonical ids, and every other spelling — canonical,
++// target, unknown, or empty — passes through unchanged for the existing
++// refusal to own.
++func TestNormalizeEnvID(t *testing.T) {
++	for alias, canonical := range map[string]string{"claude": ClaudeCode, "codex": CodexCLI} {
++		if got := NormalizeEnvID(alias); got != canonical {
++			t.Fatalf("NormalizeEnvID(%q) = %q, want %q", alias, got, canonical)
++		}
++	}
++	for _, id := range []string{ClaudeCode, CodexCLI, OpenCode, Pi, "xcode-coding-assistant", "cursor", "Claude", "claude-code", ""} {
++		if got := NormalizeEnvID(id); got != id {
++			t.Fatalf("NormalizeEnvID(%q) = %q, want it unchanged", id, got)
++		}
++	}
++}
++
++// TestAliasesNeverReachTheWireLookup pins the layering: the registry
++// lookup still refuses the raw aliases with environment_unknown, so only
++// the CLI boundary normalizes and the wire identifiers are unchanged.
++func TestAliasesNeverReachTheWireLookup(t *testing.T) {
++	for _, alias := range []string{"claude", "codex"} {
++		if _, err := ByID(alias); err == nil || !strings.Contains(err.Error(), DiagUnknown) {
++			t.Fatalf("ByID(%q) must fail with %s, got %v", alias, DiagUnknown, err)
++		}
++	}
++}
++
+ func TestUnknownTarget(t *testing.T) {
+ 	_, err := TargetByID("nope")
+ 	if err == nil || !strings.Contains(err.Error(), DiagTargetUnknown) {
