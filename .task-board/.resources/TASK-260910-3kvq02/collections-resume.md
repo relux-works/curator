@@ -1,0 +1,5 @@
+# Resume — TASK-260910-3kvq02 after the Story base refresh (2026-09-16)
+
+Your previous candidate (tree a26dc0d83293435de0dd22a2c64700ec8cc10dee, six owned paths: internal/closure/closure.go, internal/closure/selections.go, internal/closure/selections_test.go, internal/manifest/expand.go, internal/manifest/expand_test.go, docs/draft-source-expansion.md) could not be published because the Story branch had forked from a trunk that has since advanced; the runtime refused with change_request_base_authority_mismatch. The orchestrator preserved the candidate as the precondition resource `TASK-260910-3kvq02_collections-candidate-rev0.patch` (git diff-tree -p --binary from the checkpoint 65c6f1e) and cleaned the worktree so this spawn's final-leaf refresh could replay the checkpoint onto current trunk.
+
+Do: verify `git log --oneline -3` shows the parser checkpoint on top of current trunk (b0e905d or later); `git apply --check` then `git apply` the patch from the resource; rerun your narrow tests, vet, lint; re-attach results; hand off. Do not rewrite the candidate unless the refresh introduced a real conflict (then adapt minimally and say so).

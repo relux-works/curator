@@ -1,0 +1,65 @@
+{"mutant": "legacy-metadata-link", "command": ["go", "test", "-count=1", "./internal/manifest", "-run", "^TestExpandMetadataLinks/csk-skill.json$"], "exit_code": 0, "killed": false}
+ok  	github.com/relux-works/curator/internal/manifest	0.408s
+
+{"mutant": "missing-before-exclude", "command": ["go", "test", "-count=1", "./internal/manifest", "-run", "^TestExpandRefusals/missing-excluded$"], "exit_code": 1, "killed": true}
+--- FAIL: TestExpandRefusals (0.00s)
+    --- FAIL: TestExpandRefusals/missing-excluded (0.00s)
+        expand_test.go:111: got [], source_selection_invalid: empty collection s:skills; want source_member_missing
+FAIL
+FAIL	github.com/relux-works/curator/internal/manifest	0.518s
+FAIL
+
+{"mutant": "case-destination", "command": ["go", "test", "-count=1", "./internal/manifest", "-run", "^TestExpandRefusals/case-collision$"], "exit_code": 1, "killed": true}
+--- FAIL: TestExpandRefusals (0.00s)
+    --- FAIL: TestExpandRefusals/case-collision (0.00s)
+        expand_test.go:111: got [{Index:0 Decl:{Name:good Source: Ref:{Kind: Value:} Git: Selector:0x3a94ecad0960} Directory:skills/good Path:/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestExpandRefusalscase-collision2307670314/001/skills/good Spec:0x3a94ecb92ea0} {Index:0 Decl:{Name:GOOD Source: Ref:{Kind: Value:} Git: Selector:0x3a94ecad0a80} Directory:skills/second Path:/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestExpandRefusalscase-collision2307670314/001/skills/second Spec:0x3a94ecb93200}], <nil>; want source_name_conflict
+FAIL
+FAIL	github.com/relux-works/curator/internal/manifest	0.469s
+FAIL
+
+{"mutant": "discovered-name", "command": ["go", "test", "-count=1", "./internal/manifest", "-run", "^TestExpandRefusals/invalid-discovered-name$"], "exit_code": 1, "killed": true}
+--- FAIL: TestExpandRefusals (0.00s)
+    --- FAIL: TestExpandRefusals/invalid-discovered-name (0.00s)
+        expand_test.go:111: got [{Index:0 Decl:{Name:../bad Source: Ref:{Kind: Value:} Git: Selector:0xf7b11d4e960} Directory:skills/bad Path:/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestExpandRefusalsinvalid-discovered-name1027694539/001/skills/bad Spec:0xf7b11e10ea0} {Index:0 Decl:{Name:good Source: Ref:{Kind: Value:} Git: Selector:0xf7b11d4ea80} Directory:skills/good Path:/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestExpandRefusalsinvalid-discovered-name1027694539/001/skills/good Spec:0xf7b11e11200}], <nil>; want source_member_invalid
+FAIL
+FAIL	github.com/relux-works/curator/internal/manifest	0.521s
+FAIL
+
+{"mutant": "description-type", "command": ["go", "test", "-count=1", "./internal/manifest", "-run", "^TestExpandRefusals/metadata-description$"], "exit_code": 1, "killed": true}
+--- FAIL: TestExpandRefusals (0.01s)
+    --- FAIL: TestExpandRefusals/metadata-description (0.01s)
+        expand_test.go:111: got [{Index:0 Decl:{Name:good Source: Ref:{Kind: Value:} Git: Selector:0x161de1ffe900} Directory:skills/good Path:/private/var/folders/xk/2m1x7tqd61z26cmdwvdz7_v40000gn/T/TestExpandRefusalsmetadata-description3926615753/001/skills/good Spec:0x161de2042ea0}], <nil>; want source_member_invalid
+FAIL
+FAIL	github.com/relux-works/curator/internal/manifest	0.445s
+FAIL
+
+{"mutant": "physical-escape", "command": ["go", "test", "-count=1", "./internal/manifest", "-run", "^TestExpandPhysicalBoundariesAndPruning/escape$"], "exit_code": 1, "killed": true}
+--- FAIL: TestExpandPhysicalBoundariesAndPruning (0.06s)
+    --- FAIL: TestExpandPhysicalBoundariesAndPruning/escape (0.06s)
+        expand_test.go:159: source_member_invalid: s:skills/link: SKILL.md name "outside" differs from "other", want source_selection_invalid
+FAIL
+FAIL	github.com/relux-works/curator/internal/manifest	0.515s
+FAIL
+
+{"mutant": "manifest-identity", "command": ["go", "test", "-count=1", "./internal/manifest", "-run", "^TestExpandDeclaredManifestIdentity/other$"], "exit_code": 1, "killed": true}
+--- FAIL: TestExpandDeclaredManifestIdentity (0.00s)
+    --- FAIL: TestExpandDeclaredManifestIdentity/other (0.00s)
+        expand_test.go:213: <nil>
+FAIL
+FAIL	github.com/relux-works/curator/internal/manifest	0.694s
+FAIL
+
+{"mutant": "alias-commit", "command": ["go", "test", "-count=1", "./internal/closure", "-run", "^TestBuildExpandedGitIdentity/split-commit$"], "exit_code": 1, "killed": true}
+--- FAIL: TestBuildExpandedGitIdentity (0.08s)
+    --- FAIL: TestBuildExpandedGitIdentity/split-commit (0.08s)
+        selections_test.go:174: [0x149b06e26360 0x149b06e26480] <nil>
+FAIL
+FAIL	github.com/relux-works/curator/internal/closure	0.601s
+FAIL
+
+{"mutant": "output-read-failure", "command": ["go", "test", "-count=1", "./internal/manifest", "-run", "^TestExpandOutputReadFailure$"], "exit_code": 1, "killed": true}
+--- FAIL: TestExpandOutputReadFailure (0.00s)
+    expand_test.go:250: <nil>
+FAIL
+FAIL	github.com/relux-works/curator/internal/manifest	0.497s
+FAIL

@@ -1,0 +1,4187 @@
+diff --git a/docs/draft-source-expansion.md b/docs/draft-source-expansion.md
+new file mode 100644
+index 0000000..2712474
+--- /dev/null
++++ b/docs/draft-source-expansion.md
+@@ -0,0 +1,48 @@
++# Draft source expansion boundary
++
++This is an internal implementation of unreleased `skillfile-sources-v1` §1,
++not an enabled schema-2 installation path. The default manifest reader still
++rejects schema 2. Frozen v1 and release qualification are unchanged.
++
++`manifest.Expand` consumes a manifest parsed with `DraftSourcesV1`. Local paths
++are literal and relative to the declaring Skillfile; Git aliases require an
++already acquired tree in `ExpansionOptions.GitRoots`. It performs no network
++operation. The acquisition owner supplies machine runtime/cache/snapshot/staging
++boundaries through `OutputRoots`; project `.agents`, adapter outputs and `.git`
++metadata are excluded internally. Boundary paths must be absolute.
++
++Each result retains the original selection index, individual declaration,
++source-relative directory, observed physical path and parsed skill manifest.
++Collections enumerate immediate directories in UTF-8 byte order. Explicit
++literals are checked before exclusion; invalid remaining packages fail the
++whole result. Names come from validated SKILL.md YAML and must agree with an
++individual selector and any optional legacy manifest name. Duplicate installed
++names and case-equivalent portable destinations fail across all direct entries.
++
++`closure.BuildExpanded` connects expansion to the existing provider-first
++closure walk through an explicit `AcquireSelection` boundary. That acquisition
++owner must freeze package bytes, validate the acquired spec and supply its
++snapshot. Git nodes retain their repository identity/ref/commit, and all members
++of one alias must agree on the commit. Local nodes leave Git fields empty.
++Identical transitive Git requirements still unify, including diamonds; local
++packages and repository subdirectories cannot be identified by a legacy
++root-repository dependency of the same installed name. Version/source conflicts,
++cycles and command-narrowing validation remain in the existing closure walk.
++Legacy `closure.Build` refuses unresolved selectors before acquisition.
++
++## Deliberate integration bounds
++
++Expansion paths are observations, not immutable package identities. This task
++adds neither a local snapshot capturer nor a lock writer, transport resolver,
++publication path, root-input policy, audit bypass or marker migration. A caller
++must implement those independently before enabling schema-2 CLI installation.
++In particular, acquisition must revalidate membership and package inputs,
++apply root-input policy and recheck destination separation before publication.
++Do not pass these nodes to legacy marker or runtime-store writers. The
++`AcquireSelection` callback is a trusted internal acquisition interface, not
++package-provided code or attestation evidence.
++
++Tests drive `manifest.Expand`, `closure.BuildExpanded`, and the legacy `Build`
++refusal path. Acquisition fixtures are immutable temporary directories; tests
++of expansion and closure are not evidence of snapshot capture, lock replay,
++transport authentication or installation. Those remain separate delivery work.
+diff --git a/internal/closure/closure.go b/internal/closure/closure.go
+index 0a688b3..69989e1 100644
+--- a/internal/closure/closure.go
++++ b/internal/closure/closure.go
+@@ -139,19 +139,22 @@ type Options struct {
+ }
+ 
+ type pending struct {
+-	name   string
+-	git    string
+-	ref    manifest.Ref
+-	source string
+-	edge   Edge
+-	chain  string
++	name     string
++	git      string
++	ref      manifest.Ref
++	source   string
++	edge     Edge
++	chain    string
++	selected *Node
+ }
+ 
+ // Build expands the manifest into an ordered closure.
+ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[string]devsub.Substitution) ([]*Node, error) {
+-	nodes := map[string]*Node{}
+ 	var queue []pending
+ 	for _, decl := range projectManifest.Skills {
++		if decl.Selector != nil {
++			return nil, fmt.Errorf("source_selection_invalid: draft selectors require expansion and frozen package acquisition before Git closure resolution")
++		}
+ 		queue = append(queue, pending{
+ 			name:   decl.Name,
+ 			git:    decl.Git,
+@@ -162,14 +165,28 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
+ 		})
+ 	}
+ 
++	return buildQueue(opts, queue, substitutions, false)
++}
++
++func buildQueue(opts Options, queue []pending, substitutions map[string]devsub.Substitution, draft bool) ([]*Node, error) {
++	nodes := map[string]*Node{}
+ 	for len(queue) > 0 {
+ 		item := queue[0]
+ 		queue = queue[1:]
+ 		node, exists := nodes[item.name]
+ 		if !exists {
+-			resolved, err := resolveNode(opts, item, substitutions)
+-			if err != nil {
+-				return nil, err
++			resolved := item.selected
++			if resolved == nil {
++				var err error
++				resolved, err = resolveNode(opts, item, substitutions)
++				if err != nil {
++					return nil, err
++				}
++			}
++			for name := range nodes {
++				if draft && name != item.name && strings.EqualFold(name, item.name) {
++					return nil, fmt.Errorf("source_name_conflict: filesystem-equivalent skill names %s and %s", name, item.name)
++				}
+ 			}
+ 			nodes[item.name] = resolved
+ 			node = resolved
+@@ -190,6 +207,9 @@ func Build(opts Options, projectManifest *manifest.Manifest, substitutions map[s
+ 				})
+ 			}
+ 		} else if err := unify(node, item); err != nil {
++			if draft {
++				return nil, fmt.Errorf("source_name_conflict: %w", err)
++			}
+ 			return nil, err
+ 		}
+ 		node.Edges = append(node.Edges, item.edge)
+@@ -221,6 +241,9 @@ func DetectActiveCommandCollisions(nodes []*Node) error {
+ // repository and the same commit (Spec §8.3). A substituted node skips
+ // unification: the substitution replaces every requirement of that name.
+ func unify(node *Node, item pending) error {
++	if node.Decl.Selector != nil && (node.Resolved.Commit == "" || node.Decl.Selector.Directory != ".") {
++		return fmt.Errorf("source_name_conflict: %s dependency cannot identify the selected local package or repository subdirectory", node.Name)
++	}
+ 	if node.Substituted != "" {
+ 		return nil
+ 	}
+diff --git a/internal/closure/selections.go b/internal/closure/selections.go
+new file mode 100644
+index 0000000..39bf461
+--- /dev/null
++++ b/internal/closure/selections.go
+@@ -0,0 +1,73 @@
++package closure
++
++import (
++	"encoding/hex"
++	"fmt"
++	"strings"
++
++	"github.com/relux-works/curator/internal/devsub"
++	"github.com/relux-works/curator/internal/manifest"
++)
++
++// AcquireSelection is the acquisition boundary for a single expanded skill.
++// It must freeze the selected package and return its validated Spec, Snapshot,
++// and (for Git only) Repo, Resolved and canonical Identity. A local snapshot
++// must leave Git fields empty, never put a snapshot digest in Commit. Lock,
++// snapshot revalidation, audit and publication remain acquisition's obligations.
++// The returned node is consumed by BuildExpanded and must not be reused.
++type AcquireSelection func(manifest.Selection) (*Node, error)
++
++// BuildExpanded resolves the full dependency closure after deterministic draft
++// expansion. Acquisition is explicit so local bytes are never coerced through
++// legacy Git resolution. Unchanged legacy declarations still use that lane.
++// Callers must not publish these nodes using legacy marker/lock formats.
++func BuildExpanded(opts Options, m *manifest.Manifest, expansion manifest.ExpansionOptions, acquire AcquireSelection, substitutions map[string]devsub.Substitution) ([]*Node, error) {
++	members, err := manifest.Expand(m, expansion)
++	if err != nil {
++		return nil, err
++	}
++	queue := make([]pending, 0, len(members))
++	commits := map[string]string{}
++	for _, member := range members {
++		decl := member.Decl
++		item := pending{name: decl.Name, git: decl.Git, ref: decl.Ref, source: decl.Source, edge: Edge{Consumer: ProjectEdge, Mode: "full"}, chain: ProjectEdge + " -> " + decl.Name}
++		if decl.Selector != nil {
++			if acquire == nil {
++				return nil, fmt.Errorf("source_selection_invalid: frozen package acquisition required for %s", decl.Name)
++			}
++			node, err := acquire(member)
++			if err != nil {
++				return nil, err
++			}
++			if node == nil || node.Name != decl.Name || node.Spec == nil || node.Snapshot == "" || node.Substituted != "" {
++				return nil, fmt.Errorf("source_member_invalid: invalid acquired member %s", decl.Name)
++			}
++			source := m.Sources[decl.Selector.From]
++			if source.Path != "" {
++				if node.Resolved.Commit != "" || node.Identity != "" || node.Repo != "" {
++					return nil, fmt.Errorf("source_member_invalid: local member %s has Git identity", decl.Name)
++				}
++			} else {
++				commit := node.Resolved.Commit
++				_, hexErr := hex.DecodeString(commit)
++				if (len(commit) != 40 && len(commit) != 64) || hexErr != nil || strings.ToLower(commit) != commit || node.Identity != source.Identity || node.Repo == "" || node.Resolved.Kind != source.Ref.Kind || node.Resolved.Ref != source.Ref.Value {
++					return nil, fmt.Errorf("source_member_invalid: acquired Git identity differs for %s", decl.Name)
++				}
++				if previous, ok := commits[decl.Selector.From]; ok && previous != commit {
++					return nil, fmt.Errorf("source_name_conflict: alias %s resolved to multiple commits", decl.Selector.From)
++				}
++				commits[decl.Selector.From] = commit
++			}
++			node.Decl = decl
++			node.Edges = nil
++			node.Chains = nil
++			item.selected = node
++		}
++		queue = append(queue, item)
++	}
++	nodes, err := buildQueue(opts, queue, substitutions, true)
++	if err != nil {
++		return nil, err
++	}
++	return nodes, nil
++}
+diff --git a/internal/closure/selections_test.go b/internal/closure/selections_test.go
+new file mode 100644
+index 0000000..9f825ca
+--- /dev/null
++++ b/internal/closure/selections_test.go
+@@ -0,0 +1,178 @@
++package closure
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/manifest"
++)
++
++func selectionProject(t *testing.T, root string, names []string, requirements map[string]map[string]any) *manifest.Manifest {
++	t.Helper()
++	for _, name := range names {
++		dir := filepath.Join(root, "skills", name)
++		if err := os.MkdirAll(dir, 0755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: "+name+"\ndescription: Test\n---\n"), 0644); err != nil {
++			t.Fatal(err)
++		}
++		spec := map[string]any{"schema_version": 4, "capabilities": map[string]any{}, "commands": map[string]any{}, "dependencies": map[string]any{"skills": requirements}}
++		data, err := json.Marshal(spec)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(filepath.Join(dir, "agent-skill.json"), data, 0644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	m, err := manifest.ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"from":"s","directory":"skills","include":["*"]}]}`), filepath.Join(root, manifest.Name), manifest.ParseOptions{DraftSourcesV1: true})
++	if err != nil {
++		t.Fatal(err)
++	}
++	return m
++}
++
++// Fixtures are immutable temporary trees. This boundary supplies already acquired
++// local nodes; it makes no claim to exercise the future local snapshot capture.
++func fixtureAcquisition(s manifest.Selection) (*Node, error) {
++	return &Node{Name: s.Decl.Name, Snapshot: s.Path, Spec: s.Spec}, nil
++}
++
++func TestBuildExpandedDiamondAndLegacy(t *testing.T) {
++	h := newHarness(t)
++	h.skill("provider", nil, nil)
++	m := selectionProject(t, t.TempDir(), []string{"zulu", "alpha"}, map[string]map[string]any{"provider": requirement("provider", "context")})
++	nodes, err := BuildExpanded(Options{SkillsRoot: h.skillsRoot, Home: h.home}, m, manifest.ExpansionOptions{}, fixtureAcquisition, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var names []string
++	for _, n := range nodes {
++		names = append(names, n.Name)
++	}
++	if !reflect.DeepEqual(names, []string{"provider", "alpha", "zulu"}) {
++		t.Fatal(names)
++	}
++	if len(nodes[0].Edges) != 2 || nodes[1].Edges[0].Consumer != ProjectEdge || nodes[2].Decl.Selector.Directory != "skills/zulu" {
++		t.Fatalf("skill-level edges lost: %+v", nodes)
++	}
++	m.Skills = append(m.Skills, manifest.Decl{Name: "legacy", Source: "legacy", Ref: manifest.Ref{Kind: "tag", Value: "v1"}})
++	h.skill("legacy", nil, nil)
++	nodes, err = BuildExpanded(Options{SkillsRoot: h.skillsRoot, Home: h.home}, m, manifest.ExpansionOptions{}, fixtureAcquisition, nil)
++	if err != nil || len(nodes) != 4 {
++		t.Fatalf("legacy mix: %v %v", nodes, err)
++	}
++}
++
++func TestBuildExpandedRefusals(t *testing.T) {
++	for _, mode := range []string{"version", "source", "case", "local-identity", "cycle", "missing-acquisition", "invalid-acquisition", "unexpanded"} {
++		t.Run(mode, func(t *testing.T) {
++			h := newHarness(t)
++			repo := h.skill("provider", nil, nil)
++			req := map[string]map[string]any{"provider": requirement("provider", "context")}
++			m := selectionProject(t, t.TempDir(), []string{"alpha", "zulu"}, req)
++			opts := Options{SkillsRoot: h.skillsRoot, Home: h.home}
++			want := ""
++			acquire := AcquireSelection(fixtureAcquisition)
++			switch mode {
++			case "version":
++				if err := os.WriteFile(filepath.Join(repo, "new"), []byte("new"), 0644); err != nil {
++					t.Fatal(err)
++				}
++				h.git(repo, "add", ".")
++				h.git(repo, "commit", "-qm", "second")
++				h.git(repo, "tag", "v2")
++				m.Skills = append(m.Skills, manifest.Decl{Name: "provider", Source: "provider", Ref: manifest.Ref{Kind: "tag", Value: "v2"}})
++				want = "version conflict"
++			case "source":
++				m.Skills = append(m.Skills, manifest.Decl{Name: "provider", Source: "provider", Git: "https://example.org/a", Ref: manifest.Ref{Kind: "tag", Value: "v1"}})
++				acquire = func(s manifest.Selection) (*Node, error) {
++					n, _ := fixtureAcquisition(s)
++					r := n.Spec.Requirements["provider"]
++					r.Git = "https://example.org/b"
++					n.Spec.Requirements["provider"] = r
++					return n, nil
++				}
++				want = "source conflict"
++			case "case":
++				m.Skills = append(m.Skills, manifest.Decl{Name: "PROVIDER", Source: "provider", Ref: manifest.Ref{Kind: "tag", Value: "v1"}})
++				want = "source_name_conflict"
++			case "local-identity":
++				acquire = func(s manifest.Selection) (*Node, error) {
++					n, _ := fixtureAcquisition(s)
++					r := n.Spec.Requirements["provider"]
++					delete(n.Spec.Requirements, "provider")
++					r.Name = "alpha"
++					n.Spec.Requirements["alpha"] = r
++					return n, nil
++				}
++				want = "source_name_conflict"
++			case "cycle":
++				// Cycle detection in the legacy dependency subgraph stays active.
++				h.skill("cycle", nil, map[string]map[string]any{"cycle": requirement("cycle", "context")})
++				m.Skills = append(m.Skills, manifest.Decl{Name: "cycle", Source: "cycle", Ref: manifest.Ref{Kind: "tag", Value: "v1"}})
++				want = "dependency cycle"
++			case "missing-acquisition":
++				acquire = nil
++				want = "source_selection_invalid"
++			case "invalid-acquisition":
++				acquire = func(manifest.Selection) (*Node, error) { return &Node{Name: "forged"}, nil }
++				want = "source_member_invalid"
++			case "unexpanded":
++				_, err := Build(opts, m, nil)
++				if err == nil || !strings.Contains(err.Error(), "source_selection_invalid") {
++					t.Fatalf("%v", err)
++				}
++				return
++			}
++			nodes, err := BuildExpanded(opts, m, manifest.ExpansionOptions{}, acquire, nil)
++			if err == nil || !strings.Contains(err.Error(), want) || nodes != nil {
++				t.Fatalf("%+v %v; want %s", nodes, err, want)
++			}
++		})
++	}
++}
++
++func TestBuildExpandedGitIdentity(t *testing.T) {
++	for _, mode := range []string{"valid", "split-commit", "wrong-repository", "missing-commit", "local-with-git"} {
++		t.Run(mode, func(t *testing.T) {
++			root := t.TempDir()
++			m := selectionProject(t, root, []string{"alpha", "zulu"}, map[string]map[string]any{})
++			source := manifest.Source{Git: "https://example.org/kit", Identity: "example.org/kit", Ref: manifest.Ref{Kind: "tag", Value: "v1"}}
++			if mode != "local-with-git" {
++				m.Sources["s"] = source
++			}
++			acquire := func(s manifest.Selection) (*Node, error) {
++				n, _ := fixtureAcquisition(s)
++				n.Repo = root
++				n.Identity = source.Identity
++				n.Resolved.Kind = "tag"
++				n.Resolved.Ref = "v1"
++				n.Resolved.Commit = strings.Repeat("a", 40)
++				if mode == "split-commit" && s.Decl.Name == "zulu" {
++					n.Resolved.Commit = strings.Repeat("b", 40)
++				}
++				if mode == "wrong-repository" {
++					n.Identity = "example.org/other"
++				}
++				if mode == "missing-commit" {
++					n.Resolved.Commit = ""
++				}
++				return n, nil
++			}
++			nodes, err := BuildExpanded(Options{}, m, manifest.ExpansionOptions{GitRoots: map[string]string{"s": root}}, acquire, nil)
++			if mode == "valid" {
++				if err != nil || len(nodes) != 2 {
++					t.Fatalf("%v %v", nodes, err)
++				}
++			} else if err == nil || nodes != nil {
++				t.Fatalf("%v %v", nodes, err)
++			}
++		})
++	}
++}
+diff --git a/internal/identity/draft_sources.go b/internal/identity/draft_sources.go
+new file mode 100644
+index 0000000..712dc29
+--- /dev/null
++++ b/internal/identity/draft_sources.go
+@@ -0,0 +1,25 @@
++package identity
++
++import (
++	"strings"
++	"unicode/utf8"
++)
++
++// DraftSourceRefName validates draft-sources-v1's gitRefName scalar-length
++// bound and Git ref grammar. It does not alter legacy acquisition validators.
++func DraftSourceRefName(value string) bool {
++	if value == "" || !utf8.ValidString(value) || utf8.RuneCountInString(value) > 255 || value == "@" || strings.HasPrefix(value, "/") || strings.HasSuffix(value, "/") || strings.HasSuffix(value, ".") || strings.Contains(value, "//") || strings.Contains(value, "..") || strings.Contains(value, "@{") {
++		return false
++	}
++	for _, r := range value {
++		if r <= 0x20 || r == 0x7f || strings.ContainsRune("~^:?*[\\", r) {
++			return false
++		}
++	}
++	for _, component := range strings.Split(value, "/") {
++		if strings.HasPrefix(component, ".") || strings.HasSuffix(component, ".lock") {
++			return false
++		}
++	}
++	return true
++}
+diff --git a/internal/manifest/expand.go b/internal/manifest/expand.go
+new file mode 100644
+index 0000000..b4df0d9
+--- /dev/null
++++ b/internal/manifest/expand.go
+@@ -0,0 +1,393 @@
++package manifest
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path"
++	"path/filepath"
++	"sort"
++	"strings"
++
++	"github.com/relux-works/curator/internal/adapters"
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/skillspec"
++	"gopkg.in/yaml.v3"
++)
++
++// ExpansionOptions supplies acquisition-owned Git trees and machine-owned
++// output boundaries. GitRoots must contain one already acquired tree per alias;
++// expansion never fetches, resolves refs, snapshots, or publishes anything.
++// OutputRoots includes runtime stores, caches, snapshot stores and staging.
++// Project managed paths and .git metadata are additionally excluded internally.
++type ExpansionOptions struct {
++	GitRoots    map[string]string
++	OutputRoots []string
++}
++
++// Selection is one skill-level input to acquisition and dependency resolution.
++// Index is the original zero-based Skillfile selection. Legacy declarations are
++// preserved verbatim and have no Path or Spec. Path is an observation of source
++// bytes, NOT an immutable snapshot or permission to install. Acquisition must
++// freeze and revalidate both package bytes and this ordered membership first.
++type Selection struct {
++	Index     int
++	Decl      Decl
++	Directory string
++	Path      string
++	Spec      *skillspec.Spec
++}
++
++// Expand validates and expands a parsed draft manifest, in declaration order
++// and UTF-8 folder byte order within collections. No partial result is returned
++// on failure. The returned units retain dependencies in their individual Spec.
++func Expand(m *Manifest, opts ExpansionOptions) ([]Selection, error) {
++	if m == nil || m.SchemaVersion != 2 {
++		return nil, fmt.Errorf("source_selection_invalid: expansion requires draft Skillfile schema 2")
++	}
++	project, err := filepath.Abs(filepath.Dir(m.Path))
++	if err != nil {
++		return nil, err
++	}
++	outputs := append([]string{}, opts.OutputRoots...)
++	outputs = append(outputs, filepath.Join(project, ".agents"))
++	for _, rel := range adapters.AgentPaths {
++		outputs = append(outputs, filepath.Join(project, filepath.FromSlash(rel)))
++	}
++	for _, output := range outputs {
++		if !filepath.IsAbs(output) {
++			return nil, fmt.Errorf("source_output_overlap: output boundary must be absolute")
++		}
++		if _, err := os.Stat(output); err != nil && !os.IsNotExist(err) {
++			return nil, fmt.Errorf("source_output_overlap: cannot inspect output boundary: %w", err)
++		}
++	}
++	var result []Selection
++	seen := map[string]string{}
++	appendMember := func(member Selection) error {
++		// Portable installed identifiers are ASCII. Case folding also prevents a
++		// lock produced on a sensitive host from aliasing destinations on another.
++		key := strings.ToLower(member.Decl.Name)
++		if previous, ok := seen[key]; ok {
++			return fmt.Errorf("source_name_conflict: %s repeats destination %s", member.Decl.Name, previous)
++		}
++		seen[key] = member.Decl.Name
++		result = append(result, member)
++		return nil
++	}
++	for index, decl := range m.Skills {
++		if decl.Selector == nil {
++			if err := appendMember(Selection{Index: index, Decl: decl, Directory: "."}); err != nil {
++				return nil, err
++			}
++			continue
++		}
++		s := decl.Selector
++		source, ok := m.Sources[s.From]
++		if !ok {
++			return nil, fmt.Errorf("source_alias_unknown: %s", s.From)
++		}
++		// Reuse parser validation even for in-memory callers, before touching paths.
++		entry := map[string]any{"from": s.From, "directory": s.Directory}
++		if s.Collection {
++			entry["include"] = memberValues(s.Include)
++			entry["exclude"] = memberValues(s.Exclude)
++		} else {
++			entry["name"] = decl.Name
++		}
++		if _, err := parseSelector(entry, m.Sources, "selection"); err != nil {
++			return nil, err
++		}
++		root := source.Path
++		if root == "" {
++			root = opts.GitRoots[s.From]
++			if root == "" {
++				return nil, fmt.Errorf("source_selection_invalid: alias %s requires an acquired Git tree", s.From)
++			}
++		} else if !filepath.IsAbs(root) {
++			root = filepath.Join(project, root)
++		}
++		root, err = filepath.Abs(root)
++		if err != nil {
++			return nil, err
++		}
++		root, err = filepath.EvalSymlinks(root)
++		if err != nil {
++			return nil, fmt.Errorf("source_member_invalid: alias %s: %w", s.From, err)
++		}
++		base, err := selectionDirectory(root, s.Directory, outputs)
++		if err != nil {
++			return nil, err
++		}
++		directories := []string{s.Directory}
++		if s.Collection {
++			folders, err := collectionFolders(root, base, s, outputs)
++			if err != nil {
++				return nil, err
++			}
++			directories = nil
++			for _, folder := range folders {
++				directories = append(directories, path.Join(s.Directory, folder))
++			}
++		}
++		for _, directory := range directories {
++			physical, err := selectionDirectory(root, directory, outputs)
++			if err != nil {
++				return nil, err
++			}
++			name, spec, err := selectedPackage(physical)
++			if err != nil {
++				return nil, fmt.Errorf("source_member_invalid: %s:%s: %w", s.From, directory, err)
++			}
++			if !s.Collection && name != decl.Name {
++				return nil, fmt.Errorf("source_member_invalid: %s:%s: SKILL.md name %q differs from %q", s.From, directory, name, decl.Name)
++			}
++			individual := Decl{Name: name, Selector: &Selector{From: s.From, Directory: directory}}
++			if err := appendMember(Selection{Index: index, Decl: individual, Directory: directory, Path: physical, Spec: spec}); err != nil {
++				return nil, err
++			}
++		}
++	}
++	return result, nil
++}
++
++func memberValues(values []string) []any {
++	out := make([]any, len(values))
++	for i, v := range values {
++		out[i] = v
++	}
++	return out
++}
++
++func collectionFolders(root, base string, s *Selector, outputs []string) ([]string, error) {
++	selected := map[string]bool{}
++	for _, name := range s.Include {
++		if name == "*" {
++			continue
++		}
++		// Explicit literals must exist and be directories before exclusion, even
++		// when '*' would find the same member.
++		if _, err := selectionDirectory(root, path.Join(s.Directory, name), outputs); err != nil {
++			return nil, err
++		}
++		selected[name] = true
++	}
++	for _, name := range s.Include {
++		if name != "*" {
++			continue
++		}
++		entries, err := os.ReadDir(base)
++		if err != nil {
++			return nil, fmt.Errorf("source_member_invalid: collection %s: %w", s.Directory, err)
++		}
++		for _, entry := range entries {
++			candidate := filepath.Join(base, entry.Name())
++			if generatedPath(candidate, outputs) {
++				continue
++			}
++			info, err := os.Stat(candidate)
++			if err != nil {
++				return nil, fmt.Errorf("source_member_invalid: %s: %w", entry.Name(), err)
++			}
++			if info.IsDir() {
++				selected[entry.Name()] = true
++			}
++		}
++	}
++	for _, name := range s.Exclude {
++		delete(selected, name)
++	}
++	names := make([]string, 0, len(selected))
++	for name := range selected {
++		names = append(names, name)
++	}
++	sort.Strings(names)
++	if len(names) == 0 {
++		return nil, fmt.Errorf("source_selection_invalid: empty collection %s:%s", s.From, s.Directory)
++	}
++	for _, name := range names {
++		if !identifiers.Valid(name) {
++			return nil, fmt.Errorf("source_member_invalid: invalid discovered folder %q", name)
++		}
++	}
++	return names, nil
++}
++
++func selectionDirectory(root, directory string, outputs []string) (string, error) {
++	candidate := filepath.Join(root, filepath.FromSlash(directory))
++	if generatedPath(candidate, outputs) {
++		return "", fmt.Errorf("source_output_overlap: %s", directory)
++	}
++	physical, err := filepath.EvalSymlinks(candidate)
++	if err != nil {
++		class := "source_member_invalid"
++		if os.IsNotExist(err) {
++			class = "source_member_missing"
++		}
++		return "", fmt.Errorf("%s: %s: %w", class, directory, err)
++	}
++	if !physicalWithin(root, physical) {
++		return "", fmt.Errorf("source_selection_invalid: %s escapes source", directory)
++	}
++	if generatedPath(physical, outputs) {
++		return "", fmt.Errorf("source_output_overlap: %s", directory)
++	}
++	info, err := os.Stat(physical)
++	if err != nil {
++		return "", fmt.Errorf("source_member_invalid: %s: %w", directory, err)
++	}
++	if !info.IsDir() {
++		return "", fmt.Errorf("source_member_invalid: %s is not a directory", directory)
++	}
++	return physical, nil
++}
++
++// SameFile ancestry uses the filesystem's actual case equivalence, including
++// case-insensitive macOS volumes, rather than a GOOS-based string prefix.
++func physicalWithin(root, candidate string) bool {
++	rootInfo, err := os.Stat(root)
++	if err != nil {
++		return false
++	}
++	for current := candidate; ; current = filepath.Dir(current) {
++		if info, err := os.Stat(current); err == nil && os.SameFile(rootInfo, info) {
++			return true
++		}
++		if filepath.Dir(current) == current {
++			return false
++		}
++	}
++}
++
++func generatedPath(candidate string, outputs []string) bool {
++	if physical, err := filepath.EvalSymlinks(candidate); err == nil {
++		candidate = physical
++	}
++	for current := candidate; ; current = filepath.Dir(current) {
++		if strings.EqualFold(filepath.Base(current), ".git") {
++			return true
++		}
++		if filepath.Dir(current) == current {
++			break
++		}
++	}
++	for _, output := range outputs {
++		if physicalWithin(output, candidate) {
++			return true
++		}
++	}
++	return false
++}
++
++func selectedPackage(dir string) (string, *skillspec.Spec, error) {
++	file := filepath.Join(dir, "SKILL.md")
++	info, err := os.Lstat(file)
++	if err != nil {
++		return "", nil, err
++	}
++	if !info.Mode().IsRegular() {
++		return "", nil, fmt.Errorf("SKILL.md must be a regular file")
++	}
++	data, err := os.ReadFile(file) // #nosec G304 -- contained selected package; fixed metadata filename
++	if err != nil {
++		return "", nil, err
++	}
++	lines := bytes.Split(bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n")), []byte("\n"))
++	if len(lines) < 3 || string(lines[0]) != "---" {
++		return "", nil, fmt.Errorf("missing YAML frontmatter")
++	}
++	end := 1
++	for end < len(lines) && string(lines[end]) != "---" {
++		end++
++	}
++	if end == len(lines) {
++		return "", nil, fmt.Errorf("unterminated YAML frontmatter")
++	}
++	var metadata map[string]any
++	if err := yaml.Unmarshal(bytes.Join(lines[1:end], []byte("\n")), &metadata); err != nil {
++		return "", nil, fmt.Errorf("invalid YAML frontmatter: %w", err)
++	}
++	name, ok := metadata["name"].(string)
++	if !ok || !identifiers.Valid(name) {
++		return "", nil, fmt.Errorf("invalid SKILL.md name")
++	}
++	description, ok := metadata["description"].(string)
++	if !ok || strings.TrimSpace(description) == "" {
++		return "", nil, fmt.Errorf("invalid SKILL.md description")
++	}
++	if raw, ok := metadata["triggers"]; ok {
++		triggers, ok := raw.([]any)
++		if !ok {
++			return "", nil, fmt.Errorf("invalid triggers")
++		}
++		for _, raw := range triggers {
++			value, ok := raw.(string)
++			if !ok || strings.TrimSpace(value) == "" {
++				return "", nil, fmt.Errorf("invalid trigger")
++			}
++		}
++	}
++	modern := false
++	for _, file := range []string{skillspec.CanonicalManifestName, skillspec.LegacyManifestName} {
++		present, err := regularMetadata(dir, file)
++		if err != nil {
++			return "", nil, err
++		}
++		modern = modern || present
++	}
++	if !modern {
++		if _, err := regularMetadata(dir, skillspec.RuntimeFallbackName); err != nil {
++			return "", nil, err
++		}
++	}
++	spec, err := skillspec.Load(dir)
++	if err != nil {
++		return "", nil, err
++	}
++	// Schema 1 permits an optional identity extension. Later schemas reject
++	// unknown identity fields in skillspec.Load; do not invent one for them.
++	if spec.SourceFile == skillspec.CanonicalManifestName || spec.SourceFile == skillspec.LegacyManifestName {
++		payload, err := os.ReadFile(filepath.Join(dir, spec.SourceFile)) // #nosec G304 -- filename chosen by skillspec.Load
++		if err != nil {
++			return "", nil, err
++		}
++		var object map[string]any
++		if err := json.Unmarshal(payload, &object); err != nil {
++			return "", nil, err
++		}
++		if declared, present := object["name"]; present && declared != name {
++			return "", nil, fmt.Errorf("skill manifest name differs from SKILL.md")
++		}
++	}
++	return name, spec, nil
++}
++
++// Metadata is read during expansion, before snapshot capture. Refuse links and
++// special files here too, rather than reading outside the package or blocking
++// on a FIFO. Only actual absence permits the ordinary manifest fallback.
++func regularMetadata(root, relative string) (bool, error) {
++	current := root
++	parts := strings.Split(relative, "/")
++	for i, part := range parts {
++		current = filepath.Join(current, part)
++		info, err := os.Lstat(current)
++		if os.IsNotExist(err) {
++			return false, nil
++		}
++		if err != nil {
++			return false, err
++		}
++		if info.Mode()&os.ModeSymlink != 0 {
++			return false, fmt.Errorf("metadata path %s contains a symlink", relative)
++		}
++		if i == len(parts)-1 {
++			if !info.Mode().IsRegular() {
++				return false, fmt.Errorf("metadata %s must be a regular file", relative)
++			}
++		} else if !info.IsDir() {
++			return false, fmt.Errorf("metadata parent %s is not a directory", relative)
++		}
++	}
++	return true, nil
++}
+diff --git a/internal/manifest/expand_test.go b/internal/manifest/expand_test.go
+new file mode 100644
+index 0000000..b989ee9
+--- /dev/null
++++ b/internal/manifest/expand_test.go
+@@ -0,0 +1,285 @@
++package manifest
++
++import (
++	"fmt"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++)
++
++func packageAt(t *testing.T, root, folder, name string) string {
++	t.Helper()
++	dir := filepath.Join(root, filepath.FromSlash(folder))
++	if err := os.MkdirAll(dir, 0755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: "+name+"\ndescription: A skill\n---\n"), 0644); err != nil {
++		t.Fatal(err)
++	}
++	return dir
++}
++func expandFixture(t *testing.T, root, selectors string) (*Manifest, error) {
++	t.Helper()
++	return ParseBytesWithOptions([]byte(fmt.Sprintf(`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[%s]}`, selectors)), filepath.Join(root, Name), draftOptions)
++}
++func TestExpandOrderedIndividualAndCollections(t *testing.T) {
++	root := t.TempDir()
++	packageAt(t, root, "skills/zulu", "last")
++	packageAt(t, root, "skills/alpha", "first")
++	packageAt(t, root, "skills/alpha/nested", "not-discovered")
++	packageAt(t, root, "skills/excluded", "unused")
++	m, err := expandFixture(t, root, `{"from":"s","directory":"skills","include":["*","alpha"],"exclude":["excluded","absent"]}`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err := Expand(m, ExpansionOptions{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	var names, dirs []string
++	for _, s := range got {
++		names = append(names, s.Decl.Name)
++		dirs = append(dirs, s.Directory)
++		if s.Index != 0 || s.Spec == nil || s.Decl.Selector.Collection {
++			t.Fatalf("not a skill-level selection: %+v", s)
++		}
++	}
++	if !reflect.DeepEqual(names, []string{"first", "last"}) || !reflect.DeepEqual(dirs, []string{"skills/alpha", "skills/zulu"}) {
++		t.Fatalf("%v %v", names, dirs)
++	}
++	m, err = expandFixture(t, root, `{"name":"last","from":"s","directory":"skills/zulu"},{"name":"old","source":"configured","tag":"v1"}`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	got, err = Expand(m, ExpansionOptions{})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(got) != 2 || got[0].Index != 0 || got[1].Index != 1 || got[1].Decl.Source != "configured" || got[1].Path != "" || got[1].Spec != nil {
++		t.Fatalf("%+v", got)
++	}
++}
++
++func TestExpandRefusals(t *testing.T) {
++	tests := []struct {
++		name, selection, code string
++		setup                 func(*testing.T, string)
++	}{
++		{"missing-excluded", `{"from":"s","directory":"skills","include":["missing"],"exclude":["missing"]}`, "source_member_missing", nil},
++		{"file-excluded", `{"from":"s","directory":"skills","include":["file"],"exclude":["file"]}`, "source_member_invalid", nil},
++		{"empty", `{"from":"s","directory":"skills","include":["good"],"exclude":["good"]}`, "source_selection_invalid", nil},
++		{"missing-frontmatter", `{"from":"s","directory":"skills","include":["*"]}`, "source_member_invalid", func(t *testing.T, r string) {
++			if err := os.Mkdir(filepath.Join(r, "skills", "bad"), 0755); err != nil {
++				t.Fatal(err)
++			}
++		}},
++		{"invalid-discovered-name", `{"from":"s","directory":"skills","include":["*"]}`, "source_member_invalid", func(t *testing.T, r string) { packageAt(t, r, "skills/bad", "../bad") }},
++		{"name-mismatch", `{"name":"other","from":"s","directory":"skills/good"}`, "source_member_invalid", nil},
++		{"repeated-direct", `{"from":"s","directory":"skills","include":["good"]},{"name":"good","from":"s","directory":"skills/good"}`, "source_name_conflict", nil},
++		{"legacy-collision", `{"name":"good","tag":"v1"},{"from":"s","directory":"skills","include":["good"]}`, "source_name_conflict", nil},
++		{"case-collision", `{"from":"s","directory":"skills","include":["*"]}`, "source_name_conflict", func(t *testing.T, r string) { packageAt(t, r, "skills/second", "GOOD") }},
++		{"version-collision", `{"from":"s","directory":"skills","include":["*"]}`, "source_name_conflict", func(t *testing.T, r string) { packageAt(t, r, "skills/second", "good") }},
++		{"invalid-manifest", `{"name":"good","from":"s","directory":"skills/good"}`, "source_member_invalid", func(t *testing.T, r string) {
++			writeExpansionFile(t, filepath.Join(r, "skills/good/agent-skill.json"), `{"schema_version":999}`)
++		}},
++		{"metadata-description", `{"name":"good","from":"s","directory":"skills/good"}`, "source_member_invalid", func(t *testing.T, r string) {
++			writeExpansionFile(t, filepath.Join(r, "skills/good/SKILL.md"), "---\nname: good\ndescription: 123\n---\n")
++		}},
++		{"metadata-duplicate", `{"name":"good","from":"s","directory":"skills/good"}`, "source_member_invalid", func(t *testing.T, r string) {
++			writeExpansionFile(t, filepath.Join(r, "skills/good/SKILL.md"), "---\nname: good\nname: bad\ndescription: ok\n---\n")
++		}},
++		{"metadata-triggers", `{"name":"good","from":"s","directory":"skills/good"}`, "source_member_invalid", func(t *testing.T, r string) {
++			writeExpansionFile(t, filepath.Join(r, "skills/good/SKILL.md"), "---\nname: good\ndescription: ok\ntriggers: [42]\n---\n")
++		}},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			root := t.TempDir()
++			packageAt(t, root, "skills/good", "good")
++			writeExpansionFile(t, filepath.Join(root, "skills/file"), "file")
++			if tt.setup != nil {
++				tt.setup(t, root)
++			}
++			m, err := expandFixture(t, root, tt.selection)
++			if err != nil {
++				t.Fatal(err)
++			}
++			got, err := Expand(m, ExpansionOptions{})
++			if err == nil || !strings.Contains(err.Error(), tt.code) || got != nil {
++				t.Fatalf("got %+v, %v; want %s", got, err, tt.code)
++			}
++		})
++	}
++}
++func writeExpansionFile(t *testing.T, path, content string) {
++	t.Helper()
++	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
++		t.Fatal(err)
++	}
++}
++
++func TestExpandPhysicalBoundariesAndPruning(t *testing.T) {
++	for _, mode := range []string{"escape", "managed", "git", "snapshot", "contained"} {
++		t.Run(mode, func(t *testing.T) {
++			root := t.TempDir()
++			packageAt(t, root, "skills/good", "good")
++			target := packageAt(t, root, "other", "other")
++			opts := ExpansionOptions{}
++			want := ""
++			switch mode {
++			case "escape":
++				target = packageAt(t, t.TempDir(), "outside", "outside")
++				want = "source_selection_invalid"
++			case "managed":
++				target = packageAt(t, root, ".agents/skills/output", "output")
++				want = "source_output_overlap"
++			case "git":
++				target = packageAt(t, root, ".git/objects", "output")
++				want = "source_output_overlap"
++			case "snapshot":
++				target = packageAt(t, root, "store/output", "output")
++				opts.OutputRoots = []string{filepath.Join(root, "store")}
++				want = "source_output_overlap"
++			}
++			if err := os.Symlink(target, filepath.Join(root, "skills/link")); err != nil {
++				t.Fatal(err)
++			}
++			m, err := expandFixture(t, root, `{"name":"other","from":"s","directory":"skills/link"}`)
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, err = Expand(m, opts)
++			if want == "" {
++				if err != nil {
++					t.Fatal(err)
++				}
++			} else if err == nil || !strings.Contains(err.Error(), want) {
++				t.Fatalf("%v, want %s", err, want)
++			}
++			if mode == "managed" || mode == "snapshot" {
++				m, err = expandFixture(t, root, `{"from":"s","directory":"skills","include":["*"]}`)
++				if err != nil {
++					t.Fatal(err)
++				}
++				got, err := Expand(m, opts)
++				if err != nil || len(got) != 1 || got[0].Decl.Name != "good" {
++					t.Fatalf("pruning: %+v %v", got, err)
++				}
++			}
++		})
++	}
++}
++
++func TestExpandAcquiredGitAndLiteralPath(t *testing.T) {
++	root := t.TempDir()
++	gitTree := t.TempDir()
++	packageAt(t, gitTree, ".", "root-skill")
++	m, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"repository":"example.org/kit","tag":"v1"}},"skills":[{"name":"root-skill","from":"s","directory":"."}]}`), filepath.Join(root, Name), draftOptions)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := Expand(m, ExpansionOptions{}); err == nil {
++		t.Fatal("unacquired Git accepted")
++	}
++	got, err := Expand(m, ExpansionOptions{GitRoots: map[string]string{"s": gitTree}})
++	if err != nil || len(got) != 1 || got[0].Directory != "." {
++		t.Fatalf("%+v %v", got, err)
++	}
++	packageAt(t, root, "$HOME/~literal", "root-skill")
++	m.Sources["s"] = Source{Path: "$HOME/~literal"}
++	got, err = Expand(m, ExpansionOptions{})
++	if err != nil || !strings.Contains(got[0].Path, "$HOME") {
++		t.Fatalf("literal path: %+v %v", got, err)
++	}
++}
++
++func TestExpandDeclaredManifestIdentity(t *testing.T) {
++	for _, name := range []string{"good", "other"} {
++		t.Run(name, func(t *testing.T) {
++			root := t.TempDir()
++			packageAt(t, root, "skill", "good")
++			writeExpansionFile(t, filepath.Join(root, "skill/agent-skill.json"), fmt.Sprintf(`{"schema_version":1,"name":%q}`, name))
++			m, err := expandFixture(t, root, `{"name":"good","from":"s","directory":"skill"}`)
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, err = Expand(m, ExpansionOptions{})
++			if name == "good" && err != nil {
++				t.Fatal(err)
++			}
++			if name != "good" && (err == nil || !strings.Contains(err.Error(), "source_member_invalid")) {
++				t.Fatalf("%v", err)
++			}
++		})
++	}
++}
++
++func TestExpandMalformedSelectorBeforeFilesystem(t *testing.T) {
++	for _, selection := range []string{
++		`{"name":"good","from":"missing","directory":"."}`,
++		`{"name":"good","from":"s","directory":"../escape"}`,
++		`{"from":"s","directory":".","include":["**"]}`,
++		`{"from":"s","directory":".","include":["a*"]}`,
++		`{"from":"s","directory":".","include":["a/b"]}`,
++		`{"from":"s","directory":".","include":["*"],"exclude":["*"]}`,
++	} {
++		t.Run(selection, func(t *testing.T) {
++			m, err := expandFixture(t, filepath.Join(t.TempDir(), "absent"), selection)
++			if err == nil {
++				_, err = Expand(m, ExpansionOptions{})
++			}
++			if err == nil {
++				t.Fatal("invalid selector accepted")
++			}
++		})
++	}
++}
++
++func TestExpandOutputReadFailure(t *testing.T) {
++	root := t.TempDir()
++	packageAt(t, root, "skill", "good")
++	writeExpansionFile(t, filepath.Join(root, "file"), "x")
++	m, err := expandFixture(t, root, `{"name":"good","from":"s","directory":"skill"}`)
++	if err != nil {
++		t.Fatal(err)
++	}
++	_, err = Expand(m, ExpansionOptions{OutputRoots: []string{filepath.Join(root, "file/child")}})
++	if err == nil || !strings.Contains(err.Error(), "source_output_overlap") {
++		t.Fatalf("%v", err)
++	}
++}
++
++func TestExpandMetadataLinks(t *testing.T) {
++	for _, file := range []string{"SKILL.md", "agent-skill.json", "csk-skill.json", "agents"} {
++		t.Run(file, func(t *testing.T) {
++			root := t.TempDir()
++			dir := packageAt(t, root, "skill", "good")
++			outside := t.TempDir()
++			target := filepath.Join(outside, "manifest")
++			writeExpansionFile(t, target, `{"schema_version":1}`)
++			if file == "SKILL.md" {
++				if err := os.Remove(filepath.Join(dir, file)); err != nil {
++					t.Fatal(err)
++				}
++				writeExpansionFile(t, target, "---\nname: good\ndescription: external\n---\n")
++			}
++			if file == "agents" {
++				target = outside
++				writeExpansionFile(t, filepath.Join(outside, "runtime.json"), `{}`)
++			}
++			if err := os.Symlink(target, filepath.Join(dir, file)); err != nil {
++				t.Fatal(err)
++			}
++			m, err := expandFixture(t, root, `{"name":"good","from":"s","directory":"skill"}`)
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, err = Expand(m, ExpansionOptions{})
++			if err == nil || !strings.Contains(err.Error(), "source_member_invalid") {
++				t.Fatalf("%v", err)
++			}
++		})
++	}
++}
+diff --git a/internal/manifest/manifest.go b/internal/manifest/manifest.go
+index cc225ff..0a5fc3c 100644
+--- a/internal/manifest/manifest.go
++++ b/internal/manifest/manifest.go
+@@ -1,5 +1,5 @@
+-// Package manifest parses the project manifest Skillfile.json, schema 1
+-// (Spec §6.1), and edits skill declarations in place.
++// Package manifest parses the project manifest Skillfile.json, frozen schema 1
++// (Spec §6.1) and explicitly opted-in draft schema 2, and edits legacy declarations.
+ package manifest
+ 
+ import (
+@@ -17,7 +17,7 @@ import (
+ 	"github.com/relux-works/curator/internal/verr"
+ )
+ 
+-// SchemaVersion is the only supported Skillfile schema.
++// SchemaVersion is the default, frozen Skillfile schema.
+ const SchemaVersion = 1
+ 
+ // Name is the manifest file name at the project root.
+@@ -36,15 +36,20 @@ type Decl struct {
+ 	Source string // path under skills_root; defaults to Name
+ 	Ref    Ref
+ 	Git    string // optional clone URL
++	// Selector is non-nil only for an opt-in draft source selection. Legacy
++	// Source, Git and Ref remain empty for that arm.
++	Selector *Selector
+ }
+ 
+ // Manifest is the parsed project manifest.
+ type Manifest struct {
+-	Path         string
+-	ProjectAlias string
+-	Agents       []string
+-	Locale       string
+-	Skills       []Decl
++	Path          string
++	SchemaVersion int
++	Sources       map[string]Source
++	ProjectAlias  string
++	Agents        []string
++	Locale        string
++	Skills        []Decl
+ }
+ 
+ // PathIn returns the manifest path for a project root.
+@@ -55,6 +60,11 @@ func PathIn(projectRoot string) string {
+ // Load reads and parses the project manifest. A missing file returns
+ // (nil, nil): the project is simply not initialized.
+ func Load(projectRoot string) (*Manifest, error) {
++	return LoadWithOptions(projectRoot, ParseOptions{})
++}
++
++// LoadWithOptions reads a root project with explicitly admitted draft capabilities.
++func LoadWithOptions(projectRoot string, options ParseOptions) (*Manifest, error) {
+ 	filePath := PathIn(projectRoot)
+ 	payload, err := os.ReadFile(filePath) // #nosec G304 -- path is derived from the project root
+ 	if os.IsNotExist(err) {
+@@ -63,7 +73,7 @@ func Load(projectRoot string) (*Manifest, error) {
+ 	if err != nil {
+ 		return nil, err
+ 	}
+-	return ParseBytes(payload, filePath)
++	return ParseBytesWithOptions(payload, filePath, options)
+ }
+ 
+ // ParseBytes parses one manifest payload that a caller already read. It is the
+@@ -72,6 +82,11 @@ func Load(projectRoot string) (*Manifest, error) {
+ // the file once and parse those bytes, instead of reading the path a second time
+ // and parsing a possibly different generation.
+ func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
++	return ParseBytesWithOptions(payload, filePath, ParseOptions{})
++}
++
++// ParseBytesWithOptions validates the entire declaration without source I/O.
++func ParseBytesWithOptions(payload []byte, filePath string, options ParseOptions) (*Manifest, error) {
+ 	if err := protocoljson.Validate(payload); err != nil {
+ 		return nil, fmt.Errorf("malformed JSON in %s: %w", filePath, err)
+ 	}
+@@ -83,14 +98,16 @@ func ParseBytes(payload []byte, filePath string) (*Manifest, error) {
+ 	if !ok {
+ 		return nil, fmt.Errorf("%s must contain a JSON object", filePath)
+ 	}
+-	return Parse(obj, filePath)
++	return ParseWithOptions(obj, filePath, options)
+ }
+ 
+ // Parse validates a raw manifest object (Spec §6.1).
+ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
+-	if unknown := unknownFields(obj, "schema_version", "project", "agents", "locale", "skills"); len(unknown) > 0 {
+-		return nil, verr.New("Skillfile", "unsupported field(s): %s", strings.Join(unknown, ", "))
+-	}
++	return ParseWithOptions(obj, filePath, ParseOptions{})
++}
++
++// ParseWithOptions admits schema 2 only for a reader supporting the draft.
++func ParseWithOptions(obj map[string]any, filePath string, options ParseOptions) (*Manifest, error) {
+ 	schema, present := obj["schema_version"]
+ 	if !present {
+ 		return nil, verr.New("schema_version", "missing required field")
+@@ -99,10 +116,26 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
+ 	if !ok || number != float64(int(number)) {
+ 		return nil, verr.New("schema_version", "must be an integer, got %v", schema)
+ 	}
+-	if int(number) != SchemaVersion {
++	if number != SchemaVersion && !(number == 2 && options.DraftSourcesV1) {
+ 		return nil, verr.New("schema_version", "unsupported Skillfile schema_version %d; this Skillfile requires a newer tool", int(number))
+ 	}
+ 
++	allowed := []string{"schema_version", "project", "agents", "locale", "skills"}
++	if number == 2 {
++		allowed = append(allowed, "sources")
++	}
++	if unknown := unknownFields(obj, allowed...); len(unknown) > 0 {
++		return nil, verr.New("Skillfile", "unsupported field(s): %s", strings.Join(unknown, ", "))
++	}
++	var sources map[string]Source
++	if number == 2 {
++		var err error
++		sources, err = parseSources(obj)
++		if err != nil {
++			return nil, err
++		}
++	}
++
+ 	alias, err := parseProjectAlias(obj)
+ 	if err != nil {
+ 		return nil, err
+@@ -141,6 +174,20 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
+ 		if !ok {
+ 			return nil, verr.New(label, "must be an object")
+ 		}
++		if _, selected := entry["from"]; selected && number == 2 {
++			decl, err := parseSelector(entry, sources, label)
++			if err != nil {
++				return nil, err
++			}
++			if decl.Name != "" {
++				if seen[decl.Name] {
++					return nil, verr.New(label, "source_name_conflict: duplicate skill name %s", decl.Name)
++				}
++				seen[decl.Name] = true
++			}
++			skills = append(skills, decl)
++			continue
++		}
+ 		if unknown := unknownFields(entry, "name", "source", "git", "tag", "branch", "revision"); len(unknown) > 0 {
+ 			return nil, verr.New(label, "unsupported field(s): %s", strings.Join(unknown, ", "))
+ 		}
+@@ -192,7 +239,7 @@ func Parse(obj map[string]any, filePath string) (*Manifest, error) {
+ 		skills = append(skills, Decl{Name: name, Source: source, Ref: Ref{Kind: refKeys[0], Value: refValue}, Git: git})
+ 	}
+ 
+-	return &Manifest{Path: filePath, ProjectAlias: alias, Agents: agents, Locale: locale, Skills: skills}, nil
++	return &Manifest{Path: filePath, SchemaVersion: int(number), Sources: sources, ProjectAlias: alias, Agents: agents, Locale: locale, Skills: skills}, nil
+ }
+ 
+ func parseProjectAlias(obj map[string]any) (string, error) {
+diff --git a/internal/manifest/sources.go b/internal/manifest/sources.go
+new file mode 100644
+index 0000000..195e276
+--- /dev/null
++++ b/internal/manifest/sources.go
+@@ -0,0 +1,185 @@
++package manifest
++
++import (
++	"strings"
++	"unicode/utf8"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/identity"
++	"github.com/relux-works/curator/internal/verr"
++)
++
++// ParseOptions is reader-owned capability admission, never a manifest field.
++// This opts into unreleased skillfile-sources-v1 parsing only; callers must
++// implement resolution/locking before consuming selectors for installation.
++type ParseOptions struct{ DraftSourcesV1 bool }
++
++// Source is the closed acquisition union. Path is literal native filesystem
++// syntax relative to the declaring Skillfile (or absolute), without expansion.
++// Network arms retain the declaration separately from canonical identity.
++// Exactly one of Path, Git, Repository is populated by the parser.
++type Source struct {
++	Path       string
++	Git        string
++	Repository string
++	Identity   string
++	Ref        Ref
++}
++
++// Selector is either an individual (Decl.Name is set, Collection is false)
++// or a collection. Directory remains source-relative, including the root ".".
++// Include/exclude are unexpanded: filesystem membership belongs to resolution.
++type Selector struct {
++	From       string
++	Directory  string
++	Collection bool
++	Include    []string
++	Exclude    []string
++}
++
++func parseSources(obj map[string]any) (map[string]Source, error) {
++	raw, present := obj["sources"]
++	if !present {
++		return nil, nil
++	}
++	entries, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("sources", "source_selection_invalid: must be an object")
++	}
++	sources := make(map[string]Source, len(entries))
++	for alias, raw := range entries {
++		label := "sources." + alias
++		if !identifiers.Valid(alias) {
++			return nil, verr.New(label, "source_selection_invalid: invalid alias")
++		}
++		entry, ok := raw.(map[string]any)
++		if !ok {
++			return nil, verr.New(label, "source_selection_invalid: must be an object")
++		}
++		if _, present := entry["path"]; present {
++			value, ok := entry["path"].(string)
++			if len(unknownFields(entry, "path")) != 0 || !ok || value == "" || !utf8.ValidString(value) || utf8.RuneCountInString(value) > 4096 || containsControl(value) {
++				return nil, verr.New(label, "source_selection_invalid: path requires a non-empty control-free native path and no other fields")
++			}
++			sources[alias] = Source{Path: value}
++			continue
++		}
++		if len(unknownFields(entry, "git", "repository", "tag", "branch", "revision")) != 0 {
++			return nil, verr.New(label, "source_selection_invalid: unsupported source fields")
++		}
++		_, gitPresent := entry["git"]
++		_, repositoryPresent := entry["repository"]
++		if gitPresent == repositoryPresent {
++			return nil, verr.New(label, "source_selection_invalid: requires exactly one of git or repository")
++		}
++		source := Source{}
++		if gitPresent {
++			value, _ := entry["git"].(string)
++			parsed, err := buildrepo.ParseSource(value)
++			if err != nil {
++				return nil, verr.New(label, "source_selection_invalid: invalid repository endpoint")
++			}
++			source.Git, source.Identity = value, parsed.Identity
++		} else {
++			value, _ := entry["repository"].(string)
++			// Reuse the closed HTTPS endpoint grammar, then require exact canonical
++			// equality: no normalization, credentials, ports or terminal .git allowed.
++			parsed, err := buildrepo.ParseSource("https://" + value)
++			if err != nil || parsed.Identity != value {
++				return nil, verr.New(label, "source_selection_invalid: repository must be canonical host/path")
++			}
++			source.Repository, source.Identity = value, value
++		}
++		for _, kind := range []string{"tag", "branch", "revision"} {
++			raw, present := entry[kind]
++			if !present {
++				continue
++			}
++			value, ok := raw.(string)
++			if source.Ref.Kind != "" || !ok || !validSourceRef(kind, value) {
++				return nil, verr.New(label, "source_selection_invalid: requires exactly one valid tag, branch or revision")
++			}
++			source.Ref = Ref{Kind: kind, Value: value}
++		}
++		if source.Ref.Kind == "" {
++			return nil, verr.New(label, "source_selection_invalid: missing exact reference")
++		}
++		sources[alias] = source
++	}
++	return sources, nil
++}
++
++func validSourceRef(kind, value string) bool {
++	if kind != "revision" {
++		return identity.DraftSourceRefName(value)
++	}
++	if len(value) != 40 && len(value) != 64 {
++		return false
++	}
++	for _, c := range value {
++		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
++			return false
++		}
++	}
++	return true
++}
++
++func parseSelector(entry map[string]any, sources map[string]Source, label string) (Decl, error) {
++	invalid := func(reason string) (Decl, error) {
++		return Decl{}, verr.New(label, "source_selection_invalid: %s", reason)
++	}
++	from, _ := entry["from"].(string)
++	if !identifiers.Valid(from) {
++		return invalid("invalid source alias")
++	}
++	if _, exists := sources[from]; !exists {
++		return Decl{}, verr.New(label, "source_alias_unknown: %s", from)
++	}
++	directory, _ := entry["directory"].(string)
++	if directory != "." && (!identifiers.PortablePath(directory) || strings.ContainsAny(directory, "*?[]")) {
++		return invalid("directory must be a portable contained path or '.'")
++	}
++	selector := &Selector{From: from, Directory: directory}
++	if raw, named := entry["name"]; named {
++		name, _ := raw.(string)
++		if !identifiers.Valid(name) || len(unknownFields(entry, "name", "from", "directory")) != 0 {
++			return invalid("invalid individual selector or mixed arms")
++		}
++		return Decl{Name: name, Selector: selector}, nil
++	}
++	if len(unknownFields(entry, "from", "directory", "include", "exclude")) != 0 {
++		return invalid("unsupported collection fields")
++	}
++	include, err := selectorMembers(entry["include"], true)
++	if err != nil {
++		return invalid("include requires unique literal identifiers or '*' and must not be empty")
++	}
++	var exclude []string
++	if raw, present := entry["exclude"]; present {
++		exclude, err = selectorMembers(raw, false)
++		if err != nil {
++			return invalid("exclude requires unique literal identifiers")
++		}
++	}
++	selector.Collection, selector.Include, selector.Exclude = true, include, exclude
++	return Decl{Selector: selector}, nil
++}
++
++func selectorMembers(raw any, include bool) ([]string, error) {
++	list, ok := raw.([]any)
++	if !ok || include && len(list) == 0 {
++		return nil, verr.New("members", "invalid list")
++	}
++	result := make([]string, 0, len(list))
++	seen := map[string]bool{}
++	for _, raw := range list {
++		value, ok := raw.(string)
++		if !ok || seen[value] || (!include || value != "*") && !identifiers.Valid(value) {
++			return nil, verr.New("members", "invalid member")
++		}
++		seen[value] = true
++		result = append(result, value)
++	}
++	return result, nil
++}
+diff --git a/internal/manifest/sources_test.go b/internal/manifest/sources_test.go
+new file mode 100644
+index 0000000..a899919
+--- /dev/null
++++ b/internal/manifest/sources_test.go
+@@ -0,0 +1,165 @@
++package manifest
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"reflect"
++	"strings"
++	"testing"
++)
++
++var draftOptions = ParseOptions{DraftSourcesV1: true}
++
++func TestDraftPublishedSchemaCases(t *testing.T) {
++	files, err := filepath.Glob("testdata/draft-sources-v1/skillfile-v2/*.json")
++	if err != nil || len(files) != 41 {
++		t.Fatalf("published corpus: %d files, %v", len(files), err)
++	}
++	for _, file := range files {
++		t.Run(filepath.Base(file), func(t *testing.T) {
++			payload, err := os.ReadFile(file)
++			if err != nil {
++				t.Fatal(err)
++			}
++			root := writeManifest(t, string(payload))
++			_, err = LoadWithOptions(root, draftOptions)
++			want := strings.HasPrefix(filepath.Base(file), "valid-")
++			if (err == nil) != want {
++				t.Fatalf("valid=%v: %v", want, err)
++			}
++		})
++	}
++}
++
++func TestDraftCapabilityAdmission(t *testing.T) {
++	for _, version := range []string{"0", "1", "2", "3", "2.5", "null", `"2"`, "1e100"} {
++		payload := []byte(`{"schema_version":` + version + `,"skills":[]}`)
++		for _, opted := range []bool{false, true} {
++			_, err := ParseBytesWithOptions(payload, "/missing/Skillfile.json", ParseOptions{DraftSourcesV1: opted})
++			want := version == "1" || version == "2" && opted
++			if (err == nil) != want {
++				t.Errorf("version=%s opted=%v err=%v", version, opted, err)
++			}
++		}
++	}
++	root := writeManifest(t, `{"schema_version":2,"skills":[]}`)
++	if _, err := Load(root); err == nil {
++		t.Fatal("legacy Load accepted draft")
++	}
++	if _, err := ParseBytes([]byte(`{"schema_version":2,"skills":[]}`), "Skillfile.json"); err == nil {
++		t.Fatal("legacy ParseBytes accepted draft")
++	}
++	if _, err := Parse(map[string]any{"schema_version": float64(2), "skills": []any{}}, "Skillfile.json"); err == nil {
++		t.Fatal("legacy Parse accepted draft")
++	}
++}
++
++func TestDraftPreservesEveryLegacyField(t *testing.T) {
++	payload := `{"schema_version":1,"project":{"alias":"Demo iOS"},"agents":["codex_cli","claude_code"],"locale":"ru","skills":[{"name":"one","source":"références/文書","git":"http://example.org/one","branch":"legacy branch"},{"name":"two","revision":"abc123"},{"name":"three","tag":"v1"}]}`
++	legacy, err := ParseBytes([]byte(payload), "/project/Skillfile.json")
++	if err != nil {
++		t.Fatal(err)
++	}
++	draft, err := ParseBytesWithOptions([]byte(strings.Replace(payload, `"schema_version":1`, `"schema_version":2`, 1)), "/project/Skillfile.json", draftOptions)
++	if err != nil {
++		t.Fatal(err)
++	}
++	draft.SchemaVersion = 1
++	if !reflect.DeepEqual(legacy, draft) {
++		t.Fatalf("legacy fields changed:\n%+v\n%+v", legacy, draft)
++	}
++	if draft.Skills[0].Source != "références/文書" || draft.Skills[1].Source != "two" {
++		t.Fatal("configured-root source meaning changed")
++	}
++}
++
++func TestDraftSourceUnionAndSelectors(t *testing.T) {
++	payload := `{"schema_version":2,"sources":{"rel":{"path":"../$HOME/~kit"},"abs":{"path":"/missing/kit"},"url":{"git":"ssh://git@EXAMPLE.org/team/kit.git","branch":"feature/work"},"logical":{"repository":"example.org/team/kit","revision":"` + strings.Repeat("a", 64) + `"}},"skills":[{"name":"one","from":"rel","directory":"."},{"from":"logical","directory":"skills","include":["*","two"],"exclude":["three"]}]}`
++	m, err := LoadWithOptions(writeManifest(t, payload), draftOptions)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if m.Sources["rel"].Path != "../$HOME/~kit" || m.Sources["abs"].Path != "/missing/kit" || m.Sources["url"].Identity != "example.org/team/kit" || m.Sources["url"].Git != "ssh://git@EXAMPLE.org/team/kit.git" || m.Sources["logical"].Repository != "example.org/team/kit" {
++		t.Fatalf("sources=%+v", m.Sources)
++	}
++	if m.Skills[0].Source != "" || m.Skills[0].Ref != (Ref{}) || m.Skills[0].Selector.Directory != "." || !m.Skills[1].Selector.Collection || !reflect.DeepEqual(m.Skills[1].Selector.Include, []string{"*", "two"}) || !reflect.DeepEqual(m.Skills[1].Selector.Exclude, []string{"three"}) {
++		t.Fatalf("selectors=%+v", m.Skills)
++	}
++}
++
++func TestDraftNegativeAdmission(t *testing.T) {
++	sources := []string{
++		`null`, `[]`, `{"Bad/Alias":{"path":"."}}`, `{"s":null}`, `{"s":{"path":".","tag":"v1"}}`,
++		`{"s":{"git":"https://example.org/a","repository":"example.org/a","tag":"v1"}}`,
++		`{"s":{"repository":"EXAMPLE.org/a","tag":"v1"}}`, `{"s":{"repository":"example.org/a.git","tag":"v1"}}`,
++		`{"s":{"repository":"example.org/a","tag":"v1","branch":"main"}}`,
++		`{"s":{"git":"http://example.org/a","tag":"v1"}}`, `{"s":{"git":"https://token@example.org/a","tag":"v1"}}`,
++		`{"s":{"git":"ssh://git@example.org:22/a","tag":"v1"}}`,
++		`{"s":{"repository":"example.org/a","revision":"abc123"}}`, `{"s":{"repository":"example.org/a","branch":"bad..ref"}}`,
++		`{"s":{"repository":"example.org/a","tag":"foo.lock"}}`, `{"s":{"repository":"example.org/a","branch":null}}`,
++	}
++	for _, source := range sources {
++		_, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":`+source+`,"skills":[]}`), "/nonexistent/Skillfile.json", draftOptions)
++		if err == nil {
++			t.Errorf("accepted sources %s", source)
++		}
++	}
++	selections := []string{
++		`{"name":"a","from":"unknown","directory":"."}`, `{"name":"a","from":"S","directory":"."}`,
++		`{"name":"a","from":"s","directory":".","git":null}`, `{"name":"a","from":"s","directory":".","include":["*"]}`,
++		`{"from":"s","directory":".","include":[]}`, `{"from":"s","directory":".","include":["*","*"]}`,
++		`{"from":"s","directory":".","include":["*"],"exclude":null}`, `{"from":"s","directory":".","include":["*"],"exclude":["a","a"]}`,
++	}
++	for _, dir := range []string{"", "..", "../a", "/a", "a//b", "a/./b", `a\b`, "C:/a", "NUL", "a/COM1.txt", "a.", "a ", "a*", "a?", "a[b]"} {
++		encoded, _ := json.Marshal(dir)
++		selections = append(selections, `{"name":"a","from":"s","directory":`+string(encoded)+`}`)
++	}
++	for _, selection := range selections {
++		_, err := ParseBytesWithOptions([]byte(`{"schema_version":2,"sources":{"s":{"path":"/nonexistent"}},"skills":[`+selection+`]}`), "/nonexistent/Skillfile.json", draftOptions)
++		if err == nil {
++			t.Errorf("accepted selection %s", selection)
++		}
++	}
++	for _, payload := range []string{
++		`{"schema_version":2,"schema_version":1,"skills":[]}`,
++		`{"schema_version":2,"sources":{"s":{"path":"a","path":"b"}},"skills":[]}`,
++		`{"schema_version":1,"sources":{},"skills":[]}`,
++		`{"schema_version":2,"DraftSourcesV1":true,"skills":[]}`,
++		`{"schema_version":2,"sources":{"s":{"path":"."}},"skills":[{"name":"a","tag":"v1"},{"name":"a","from":"s","directory":"."}]}`,
++	} {
++		if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err == nil {
++			t.Errorf("accepted %s", payload)
++		}
++	}
++}
++
++func TestDraftValidRefsAndEndpoints(t *testing.T) {
++	for _, endpoint := range []string{`"git":"https://EXAMPLE.org/a.git"`, `"git":"ssh://git@example.org/a"`, `"git":"git@example.org:a"`, `"repository":"example.org/a"`} {
++		for _, ref := range []string{`"tag":"v1"`, `"branch":"feature/x"`, `"revision":"` + strings.Repeat("a", 40) + `"`, `"revision":"` + strings.Repeat("b", 64) + `"`} {
++			payload := `{"schema_version":2,"sources":{"s":{` + endpoint + `,` + ref + `}},"skills":[]}`
++			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err != nil {
++				t.Errorf("%s: %v", payload, err)
++			}
++		}
++	}
++}
++
++func TestDraftRefGrammarBounds(t *testing.T) {
++	for _, kind := range []string{"tag", "branch"} {
++		for _, value := range []string{"@", "/a", "a/", "a.", "a//b", "a..b", "a@{b", "a b", "a\x7fb", "a~b", "a^b", "a:b", "a?b", "a*b", "a[b", `a\b`, ".a", "x/.a", "x/a.lock", strings.Repeat("é", 256)} {
++			raw, _ := json.Marshal(value)
++			payload := `{"schema_version":2,"sources":{"s":{"repository":"example.org/a","` + kind + `":` + string(raw) + `}},"skills":[]}`
++			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err == nil {
++				t.Errorf("accepted %s %q", kind, value)
++			}
++		}
++		for _, value := range []string{"a", "é", strings.Repeat("é", 255), "heads/a", "a.locked"} {
++			raw, _ := json.Marshal(value)
++			payload := `{"schema_version":2,"sources":{"s":{"repository":"example.org/a","` + kind + `":` + string(raw) + `}},"skills":[]}`
++			if _, err := ParseBytesWithOptions([]byte(payload), "/missing/Skillfile.json", draftOptions); err != nil {
++				t.Errorf("rejected %s %q: %v", kind, value, err)
++			}
++		}
++	}
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/README.md b/internal/manifest/testdata/draft-sources-v1/README.md
+new file mode 100644
+index 0000000..9483398
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/README.md
+@@ -0,0 +1,17 @@
++# Unreleased draft Skillfile parser fixtures
++
++Copied without edits from curator-spec at 3535d63ea80f97bba2fcb6e1f06996cfc25cf7df
++(the source contract landed in a4fcaf02):
++
++- `conformance/draft-sources-v1/schema-cases/skillfile-v2`: all 41 cases.
++- `schemas/draft-sources-v1/skillfile-v2.schema.json` and its frozen v1 references.
++
++`TestDraftPublishedSchemaCases` drives every published case through
++`manifest.LoadWithOptions`. Filename labels are the published schema oracle.
++The local schemas document that oracle; Go tests do not execute a JSON Schema
++engine. Semantic cases (unknown aliases, canonical spelling, duplicates and
++ref bounds) additionally drive the byte parser in sources_test.go.
++
++This evidence covers parsing only. It does not establish source containment,
++collection enumeration, lock/snapshot integrity, transport policy, installation,
++or cross-platform filesystem behavior. Default reader APIs still reject v2.
+diff --git a/internal/manifest/testdata/draft-sources-v1/schemas/draft-sources-v1/skillfile-v2.schema.json b/internal/manifest/testdata/draft-sources-v1/schemas/draft-sources-v1/skillfile-v2.schema.json
+new file mode 100644
+index 0000000..4fcb91f
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/schemas/draft-sources-v1/skillfile-v2.schema.json
+@@ -0,0 +1,227 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/draft-sources-v1/skillfile-v2.schema.json",
++  "type": "object",
++  "properties": {
++    "project": {
++      "$ref": "../v1/skillfile-v1.schema.json#/properties/project"
++    },
++    "agents": {
++      "$ref": "../v1/skillfile-v1.schema.json#/properties/agents"
++    },
++    "locale": {
++      "$ref": "../v1/skillfile-v1.schema.json#/properties/locale"
++    },
++    "schema_version": {
++      "const": 2
++    },
++    "sources": {
++      "type": "object",
++      "propertyNames": {
++        "$ref": "../v1/common.schema.json#/$defs/identifier"
++      },
++      "additionalProperties": {
++        "oneOf": [
++          {
++            "type": "object",
++            "properties": {
++              "path": {
++                "type": "string",
++                "minLength": 1,
++                "maxLength": 4096,
++                "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
++              }
++            },
++            "required": [
++              "path"
++            ],
++            "additionalProperties": false
++          },
++          {
++            "type": "object",
++            "properties": {
++              "git": {
++                "$ref": "../v1/common.schema.json#/$defs/repositoryGit"
++              },
++              "repository": {
++                "type": "string",
++                "maxLength": 4096,
++                "pattern": "^[a-z0-9][a-z0-9.-]*/(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\s\\\\:%?#/]+(?:/[^\\s\\\\:%?#/]+)*$"
++              },
++              "tag": {
++                "$ref": "../v1/common.schema.json#/$defs/gitRefName"
++              },
++              "branch": {
++                "$ref": "../v1/common.schema.json#/$defs/gitRefName"
++              },
++              "revision": {
++                "$ref": "../v1/common.schema.json#/$defs/commit"
++              }
++            },
++            "required": [],
++            "additionalProperties": false,
++            "allOf": [
++              {
++                "oneOf": [
++                  {
++                    "required": [
++                      "git"
++                    ]
++                  },
++                  {
++                    "required": [
++                      "repository"
++                    ]
++                  }
++                ]
++              },
++              {
++                "oneOf": [
++                  {
++                    "required": [
++                      "tag"
++                    ]
++                  },
++                  {
++                    "required": [
++                      "branch"
++                    ]
++                  },
++                  {
++                    "required": [
++                      "revision"
++                    ]
++                  }
++                ]
++              }
++            ]
++          }
++        ]
++      }
++    },
++    "skills": {
++      "type": "array",
++      "items": {
++        "oneOf": [
++          {
++            "$ref": "../v1/skillfile-v1.schema.json#/properties/skills/items"
++          },
++          {
++            "type": "object",
++            "properties": {
++              "name": {
++                "$ref": "../v1/common.schema.json#/$defs/identifier"
++              },
++              "from": {
++                "$ref": "../v1/common.schema.json#/$defs/identifier"
++              },
++              "directory": {
++                "oneOf": [
++                  {
++                    "const": "."
++                  },
++                  {
++                    "allOf": [
++                      {
++                        "$ref": "../v1/common.schema.json#/$defs/portablePath"
++                      },
++                      {
++                        "not": {
++                          "pattern": "(?:^|/)[^/]*[ .](?:/|$)|[*?\\[\\]]"
++                        }
++                      }
++                    ]
++                  }
++                ]
++              }
++            },
++            "required": [
++              "name",
++              "from",
++              "directory"
++            ],
++            "additionalProperties": false
++          },
++          {
++            "type": "object",
++            "properties": {
++              "from": {
++                "$ref": "../v1/common.schema.json#/$defs/identifier"
++              },
++              "directory": {
++                "oneOf": [
++                  {
++                    "const": "."
++                  },
++                  {
++                    "allOf": [
++                      {
++                        "$ref": "../v1/common.schema.json#/$defs/portablePath"
++                      },
++                      {
++                        "not": {
++                          "pattern": "(?:^|/)[^/]*[ .](?:/|$)|[*?\\[\\]]"
++                        }
++                      }
++                    ]
++                  }
++                ]
++              },
++              "include": {
++                "type": "array",
++                "items": {
++                  "oneOf": [
++                    {
++                      "const": "*"
++                    },
++                    {
++                      "allOf": [
++                        {
++                          "$ref": "../v1/common.schema.json#/$defs/identifier"
++                        },
++                        {
++                          "not": {
++                            "pattern": "[/\\\\*?\\[\\]]"
++                          }
++                        }
++                      ]
++                    }
++                  ]
++                },
++                "minItems": 1,
++                "uniqueItems": true
++              },
++              "exclude": {
++                "type": "array",
++                "items": {
++                  "allOf": [
++                    {
++                      "$ref": "../v1/common.schema.json#/$defs/identifier"
++                    },
++                    {
++                      "not": {
++                        "pattern": "[/\\\\*?\\[\\]]"
++                      }
++                    }
++                  ]
++                },
++                "uniqueItems": true
++              }
++            },
++            "required": [
++              "from",
++              "directory",
++              "include"
++            ],
++            "additionalProperties": false
++          }
++        ]
++      }
++    }
++  },
++  "required": [
++    "schema_version",
++    "skills"
++  ],
++  "additionalProperties": false
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/schemas/v1/common.schema.json b/internal/manifest/testdata/draft-sources-v1/schemas/v1/common.schema.json
+new file mode 100644
+index 0000000..50b0a60
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/schemas/v1/common.schema.json
+@@ -0,0 +1,665 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/common.schema.json",
++  "title": "Curator Protocol common definitions",
++  "$defs": {
++    "identifier": {
++      "allOf": [
++        {"type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?$", "maxLength": 128},
++        {"not": {"pattern": "^(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|$)"}}
++      ]
++    },
++    "portablePath": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 4096,
++      "pattern": "^[^/\\\\:\\u0000-\\u001f\\u007f-\\u009f](?:[^\\\\:\\u0000-\\u001f\\u007f-\\u009f]*[^/ .\\\\:\\u0000-\\u001f\\u007f-\\u009f])?$",
++      "not": {"pattern": "(?:^|/)(?:\\.{1,2}|[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.|/|$)|//"}
++    },
++    "nonEmptyString": {"type": "string", "minLength": 1, "maxLength": 8192},
++    "projectAlias": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"},
++    "locale": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?$"},
++    "safeInteger": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991},
++    "nonNegativeSafeInteger": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
++    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
++    "hex256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
++    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}(?:[0-9a-f]{24})?$"},
++    "timestamp": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
++    "stringSet": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
++    "identifierSet": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true},
++    "pathSet": {"type": "array", "items": {"$ref": "#/$defs/portablePath"}, "uniqueItems": true},
++    "ref": {
++      "type": "object",
++      "required": ["kind", "value"],
++      "properties": {
++        "kind": {"enum": ["tag", "revision"]},
++        "value": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "^[^\\s\\^~><*]+$"}
++      },
++      "additionalProperties": false
++    },
++    "devRef": {
++      "type": "object",
++      "required": ["kind", "value"],
++      "properties": {
++        "kind": {"enum": ["tag", "revision", "branch"]},
++        "value": {"type": "string", "minLength": 1, "maxLength": 1024}
++      },
++      "additionalProperties": false
++    },
++    "scriptCommand": {
++      "type": "object",
++      "required": ["type"],
++      "properties": {
++        "type": {"const": "script"},
++        "unix_path": {"$ref": "#/$defs/portablePath"},
++        "win_path": {"$ref": "#/$defs/portablePath"}
++      },
++      "anyOf": [{"required": ["unix_path"]}, {"required": ["win_path"]}],
++      "additionalProperties": false
++    },
++    "systemCommand": {
++      "type": "object",
++      "required": ["type", "command"],
++      "properties": {
++        "type": {"const": "system"},
++        "command": {"$ref": "#/$defs/identifier"},
++        "hint": {"$ref": "#/$defs/nonEmptyString"}
++      },
++      "additionalProperties": false
++    },
++    "command": {"oneOf": [{"$ref": "#/$defs/scriptCommand"}, {"$ref": "#/$defs/systemCommand"}]},
++    "buildCommandV6": {
++      "type": "object",
++      "required": ["type", "driver", "source_dir"],
++      "properties": {
++        "type": {"const": "build"},
++        "driver": {"const": "go-v1"},
++        "source_dir": {"$ref": "#/$defs/portablePath"}
++      },
++      "additionalProperties": false
++    },
++    "commandV6": {"oneOf": [{"$ref": "#/$defs/scriptCommand"}, {"$ref": "#/$defs/systemCommand"}, {"$ref": "#/$defs/buildCommandV6"}]},
++    "rootOrPortablePath": {
++      "oneOf": [
++        {"const": "."},
++        {"$ref": "#/$defs/portablePath"}
++      ]
++    },
++    "repositoryGit": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 4096,
++      "pattern": "^(?:https://[A-Za-z0-9][A-Za-z0-9.-]*/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+(?:/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+)*|ssh://(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9][A-Za-z0-9.-]*/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+(?:/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+)*|(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}@)?[A-Za-z0-9][A-Za-z0-9.-]*:(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+(?:/(?!(?:\\.{1,2})(?:/|$))[A-Za-z0-9._-]+)*)$"
++    },
++    "gitRefName": {
++      "type": "string",
++      "minLength": 1,
++      "maxLength": 255,
++      "pattern": "^(?!/)(?!.*//)(?!.*\\.\\.)(?!.*@\\{)(?!.*(?:^|/)\\.)(?!.*(?:^|/)[^/]*\\.lock(?:/|$))(?!.*[\\u0000-\\u0020\\u007f~^:?*\\[\\\\])(?!@$).*[^/.]$"
++    },
++    "lockedCommit": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["object_format", "hex"],
++          "properties": {
++            "object_format": {"const": "sha1"},
++            "hex": {"type": "string", "pattern": "^[0-9a-f]{40}$"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["object_format", "hex"],
++          "properties": {
++            "object_format": {"const": "sha256"},
++            "hex": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "buildRepositoryV1": {
++      "type": "object",
++      "required": ["git", "locked_commit"],
++      "properties": {
++        "git": {"$ref": "#/$defs/repositoryGit"},
++        "locked_commit": {"$ref": "#/$defs/lockedCommit"},
++        "tag": {"$ref": "#/$defs/gitRefName"}
++      },
++      "additionalProperties": false
++    },
++    "repositoryBuildCommandV1": {
++      "type": "object",
++      "required": ["type", "driver", "repository", "target"],
++      "properties": {
++        "type": {"const": "build"},
++        "driver": {"const": "go-repository-v1"},
++        "repository": {"$ref": "#/$defs/identifier"},
++        "target": {"$ref": "#/$defs/identifier"}
++      },
++      "additionalProperties": false
++    },
++    "commandV7": {
++      "oneOf": [
++        {"$ref": "#/$defs/scriptCommand"},
++        {"$ref": "#/$defs/systemCommand"},
++        {"$ref": "#/$defs/buildCommandV6"},
++        {"$ref": "#/$defs/repositoryBuildCommandV1"}
++      ]
++    },
++    "scriptExecutionPolicyV1": {"const": "script-worker-v1"},
++    "scriptInterpreterV1": {"enum": ["node-v1", "python3-v1"]},
++    "scriptCommandV8": {
++      "type": "object",
++      "required": ["type"],
++      "properties": {
++        "type": {"const": "script"},
++        "unix_path": {"$ref": "#/$defs/portablePath"},
++        "win_path": {"$ref": "#/$defs/portablePath"},
++        "execution_policy": {"$ref": "#/$defs/scriptExecutionPolicyV1"},
++        "interpreter": {"$ref": "#/$defs/scriptInterpreterV1"}
++      },
++      "anyOf": [{"required": ["unix_path"]}, {"required": ["win_path"]}],
++      "dependentRequired": {
++        "execution_policy": ["interpreter"],
++        "interpreter": ["execution_policy"]
++      },
++      "additionalProperties": false
++    },
++    "buildCommandV8": {
++      "type": "object",
++      "required": ["type", "driver", "source_dir"],
++      "properties": {
++        "type": {"const": "build"},
++        "driver": {"const": "go-v1"},
++        "source_dir": {"$ref": "#/$defs/portablePath"},
++        "modules": {"$ref": "#/$defs/pathSet"}
++      },
++      "additionalProperties": false
++    },
++    "commandV8": {
++      "oneOf": [
++        {"$ref": "#/$defs/scriptCommandV8"},
++        {"$ref": "#/$defs/systemCommand"},
++        {"$ref": "#/$defs/buildCommandV8"},
++        {"$ref": "#/$defs/repositoryBuildCommandV1"}
++      ]
++    },
++    "skillBuildTargetV1": {
++      "type": "object",
++      "required": ["driver", "build_root", "source_dir"],
++      "properties": {
++        "driver": {"const": "go-repository-v1"},
++        "build_root": {"$ref": "#/$defs/rootOrPortablePath"},
++        "source_dir": {"$ref": "#/$defs/rootOrPortablePath"}
++      },
++      "additionalProperties": false
++    },
++    "repositoryStructuredRef": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["kind", "value"],
++          "properties": {
++            "kind": {"const": "revision"},
++            "value": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"}
++          },
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["kind", "value"],
++          "properties": {
++            "kind": {"enum": ["tag", "branch"]},
++            "value": {"$ref": "#/$defs/gitRefName"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "buildRepositorySubstitution": {
++      "oneOf": [
++        {
++          "type": "object",
++          "required": ["path"],
++          "properties": {"path": {"$ref": "#/$defs/nonEmptyString"}},
++          "additionalProperties": false
++        },
++        {
++          "type": "object",
++          "required": ["git", "ref"],
++          "properties": {
++            "git": {"$ref": "#/$defs/repositoryGit"},
++            "ref": {"$ref": "#/$defs/repositoryStructuredRef"}
++          },
++          "additionalProperties": false
++        }
++      ]
++    },
++    "networkSourceIdentity": {
++      "type": "object",
++      "required": ["kind", "value"],
++      "properties": {
++        "kind": {"const": "network-git"},
++        "value": {
++          "type": "string",
++          "minLength": 3,
++          "maxLength": 4096,
++          "pattern": "^(?!.*\\.git$)[a-z0-9][a-z0-9.-]*/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+(?:/(?!(?:\\.{1,2})(?:/|$))[^\\s%?#\\\\/:\\u0000-\\u001f\\u007f-\\u009f]+)*$"
++        }
++      },
++      "additionalProperties": false
++    },
++    "localSourceIdentity": {
++      "type": "object",
++      "required": ["kind", "value"],
++      "properties": {
++        "kind": {"const": "operator-local-git"},
++        "value": {"$ref": "#/$defs/sha256"}
++      },
++      "additionalProperties": false
++    },
++    "declaredRepositorySourceV1": {
++      "type": "object",
++      "required": ["identity", "transport", "locked_commit"],
++      "properties": {
++        "identity": {"$ref": "#/$defs/networkSourceIdentity"},
++        "transport": {"enum": ["https", "ssh"]},
++        "locked_commit": {"$ref": "#/$defs/lockedCommit"},
++        "tag": {"$ref": "#/$defs/gitRefName"}
++      },
++      "additionalProperties": false
++    },
++    "effectiveRepositorySourceV1": {
++      "type": "object",
++      "required": ["identity", "object_format", "commit", "substituted", "build_source"],
++      "properties": {
++        "identity": {
++          "oneOf": [
++            {"$ref": "#/$defs/networkSourceIdentity"},
++            {"$ref": "#/$defs/localSourceIdentity"}
++          ]
++        },
++        "transport": {"enum": ["https", "ssh"]},
++        "object_format": {"enum": ["sha1", "sha256"]},
++        "commit": {"$ref": "#/$defs/commit"},
++        "substituted": {"type": "boolean"},
++        "substitution": {
++          "oneOf": [
++            {
++              "type": "object",
++              "required": ["type"],
++              "properties": {"type": {"const": "local-path"}},
++              "additionalProperties": false
++            },
++            {
++              "type": "object",
++              "required": ["type", "ref"],
++              "properties": {
++                "type": {"const": "network-git"},
++                "ref": {"$ref": "#/$defs/repositoryStructuredRef"}
++              },
++              "additionalProperties": false
++            }
++          ]
++        },
++        "build_source": {"$ref": "#/$defs/buildSourceIdentity"}
++      },
++      "allOf": [
++        {
++          "if": {"properties": {"object_format": {"const": "sha1"}}, "required": ["object_format"]},
++          "then": {"properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}},
++          "else": {"properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
++        },
++        {
++          "if": {"properties": {"substituted": {"const": true}}, "required": ["substituted"]},
++          "then": {"required": ["substitution"]},
++          "else": {"not": {"required": ["substitution"]}}
++        },
++        {
++          "if": {"properties": {"identity": {"properties": {"kind": {"const": "network-git"}}, "required": ["kind"]}}},
++          "then": {"required": ["transport"]},
++          "else": {"not": {"required": ["transport"]}}
++        }
++      ],
++      "additionalProperties": false
++    },
++    "repositoryDescriptorSelectionV1": {
++      "type": "object",
++      "required": ["path", "target"],
++      "properties": {
++        "path": {"const": "skill-build.json"},
++        "target": {"$ref": "#/$defs/identifier"}
++      },
++      "additionalProperties": false
++    },
++    "buildSourceIdentity": {
++      "type": "object",
++      "required": ["algorithm", "content_sha256"],
++      "properties": {
++        "algorithm": {"const": "curator-build-source-v1"},
++        "content_sha256": {"$ref": "#/$defs/sha256"}
++      },
++      "additionalProperties": false
++    },
++    "goNativeTargetV1": {
++      "type": "object",
++      "required": ["goos", "goarch", "tuning"],
++      "properties": {
++        "goos": {"$ref": "#/$defs/identifier"},
++        "goarch": {"$ref": "#/$defs/identifier"},
++        "tuning": {
++          "type": "object",
++          "maxProperties": 1,
++          "propertyNames": {"enum": ["GO386", "GOAMD64", "GOARM", "GOARM64", "GOMIPS", "GOMIPS64", "GOPPC64", "GORISCV64", "GOWASM"]},
++          "additionalProperties": {"$ref": "#/$defs/nonEmptyString"}
++        }
++      },
++      "additionalProperties": false
++    },
++    "goToolchainIdentityV1": {
++      "type": "object",
++      "required": ["algorithm", "go_relpath", "go_version", "content_sha256"],
++      "properties": {
++        "algorithm": {"const": "curator-go-toolchain-v1"},
++        "go_relpath": {"const": "bin/go"},
++        "go_version": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\r\\n\\u0000]+$"},
++        "content_sha256": {"$ref": "#/$defs/sha256"}
++      },
++      "additionalProperties": false
++    },
++    "goExecutionPolicyV1": {"const": "manager-worker-v1"},
++    "goBuildPolicyV1": {
++      "type": "object",
++      "required": ["module_mode", "network", "workspace", "cgo", "compiler_directives", "target_mode", "link_mode", "libgcc", "package_assembly", "host_objects", "telemetry", "execution_policy"],
++      "properties": {
++        "module_mode": {"const": "vendor"},
++        "network": {"const": "none"},
++        "workspace": {"const": false},
++        "cgo": {"const": false},
++        "compiler_directives": {"const": "reject-nonstandard-cgo-import-dynamic-v1"},
++        "target_mode": {"const": "native"},
++        "link_mode": {"const": "internal"},
++        "libgcc": {"const": "none"},
++        "package_assembly": {"const": false},
++        "host_objects": {"const": false},
++        "telemetry": {"const": "off-private"},
++        "execution_policy": {"$ref": "#/$defs/goExecutionPolicyV1"}
++      },
++      "additionalProperties": false
++    },
++    "goRepositoryBuildPolicyV1": {
++      "type": "object",
++      "required": ["module_mode", "network", "workspace", "cgo", "compiler_directives", "target_mode", "link_mode", "libgcc", "package_assembly", "host_objects", "telemetry", "execution_policy", "source_kind"],
++      "properties": {
++        "module_mode": {"const": "vendor"},
++        "network": {"const": "none"},
++        "workspace": {"const": false},
++        "cgo": {"const": false},
++        "compiler_directives": {"const": "reject-nonstandard-cgo-import-dynamic-v1"},
++        "target_mode": {"const": "native"},
++        "link_mode": {"const": "internal"},
++        "libgcc": {"const": "none"},
++        "package_assembly": {"const": false},
++        "host_objects": {"const": false},
++        "telemetry": {"const": "off-private"},
++        "execution_policy": {"$ref": "#/$defs/goExecutionPolicyV1"},
++        "source_kind": {"const": "locked-external-git-v1"}
++      },
++      "additionalProperties": false
++    },
++    "goBuildInputV1": {
++      "type": "object",
++      "required": ["schema_version", "driver", "build_source", "build_root", "command", "source_dir", "target", "toolchain", "policy"],
++      "properties": {
++        "schema_version": {"const": 1},
++        "driver": {"const": "go-v1"},
++        "build_source": {"$ref": "#/$defs/buildSourceIdentity"},
++        "build_root": {"$ref": "#/$defs/portablePath"},
++        "command": {"$ref": "#/$defs/identifier"},
++        "source_dir": {"$ref": "#/$defs/portablePath"},
++        "target": {"$ref": "#/$defs/goNativeTargetV1"},
++        "toolchain": {"$ref": "#/$defs/goToolchainIdentityV1"},
++        "policy": {"$ref": "#/$defs/goBuildPolicyV1"}
++      },
++      "additionalProperties": false
++    },
++    "goRepositoryBuildInputV1": {
++      "type": "object",
++      "required": ["schema_version", "driver", "source", "command", "build_root", "source_dir", "target", "toolchain", "policy"],
++      "properties": {
++        "schema_version": {"const": 2},
++        "driver": {"const": "go-repository-v1"},
++        "source": {
++          "type": "object",
++          "required": ["repository", "declared", "effective", "descriptor"],
++          "properties": {
++            "repository": {"$ref": "#/$defs/identifier"},
++            "declared": {"$ref": "#/$defs/declaredRepositorySourceV1"},
++            "effective": {"$ref": "#/$defs/effectiveRepositorySourceV1"},
++            "descriptor": {"$ref": "#/$defs/repositoryDescriptorSelectionV1"}
++          },
++          "additionalProperties": false
++        },
++        "command": {"$ref": "#/$defs/identifier"},
++        "build_root": {"$ref": "#/$defs/rootOrPortablePath"},
++        "source_dir": {"$ref": "#/$defs/rootOrPortablePath"},
++        "target": {"$ref": "#/$defs/goNativeTargetV1"},
++        "toolchain": {"$ref": "#/$defs/goToolchainIdentityV1"},
++        "policy": {"$ref": "#/$defs/goRepositoryBuildPolicyV1"}
++      },
++      "additionalProperties": false
++    },
++    "buildArtifactV1": {
++      "type": "object",
++      "required": ["path", "sha256", "size"],
++      "properties": {
++        "path": {"$ref": "#/$defs/portablePath"},
++        "sha256": {"$ref": "#/$defs/sha256"},
++        "size": {"$ref": "#/$defs/nonNegativeSafeInteger"}
++      },
++      "additionalProperties": false
++    },
++    "buildRecordV1": {
++      "type": "object",
++      "required": ["driver", "cache_key", "receipt_sha256", "artifact_sha256", "artifact_path"],
++      "properties": {
++        "driver": {"const": "go-v1"},
++        "cache_key": {"$ref": "#/$defs/sha256"},
++        "receipt_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_path": {"$ref": "#/$defs/portablePath"}
++      },
++      "additionalProperties": false
++    },
++    "buildRecordV1WithReceiptVersion": {
++      "type": "object",
++      "required": ["driver", "receipt_schema_version", "execution_policy", "cache_key", "receipt_sha256", "artifact_sha256", "artifact_path"],
++      "properties": {
++        "driver": {"const": "go-v1"},
++        "receipt_schema_version": {"const": 1},
++        "execution_policy": {"$ref": "#/$defs/goExecutionPolicyV1"},
++        "cache_key": {"$ref": "#/$defs/sha256"},
++        "receipt_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_path": {"$ref": "#/$defs/portablePath"}
++      },
++      "additionalProperties": false
++    },
++    "buildRecordV2": {
++      "type": "object",
++      "required": ["driver", "receipt_schema_version", "execution_policy", "repository", "declared_identity", "declared_locked_commit", "effective_identity", "object_format", "commit", "substituted", "build_source", "descriptor_target", "cache_key", "receipt_sha256", "artifact_sha256", "artifact_path"],
++      "properties": {
++        "driver": {"const": "go-repository-v1"},
++        "receipt_schema_version": {"const": 2},
++        "execution_policy": {"$ref": "#/$defs/goExecutionPolicyV1"},
++        "repository": {"$ref": "#/$defs/identifier"},
++        "declared_identity": {"$ref": "#/$defs/networkSourceIdentity"},
++        "declared_locked_commit": {"$ref": "#/$defs/lockedCommit"},
++        "declared_tag": {"$ref": "#/$defs/gitRefName"},
++        "effective_identity": {
++          "oneOf": [
++            {"$ref": "#/$defs/networkSourceIdentity"},
++            {"$ref": "#/$defs/localSourceIdentity"}
++          ]
++        },
++        "object_format": {"enum": ["sha1", "sha256"]},
++        "commit": {"$ref": "#/$defs/commit"},
++        "substituted": {"type": "boolean"},
++        "substitution": {
++          "oneOf": [
++            {
++              "type": "object",
++              "required": ["type"],
++              "properties": {"type": {"const": "local-path"}},
++              "additionalProperties": false
++            },
++            {
++              "type": "object",
++              "required": ["type", "ref"],
++              "properties": {
++                "type": {"const": "network-git"},
++                "ref": {"$ref": "#/$defs/repositoryStructuredRef"}
++              },
++              "additionalProperties": false
++            }
++          ]
++        },
++        "build_source": {"$ref": "#/$defs/buildSourceIdentity"},
++        "descriptor_target": {"$ref": "#/$defs/identifier"},
++        "cache_key": {"$ref": "#/$defs/sha256"},
++        "receipt_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_sha256": {"$ref": "#/$defs/sha256"},
++        "artifact_path": {"$ref": "#/$defs/portablePath"}
++      },
++      "allOf": [
++        {
++          "if": {"properties": {"object_format": {"const": "sha1"}}, "required": ["object_format"]},
++          "then": {"properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}},
++          "else": {"properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
++        },
++        {
++          "if": {"properties": {"substituted": {"const": true}}, "required": ["substituted"]},
++          "then": {"required": ["substitution"]},
++          "else": {"not": {"required": ["substitution"]}}
++        }
++      ],
++      "additionalProperties": false
++    },
++    "legacySkillCommand": {
++      "type": "object",
++      "required": ["type", "skill", "command"],
++      "properties": {
++        "type": {"const": "skill"},
++        "skill": {"$ref": "#/$defs/identifier"},
++        "command": {"$ref": "#/$defs/identifier"},
++        "hint": {"$ref": "#/$defs/nonEmptyString"}
++      },
++      "additionalProperties": false
++    },
++    "capabilities": {
++      "type": "object",
++      "properties": {
++        "network": {
++          "oneOf": [
++            {"const": "none"},
++            {"type": "array", "items": {"type": "string", "minLength": 1, "pattern": "^[^\\s/\\\\]+$"}, "uniqueItems": true}
++          ],
++          "default": "none"
++        },
++        "filesystem": {
++          "oneOf": [
++            {"enum": ["repo", "home-config"]},
++            {"$ref": "#/$defs/pathSet"}
++          ],
++          "default": "repo"
++        },
++        "exec": {
++          "oneOf": [{"const": "none"}, {"$ref": "#/$defs/identifierSet"}],
++          "default": "none"
++        },
++        "secrets": {
++          "oneOf": [{"const": "none"}, {"$ref": "#/$defs/stringSet"}],
++          "default": "none"
++        },
++        "env_read": {
++          "type": "array",
++          "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
++          "uniqueItems": true,
++          "default": []
++        },
++        "prompt_scope": {"$ref": "#/$defs/nonEmptyString"}
++      },
++      "additionalProperties": false
++    },
++    "skillRequirement": {
++      "type": "object",
++      "required": ["git", "ref"],
++      "properties": {
++        "git": {"$ref": "#/$defs/nonEmptyString"},
++        "ref": {"$ref": "#/$defs/ref"},
++        "mode": {"enum": ["full", "runtime", "context"], "default": "full"},
++        "commands": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true}
++      },
++      "allOf": [
++        {"if": {"required": ["commands"]}, "then": {"properties": {"mode": {"const": "runtime"}}, "required": ["mode"]}}
++      ],
++      "additionalProperties": false
++    },
++    "mcpRequirement": {
++      "type": "object",
++      "required": ["hint"],
++      "properties": {
++        "hint": {"$ref": "#/$defs/nonEmptyString"},
++        "transport": {"enum": ["stdio", "http"]},
++        "required_in": {"enum": ["any", "all"], "default": "any"}
++      },
++      "additionalProperties": false
++    },
++    "dependenciesV2": {
++      "type": "object",
++      "properties": {
++        "commands": {"type": "object", "additionalProperties": {"oneOf": [{"$ref": "#/$defs/systemCommand"}, {"$ref": "#/$defs/legacySkillCommand"}]}}
++      },
++      "additionalProperties": false
++    },
++    "dependenciesV4": {
++      "type": "object",
++      "properties": {
++        "commands": {"type": "object", "additionalProperties": {"oneOf": [{"$ref": "#/$defs/systemCommand"}, {"$ref": "#/$defs/legacySkillCommand"}]}},
++        "skills": {"type": "object", "additionalProperties": {"$ref": "#/$defs/skillRequirement"}}
++      },
++      "additionalProperties": false
++    },
++    "dependenciesV5": {
++      "type": "object",
++      "properties": {
++        "commands": {"type": "object", "additionalProperties": {"oneOf": [{"$ref": "#/$defs/systemCommand"}, {"$ref": "#/$defs/legacySkillCommand"}]}},
++        "skills": {"type": "object", "additionalProperties": {"$ref": "#/$defs/skillRequirement"}},
++        "mcp_servers": {"type": "object", "additionalProperties": {"$ref": "#/$defs/mcpRequirement"}}
++      },
++      "additionalProperties": false
++    },
++    "signature": {
++      "type": "object",
++      "required": ["algorithm", "key_id", "signature"],
++      "properties": {
++        "algorithm": {"const": "ed25519"},
++        "key_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
++        "signature": {"type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$"}
++      },
++      "additionalProperties": false
++    },
++    "canonicalValue": {
++      "oneOf": [
++        {"type": "null"},
++        {"type": "boolean"},
++        {"$ref": "#/$defs/safeInteger"},
++        {"type": "string"},
++        {"type": "array", "items": {"$ref": "#/$defs/canonicalValue"}},
++        {"type": "object", "additionalProperties": {"$ref": "#/$defs/canonicalValue"}}
++      ]
++    }
++  }
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/schemas/v1/skillfile-v1.schema.json b/internal/manifest/testdata/draft-sources-v1/schemas/v1/skillfile-v1.schema.json
+new file mode 100644
+index 0000000..739b4c9
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/schemas/v1/skillfile-v1.schema.json
+@@ -0,0 +1,35 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://relux-works.github.io/curator-spec/schemas/v1/skillfile-v1.schema.json",
++  "title": "Skillfile.json schema 1",
++  "type": "object",
++  "required": ["schema_version", "skills"],
++  "properties": {
++    "schema_version": {"const": 1},
++    "project": {
++      "type": "object",
++      "properties": {"alias": {"$ref": "common.schema.json#/$defs/projectAlias"}},
++      "additionalProperties": false
++    },
++    "agents": {"$ref": "common.schema.json#/$defs/identifierSet"},
++    "locale": {"$ref": "common.schema.json#/$defs/locale"},
++    "skills": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": ["name"],
++        "properties": {
++          "name": {"$ref": "common.schema.json#/$defs/identifier"},
++          "source": {"$ref": "common.schema.json#/$defs/portablePath"},
++          "git": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++          "tag": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++          "branch": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
++          "revision": {"$ref": "common.schema.json#/$defs/nonEmptyString"}
++        },
++        "oneOf": [{"required": ["tag"]}, {"required": ["branch"]}, {"required": ["revision"]}],
++        "additionalProperties": false
++      }
++    }
++  },
++  "additionalProperties": false
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-0.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-0.json
+new file mode 100644
+index 0000000..e96ba44
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-0.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "../review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-1.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-1.json
+new file mode 100644
+index 0000000..1e43ed2
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-1.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a/../b"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-10.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-10.json
+new file mode 100644
+index 0000000..2d26c9d
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-10.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a/CON"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-11.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-11.json
+new file mode 100644
+index 0000000..9d648c5
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-11.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a/.."
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-12.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-12.json
+new file mode 100644
+index 0000000..84c148f
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-12.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a/"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-13.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-13.json
+new file mode 100644
+index 0000000..2ac5cc2
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-13.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "./review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-2.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-2.json
+new file mode 100644
+index 0000000..c2c05d8
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-2.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-3.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-3.json
+new file mode 100644
+index 0000000..bae61ed
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-3.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a//b"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-4.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-4.json
+new file mode 100644
+index 0000000..e6bc08d
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-4.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a/./b"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-5.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-5.json
+new file mode 100644
+index 0000000..95602df
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-5.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a\\b"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-6.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-6.json
+new file mode 100644
+index 0000000..39507cc
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-6.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a./b"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-7.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-7.json
+new file mode 100644
+index 0000000..dc70ebf
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-7.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a /b"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-8.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-8.json
+new file mode 100644
+index 0000000..6258570
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-8.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "C:review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-9.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-9.json
+new file mode 100644
+index 0000000..1dbf79a
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-directory-9.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "a/*"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-duplicate.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-duplicate.json
+new file mode 100644
+index 0000000..891a70a
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-duplicate.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "a",
++        "a"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-empty.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-empty.json
+new file mode 100644
+index 0000000..c18d28b
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-empty.json
+@@ -0,0 +1,32 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-collection.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-collection.json
+new file mode 100644
+index 0000000..83f1773
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-collection.json
+@@ -0,0 +1,37 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review",
++      "include": [
++        "*"
++      ]
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-git.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-git.json
+new file mode 100644
+index 0000000..7360397
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-git.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review",
++      "git": "https://example.org/kit"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-ref.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-ref.json
+new file mode 100644
+index 0000000..647c13b
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-ref.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review",
++      "tag": "v1"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-source.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-source.json
+new file mode 100644
+index 0000000..073d030
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-mixed-source.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review",
++      "source": "other"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-partial.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-partial.json
+new file mode 100644
+index 0000000..fbe034d
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-partial.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "rev*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-path.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-path.json
+new file mode 100644
+index 0000000..48efbf7
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-path.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "a/b"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-recursive.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-recursive.json
+new file mode 100644
+index 0000000..6d37977
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-recursive.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "**"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-0.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-0.json
+new file mode 100644
+index 0000000..93f2c61
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-0.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": ".",
++      "tag": "v1"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-1.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-1.json
+new file mode 100644
+index 0000000..babcc4e
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-1.json
+@@ -0,0 +1,36 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": ".",
++      "git": "https://example.org/kit",
++      "tag": "v1"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-2.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-2.json
+new file mode 100644
+index 0000000..712c6b5
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-2.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "git": "https://example.org/kit"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-3.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-3.json
+new file mode 100644
+index 0000000..1f73718
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-3.json
+@@ -0,0 +1,36 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "git": "https://example.org/kit",
++      "tag": "v1",
++      "branch": "main"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-4.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-4.json
+new file mode 100644
+index 0000000..b8a46c7
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-4.json
+@@ -0,0 +1,36 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "git": "https://example.org/kit",
++      "repository": "example.org/kit",
++      "tag": "v1"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-5.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-5.json
+new file mode 100644
+index 0000000..ba67f4f
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-5.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "git": "https://user:secret@example.org/kit",
++      "tag": "v1"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-6.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-6.json
+new file mode 100644
+index 0000000..4c57182
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-6.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "git": "https://example.org:443/kit",
++      "tag": "v1"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-7.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-7.json
+new file mode 100644
+index 0000000..3deb90b
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-7.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "repository": "../kit",
++      "tag": "v1"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-8.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-8.json
+new file mode 100644
+index 0000000..1468da2
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-8.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "repository": "example.org/a/../b",
++      "tag": "v1"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-9.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-9.json
+new file mode 100644
+index 0000000..62570e0
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-source-9.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": ""
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-unknown.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-unknown.json
+new file mode 100644
+index 0000000..d980b01
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-unknown.json
+@@ -0,0 +1,35 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review",
++      "extra": true
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-wildcard-exclude.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-wildcard-exclude.json
+new file mode 100644
+index 0000000..ba2fa56
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/invalid-wildcard-exclude.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "*"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-absolute.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-absolute.json
+new file mode 100644
+index 0000000..a1bcebd
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-absolute.json
+@@ -0,0 +1,19 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "/work/skills"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "."
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-https.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-https.json
+new file mode 100644
+index 0000000..d682c8b
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-https.json
+@@ -0,0 +1,20 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "git": "https://example.org/kit.git",
++      "revision": "0000000000000000000000000000000000000000"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "."
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-legacy-only.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-legacy-only.json
+new file mode 100644
+index 0000000..343088e
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-legacy-only.json
+@@ -0,0 +1,9 @@
++{
++  "schema_version": 2,
++  "skills": [
++    {
++      "name": "review",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-mixed.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-mixed.json
+new file mode 100644
+index 0000000..978a30d
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-mixed.json
+@@ -0,0 +1,34 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "."
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "agents/skills/review"
++    },
++    {
++      "from": "team",
++      "directory": "skills",
++      "include": [
++        "*"
++      ],
++      "exclude": [
++        "release"
++      ]
++    },
++    {
++      "name": "legacy",
++      "source": "team/legacy",
++      "tag": "v1"
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-relative.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-relative.json
+new file mode 100644
+index 0000000..7157c00
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-relative.json
+@@ -0,0 +1,19 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "path": "../shared"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "."
++    }
++  ]
++}
+diff --git a/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-ssh.json b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-ssh.json
+new file mode 100644
+index 0000000..9eafd83
+--- /dev/null
++++ b/internal/manifest/testdata/draft-sources-v1/skillfile-v2/valid-ssh.json
+@@ -0,0 +1,20 @@
++{
++  "schema_version": 2,
++  "sources": {
++    "local": {
++      "git": "git@example.org:kit.git",
++      "branch": "main"
++    },
++    "team": {
++      "repository": "example.org/kit",
++      "tag": "v1.0.0"
++    }
++  },
++  "skills": [
++    {
++      "name": "review",
++      "from": "local",
++      "directory": "."
++    }
++  ]
++}
