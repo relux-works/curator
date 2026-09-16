@@ -1,10 +1,10 @@
-# spec: rename claude_code→claude and codex_cli→codex with deprecated aliases
+# spec: CLI aliases claude/codex normalized to claude_code/codex_cli
 
 ## Description
-curator-spec amendment: canonical environment ids claude and codex; claude_code and codex_cli accepted as deprecated aliases for one release in every surface that names an environment (manifests targets/forms, machine config knobs, launch fragments, CLI, defaults); marker migration rule for provisioned managed homes; decide the frozen-v1 launch-env-fragment schema path (additive enum + alias normalization rule vs versioned schema) and record it; update environments.md, manager.md, schemas, conformance vectors, docs, CHANGELOG, COMPATIBILITY.
+curator-spec amendment (small): profiles/manager.md CLI section and the launcher SPEC reference state that the command-line environment operand accepts claude and codex as aliases of claude_code and codex_cli, normalized before validation; diagnostics and outputs print the canonical id; aliases are never written to config, markers, fragments or locks; no schema/vector change. CHANGELOG entry.
 
 ## Scope
 (define task scope)
 
 ## Acceptance Criteria
-Text and schema/vectors consistent; make validate green; explicit compatibility statement for v1 consumers; deprecation timeline stated.
+One alias rule in manager.md (+ launcher SPEC pointer); make validate green; frozen schemas untouched.

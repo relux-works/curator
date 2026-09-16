@@ -1,7 +1,7 @@
-# rename environment ids: claude_code → claude, codex_cli → codex
+# CLI aliases claude and codex for the environment ids (wire ids unchanged)
 
 ## Description
-Operator decisions 2026-09-16: environment identifiers claude_code → claude and codex_cli → codex (pi and opencode unchanged). Spec-first: environments spec registers claude and codex as canonical ids with claude_code and codex_cli as deprecated aliases for one release (manifests, machine config, CLI, launcher, defaults.json, markers of existing managed homes migrate transparently); the frozen v1 launch-env-fragment schema enumerates env ids, so the spec task must decide the compatible path (additive enum values plus alias normalization rule, or a versioned schema) without breaking v1 consumers. Then Curator (envregistry, markers, CLI), launcher (curator run claude|codex), relux-root-context packages (validate.sh registered envs, per-env targets/forms) and docs.
+Operator decision 2026-09-16 (revised after review): the wire environment identifiers claude_code and codex_cli stay frozen (environments 1.1 rev 1, launch-env-fragment v1, markers, defaults.json, packages). Instead, the CLI surfaces accept the short spellings claude and codex as aliases and normalize them to the canonical ids before anything else: Curator machine CLI (curator run <env>, curator env resolve|status, profile use --env, config knobs given on the command line) and the launcher curator-run <env>. Outputs, markers, fragments and config files keep the canonical ids. Spec: one alias rule in profiles/manager.md CLI section (and the launcher SPEC), no schema or vector changes.
 
 ## Scope
 (define story scope)

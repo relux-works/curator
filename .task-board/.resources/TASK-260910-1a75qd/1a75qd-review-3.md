@@ -1,0 +1,2 @@
+# Review brief addendum — TASK-260910-1a75qd rev 3
+Revision 2 was CHANGES_REQUESTED (P1: lock member `repository` not enforced canonical — `example.org/kit.git` accepted by New/Write/Read). Review revision 3 against skillfile-wave2-review-brief.md plus: non-canonical repository spellings (trailing .git, uppercase host, transport prefix, username) are rejected by New, Write and Read with the persisted-reader regression carrying a correctly recomputed digest; canonical `example.org/kit` still positive; nothing else regressed. Accept with revision=3 if all hold.

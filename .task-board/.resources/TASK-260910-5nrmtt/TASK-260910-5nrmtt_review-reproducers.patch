@@ -1,0 +1,52 @@
+--- a/internal/buildrepo/transport_test.go
++++ b/internal/buildrepo/transport_test.go
+@@ -1233,3 +1233,49 @@
+ 		}
+ 	}
+ }
++
++func TestReviewResolvedMustRetainAdmission(t *testing.T) {
++ requirePOSIXTransport(t)
++ fixture := makeGitFixture(t, "sha1", false)
++ for _, mode := range []string{"missing-ssh-wrapper", "missing-ssh-credentials", "missing-https-broker", "invalid-ref-kind"} {
++ t.Run(mode, func(t *testing.T) {
++ tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS:{succeed:true,fileRepo:fixture.bare},transportSSH:{succeed:true,fileRepo:fixture.bare}})
++ base:=transportBase(t,tool,fixture)
++ url:=transportHTTPS
++ switch mode {
++ case "missing-ssh-wrapper": url=transportSSH; base.Tool.SSHWrapper=""
++ case "missing-ssh-credentials": url=transportSSH; base.Tool.SSHCredentials=OperatorSSHCredentials{}
++ case "missing-https-broker": base.Tool.AskPass=""
++ case "invalid-ref-kind": base.RefKind="not-supported"; base.RefValue=fixture.commit
++ }
++ base.Source,_=ParseSource(url)
++ _, direct:=AcquireNetwork(context.Background(),base)
++ if direct==nil {t.Fatal("control did not refuse")}
++ plan:=TransportPlan{Identity:base.Source.Identity,Attempts:[]TransportAttempt{{URL:url}},Fallback:TransportFallbackNone}
++ _, got:=AcquireNetworkResolved(context.Background(),base,plan,nil,nil)
++ if got==nil {t.Fatalf("resolved accepted %s; legacy refused %v; fetches=%d",mode,direct,len(transportFetchLines(t,logPath)))}
++ })
++ }
++}
++func TestReviewAmbiguousFailureMustNotFallback(t *testing.T) {
++ requirePOSIXTransport(t)
++ fixture:=makeGitFixture(t,"sha1",false)
++ for _, msg:= range []string{"fatal: cannot create temporary file: Permission denied", "remote: audit denied: operation timed out", "error: object hash mismatch\nfatal: connection timed out"} {
++ t.Run(msg,func(t *testing.T){
++ tool,logPath:=fakeTransportGitTool(t,map[string]transportBehavior{transportHTTPS:failTransport(msg),transportSSH:{succeed:true,fileRepo:fixture.bare}})
++ plan:=TransportPlan{Identity:"fixture.test/repository",Attempts:[]TransportAttempt{{URL:transportHTTPS},{URL:transportSSH}},Fallback:TransportFallbackAvailabilityAuth}
++ _,err:=AcquireNetworkResolved(context.Background(),transportBase(t,tool,fixture),plan,nil,nil)
++ if n:=len(transportFetchLines(t,logPath));n!=1 {t.Fatalf("ambiguous/local/integrity error caused %d fetches (err=%v)",n,err)}
++ })
++ }
++}
++
++func TestReviewDeadlineIncludesChildPipes(t *testing.T) {
++ requirePOSIXTransport(t)
++ fixture:=makeGitFixture(t,"sha1",false)
++ tool,_:=fakeTransportGitTool(t,map[string]transportBehavior{transportHTTPS:{stderr:transportDNSStderr,sleep:5*time.Second}})
++ base:=transportBase(t,tool,fixture);base.Limits.Timeout=2*time.Second
++ plan:=TransportPlan{Identity:base.Source.Identity,Attempts:[]TransportAttempt{{URL:transportHTTPS}},Fallback:TransportFallbackNone}
++ start:=time.Now();_,err:=AcquireNetworkResolved(context.Background(),base,plan,nil,nil)
++ if elapsed:=time.Since(start);elapsed>4*time.Second {t.Fatalf("2s total deadline returned after %s: %v",elapsed,err)}
++}
