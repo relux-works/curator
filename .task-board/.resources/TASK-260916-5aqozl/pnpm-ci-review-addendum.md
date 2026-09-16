@@ -1,0 +1,3 @@
+Verdict as usual: ACCEPT or CHANGES_REQUESTED with numbered findings and file:line; accept_cr on ACCEPT. Narrow tests only if you run anything locally (internal/pnpmsource).
+
+Addendum (rev3): the two remaining Windows real-pnpm cases are a product gap filed as BUG-260916-2f3xbf (writable store registry undeclared member on Windows); the orchestrator authorized declaring exactly those two cases Windows-deferred in the platform-case ledger. Verify the deferral is narrow (two named tests, GOOS=windows only, reason names the bug), the third case still runs on Windows, and nothing else was skipped.

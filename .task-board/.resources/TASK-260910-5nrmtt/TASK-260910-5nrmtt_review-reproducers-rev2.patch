@@ -1,0 +1,26 @@
+--- a/internal/buildrepo/transport_test.go
++++ b/internal/buildrepo/transport_test.go
+@@ -1718,3 +1718,23 @@
+ 		t.Errorf("second attempt was offered the first attempt's material:\n%s", invocations[1])
+ 	}
+ }
++
++func TestReviewRev2MixedUnknownMustNotFallback(t *testing.T) {
++ requirePOSIXTransport(t)
++ fixture := makeGitFixture(t, "sha1", false)
++ for _, msg := range []string{
++  "fatal: unable to access 'https://fixture.test/repository.git/': Could not resolve host: fixture.test\nfatal: unexpected protocol response",
++  "fatal: unable to read object 0123456789012345678901234567890123456789\nfatal: connection timed out",
++  "fatal: cannot create temporary file 'connection timed out': Permission denied",
++ } {
++  t.Run(msg, func(t *testing.T) {
++   tool, logPath := fakeTransportGitTool(t, map[string]transportBehavior{transportHTTPS: failTransport(msg), transportSSH: {succeed:true, fileRepo:fixture.bare}})
++   tool = transportSSHBaseTool(t, tool)
++   base := transportBase(t, tool, fixture)
++   plan := TransportPlan{Identity:base.Source.Identity, Attempts:[]TransportAttempt{{URL:transportHTTPS},{URL:transportSSH}}, Fallback:TransportFallbackAvailabilityAuth}
++   _, err := AcquireNetworkResolved(context.Background(), base, plan, nil, nil)
++   n := len(transportFetchLines(t, logPath))
++   if err == nil || n != 1 { t.Fatalf("fail-closed diagnostic produced %d fetches, err=%v", n, err) }
++  })
++ }
++}

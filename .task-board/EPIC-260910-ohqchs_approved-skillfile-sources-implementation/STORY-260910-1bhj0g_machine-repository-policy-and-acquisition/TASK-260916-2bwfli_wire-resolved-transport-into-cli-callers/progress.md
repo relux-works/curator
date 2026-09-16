@@ -1,5 +1,5 @@
 ## Status
-development
+backlog
 
 ## Review
 required
@@ -7,8 +7,11 @@ required
 ## Task Class
 code
 
+## Estimate
+notEstimated
+
 ## Blocked By
-- (none)
+- TASK-260910-5nrmtt
 
 ## Blocks
 - (none)
@@ -25,7 +28,7 @@ code
 (none)
 
 ## Created
-2026-09-10T13:56:00Z
+2026-09-16T14:03:01Z
 
 ## Last Update
-2026-09-16T15:35:59Z
+2026-09-16T14:03:03Z

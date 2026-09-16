@@ -1,0 +1,8 @@
+# TASK-260910-14hsti — rev5 gate failure detail (windows-latest only)
+
+Run 35101307516, artifact test-evidence-windows-latest: 32 failing subtests, all in internal/install/atomicity (TestFailureAtEveryTargetClassRestoresPriorStateInReverseOrder project-hybrid-auto/global-auto, TestAdapterMirrorLinksAreJournaledAndRestoredExactly, TestStaleAdapterEntryIsRemovedBeforeTheConsumerLedger auto/symlink). Two symptoms, one cause:
+
+- `install after the rollback sweep failed: … Errors:[source_output_overlap: C:\…\003\.claude\skills\skill-h: CreateFile C:\…\003\.claude\skills\skill-h: Access is denied.]`
+- `the injected fault never fired` (consequence: the install is refused by the new guard before the fault point).
+
+Cause: the production-wired publication guard / physical-identity probe (rev5 wiring of scopeTargets.boundaries into the real planner) opens the DESTINATION path on Windows with CreateFile without FILE_FLAG_BACKUP_SEMANTICS / FILE_FLAG_OPEN_REPARSE_POINT: when the destination is a directory or an adapter mirror link (junction/symlink) the open fails with Access is denied, and that I/O error is mapped to `source_output_overlap`. Both are wrong: (1) on Windows use os.Lstat + os.SameFile (or open with backup semantics and reparse-point flag via golang.org/x/sys/windows) so directories and links are identified without opening them for data access; (2) an identity probe that errors must never be reported as an overlap — classify it as its own refusal (e.g. boundary_identity_unreadable) and keep overlap for a proven overlap. Add a Windows-specific test for a directory destination and a junction/symlink mirror destination through the production install path. ubuntu/macOS were green; keep everything else in rev5.

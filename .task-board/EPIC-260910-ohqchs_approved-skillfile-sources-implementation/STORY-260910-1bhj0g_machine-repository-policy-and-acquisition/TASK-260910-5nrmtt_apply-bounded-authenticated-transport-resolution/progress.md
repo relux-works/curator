@@ -1,5 +1,5 @@
 ## Status
-development
+to-review
 
 ## Review
 required
@@ -16,6 +16,7 @@ estimated(fibonacci(8))
 ## Blocks
 - TASK-260910-19w2aj
 - TASK-260910-1xya7x
+- TASK-260916-2bwfli
 
 ## Checklist
 - [x] Implement the scoped production behavior with traceability to the accepted draft contracts.
@@ -74,6 +75,70 @@ spawn agent resolution: Agent selection: muse via explicit_override (preferred_a
 spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
 spawn queued: [implementer] developer (muse) (run=RUN-260916-1fcc19, max_parallel=20)
 spawn run started: [implementer] developer (muse) (run=RUN-260916-1fcc19)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-1fcc19, pid=51681, exit=0)
+spawn selection rationale tuple: {"role":"reviewer","pair":"gpt-6-astra/low","text":"independent review rev2 (transport resolution, 3 P1 rework); astra:low per worker policy"}
+spawn selection rationale for gpt-6-astra/low: independent review rev2 (transport resolution, 3 P1 rework); astra:low per worker policy
+spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
+spawn queued: [reviewer] reviewer (codex) (run=RUN-260916-1ba737, max_parallel=20)
+spawn run started: [reviewer] reviewer (codex) (run=RUN-260916-1ba737)
+Revision 2 CHANGES_REQUESTED: independent AcquireNetworkResolved probes reproduce 3/3 forbidden successful fallbacks on mixed/unknown/local diagnostics. Windows cancellation still kills only Git; descendant lifetime remains unbounded. See TASK-260910-5nrmtt_review-verdict-rev2.md, review-reproducers-rev2.patch and review-checks-rev2.md. Narrow suites/vet/gofmt pass; 2/2 production-entry narrowing mutants killed. Candidate untouched.
+agent completed: [reviewer] reviewer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-1ba737, pid=74759, exit=0)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"rework rev3 (positive diagnostic grammar, Windows process tree); muse-spark:max"}
+STORY-260910-1bhj0g base refresh SKIPPED: the managed workspace holds uncommitted work, so there was no clean checkpoint branch to replay onto trunk b7633b7dcf51; the branch is unchanged at fork point f38ee3946110
+spawn selection rationale for muse-spark-1.3-contributor/max: rework rev3 (positive diagnostic grammar, Windows process tree); muse-spark:max
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-2a10a5, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-2a10a5)
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run RUN-260916-2a10a5 cancelled by operator; operator action required; reason: no operator reason supplied
+spawn run completed: muse (run=RUN-260916-2a10a5, pid=79864, exit=143)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"rework rev3 re-anchored (positive diagnostic grammar, Windows process tree); muse-spark:max"}
+STORY-260910-1bhj0g base refresh: the Story branch was replayed onto trunk 2bdf7de7f8df before this final-leaf producer started; the reviewed trunk OID is 2bdf7de7f8df
+spawn selection rationale for muse-spark-1.3-contributor/max: rework rev3 re-anchored (positive diagnostic grammar, Windows process tree); muse-spark:max
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-511d44, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-511d44)
+agent completed: [implementer] developer (muse) (exit=1)
+spawn run completed: muse (run=RUN-260916-511d44, pid=81003, exit=1)
+spawn autonomous recovery: run RUN-260916-511d44 queued successor RUN-260916-760858 (attempt 1/3, model=muse-spark-1.3-contributor): spawned agent exited with code 1
+spawn run started: [implementer] developer (muse) (run=RUN-260916-760858)
+agent completed: [implementer] developer (muse) (exit=1)
+spawn run completed: muse (run=RUN-260916-760858, pid=85059, exit=1)
+spawn autonomous recovery: run RUN-260916-760858 queued successor RUN-260916-f74ce9 (attempt 2/3, model=muse-spark-1.3-contributor): spawned agent exited with code 1
+spawn run started: [implementer] developer (muse) (run=RUN-260916-f74ce9)
+agent completed: [implementer] developer (muse) (exit=1)
+spawn run completed: muse (run=RUN-260916-f74ce9, pid=67179, exit=1)
+spawn autonomous recovery: run RUN-260916-f74ce9 queued successor RUN-260916-d7d74b (attempt 3/3, model=muse-spark-1.3-contributor): spawned agent exited with code 1
+spawn run started: [implementer] developer (muse) (run=RUN-260916-d7d74b)
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run RUN-260916-d7d74b cancelled by operator; operator action required; reason: no operator reason supplied
+spawn run completed: muse (run=RUN-260916-d7d74b, pid=69926, exit=143)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/max","text":"rework rev3 (now non-final leaf; lite context after three stream-idle deaths); muse-spark:max"}
+spawn selection rationale for muse-spark-1.3-contributor/max: rework rev3 (now non-final leaf; lite context after three stream-idle deaths); muse-spark:max
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-db0f09, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-db0f09)
+agent completed: [implementer] developer (muse) (exit=1)
+spawn run completed: muse (run=RUN-260916-db0f09, pid=71055, exit=1)
+spawn autonomous recovery: run RUN-260916-db0f09 queued successor RUN-260916-59c6b2 (attempt 1/3, model=muse-spark-1.3-contributor): spawned agent exited with code 1
+spawn run started: [implementer] developer (muse) (run=RUN-260916-59c6b2)
+agent completed: [implementer] developer (muse) (exit=143)
+spawn run RUN-260916-59c6b2 cancelled by operator; operator action required; reason: no operator reason supplied
+spawn run completed: muse (run=RUN-260916-59c6b2, pid=76577, exit=143)
+spawn selection rationale tuple: {"role":"developer","pair":"muse-spark-1.3-contributor/xhigh","text":"rework rev3: xhigh instead of max after four stream-idle deaths at max on this task (first-token latency); lite context"}
+spawn selection rationale for muse-spark-1.3-contributor/xhigh: rework rev3: xhigh instead of max after four stream-idle deaths at max on this task (first-token latency); lite context
+spawn agent resolution: Agent selection: muse via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
+spawn launch composition: degraded_contract_unavailable; contract=agents-infra.child-launch-composition; provider=muse; schema=1; diagnostic=composition_contract_unavailable; bare child launch retained
+spawn queued: [implementer] developer (muse) (run=RUN-260916-96ca5d, max_parallel=20)
+spawn run started: [implementer] developer (muse) (run=RUN-260916-96ca5d)
+agent completed: [implementer] developer (muse) (exit=0)
+spawn run completed: muse (run=RUN-260916-96ca5d, pid=77187, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-5nrmtt_source-contract.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -85,10 +150,12 @@ spawn run started: [implementer] developer (muse) (run=RUN-260916-1fcc19)
 - [5nrmtt-rework-1.md](file://TASK-260910-5nrmtt/5nrmtt-rework-1.md)
 - [TASK-260910-5nrmtt_rev2-candidate.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_rev2-candidate.patch)
 - [5nrmtt-reapply.md](file://TASK-260910-5nrmtt/5nrmtt-reapply.md)
+- [5nrmtt-rework-2.md](file://TASK-260910-5nrmtt/5nrmtt-rework-2.md)
+- [5nrmtt-rework-2b.md](file://TASK-260910-5nrmtt/5nrmtt-rework-2b.md)
 
 ## Outcome Resources
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96d008.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96d008.log) — System spawn log captured by task-board
-- [TASK-260910-5nrmtt_results.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_results.md) — Rework 1 (rev2) evidence: admission+binding, positive classification, process-tree deadline
+- [TASK-260910-5nrmtt_results.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_results.md) — Rework 2 rev3 handoff evidence
 - [TASK-260910-5nrmtt_change-request_rev1.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev1.patch) — Change Request CR-TASK-260910-5nrmtt-1 revision 1 candidate patch (repository_delta=present, 18 changed paths)
 - [TASK-260910-5nrmtt_change-request_rev1-validation.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev1-validation.log) — Change Request CR-TASK-260910-5nrmtt-1 revision 1 bounded validation log
 - [TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-3e6665.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-3e6665.log) — System spawn log captured by task-board
@@ -99,12 +166,26 @@ spawn run started: [implementer] developer (muse) (run=RUN-260916-1fcc19)
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-4214eb.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-4214eb.log) — System spawn log captured by task-board
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96b496.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96b496.log) — System spawn log captured by task-board
 - [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-1fcc19.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-1fcc19.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_change-request_rev2.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev2.patch) — Change Request CR-TASK-260910-5nrmtt-2 revision 2 candidate patch (repository_delta=present, 23 changed paths)
+- [TASK-260910-5nrmtt_change-request_rev2-validation.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_change-request_rev2-validation.log) — Change Request CR-TASK-260910-5nrmtt-2 revision 2 bounded validation log
+- [TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-1ba737.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-reviewer--reviewer--codex-_RUN-260916-1ba737.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_review-reproducers-rev2.patch](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-reproducers-rev2.patch) — Three production-entry forbidden-fallback reproducers; candidate unchanged
+- [TASK-260910-5nrmtt_review-checks-rev2.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-checks-rev2.md) — Independent baseline, regression probes and narrowing-mutant results
+- [TASK-260910-5nrmtt_review-verdict-rev2.md](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_review-verdict-rev2.md) — CHANGES_REQUESTED: forbidden fallback persists; Windows process-tree bound missing
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-2a10a5.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-2a10a5.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-511d44.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-511d44.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-760858.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-760858.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-f74ce9.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-f74ce9.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-d7d74b.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-d7d74b.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-db0f09.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-db0f09.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-59c6b2.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-59c6b2.log) — System spawn log captured by task-board
+- [TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96ca5d.log](file://TASK-260910-5nrmtt/TASK-260910-5nrmtt_spawn-log_-implementer--developer--muse-_RUN-260916-96ca5d.log) — System spawn log captured by task-board
 
 ## Created
 2026-09-10T13:56:21Z
 
 ## Last Update
-2026-09-16T12:52:11Z
+2026-09-16T15:14:43Z
 
 ## Assigned To
 [implementer] developer (muse)

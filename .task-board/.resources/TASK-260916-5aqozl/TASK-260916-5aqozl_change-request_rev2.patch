@@ -1,0 +1,429 @@
+diff --git a/.github/ci/gate-selftest.sh b/.github/ci/gate-selftest.sh
+index 6589725..e039173 100755
+--- a/.github/ci/gate-selftest.sh
++++ b/.github/ci/gate-selftest.sh
+@@ -738,6 +738,86 @@ else
+ 		"workflow='$other_timeout' test-gate.sh default='$GATE_DEFAULT_TIMEOUT'"
+ fi
+ 
++echo ''
++echo '=== pnpm-pin-guard.sh: the workflow copy of the pin cannot drift ==='
++PPG="$HERE/pnpm-pin-guard.sh"
++WF_PIN="$(awk '/^[ \t]*PNPM_PIN:[ \t]*/{gsub(/"/, "", $2); print $2; exit}' "$WORKFLOW")"
++if [ -z "$WF_PIN" ]; then
++	bad 'the workflow declares a PNPM_PIN' 'no PNPM_PIN: line in .github/workflows/ci.yml'
++	WF_PIN='0.0.0-drift-probe'
++fi
++assert 'the workflow PNPM_PIN agrees with SupportedPNPMVersion' 0 env PNPM_PIN="$WF_PIN" bash "$PPG"
++assert 'a drifted workflow pin is rejected' 1 env PNPM_PIN='9.9.9-drift-probe' bash "$PPG"
++assert 'an unset pin fails closed' 1 env -u PNPM_PIN bash "$PPG"
++assert 'an unreadable Go source fails closed' 1 env PNPM_PIN="$WF_PIN" CI_PNPM_GO_SOURCE="$WORK/absent.go" bash "$PPG"
++printf 'package pnpmsource\n\nconst SomethingElse = "1.0.0"\n' >"$WORK/no-const.go"
++assert 'a Go source with no declaration fails closed' 1 env PNPM_PIN="$WF_PIN" CI_PNPM_GO_SOURCE="$WORK/no-const.go" bash "$PPG"
++
++echo ''
++echo '=== ci.yml: every suite lane verifies and installs the pinned pnpm first ==='
++
++# A lane that runs test-gate.sh runs the TestRealPinnedPNPM* cases, so it
++# must verify the workflow pin against the Go constant, then install
++# exactly that release with npm into a lane-local prefix, then prepend
++# that prefix to PATH -- guard, then install, then PATH, in that order,
++# before any test runs. A lane that drops the guard can drift; a lane that
++# drops the install silently reverts to skipping the real-pnpm cases
++# (hosted: pnpm absent) or to resolving an ambient shim (self-hosted:
++# macbook-iv run 35072267145); a lane that installs without prepending
++# leaves the ambient shim first. These cases read the wiring back, so a
++# refactor cannot drop a step without this self-test noticing.
++#
++# Emits one "<job> <guard?> <install?> <path?> <ordered?>" record per
++# test-gate.sh lane.
++pnpm_lane_records() {
++	awk '
++		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ { job = $1; sub(/:[ \t\r]*$/, "", job); next }
++		/^[ \t]*run:.*test-gate\.sh/      { gate[job] = 1; next }
++		/^[ \t]*run:.*pnpm-pin-guard\.sh/ { guard[job] = 1; guardline[job] = NR; next }
++		/npm install -g --prefix .*pnpm-prefix/ { install[job] = 1; installline[job] = NR; next }
++		/pnpm-prefix.*GITHUB_PATH/        { path[job] = 1; pathline[job] = NR; next }
++		END {
++			for (j in gate) {
++				ordered = (guard[j] && install[j] && path[j] && \
++				           guardline[j] < installline[j] && installline[j] < pathline[j]) ? 1 : 0
++				printf "%s %d %d %d %d\n", j, (guard[j] ? 1 : 0), (install[j] ? 1 : 0), \
++					(path[j] ? 1 : 0), ordered
++			}
++		}
++	' "$WORKFLOW"
++}
++
++lane_records="$(pnpm_lane_records)"
++if [ -z "$lane_records" ]; then
++	bad 'the workflow still runs test-gate.sh' 'no test-gate.sh step found in .github/workflows/ci.yml'
++else
++	unprovisioned=''
++	while read -r job has_guard has_install has_path ordered; do
++		[ -n "$job" ] || continue
++		if [ "$has_guard" != '1' ] || [ "$has_install" != '1' ] || \
++		   [ "$has_path" != '1' ] || [ "$ordered" != '1' ]; then
++			unprovisioned="$unprovisioned $job(guard=$has_guard,install=$has_install,path=$has_path,ordered=$ordered)"
++		fi
++	done <<-RECORDS
++	$lane_records
++	RECORDS
++	if [ -z "$unprovisioned" ]; then
++		ok 'every test-gate.sh lane verifies the pin, then installs it via npm first on PATH'
++	else
++		bad 'every test-gate.sh lane verifies the pin, then installs it via npm first on PATH' \
++			"lanes missing the guard, the install, or the order:$unprovisioned"
++	fi
++fi
++
++# The pin lives in exactly one place. A lane that hardcodes pnpm@<release>
++# instead of reading ${{ env.PNPM_PIN }} reinstalls the drift the guard
++# exists to prevent.
++if grep -nE 'pnpm@[0-9]' "$WORKFLOW" >"$WORK/out.txt"; then
++	bad 'no lane hardcodes a pnpm release' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
++else
++	ok 'no lane hardcodes a pnpm release; every install reads PNPM_PIN'
++fi
++
+ echo ''
+ printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
+ [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
+diff --git a/.github/ci/pnpm-pin-guard.sh b/.github/ci/pnpm-pin-guard.sh
+new file mode 100755
+index 0000000..014de0e
+--- /dev/null
++++ b/.github/ci/pnpm-pin-guard.sh
+@@ -0,0 +1,39 @@
++#!/usr/bin/env bash
++# pnpm pin guard: the workflow's PNPM_PIN must name exactly the release
++# internal/pnpmsource admits, or the lane stops before installing anything.
++#
++# The Go constant internal/pnpmsource.SupportedPNPMVersion is the single
++# source of truth; the workflow-level `env: PNPM_PIN` is a copy of it, kept
++# as a copy (rather than extracted at install time) so the installed release
++# is visible in the workflow and in every job log. This script is what keeps
++# the copy honest: a Go-side bump that forgets the workflow fails the lane
++# here, instead of installing the old pnpm and skipping (or failing) the
++# real-pnpm integration tests downstream.
++#
++# A read failure is never a match: an unset pin, an unreadable source file,
++# or a source file with no declaration all fail closed.
++#
++# Usage:
++#   PNPM_PIN=10.33.0 bash .github/ci/pnpm-pin-guard.sh
++#
++# Self-test override:
++#   CI_PNPM_GO_SOURCE  Go source to read the constant from
++#                      (default: internal/pnpmsource/errors.go)
++
++set -u
++
++fail() { echo "pnpm-pin: $*" >&2; exit 1; }
++
++[ -n "${PNPM_PIN:-}" ] || fail 'PNPM_PIN is not set; the workflow must export the pinned pnpm release'
++
++src="${CI_PNPM_GO_SOURCE:-internal/pnpmsource/errors.go}"
++[ -r "$src" ] || fail "cannot read $src"
++
++line="$(grep -E 'SupportedPNPMVersion[[:space:]]*=[[:space:]]*"' "$src" | head -n 1)"
++[ -n "$line" ] || fail "no SupportedPNPMVersion declaration in $src"
++go_pin="$(printf '%s' "$line" | sed -n 's/.*SupportedPNPMVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p')"
++[ -n "$go_pin" ] || fail "cannot parse SupportedPNPMVersion from $src"
++
++[ "$PNPM_PIN" = "$go_pin" ] || fail "workflow PNPM_PIN=$PNPM_PIN disagrees with internal/pnpmsource SupportedPNPMVersion=$go_pin"
++
++printf 'pnpm-pin: workflow and Go agree on pnpm %s\n' "$PNPM_PIN"
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 0a6c66f..d0f212f 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -58,6 +58,26 @@ env:
+   # Quoted deliberately: bare `off` is a YAML 1.1 boolean and would reach the
+   # runner as "false", which is a real per-user go env file path, not "off".
+   GOENV: "off"
++  # The one pnpm release the real-pnpm integration tests admit. This is a
++  # COPY of internal/pnpmsource.SupportedPNPMVersion, kept next to the lanes
++  # that install it so the installed release is visible in the workflow; the
++  # copy cannot drift silently because `.github/ci/pnpm-pin-guard.sh` fails
++  # any lane where the two disagree. Every lane that runs the Go test suite
++  # installs exactly this release with npm into a lane-local prefix (see the
++  # per-lane steps), so the TestRealPinnedPNPM* cases execute everywhere
++  # instead of skipping for "pinned pnpm executable unavailable" -- and so a
++  # broken pnpm shim that happens to be first on a self-hosted runner's PATH
++  # can no longer fail the lane, as the macbook-iv fallback shim did on run
++  # 35072267145 (`node <shim> --version` died with a SyntaxError on the
++  # shim's `set -euo pipefail` line, failing `read pnpm version` in
++  # newConcretePNPMRunner). The lane-local bin directory is prepended via
++  # GITHUB_PATH precisely to outrank any such ambient shim.
++  #
++  # npm, not corepack, is the installer: the tests resolve the pnpm
++  # executable and stage its package root, which a corepack dispatcher shim
++  # does not provide (rehearsal: 3x FAIL MODULE_NOT_FOUND with corepack, 3x
++  # PASS with npm-installed pnpm).
++  PNPM_PIN: "10.33.0"
+ 
+ jobs:
+   # ---------------------------------------------------------------------------
+@@ -96,6 +116,37 @@ jobs:
+         with:
+           go-version-file: go.mod
+ 
++      # The hosted images ship their own Node, but the pnpm the
++      # TestRealPinnedPNPM* cases admit is installed here, never taken from
++      # the image: setup-node guarantees an npm toolchain, and the
++      # lane-local prefix below is prepended to PATH so it outranks any
++      # ambient pnpm shim (macbook-iv run 35072267145: a broken fallback
++      # shim first on PATH failed `read pnpm version` and turned the
++      # rose-air lane red).
++      - uses: actions/setup-node@v4
++        with:
++          node-version: "22"
++
++      - name: Verify pnpm pin matches Go constant
++        shell: bash
++        run: bash .github/ci/pnpm-pin-guard.sh
++
++      - name: Install pinned pnpm via npm
++        shell: bash
++        run: |
++          set -euo pipefail
++          # Lane-local prefix: npm stages a REAL pnpm package root here, which
++          # the TestRealPinnedPNPM* cases need (they resolve the executable
++          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
++          # provides no such root (rehearsal: MODULE_NOT_FOUND).
++          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
++          # npm lays out the global bin dir per platform ($prefix/bin on unix,
++          # the prefix root itself on Windows); prepend both so the pinned
++          # pnpm is first on PATH on every runner and outranks any ambient
++          # shim (macbook-iv run 35072267145).
++          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
++          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
++
+       - name: Verify Go toolchain identity
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+@@ -194,10 +245,35 @@ jobs:
+       # The hosted macOS image ships Node; the self-hosted runner does not.
+       # internal/npmsource's real-npm cases skip with "npm unavailable"
+       # otherwise, a reason the skip classes do not tolerate on darwin.
++      # The same toolchain provisions the npm-installed pnpm below.
+       - uses: actions/setup-node@v4
+         with:
+           node-version: "22"
+ 
++      # This lane is where the incident happened (macbook-iv run 35072267145:
++      # a broken fallback pnpm shim first on PATH failed `read pnpm
++      # version`). The lane-local prefix bin directory is prepended to PATH
++      # precisely to outrank any such ambient shim.
++      - name: Verify pnpm pin matches Go constant
++        shell: bash
++        run: bash .github/ci/pnpm-pin-guard.sh
++
++      - name: Install pinned pnpm via npm
++        shell: bash
++        run: |
++          set -euo pipefail
++          # Lane-local prefix: npm stages a REAL pnpm package root here, which
++          # the TestRealPinnedPNPM* cases need (they resolve the executable
++          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
++          # provides no such root (rehearsal: MODULE_NOT_FOUND).
++          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
++          # npm lays out the global bin dir per platform ($prefix/bin on unix,
++          # the prefix root itself on Windows); prepend both so the pinned
++          # pnpm is first on PATH on every runner and outranks any ambient
++          # shim (macbook-iv run 35072267145).
++          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
++          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
++
+       - name: Verify Go toolchain identity
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+@@ -272,6 +348,34 @@ jobs:
+         with:
+           go-version-file: go.mod
+ 
++      # Same provisioning as the Test lane: the TestRealPinnedPNPM* cases
++      # run under -race too, so the pinned pnpm is installed here and
++      # prepended to PATH ahead of any ambient shim (macbook-iv run
++      # 35072267145).
++      - uses: actions/setup-node@v4
++        with:
++          node-version: "22"
++
++      - name: Verify pnpm pin matches Go constant
++        shell: bash
++        run: bash .github/ci/pnpm-pin-guard.sh
++
++      - name: Install pinned pnpm via npm
++        shell: bash
++        run: |
++          set -euo pipefail
++          # Lane-local prefix: npm stages a REAL pnpm package root here, which
++          # the TestRealPinnedPNPM* cases need (they resolve the executable
++          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
++          # provides no such root (rehearsal: MODULE_NOT_FOUND).
++          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
++          # npm lays out the global bin dir per platform ($prefix/bin on unix,
++          # the prefix root itself on Windows); prepend both so the pinned
++          # pnpm is first on PATH on every runner and outranks any ambient
++          # shim (macbook-iv run 35072267145).
++          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
++          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
++
+       - name: Verify Go toolchain identity
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+@@ -455,6 +559,34 @@ jobs:
+         with:
+           go-version-file: go.mod
+ 
++      # Same provisioning as the Test lane: this lane runs the full suite
++      # through test-gate.sh, so the TestRealPinnedPNPM* cases execute here
++      # too, against the pinned pnpm prepended to PATH ahead of any ambient
++      # shim (macbook-iv run 35072267145).
++      - uses: actions/setup-node@v4
++        with:
++          node-version: "22"
++
++      - name: Verify pnpm pin matches Go constant
++        shell: bash
++        run: bash .github/ci/pnpm-pin-guard.sh
++
++      - name: Install pinned pnpm via npm
++        shell: bash
++        run: |
++          set -euo pipefail
++          # Lane-local prefix: npm stages a REAL pnpm package root here, which
++          # the TestRealPinnedPNPM* cases need (they resolve the executable
++          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
++          # provides no such root (rehearsal: MODULE_NOT_FOUND).
++          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
++          # npm lays out the global bin dir per platform ($prefix/bin on unix,
++          # the prefix root itself on Windows); prepend both so the pinned
++          # pnpm is first on PATH on every runner and outranks any ambient
++          # shim (macbook-iv run 35072267145).
++          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
++          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
++
+       - name: Verify Go toolchain identity
+         shell: bash
+         run: bash .github/ci/toolchain-identity.sh
+diff --git a/internal/pnpmsource/conformance_test.go b/internal/pnpmsource/conformance_test.go
+index 82a523a..43809f2 100644
+--- a/internal/pnpmsource/conformance_test.go
++++ b/internal/pnpmsource/conformance_test.go
+@@ -20,6 +20,7 @@ import (
+ 	"github.com/relux-works/curator/internal/closureexec"
+ 	"github.com/relux-works/curator/internal/closuregraph"
+ 	"github.com/relux-works/curator/internal/nodesource"
++	"github.com/relux-works/curator/internal/privatedir"
+ )
+ 
+ type fixturePackage struct {
+@@ -1223,12 +1224,73 @@ type concretePNPMRunner struct {
+ 	launches                   []closureexec.ProcessLaunch
+ }
+ 
++// resolveWindowsPNPMEntrypoint maps a Windows npm-global pnpm launcher to the
++// real node entry point the integration harness stages and probes.
++//
++// On Windows exec.LookPath("pnpm") returns a `.cmd`/`.bat`/`.ps1` launcher,
++// which node cannot execute (`node pnpm.cmd --version` dies with a
++// SyntaxError, failing `read pnpm version` below). The npm global layout
++// places the real entry point next to the launcher at
++// `<prefix>/node_modules/pnpm/bin/pnpm.cjs`, so this helper resolves exactly
++// that path and the caller uses it for both the version probe and the staged
++// toolchain root (dir(dir(pnpm.cjs)) is the package root, as on unix).
++//
++// Test-only helper authorized by Decision 2 on TASK-260916-5aqozl (Option B):
++// the unix path is returned unchanged, the existing skip classes for
++// absent/unpinned pnpm are untouched, and no production code is involved. A
++// launcher whose package entry point is missing is a broken installation, so
++// it fails closed like the version-probe failure below rather than skipping.
++func resolveWindowsPNPMEntrypoint(t *testing.T, launcher string) string {
++	t.Helper()
++	switch strings.ToLower(filepath.Ext(launcher)) {
++	case ".cmd", ".bat", ".ps1":
++	default:
++		return launcher
++	}
++	candidate := filepath.Join(filepath.Dir(launcher), "node_modules", "pnpm", "bin", "pnpm.cjs")
++	info, err := os.Stat(candidate)
++	if err != nil || info.IsDir() {
++		t.Fatalf("pnpm launcher %s has no adjacent package entry point %s: %v", launcher, candidate, err)
++	}
++	return candidate
++}
++
++func TestResolveWindowsPNPMEntrypoint(t *testing.T) {
++	t.Run("unix path passes through unchanged", func(t *testing.T) {
++		for _, launcher := range []string{"/usr/local/bin/pnpm", `C:\tools\pnpm.exe`} {
++			if got := resolveWindowsPNPMEntrypoint(t, launcher); got != launcher {
++				t.Fatalf("resolveWindowsPNPMEntrypoint(%q) = %q, want unchanged", launcher, got)
++			}
++		}
++	})
++	t.Run("windows launcher resolves to the adjacent package entry point", func(t *testing.T) {
++		for _, launcherName := range []string{"pnpm.cmd", "pnpm.bat", "pnpm.ps1", "pnpm.CMD"} {
++			prefix := t.TempDir()
++			launcher := filepath.Join(prefix, launcherName)
++			entrypoint := filepath.Join(prefix, "node_modules", "pnpm", "bin", "pnpm.cjs")
++			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(launcher, []byte("@echo off\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			if err := os.WriteFile(entrypoint, []byte("console.log('pnpm')\n"), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			if got := resolveWindowsPNPMEntrypoint(t, launcher); got != entrypoint {
++				t.Fatalf("resolveWindowsPNPMEntrypoint(%q) = %q, want %q", launcher, got, entrypoint)
++			}
++		}
++	})
++}
++
+ func newConcretePNPMRunner(t *testing.T) *concretePNPMRunner {
+ 	t.Helper()
+ 	pnpmCommand, err := exec.LookPath("pnpm")
+ 	if err != nil {
+ 		t.Skip("pinned pnpm executable unavailable")
+ 	}
++	pnpmCommand = resolveWindowsPNPMEntrypoint(t, pnpmCommand)
+ 	versionOutput, err := exec.Command("node", pnpmCommand, "--version").CombinedOutput() // #nosec G204 -- integration test resolves the explicitly selected task-local pnpm path.
+ 	if err != nil {
+ 		t.Fatalf("read pnpm version: %v: %s", err, versionOutput)
+@@ -1242,8 +1304,19 @@ func newConcretePNPMRunner(t *testing.T) *concretePNPMRunner {
+ 	}
+ 	pnpmRoot := filepath.Dir(filepath.Dir(pnpmPath))
+ 	executionRoot := filepath.Join(t.TempDir(), "execution")
++	// The portable runner privacy-validates OutputRoot before every operation
++	// (closureexec ensureEmptyDirectory), so the harness creates it the way
++	// production does. os.MkdirAll(0o700) passes that check on unix but fails
++	// it on Windows, where privacy is an owner-only protected DACL, not mode
++	// bits (gate run 35091265197: 3x FAIL "portable output root is not a
++	// private real directory"). The npm sibling fixture is the control: it
++	// never pre-creates output/, so production creates it private there, and
++	// its real-npm tests pass on Windows with the same unresolved TempDir
++	// base. privatedir.MakeAll is MkdirAll(0o700) on unix and the protected
++	// DACL on Windows. Test-only, same Decision 2 class as the entry-point
++	// resolution above: no production code, no new skip.
+ 	for _, dir := range []string{"bin", "work", "output"} {
+-		if err = os.MkdirAll(filepath.Join(executionRoot, dir), 0o700); err != nil {
++		if err = privatedir.MakeAll(filepath.Join(executionRoot, dir)); err != nil {
+ 			t.Fatal(err)
+ 		}
+ 	}
+@@ -1349,7 +1422,9 @@ func (runner *concretePNPMRunner) Run(ctx context.Context, request closureexec.E
+ 	if err := os.RemoveAll(runner.OutputRoot); err != nil {
+ 		return closureexec.PortableRunResult{}, err
+ 	}
+-	if err := os.MkdirAll(runner.OutputRoot, 0o700); err != nil {
++	// Rotated between operations; recreated private for the same Windows
++	// DACL reason as the execution root above.
++	if err := privatedir.MakeAll(runner.OutputRoot); err != nil {
+ 		return closureexec.PortableRunResult{}, err
+ 	}
+ 	return runner.ManagerProcessRunner.Run(ctx, request)

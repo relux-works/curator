@@ -81,6 +81,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260916-61cbfc, max_parallel=20)
 spawn run started: [implementer] developer (codex) (run=RUN-260916-61cbfc)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-61cbfc, pid=90677, exit=0)
 
 ## Precondition Resources
 - [alias-impl-brief.md](file://TASK-260916-11lwua/alias-impl-brief.md)
@@ -107,12 +109,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260916-61cbfc)
 - [TASK-260916-11lwua_spawn-log_-reviewer--reviewer--codex-_RUN-260916-e711d2.log](file://TASK-260916-11lwua/TASK-260916-11lwua_spawn-log_-reviewer--reviewer--codex-_RUN-260916-e711d2.log) — System spawn log captured by task-board
 - [TASK-260916-11lwua_review-verdict-rev3.md](file://TASK-260916-11lwua/TASK-260916-11lwua_review-verdict-rev3.md) — Independent revision 3 acceptance with exact-tree tests and narrowing probe
 - [TASK-260916-11lwua_spawn-log_-implementer--developer--codex-_RUN-260916-61cbfc.log](file://TASK-260916-11lwua/TASK-260916-11lwua_spawn-log_-implementer--developer--codex-_RUN-260916-61cbfc.log) — System spawn log captured by task-board
+- [TASK-260916-11lwua_integration-results.md](file://TASK-260916-11lwua/TASK-260916-11lwua_integration-results.md) — Integration revision 3: zsh with pipefail; exit code 0; exact landed tree revalidated; cleanup_pending; hosted publication and merge remain.
 
 ## Created
 2026-09-16T10:53:28Z
 
 ## Last Update
-2026-09-16T14:53:32Z
+2026-09-16T15:37:32Z
 
 ## Assigned To
 [implementer] developer (codex)
