@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -104,6 +104,7 @@ Evidence: BUG-260906-1bdotx_review-verdict-rev1.md
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260907-e84359, pid=17231, exit=0)
 Landed on curator main as eca87fe3 through PR #64: eleven hosted lanes green including Windows, reviewer ACCEPT on all four acceptance rows with the mechanism reproduced deterministically on darwin and mutant M2 surviving at base and dying at head. The Change Request records an empty delta because the story worktree is a curator-spec checkout while the fix lives in the curator repository; the integration is the fast-forward of the reviewed head, already performed.
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 12f1287ee0fb: pull request 64 names the element and its merge commit eca87fe38957 is an ancestor; method=legacy_pr_attested attested=true landing_commit=eca87fe38957ed08f4819836cc6fe12a3efd18dd authority=12f1287ee0fb538f9ca004dd53b870e824e5baf2; reason: landed by curator PR #64 (reviewed: review-verdict-rev1 resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-snapshot-flake.md](file://BUG-260906-1bdotx/producer-brief-snapshot-flake.md) — Producer brief: establish the Windows snapshot-timestamp flake mechanism before changing the gate
@@ -121,7 +122,7 @@ Landed on curator main as eca87fe3 through PR #64: eleven hosted lanes green inc
 2026-09-06T09:21:16Z
 
 ## Last Update
-2026-09-07T19:50:45Z
+2026-09-16T10:08:26Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

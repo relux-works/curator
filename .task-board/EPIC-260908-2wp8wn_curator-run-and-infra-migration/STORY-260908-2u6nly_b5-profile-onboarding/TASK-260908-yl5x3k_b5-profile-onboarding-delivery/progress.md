@@ -94,6 +94,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260916-4cf7e6, max_parallel=20)
 spawn run started: [implementer] developer (codex) (run=RUN-260916-4cf7e6)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-4cf7e6, pid=70296, exit=0)
 
 ## Precondition Resources
 - [b5-agents-infra-doctor-before.txt](file://TASK-260908-yl5x3k/b5-agents-infra-doctor-before.txt)
@@ -125,12 +127,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260916-4cf7e6)
 - [TASK-260908-yl5x3k_spawn-log_-reviewer--reviewer--codex-_RUN-260916-a32574.log](file://TASK-260908-yl5x3k/TASK-260908-yl5x3k_spawn-log_-reviewer--reviewer--codex-_RUN-260916-a32574.log) — System spawn log captured by task-board
 - [TASK-260908-yl5x3k_review-verdict-rev3.md](file://TASK-260908-yl5x3k/TASK-260908-yl5x3k_review-verdict-rev3.md) — Independent rev3 acceptance: host state, backup, launches, exact empty candidate, and explicit bounds
 - [TASK-260908-yl5x3k_spawn-log_-implementer--developer--codex-_RUN-260916-4cf7e6.log](file://TASK-260908-yl5x3k/TASK-260908-yl5x3k_spawn-log_-implementer--developer--codex-_RUN-260916-4cf7e6.log) — System spawn log captured by task-board
+- [TASK-260908-yl5x3k_integration-results.md](file://TASK-260908-yl5x3k/TASK-260908-yl5x3k_integration-results.md) — Revision 3 integration output; zsh pipefail enabled; integration pipeline exit code 0; cleanup_pending; board commit 3cface56eecccc5ee6ba96dd54320112f2596517
 
 ## Created
 2026-09-07T23:11:34Z
 
 ## Last Update
-2026-09-16T01:13:59Z
+2026-09-16T01:14:57Z
 
 ## Assigned To
 [implementer] developer (codex)

@@ -1,0 +1,5 @@
+# Brief — TASK-260906-vlrjo1 dotfile-heuristic-list-is-posix-only (research, curator-spec)
+
+environments.md 1.1 §9.5 gives the dotfile-manager heuristic a closed documented list spelled only in POSIX form (e.g. ~/.claude, ~/.codex symlink shapes), so on Windows the heuristic is inert. Decide, with evidence, whether the list is platform-specific and what each manager's Windows state location is.
+- Verify on installed binaries where possible on this host (macOS: `claude --version`, `codex --version`, their documented config dirs); for Windows locations, cite vendor documentation with URLs and label each claim "docs-confidence", never invent.
+- Deliverable: a task-scoped outcome resource `TASK-260906-vlrjo1_findings.md` with a table (manager, POSIX location, Windows location, evidence kind, source), a recommendation (platform-specific list vs platform-neutral rule), and the exact spec sentence(s) that would change. No spec edits in this task; the change is a follow-up docs task if the recommendation is accepted.

@@ -78,6 +78,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260915-d3d9ba, max_parallel=8)
 spawn run started: [implementer] developer (codex) (run=RUN-260915-d3d9ba)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260915-d3d9ba, pid=96658, exit=0)
 
 ## Precondition Resources
 - [owned-env-snapshot-brief.md](file://TASK-260915-23628n/owned-env-snapshot-brief.md) — Brief: owned-environment snapshot API (option 1)
@@ -99,12 +101,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260915-d3d9ba)
 - [TASK-260915-23628n_spawn-log_-reviewer--reviewer--claude-_RUN-260915-4ccedd.log](file://TASK-260915-23628n/TASK-260915-23628n_spawn-log_-reviewer--reviewer--claude-_RUN-260915-4ccedd.log) — System spawn log captured by task-board
 - [TASK-260915-23628n_review-verdict-rev1.md](file://TASK-260915-23628n/TASK-260915-23628n_review-verdict-rev1.md) — Independent reviewer verdict for CR rev1: accepted with validation exits, mutant kills, and bounds
 - [TASK-260915-23628n_spawn-log_-implementer--developer--codex-_RUN-260915-d3d9ba.log](file://TASK-260915-23628n/TASK-260915-23628n_spawn-log_-implementer--developer--codex-_RUN-260915-d3d9ba.log) — System spawn log captured by task-board
+- [TASK-260915-23628n_integration-results.md](file://TASK-260915-23628n/TASK-260915-23628n_integration-results.md) — Fresh integration transaction output and real exit code
 
 ## Created
 2026-09-15T19:55:15Z
 
 ## Last Update
-2026-09-15T20:26:51Z
+2026-09-15T20:28:22Z
 
 ## Assigned To
 [implementer] developer (codex)

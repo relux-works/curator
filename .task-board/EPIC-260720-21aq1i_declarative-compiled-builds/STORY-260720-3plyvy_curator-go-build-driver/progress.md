@@ -8,13 +8,13 @@ backlog
 2026-07-19T22:10:05Z
 
 ## Last Update
-2026-08-27T03:32:11Z
+2026-09-15T16:35:47Z
 
 ## Blocked By
 - (none)
 
 ## Blocks
-- STORY-260720-1uv5gi
+- (none)
 
 ## Checklist
 - [x] Decompose the accepted protocol contract into atomic Curator Go implementation, lifecycle, cache, platform, documentation, and test tasks with explicit dependencies; planning only, then leave the story at to-dev

@@ -8,7 +8,7 @@ required
 code
 
 ## Estimate
-notEstimated
+estimated(fibonacci(5))
 
 ## Blocked By
 - (none)
@@ -17,7 +17,9 @@ notEstimated
 - (none)
 
 ## Checklist
-(empty)
+- [ ] FU-1: profile_source_path_missing and profile_source_path_unreadable diagnostics exist and are tested so that neither fires on the other case (absence vs unreadable rule of environments 1.1)
+- [ ] FU-2: loadMachinePolicy distinguishes absent config from unreadable config per the absence-vs-unreadable rule, or the bound is stated in code and docs with a test
+- [ ] FU-3: machine-scope switch clears scope records equal to the effective machine default in the same journaled publish (section 9.3 invariant), covered by a narrowing mutant; FU-4: F16 fixtures scope two adapters
 
 ## Notes
 Cycle-6 reviewer follow-ups (curator head 834b40f6), reproductions in TASK-260905-30zs8t_review-findings-stage-a-6.md:
@@ -31,7 +33,7 @@ FU-5 — a machine-scope switch in which every registered adapter carries a scop
 Carried from cycle 5: FU-1 (section 1.1 profile_source_path_missing / profile_source_path_unreadable diagnostic names do not exist; both shapes fail closed as profile_source_invalid) and FU-2 (a partial install whose activation fails before materializeScope prints no installed-profile line, cmd/curator/profile.go:78; the success path is unaffected).
 
 ## Precondition Resources
-(none)
+- [campaign-producer-rules.md](file://TASK-260906-1f2ng0/campaign-producer-rules.md) — Campaign producer/reviewer rules for host e11-1
 
 ## Outcome Resources
 (none)
@@ -40,4 +42,4 @@ Carried from cycle 5: FU-1 (section 1.1 profile_source_path_missing / profile_so
 2026-09-06T03:40:31Z
 
 ## Last Update
-2026-09-06T04:19:34Z
+2026-09-15T16:46:36Z

@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -201,6 +201,7 @@ spawn run started: [implementer] developer (muse) (run=RUN-260906-21481e)
 agent completed: [implementer] developer (muse) (exit=143)
 spawn run completed: muse (run=RUN-260906-21481e, pid=116, exit=143)
 recovery parked after 3 successor attempts for chain RUN-260906-edbef7; operator action required; last failure: spawned agent exited with code 143
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 12f1287ee0fb: pull request 59 names the element and its merge commit 981b1eeb09a0 is an ancestor; method=legacy_pr_attested attested=true landing_commit=981b1eeb09a08ff17b77ed23286d26c119446fbb authority=12f1287ee0fb538f9ca004dd53b870e824e5baf2; reason: landed by curator PR #59 (reviewed: review-verdict-rev6 resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-stage-a-core.md](file://TASK-260905-30zs8t/producer-brief-stage-a-core.md) — Producer brief: stage (a) core — packages, ranges, resolution+lock, store, audit, monolithic materialization, linked switching, migration (base = acquisition branch head)
@@ -265,7 +266,7 @@ recovery parked after 3 successor attempts for chain RUN-260906-edbef7; operator
 2026-09-05T17:54:17Z
 
 ## Last Update
-2026-09-06T06:03:33Z
+2026-09-16T10:07:50Z
 
 ## Assigned To
 [implementer] developer (muse)

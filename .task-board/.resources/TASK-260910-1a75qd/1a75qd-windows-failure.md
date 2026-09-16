@@ -1,0 +1,6 @@
+# Remote gate failure detail — TASK-260910-1a75qd revision 1 (Windows only)
+
+Hosted CI: ubuntu/macos green; `Test (windows-latest)` failed in the new package internal/sourcelock (from the go-test JSON evidence):
+- TestBindingsRoundTrip, TestBindingsValidation, TestBindingsCheckFresh, TestRebindingPreservesIdentity: `NewBindings: sources.<name>.location: source_selection_invalid: location must be a canonical absolute path` — the fixtures use POSIX absolute paths (`/…`) which are not absolute on Windows. Build fixture locations from `t.TempDir()` (or `filepath.Abs` of a temp path) and keep the canonical-absolute rule in production code; if the production check itself rejects Windows drive-letter paths, fix it (filepath.IsAbs + filepath.Clean + case/volume handling per the spec's machine-binding rules).
+- TestWriteReadRoundTrip: `lock mode = 666, want 644` — Windows reports 0666 for regular files; assert the mode only on non-Windows (or assert "not executable / not world-writable" in a portable way) and keep the 0644 write intent.
+Fix these portably (no platform-conditional production semantics unless the spec demands), rerun `go test -count=1 ./internal/sourcelock` locally, then hand off again (the gate reruns on all three platforms).

@@ -1,0 +1,2423 @@
+diff --git a/internal/sourcelock/bindings.go b/internal/sourcelock/bindings.go
+new file mode 100644
+index 0000000..c894e1e
+--- /dev/null
++++ b/internal/sourcelock/bindings.go
+@@ -0,0 +1,235 @@
++package sourcelock
++
++import (
++	"bytes"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"strconv"
++	"strings"
++
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/verr"
++)
++
++// BindingsSchemaVersion is the only machine-bindings schema this reader accepts.
++const BindingsSchemaVersion = 1
++
++// SourceBinding is the machine-private record for one source alias: the
++// canonical physical source location plus a snapshot of the admitted
++// root-input configuration consumed at lock time. The operator-owned
++// source-policy.json remains the configuration source of truth; this is
++// the per-lock-generation record refresh compares against.
++type SourceBinding struct {
++	Location   string
++	RootInputs []string
++}
++
++// Bindings records the machine side of a frozen selection, keyed by source
++// alias and bound to one lock generation. It is never portable content:
++// it must not be copied into locks, manifests, receipts, or markers.
++type Bindings struct {
++	LockSHA256 string
++	Sources    map[string]SourceBinding
++}
++
++// NewBindings builds a bindings record over a lock digest.
++func NewBindings(lockSHA256 string, sources map[string]SourceBinding) (*Bindings, error) {
++	bindings := &Bindings{LockSHA256: lockSHA256, Sources: sources}
++	if err := bindings.Validate(); err != nil {
++		return nil, err
++	}
++	return bindings, nil
++}
++
++// Validate enforces identifier aliases, absolute canonical-stable locations,
++// and unique disjoint portable root inputs.
++func (b *Bindings) Validate() error {
++	if b == nil {
++		return verr.New("bindings", "source_selection_invalid: bindings are nil")
++	}
++	if !digestRE.MatchString(b.LockSHA256) {
++		return verr.New("lock_sha256", "source_selection_invalid: lock_sha256 must be sha256:<64 lowercase hex>")
++	}
++	for alias, binding := range b.Sources {
++		path := "sources." + alias
++		if !identifiers.Valid(alias) {
++			return verr.New(path, "source_alias_unknown: invalid source alias %q", alias)
++		}
++		if err := validLocation(binding.Location); err != nil {
++			return verr.New(path+".location", "source_selection_invalid: %s", err)
++		}
++		seen := map[string]bool{}
++		for _, input := range binding.RootInputs {
++			if !identifiers.PortablePath(input) {
++				return verr.New(path+".root_inputs", "source_selection_invalid: root input %q must be a portable source-relative path", input)
++			}
++			if seen[input] {
++				return verr.New(path+".root_inputs", "source_selection_invalid: duplicate root input %q", input)
++			}
++			for previous := range seen {
++				if isPathPrefix(previous, input) || isPathPrefix(input, previous) {
++					return verr.New(path+".root_inputs", "source_selection_invalid: overlapping root inputs %q and %q", previous, input)
++				}
++			}
++			seen[input] = true
++		}
++	}
++	return nil
++}
++
++func validLocation(value string) error {
++	if value == "" {
++		return fmt.Errorf("location must be a canonical absolute path")
++	}
++	for index := 0; index < len(value); index++ {
++		if value[index] == 0 {
++			return fmt.Errorf("location must not contain NUL")
++		}
++	}
++	if !filepath.IsAbs(value) || filepath.Clean(value) != value {
++		return fmt.Errorf("location must be a canonical absolute path")
++	}
++	return nil
++}
++
++func isPathPrefix(parent, child string) bool {
++	return strings.HasPrefix(child, parent+"/")
++}
++
++// CheckFresh requires the bindings to belong to the given lock generation.
++// Changed machine bindings require explicit refresh and never reinterpret
++// an existing lock.
++func (b *Bindings) CheckFresh(lock *Lock) error {
++	if b == nil {
++		return verr.New("bindings", "source_selection_invalid: bindings are nil")
++	}
++	if lock == nil {
++		return verr.New("lock", "source_selection_invalid: lock is nil")
++	}
++	if b.LockSHA256 != lock.LockSHA256 {
++		return verr.New("lock_sha256", "source_lock_stale: machine bindings belong to another lock generation; explicit refresh required")
++	}
++	return nil
++}
++
++func (b *Bindings) object() map[string]any {
++	sources := make(map[string]any, len(b.Sources))
++	for alias, binding := range b.Sources {
++		entry := map[string]any{"location": binding.Location}
++		if binding.RootInputs != nil {
++			inputs := make([]any, 0, len(binding.RootInputs))
++			for _, input := range binding.RootInputs {
++				inputs = append(inputs, input)
++			}
++			entry["root_inputs"] = inputs
++		}
++		sources[alias] = entry
++	}
++	return map[string]any{
++		"schema_version": BindingsSchemaVersion,
++		"lock_sha256":    b.LockSHA256,
++		"sources":        sources,
++	}
++}
++
++// ParseBindings decodes one machine-bindings payload under the strict reader
++// discipline: protocol JSON, no unknown fields, full validation.
++func ParseBindings(payload []byte) (*Bindings, error) {
++	if err := protocoljson.Validate(payload); err != nil {
++		return nil, fmt.Errorf("source_selection_invalid: malformed bindings JSON: %w", err)
++	}
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
++	var raw any
++	if err := decoder.Decode(&raw); err != nil {
++		return nil, fmt.Errorf("source_selection_invalid: malformed bindings JSON: %w", err)
++	}
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("bindings", "source_selection_invalid: bindings must contain a JSON object")
++	}
++	if unknown := unknownFields(obj, "schema_version", "lock_sha256", "sources"); len(unknown) > 0 {
++		return nil, verr.New("bindings", "source_selection_invalid: unsupported field(s): %s", strings.Join(unknown, ", "))
++	}
++	version, ok := obj["schema_version"].(json.Number)
++	if !ok || version.String() != strconv.Itoa(BindingsSchemaVersion) {
++		return nil, verr.New("schema_version", "source_selection_invalid: unsupported bindings schema_version")
++	}
++	digest, _ := obj["lock_sha256"].(string)
++	rawSources, ok := obj["sources"].(map[string]any)
++	if !ok {
++		return nil, verr.New("sources", "source_selection_invalid: bindings require field 'sources' as an object")
++	}
++	sources := make(map[string]SourceBinding, len(rawSources))
++	for alias, entry := range rawSources {
++		binding, err := parseSourceBinding(entry, "sources."+alias)
++		if err != nil {
++			return nil, err
++		}
++		sources[alias] = binding
++	}
++	bindings := &Bindings{LockSHA256: digest, Sources: sources}
++	if err := bindings.Validate(); err != nil {
++		return nil, err
++	}
++	return bindings, nil
++}
++
++func parseSourceBinding(entry any, path string) (SourceBinding, error) {
++	obj, ok := entry.(map[string]any)
++	if !ok {
++		return SourceBinding{}, verr.New(path, "source_selection_invalid: must be an object")
++	}
++	if unknown := unknownFields(obj, "location", "root_inputs"); len(unknown) > 0 {
++		return SourceBinding{}, verr.New(path, "source_selection_invalid: unsupported field(s): %s", strings.Join(unknown, ", "))
++	}
++	location, _ := obj["location"].(string)
++	var inputs []string
++	if raw, present := obj["root_inputs"]; present {
++		list, ok := raw.([]any)
++		if !ok {
++			return SourceBinding{}, verr.New(path+".root_inputs", "source_selection_invalid: root inputs must be a list")
++		}
++		for _, item := range list {
++			text, ok := item.(string)
++			if !ok {
++				return SourceBinding{}, verr.New(path+".root_inputs", "source_selection_invalid: root inputs must be a list of strings")
++			}
++			inputs = append(inputs, text)
++		}
++	}
++	return SourceBinding{Location: location, RootInputs: inputs}, nil
++}
++
++// ReadBindings loads and validates the machine bindings at path. The path
++// is caller-chosen machine configuration; it is never the portable lock.
++func ReadBindings(path string) (*Bindings, error) {
++	payload, err := os.ReadFile(path) // #nosec G304 -- caller-supplied machine path
++	if err != nil {
++		return nil, err
++	}
++	bindings, err := ParseBindings(payload)
++	if err != nil {
++		return nil, fmt.Errorf("bindings %s: %w", path, err)
++	}
++	return bindings, nil
++}
++
++// WriteBindings validates the bindings and stores their canonical bytes at
++// path atomically with owner-only permissions.
++func WriteBindings(path string, bindings *Bindings) error {
++	if bindings == nil {
++		return verr.New("bindings", "source_selection_invalid: bindings are nil")
++	}
++	if err := bindings.Validate(); err != nil {
++		return err
++	}
++	canonical, err := protocoljson.MarshalCanonical(bindings.object())
++	if err != nil {
++		return err
++	}
++	return writeFileAtomic(path, canonical, 0o600, 0o700)
++}
+diff --git a/internal/sourcelock/bindings_test.go b/internal/sourcelock/bindings_test.go
+new file mode 100644
+index 0000000..0a350eb
+--- /dev/null
++++ b/internal/sourcelock/bindings_test.go
+@@ -0,0 +1,243 @@
++package sourcelock
++
++import (
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/protocoljson"
++)
++
++// bindingsFixture carries a valid bindings record plus the platform-native
++// fixture locations it binds. Locations come from t.TempDir, which is
++// absolute and Clean-stable on every platform: Unix-only literals such as
++// "/work/skills" are not absolute paths on Windows.
++type bindingsFixture struct {
++	bindings *Bindings
++	project  string
++	team     string
++}
++
++func mustBindingsFixture(t *testing.T) bindingsFixture {
++	t.Helper()
++	fixture := bindingsFixture{
++		project: filepath.Join(t.TempDir(), "skills"),
++		team:    filepath.Join(t.TempDir(), "kit"),
++	}
++	bindings, err := NewBindings(goldenLockSHA256, map[string]SourceBinding{
++		"project": {Location: fixture.project, RootInputs: []string{"SKILL.md", "scripts", "references"}},
++		"team":    {Location: fixture.team},
++	})
++	if err != nil {
++		t.Fatalf("NewBindings: %v", err)
++	}
++	fixture.bindings = bindings
++	return fixture
++}
++
++func mustBindings(t *testing.T) *Bindings {
++	t.Helper()
++	return mustBindingsFixture(t).bindings
++}
++
++func TestBindingsRoundTrip(t *testing.T) {
++	path := filepath.Join(t.TempDir(), "source-bindings.json")
++	fixture := mustBindingsFixture(t)
++	want := fixture.bindings
++	if err := WriteBindings(path, want); err != nil {
++		t.Fatalf("WriteBindings: %v", err)
++	}
++	info, err := os.Stat(path)
++	if err != nil {
++		t.Fatalf("stat bindings: %v", err)
++	}
++	// Windows only honors the owner-write bit; exact Unix modes are
++	// asserted off Windows, following the repository convention.
++	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
++		t.Fatalf("bindings mode = %o, want 600", info.Mode().Perm())
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatalf("read bindings: %v", err)
++	}
++	if err := protocoljson.RequireCanonical(payload); err != nil {
++		t.Fatalf("bindings bytes are not canonical: %v", err)
++	}
++	// Machine locations live here and only here. The needle is encoded
++	// with the same canonical string encoding the payload uses, so the
++	// byte check holds on Windows backslash paths too.
++	needle := mustCanonical(t, fixture.project)
++	if !strings.Contains(string(payload), string(needle)) {
++		t.Fatalf("bindings lost the machine location")
++	}
++	got, err := ReadBindings(path)
++	if err != nil {
++		t.Fatalf("ReadBindings: %v", err)
++	}
++	if got.LockSHA256 != want.LockSHA256 || len(got.Sources) != len(want.Sources) {
++		t.Fatalf("bindings changed across the round trip")
++	}
++	entry := got.Sources["project"]
++	if entry.Location != fixture.project || strings.Join(entry.RootInputs, ",") != "SKILL.md,scripts,references" {
++		t.Fatalf("project binding = %+v", entry)
++	}
++	if got.Sources["team"].RootInputs != nil {
++		t.Fatalf("absent root_inputs became %v", got.Sources["team"].RootInputs)
++	}
++	if _, err := ReadBindings(filepath.Join(t.TempDir(), "missing.json")); !os.IsNotExist(err) {
++		t.Fatalf("missing bindings err = %v, want IsNotExist", err)
++	}
++}
++
++func bindingsPayload(t *testing.T, mutate func(obj map[string]any)) []byte {
++	t.Helper()
++	raw, err := json.Marshal(mustBindings(t).object())
++	if err != nil {
++		t.Fatalf("marshal base bindings: %v", err)
++	}
++	var obj map[string]any
++	if err := json.Unmarshal(raw, &obj); err != nil {
++		t.Fatalf("unmarshal base bindings: %v", err)
++	}
++	if mutate != nil {
++		mutate(obj)
++	}
++	payload, err := json.Marshal(obj)
++	if err != nil {
++		t.Fatalf("marshal mutated bindings: %v", err)
++	}
++	return payload
++}
++
++func bindingAt(obj map[string]any, alias string) map[string]any {
++	return obj["sources"].(map[string]any)[alias].(map[string]any)
++}
++
++func TestBindingsValidation(t *testing.T) {
++	rawCases := map[string][]byte{
++		"garbage":  []byte("{nope"),
++		"array":    []byte("[]"),
++		"dup-keys": []byte(`{"schema_version":1,"schema_version":1}`),
++		"sources-missing": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { delete(obj, "sources") })
++		}(),
++		"sources-list": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { obj["sources"] = []any{} })
++		}(),
++		"unknown-top-level": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { obj["manifest_sha256"] = "x" })
++		}(),
++		"schema-version-2": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { obj["schema_version"] = float64(2) })
++		}(),
++		"lock-digest-bare": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { obj["lock_sha256"] = repeat("ab", 32) })
++		}(),
++		"bad-alias": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) {
++				obj["sources"].(map[string]any)["Bad Name"] = obj["sources"].(map[string]any)["team"]
++			})
++		}(),
++		"relative-location": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { bindingAt(obj, "team")["location"] = "work/kit" })
++		}(),
++		"unclean-location": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { bindingAt(obj, "team")["location"] = "/work//kit" })
++		}(),
++		"missing-location": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { delete(bindingAt(obj, "team"), "location") })
++		}(),
++		"unknown-entry-field": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { bindingAt(obj, "team")["snapshot"] = "x" })
++		}(),
++		"root-inputs-escape": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { bindingAt(obj, "project")["root_inputs"] = []any{"SKILL.md", "../x"} })
++		}(),
++		"root-inputs-absolute": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { bindingAt(obj, "project")["root_inputs"] = []any{"/etc/x"} })
++		}(),
++		"root-inputs-duplicate": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) {
++				bindingAt(obj, "project")["root_inputs"] = []any{"SKILL.md", "SKILL.md"}
++			})
++		}(),
++		"root-inputs-overlap": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) {
++				bindingAt(obj, "project")["root_inputs"] = []any{"scripts", "scripts/worker"}
++			})
++		}(),
++		"root-inputs-nonstring": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) { bindingAt(obj, "project")["root_inputs"] = []any{1} })
++		}(),
++		"root-inputs-object": func() []byte {
++			return bindingsPayload(t, func(obj map[string]any) {
++				bindingAt(obj, "project")["root_inputs"] = map[string]any{}
++			})
++		}(),
++	}
++	for name, payload := range rawCases {
++		if _, err := ParseBindings(payload); err == nil {
++			t.Fatalf("ParseBindings accepted %s", name)
++		}
++	}
++	if _, err := NewBindings("bad", nil); err == nil {
++		t.Fatalf("NewBindings accepted a bad digest")
++	}
++	if err := WriteBindings(filepath.Join(t.TempDir(), "b.json"), nil); err == nil {
++		t.Fatalf("WriteBindings accepted nil")
++	}
++	empty, err := NewBindings(goldenLockSHA256, map[string]SourceBinding{})
++	if err != nil {
++		t.Fatalf("empty bindings rejected: %v", err)
++	}
++	if err := empty.Validate(); err != nil {
++		t.Fatalf("empty Validate: %v", err)
++	}
++}
++
++func TestBindingsCheckFresh(t *testing.T) {
++	lock := mustGoldenLock(t)
++	bindings := mustBindings(t)
++	if err := bindings.CheckFresh(lock); err != nil {
++		t.Fatalf("fresh bindings rejected: %v", err)
++	}
++	stale, err := NewBindings("sha256:"+repeat("00", 32), map[string]SourceBinding{
++		"project": {Location: filepath.Join(t.TempDir(), "elsewhere")},
++	})
++	if err != nil {
++		t.Fatalf("NewBindings: %v", err)
++	}
++	if err := stale.CheckFresh(lock); err == nil || !strings.Contains(err.Error(), "source_lock_stale") {
++		t.Fatalf("foreign generation err = %v, want source_lock_stale", err)
++	}
++	var nilBindings *Bindings
++	if err := nilBindings.CheckFresh(lock); err == nil {
++		t.Fatalf("nil bindings accepted")
++	}
++	if err := bindings.CheckFresh(nil); err == nil {
++		t.Fatalf("nil lock accepted")
++	}
++}
++
++func TestBindingsLocationIsPlatformAbsolute(t *testing.T) {
++	// Regression: bindings locations are machine paths, so valid fixtures
++	// must be absolute on the test platform. Unix-only literals such as
++	// "/work/skills" are not absolute on Windows and failed CI there.
++	absolute := filepath.Join(t.TempDir(), "skills")
++	if !filepath.IsAbs(absolute) || filepath.Clean(absolute) != absolute {
++		t.Fatalf("fixture location %q is not canonical absolute", absolute)
++	}
++	if _, err := NewBindings(goldenLockSHA256, map[string]SourceBinding{
++		"project": {Location: absolute},
++	}); err != nil {
++		t.Fatalf("platform-absolute location rejected: %v", err)
++	}
++	if _, err := NewBindings(goldenLockSHA256, map[string]SourceBinding{
++		"project": {Location: "relative/path"},
++	}); err == nil {
++		t.Fatalf("relative location accepted")
++	}
++}
+diff --git a/internal/sourcelock/fixtures_test.go b/internal/sourcelock/fixtures_test.go
+new file mode 100644
+index 0000000..a39a437
+--- /dev/null
++++ b/internal/sourcelock/fixtures_test.go
+@@ -0,0 +1,219 @@
++package sourcelock
++
++import (
++	"encoding/json"
++	"strings"
++	"testing"
++)
++
++// Byte-copies of curator-spec
++// conformance/draft-sources-v1/schema-cases/skillfile-lock-v1/*.json at
++// main 871d11b. They pin JSON-schema shapes, not digests: every file
++// carries the same placeholder lock_sha256, and the Git fixtures use a
++// placeholder package directory that disagrees with the member directory.
++// The normative member/package directory-agreement rule therefore rejects
++// the Git fixtures semantically; the invalid fixtures must fail
++// structurally, before integrity is even consulted.
++
++const fixtureValidLocal = `{
++  "schema_version": 1,
++  "manifest_sha256": "sha256:b9b161ebadcac2d76b211fcfb38b74da89f62fc5b605e614588732555784f989",
++  "members": [
++    {
++      "name": "review",
++      "selection": 0,
++      "directory": "agents/skills/review",
++      "package": {
++        "kind": "local-snapshot",
++        "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++      },
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++    }
++  ],
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}`
++
++const fixtureValidGit = `{
++  "schema_version": 1,
++  "manifest_sha256": "sha256:b9b161ebadcac2d76b211fcfb38b74da89f62fc5b605e614588732555784f989",
++  "members": [
++    {
++      "name": "review",
++      "selection": 0,
++      "directory": "agents/skills/review",
++      "package": {
++        "kind": "network-git",
++        "repository": "example.org/kit",
++        "directory": ".",
++        "commit": {
++          "object_format": "sha1",
++          "hex": "0000000000000000000000000000000000000000"
++        }
++      },
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++    }
++  ],
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}`
++
++const fixtureValidConfigured = `{
++  "schema_version": 1,
++  "manifest_sha256": "sha256:b9b161ebadcac2d76b211fcfb38b74da89f62fc5b605e614588732555784f989",
++  "members": [
++    {
++      "name": "review",
++      "selection": 0,
++      "directory": "agents/skills/review",
++      "package": {
++        "kind": "configured-git",
++        "source": "team/review",
++        "commit": {
++          "object_format": "sha1",
++          "hex": "0000000000000000000000000000000000000000"
++        },
++        "directory": "."
++      },
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++    }
++  ],
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}`
++
++const fixtureInvalidCommitFormat = `{
++  "schema_version": 1,
++  "manifest_sha256": "sha256:b9b161ebadcac2d76b211fcfb38b74da89f62fc5b605e614588732555784f989",
++  "members": [
++    {
++      "name": "review",
++      "selection": 0,
++      "directory": "agents/skills/review",
++      "package": {
++        "kind": "network-git",
++        "repository": "example.org/kit",
++        "directory": ".",
++        "commit": {
++          "object_format": "sha1",
++          "hex": "0000000000000000000000000000000000000000000000000000000000000000"
++        }
++      },
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++    }
++  ],
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}`
++
++const fixtureInvalidConfiguredEscape = `{
++  "schema_version": 1,
++  "manifest_sha256": "sha256:b9b161ebadcac2d76b211fcfb38b74da89f62fc5b605e614588732555784f989",
++  "members": [
++    {
++      "name": "review",
++      "selection": 0,
++      "directory": "agents/skills/review",
++      "package": {
++        "kind": "configured-git",
++        "source": "../review",
++        "commit": {
++          "object_format": "sha1",
++          "hex": "0000000000000000000000000000000000000000"
++        },
++        "directory": "."
++      },
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++    }
++  ],
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}`
++
++const fixtureInvalidFakeCommit = `{
++  "schema_version": 1,
++  "manifest_sha256": "sha256:b9b161ebadcac2d76b211fcfb38b74da89f62fc5b605e614588732555784f989",
++  "members": [
++    {
++      "name": "review",
++      "selection": 0,
++      "directory": "agents/skills/review",
++      "package": {
++        "kind": "local-snapshot",
++        "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
++        "commit": "0000000000000000000000000000000000000000"
++      },
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++    }
++  ],
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81"
++}`
++
++const fixtureInvalidUnknownTopLevel = `{
++  "schema_version": 1,
++  "manifest_sha256": "sha256:b9b161ebadcac2d76b211fcfb38b74da89f62fc5b605e614588732555784f989",
++  "members": [
++    {
++      "name": "review",
++      "selection": 0,
++      "directory": "agents/skills/review",
++      "package": {
++        "kind": "local-snapshot",
++        "snapshot": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++      },
++      "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
++    }
++  ],
++  "lock_sha256": "sha256:04c57a18c2e1ccae26695420aa586ded8d15d7aace16d198bc5fbe4fbb060d81",
++  "unexpected": true
++}`
++
++// withDigest rewrites a fixture's placeholder lock_sha256.
++func withDigest(t *testing.T, fixture, digest string) []byte {
++	t.Helper()
++	var obj map[string]any
++	if err := json.Unmarshal([]byte(fixture), &obj); err != nil {
++		t.Fatalf("unmarshal fixture: %v", err)
++	}
++	obj["lock_sha256"] = digest
++	payload, err := json.Marshal(obj)
++	if err != nil {
++		t.Fatalf("marshal fixture: %v", err)
++	}
++	return payload
++}
++
++func TestSchemaFixtures(t *testing.T) {
++	// The local fixture is structurally valid: with a wrong digest the
++	// only failure is integrity, proving structure passed.
++	_, err := Parse(withDigest(t, fixtureValidLocal, "sha256:"+repeat("00", 32)))
++	if err == nil || !strings.Contains(err.Error(), "lock_sha256 mismatch") {
++		t.Fatalf("valid local fixture err = %v, want only a digest mismatch", err)
++	}
++	// The Git fixtures disagree on member/package directories, which the
++	// normative text forbids even though JSON Schema cannot express it.
++	for name, fixture := range map[string]string{"git": fixtureValidGit, "configured": fixtureValidConfigured} {
++		_, err := Parse(withDigest(t, fixture, "sha256:"+repeat("00", 32)))
++		if err == nil || !strings.Contains(err.Error(), "source_member_invalid") {
++			t.Fatalf("%s fixture err = %v, want source_member_invalid directory disagreement", name, err)
++		}
++		if strings.Contains(err.Error(), "lock_sha256 mismatch") {
++			t.Fatalf("%s fixture failed integrity before structure: %v", name, err)
++		}
++	}
++	// Every invalid fixture must fail structurally: integrity is never
++	// consulted for a malformed lock.
++	invalid := map[string]string{
++		"commit-format":     fixtureInvalidCommitFormat,
++		"configured-escape": fixtureInvalidConfiguredEscape,
++		"fake-commit":       fixtureInvalidFakeCommit,
++		"unknown-top-level": fixtureInvalidUnknownTopLevel,
++	}
++	for name, fixture := range invalid {
++		_, err := Parse(withDigest(t, fixture, "sha256:"+repeat("00", 32)))
++		if err == nil {
++			t.Fatalf("invalid fixture %s accepted", name)
++		}
++		if strings.Contains(err.Error(), "lock_sha256 mismatch") {
++			t.Fatalf("invalid fixture %s failed integrity before structure: %v", name, err)
++		}
++		if !strings.Contains(err.Error(), "source_member_invalid") && !strings.Contains(err.Error(), "source_selection_invalid") {
++			t.Fatalf("invalid fixture %s err = %v, want a source diagnostic", name, err)
++		}
++	}
++}
+diff --git a/internal/sourcelock/sourcelock.go b/internal/sourcelock/sourcelock.go
+new file mode 100644
+index 0000000..ac917f3
+--- /dev/null
++++ b/internal/sourcelock/sourcelock.go
+@@ -0,0 +1,778 @@
++// Package sourcelock implements the portable Skillfile package lock
++// (Skillfile.lock.json, skillfile-lock schema 1) of the unreleased
++// skillfile-sources-v1 extension.
++//
++// A package lock freezes the resolved closure: exact per-member package
++// identities, the declaring Skillfile digest, and the selection indexes.
++// It carries portable content identity only; machine-resolved absolute
++// paths, endpoint choices, and credentials MUST NOT enter it. Those live
++// in the machine-private Bindings record instead.
++//
++// This is NOT the environment context lock (internal/contextlock,
++// context-lock-v1): different file, different schema, different identity
++// arms. The two must never be parsed or consumed as each other.
++//
++// Diagnostic classes follow skillfile-sources §5: malformed lock shape is
++// source_selection_invalid, malformed member records are
++// source_member_invalid, duplicate names are source_name_conflict, a lock
++// that no longer matches its manifest, plan, or machine bindings is
++// source_lock_stale, and a plan member absent from the lock is
++// source_member_missing.
++package sourcelock
++
++import (
++	"bytes"
++	"crypto/sha256"
++	"encoding/hex"
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"regexp"
++	"sort"
++	"strconv"
++	"strings"
++	"unicode/utf8"
++
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/identity"
++	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/verr"
++)
++
++// SchemaVersion is the only Skillfile lock schema this reader accepts.
++const SchemaVersion = 1
++
++// FileName is the portable lock file next to the declaring Skillfile.
++const FileName = "Skillfile.lock.json"
++
++// Package identity arms (source-types schema 1). The arms are disjoint:
++// a local snapshot never carries Git fields and a Git package never
++// carries a snapshot digest.
++const (
++	KindLocalSnapshot = "local-snapshot"
++	KindNetworkGit    = "network-git"
++	KindConfiguredGit = "configured-git"
++)
++
++var (
++	digestRE    = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
++	sha1RE      = regexp.MustCompile(`^[0-9a-f]{40}$`)
++	sha256HexRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
++)
++
++// Commit is a locked Git object: format-bound lowercase hex, never a
++// snapshot digest and never prefixed.
++type Commit struct {
++	ObjectFormat string // "sha1" or "sha256"
++	Hex          string
++}
++
++// Validate enforces the lockedCommit shape: sha1 binds 40 hex, sha256 64.
++func (c Commit) Validate(path string) error {
++	switch c.ObjectFormat {
++	case "sha1":
++		if !sha1RE.MatchString(c.Hex) {
++			return verr.New(path, "source_member_invalid: sha1 commit must be 40 lowercase hex")
++		}
++	case "sha256":
++		if !sha256HexRE.MatchString(c.Hex) {
++			return verr.New(path, "source_member_invalid: sha256 commit must be 64 lowercase hex")
++		}
++	default:
++		return verr.New(path, "source_member_invalid: commit object_format must be sha1 or sha256")
++	}
++	return nil
++}
++
++// Package is one frozen package identity. Exactly one arm is populated;
++// Validate rejects any cross-arm field.
++type Package struct {
++	Kind       string
++	Snapshot   string // local-snapshot only: sha256:<hex> inventory digest
++	Repository string // network-git only: canonical host/path
++	Source     string // configured-git only: legacy configured-root path
++	Commit     Commit // Git arms only
++	Directory  string // Git arms only: effective per-member directory
++}
++
++// LocalPackage builds a local-snapshot identity over an inventory digest.
++func LocalPackage(snapshot string) (Package, error) {
++	p := Package{Kind: KindLocalSnapshot, Snapshot: snapshot}
++	if err := p.Validate("package"); err != nil {
++		return Package{}, err
++	}
++	return p, nil
++}
++
++// NetworkGitPackage builds a network-git identity. Directory is the
++// effective per-member source-relative directory and must equal the
++// lock member directory.
++func NetworkGitPackage(repository string, commit Commit, directory string) (Package, error) {
++	p := Package{Kind: KindNetworkGit, Repository: repository, Commit: commit, Directory: directory}
++	if err := p.Validate("package"); err != nil {
++		return Package{}, err
++	}
++	return p, nil
++}
++
++// ConfiguredGitPackage builds a configured-git identity for a legacy entry
++// whose repository has no canonical network identity. The directory is
++// always "." relative to that entry's selected repository.
++func ConfiguredGitPackage(source string, commit Commit) (Package, error) {
++	p := Package{Kind: KindConfiguredGit, Source: source, Commit: commit, Directory: "."}
++	if err := p.Validate("package"); err != nil {
++		return Package{}, err
++	}
++	return p, nil
++}
++
++// IsGit reports whether the package uses a Git identity arm.
++func (p Package) IsGit() bool {
++	return p.Kind == KindNetworkGit || p.Kind == KindConfiguredGit
++}
++
++// Validate enforces the disjoint arm shapes of source-types schema 1.
++func (p Package) Validate(path string) error {
++	switch p.Kind {
++	case KindLocalSnapshot:
++		if !digestRE.MatchString(p.Snapshot) {
++			return verr.New(path+".snapshot", "source_member_invalid: snapshot must be sha256:<64 lowercase hex>")
++		}
++		if p.Repository != "" || p.Source != "" || p.Commit != (Commit{}) || p.Directory != "" {
++			return verr.New(path, "source_member_invalid: local-snapshot must not carry Git identity")
++		}
++	case KindNetworkGit:
++		if p.Snapshot != "" || p.Source != "" {
++			return verr.New(path, "source_member_invalid: network-git must not carry snapshot or configured source")
++		}
++		if !validRepository(p.Repository) {
++			return verr.New(path+".repository", "source_member_invalid: repository must be canonical host/path")
++		}
++		if err := p.Commit.Validate(path + ".commit"); err != nil {
++			return err
++		}
++		if !validLockDirectory(p.Directory) {
++			return verr.New(path+".directory", "source_member_invalid: directory must be '.' or a portable contained path")
++		}
++	case KindConfiguredGit:
++		if p.Snapshot != "" || p.Repository != "" {
++			return verr.New(path, "source_member_invalid: configured-git must not carry snapshot or network repository")
++		}
++		if !identifiers.PortablePath(p.Source) {
++			return verr.New(path+".source", "source_member_invalid: source must be a portable configured-root path")
++		}
++		if err := p.Commit.Validate(path + ".commit"); err != nil {
++			return err
++		}
++		if p.Directory != "." {
++			return verr.New(path+".directory", "source_member_invalid: configured-git directory must be '.'")
++		}
++	default:
++		return verr.New(path+".kind", "source_selection_invalid: unknown package kind %q", p.Kind)
++	}
++	return nil
++}
++
++// validRepository enforces repository-transport revision 1 §1: a lock
++// member's repository MUST already be canonical (lowercase host,
++// case-sensitive path, exactly one terminal ".git" removed, no transport
++// or username). identity.ValidCanonical covers grammar, host case, and
++// transport/username rejection; the terminal ".git" suffix is enforced
++// here so legacy identity semantics elsewhere stay untouched.
++func validRepository(value string) bool {
++	if value == "" || utf8.RuneCountInString(value) > 4096 {
++		return false
++	}
++	if strings.HasSuffix(value, ".git") {
++		return false
++	}
++	return identity.ValidCanonical(value)
++}
++
++// validLockDirectory admits "." and portable contained paths without glob
++// metacharacters, mirroring the manifest selector rule.
++func validLockDirectory(value string) bool {
++	return value == "." || (identifiers.PortablePath(value) && !strings.ContainsAny(value, "*?[]"))
++}
++
++func (p Package) object() map[string]any {
++	switch p.Kind {
++	case KindNetworkGit:
++		return map[string]any{
++			"kind":       p.Kind,
++			"repository": p.Repository,
++			"commit":     map[string]any{"object_format": p.Commit.ObjectFormat, "hex": p.Commit.Hex},
++			"directory":  p.Directory,
++		}
++	case KindConfiguredGit:
++		return map[string]any{
++			"kind":      p.Kind,
++			"source":    p.Source,
++			"commit":    map[string]any{"object_format": p.Commit.ObjectFormat, "hex": p.Commit.Hex},
++			"directory": p.Directory,
++		}
++	default:
++		return map[string]any{"kind": p.Kind, "snapshot": p.Snapshot}
++	}
++}
++
++// Canonical returns the CCJ-1 bytes of the package identity after validation.
++// Runtime store keys hash these bytes; callers must never substitute a
++// snapshot digest into a Git commit field or vice versa.
++func (p Package) Canonical() ([]byte, error) {
++	if err := p.Validate("package"); err != nil {
++		return nil, err
++	}
++	return protocoljson.MarshalCanonical(p.object())
++}
++
++// Digest returns the sha256:<hex> content identity of the package over its
++// CCJ-1 bytes. Rebinding the same bytes on another machine preserves it.
++func (p Package) Digest() (string, error) {
++	canonical, err := p.Canonical()
++	if err != nil {
++		return "", err
++	}
++	sum := sha256.Sum256(canonical)
++	return "sha256:" + hex.EncodeToString(sum[:]), nil
++}
++
++// Member is one frozen closure member. Selection is the zero-based root
++// skills index, shared by collection-expanded siblings, or nil for a
++// transitive member. Directory is source-relative; for both Git arms it
++// must equal the package directory.
++type Member struct {
++	Name          string
++	Selection     *int
++	Directory     string
++	Package       Package
++	ContentSHA256 string // context content hash, not package identity
++}
++
++// Validate enforces the member shape and the Git directory-agreement rule.
++func (m Member) Validate(path string) error {
++	if !identifiers.Valid(m.Name) {
++		return verr.New(path+".name", "source_member_invalid: name %s", identifiers.Rule)
++	}
++	if m.Selection != nil && (*m.Selection < 0 || int64(*m.Selection) > protocoljson.MaxSafeInteger) {
++		return verr.New(path+".selection", "source_selection_invalid: selection must be null or a non-negative safe integer")
++	}
++	if !validLockDirectory(m.Directory) {
++		return verr.New(path+".directory", "source_member_invalid: directory must be '.' or a portable contained path")
++	}
++	if err := m.Package.Validate(path + ".package"); err != nil {
++		return err
++	}
++	if m.Package.IsGit() && m.Directory != m.Package.Directory {
++		return verr.New(path+".directory", "source_member_invalid: member directory %q differs from package directory %q", m.Directory, m.Package.Directory)
++	}
++	if !digestRE.MatchString(m.ContentSHA256) {
++		return verr.New(path+".content_sha256", "source_member_invalid: content_sha256 must be sha256:<64 lowercase hex>")
++	}
++	return nil
++}
++
++func (m Member) object() map[string]any {
++	var selection any
++	if m.Selection != nil {
++		selection = *m.Selection
++	}
++	return map[string]any{
++		"name":           m.Name,
++		"selection":      selection,
++		"directory":      m.Directory,
++		"package":        m.Package.object(),
++		"content_sha256": m.ContentSHA256,
++	}
++}
++
++// equalRecord reports whether two members agree on every frozen field.
++func (m Member) equalRecord(other Member) bool {
++	if m.Name != other.Name || m.Directory != other.Directory || m.ContentSHA256 != other.ContentSHA256 {
++		return false
++	}
++	if (m.Selection == nil) != (other.Selection == nil) {
++		return false
++	}
++	if m.Selection != nil && *m.Selection != *other.Selection {
++		return false
++	}
++	a, b := m.Package, other.Package
++	return a.Kind == b.Kind && a.Snapshot == b.Snapshot && a.Repository == b.Repository &&
++		a.Source == b.Source && a.Commit == b.Commit && a.Directory == b.Directory
++}
++
++// Lock is one parsed Skillfile.lock.json object: the declaring manifest
++// digest plus the frozen closure sorted by UTF-8 skill name.
++type Lock struct {
++	ManifestSHA256 string
++	Members        []Member
++	LockSHA256     string
++}
++
++// New builds a lock over a manifest digest, sorting members into canonical
++// UTF-8 name order and computing lock_sha256.
++func New(manifestSHA256 string, members []Member) (*Lock, error) {
++	lock := &Lock{ManifestSHA256: manifestSHA256, Members: append([]Member(nil), members...)}
++	sort.SliceStable(lock.Members, func(i, j int) bool {
++		return bytes.Compare([]byte(lock.Members[i].Name), []byte(lock.Members[j].Name)) < 0
++	})
++	if err := lock.validateStructure(); err != nil {
++		return nil, err
++	}
++	digest, err := lock.digest()
++	if err != nil {
++		return nil, err
++	}
++	lock.LockSHA256 = digest
++	return lock, nil
++}
++
++// Find returns the locked member with the given installed name.
++func (lock *Lock) Find(name string) (Member, bool) {
++	if lock == nil {
++		return Member{}, false
++	}
++	for _, member := range lock.Members {
++		if member.Name == name {
++			return member, true
++		}
++	}
++	return Member{}, false
++}
++
++// digestObject renders the lock minus lock_sha256, the digest preimage.
++func (lock *Lock) digestObject() map[string]any {
++	members := make([]any, 0, len(lock.Members))
++	for _, member := range lock.Members {
++		members = append(members, member.object())
++	}
++	return map[string]any{
++		"schema_version":  SchemaVersion,
++		"manifest_sha256": lock.ManifestSHA256,
++		"members":         members,
++	}
++}
++
++// Object renders the complete lock including lock_sha256.
++func (lock *Lock) Object() map[string]any {
++	object := lock.digestObject()
++	object["lock_sha256"] = lock.LockSHA256
++	return object
++}
++
++// digest hashes the CCJ-1 bytes of the lock with lock_sha256 omitted.
++func (lock *Lock) digest() (string, error) {
++	canonical, err := protocoljson.MarshalCanonical(lock.digestObject())
++	if err != nil {
++		return "", err
++	}
++	sum := sha256.Sum256(canonical)
++	return "sha256:" + hex.EncodeToString(sum[:]), nil
++}
++
++// Digest validates the lock structure and returns its lock_sha256.
++func (lock *Lock) Digest() (string, error) {
++	if lock == nil {
++		return "", verr.New("lock", "source_selection_invalid: lock is nil")
++	}
++	if err := lock.validateStructure(); err != nil {
++		return "", err
++	}
++	return lock.digest()
++}
++
++// Validate enforces the full lock shape and the lock_sha256 self-integrity.
++func (lock *Lock) Validate() error {
++	if lock == nil {
++		return verr.New("lock", "source_selection_invalid: lock is nil")
++	}
++	if err := lock.validateStructure(); err != nil {
++		return err
++	}
++	if !digestRE.MatchString(lock.LockSHA256) {
++		return verr.New("lock_sha256", "source_selection_invalid: lock_sha256 must be sha256:<64 lowercase hex>")
++	}
++	expected, err := lock.digest()
++	if err != nil {
++		return err
++	}
++	if lock.LockSHA256 != expected {
++		return verr.New("lock_sha256", "source_selection_invalid: lock_sha256 mismatch: lock was modified without refresh")
++	}
++	return nil
++}
++
++func (lock *Lock) validateStructure() error {
++	if !digestRE.MatchString(lock.ManifestSHA256) {
++		return verr.New("manifest_sha256", "source_selection_invalid: manifest_sha256 must be sha256:<64 lowercase hex>")
++	}
++	seen := map[string]string{}
++	for index, member := range lock.Members {
++		path := "members[" + strconv.Itoa(index) + "]"
++		if err := member.Validate(path); err != nil {
++			return err
++		}
++		folded := strings.ToLower(member.Name)
++		if previous, ok := seen[folded]; ok {
++			return verr.New(path+".name", "source_name_conflict: %s repeats destination %s", member.Name, previous)
++		}
++		seen[folded] = member.Name
++		if index > 0 && bytes.Compare([]byte(lock.Members[index-1].Name), []byte(member.Name)) >= 0 {
++			return verr.New(path+".name", "source_selection_invalid: members are not sorted by UTF-8 skill name")
++		}
++	}
++	return nil
++}
++
++// ManifestDigest binds a lock to its declaring Skillfile: the CCJ-1 SHA-256
++// of the entire parsed manifest, including declared paths, with no field
++// excluded. Callers pass the bytes of a successfully parsed Skillfile.
++func ManifestDigest(payload []byte) (string, error) {
++	if err := protocoljson.Validate(payload); err != nil {
++		return "", fmt.Errorf("source_selection_invalid: malformed Skillfile JSON: %w", err)
++	}
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
++	var value any
++	if err := decoder.Decode(&value); err != nil {
++		return "", fmt.Errorf("source_selection_invalid: malformed Skillfile JSON: %w", err)
++	}
++	if _, ok := value.(map[string]any); !ok {
++		return "", verr.New("Skillfile", "source_selection_invalid: manifest must contain a JSON object")
++	}
++	canonical, err := protocoljson.MarshalCanonical(value)
++	if err != nil {
++		return "", fmt.Errorf("source_selection_invalid: manifest is not CCJ-1 encodable: %w", err)
++	}
++	sum := sha256.Sum256(canonical)
++	return "sha256:" + hex.EncodeToString(sum[:]), nil
++}
++
++// CheckStale requires the lock to bind the given declaring Skillfile bytes.
++// A changed manifest fails source_lock_stale; only explicit refresh may
++// replace the lock.
++func (lock *Lock) CheckStale(manifestPayload []byte) error {
++	if lock == nil {
++		return verr.New("lock", "source_selection_invalid: lock is nil")
++	}
++	digest, err := ManifestDigest(manifestPayload)
++	if err != nil {
++		return err
++	}
++	return lock.CheckStaleDigest(digest)
++}
++
++// CheckStaleDigest requires the lock to bind a manifest digest.
++func (lock *Lock) CheckStaleDigest(digest string) error {
++	if lock == nil {
++		return verr.New("lock", "source_selection_invalid: lock is nil")
++	}
++	if lock.ManifestSHA256 != digest {
++		return verr.New("manifest_sha256", "source_lock_stale: Skillfile changed since lock; explicit refresh required")
++	}
++	return nil
++}
++
++// CheckNames requires the locked member set to equal exactly the expected
++// installed names from manifest expansion. Launch and install consume the
++// locked set; a plan member absent from the lock fails
++// source_member_missing, and a locked member outside the plan fails
++// source_lock_stale. Callers pass expansion names, never live filesystem
++// members, so live collection extras never widen the frozen set.
++func (lock *Lock) CheckNames(expected []string) error {
++	if lock == nil {
++		return verr.New("lock", "source_selection_invalid: lock is nil")
++	}
++	locked := map[string]bool{}
++	for _, member := range lock.Members {
++		locked[member.Name] = true
++	}
++	want := append([]string(nil), expected...)
++	sort.Strings(want)
++	for _, name := range want {
++		if !locked[name] {
++			return verr.New("members", "source_member_missing: %s is not in the lock", name)
++		}
++	}
++	planned := map[string]bool{}
++	for _, name := range expected {
++		planned[name] = true
++	}
++	for _, member := range lock.Members {
++		if !planned[member.Name] {
++			return verr.New("members", "source_lock_stale: lock contains %s outside the plan; explicit refresh required", member.Name)
++		}
++	}
++	return nil
++}
++
++// CheckMembership requires the locked member records to equal exactly the
++// expected frozen set: names, selection indexes, directories, package
++// identities, and content hashes.
++func (lock *Lock) CheckMembership(expected []Member) error {
++	if lock == nil {
++		return verr.New("lock", "source_selection_invalid: lock is nil")
++	}
++	want := append([]Member(nil), expected...)
++	sort.SliceStable(want, func(i, j int) bool { return want[i].Name < want[j].Name })
++	for _, member := range want {
++		locked, ok := lock.Find(member.Name)
++		if !ok {
++			return verr.New("members", "source_member_missing: %s is not in the lock", member.Name)
++		}
++		if !locked.equalRecord(member) {
++			return verr.New("members", "source_member_invalid: locked %s differs from the plan", member.Name)
++		}
++	}
++	planned := map[string]bool{}
++	for _, member := range expected {
++		planned[member.Name] = true
++	}
++	for _, member := range lock.Members {
++		if !planned[member.Name] {
++			return verr.New("members", "source_lock_stale: lock contains %s outside the plan; explicit refresh required", member.Name)
++		}
++	}
++	return nil
++}
++
++// PathIn returns the lock path for a project root.
++func PathIn(projectRoot string) string {
++	return filepath.Join(projectRoot, FileName)
++}
++
++// Parse decodes one lock payload under the strict reader discipline:
++// protocol JSON, no unknown fields, full structural validation, and
++// lock_sha256 self-integrity. Any serialization parses; only the value
++// must verify.
++func Parse(payload []byte) (*Lock, error) {
++	if err := protocoljson.Validate(payload); err != nil {
++		return nil, fmt.Errorf("source_selection_invalid: malformed lock JSON: %w", err)
++	}
++	decoder := json.NewDecoder(bytes.NewReader(payload))
++	decoder.UseNumber()
++	var raw any
++	if err := decoder.Decode(&raw); err != nil {
++		return nil, fmt.Errorf("source_selection_invalid: malformed lock JSON: %w", err)
++	}
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("lock", "source_selection_invalid: lock must contain a JSON object")
++	}
++	if unknown := unknownFields(obj, "schema_version", "manifest_sha256", "members", "lock_sha256"); len(unknown) > 0 {
++		return nil, verr.New("lock", "source_selection_invalid: unsupported field(s): %s", strings.Join(unknown, ", "))
++	}
++	version, ok := obj["schema_version"].(json.Number)
++	if !ok || version.String() != strconv.Itoa(SchemaVersion) {
++		return nil, verr.New("schema_version", "source_selection_invalid: unsupported lock schema_version; this lock requires a newer tool")
++	}
++	manifest, _ := obj["manifest_sha256"].(string)
++	rawMembers, ok := obj["members"].([]any)
++	if !ok {
++		return nil, verr.New("members", "source_selection_invalid: lock requires field 'members' as a list")
++	}
++	members := make([]Member, 0, len(rawMembers))
++	for index, entry := range rawMembers {
++		member, err := parseMember(entry, "members["+strconv.Itoa(index)+"]")
++		if err != nil {
++			return nil, err
++		}
++		members = append(members, member)
++	}
++	digest, _ := obj["lock_sha256"].(string)
++	lock := &Lock{ManifestSHA256: manifest, Members: members, LockSHA256: digest}
++	if err := lock.Validate(); err != nil {
++		return nil, err
++	}
++	return lock, nil
++}
++
++func parseMember(entry any, path string) (Member, error) {
++	obj, ok := entry.(map[string]any)
++	if !ok {
++		return Member{}, verr.New(path, "source_member_invalid: must be an object")
++	}
++	if unknown := unknownFields(obj, "name", "selection", "directory", "package", "content_sha256"); len(unknown) > 0 {
++		return Member{}, verr.New(path, "source_member_invalid: unsupported field(s): %s", strings.Join(unknown, ", "))
++	}
++	name, _ := obj["name"].(string)
++	rawSelection, present := obj["selection"]
++	if !present {
++		return Member{}, verr.New(path+".selection", "source_selection_invalid: selection is required and must be null or an index")
++	}
++	selection, err := parseSelection(rawSelection, path+".selection")
++	if err != nil {
++		return Member{}, err
++	}
++	directory, _ := obj["directory"].(string)
++	rawPackage, present := obj["package"]
++	if !present {
++		return Member{}, verr.New(path+".package", "source_member_invalid: package is required")
++	}
++	parsed, err := parsePackage(rawPackage, path+".package")
++	if err != nil {
++		return Member{}, err
++	}
++	content, _ := obj["content_sha256"].(string)
++	member := Member{Name: name, Selection: selection, Directory: directory, Package: parsed, ContentSHA256: content}
++	if err := member.Validate(path); err != nil {
++		return Member{}, err
++	}
++	return member, nil
++}
++
++func parseSelection(raw any, path string) (*int, error) {
++	if raw == nil {
++		return nil, nil
++	}
++	number, ok := raw.(json.Number)
++	if !ok {
++		return nil, verr.New(path, "source_selection_invalid: selection must be null or a non-negative safe integer")
++	}
++	value, err := strconv.ParseInt(number.String(), 10, 64)
++	if err != nil || strconv.FormatInt(value, 10) != number.String() || value < 0 || value > protocoljson.MaxSafeInteger {
++		return nil, verr.New(path, "source_selection_invalid: selection must be null or a non-negative safe integer")
++	}
++	index := int(value)
++	return &index, nil
++}
++
++func parsePackage(raw any, path string) (Package, error) {
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return Package{}, verr.New(path, "source_member_invalid: package must be an object")
++	}
++	kind, _ := obj["kind"].(string)
++	var parsed Package
++	switch kind {
++	case KindLocalSnapshot:
++		if unknown := unknownFields(obj, "kind", "snapshot"); len(unknown) > 0 {
++			return Package{}, verr.New(path, "source_member_invalid: local-snapshot admits only kind and snapshot")
++		}
++		snapshot, _ := obj["snapshot"].(string)
++		parsed = Package{Kind: kind, Snapshot: snapshot}
++	case KindNetworkGit:
++		if unknown := unknownFields(obj, "kind", "repository", "commit", "directory"); len(unknown) > 0 {
++			return Package{}, verr.New(path, "source_member_invalid: network-git admits only kind, repository, commit and directory")
++		}
++		repository, _ := obj["repository"].(string)
++		commit, err := parseCommit(obj["commit"], path+".commit")
++		if err != nil {
++			return Package{}, err
++		}
++		directory, _ := obj["directory"].(string)
++		parsed = Package{Kind: kind, Repository: repository, Commit: commit, Directory: directory}
++	case KindConfiguredGit:
++		if unknown := unknownFields(obj, "kind", "source", "commit", "directory"); len(unknown) > 0 {
++			return Package{}, verr.New(path, "source_member_invalid: configured-git admits only kind, source, commit and directory")
++		}
++		source, _ := obj["source"].(string)
++		commit, err := parseCommit(obj["commit"], path+".commit")
++		if err != nil {
++			return Package{}, err
++		}
++		directory, _ := obj["directory"].(string)
++		parsed = Package{Kind: kind, Source: source, Commit: commit, Directory: directory}
++	default:
++		return Package{}, verr.New(path+".kind", "source_selection_invalid: unknown package kind %q", kind)
++	}
++	if err := parsed.Validate(path); err != nil {
++		return Package{}, err
++	}
++	return parsed, nil
++}
++
++func parseCommit(raw any, path string) (Commit, error) {
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return Commit{}, verr.New(path, "source_member_invalid: commit must be an object")
++	}
++	if unknown := unknownFields(obj, "object_format", "hex"); len(unknown) > 0 {
++		return Commit{}, verr.New(path, "source_member_invalid: unsupported field(s): %s", strings.Join(unknown, ", "))
++	}
++	format, _ := obj["object_format"].(string)
++	hexValue, _ := obj["hex"].(string)
++	commit := Commit{ObjectFormat: format, Hex: hexValue}
++	if err := commit.Validate(path); err != nil {
++		return Commit{}, err
++	}
++	return commit, nil
++}
++
++func unknownFields(object map[string]any, allowed ...string) []string {
++	set := map[string]bool{}
++	for _, field := range allowed {
++		set[field] = true
++	}
++	var unknown []string
++	for field := range object {
++		if !set[field] {
++			unknown = append(unknown, field)
++		}
++	}
++	sort.Strings(unknown)
++	return unknown
++}
++
++// Read loads and validates the lock at path. A missing file returns the
++// filesystem error, never an empty lock: absence is not validity.
++func Read(path string) (*Lock, error) {
++	payload, err := os.ReadFile(path) // #nosec G304 -- caller-supplied lock path
++	if err != nil {
++		return nil, err
++	}
++	lock, err := Parse(payload)
++	if err != nil {
++		return nil, fmt.Errorf("lock %s: %w", path, err)
++	}
++	return lock, nil
++}
++
++// Write validates the lock and stores its canonical bytes at path
++// atomically. The lock must already carry its lock_sha256; New computes it.
++func Write(path string, lock *Lock) error {
++	if lock == nil {
++		return verr.New("lock", "source_selection_invalid: lock is nil")
++	}
++	if err := lock.Validate(); err != nil {
++		return err
++	}
++	canonical, err := protocoljson.MarshalCanonical(lock.Object())
++	if err != nil {
++		return err
++	}
++	return writeFileAtomic(path, canonical, 0o644, 0o755)
++}
++
++func writeFileAtomic(path string, payload []byte, fileMode, dirMode os.FileMode) error {
++	if err := os.MkdirAll(filepath.Dir(path), dirMode); err != nil {
++		return err
++	}
++	tmp, err := os.CreateTemp(filepath.Dir(path), ".lock-*")
++	if err != nil {
++		return err
++	}
++	name := tmp.Name()
++	defer func() { _ = os.Remove(name) }()
++	if err := tmp.Chmod(fileMode); err != nil {
++		_ = tmp.Close()
++		return err
++	}
++	if _, err := tmp.Write(payload); err != nil {
++		_ = tmp.Close()
++		return err
++	}
++	if err := tmp.Sync(); err != nil {
++		_ = tmp.Close()
++		return err
++	}
++	if err := tmp.Close(); err != nil {
++		return err
++	}
++	if err := os.Rename(name, path); err != nil {
++		return err
++	}
++	return nil
++}
+diff --git a/internal/sourcelock/sourcelock_test.go b/internal/sourcelock/sourcelock_test.go
+new file mode 100644
+index 0000000..4fb4ccd
+--- /dev/null
++++ b/internal/sourcelock/sourcelock_test.go
+@@ -0,0 +1,918 @@
++package sourcelock
++
++import (
++	"bytes"
++	"encoding/json"
++	"os"
++	"path/filepath"
++	"runtime"
++	"sort"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/contextlock"
++	"github.com/relux-works/curator/internal/manifest"
++	"github.com/relux-works/curator/internal/protocoljson"
++)
++
++// Golden vectors below were cross-checked against an independent Python
++// CCJ-1/SHA-256 implementation (/tmp/ccj_check.py): the Go digests must
++// equal the Python digests byte for byte.
++
++// goldenManifest is intentionally pretty-printed with unsorted keys: the
++// digest runs over the parsed value, not the bytes.
++const goldenManifest = `{
++  "skills": [
++    {"name": "review", "from": "team", "directory": "skills/review"},
++    {"from": "project", "directory": "skills", "include": ["docs"]}
++  ],
++  "schema_version": 2,
++  "sources": {
++    "team": {"tag": "v1.2.0", "git": "https://example.org/kit.git"},
++    "project": {"path": "./agents"}
++  }
++}`
++
++const (
++	goldenManifestSHA256 = "sha256:f38287608ffb1dc5ba62508a9afb6c9633544b38e013255f2a0ef724cc327066"
++	goldenLockSHA256     = "sha256:f8541eccf52e7f2c479b1648bf386af4f554540272fde09fbe1741304889871b"
++	goldenLocalDigest    = "sha256:ec6b66e6d2ad7cf7ae1cedebf98bb577292ae09821e956ce124fca5f6fba38ec"
++	goldenNetworkDigest  = "sha256:c98205a2e34d49dbf04222c6fc399cc99745ff55461dc56e65aea937f02618bc"
++	goldenConfigDigest   = "sha256:9d406e20e4faa6d678b04b5ff4dfa99791938a57dcc615e0823d93f19747d681"
++)
++
++func index(i int) *int { return &i }
++
++func repeat(s string, n int) string {
++	out := ""
++	for i := 0; i < n; i++ {
++		out += s
++	}
++	return out
++}
++
++// goldenMembers returns the three-arm closure in deliberately unsorted
++// order: New must sort it into canonical order.
++func goldenMembers() []Member {
++	local, err := LocalPackage("sha256:" + repeat("11", 32))
++	if err != nil {
++		panic(err)
++	}
++	network, err := NetworkGitPackage("example.org/kit", Commit{ObjectFormat: "sha1", Hex: repeat("0", 40)}, "skills/review")
++	if err != nil {
++		panic(err)
++	}
++	configured, err := ConfiguredGitPackage("team/audit-helper", Commit{ObjectFormat: "sha256", Hex: repeat("ab", 32)})
++	if err != nil {
++		panic(err)
++	}
++	return []Member{
++		{Name: "review", Selection: index(0), Directory: "skills/review", Package: network, ContentSHA256: "sha256:" + repeat("33", 32)},
++		{Name: "docs", Selection: index(1), Directory: "skills/docs", Package: local, ContentSHA256: "sha256:" + repeat("22", 32)},
++		{Name: "audit-helper", Selection: nil, Directory: ".", Package: configured, ContentSHA256: "sha256:" + repeat("44", 32)},
++	}
++}
++
++func mustGoldenLock(t *testing.T) *Lock {
++	t.Helper()
++	lock, err := New(goldenManifestSHA256, goldenMembers())
++	if err != nil {
++		t.Fatalf("New golden lock: %v", err)
++	}
++	return lock
++}
++
++func mustCanonical(t *testing.T, value any) []byte {
++	t.Helper()
++	canonical, err := protocoljson.MarshalCanonical(value)
++	if err != nil {
++		t.Fatalf("marshal canonical: %v", err)
++	}
++	return canonical
++}
++
++func TestManifestDigestGolden(t *testing.T) {
++	payload := []byte(goldenManifest)
++	parsed, err := manifest.ParseBytesWithOptions(payload, "Skillfile.json", manifest.ParseOptions{DraftSourcesV1: true})
++	if err != nil {
++		t.Fatalf("golden manifest must parse as draft schema 2: %v", err)
++	}
++	if parsed.SchemaVersion != 2 || len(parsed.Skills) != 2 {
++		t.Fatalf("unexpected golden manifest shape: %+v", parsed)
++	}
++	digest, err := ManifestDigest(payload)
++	if err != nil {
++		t.Fatalf("ManifestDigest: %v", err)
++	}
++	if digest != goldenManifestSHA256 {
++		t.Fatalf("manifest digest = %s, want %s", digest, goldenManifestSHA256)
++	}
++}
++
++func TestNewSortsMembersAndSealsDigest(t *testing.T) {
++	lock := mustGoldenLock(t)
++	var names []string
++	for _, member := range lock.Members {
++		names = append(names, member.Name)
++	}
++	if strings.Join(names, ",") != "audit-helper,docs,review" {
++		t.Fatalf("member order = %v, want canonical UTF-8 order", names)
++	}
++	if lock.LockSHA256 != goldenLockSHA256 {
++		t.Fatalf("lock_sha256 = %s, want %s", lock.LockSHA256, goldenLockSHA256)
++	}
++	digest, err := lock.Digest()
++	if err != nil {
++		t.Fatalf("Digest: %v", err)
++	}
++	if digest != goldenLockSHA256 {
++		t.Fatalf("Digest = %s, want %s", digest, goldenLockSHA256)
++	}
++	if err := lock.Validate(); err != nil {
++		t.Fatalf("Validate: %v", err)
++	}
++}
++
++func TestPackageDigestsGolden(t *testing.T) {
++	lock := mustGoldenLock(t)
++	want := map[string]string{
++		"docs":         goldenLocalDigest,
++		"review":       goldenNetworkDigest,
++		"audit-helper": goldenConfigDigest,
++	}
++	for _, member := range lock.Members {
++		digest, err := member.Package.Digest()
++		if err != nil {
++			t.Fatalf("Digest %s: %v", member.Name, err)
++		}
++		if digest != want[member.Name] {
++			t.Fatalf("package digest %s = %s, want %s", member.Name, digest, want[member.Name])
++		}
++	}
++}
++
++func TestWriteReadRoundTrip(t *testing.T) {
++	dir := t.TempDir()
++	path := PathIn(dir)
++	if filepath.Base(path) != FileName || FileName != "Skillfile.lock.json" {
++		t.Fatalf("lock file name = %s", path)
++	}
++	want := mustGoldenLock(t)
++	if err := Write(path, want); err != nil {
++		t.Fatalf("Write: %v", err)
++	}
++	info, err := os.Stat(path)
++	if err != nil {
++		t.Fatalf("stat lock: %v", err)
++	}
++	// Windows only honors the owner-write bit; exact Unix modes are
++	// asserted off Windows, following the repository convention.
++	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o644 {
++		t.Fatalf("lock mode = %o, want 644", info.Mode().Perm())
++	}
++	payload, err := os.ReadFile(path)
++	if err != nil {
++		t.Fatalf("read lock: %v", err)
++	}
++	if err := protocoljson.RequireCanonical(payload); err != nil {
++		t.Fatalf("lock bytes are not canonical: %v", err)
++	}
++	got, err := Read(path)
++	if err != nil {
++		t.Fatalf("Read: %v", err)
++	}
++	if string(mustCanonical(t, got.Object())) != string(mustCanonical(t, want.Object())) {
++		t.Fatalf("round trip changed the lock value")
++	}
++	if got.Members[1].Selection == nil || *got.Members[1].Selection != 1 {
++		t.Fatalf("selection index did not survive the round trip")
++	}
++	if got.Members[0].Selection != nil {
++		t.Fatalf("null transitive selection became %v", *got.Members[0].Selection)
++	}
++}
++
++func TestReadMissing(t *testing.T) {
++	_, err := Read(filepath.Join(t.TempDir(), FileName))
++	if !os.IsNotExist(err) {
++		t.Fatalf("missing lock err = %v, want IsNotExist", err)
++	}
++}
++
++func TestParseAcceptsPrettyPrinted(t *testing.T) {
++	want := mustGoldenLock(t)
++	pretty, err := json.MarshalIndent(want.Object(), "", "  ")
++	if err != nil {
++		t.Fatalf("indent: %v", err)
++	}
++	got, err := Parse(pretty)
++	if err != nil {
++		t.Fatalf("Parse pretty-printed lock: %v", err)
++	}
++	if string(mustCanonical(t, got.Object())) != string(mustCanonical(t, want.Object())) {
++		t.Fatalf("pretty-printed parse changed the lock value")
++	}
++}
++
++func TestCheckStale(t *testing.T) {
++	lock := mustGoldenLock(t)
++	if err := lock.CheckStale([]byte(goldenManifest)); err != nil {
++		t.Fatalf("fresh lock reported stale: %v", err)
++	}
++	if err := lock.CheckStaleDigest(goldenManifestSHA256); err != nil {
++		t.Fatalf("fresh digest reported stale: %v", err)
++	}
++	changed := strings.Replace(goldenManifest, `"v1.2.0"`, `"v1.2.1"`, 1)
++	if err := lock.CheckStale([]byte(changed)); err == nil || !strings.Contains(err.Error(), "source_lock_stale") {
++		t.Fatalf("changed manifest err = %v, want source_lock_stale", err)
++	}
++	if err := lock.CheckStaleDigest("sha256:" + repeat("00", 32)); err == nil || !strings.Contains(err.Error(), "source_lock_stale") {
++		t.Fatalf("wrong digest err = %v, want source_lock_stale", err)
++	}
++	// Whitespace alone is not a manifest change: the digest runs over the value.
++	relaxed := strings.ReplaceAll(goldenManifest, " ", "")
++	if err := lock.CheckStale([]byte(relaxed)); err != nil {
++		t.Fatalf("whitespace-only change reported stale: %v", err)
++	}
++}
++
++func lockPayload(t *testing.T, mutate func(obj map[string]any)) []byte {
++	t.Helper()
++	var obj map[string]any
++	raw, err := json.Marshal(mustGoldenLock(t).Object())
++	if err != nil {
++		t.Fatalf("marshal base lock: %v", err)
++	}
++	if err := json.Unmarshal(raw, &obj); err != nil {
++		t.Fatalf("unmarshal base lock: %v", err)
++	}
++	if mutate != nil {
++		mutate(obj)
++	}
++	payload, err := json.Marshal(obj)
++	if err != nil {
++		t.Fatalf("marshal mutated lock: %v", err)
++	}
++	return payload
++}
++
++func memberAt(obj map[string]any, i int) map[string]any {
++	return obj["members"].([]any)[i].(map[string]any)
++}
++
++func TestMalformedLocks(t *testing.T) {
++	cases := []struct {
++		name      string
++		payload   func(t *testing.T) []byte
++		wantClass string
++	}{
++		{"garbage", func(*testing.T) []byte { return []byte("{not json") }, "source_selection_invalid"},
++		{"trailing-data", func(*testing.T) []byte { return []byte("{} {}") }, "source_selection_invalid"},
++		{"duplicate-keys", func(*testing.T) []byte {
++			return []byte(`{"schema_version":1,"schema_version":1,"manifest_sha256":"x","members":[],"lock_sha256":"y"}`)
++		}, "source_selection_invalid"},
++		{"top-level-array", func(*testing.T) []byte { return []byte("[]") }, "source_selection_invalid"},
++		{"unknown-top-level", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { obj["unexpected"] = true })
++		}, "source_selection_invalid"},
++		{"schema-version-2", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { obj["schema_version"] = float64(2) })
++		}, "source_selection_invalid"},
++		{"schema-version-string", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { obj["schema_version"] = "1" })
++		}, "source_selection_invalid"},
++		{"manifest-digest-bare", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { obj["manifest_sha256"] = repeat("ab", 32) })
++		}, "source_selection_invalid"},
++		{"members-missing", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { delete(obj, "members") })
++		}, "source_selection_invalid"},
++		{"member-unknown-field", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 0)["location"] = "/tmp/x" })
++		}, "source_member_invalid"},
++		{"member-machine-endpoint", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 2)["endpoint"] = "https://example.org/kit.git" })
++		}, "source_member_invalid"},
++		{"member-missing-selection", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { delete(memberAt(obj, 0), "selection") })
++		}, "source_selection_invalid"},
++		{"selection-negative", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 1)["selection"] = float64(-1) })
++		}, "source_selection_invalid"},
++		{"selection-fraction", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 1)["selection"] = 1.5 })
++		}, "source_selection_invalid"},
++		{"selection-string", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 1)["selection"] = "1" })
++		}, "source_selection_invalid"},
++		{"name-empty", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 0)["name"] = "" })
++		}, "source_member_invalid"},
++		{"name-reserved", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 0)["name"] = "CON" })
++		}, "source_member_invalid"},
++		{"directory-absolute", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 1)["directory"] = "/tmp/x" })
++		}, "source_member_invalid"},
++		{"directory-glob", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 1)["directory"] = "skills/*" })
++		}, "source_member_invalid"},
++		{"content-bare", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { memberAt(obj, 0)["content_sha256"] = repeat("44", 32) })
++		}, "source_member_invalid"},
++		{"lock-digest-missing", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) { delete(obj, "lock_sha256") })
++		}, "source_selection_invalid"},
++		{"lock-digest-tampered-member", func(t *testing.T) []byte {
++			return lockPayload(t, func(obj map[string]any) {
++				memberAt(obj, 0)["content_sha256"] = "sha256:" + repeat("55", 32)
++			})
++		}, "source_selection_invalid"},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			_, err := Parse(tc.payload(t))
++			if err == nil {
++				t.Fatalf("Parse accepted %s", tc.name)
++			}
++			if !strings.Contains(err.Error(), tc.wantClass) {
++				t.Fatalf("err = %v, want class %s", err, tc.wantClass)
++			}
++		})
++	}
++}
++
++func TestDuplicateNamesConflict(t *testing.T) {
++	members := goldenMembers()
++	members = append(members, members[0])
++	if _, err := New(goldenManifestSHA256, members); err == nil || !strings.Contains(err.Error(), "source_name_conflict") {
++		t.Fatalf("exact duplicate err = %v, want source_name_conflict", err)
++	}
++	folded := goldenMembers()
++	alias := folded[0]
++	alias.Name = "REVIEW"
++	alias.ContentSHA256 = "sha256:" + repeat("34", 32)
++	folded = append(folded, alias)
++	if _, err := New(goldenManifestSHA256, folded); err == nil || !strings.Contains(err.Error(), "source_name_conflict") {
++		t.Fatalf("case-fold duplicate err = %v, want source_name_conflict", err)
++	}
++	payload := lockPayload(t, func(obj map[string]any) {
++		dup := memberAt(obj, 0)
++		obj["members"] = []any{dup, dup}
++	})
++	if _, err := Parse(payload); err == nil || !strings.Contains(err.Error(), "source_name_conflict") {
++		t.Fatalf("parsed duplicate err = %v, want source_name_conflict", err)
++	}
++}
++
++func TestUnsortedMembersRejected(t *testing.T) {
++	lock := mustGoldenLock(t)
++	raw, err := json.Marshal(lock.Object())
++	if err != nil {
++		t.Fatalf("marshal: %v", err)
++	}
++	var obj map[string]any
++	if err := json.Unmarshal(raw, &obj); err != nil {
++		t.Fatalf("unmarshal: %v", err)
++	}
++	members := obj["members"].([]any)
++	obj["members"] = []any{members[2], members[1], members[0]}
++	payload, err := json.Marshal(obj)
++	if err != nil {
++		t.Fatalf("marshal: %v", err)
++	}
++	_, err = Parse(payload)
++	if err == nil || !strings.Contains(err.Error(), "source_selection_invalid") {
++		t.Fatalf("unsorted members err = %v, want source_selection_invalid", err)
++	}
++}
++
++func TestThreeArmsRoundTrip(t *testing.T) {
++	sha1 := Commit{ObjectFormat: "sha1", Hex: repeat("0", 40)}
++	sha256 := Commit{ObjectFormat: "sha256", Hex: repeat("ab", 32)}
++	local, err := LocalPackage("sha256:" + repeat("11", 32))
++	if err != nil {
++		t.Fatalf("LocalPackage: %v", err)
++	}
++	network, err := NetworkGitPackage("example.org/kit", sha1, "skills/review")
++	if err != nil {
++		t.Fatalf("NetworkGitPackage: %v", err)
++	}
++	configured, err := ConfiguredGitPackage("team/review", sha256)
++	if err != nil {
++		t.Fatalf("ConfiguredGitPackage: %v", err)
++	}
++	if local.IsGit() || !network.IsGit() || !configured.IsGit() {
++		t.Fatalf("arm predicates confused: %+v %+v %+v", local, network, configured)
++	}
++	lock, err := New(goldenManifestSHA256, []Member{
++		{Name: "a-local", Selection: index(0), Directory: ".", Package: local, ContentSHA256: "sha256:" + repeat("01", 32)},
++		{Name: "b-network", Selection: index(1), Directory: "skills/review", Package: network, ContentSHA256: "sha256:" + repeat("02", 32)},
++		{Name: "c-configured", Selection: nil, Directory: ".", Package: configured, ContentSHA256: "sha256:" + repeat("03", 32)},
++	})
++	if err != nil {
++		t.Fatalf("New: %v", err)
++	}
++	parsed, err := Parse(mustCanonical(t, lock.Object()))
++	if err != nil {
++		t.Fatalf("Parse: %v", err)
++	}
++	for _, name := range []string{"a-local", "b-network", "c-configured"} {
++		want, _ := lock.Find(name)
++		got, ok := parsed.Find(name)
++		if !ok || !got.equalRecord(want) {
++			t.Fatalf("member %s did not survive the round trip", name)
++		}
++	}
++}
++
++func packageAt(obj map[string]any, i int) map[string]any {
++	return memberAt(obj, i)["package"].(map[string]any)
++}
++
++func TestCrossArmConfusionRejected(t *testing.T) {
++	// Member indexes in canonical order: 0 audit-helper (configured),
++	// 1 docs (local), 2 review (network).
++	cases := []struct {
++		name   string
++		mutate func(obj map[string]any)
++	}{
++		{"local-with-commit", func(obj map[string]any) {
++			packageAt(obj, 1)["commit"] = map[string]any{"object_format": "sha1", "hex": repeat("0", 40)}
++		}},
++		{"local-with-repository", func(obj map[string]any) {
++			packageAt(obj, 1)["repository"] = "example.org/kit"
++		}},
++		{"local-with-source", func(obj map[string]any) {
++			packageAt(obj, 1)["source"] = "team/docs"
++		}},
++		{"local-with-directory", func(obj map[string]any) {
++			packageAt(obj, 1)["directory"] = "."
++		}},
++		{"local-missing-snapshot", func(obj map[string]any) {
++			delete(packageAt(obj, 1), "snapshot")
++		}},
++		{"local-bare-snapshot", func(obj map[string]any) {
++			packageAt(obj, 1)["snapshot"] = repeat("11", 32)
++		}},
++		{"network-with-snapshot", func(obj map[string]any) {
++			packageAt(obj, 2)["snapshot"] = "sha256:" + repeat("11", 32)
++		}},
++		{"network-with-source", func(obj map[string]any) {
++			packageAt(obj, 2)["source"] = "team/review"
++		}},
++		{"network-missing-commit", func(obj map[string]any) {
++			delete(packageAt(obj, 2), "commit")
++		}},
++		{"network-missing-directory", func(obj map[string]any) {
++			delete(packageAt(obj, 2), "directory")
++		}},
++		{"network-endpoint-smuggled", func(obj map[string]any) {
++			packageAt(obj, 2)["url"] = "https://example.org/kit.git"
++		}},
++		{"configured-with-repository", func(obj map[string]any) {
++			packageAt(obj, 0)["repository"] = "example.org/kit"
++		}},
++		{"configured-with-snapshot", func(obj map[string]any) {
++			packageAt(obj, 0)["snapshot"] = "sha256:" + repeat("11", 32)
++		}},
++		{"configured-nonroot-directory", func(obj map[string]any) {
++			packageAt(obj, 0)["directory"] = "sub"
++		}},
++		{"unknown-kind", func(obj map[string]any) {
++			packageAt(obj, 1)["kind"] = "git"
++		}},
++		{"commit-extra-field", func(obj map[string]any) {
++			packageAt(obj, 2)["commit"].(map[string]any)["snapshot"] = "sha256:" + repeat("11", 32)
++		}},
++		{"commit-missing-hex", func(obj map[string]any) {
++			delete(packageAt(obj, 2)["commit"].(map[string]any), "hex")
++		}},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			_, err := Parse(lockPayload(t, tc.mutate))
++			if err == nil {
++				t.Fatalf("Parse accepted %s", tc.name)
++			}
++			if !strings.Contains(err.Error(), "source_member_invalid") && !strings.Contains(err.Error(), "source_selection_invalid") {
++				t.Fatalf("err = %v, want a source selection/member diagnostic", err)
++			}
++		})
++	}
++	// A hand-built struct must not smuggle Git fields into a local arm either.
++	smuggled := Package{Kind: KindLocalSnapshot, Snapshot: "sha256:" + repeat("11", 32), Commit: Commit{ObjectFormat: "sha1", Hex: repeat("0", 40)}}
++	if err := smuggled.Validate("package"); err == nil {
++		t.Fatalf("Validate accepted a local package carrying a commit")
++	}
++	if _, err := LocalPackage(repeat("11", 32)); err == nil {
++		t.Fatalf("LocalPackage accepted a bare-hex snapshot")
++	}
++}
++
++func TestCommitValidation(t *testing.T) {
++	cases := []struct {
++		name   string
++		commit Commit
++		valid  bool
++	}{
++		{"sha1", Commit{ObjectFormat: "sha1", Hex: repeat("0", 40)}, true},
++		{"sha256", Commit{ObjectFormat: "sha256", Hex: repeat("ab", 32)}, true},
++		{"sha1-long", Commit{ObjectFormat: "sha1", Hex: repeat("0", 64)}, false},
++		{"sha256-short", Commit{ObjectFormat: "sha256", Hex: repeat("0", 40)}, false},
++		{"uppercase", Commit{ObjectFormat: "sha1", Hex: repeat("A", 40)}, false},
++		{"prefixed", Commit{ObjectFormat: "sha1", Hex: "sha256:" + repeat("0", 40)}, false},
++		{"snapshot-in-commit", Commit{ObjectFormat: "sha256", Hex: ""}, false},
++		{"bad-format", Commit{ObjectFormat: "md5", Hex: repeat("0", 32)}, false},
++		{"empty", Commit{}, false},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			_, err := NetworkGitPackage("example.org/kit", tc.commit, "skills/review")
++			if tc.valid && err != nil {
++				t.Fatalf("valid commit rejected: %v", err)
++			}
++			if !tc.valid && err == nil {
++				t.Fatalf("invalid commit accepted")
++			}
++		})
++	}
++}
++
++func TestDirectoryAgreement(t *testing.T) {
++	network, err := NetworkGitPackage("example.org/kit", Commit{ObjectFormat: "sha1", Hex: repeat("0", 40)}, "skills/review")
++	if err != nil {
++		t.Fatalf("NetworkGitPackage: %v", err)
++	}
++	disagree := Member{Name: "review", Selection: index(0), Directory: "skills/other", Package: network, ContentSHA256: "sha256:" + repeat("33", 32)}
++	if err := disagree.Validate("members[0]"); err == nil || !strings.Contains(err.Error(), "source_member_invalid") {
++		t.Fatalf("directory disagreement err = %v, want source_member_invalid", err)
++	}
++	agree := disagree
++	agree.Directory = "skills/review"
++	if err := agree.Validate("members[0]"); err != nil {
++		t.Fatalf("agreeing directories rejected: %v", err)
++	}
++	configured, err := ConfiguredGitPackage("team/review", Commit{ObjectFormat: "sha1", Hex: repeat("0", 40)})
++	if err != nil {
++		t.Fatalf("ConfiguredGitPackage: %v", err)
++	}
++	legacy := Member{Name: "review", Selection: index(0), Directory: "sub", Package: configured, ContentSHA256: "sha256:" + repeat("33", 32)}
++	if err := legacy.Validate("members[0]"); err == nil {
++		t.Fatalf("configured-git with non-root member directory accepted")
++	}
++	legacy.Directory = "."
++	if err := legacy.Validate("members[0]"); err != nil {
++		t.Fatalf("legacy root directory rejected: %v", err)
++	}
++}
++
++func TestRepositoryValidation(t *testing.T) {
++	commit := Commit{ObjectFormat: "sha1", Hex: repeat("0", 40)}
++	valid := []string{"example.org/kit", "github.com/acme/kit", "git.example-codec-1.internal/a/b/c"}
++	for _, repo := range valid {
++		if _, err := NetworkGitPackage(repo, commit, "."); err != nil {
++			t.Fatalf("repository %q rejected: %v", repo, err)
++		}
++	}
++	invalid := []string{
++		"",
++		"Example.org/kit",
++		"example.org:8080/kit",
++		"example.org/kit?.git",
++		"example.org/kit with space",
++		"example.org/kit%20x",
++		"example.org",
++		"example.org/../kit",
++		"https://example.org/kit",
++		"example.org/kit.git",
++		"github.com/acme/kit.git",
++		"example.org/" + repeat("a", 4096),
++	}
++	for _, repo := range invalid {
++		if _, err := NetworkGitPackage(repo, commit, "."); err == nil {
++			t.Fatalf("repository %q accepted", repo)
++		}
++	}
++}
++
++// TestNoncanonicalRepositoryRejected pins repository-transport revision 1
++// §1 for the lock: a member repository MUST already be canonical, so a
++// terminal ".git" is rejected by New, Write, Parse and Read alike. The
++// persisted payload carries a correctly recomputed lock_sha256, proving
++// the rejection is normalization (source_member_invalid on the
++// repository), not an integrity mismatch.
++func TestNoncanonicalRepositoryRejected(t *testing.T) {
++	commit := Commit{ObjectFormat: "sha1", Hex: repeat("0", 40)}
++	if _, err := NetworkGitPackage("example.org/kit.git", commit, "skills/review"); err == nil ||
++		!strings.Contains(err.Error(), "source_member_invalid") || !strings.Contains(err.Error(), "repository") {
++		t.Fatalf("NetworkGitPackage .git err = %v, want source_member_invalid on repository", err)
++	}
++	members := goldenMembers()
++	for i := range members {
++		if members[i].Package.Kind == KindNetworkGit {
++			members[i].Package.Repository = "example.org/kit.git"
++		}
++	}
++	if _, err := New(goldenManifestSHA256, members); err == nil ||
++		!strings.Contains(err.Error(), "source_member_invalid") {
++		t.Fatalf("New .git err = %v, want source_member_invalid", err)
++	}
++	// Canonical member order isolates the repository as the only defect.
++	sort.SliceStable(members, func(i, j int) bool {
++		return bytes.Compare([]byte(members[i].Name), []byte(members[j].Name)) < 0
++	})
++	raw := &Lock{ManifestSHA256: goldenManifestSHA256, Members: members}
++	digest, err := raw.digest()
++	if err != nil {
++		t.Fatalf("digest of .git lock: %v", err)
++	}
++	raw.LockSHA256 = digest
++	assertNormalization := func(stage string, err error) {
++		t.Helper()
++		if err == nil || !strings.Contains(err.Error(), "source_member_invalid") ||
++			!strings.Contains(err.Error(), "repository") {
++			t.Fatalf("%s err = %v, want source_member_invalid on repository", stage, err)
++		}
++		if strings.Contains(err.Error(), "lock_sha256 mismatch") {
++			t.Fatalf("%s failed integrity instead of normalization: %v", stage, err)
++		}
++	}
++	assertNormalization("Write", Write(PathIn(t.TempDir()), raw))
++	payload := mustCanonical(t, raw.Object())
++	assertNormalization("Parse", func() error { _, err := Parse(payload); return err }())
++	diskPath := PathIn(t.TempDir())
++	if err := os.WriteFile(diskPath, payload, 0o644); err != nil {
++		t.Fatalf("stage .git lock on disk: %v", err)
++	}
++	assertNormalization("Read", func() error { _, err := Read(diskPath); return err }())
++	// Positive control: the canonical spelling without ".git" stays valid.
++	if _, err := NetworkGitPackage("example.org/kit", commit, "skills/review"); err != nil {
++		t.Fatalf("canonical repository rejected: %v", err)
++	}
++}
++
++func TestSelectionSemantics(t *testing.T) {
++	local, err := LocalPackage("sha256:" + repeat("11", 32))
++	if err != nil {
++		t.Fatalf("LocalPackage: %v", err)
++	}
++	// Collection siblings share one selection index; a transitive member
++	// carries null. Index 0 must never read as null.
++	lock, err := New(goldenManifestSHA256, []Member{
++		{Name: "sib-a", Selection: index(1), Directory: "skills/sib-a", Package: local, ContentSHA256: "sha256:" + repeat("22", 32)},
++		{Name: "sib-b", Selection: index(1), Directory: "skills/sib-b", Package: local, ContentSHA256: "sha256:" + repeat("23", 32)},
++		{Name: "root-zero", Selection: index(0), Directory: ".", Package: local, ContentSHA256: "sha256:" + repeat("24", 32)},
++		{Name: "transitive", Selection: nil, Directory: ".", Package: local, ContentSHA256: "sha256:" + repeat("25", 32)},
++	})
++	if err != nil {
++		t.Fatalf("New: %v", err)
++	}
++	parsed, err := Parse(mustCanonical(t, lock.Object()))
++	if err != nil {
++		t.Fatalf("Parse: %v", err)
++	}
++	zero, _ := parsed.Find("root-zero")
++	if zero.Selection == nil || *zero.Selection != 0 {
++		t.Fatalf("selection 0 confused with null")
++	}
++	transitive, _ := parsed.Find("transitive")
++	if transitive.Selection != nil {
++		t.Fatalf("null selection became %d", *transitive.Selection)
++	}
++	asRoot := transitive
++	asRoot.Selection = index(2)
++	if err := parsed.CheckMembership([]Member{asRoot}); err == nil || !strings.Contains(err.Error(), "source_member_invalid") {
++		t.Fatalf("null-vs-index substitution err = %v, want source_member_invalid", err)
++	}
++}
++
++func TestEmptyMembers(t *testing.T) {
++	lock, err := New(goldenManifestSHA256, nil)
++	if err != nil {
++		t.Fatalf("empty lock rejected: %v", err)
++	}
++	parsed, err := Parse(mustCanonical(t, lock.Object()))
++	if err != nil {
++		t.Fatalf("Parse empty lock: %v", err)
++	}
++	if len(parsed.Members) != 0 {
++		t.Fatalf("empty lock gained members")
++	}
++	if err := parsed.CheckNames(nil); err != nil {
++		t.Fatalf("empty coverage rejected: %v", err)
++	}
++	if err := parsed.CheckNames([]string{"x"}); err == nil || !strings.Contains(err.Error(), "source_member_missing") {
++		t.Fatalf("empty lock coverage err = %v, want source_member_missing", err)
++	}
++}
++
++func TestCheckNames(t *testing.T) {
++	lock := mustGoldenLock(t)
++	if err := lock.CheckNames([]string{"review", "docs", "audit-helper"}); err != nil {
++		t.Fatalf("exact coverage rejected: %v", err)
++	}
++	// A plan name outside the lock is missing; a locked name outside the
++	// plan is stale. Callers pass manifest expansion, never live
++	// filesystem members, so live extras never widen the frozen set.
++	if err := lock.CheckNames([]string{"docs", "review", "audit-helper", "docs-extra"}); err == nil || !strings.Contains(err.Error(), "source_member_missing") {
++		t.Fatalf("extra plan name err = %v, want source_member_missing", err)
++	}
++	if err := lock.CheckNames([]string{"review"}); err == nil || !strings.Contains(err.Error(), "source_lock_stale") {
++		t.Fatalf("extra locked member err = %v, want source_lock_stale", err)
++	}
++}
++
++func TestCheckMembership(t *testing.T) {
++	lock := mustGoldenLock(t)
++	if err := lock.CheckMembership(goldenMembers()); err != nil {
++		t.Fatalf("exact membership rejected: %v", err)
++	}
++	missing := goldenMembers()[:2]
++	if err := lock.CheckMembership(missing); err == nil || !strings.Contains(err.Error(), "source_lock_stale") {
++		t.Fatalf("narrow plan err = %v, want source_lock_stale", err)
++	}
++	extra := append(append([]Member(nil), goldenMembers()...), Member{Name: "stowaway"})
++	if err := lock.CheckMembership(extra); err == nil || !strings.Contains(err.Error(), "source_member_missing") {
++		t.Fatalf("stowaway err = %v, want source_member_missing", err)
++	}
++	differ := func(mutate func(*Member)) []Member {
++		members := append([]Member(nil), goldenMembers()...)
++		for i := range members {
++			if members[i].Name == "review" {
++				mutate(&members[i])
++			}
++		}
++		return members
++	}
++	cases := map[string][]Member{
++		"directory": differ(func(m *Member) { m.Directory = "skills/other" }),
++		"commit": differ(func(m *Member) {
++			m.Package.Commit = Commit{ObjectFormat: "sha1", Hex: repeat("1", 40)}
++		}),
++		"content":   differ(func(m *Member) { m.ContentSHA256 = "sha256:" + repeat("99", 32) }),
++		"selection": differ(func(m *Member) { m.Selection = index(7) }),
++		"kind": differ(func(m *Member) {
++			m.Package.Kind = KindLocalSnapshot
++			m.Package.Snapshot = "sha256:" + repeat("11", 32)
++		}),
++	}
++	for name, expected := range cases {
++		if err := lock.CheckMembership(expected); err == nil || !strings.Contains(err.Error(), "source_member_invalid") {
++			t.Fatalf("%s drift err = %v, want source_member_invalid", name, err)
++		}
++	}
++}
++
++func TestFind(t *testing.T) {
++	lock := mustGoldenLock(t)
++	member, ok := lock.Find("docs")
++	if !ok || member.Name != "docs" {
++		t.Fatalf("Find missed a locked member")
++	}
++	if _, ok := lock.Find("nope"); ok {
++		t.Fatalf("Find returned an unlocked member")
++	}
++	var nilLock *Lock
++	if _, ok := nilLock.Find("docs"); ok {
++		t.Fatalf("Find on nil lock succeeded")
++	}
++}
++
++func TestNilGuards(t *testing.T) {
++	var lock *Lock
++	if err := lock.Validate(); err == nil {
++		t.Fatalf("nil Validate accepted")
++	}
++	if _, err := lock.Digest(); err == nil {
++		t.Fatalf("nil Digest accepted")
++	}
++	if err := lock.CheckStale([]byte(goldenManifest)); err == nil {
++		t.Fatalf("nil CheckStale accepted")
++	}
++	if err := lock.CheckNames(nil); err == nil {
++		t.Fatalf("nil CheckNames accepted")
++	}
++	if err := lock.CheckMembership(nil); err == nil {
++		t.Fatalf("nil CheckMembership accepted")
++	}
++	if err := Write(filepath.Join(t.TempDir(), FileName), nil); err == nil {
++		t.Fatalf("Write nil lock accepted")
++	}
++	if _, err := ManifestDigest(nil); err == nil {
++		t.Fatalf("ManifestDigest accepted empty input")
++	}
++	if _, err := ManifestDigest([]byte(`[]`)); err == nil {
++		t.Fatalf("ManifestDigest accepted a non-object")
++	}
++}
++
++func objectKeys(value map[string]any) []string {
++	var keys []string
++	for key := range value {
++		keys = append(keys, key)
++	}
++	return keys
++}
++
++func TestMachineSeparation(t *testing.T) {
++	lock := mustGoldenLock(t)
++	top := map[string]bool{}
++	for _, key := range objectKeys(lock.Object()) {
++		top[key] = true
++	}
++	for _, key := range []string{"schema_version", "manifest_sha256", "members", "lock_sha256"} {
++		if !top[key] || len(top) != 4 {
++			t.Fatalf("lock object keys = %v", objectKeys(lock.Object()))
++		}
++	}
++	for _, member := range lock.Members {
++		obj := member.object()
++		fields := map[string]bool{}
++		for _, key := range objectKeys(obj) {
++			fields[key] = true
++		}
++		for _, key := range []string{"name", "selection", "directory", "package", "content_sha256"} {
++			if !fields[key] || len(fields) != 5 {
++				t.Fatalf("member %s object keys = %v", member.Name, objectKeys(obj))
++			}
++		}
++		packageObj := member.Package.object()
++		pfields := map[string]bool{}
++		for _, key := range objectKeys(packageObj) {
++			pfields[key] = true
++		}
++		var want []string
++		switch member.Package.Kind {
++		case KindLocalSnapshot:
++			want = []string{"kind", "snapshot"}
++		case KindNetworkGit:
++			want = []string{"kind", "repository", "commit", "directory"}
++		case KindConfiguredGit:
++			want = []string{"kind", "source", "commit", "directory"}
++		}
++		for _, key := range want {
++			if !pfields[key] || len(pfields) != len(want) {
++				t.Fatalf("package %s object keys = %v", member.Name, objectKeys(packageObj))
++			}
++		}
++	}
++	// No absolute path, endpoint, or credential-adjacent field may appear
++	// in the portable bytes.
++	raw := string(mustCanonical(t, lock.Object()))
++	for _, forbidden := range []string{"/tmp/", "https://", "ssh://", "location", "endpoint", "authentication", ".git"} {
++		if strings.Contains(raw, forbidden) {
++			t.Fatalf("lock bytes contain %q", forbidden)
++		}
++	}
++}
++
++func TestRebindingPreservesIdentity(t *testing.T) {
++	lock := mustGoldenLock(t)
++	member, _ := lock.Find("docs")
++	first, err := member.Package.Digest()
++	if err != nil {
++		t.Fatalf("Digest: %v", err)
++	}
++	again, err := member.Package.Digest()
++	if err != nil || again != first {
++		t.Fatalf("package digest unstable: %s vs %s", first, again)
++	}
++	// The same lock generation binds fresh machine locations on two
++	// machines without changing portable identity. Locations come from
++	// t.TempDir so they are absolute on every platform.
++	for _, machine := range []string{"machine-a", "machine-b"} {
++		location := filepath.Join(t.TempDir(), machine, "skills")
++		bindings, err := NewBindings(lock.LockSHA256, map[string]SourceBinding{
++			"project": {Location: location},
++		})
++		if err != nil {
++			t.Fatalf("NewBindings: %v", err)
++		}
++		if err := bindings.CheckFresh(lock); err != nil {
++			t.Fatalf("rebound bindings rejected: %v", err)
++		}
++	}
++}
++
++func TestContextLockConfusion(t *testing.T) {
++	// A context lock (environments capability) must never parse as a
++	// package lock, and a package lock must never parse as a context lock.
++	context := &contextlock.Lock{
++		Root: "app",
++		Members: []contextlock.Member{
++			{Kind: contextlock.KindContext, Name: "app", Version: "1.0.0", StateHash: repeat("aa", 32), RequiredBy: []string{}},
++		},
++	}
++	contextBytes, err := context.Canonical()
++	if err != nil {
++		t.Fatalf("context Canonical: %v", err)
++	}
++	if _, err := Parse(contextBytes); err == nil {
++		t.Fatalf("package lock parser accepted a context lock")
++	}
++	packageBytes := mustCanonical(t, mustGoldenLock(t).Object())
++	if _, err := contextlock.Parse(packageBytes); err == nil {
++		t.Fatalf("context lock parser accepted a package lock")
++	}
++}

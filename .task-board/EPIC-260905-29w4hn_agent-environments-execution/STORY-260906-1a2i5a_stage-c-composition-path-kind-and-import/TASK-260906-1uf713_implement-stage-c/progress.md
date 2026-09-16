@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -211,6 +211,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260906-a1742f)
 Cycle 6 review (RUN-260906-a1742f): ACCEPT on CR revision 6. Two minors, no blocking, no major. C6-m1 (repeat-of C5-M1): profile install <git-url> --use --takeover after the 9.5 stop is a silent no-op reporting success -- driven, but reproduced identically on origin/main db444157, so a pre-existing trunk defect; the rework-5 brief scoped the fix to path roots and the flag works on a git first install. The leaf owes one corrected clause in its bound ("undrivable hermetically here" is false; it drives in ~30 lines with the repo insteadOf fixture) plus a trunk follow-up. C6-m2 (repeat-of C5-m1): reinstallActivation first-install clause unpinned, mutant survives, production correct and driven. 20 mutants applied by the reviewer, 17 killed; all three cycle-5 survivors now dead; 12.2 pin dies both ways. All 11 hosted lanes green on 8b8aa041; candidate dispatch 34058365116 against the task authority 550579d green on all three runners with deferred=0 (Windows after re-running a job that had died on The hosted runner lost communication with the server, no test result). Candidate vs curator-spec main stays red on the 30 path-overlay subcases -- the filed TASK-260906-19gjyw gap. Stage (c) is safe to land.
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260906-a1742f, pid=71638, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 12f1287ee0fb: pull request 61 names the element and its merge commit 7c74a49216f1 is an ancestor; method=legacy_pr_attested attested=true landing_commit=7c74a49216f1da820ca562eb2643353ccea520b1 authority=12f1287ee0fb538f9ca004dd53b870e824e5baf2; reason: landed by curator PR #61 (reviewed: review-verdict-rev6 resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-stage-c.md](file://TASK-260906-1uf713/producer-brief-stage-c.md) — Producer brief: stage (c) composition, path kind, onboarding import, config schema 2
@@ -277,7 +278,7 @@ spawn run completed: claude (run=RUN-260906-a1742f, pid=71638, exit=0)
 2026-09-06T09:25:02Z
 
 ## Last Update
-2026-09-06T22:06:59Z
+2026-09-16T10:08:14Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

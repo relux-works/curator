@@ -1,5 +1,5 @@
 ## Status
-backlog
+closed
 
 ## Review
 required
@@ -30,6 +30,7 @@ estimated(fibonacci(8))
 
 ## Notes
 Linux qualification host now available temporarily via ssh lev. Add non-destructive Linux validation in private temporary directories when this task enters execution, after inventory, while preserving macOS-primary and Windows-via-ssh-win gates.
+Closed 2026-09-15 as superseded: the Curator-side Rust and SwiftPM (and Node/TS) adapters were delivered in August 2026 under EPIC-260810-271m92 (STORY-260811-2epsp4; commits f8b7cc7 and 6f93b51; internal/rustsource, internal/swiftpmbuild, internal/swiftpmsource, docs/authoring-language-adapters.md); Kotlin was explicitly deferred in STORY-260811-1tybyr. The July 'driver pair' plan is not being implemented in that shape, and the csk (ivanopcode/cocoaskills) halves are outside this delivery (no push admission). Operator confirmed 2026-09-15.
 
 ## Precondition Resources
 (none)
@@ -41,4 +42,4 @@ Linux qualification host now available temporarily via ssh lev. Add non-destruct
 2026-07-28T09:09:38Z
 
 ## Last Update
-2026-07-29T00:37:44Z
+2026-09-15T19:24:58Z

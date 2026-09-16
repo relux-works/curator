@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -62,6 +62,7 @@ spawn run completed: codex (run=RUN-260910-eee409, pid=81170, exit=0)
 User-requested stopping boundary reached: Astra medium producer -> reviewer -> rework -> reviewer accepted CR revision 2, tree 4087f02f5459a96d1a03d78ddb343d82608df0e6. Parent verified all 126 changed paths match the accepted tree, no extra changes, unchanged HEAD/base d019f0e7179520b5c8dcde321c4fe51e04552f58, untouched real index and clean control checkout. Files remain in the Story worktree. Do not checkpoint, integrate, commit, tag, push or publish until the user changes the explicit no-commit instruction. Board integrating means reviewed and deliberately unlanded, not an external blocker. See final-state JSON and review-verdict-rev2.md.
 Implementation decomposition is recorded separately under EPIC-260910-ohqchs. Plan: /Users/iv/Developer/ReluxWorks/curator-spec/.temp/STORY-260910-8fv3s5/worktree/.planning/260910_175847_skillfile-sources-implementation.md. No implementation started; accepted candidate unchanged; no commits.
 Publication completed 2026-09-15: curator-spec PR #50 is MERGED at signed exact reviewed head 3535d63ea80f97bba2fcb6e1f06996cfc25cf7df after all eight required hosted checks passed. Normative ancestor a4fcaf024bf25aa94e22367aa111864802f1f8e5 has exact accepted CR2 tree 4087f02f5459a96d1a03d78ddb343d82608df0e6; final commit adds the reviewed plan only. Spec control root and authoring worktree are clean and equal origin/main. Curator preparatory checkout is clean and equals fresh origin/main 683364ce233df872d6cbb194e0e6b205127f5bca. No feature implementation or new spec design started. Implementation task state and dependencies are persisted on the local authoritative board; the complete portable plan is in the published specification repository. This delivery note is not a fabricated managed board-completion transition. Preserve unrelated board/worktree ownership and existing LOGBOOK changes.
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 871d11bcdfd2: pull request 50 names the element and its merge commit 3535d63ea80f is an ancestor; method=legacy_pr_attested attested=true landing_commit=3535d63ea80f97bba2fcb6e1f06996cfc25cf7df authority=871d11bcdfd240a6260d0722503bdd1642a8fce8; reason: landed by curator-spec PR #50 (reviewed); record-less legacy closure
 
 ## Precondition Resources
 - [TASK-260910-1xph2y_approved-design.md](file://TASK-260910-1xph2y/TASK-260910-1xph2y_approved-design.md) — Approved detailed design and explicit no-commit boundary for both Astra medium roles.
@@ -92,7 +93,7 @@ Publication completed 2026-09-15: curator-spec PR #50 is MERGED at signed exact 
 2026-09-10T13:07:13Z
 
 ## Last Update
-2026-09-15T15:26:16Z
+2026-09-16T10:10:28Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

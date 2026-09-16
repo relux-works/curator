@@ -1,5 +1,5 @@
 ## Status
-backlog
+closed
 
 ## Review
 required
@@ -37,6 +37,7 @@ Self-verification before creation: decision 0007 sections 1, 1.3, 3, 4; decision
 Dependency note: a link TASK-260728-251p01 blocked_by this task was attempted and rejected by the board as a cycle. The obligation is instead carried normatively in decision 0010 section 14.
 
 Host note: TASK-260729-rhjxtx measured that the reachable Windows host carries no Kotlin toolchain of any backend. That is not a blocker: decision 0010 section 3 makes the toolchain an operator-curated bundle, and section 1.3 of the reference gives the curation procedure.
+Closed 2026-09-15 as superseded: the Curator-side Rust and SwiftPM (and Node/TS) adapters were delivered in August 2026 under EPIC-260810-271m92 (STORY-260811-2epsp4; commits f8b7cc7 and 6f93b51; internal/rustsource, internal/swiftpmbuild, internal/swiftpmsource, docs/authoring-language-adapters.md); Kotlin was explicitly deferred in STORY-260811-1tybyr. The July 'driver pair' plan is not being implemented in that shape, and the csk (ivanopcode/cocoaskills) halves are outside this delivery (no push admission). Operator confirmed 2026-09-15.
 
 ## Precondition Resources
 (none)
@@ -48,4 +49,4 @@ Host note: TASK-260729-rhjxtx measured that the reachable Windows host carries n
 2026-07-29T00:04:43Z
 
 ## Last Update
-2026-07-29T00:05:05Z
+2026-09-15T19:25:28Z

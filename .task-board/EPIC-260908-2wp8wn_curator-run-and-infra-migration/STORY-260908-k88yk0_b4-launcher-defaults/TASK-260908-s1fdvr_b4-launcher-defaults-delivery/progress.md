@@ -53,6 +53,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260916-2f9cec, max_parallel=8)
 spawn run started: [implementer] developer (codex) (run=RUN-260916-2f9cec)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-2f9cec, pid=85721, exit=0)
 
 ## Precondition Resources
 - [b4-verify-brief.md](file://TASK-260908-s1fdvr/b4-verify-brief.md)
@@ -69,12 +71,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260916-2f9cec)
 - [TASK-260908-s1fdvr_spawn-log_-reviewer--reviewer--codex-_RUN-260916-cf2baf.log](file://TASK-260908-s1fdvr/TASK-260908-s1fdvr_spawn-log_-reviewer--reviewer--codex-_RUN-260916-cf2baf.log) — System spawn log captured by task-board
 - [TASK-260908-s1fdvr_review-verdict-rev1.md](file://TASK-260908-s1fdvr/TASK-260908-s1fdvr_review-verdict-rev1.md) — Independent ACCEPT review of revision 1: exact defaults and three real launches
 - [TASK-260908-s1fdvr_spawn-log_-implementer--developer--codex-_RUN-260916-2f9cec.log](file://TASK-260908-s1fdvr/TASK-260908-s1fdvr_spawn-log_-implementer--developer--codex-_RUN-260916-2f9cec.log) — System spawn log captured by task-board
+- [TASK-260908-s1fdvr_integration-results.md](file://TASK-260908-s1fdvr/TASK-260908-s1fdvr_integration-results.md) — Exact completion command output and exit code for accepted revision 1
 
 ## Created
 2026-09-07T23:11:31Z
 
 ## Last Update
-2026-09-16T01:35:00Z
+2026-09-16T01:35:40Z
 
 ## Assigned To
 [implementer] developer (codex)

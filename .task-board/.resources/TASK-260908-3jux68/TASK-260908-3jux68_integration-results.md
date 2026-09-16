@@ -1,27 +1,21 @@
 # TASK-260908-3jux68 integration results
 
-Command (cwd: /Users/administrator/Developer/ReluxWorks/relux-root-context; shell: zsh):
+Command run from `/Users/administrator/Developer/ReluxWorks/relux-root-context` using zsh:
 
-```bash
+```sh
 task-board worktree complete STORY-260908-l5nerr --cr TASK-260908-3jux68 --revision 1 --landed-commit 66d86a5287cc82b8aa6a48b3d13fd71ddbf65bd7
 ```
 
-Exit code: 1
+Exit code: 0
 
 Full output:
 
 ```text
-code_landing_identity_mismatch: the landed commit 66d86a5287cc82b8aa6a48b3d13fd71ddbf65bd7 is authored by Ivan Oparin <ivan@relux.works>, not by the configured human identity Relux Bot <bot@relux.works>
-  author_email: ivan@relux.works
-  author_name: Ivan Oparin
-  configured_email: bot@relux.works
-  configured_name: Relux Bot
-  cr_id: CR-TASK-260908-3jux68-1
-  declared_commit: 66d86a5287cc82b8aa6a48b3d13fd71ddbf65bd7
-  protected_oid: 66d86a5287cc82b8aa6a48b3d13fd71ddbf65bd7
-  protected_ref: refs/heads/main
-  remote_url: ssh://git@github.com/relux-works/relux-root-context
-  resolved_commit: 66d86a5287cc82b8aa6a48b3d13fd71ddbf65bd7
+STORY-260908-l5nerr  cleanup_pending
+  code landed:  66d86a5287cc82b8aa6a48b3d13fd71ddbf65bd7 (proven on the code repository's protected default)
+  board commit: 903a265e3bd75ca47ddd4a411fb354707c5a6a83
+  board published to refs/heads/main in /Users/administrator/Developer/ReluxWorks/curator/curator
+  note: safe cleanup is now eligible; `worktree cleanup` removes the workspace and branch only after exact commit ancestry, Story done, a committed board record, a clean workspace, and no active lease or RUN
 ```
 
-Stopped on refusal per integration instruction. No code, identity configuration, or explicit status changes; no checkpoint, integrate, or handoff command run. Initial add_resource exited 1 because this outcome name already existed; this resource was explicitly updated with this run's evidence.
+No code changes or manual status changes were made. No checkpoint, integrate, handoff or cleanup commands were run. Cleanup remains pending. Initial add_resource returned exit 1 because this resource already existed; this evidence replaces it through update_resource.

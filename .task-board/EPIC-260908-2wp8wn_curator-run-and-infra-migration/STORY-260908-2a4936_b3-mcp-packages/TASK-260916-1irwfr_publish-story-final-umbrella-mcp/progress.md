@@ -92,6 +92,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260915-d95431, max_parallel=8)
 spawn run started: [implementer] developer (codex) (run=RUN-260915-d95431)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260915-d95431, pid=81211, exit=0)
 
 ## Precondition Resources
 - [1irwfr-brief.md](file://TASK-260916-1irwfr/1irwfr-brief.md) — Publish story_final only; no code
@@ -111,7 +113,7 @@ spawn run started: [implementer] developer (codex) (run=RUN-260915-d95431)
 - [TASK-260916-1irwfr_spawn-log_-reviewer--reviewer--codex-_RUN-260915-c770df.log](file://TASK-260916-1irwfr/TASK-260916-1irwfr_spawn-log_-reviewer--reviewer--codex-_RUN-260915-c770df.log) — System spawn log captured by task-board
 - [TASK-260916-1irwfr_review-verdict-rev1.md](file://TASK-260916-1irwfr/TASK-260916-1irwfr_review-verdict-rev1.md) — Independent ACCEPT verdict for revision 1
 - [TASK-260916-1irwfr_spawn-log_-implementer--developer--codex-_RUN-260915-10b14e.log](file://TASK-260916-1irwfr/TASK-260916-1irwfr_spawn-log_-implementer--developer--codex-_RUN-260915-10b14e.log) — System spawn log captured by task-board
-- [TASK-260916-1irwfr_integration-results.md](file://TASK-260916-1irwfr/TASK-260916-1irwfr_integration-results.md) — Exact integration refusal and exit code
+- [TASK-260916-1irwfr_integration-results.md](file://TASK-260916-1irwfr/TASK-260916-1irwfr_integration-results.md) — Revision 2 integration transaction full output and exit code
 - [TASK-260916-1irwfr_spawn-log_-implementer--developer--muse-_RUN-260915-8eb272.log](file://TASK-260916-1irwfr/TASK-260916-1irwfr_spawn-log_-implementer--developer--muse-_RUN-260915-8eb272.log) — System spawn log captured by task-board
 - [TASK-260916-1irwfr_change-request_rev2.patch](file://TASK-260916-1irwfr/TASK-260916-1irwfr_change-request_rev2.patch) — Change Request CR-TASK-260916-1irwfr-2 revision 2 candidate patch (repository_delta=empty, 0 changed paths)
 - [TASK-260916-1irwfr_change-request_rev2-validation.log](file://TASK-260916-1irwfr/TASK-260916-1irwfr_change-request_rev2-validation.log) — Change Request CR-TASK-260916-1irwfr-2 revision 2 bounded validation log
@@ -123,7 +125,7 @@ spawn run started: [implementer] developer (codex) (run=RUN-260915-d95431)
 2026-09-15T23:21:42Z
 
 ## Last Update
-2026-09-15T23:47:48Z
+2026-09-15T23:49:06Z
 
 ## Assigned To
 [implementer] developer (codex)

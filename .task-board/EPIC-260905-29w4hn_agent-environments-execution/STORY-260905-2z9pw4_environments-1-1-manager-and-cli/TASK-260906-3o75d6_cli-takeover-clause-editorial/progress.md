@@ -17,7 +17,7 @@ notEstimated
 - (none)
 
 ## Checklist
-(empty)
+- [ ] The takeover clause repeated across the six CLI rows states the enumeration's closure once and the rows reference it; make validate green
 
 ## Notes
 
@@ -31,4 +31,4 @@ notEstimated
 2026-09-06T07:48:36Z
 
 ## Last Update
-2026-09-06T07:48:36Z
+2026-09-15T16:46:44Z

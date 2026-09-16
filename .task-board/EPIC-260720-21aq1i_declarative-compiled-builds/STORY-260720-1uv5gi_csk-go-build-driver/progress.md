@@ -8,10 +8,10 @@ backlog
 2026-07-19T22:10:05Z
 
 ## Last Update
-2026-08-27T03:32:10Z
+2026-09-15T16:35:47Z
 
 ## Blocked By
-- STORY-260720-3plyvy
+- (none)
 
 ## Blocks
 - STORY-260720-21bsr2

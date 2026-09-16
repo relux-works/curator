@@ -75,6 +75,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260916-6fdd20, max_parallel=8)
 spawn run started: [implementer] developer (codex) (run=RUN-260916-6fdd20)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-6fdd20, pid=83703, exit=0)
 
 ## Precondition Resources
 - [3du5nd-spec-brief.md](file://TASK-260910-3du5nd/3du5nd-spec-brief.md)
@@ -99,12 +101,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260916-6fdd20)
 - [TASK-260910-3du5nd_review-validate.log](file://TASK-260910-3du5nd/TASK-260910-3du5nd_review-validate.log) — Independent revision 2 make validate output, exit 0
 - [TASK-260910-3du5nd_review-verdict-rev2.md](file://TASK-260910-3du5nd/TASK-260910-3du5nd_review-verdict-rev2.md) — Independent ACCEPT verdict for revision 2, exact candidate and negative gate evidence
 - [TASK-260910-3du5nd_spawn-log_-implementer--developer--codex-_RUN-260916-6fdd20.log](file://TASK-260910-3du5nd/TASK-260910-3du5nd_spawn-log_-implementer--developer--codex-_RUN-260916-6fdd20.log) — System spawn log captured by task-board
+- [TASK-260910-3du5nd_integration-results.md](file://TASK-260910-3du5nd/TASK-260910-3du5nd_integration-results.md) — Integration transaction full output and exit code
 
 ## Created
 2026-09-10T12:57:34Z
 
 ## Last Update
-2026-09-16T01:32:31Z
+2026-09-16T01:33:20Z
 
 ## Assigned To
 [implementer] developer (codex)

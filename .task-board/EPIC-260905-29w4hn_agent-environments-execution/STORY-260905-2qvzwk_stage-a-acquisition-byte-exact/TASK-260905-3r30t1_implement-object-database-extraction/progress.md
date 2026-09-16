@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -114,6 +114,7 @@ Review cycle 2 (RUN-260905-2d5b2b): ACCEPTED CR rev 5 at curator bb14375a; eleme
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260905-2d5b2b, pid=64311, exit=0)
 Landed on curator main as e8038558 (PR #58, fast-forward of the reviewed head rebased with signing; range-diff proved all seven commits identical) on 2026-09-06 after two review cycles. Follow-up N1 (directory-component fold gate) is TASK-260906-2b3nar.
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 12f1287ee0fb: pull request 58 names the element and its merge commit e80385586554 is an ancestor; method=legacy_pr_attested attested=true landing_commit=e80385586554f43026799f29de2733814075ed4b authority=12f1287ee0fb538f9ca004dd53b870e824e5baf2; reason: landed by curator PR #58 (reviewed: review-verdict-rev5 resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-acquisition-fix.md](file://TASK-260905-3r30t1/producer-brief-acquisition-fix.md) — Producer brief: byte-exact object-database extraction replacing git archive (review M3, environments §1.2)
@@ -158,7 +159,7 @@ Landed on curator main as e8038558 (PR #58, fast-forward of the reviewed head re
 2026-09-05T08:20:33Z
 
 ## Last Update
-2026-09-05T23:52:02Z
+2026-09-16T10:07:46Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

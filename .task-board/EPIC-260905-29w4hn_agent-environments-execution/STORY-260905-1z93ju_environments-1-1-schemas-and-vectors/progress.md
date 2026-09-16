@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -29,4 +29,4 @@ Landed on curator-spec main as fd237ba (PR #42, fast-forward of the reviewed hea
 2026-09-05T12:59:31Z
 
 ## Last Update
-2026-09-05T17:52:57Z
+2026-09-16T10:10:13Z

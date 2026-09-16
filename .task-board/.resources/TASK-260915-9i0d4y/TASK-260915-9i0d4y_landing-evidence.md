@@ -1,0 +1,4 @@
+# TASK-260915-9i0d4y — delivery evidence (publish preserved board and logbook state)
+
+Delivered before this session by curator PR 69 "Preserve board state and clean the primary checkout", merged 2026-09-15 at 4f27ccb21fd7c7b5f449466c6c858bf9b8108940 (signed by Ivan Oparin <oparin@me.com>, ECDSA SHA256:V6Ji…), whose body names STORY-260915-3w11un and this task. It carried the accumulated `.task-board` state (moved elements, untracked task resources) and LOGBOOK.md ("Preserve accumulated board and release records [skip ci]").
+Verification on host e11-1 (2026-09-15): `git -C curator status` clean before this campaign started; `git log --oneline -1` = 4f27ccb; `main...origin/main` synchronized; the board validates with only historical MISSING_ACTIVITY diagnostics (pre-existing, recorded in the campaign state). No feature implementation was made by that PR.

@@ -124,6 +124,8 @@ spawn selection rationale for gpt-6-astra/low: bound integration run; astra:low 
 spawn agent resolution: Agent selection: codex via explicit_override (preferred_agentic_system: mixed[claude,codex,muse], config: spawn.preferred_agentic_system)
 spawn queued: [implementer] developer (codex) (run=RUN-260916-2d6c1b, max_parallel=20)
 spawn run started: [implementer] developer (codex) (run=RUN-260916-2d6c1b)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260916-2d6c1b, pid=32892, exit=0)
 
 ## Precondition Resources
 - [TASK-260910-3kvq02_source-contract.md](file://TASK-260910-3kvq02/TASK-260910-3kvq02_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
@@ -173,12 +175,13 @@ spawn run started: [implementer] developer (codex) (run=RUN-260916-2d6c1b)
 - [TASK-260910-3kvq02_spawn-log_-reviewer--reviewer--codex-_RUN-260916-c8c517.log](file://TASK-260910-3kvq02/TASK-260910-3kvq02_spawn-log_-reviewer--reviewer--codex-_RUN-260916-c8c517.log) — System spawn log captured by task-board
 - [TASK-260910-3kvq02_review-verdict-rev3.md](file://TASK-260910-3kvq02/TASK-260910-3kvq02_review-verdict-rev3.md) — Independent revision 3 acceptance and narrowing evidence
 - [TASK-260910-3kvq02_spawn-log_-implementer--developer--codex-_RUN-260916-2d6c1b.log](file://TASK-260910-3kvq02/TASK-260910-3kvq02_spawn-log_-implementer--developer--codex-_RUN-260916-2d6c1b.log) — System spawn log captured by task-board
+- [TASK-260910-3kvq02_integration-results.md](file://TASK-260910-3kvq02/TASK-260910-3kvq02_integration-results.md) — Revision 3 integration output; zsh pipefail pipeline exited 0; local landing and exact-tree revalidation reported, hosted delivery remains pending
 
 ## Created
 2026-09-10T13:55:56Z
 
 ## Last Update
-2026-09-16T07:25:02Z
+2026-09-16T08:09:17Z
 
 ## Assigned To
 [implementer] developer (codex)

@@ -1,0 +1,149 @@
+{
+ "execClaim": {
+  "command": "make check",
+  "count": 1,
+  "exactly": true,
+  "failClosed": true
+ },
+ "executions": [
+  {
+   "provenance": "runtime",
+   "command": "make check",
+   "exit": 0,
+   "exitKnown": true,
+   "standing": "direct",
+   "logRef": "TASK-260909-2vy977_change-request_rev1-validation.log sha256:080908f9dcd43cb6730a1d97f77a0fcecd1c772a2ae25c6af6541ffdd56aed8c: begins '$ make check', ends '[exit 0]'"
+  }
+ ],
+ "collection": {
+  "scope": "RUN-260915-042561 producer spawn log (no manual make check found) plus TASK-260909-2vy977_change-request_rev1-validation.log written at CR publication 2026-09-15 22:08:50",
+  "complete": true
+ },
+ "covClaim": {
+  "driven": 11,
+  "of": 12
+ },
+ "rows": [
+  {
+   "id": "1-lineup-fallback",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunLineupEnvsPrintGroupBeforeRefusal",
+   "callSite": "run -> Files.Complete -> EmitGroup",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/main_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "2-levels-1-2-preserved",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunDefaultsPerMember/operator-model-machine-effort",
+   "callSite": "run -> Load -> Files.Complete",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/defaults_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "3-only-missing-filled",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunDefaultsPerMember/explicit-empty",
+   "callSite": "run -> Files.Complete -> EmitGroup",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/defaults_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "4-own-row-recommendation",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunDefaultsPerMember/own-row-recommendation",
+   "callSite": "run -> Files.Complete -> EmitGroup",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/defaults_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "5-no-effort-unknown",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunDefaultsPerMember/no-effort",
+   "callSite": "run -> Files.Complete -> EmitGroup",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/defaults_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "6-no-completion-past-failure",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunDefaultsFailuresStopBeforeGroup",
+   "callSite": "run -> Load/Complete -> diagnostics.Emit",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/defaults_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "7-per-member-group",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunPiResolvesNativeLineup",
+   "callSite": "run -> Files.Complete -> EmitGroup",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/main_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "8-group-before-plan",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunLineupEnvsPrintGroupBeforeRefusal",
+   "callSite": "run -> Complete -> EmitGroup -> not_implemented",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/main_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "9-locks-refuse-no-launch",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunDefaultsFailuresStopBeforeGroup/model-lock",
+   "callSite": "run -> Load -> diagnostics.Emit",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/defaults_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "10-typed-failure-no-invented-model",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunPiRuntimePreference/no-preferred-driven-row",
+   "callSite": "run -> Complete -> diagnostics.Emit",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/defaults_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "11-three-envs-real-module",
+   "productionEntry": "cmd/curator-run.run",
+   "test": "TestRunLineupEnvsPrintGroupBeforeRefusal",
+   "callSite": "run -> Files.Complete -> EmitGroup",
+   "kind": "production-entry",
+   "bounds": "origin/completion up to the pending plan refusal; excludes BuildLaunch, real Pi execution, ax and main integration",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 cmd/curator-run/main_test.go",
+   "illustrative": false
+  },
+  {
+   "id": "12-tag-pin-no-override",
+   "productionEntry": "none: go.mod require line (not a production call site)",
+   "test": "manual: go list -m -json + git ls-remote v0.5.11 (not a test)",
+   "callSite": "go.mod/go.sum, go list -m, git ls-remote",
+   "kind": "dependency-inspection",
+   "bounds": "inspection only; no production call site",
+   "ref": "candidate tree 680a1da6162e183e07d83e1e26cd012411cd5f46 go.mod",
+   "illustrative": false
+  }
+ ],
+ "priorExecutions": []
+}

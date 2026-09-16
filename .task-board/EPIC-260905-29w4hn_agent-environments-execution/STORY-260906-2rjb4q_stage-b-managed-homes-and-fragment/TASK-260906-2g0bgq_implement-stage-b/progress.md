@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -92,6 +92,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260906-0644ed)
 Cycle-3 review (RUN-260906-0644ed): ACCEPT at head 1a936e77 via accept_cr rev 3; element routed to integrating. 0 blocking, 0 major, 3 minors. repeat-of: none — the cycle-2 meta-finding (a gate line attested that the command does not print) does not recur. Rework 2 B1/B1b/M1/m2/m3/m4 all driven: 6 of 6 rows, 6 mutants applied, 5 killed, 1 survived and chased to a redundant clause. B1 override tested not accepted: candidate-lane suite-plan fails closed (exit 1) on a root missing either family, a served-but-empty family stays fatal, and the rejected root-content alternative is policy allow in every lane. Every hosted lane green on the exact accepted head (Test/Race x3 os, Lint, Gate self-test x3, Interop, Naming); the Windows lane ran and passed TestCheckBoundary and recorded the three drivers as tolerated root-unset skips. Two minors need orchestrator routing: m5 — internal/interop vector families are still unregistered in root-artifacts.tsv, so a candidate root dropping vectors/environments.json would pass green with all 25 environments cases silently skipped (inherited from stage (a) 4b5cd059, covers five further families, needs its own CI leaf); m6 — the three schema drivers assert nothing on any automatic hosted lane until SPEC_PIN is bumped past f39f4a9. m7 needs no action. Evidence: TASK-260906-2g0bgq_review-findings-stage-b-3.md, _review-verdict-rev3.md, _review-probes-stage-b-3.tar.gz.
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260906-0644ed, pid=78134, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 12f1287ee0fb: pull request 60 names the element and its merge commit 1a936e77490d is an ancestor; method=legacy_pr_attested attested=true landing_commit=1a936e77490df3008efe08fa0aba473ff77575c6 authority=12f1287ee0fb538f9ca004dd53b870e824e5baf2; reason: landed by curator PR #60 (reviewed: review-verdict-rev3 resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-stage-b.md](file://TASK-260906-2g0bgq/producer-brief-stage-b.md) — Producer brief: стадия (b) — managed homes, seeds и passthrough, read-only resolve и фрагмент, MCP-каналы, umbrella dispatch, env status
@@ -126,7 +127,7 @@ spawn run completed: claude (run=RUN-260906-0644ed, pid=78134, exit=0)
 2026-09-06T00:55:07Z
 
 ## Last Update
-2026-09-06T08:39:05Z
+2026-09-16T10:07:54Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

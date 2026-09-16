@@ -1,5 +1,5 @@
 ## Status
-to-dev
+development
 
 ## Review
 required
@@ -33,4 +33,4 @@ Publication completed 2026-09-15: curator-spec PR #50 is MERGED at signed exact 
 2026-09-10T13:55:47Z
 
 ## Last Update
-2026-09-16T07:25:02Z
+2026-09-16T10:05:25Z

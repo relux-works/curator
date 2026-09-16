@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -65,6 +65,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-a9e95f)
 Review cycle 1: ACCEPT. 9af8af8 vs a68559b reviewed; CR rev 1 empty delta is correct (no-edit publish run of the squashed commit). make validate + regenerate-check green at 9af8af8. 7 schema mutants: 6 caught, 1 survived (widened precedence.winner enum) -> minor F1; F2 missing overlay range/tag/source grammar negatives; F3 --repair attribution nit. Evidence: TASK-260905-369vye_review-verdict.md
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260905-a9e95f, pid=99117, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 871d11bcdfd2: pull request 41 names the element and its merge commit f61ee9a75cd1 is an ancestor; method=legacy_pr_attested attested=true landing_commit=f61ee9a75cd1861a9993b0ee9ad4ad32a5ef3c9f authority=871d11bcdfd240a6260d0722503bdd1642a8fce8; reason: landed by curator-spec PR #41 (reviewed); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-env-manager-cli.md](file://TASK-260905-369vye/producer-brief-env-manager-cli.md) — Producer brief: environments 1.1 batch 3 — manager §12, cli rows, manager-config schema 2
@@ -88,7 +89,7 @@ spawn run completed: claude (run=RUN-260905-a9e95f, pid=99117, exit=0)
 2026-09-05T13:01:44Z
 
 ## Last Update
-2026-09-05T13:26:44Z
+2026-09-16T10:10:08Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -50,6 +50,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-131cd2)
 Review cycle 1: ACCEPT at skill-agents-management 93abeae (CR rev 1 accepted, element -> integrating). Reviewer reran make build/vet/test/regress + gofmt (all 0) and mutants M1 (Prefix&&Servers), M2 (no TrimSpace), M3 (interactive-only gate) on a scratch copy: all killed, per-plugin failures in claude/codex/regress. Empty curator-spec delta is correct: code lives in the other repo; Decision 0013 erratum scheduled for environments 1.1 batch. Minor N1: codex empty-model subcase covers only "" not whitespace. Next: integration run with developer/implementer to fast-forward 93abeae onto main.
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260905-131cd2, pid=55067, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 7f0b6bc69c43: pull request 20 names the element and its merge commit 93abeaebd85e is an ancestor; method=legacy_pr_attested attested=true landing_commit=93abeaebd85e7966956dc399b53ef00995440eaa authority=7f0b6bc69c4388841e4aea17309416e9c1393ab5; reason: landed by skill-agents-management PR #20 (reviewed); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-agm-followups.md](file://TASK-260905-1wi9j6/producer-brief-agm-followups.md) — Producer brief: interactive-mode follow-ups (split composition negatives, ErrModelMissing)
@@ -68,7 +69,7 @@ spawn run completed: claude (run=RUN-260905-131cd2, pid=55067, exit=0)
 2026-09-05T07:54:54Z
 
 ## Last Update
-2026-09-05T18:30:00Z
+2026-09-16T10:10:49Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

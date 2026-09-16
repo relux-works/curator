@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -45,6 +45,7 @@ Review cycle 1 (f39f4a9): ACCEPT. Schema 2 closed to the six §12.2 keys, isolat
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260905-21441f, pid=76500, exit=0)
 Landed on curator-spec main as f39f4a9 (PR #44, fast-forward of the reviewed head) on 2026-09-05; review ACCEPT.
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 871d11bcdfd2: pull request 43 names the element and its merge commit fcdb9ba8912a is an ancestor; method=legacy_pr_attested attested=true landing_commit=fcdb9ba8912a56e59970c1c21a59850dc9367eec authority=871d11bcdfd240a6260d0722503bdd1642a8fce8; reason: landed by curator-spec PR #43 (reviewed); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-system-config-v2.md](file://TASK-260905-26o45p/producer-brief-system-config-v2.md) — Producer brief: system-config schema 2 with the environments lockable keys
@@ -62,7 +63,7 @@ Landed on curator-spec main as f39f4a9 (PR #44, fast-forward of the reviewed hea
 2026-09-05T17:55:18Z
 
 ## Last Update
-2026-09-05T18:38:55Z
+2026-09-16T10:10:18Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

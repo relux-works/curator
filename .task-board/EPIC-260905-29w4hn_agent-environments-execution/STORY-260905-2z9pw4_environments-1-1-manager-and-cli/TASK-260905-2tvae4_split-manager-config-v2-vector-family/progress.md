@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -45,6 +45,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-21b82b)
 Reviewer RUN-260905-21b82b: ACCEPT CR rev 1. Draft head f61ee9a verified: schema-1 vector file byte-identical to a68559b, v2 family carries all 10 moved cases, make validate / regenerate-check / 170 unit tests green, pinned Go a3abcf34 interop ok against draft root and FAILs against 9af8af8 root (negative reproduced), 6 validator mutants all killed via real entry point, PR #41 Implementations green x3, one GitHub-verified signed commit. Empty repository delta is correct: rework lived in the draft worktree by brief. Evidence: TASK-260905-2tvae4_review-verdict.md.
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260905-21b82b, pid=29396, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 871d11bcdfd2: pull request 41 names the element and its merge commit f61ee9a75cd1 is an ancestor; method=legacy_pr_attested attested=true landing_commit=f61ee9a75cd1861a9993b0ee9ad4ad32a5ef3c9f authority=871d11bcdfd240a6260d0722503bdd1642a8fce8; reason: landed by curator-spec PR #41 (reviewed: review-verdict resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-manager-split-vectors.md](file://TASK-260905-2tvae4/producer-brief-manager-split-vectors.md) — Rework: split schema-2 cases into vectors/manager-config-v2.json so the pinned Go manager keeps passing
@@ -62,7 +63,7 @@ spawn run completed: claude (run=RUN-260905-21b82b, pid=29396, exit=0)
 2026-09-05T13:32:45Z
 
 ## Last Update
-2026-09-05T13:52:29Z
+2026-09-16T10:10:34Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

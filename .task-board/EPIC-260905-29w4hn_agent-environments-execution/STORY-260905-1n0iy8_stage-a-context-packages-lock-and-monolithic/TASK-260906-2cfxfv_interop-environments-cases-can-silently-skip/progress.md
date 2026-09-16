@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -111,6 +111,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260907-ce5658)
 Review cycle 2: ACCEPT. Reviewed curator e3a97d7b (PR #63), 4 signed commits, origin/main fb916acd is an ancestor -- fast-forward, no rebase. AC reproduced from scratch: 7 negative runs (each declared artefact removed) all exit=1 naming the missing artefact, package not served; positive green; roots plain checkouts verified 1047/1047 and 691/691 against manifest.json. Default lane loses nothing: internal/interop on the pin went 25 PASS + 6 SKIP -> 25 PASS + 0 SKIP, 49 cases moved, 0 lost. F1b replay byte-identical old vs new on both lane streams; attacked with 4 real ledger rows -- fires only where it must, narrows exactly one class, and is the only thing closing the one skip wording that evades the static scan. 9 skip shapes injected: 8 killed, 1 documented bound fatal behaviourally in all 4 wordings. 7 gate mutants (5 narrowing, 1 widening, 1 delete) each kill a named assertion. All local gates exit 0 incl gate-selftest 130/0 and ledger-consistency 231 rows. Hosted: no red lane, Test(windows) pending. Empty repository_delta is correct -- the CR snapshots curator-spec while the leaf scope is the curator repo. INTEGRATION MUST LAND curator e3a97d7b / PR #63, not an empty curator-spec merge. Non-blocking: F4 minor (ledger note + contract_test.go:228 claim rootPath is the only root door; os.Getenv bypasses all four scans -- fails red, never silent), F5 cross-repo companion (add ./internal/interop/environments to curator-spec implementations.yml when the Go pin advances past e3a97d7b), F6 nit (gate prints a FATAL case again as tol).
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260907-ce5658, pid=52686, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 12f1287ee0fb: pull request 63 names the element and its merge commit 919e2e9c74eb is an ancestor; method=legacy_pr_attested attested=true landing_commit=919e2e9c74eb4878a648dae77de85a845fe32e1a authority=12f1287ee0fb538f9ca004dd53b870e824e5baf2; reason: landed by curator PR #63 (reviewed: review-verdict-rev2 resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-interop-coverage.md](file://TASK-260906-2cfxfv/producer-brief-interop-coverage.md) — Producer brief: make a missing environments vector family fail the candidate lane closed
@@ -139,7 +140,7 @@ spawn run completed: claude (run=RUN-260907-ce5658, pid=52686, exit=0)
 2026-09-06T06:55:23Z
 
 ## Last Update
-2026-09-07T12:20:22Z
+2026-09-16T10:08:22Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

@@ -24,6 +24,7 @@ estimated(fibonacci(5))
 
 ## Precondition Resources
 - [TASK-260910-17ps6u_source-contract.md](file://TASK-260910-17ps6u/TASK-260910-17ps6u_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
+- [skillfile-implementation-authorization.md](file://TASK-260910-17ps6u/skillfile-implementation-authorization.md) — Implementation AUTHORIZED (operator 2026-09-15); supersedes the planning-only sentence
 
 ## Outcome Resources
 (none)
@@ -32,4 +33,4 @@ estimated(fibonacci(5))
 2026-09-10T13:56:46Z
 
 ## Last Update
-2026-09-15T15:16:22Z
+2026-09-15T20:15:22Z

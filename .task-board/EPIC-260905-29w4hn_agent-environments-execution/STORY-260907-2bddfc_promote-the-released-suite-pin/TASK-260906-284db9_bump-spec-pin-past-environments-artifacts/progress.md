@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -70,6 +70,7 @@ Non-blocking findings in the verdict artifact: F1 platform-exclusions.tsv:11 cla
 EMPTY repository_delta: a workspace-provisioning artifact, not a producer failure. The Story workspace is a curator-spec checkout; this leaf changes curator paths that do not exist there. The real delta is chore/promote-spec-pin at 04550e28, PR #66, two signed commits with human identity. Integrating THIS revision lands nothing -- PR #66 still needs its own landing.
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260907-086d22, pid=94090, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 12f1287ee0fb: pull request 66 names the element and its merge commit 04550e282705 is an ancestor; method=legacy_pr_attested attested=true landing_commit=04550e282705e8dc361ca02233ad1557589a4b18 authority=12f1287ee0fb538f9ca004dd53b870e824e5baf2; reason: landed by curator PR #66 (reviewed: review-verdict-rev1 resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-spec-pin.md](file://TASK-260906-284db9/producer-brief-spec-pin.md) — Producer brief: move SPEC_PIN to the v1.0.0-rc.11 released revision and retire the deferrals it existed for
@@ -86,7 +87,7 @@ spawn run completed: claude (run=RUN-260907-086d22, pid=94090, exit=0)
 2026-09-06T08:39:39Z
 
 ## Last Update
-2026-09-07T22:40:35Z
+2026-09-16T10:08:30Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

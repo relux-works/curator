@@ -1,9 +1,9 @@
 diff --git a/.scripts/defaults-mutants.py b/.scripts/defaults-mutants.py
 new file mode 100644
-index 0000000..2619afb
+index 0000000..64595c9
 --- /dev/null
 +++ b/.scripts/defaults-mutants.py
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,103 @@
 +#!/usr/bin/env python3
 +"""SPEC 4.3 defaults and lineup narrowing probes; restores candidate bytes.
 +
@@ -47,20 +47,28 @@ index 0000000..2619afb
 + ('effort-lock', source, 'locked && row.flag.Present && row.machine.Present', 'locked && row.flag.Present && row.machine.Present && row.name != "effort"', 'TestResolveLocks/effort', 'enforce locks only for model'),
 + ('operator-ignore', source, 'if locked {\n\t\toperator = Pair{}', 'if locked && machine.Effort.Present {\n\t\toperator = Pair{}', 'TestResolveLocks/model', 'ignore operator only when machine sets effort'),
 + ('presence', source, 'if candidate.Present {', 'if candidate.Present && !(candidate.Origin == OriginFlag && candidate.Value == "") {', pkg_defaults, 'TestResolveExplicitEmptyOverrides', 'ignore explicitly empty flags only'),
-+ ('lineup-bottom', lineup, 'top := ranked[0].Model', 'top := ranked[len(ranked)-1].Model', pkg_defaults, 'TestCompleteLineupTops', 'supply bottom row only'),
-+ ('effort-none-fill', lineup, 'if row.Effort.Support != agentic.EffortSupportRequired {', 'if row.Effort.Support == agentic.EffortSupportRequired {', pkg_defaults, 'TestCompleteNoEffortSemantics', 'fill effortless rows and drop required ones'),
-+ ('effort-overwrite-explicit', lineup, 'if partial.Model.Present && partial.Effort.Present {', 'if partial.Model.Present && !partial.Effort.Present {', pkg_defaults, 'TestCompletePerMemberFill', 'resolve full pairs through the row effort'),
-+ ('top-effort-overwrite', lineup, 'if partial.Effort.Present {\n\t\treturn out, nil\n\t}', 'if partial.Effort.Present && false {\n\t\treturn out, nil\n\t}', pkg_defaults, 'TestCompletePerMemberFill', 'overwrite explicit effort with the lineup top effort'),
-+ ('unresolvable-admit-empty', lineup, 'if !ok {\n\t\treturn Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q)", environment, target.System)}', 'if !ok {\n\t\treturn Resolved{}, nil', pkg_defaults, 'TestCompleteUnresolvable', 'admit empty resolution'),
-+ ('ambiguity-first-wins', lineup, 'return found, matches == 1', 'return found, matches >= 1', pkg_defaults, 'TestCompleteAmbiguousRuntime', 'admit first of several runtimes'),
-+ ('fire-past-resolve-error', lineup, '\tpartial, err := f.Resolve(environment, flags)\n\tif err != nil {\n\t\treturn Resolved{}, err\n\t}', '\tpartial, _ := f.Resolve(environment, flags)', pkg_defaults, 'TestCompleteNoFirePastFailure', 'complete past a lock refusal'),
-+ ('mapping-skip', lineup, '\ttarget, err := mapping.Resolve(environment)\n\tif err != nil {\n\t\treturn Resolved{}, err\n\t}', '\ttarget, _ := mapping.Resolve(environment)', pkg_defaults, 'TestCompleteMappingRefusal', 'admit unmapped environments'),
-+ ('findrow-fuzzy', lineup, 'if string(driven[i].ID) == id {', 'if string(driven[i].ID) != id {', pkg_defaults, 'TestCompletePerMemberFill', 'take another row effort'),
++ ('lineup-bottom', lineup, 'top := vendorplugin.Lineup(models)[0].Model', 'top := vendorplugin.Lineup(models)[len(models)-1].Model', pkg_defaults, 'TestCompleteLineupTops', 'supply bottom row only'),
++ ('effort-none-fill', lineup, 'if row.Effort.Support != agentic.EffortSupportRequired {', 'if row.Effort.Support != agentic.EffortSupportRequired && row.ID != "claude-haiku-4-5" {', pkg_main, 'TestRunDefaultsPerMember/no-effort', 'admit effort only for the effortless haiku row'),
++ ('effort-overwrite-explicit', lineup, 'if partial.Model.Present && partial.Effort.Present {', 'if partial.Model.Present && partial.Effort.Present && partial.Effort.Value != "low" {', pkg_main, 'TestRunDefaultsPerMember/operator-model-machine-effort', 'overwrite explicitly supplied low only'),
++ ('top-effort-overwrite', lineup, 'if partial.Effort.Present {\n\t\treturn out, nil\n\t}', 'if partial.Effort.Present && partial.Effort.Value != "unsupported-word" {\n\t\treturn out, nil\n\t}', pkg_main, 'TestRunDefaultsPerMember/flag-effort', 'overwrite unsupported-word only'),
++ ('unresolvable-admit-empty', lineup, 'if len(cands) == 0 {', 'if len(cands) == 0 && environment == "claude_code" { return Resolved{}, nil }; if len(cands) == 0 {', pkg_defaults, 'TestCompleteWrongVendorModels', 'admit empty claude_code candidates only'),
++ ('ambiguity-model-admit', lineup, '\t\tif len(matches) > 1 {', '\t\tif len(matches) > 2 {', pkg_defaults, 'TestCompleteAmbiguousRuntime/configured-model', 'admit exactly-two-contributor models'),
++ ('top-contributor-admit', lineup, '\tif len(matches) != 1 {', '\tif len(matches) != 1 && len(matches) != 2 {', pkg_defaults, 'TestCompleteAmbiguousRuntime/lineup-top', 'admit exactly two top contributors'),
++ ('fire-past-resolve-error', lineup, 'partial, err := f.Resolve(environment, flags)\n\tif err != nil {', 'partial, err := f.Resolve(environment, flags)\n\tif err != nil && environment != "pi" {', pkg_main, 'TestRunDefaultsFailuresStopBeforeGroup/model-lock', 'ignore Pi lock refusal only'),
++ ('mapping-skip', lineup, 'target, err := mapping.Resolve(environment)\n\tif err != nil {', 'target, err := mapping.Resolve(environment)\n\tif err != nil && environment != "opencode" {', pkg_defaults, 'TestCompleteMappingRefusal', 'skip opencode mapping refusal only'),
++ ('findrow-fuzzy', lineup, 'if string(cand.model.ID) == id {', 'if string(cand.model.ID) == id || (id == "nope-not-a-model" && cand.model.ID == "claude-opus-5") {', pkg_defaults, 'TestCompleteNoEffortSemantics/unknown-model', 'admit one unknown id while preserving all exact matches'),
 + ('origin-mislabel', lineup, 'out.Model = ResolvedMember{Member: Member{Value: string(top.ID), Present: true}, Origin: OriginLineup}', 'out.Model = ResolvedMember{Member: Member{Value: string(top.ID), Present: true}, Origin: OriginFlag}', pkg_defaults, 'TestCompleteLineupTops', 'label lineup values as flags'),
-+ ('runtime-drop', lineup, '\t\t// empty Runtime leaves the unknown runtime to the plan stage.\n\t\tif id, ok := selectDecl(target.System, reg.RuntimeDeclarations()); ok {\n\t\t\tout.Runtime = string(id)\n\t\t}', '\t\t// empty Runtime leaves the unknown runtime to the plan stage.\n\t\tif _, ok := selectDecl(target.System, reg.RuntimeDeclarations()); ok {\n\t\t\tout.Runtime = ""\n\t\t}', pkg_defaults, 'TestCompletePerMemberFill', 'drop the recorded binding'),
++ ('runtime-drop', lineup, '\t\tif matches := contributorsFor(cands, partial.Model.Value); len(matches) == 1 {\n\t\t\tout.Runtime = string(matches[0].runtime)\n\t\t}\n\t\treturn out, nil', '\t\tif matches := contributorsFor(cands, partial.Model.Value); len(matches) == 1 {\n\t\t\tout.Runtime = ""\n\t\t}\n\t\treturn out, nil', pkg_defaults, 'TestCompletePerMemberFill', 'drop the recorded binding'),
 + ('exit-usage-downgrade', main, 'return diagnostics.ExitForCode(derr.Code)', 'return diagnostics.ExitOperational', pkg_main, 'TestRunDiagnosticsContract/usage_locked_flag', 'downgrade usage to exit 1'),
-+ ('resolution-failure-admit', lineup, '\truntime, err := reg.ResolveRuntime(id)\n\tif err != nil {\n\t\treturn Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q): %v", environment, target.System, err)}\n\t}', '\truntime, err := reg.ResolveRuntime(id)\n\tif err != nil {\n\t\treturn Resolved{Runtime: string(id)}, nil\n\t}', pkg_defaults, 'TestCompleteRuntimeResolutionFailure', 'admit failed resolution as success'),
-+ ('empty-lineup-admit', lineup, '\tranked := vendorplugin.Lineup(driven)\n\tif len(ranked) == 0 {\n\t\treturn Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q)", environment, target.System)}\n\t}', '\tranked := vendorplugin.Lineup(driven)\n\tif len(ranked) == 0 {\n\t\treturn Resolved{Runtime: string(id)}, nil\n\t}', pkg_defaults, 'TestCompleteWrongVendorModels', 'admit empty lineup as success'),
++ ('resolution-failure-admit', lineup, 'runtime, err := reg.ResolveRuntime(decl.ID)\n\t\tif err != nil {\n\t\t\treturn nil, err', 'runtime, err := reg.ResolveRuntime(decl.ID)\n\t\tif err != nil {\n\t\t\tif decl.ID == "claude-bad" { continue }; return nil, err', pkg_defaults, 'TestCompleteRuntimeResolutionFailure/partial-failure', 'skip one broken declaration only'),
++ ('pi-union-leak', lineup, 'if string(cand.runtime) == id {', 'if string(cand.runtime) == id || cand.runtime == "pi-openai" {', pkg_main, 'TestRunPiRuntimePreference/ordered-not-declaration-or-score', 'admit openai rows into preferred anthropic lineup'),
++ ('pi-empty-runtime', lineup, 'if len(preferred) > 0 {', 'if len(preferred) > 0 || id == "pi-anthropic" {', pkg_main, 'TestRunPiRuntimePreference/first-with-no-driven-rows', 'stop at an empty anthropic runtime only'),
++ ('pi-preference-order', lineup, 'const piRuntimePreference = "pi-anthropic pi-openai pi-google"', 'const piRuntimePreference = "pi-openai pi-anthropic pi-google"', pkg_main, 'TestRunPiRuntimePreference/ordered-not-declaration-or-score', 'swap only first two preferred runtimes'),
++ ('pi-configured-restrict', lineup, 'if target.System == "pi-native" && !partial.Model.Present {', 'if target.System == "pi-native" && (!partial.Model.Present || partial.Model.Value == "gpt-5.6-sol") {', pkg_main, 'TestRunDefaultsPerMember/pi-openai-override', 'restrict configured OpenAI model to preferred vendor only'),
++ ('pi-unpreferred-admit', lineup, 'if len(preferred) == 0 {', 'if len(preferred) == 0 && len(cands) > 0 && cands[0].runtime == \"pi-other\" { preferred = cands }; if len(preferred) == 0 {', pkg_main, 'TestRunPiRuntimePreference/unpreferred-only', 'admit one unpreferred runtime only'),
++ ('path-failure-as-absence', main, 'paths, err := deps.configPaths()', 'paths, err := deps.configPaths(); if err != nil && err.Error() == "path discovery failed" { paths = deps.defaults; err = nil }', pkg_main, 'TestRunDefaultsPathOrdering/path-failure', 'treat one configuration discovery error as absent paths'),
++ ('nil-registry-admit-claude', lineup, 'if reg == nil {', 'if reg == nil && environment == "claude_code" { return Resolved{}, nil }; if reg == nil {', pkg_defaults, 'TestCompleteNilRegistry', 'admit nil registry only for claude_code'),
++ ('cross-driven-row', lineup, 'if model.DrivenBy(agentic.SystemID(system)) {', 'if model.DrivenBy(agentic.SystemID(system)) || model.ID == "gpt-6-astra" {', pkg_defaults, 'TestCompleteWrongVendorModels', 'admit the unsupported astra row only'),
 +]
 +rows = ['mutant\tnarrows_to\ttest\texit\tverdict\tsurvival_bound']
 +failed = False
@@ -84,7 +92,7 @@ index 0000000..2619afb
 +        if text.count(old) != 1:
 +            raise RuntimeError(f'{ident}: anchor is not unique')
 +        path.write_text(text.replace(old, new, 1))
-+        command = ['go', 'test', pkg, '-count=1', '-v']
++        command = ['go', 'test', pkg, '-run', '^' + test + '$', '-count=1', '-v']
 +        with (out / f'{ident}.log').open('w') as log:
 +            log.write('COMMAND: ' + ' '.join(command) + '\n')
 +            log.flush()
@@ -100,40 +108,53 @@ index 0000000..2619afb
 +print('\n'.join(rows))
 +sys.exit(1 if failed else 0)
 diff --git a/README.md b/README.md
-index 72584b5..42e6454 100644
+index 15f83a3..3be6e5d 100644
 --- a/README.md
 +++ b/README.md
-@@ -42,6 +42,29 @@ managed home when Curator finds it stale), maps its supported system/provider pa
+@@ -35,13 +35,30 @@ resolved environment to its system/provider pair (`internal/mapping`):
+ `claude_code` → `claude-code`/`claude`, `codex_cli` → `codex`/`codex`,
+ `pi` → `pi-native`/`pi`. Unsupported IDs (including known `opencode`)
+ refuse `env_unsupported` with exit 1 before later stages. The executable wiring for the later
+-steps (§4.3–§4.6), main integration of system-prompt policy (§5), and the
+-`defaults.json`/`ax.json` file family (§4.7) are not delivered: a
++steps (§4.4–§4.6), main integration of system-prompt policy (§5), and the
++`ax.json` configuration (§4.7) are not delivered: a
+ well-formed launch invocation parses, resolves its fragment (repairing the
+-managed home when Curator finds it stale), maps its supported system/provider pair, and is then refused with exit 1
++managed home when Curator finds it stale), maps its supported system/provider pair, resolves defaults and prints their origins, then is refused with exit 1
  and a `not_implemented` line that reports the mapping, home and fragment digest,
  launching nothing. A resolve failure is reported as its `resolve_*` code
  with exit 1.
-+An internal partial milestone for §4.3 is available in `internal/defaults`:
-+`ConfigPaths` derives launcher file locations from explicit process XDG/home
-+inputs, `Load` strictly reads the machine and operator files, and `Files.Resolve`
-+resolves flags/operator/machine values per member with presence, origins, and
-+machine locks. `schema` and `defaults` are required; omitted `locked` means false.
-+Known `opencode` entries are valid configuration even though launch mapping
-+refuses that environment. Explicit empty strings are passed through. Missing
-+files contribute nothing; invalid or unreadable files (including dangling links)
-+fail. Both files are validated even when a machine lock suppresses an operator
-+entry. `Files.Complete` finishes the section against the real tagged
-+`agents-management` module (`v0.5.10` in `go.mod`): the `Lineup` leader
-+supplies only unset members with its declared `Effort.Recommended` (or no
-+effort for effortless rows), and an admittable nothing is
-+`defaults_unresolvable` — the launcher never invents a model. The
-+executable reads both files after mapping, refuses locked flags with
-+`usage`, and prints the resolved pair with per-member origins on stderr
-+before the plan request. The `pi-native` runtime is not declared by the
-+pinned module yet, so `pi` without fully supplied files refuses; model
-+admission and the plan request belong to the next milestone. Run
-+`go test ./internal/defaults -count=1 -cover` for the filesystem,
-+strict-schema, presence, lock, precedence, lineup, and line-group suite.
-+Tests use temporary paths.
++The executable now resolves §4.3 after mapping through `internal/defaults`:
++`Load` strictly reads the machine and operator files, `Files.Resolve` applies
++per-member flags/operator/machine precedence and machine locks, and
++`Files.Complete` supplies only missing members from the real tagged v0.5.11
++module. Unknown members and unreadable files fail; explicit empty strings
++remain present. Both files are validated even when a lock suppresses an
++operator entry. Known `opencode` configuration remains valid, but its launch
++mapping refuses.
++
++Pi uses the SPEC convention `pi-anthropic`, then `pi-openai`, then `pi-google`:
++take the first runtime carrying driven rows and rank only its vendor's lineup.
++Vendor scores are never compared. Configured models bind their exact runtime
++independently of the preference. Effort comes from that model's recommendation,
++or stays unset for a row without an effort axis. The stderr defaults group
++reports each supplied member's origin before the pending plan stage; no retry
++or launch occurs. Full pipeline wiring belongs to the integration task.
 +
  Because no `ax.json` is read yet, the binary always parses as an untracked
  machine, so `--ax-profile` is currently always a usage error and `--name`
  is accepted without effect.
-@@ -263,6 +286,7 @@ or tag workflow yet.
+@@ -58,7 +75,7 @@ at their own production APIs. Absence and read failure stay distinct
+ absent home file vs unreadable file), warnings and child stderr are
+ never diagnostic code lines, and no failure degrades into a weaker
+ launch. The remaining main call-site obligations (ax policy before
+-parsing, defaults/lineup, plan and provider limits, late boundary
++parsing, plan and provider limits, late boundary
+ binding) are enumerated in `diagnostics.RemainingObligations` and below.
+ 
+ ## Composition API boundary
+@@ -293,6 +310,7 @@ or tag workflow yet.
  | Tool | Purpose | Entry point | Output |
  |---|---|---|---|
  | `go` (build, vet, test, race) | build and behavioral suite | `make check` and the targets above | stdout; nothing written to the tree |
@@ -141,6 +162,271 @@ index 72584b5..42e6454 100644
  | CLI goldens | frozen accepted/rejected §3 shapes | `go test ./internal/cli -run TestGolden -update` to regenerate, then review the diff | `internal/cli/testdata/cases.golden` |
  | `.scripts/cli-mutants.sh` | narrowing-mutant harness for the §3 gates: each mutant weakens one gate to admit one rejected shape and the named test must fail | `.scripts/cli-mutants.sh [evidence-dir]` | per-mutant logs and `summary.tsv` under the evidence dir (default `.temp/cli-mutants/`); the source tree is restored on exit |
  | `.scripts/fragment-mutants.sh` | narrowing-mutant harness for the §4.1 gates (argv, exit mapping, stderr transport, reader rules, schema closure, CCJ-1 emission, entry-point wiring); the behavioral suite runs against every mutant | `.scripts/fragment-mutants.sh [evidence-dir]` (optional `FRAGMENT_MUTANT_IDS="M27 M28" FRAGMENT_TEST_PATTERN="TestExecutableUnicodePathBoundary|TestConformanceCorpus"` for focused rework) | `mutants.log` under the evidence dir (default `.temp/fragment-mutants/`); sources are restored from byte copies on exit |
+diff --git a/SPEC.md b/SPEC.md
+index 997f006..7d7d9c5 100644
+--- a/SPEC.md
++++ b/SPEC.md
+@@ -299,8 +299,9 @@ native-Pi design (TASK-260908-ggxfte) is now landed in
+ [agents-management PR23](https://github.com/relux-works/skill-agents-management/pull/23),
+ commit `a2a6e9f377f62a5872d99ecdfff0d1690e385f2a`: system `pi-native`
+ provides native interactive Pi plans for managed homes. This mapping does
+-not require a Go import. The operator-only v0.5.11 tag is pending; this
+-revision neither pins an unreleased module nor implements §4.3/§4.4.
++not require a Go import. The published v0.5.11 tag (tag object
++`0ea486e46765ecf12fff7c2ac526e12da02e95ed`) carries that commit and is
++pinned by this revision. §4.3 registers the real native-Pi plugin.
+ 
+ An env-id outside this table that Curator nevertheless resolves is
+ `env_unsupported`: the launcher refuses rather than guessing a system or
+@@ -363,6 +364,20 @@ with no configured effort takes the lineup's effort for that model.
+    for the system, the launch fails with `defaults_unresolvable` — the
+    launcher never invents a model name.
+ 
++   For native Pi, select the first runtime in the following ordered
++   convention whose declaration carries at least one driven model, then
++   apply `Lineup` to that runtime's own models only and bind its contributor.
++   Vendor scales are never compared. If no preferred runtime has a driven
++   row, report `defaults_unresolvable` with that reason and the preference.
++
++   | System | Ordered runtime preference (pure convention) |
++   |---|---|
++   | `pi-native` | `pi-anthropic`, then `pi-openai`, then `pi-google` |
++
++   Flags and files retain per-member precedence. A configured model binds
++   the frozen runtime whose vendor carries its exact id, independently of
++   this fallback preference.
++
+ The resolved pair and the level that produced each member are printed on
+ stderr at **every** launch, before the plan request, in one line-group —
+ so an operator always sees which model is about to run and why. A
+@@ -998,3 +1013,12 @@ reordered.
+   resolve time and not re-verified before exec; the launcher MAY re-verify
+   the marker-recorded hashes under a later revision, as §10.1 permits,
+   and this revision does not.
++
++## Specification changelog
++
++- 2026-09-15, 0.3.0-draft §4.3: record the orchestrator-authorized Pi
++  runtime preference as a pure convention (defaults-lineup-brief.md).
++  The v0.5.11 Lineup contract ranks within one vendor; the previous text
++  left selection across three Pi vendors undefined. Select a runtime
++  before ranking, preserving per-member overrides. §4.2 records the
++  published tag; no protocol version or Pi MCP scope changes.
+diff --git a/cmd/curator-run/defaults_test.go b/cmd/curator-run/defaults_test.go
+new file mode 100644
+index 0000000..60345a6
+--- /dev/null
++++ b/cmd/curator-run/defaults_test.go
+@@ -0,0 +1,209 @@
++package main
++
++import (
++	"context"
++	"fmt"
++	"os"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator-agent-launcher/internal/defaults"
++	"github.com/relux-works/curator-agent-launcher/internal/fragment"
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	agy "github.com/relux-works/skill-agents-management/pkg/agentic/systems/agy"
++	claude "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
++	codex "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	gemini "github.com/relux-works/skill-agents-management/pkg/agentic/systems/gemini"
++	pinative "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/google"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/openai"
++)
++
++func TestRunDefaultsPerMember(t *testing.T) {
++	for _, tc := range []struct {
++		name, env, machine, operator string
++		flags                        []string
++		want                         string
++	}{
++		{"own-row-recommendation", "claude_code", `{"model":"claude-opus-4-8"}`, "", nil, "model=claude-opus-4-8 (machine) effort=xhigh (lineup)"},
++		{"no-effort", "claude_code", "", `{"model":"claude-haiku-4-5"}`, nil, "model=claude-haiku-4-5 (operator) effort unset"},
++		{"pi-google-override", "pi", "", `{"model":"gemini-3.1-pro-preview"}`, nil, "model=gemini-3.1-pro-preview (operator) effort unset"},
++		{"pi-openai-override", "pi", `{"model":"gpt-5.6-sol"}`, "", nil, "model=gpt-5.6-sol (machine) effort=max (lineup)"},
++		{"flag-model-machine-effort", "codex_cli", `{"effort":"low"}`, "", []string{"--model", "gpt-6-astra"}, "model=gpt-6-astra (flag) effort=low (machine)"},
++		{"operator-model-machine-effort", "codex_cli", `{"model":"gpt-5.6-sol","effort":"low"}`, `{"model":"gpt-6-astra"}`, nil, "model=gpt-6-astra (operator) effort=low (machine)"},
++		{"flag-effort", "pi", "", "", []string{"--effort", "unsupported-word"}, "model=claude-fable-5 (lineup) effort=unsupported-word (flag)"},
++		{"explicit-empty", "pi", "", `{"model":"","effort":""}`, nil, "model= (operator) effort= (operator)"},
++		{"unknown-not-replaced", "pi", "", "", []string{"--model", "unknown"}, "model=unknown (flag) effort unset"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			sr := &scriptedRunner{stdout: fragmentLineFor(tc.env)}
++			deps := testDeps(t, fragment.NewWithRunner("curator", sr))
++			for path, row := range map[string]string{deps.defaults.Machine: tc.machine, deps.defaults.Operator: tc.operator} {
++				if row != "" {
++					if err := os.WriteFile(path, []byte(fmt.Sprintf(`{"schema":"curator-run-defaults-v1","defaults":{%q:%s}}`, tc.env, row)), 0600); err != nil {
++						t.Fatal(err)
++					}
++				}
++			}
++			var out, stderr strings.Builder
++			code := run(context.Background(), append([]string{tc.env}, tc.flags...), &out, &stderr, deps)
++			if code != 1 || out.Len() != 0 || sr.calls != 1 || !strings.HasPrefix(stderr.String(), "curator-run: defaults: "+tc.want+"\ncurator-run: not_implemented: ") {
++				t.Fatalf("exit=%d calls=%d stdout=%q stderr=%q", code, sr.calls, out.String(), stderr.String())
++			}
++		})
++	}
++}
++
++// Vendor fixture retains the real rows and contract, but removes only native-Pi
++// compatibility to exercise a declared runtime with no driven row.
++type noPiVendor struct{ vendorplugin.Vendor }
++
++func (v noPiVendor) Models() []vendorplugin.Model {
++	rows := v.Vendor.Models()
++	for i := range rows {
++		var systems []agentic.SystemID
++		for _, s := range rows[i].Systems {
++			if s != "pi-native" {
++				systems = append(systems, s)
++			}
++		}
++		rows[i].Systems = systems
++	}
++	return rows
++}
++
++func piRegistry(t *testing.T, ids []string, emptyAnthropic bool) *vendorplugin.Registry {
++	t.Helper()
++	systems := agentic.NewRegistry()
++	for _, s := range []agentic.System{claude.New(), codex.New(), pinative.New(), gemini.New(), agy.New()} {
++		if err := systems.Register(s); err != nil {
++			t.Fatal(err)
++		}
++	}
++	reg := vendorplugin.NewRegistry(systems)
++	full, err := defaults.NewRegistry()
++	if err != nil {
++		t.Fatal(err)
++	}
++	for _, id := range ids {
++		for _, decl := range full.RuntimeDeclarations() {
++			if string(decl.ID) == id || (id == "pi-other" && decl.ID == "pi-anthropic") {
++				decl.ID = vendorplugin.RuntimeID(id)
++				if err := reg.DeclareRuntime(decl); err != nil {
++					t.Fatal(err)
++				}
++			}
++		}
++	}
++	var av vendorplugin.Vendor = anthropic.New()
++	if emptyAnthropic {
++		av = noPiVendor{av}
++	}
++	for _, v := range []vendorplugin.Vendor{av, openai.New(), google.New()} {
++		if err := reg.Register(v); err != nil {
++			t.Fatal(err)
++		}
++	}
++	return reg
++}
++
++func TestRunPiRuntimePreference(t *testing.T) {
++	for _, tc := range []struct {
++		name  string
++		ids   []string
++		empty bool
++		want  string
++	}{
++		{"ordered-not-declaration-or-score", []string{"pi-google", "pi-openai", "pi-anthropic"}, false, "model=claude-fable-5 (lineup) effort=high (lineup)"},
++		{"missing-first", []string{"pi-google", "pi-openai"}, false, "model=gpt-5.6-sol (lineup) effort=max (lineup)"},
++		{"first-with-no-driven-rows", []string{"pi-anthropic", "pi-openai", "pi-google"}, true, "model=gpt-5.6-sol (lineup) effort=max (lineup)"},
++		{"third", []string{"pi-google"}, false, "model=gemini-3.1-pro-preview (lineup) effort unset"},
++		{"no-preferred-driven-row", []string{"pi-anthropic"}, true, "defaults_unresolvable:"},
++		{"unpreferred-only", []string{"pi-other"}, false, "defaults_unresolvable:"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			sr := &scriptedRunner{stdout: piFragmentLine}
++			deps := testDeps(t, fragment.NewWithRunner("curator", sr))
++			deps.registry = piRegistry(t, tc.ids, tc.empty)
++			var out, stderr strings.Builder
++			code := run(context.Background(), []string{"pi"}, &out, &stderr, deps)
++			if code != 1 || sr.calls != 1 || out.Len() != 0 || !strings.Contains(stderr.String(), tc.want) {
++				t.Fatalf("exit=%d stderr=%q", code, stderr.String())
++			}
++			if strings.Contains(tc.want, "unresolvable") {
++				if !strings.Contains(stderr.String(), `no preferred Pi runtime (pi-anthropic pi-openai pi-google) declares a driven model`) {
++					t.Fatal(stderr.String())
++				}
++				if strings.Contains(stderr.String(), "not_implemented") || strings.Contains(stderr.String(), "curator-run: defaults:") {
++					t.Fatal(stderr.String())
++				}
++			} else if !strings.HasPrefix(stderr.String(), "curator-run: defaults: "+tc.want+"\ncurator-run: not_implemented:") {
++				t.Fatal(stderr.String())
++			}
++		})
++	}
++}
++
++func TestRunDefaultsFailuresStopBeforeGroup(t *testing.T) {
++	for _, tc := range []struct {
++		name, body string
++		flags      []string
++		code       int
++		detail     string
++	}{
++		{"effort-lock", `{"schema":"curator-run-defaults-v1","locked":true,"defaults":{"pi":{"effort":"high"}}}`, []string{"--effort", "low"}, 2, "effort"},
++		{"model-lock", `{"schema":"curator-run-defaults-v1","locked":true,"defaults":{"pi":{"model":"claude-opus-5"}}}`, []string{"--model", "claude-fable-5"}, 2, "model"},
++		{"unknown-member", `{"schema":"curator-run-defaults-v1","defaults":{},"extra":true}`, nil, 1, "unknown member"},
++		{"broken-link", "", nil, 1, "symlink"},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			sr := &scriptedRunner{stdout: piFragmentLine}
++			deps := testDeps(t, fragment.NewWithRunner("curator", sr))
++			if tc.body != "" {
++				if err := os.WriteFile(deps.defaults.Machine, []byte(tc.body), 0600); err != nil {
++					t.Fatal(err)
++				}
++			} else {
++				if err := os.Symlink(deps.defaults.Machine+"-absent", deps.defaults.Machine); err != nil {
++					t.Fatal(err)
++				}
++			}
++			var out, stderr strings.Builder
++			code := run(context.Background(), append([]string{"pi"}, tc.flags...), &out, &stderr, deps)
++			if code != tc.code || sr.calls != 1 || out.Len() != 0 || !strings.Contains(stderr.String(), tc.detail) || strings.Contains(stderr.String(), "not_implemented") || strings.Contains(stderr.String(), "curator-run: defaults:") {
++				t.Fatalf("exit=%d stderr=%q", code, stderr.String())
++			}
++		})
++	}
++}
++
++func TestRunDefaultsPathOrdering(t *testing.T) {
++	for _, tc := range []struct {
++		name            string
++		args            []string
++		env             string
++		pathCalls, exit int
++	}{
++		{"help", []string{"--help"}, "pi", 0, 0},
++		{"usage", []string{"--unknown"}, "pi", 0, 2},
++		{"mapping", []string{"opencode"}, "opencode", 0, 1},
++		{"path-failure", []string{"pi"}, "pi", 1, 1},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			sr := &scriptedRunner{stdout: fragmentLineFor(tc.env)}
++			deps := testDeps(t, fragment.NewWithRunner("curator", sr))
++			calls := 0
++			deps.configPaths = func() (defaults.Paths, error) { calls++; return defaults.Paths{}, fmt.Errorf("path discovery failed") }
++			var out, stderr strings.Builder
++			code := run(context.Background(), tc.args, &out, &stderr, deps)
++			if code != tc.exit || calls != tc.pathCalls {
++				t.Fatalf("exit=%d path calls=%d stderr=%q", code, calls, stderr.String())
++			}
++			if calls > 0 && (!strings.Contains(stderr.String(), "defaults_config_invalid: cannot locate defaults configuration: path discovery failed") || strings.Contains(stderr.String(), "not_implemented")) {
++				t.Fatal(stderr.String())
++			}
++		})
++	}
++}
 diff --git a/cmd/curator-run/gate_framing_test.go b/cmd/curator-run/gate_framing_test.go
 index ece75cb..5cf061c 100644
 --- a/cmd/curator-run/gate_framing_test.go
@@ -155,10 +441,32 @@ index ece75cb..5cf061c 100644
  		t.Fatalf("exit = %d, want 1 (stderr %q)", got, errOut.String())
  	}
 diff --git a/cmd/curator-run/main.go b/cmd/curator-run/main.go
-index f2a2374..3ecbf66 100644
+index f2a2374..08d762c 100644
 --- a/cmd/curator-run/main.go
 +++ b/cmd/curator-run/main.go
-@@ -20,7 +20,10 @@ import (
+@@ -3,14 +3,13 @@
+ // (curator env resolve), and the session plane (ax) into one exec.
+ //
+ // This build implements SPEC.md §3, the closed CLI surface, through
+-// internal/cli, and §4.1, the fragment resolution, through
+-// internal/fragment, and §4.2 through internal/mapping. The later
+-// composition steps (§4.3-§4.6), system-prompt
+-// application (§5), and the configuration file family (§4.7) are not
+-// delivered yet: a launch invocation whose fragment resolves is refused
+-// after mapping with exit 1 and launches nothing. The agents-management
+-// Go module is the planned spawn-plane dependency and is deliberately not
+-// imported yet.
++// internal/cli, §4.1, the fragment resolution, through
++// internal/fragment, §4.2 through internal/mapping, and §4.3, the model
++// and effort defaults, through internal/defaults against the real tagged
++// agents-management module. The later composition steps (§4.4-§4.6),
++// system-prompt application (§5), and the ax configuration file (§4.7)
++// are not delivered yet: a completed launch is refused after the origin
++// line-group with exit 1 and launches nothing.
+ package main
+ 
+ import (
+@@ -20,7 +19,10 @@ import (
  	"io"
  	"os"
  
@@ -169,31 +477,26 @@ index f2a2374..3ecbf66 100644
  	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
  	"github.com/relux-works/curator-agent-launcher/internal/fragment"
  	"github.com/relux-works/curator-agent-launcher/internal/mapping"
-@@ -35,7 +38,22 @@ const (
+@@ -35,7 +37,17 @@ const (
  )
  
  func main() {
 -	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, fragment.New()))
-+	home, err := os.UserHomeDir()
-+	if err != nil {
-+		_ = diagnostics.Emit(os.Stderr, diagnostics.CodeDefaultsInvalid, fmt.Sprintf("cannot locate the operator configuration directory: %v", err))
-+		os.Exit(diagnostics.ExitForCode(diagnostics.CodeDefaultsInvalid))
-+	}
 +	registry, err := defaults.NewRegistry()
 +	if err != nil {
 +		_ = diagnostics.Emit(os.Stderr, diagnostics.CodePlanRefused, fmt.Sprintf("cannot build the spawn-plane registry: %v", err))
 +		os.Exit(diagnostics.ExitForCode(diagnostics.CodePlanRefused))
 +	}
 +	deps := launchDeps{
-+		resolver: fragment.New(),
-+		defaults: defaults.ConfigPaths(os.Getenv("XDG_CONFIG_HOME"), home),
-+		registry: registry,
++		resolver:    fragment.New(),
++		configPaths: processDefaultsPaths,
++		registry:    registry,
 +	}
 +	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, deps))
  }
  
  // fragmentResolver is the context-plane boundary; main uses fragment.New.
-@@ -43,23 +61,39 @@ type fragmentResolver interface {
+@@ -43,23 +55,50 @@ type fragmentResolver interface {
  	Resolve(context.Context, fragment.Request) (*fragment.Fragment, error)
  }
  
@@ -201,10 +504,21 @@ index f2a2374..3ecbf66 100644
 +// Tests inject scripted resolvers, temporary configuration paths, and
 +// registries built from the real module; main builds them from process
 +// state.
++// processDefaultsPaths is evaluated only for a mapped launch. Informational
++// flags and earlier refusals never depend on configuration path discovery.
++func processDefaultsPaths() (defaults.Paths, error) {
++	home, err := os.UserHomeDir()
++	if err != nil && os.Getenv("XDG_CONFIG_HOME") == "" {
++		return defaults.Paths{}, err
++	}
++	return defaults.ConfigPaths(os.Getenv("XDG_CONFIG_HOME"), home), nil
++}
++
 +type launchDeps struct {
-+	resolver fragmentResolver
-+	defaults defaults.Paths
-+	registry *vendorplugin.Registry
++	configPaths func() (defaults.Paths, error)
++	resolver    fragmentResolver
++	defaults    defaults.Paths
++	registry    *vendorplugin.Registry
 +}
 +
  // run is the production entry point behind main. It reads the ax
@@ -240,7 +554,7 @@ index f2a2374..3ecbf66 100644
  	opts := cli.Options{AxConfigured: false}
  	inv, err := cli.Parse(args, opts)
  	if err != nil {
-@@ -88,7 +122,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver
+@@ -88,7 +127,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver
  	// SPEC §4.1: obtain the fragment. The subprocess inherits the
  	// launcher's working directory and environment; Curator's stderr goes
  	// to the operator unchanged.
@@ -249,7 +563,7 @@ index f2a2374..3ecbf66 100644
  		EnvID:      inv.EnvID,
  		Profile:    inv.Profile,
  		ProfileSet: inv.ProfileSet,
-@@ -109,7 +143,33 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver
+@@ -109,7 +148,41 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, resolver
  		return diagnostics.ExitForCode(mapping.CodeUnsupported)
  	}
  
@@ -261,6 +575,14 @@ index f2a2374..3ecbf66 100644
 +	// a system the lineup admits nothing for is defaults_unresolvable —
 +	// every one terminal with nothing launched. The resolved pair and
 +	// its per-member origins print on stderr before the plan request.
++	if deps.configPaths != nil {
++		paths, err := deps.configPaths()
++		if err != nil {
++			_ = diagnostics.Emit(stderr, defaults.CodeInvalid, fmt.Sprintf("cannot locate defaults configuration: %v", err))
++			return diagnostics.ExitForCode(defaults.CodeInvalid)
++		}
++		deps.defaults = paths
++	}
 +	files, err := defaults.Load(deps.defaults)
 +	if err == nil {
 +		var flags defaults.Pair
@@ -287,18 +609,21 @@ index f2a2374..3ecbf66 100644
 +	return diagnostics.ExitForCode(mapping.CodeUnsupported)
  }
 diff --git a/cmd/curator-run/main_test.go b/cmd/curator-run/main_test.go
-index 849e6aa..eb52c62 100644
+index 849e6aa..14276bc 100644
 --- a/cmd/curator-run/main_test.go
 +++ b/cmd/curator-run/main_test.go
-@@ -13,6 +13,7 @@ import (
+@@ -13,6 +13,10 @@ import (
  	"strings"
  	"testing"
  
++	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
++
 +	"github.com/relux-works/curator-agent-launcher/internal/defaults"
  	"github.com/relux-works/curator-agent-launcher/internal/diagnostics"
  	"github.com/relux-works/curator-agent-launcher/internal/fragment"
  )
-@@ -20,8 +21,9 @@ import (
+@@ -20,8 +24,9 @@ import (
  // run is the production dispatch site: main exits with its return value.
  // These tests drive SPEC §3 shapes through it end to end: informational
  // flags exit 0 on stdout, usage errors exit 2 with the "usage" code line
@@ -310,7 +635,7 @@ index 849e6aa..eb52c62 100644
  
  func TestRunInformationalFlags(t *testing.T) {
  	for _, args := range [][]string{{"--help"}, {"-h"}, {"--version"}, {"codex_cli", "--profile", "p", "--help"}, {"--version", "--", "x"}} {
-@@ -104,22 +106,47 @@ func (f forbiddenRunner) Run(context.Context, string, []string, string, []string
+@@ -104,22 +109,47 @@ func (f forbiddenRunner) Run(context.Context, string, []string, string, []string
  	return nil, 1, nil
  }
  
@@ -349,24 +674,23 @@ index 849e6aa..eb52c62 100644
  const piDigest = "sha256:c0512f558f8dc93780288db597a1a8250c0403a175c95fe988e0e8c0991701bf"
  
 -// TestRunParsedLaunchResolvesThenRefuses: a well-formed launch, including a
--// native tail that collides with launcher flags, parses, resolves its
++// TestRunPiResolvesNativeLineup: a well-formed pi launch, including a
+ // native tail that collides with launcher flags, parses, resolves its
 -// fragment exactly once through SPEC §4.1 with the exact argv, and is then
 -// refused with exit 1 — never 2 (not a usage error) and never 0 (nothing
 -// launched). Curator's stderr warning is forwarded verbatim before the
 -// refusal line.
 -func TestRunParsedLaunchResolvesThenRefuses(t *testing.T) {
-+// TestRunPiUnresolvable: a well-formed pi launch, including a native tail
-+// that collides with launcher flags, parses, resolves its fragment
-+// exactly once through SPEC §4.1 with the exact argv, and is then refused
-+// with defaults_unresolvable and exit 1 — the pinned module declares no
-+// pi-native runtime, so the lineup admits no model and none is invented.
-+// Curator's stderr warning is forwarded verbatim before the refusal line,
-+// and no origin line-group prints for an unresolved pair.
-+func TestRunPiUnresolvable(t *testing.T) {
++// fragment exactly once through SPEC §4.1 with the exact argv, completes
++// its §4.3 pair from the native-Pi lineup, prints the origin line-group,
++// and is then refused with exit 1 only because the plan request belongs
++// to a later stage. Curator's stderr warning is forwarded verbatim
++// before the group line.
++func TestRunPiResolvesNativeLineup(t *testing.T) {
  	warn := "warning: environment_tool_version_unverified: pi detected 0.84.3, recorded 0.84.2\n"
  	cases := []struct {
  		args     []string
-@@ -132,19 +159,85 @@ func TestRunParsedLaunchResolvesThenRefuses(t *testing.T) {
+@@ -132,19 +162,86 @@ func TestRunParsedLaunchResolvesThenRefuses(t *testing.T) {
  	for _, c := range cases {
  		sr := &scriptedRunner{stdout: piFragmentLine, stderr: warn}
  		var out, errOut strings.Builder
@@ -384,18 +708,18 @@ index 849e6aa..eb52c62 100644
  			t.Errorf("run(%v) wrote to stdout: %q", c.args, out.String())
  		}
  	}
-+	// Without flags a member is missing and the lineup admits nothing.
++	// Without flags the preferred native-Pi lineup supplies the pair: the
++	// group prints with lineup origins, then the pending plan stage
++	// refuses.
 +	for _, args := range [][]string{{"pi"}, {"pi", "--system-prompt", "append", "--name", "ok-name", "--", "--help", "", "--ax-profile", "yolo", "--profile", "x"}} {
 +		sr := &scriptedRunner{stdout: piFragmentLine, stderr: warn}
 +		var out, errOut strings.Builder
 +		if got := run(context.Background(), args, &out, &errOut, testDeps(t, fragment.NewWithRunner("curator", sr))); got != 1 {
 +			t.Errorf("run(%v) = %d, want 1 (stderr %q)", args, got, errOut.String())
 +		}
-+		if !strings.HasPrefix(errOut.String(), warn+name+": defaults_unresolvable: ") || !strings.Contains(errOut.String(), `"pi-native"`) {
-+			t.Errorf("run(%v) stderr %q: want forwarded warning, then defaults_unresolvable naming the system", args, errOut.String())
-+		}
-+		if strings.Contains(errOut.String(), "defaults: ") || strings.Contains(errOut.String(), "not_implemented") {
-+			t.Errorf("run(%v) stderr %q: no line-group and no later stage past the refusal", args, errOut.String())
++		want := warn + name + ": defaults: model=claude-fable-5 (lineup) effort=high (lineup)\n" + name + ": not_implemented: "
++		if !strings.HasPrefix(errOut.String(), want) || !strings.Contains(errOut.String(), piDigest) {
++			t.Errorf("run(%v) stderr %q: want forwarded warning, then the lineup group and not_implemented with digest", args, errOut.String())
 +		}
 +		if out.Len() != 0 {
 +			t.Errorf("run(%v) wrote to stdout: %q", args, out.String())
@@ -420,16 +744,17 @@ index 849e6aa..eb52c62 100644
 +	}
 +}
 +
-+// TestRunLineupEnvsPrintGroupBeforeRefusal drives the two environments the
-+// real module admits: with no files the lineup completes the pair, the
-+// origin line-group prints on stderr, and only then does the pending plan
-+// stage refuse with exit 1. The group precedes the refusal line.
++// TestRunLineupEnvsPrintGroupBeforeRefusal drives the three environments
++// the real module admits: with no files the lineup completes the pair,
++// the origin line-group prints on stderr, and only then does the pending
++// plan stage refuse with exit 1. The group precedes the refusal line.
 +func TestRunLineupEnvsPrintGroupBeforeRefusal(t *testing.T) {
 +	cases := []struct {
 +		env, group string
 +	}{
 +		{"claude_code", name + ": defaults: model=claude-fable-5-1 (lineup) effort=high (lineup)"},
 +		{"codex_cli", name + ": defaults: model=gpt-6-astra (lineup) effort=max (lineup)"},
++		{"pi", name + ": defaults: model=claude-fable-5 (lineup) effort=high (lineup)"},
 +	}
 +	for _, c := range cases {
 +		sr := &scriptedRunner{stdout: fragmentLineFor(c.env)}
@@ -456,7 +781,7 @@ index 849e6aa..eb52c62 100644
  }
  
  // TestRunResolveFailuresExit1: every §6 resolve-family outcome reaches the
-@@ -168,7 +261,7 @@ func TestRunResolveFailuresExit1(t *testing.T) {
+@@ -168,7 +265,7 @@ func TestRunResolveFailuresExit1(t *testing.T) {
  	for _, c := range cases {
  		sr := &scriptedRunner{stdout: c.stdout, stderr: c.stderr, exit: c.exit}
  		var out, errOut strings.Builder
@@ -465,7 +790,7 @@ index 849e6aa..eb52c62 100644
  			t.Errorf("%s: exit %d, want 1", c.name, got)
  		}
  		if sr.calls != 1 {
-@@ -204,7 +297,7 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+@@ -204,7 +301,7 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
  	t.Setenv("PATH", dir)
  
  	var out, errOut strings.Builder
@@ -474,12 +799,12 @@ index 849e6aa..eb52c62 100644
  		t.Fatalf("exit %d, want 1 (stderr %q)", got, errOut.String())
  	}
  	argv, err := os.ReadFile(filepath.Join(dir, "argv.txt"))
-@@ -214,14 +307,14 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
+@@ -214,14 +311,14 @@ func TestRunProductionResolverAgainstFakeCurator(t *testing.T) {
  	if string(argv) != "env\nresolve\npi\n--profile\ndefault\n--repair\n--format\njson\n" {
  		t.Errorf("subprocess argv %q", argv)
  	}
 -	if !strings.HasPrefix(errOut.String(), "warning: environment_tool_version_unverified: pi\n"+name+": not_implemented: ") || !strings.Contains(errOut.String(), piDigest) {
-+	if !strings.HasPrefix(errOut.String(), "warning: environment_tool_version_unverified: pi\n"+name+": defaults_unresolvable: ") || !strings.Contains(errOut.String(), `"pi-native"`) {
++	if !strings.HasPrefix(errOut.String(), "warning: environment_tool_version_unverified: pi\n"+name+": defaults: model=claude-fable-5 (lineup) effort=high (lineup)\n"+name+": not_implemented: ") {
  		t.Errorf("stderr %q", errOut.String())
  	}
  
@@ -491,16 +816,7 @@ index 849e6aa..eb52c62 100644
  		t.Errorf("missing curator: exit %d stderr %q", got, errOut.String())
  	}
  }
-@@ -262,7 +355,7 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
- 		count int
- 		code  string
- 	}{
--		{"accept4096", 4096, "not_implemented"},
-+		{"accept4096", 4096, "defaults_unresolvable"},
- 		{"reject4097", 4097, "resolve_fragment_invalid"},
- 	} {
- 		t.Run(tc.name, func(t *testing.T) {
-@@ -279,7 +372,11 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
+@@ -279,14 +376,21 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
  				t.Fatal(err)
  			}
  			cmd := exec.Command(binary, "pi")
@@ -513,14 +829,24 @@ index 849e6aa..eb52c62 100644
  			var out, stderr strings.Builder
  			cmd.Stdout, cmd.Stderr = &out, &stderr
  			err = cmd.Run()
-@@ -294,22 +391,24 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
+ 			if e, ok := err.(*exec.ExitError); !ok || e.ExitCode() != 1 {
+ 				t.Fatalf("exit: %v", err)
+ 			}
+-			if out.Len() != 0 || !strings.HasPrefix(stderr.String(), name+": "+tc.code+": ") {
++			// The accepted fragment resolves its defaults, so the
++			// origin group precedes the pending-stage refusal line;
++			// the rejected fragment never reaches defaults.
++			if out.Len() != 0 || !strings.Contains(stderr.String(), name+": "+tc.code+": ") {
+ 				t.Fatalf("stdout %q stderr %q", out.String(), stderr.String())
+ 			}
+ 		})
+@@ -294,22 +398,23 @@ func TestExecutableUnicodePathBoundary(t *testing.T) {
  }
  
  // TestRunMapping drives the production entry point with the real fragment
 -// parser. Unsupported mappings must not reach the later-stage stub.
 +// parser. Unsupported mappings must not reach the defaults stage; mapped
-+// environments resolve their §4.3 pair (or refuse it for pi) before the
-+// pending plan stage.
++// environments resolve their §4.3 pair before the pending plan stage.
  func TestRunMapping(t *testing.T) {
 -	for _, tc := range []struct{ env, system, provider string }{
 -		{"claude_code", "claude-code", "claude"},
@@ -532,7 +858,7 @@ index 849e6aa..eb52c62 100644
 +	}{
 +		{"claude_code", "claude-code", "claude", "model=claude-fable-5-1 (lineup) effort=high (lineup)"},
 +		{"codex_cli", "codex", "codex", "model=gpt-6-astra (lineup) effort=max (lineup)"},
-+		{"pi", "pi-native", "pi", ""},
++		{"pi", "pi-native", "pi", "model=claude-fable-5 (lineup) effort=high (lineup)"},
 +		{"opencode", "", "", ""},
  	} {
  		t.Run(tc.env, func(t *testing.T) {
@@ -548,16 +874,12 @@ index 849e6aa..eb52c62 100644
  			if code != 1 || out.Len() != 0 || sr.calls != 1 {
  				t.Fatalf("exit=%d stdout=%q resolves=%d", code, out.String(), sr.calls)
  			}
-@@ -317,10 +416,14 @@ func TestRunMapping(t *testing.T) {
+@@ -317,10 +422,10 @@ func TestRunMapping(t *testing.T) {
  				t.Fatalf("native argv changed: %q", args)
  			}
  			if tc.system == "" {
 -				if !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "not_implemented") {
 +				if !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "not_implemented") || strings.Contains(stderr.String(), "defaults: ") {
-+					t.Fatalf("refusal: %q", stderr.String())
-+				}
-+			} else if tc.group == "" {
-+				if !strings.HasPrefix(stderr.String(), name+": defaults_unresolvable: ") || strings.Contains(stderr.String(), "not_implemented") {
  					t.Fatalf("refusal: %q", stderr.String())
  				}
 -			} else if !strings.HasPrefix(stderr.String(), name+": not_implemented: ") || !strings.Contains(stderr.String(), fmt.Sprintf("mapped system %q / provider %q", tc.system, tc.provider)) {
@@ -565,7 +887,7 @@ index 849e6aa..eb52c62 100644
  				t.Fatalf("mapping: %q", stderr.String())
  			}
  		})
-@@ -336,7 +439,7 @@ func (resolvedUnknown) Resolve(context.Context, fragment.Request) (*fragment.Fra
+@@ -336,7 +441,7 @@ func (resolvedUnknown) Resolve(context.Context, fragment.Request) (*fragment.Fra
  }
  func TestRunUnknownResolvedMapping(t *testing.T) {
  	var out, stderr strings.Builder
@@ -574,7 +896,7 @@ index 849e6aa..eb52c62 100644
  		t.Fatalf("exit=%d", got)
  	}
  	if out.Len() != 0 || !strings.HasPrefix(stderr.String(), name+": env_unsupported: ") || strings.Contains(stderr.String(), "not_implemented") {
-@@ -347,7 +450,7 @@ func TestRunUnknownResolvedMapping(t *testing.T) {
+@@ -347,7 +452,7 @@ func TestRunUnknownResolvedMapping(t *testing.T) {
  func TestRunUnknownFragmentStillRefusesResolution(t *testing.T) {
  	sr := &scriptedRunner{stdout: strings.ReplaceAll(piFragmentLine, `"environment":"pi"`, `"environment":"future_env"`)}
  	var out, stderr strings.Builder
@@ -583,7 +905,7 @@ index 849e6aa..eb52c62 100644
  		t.Fatalf("exit=%d", got)
  	}
  	if sr.calls != 1 || out.Len() != 0 || !strings.HasPrefix(stderr.String(), name+": resolve_fragment_invalid: ") {
-@@ -360,43 +463,58 @@ func TestRunUnknownFragmentStillRefusesResolution(t *testing.T) {
+@@ -360,43 +465,67 @@ func TestRunUnknownFragmentStillRefusesResolution(t *testing.T) {
  // the exit status for the code, exactly one launcher diagnostic code
  // line on stderr carrying that code, Curator's stderr forwarded verbatim
  // ahead of it (never parsed as a launcher diagnostic), and nothing on
@@ -609,6 +931,12 @@ index 849e6aa..eb52c62 100644
 +		operator string
  		wantCode string
  		wantExit int
++		// bareRegistry swaps the production registry for one with no
++		// declarations, so the defaults stage admits nothing. Every
++		// mapped environment resolves against the production registry,
++		// so only a declaration-free registry still reaches
++		// defaults_unresolvable at the entry point.
++		bareRegistry bool
  	}{
 -		{"usage missing env", []string{}, "", "", 0, "usage", 2},
 -		{"usage stray operand", []string{"codex_cli", "resume"}, "", "", 0, "usage", 2},
@@ -621,20 +949,20 @@ index 849e6aa..eb52c62 100644
 -		{"resolve invocation failed", []string{"pi"}, "", "boom\n", 3, "resolve_invocation_failed", 1},
 -		{"resolve fragment invalid", []string{"pi"}, "{}\n", "", 0, "resolve_fragment_invalid", 1},
 -		{"env unsupported", []string{"opencode"}, opencodeLine, "", 0, "env_unsupported", 1},
-+		{"usage missing env", []string{}, "", "", 0, "", "", "usage", 2},
-+		{"usage stray operand", []string{"codex_cli", "resume"}, "", "", 0, "", "", "usage", 2},
-+		{"usage unknown flag", []string{"codex_cli", "--unknown"}, "", "", 0, "", "", "usage", 2},
-+		{"usage ax-profile untracked", []string{"codex_cli", "--ax-profile", "yolo"}, "", "", 0, "", "", "usage", 2},
-+		{"usage locked flag", []string{"pi", "--model", "flag"}, piFragmentLine, "", 0, lockedMachine, "", "usage", 2},
-+		{"resolve environment unknown", []string{"pi"}, "", "curator: environment_unknown: unregistered\n", 1, "", "", "resolve_environment_unknown", 1},
-+		{"resolve profile unknown", []string{"pi"}, "", "curator: profile_unknown: none current\n", 1, "", "", "resolve_profile_unknown", 1},
-+		{"resolve repair failed", []string{"pi"}, "", "curator: environment_repair_failed: store\n", 1, "", "", "resolve_repair_failed", 1},
-+		{"resolve lock unavailable", []string{"pi"}, "", "curator: environment_lock_unavailable: busy\n", 1, "", "", "resolve_lock_unavailable", 1},
-+		{"resolve invocation failed", []string{"pi"}, "", "boom\n", 3, "", "", "resolve_invocation_failed", 1},
-+		{"resolve fragment invalid", []string{"pi"}, "{}\n", "", 0, "", "", "resolve_fragment_invalid", 1},
-+		{"env unsupported", []string{"opencode"}, opencodeLine, "", 0, "", "", "env_unsupported", 1},
-+		{"defaults config invalid", []string{"pi"}, piFragmentLine, "", 0, "", "{", "defaults_config_invalid", 1},
-+		{"defaults unresolvable", []string{"pi"}, piFragmentLine, "", 0, "", "", "defaults_unresolvable", 1},
++		{"usage missing env", []string{}, "", "", 0, "", "", "usage", 2, false},
++		{"usage stray operand", []string{"codex_cli", "resume"}, "", "", 0, "", "", "usage", 2, false},
++		{"usage unknown flag", []string{"codex_cli", "--unknown"}, "", "", 0, "", "", "usage", 2, false},
++		{"usage ax-profile untracked", []string{"codex_cli", "--ax-profile", "yolo"}, "", "", 0, "", "", "usage", 2, false},
++		{"usage locked flag", []string{"pi", "--model", "flag"}, piFragmentLine, "", 0, lockedMachine, "", "usage", 2, false},
++		{"resolve environment unknown", []string{"pi"}, "", "curator: environment_unknown: unregistered\n", 1, "", "", "resolve_environment_unknown", 1, false},
++		{"resolve profile unknown", []string{"pi"}, "", "curator: profile_unknown: none current\n", 1, "", "", "resolve_profile_unknown", 1, false},
++		{"resolve repair failed", []string{"pi"}, "", "curator: environment_repair_failed: store\n", 1, "", "", "resolve_repair_failed", 1, false},
++		{"resolve lock unavailable", []string{"pi"}, "", "curator: environment_lock_unavailable: busy\n", 1, "", "", "resolve_lock_unavailable", 1, false},
++		{"resolve invocation failed", []string{"pi"}, "", "boom\n", 3, "", "", "resolve_invocation_failed", 1, false},
++		{"resolve fragment invalid", []string{"pi"}, "{}\n", "", 0, "", "", "resolve_fragment_invalid", 1, false},
++		{"env unsupported", []string{"opencode"}, opencodeLine, "", 0, "", "", "env_unsupported", 1, false},
++		{"defaults config invalid", []string{"pi"}, piFragmentLine, "", 0, "", "{", "defaults_config_invalid", 1, false},
++		{"defaults unresolvable", []string{"pi"}, piFragmentLine, "", 0, "", "", "defaults_unresolvable", 1, true},
  	}
  	for _, c := range cases {
  		t.Run(c.name, func(t *testing.T) {
@@ -647,6 +975,9 @@ index 849e6aa..eb52c62 100644
  			}
 -			got := run(context.Background(), c.args, &out, &errOut, resolver)
 +			deps := testDeps(t, resolver)
++			if c.bareRegistry {
++				deps.registry = vendorplugin.NewRegistry(agentic.NewRegistry())
++			}
 +			for path, data := range map[string]string{deps.defaults.Machine: c.machine, deps.defaults.Operator: c.operator} {
 +				if data == "" {
 +					continue
@@ -659,7 +990,7 @@ index 849e6aa..eb52c62 100644
  			if got != c.wantExit {
  				t.Fatalf("exit = %d, want %d (stderr %q)", got, c.wantExit, errOut.String())
  			}
-@@ -440,7 +558,7 @@ func TestRunDetailInjectionCannotForgeLine(t *testing.T) {
+@@ -440,7 +569,7 @@ func TestRunDetailInjectionCannotForgeLine(t *testing.T) {
  		resolver := fragment.NewWithRunner(
  			filepath.Join(t.TempDir(), "missing-curator"), fragment.ExecRunner{})
  		got := run(context.Background(),
@@ -668,7 +999,7 @@ index 849e6aa..eb52c62 100644
  		if got != 1 {
  			t.Fatalf("exit = %d, want 1 (stderr %q)", got, errOut.String())
  		}
-@@ -486,7 +604,7 @@ func assertSingleDiagnostic(t *testing.T, stderr, wantCode string) {
+@@ -486,7 +615,7 @@ func assertSingleDiagnostic(t *testing.T, stderr, wantCode string) {
  func TestRunResolveFailurePrecedesMapping(t *testing.T) {
  	sr := &scriptedRunner{exit: 1, stderr: "curator: environment_unknown: missing\n"}
  	var out, stderr strings.Builder
@@ -1233,10 +1564,10 @@ index 0000000..1f7ac38
 +}
 diff --git a/internal/defaults/lineup.go b/internal/defaults/lineup.go
 new file mode 100644
-index 0000000..92e2f8a
+index 0000000..dc6ab39
 --- /dev/null
 +++ b/internal/defaults/lineup.go
-@@ -0,0 +1,238 @@
+@@ -0,0 +1,300 @@
 +// Lineup fallback for SPEC §4.3 level 3.
 +//
 +// Files.Resolve (defaults.go) covers levels 1-2: flags, then the machine
@@ -1253,9 +1584,12 @@ index 0000000..92e2f8a
 +// model with no configured effort takes the lineup's effort for THAT
 +// model; an unknown configured model leaves the effort unset so the spawn
 +// plane's admission (a later stage) refuses it. When the lineup admits no
-+// model for the system — including the pi-native system, whose runtime
-+// the pinned module does not declare yet — the launch fails with
-+// defaults_unresolvable.
++// model for the system, the launch fails with defaults_unresolvable.
++//
++// Native Pi selects the first driven runtime in the SPEC preference before
++// ranking that runtime's vendor-local lineup. Configured models instead bind
++// their exact contributor across the mapped system's declarations. Scores
++// from different vendors are never compared.
 +//
 +// Only absence reaches the lineup: Complete propagates a Resolve failure
 +// (locked flags, unreadable files) without consulting the registry, so
@@ -1268,10 +1602,14 @@ index 0000000..92e2f8a
 +	"strings"
 +
 +	"github.com/relux-works/skill-agents-management/pkg/agentic"
++	agySystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/agy"
 +	claudeSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
 +	codexSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	geminiSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/gemini"
++	pinativeSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
 +	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
 +	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic"
++	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/google"
 +	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/openai"
 +
 +	"github.com/relux-works/curator-agent-launcher/internal/cli"
@@ -1285,6 +1623,9 @@ index 0000000..92e2f8a
 +// OriginLineup marks a member the level-3 fallback supplied.
 +const OriginLineup Origin = "lineup"
 +
++// piRuntimePreference is the SPEC §4.3 ordered convention, not a score ranking.
++const piRuntimePreference = "pi-anthropic pi-openai pi-google"
++
 +// Resolved is the §4.3 resolved pair plus the module runtime binding the
 +// lineup completed it against. Runtime is empty exactly when the registry
 +// admitted no runtime for the mapped system: the pair is then fully
@@ -1295,14 +1636,20 @@ index 0000000..92e2f8a
 +}
 +
 +// NewRegistry builds the production compatibility registry from the real
-+// tagged module: the claude-code and codex system plugins, the frozen
-+// runtime declarations, and the anthropic and openai vendor plugins.
++// tagged module: the claude-code, codex, pi-native, gemini-cli, and
++// antigravity system plugins, the frozen runtime declarations, and the
++// anthropic, openai, and google vendor plugins.
 +//
-+// The legacy pi system plugin is deliberately not registered: at the
-+// pinned module version it drives the agents-infra wrapper, which
-+// replaces the managed home, and it backs no declared runtime. The
-+// pi-native system arrives with the pending module release; mapping never
-+// yields the legacy id, so nothing here can admit a Pi launch through it.
++// The legacy pi system plugin is deliberately not registered: it drives
++// the agents-infra wrapper, which replaces the managed home, and it backs
++// no declared runtime. Mapping never yields the legacy id, so nothing
++// here can admit a Pi launch through it; native Pi arrives only through
++// the pi-native plugin and the three frozen pi-* runtime rows.
++//
++// The gemini-cli and antigravity systems are registered only because the
++// google vendor's own registration contract requires every agentic system
++// its rows mention; the launcher maps nothing to them and launches
++// nothing through them.
 +func NewRegistry() (*vendorplugin.Registry, error) {
 +	systems := agentic.NewRegistry()
 +	if err := systems.Register(claudeSystem.New()); err != nil {
@@ -1310,6 +1657,15 @@ index 0000000..92e2f8a
 +	}
 +	if err := systems.Register(codexSystem.New()); err != nil {
 +		return nil, fmt.Errorf("register codex system: %w", err)
++	}
++	if err := systems.Register(pinativeSystem.New()); err != nil {
++		return nil, fmt.Errorf("register pi-native system: %w", err)
++	}
++	if err := systems.Register(geminiSystem.New()); err != nil {
++		return nil, fmt.Errorf("register gemini-cli system: %w", err)
++	}
++	if err := systems.Register(agySystem.New()); err != nil {
++		return nil, fmt.Errorf("register antigravity system: %w", err)
 +	}
 +	registry := vendorplugin.NewRegistry(systems)
 +	if err := vendorplugin.SeedFrozenRuntimes(registry); err != nil {
@@ -1320,6 +1676,9 @@ index 0000000..92e2f8a
 +	}
 +	if err := registry.Register(openai.New()); err != nil {
 +		return nil, fmt.Errorf("register openai vendor: %w", err)
++	}
++	if err := registry.Register(google.New()); err != nil {
++		return nil, fmt.Errorf("register google vendor: %w", err)
 +	}
 +	return registry, nil
 +}
@@ -1342,40 +1701,68 @@ index 0000000..92e2f8a
 +		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("no compatibility registry completes %s defaults", environment)}
 +	}
 +	out := Resolved{Model: partial.Model, Effort: partial.Effort}
-+	if partial.Model.Present && partial.Effort.Present {
-+		// Nothing missing: the lineup supplies nothing. Record the
-+		// binding when the registry admits exactly one runtime; an
-+		// empty Runtime leaves the unknown runtime to the plan stage.
-+		if id, ok := selectDecl(target.System, reg.RuntimeDeclarations()); ok {
-+			out.Runtime = string(id)
-+		}
-+		return out, nil
-+	}
-+	id, ok := selectDecl(target.System, reg.RuntimeDeclarations())
-+	if !ok {
-+		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q)", environment, target.System)}
-+	}
-+	runtime, err := reg.ResolveRuntime(id)
++	cands, err := systemCandidates(target.System, reg)
 +	if err != nil {
 +		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q): %v", environment, target.System, err)}
 +	}
-+	driven := drivenModels(runtime, agentic.SystemID(target.System))
-+	ranked := vendorplugin.Lineup(driven)
-+	if len(ranked) == 0 {
++	if target.System == "pi-native" && !partial.Model.Present {
++		var preferred []candidate
++		for _, id := range strings.Fields(piRuntimePreference) {
++			for _, cand := range cands {
++				if string(cand.runtime) == id {
++					preferred = append(preferred, cand)
++				}
++			}
++			if len(preferred) > 0 {
++				break
++			}
++		}
++		if len(preferred) == 0 {
++			return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("no preferred Pi runtime (%s) declares a driven model for system %q", piRuntimePreference, target.System)}
++		}
++		cands = preferred
++	}
++	if len(cands) == 0 {
 +		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup admits no model for environment %q (system %q)", environment, target.System)}
 +	}
-+	out.Runtime = string(id)
++	if partial.Model.Present && partial.Effort.Present {
++		// Nothing missing: the lineup supplies nothing. Record the
++		// binding when exactly one of the system's runtimes drives the
++		// configured model; otherwise an empty Runtime leaves the
++		// unknown runtime to the plan stage.
++		if matches := contributorsFor(cands, partial.Model.Value); len(matches) == 1 {
++			out.Runtime = string(matches[0].runtime)
++		}
++		return out, nil
++	}
 +	if partial.Model.Present {
 +		// The effort is missing here: a full pair returned above, so
 +		// this fill cannot overwrite an explicit value.
-+		if row := findRow(driven, partial.Model.Value); row != nil {
-+			if effort, ok := effortForRow(*row); ok {
++		matches := contributorsFor(cands, partial.Model.Value)
++		if len(matches) > 1 {
++			return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("model %q for environment %q is driven by several runtimes; the launcher binds none", partial.Model.Value, environment)}
++		}
++		if len(matches) == 1 {
++			out.Runtime = string(matches[0].runtime)
++			if effort, ok := effortForRow(matches[0].model); ok {
 +				out.Effort = ResolvedMember{Member: effort, Origin: OriginLineup}
 +			}
 +		}
 +		return out, nil
 +	}
-+	top := ranked[0].Model
++	models := make([]vendorplugin.Model, 0, len(cands))
++	for _, cand := range cands {
++		models = append(models, cand.model)
++	}
++	// Candidates are non-empty here, so the lineup is non-empty too:
++	// the only empty gate is the candidate check above, and it stays
++	// in exactly that one place.
++	top := vendorplugin.Lineup(models)[0].Model
++	matches := contributorsFor(cands, string(top.ID))
++	if len(matches) != 1 {
++		return Resolved{}, &Error{CodeUnresolvable, fmt.Errorf("the lineup top model %q for environment %q is driven by several runtimes; the launcher binds none", string(top.ID), environment)}
++	}
++	out.Runtime = string(matches[0].runtime)
 +	out.Model = ResolvedMember{Member: Member{Value: string(top.ID), Present: true}, Origin: OriginLineup}
 +	if partial.Effort.Present {
 +		return out, nil
@@ -1386,48 +1773,54 @@ index 0000000..92e2f8a
 +	return out, nil
 +}
 +
-+// selectDecl finds the single runtime declaration for a mapped system.
-+// Capability scores are per-vendor and never comparable across vendors,
-+// so zero matches and several matches both admit nothing: the first is
-+// absence, the second is ambiguity, and the launcher guesses in neither.
-+func selectDecl(system string, decls []vendorplugin.RuntimeDeclaration) (vendorplugin.RuntimeID, bool) {
-+	var found vendorplugin.RuntimeID
-+	matches := 0
-+	for _, decl := range decls {
++// candidate is one vendor row the mapped system can drive, tagged with
++// the declared runtime that contributed it.
++type candidate struct {
++	runtime vendorplugin.RuntimeID
++	model   vendorplugin.Model
++}
++
++// systemCandidates gathers the driven rows across every runtime declared
++// for a mapped system, in the registry's own sorted declaration order.
++// Rows for other systems are not candidates: a launch on an undeclared
++// harness is a run nobody has evidence works. A declared runtime that
++// fails to materialize fails the whole system: a binding the registry
++// names but cannot resolve is a failure, never a hint to look elsewhere.
++func systemCandidates(system string, reg *vendorplugin.Registry) ([]candidate, error) {
++	var cands []candidate
++	declared := false
++	for _, decl := range reg.RuntimeDeclarations() {
 +		if string(decl.System) != system {
 +			continue
 +		}
-+		matches++
-+		if matches == 1 {
-+			found = decl.ID
++		declared = true
++		runtime, err := reg.ResolveRuntime(decl.ID)
++		if err != nil {
++			return nil, err
++		}
++		for _, model := range runtime.Vendor.Models() {
++			if model.DrivenBy(agentic.SystemID(system)) {
++				cands = append(cands, candidate{runtime: decl.ID, model: model})
++			}
 +		}
 +	}
-+	return found, matches == 1
-+}
-+
-+// drivenModels lists the binding's vendor rows the mapped system can
-+// drive. Rows for other systems are not candidates: a launch on an
-+// undeclared harness is a run nobody has evidence works.
-+func drivenModels(runtime vendorplugin.Runtime, system agentic.SystemID) []vendorplugin.Model {
-+	var driven []vendorplugin.Model
-+	for _, model := range runtime.Vendor.Models() {
-+		if model.DrivenBy(system) {
-+			driven = append(driven, model)
-+		}
++	if !declared {
++		return nil, fmt.Errorf("no declared runtime serves the system")
 +	}
-+	return driven
++	return cands, nil
 +}
 +
-+// findRow looks a configured model up among the driven rows by exact id.
++// contributorsFor looks a model id up among the candidates by exact id.
 +// Names are never normalized, prefixed, or otherwise derived: a spelling
-+// the vendor never issued is unknown, and the plan stage refuses it.
-+func findRow(driven []vendorplugin.Model, id string) *vendorplugin.Model {
-+	for i := range driven {
-+		if string(driven[i].ID) == id {
-+			return &driven[i]
++// no vendor issued matches nothing, and the plan stage refuses it.
++func contributorsFor(cands []candidate, id string) []candidate {
++	var matches []candidate
++	for _, cand := range cands {
++		if string(cand.model.ID) == id {
++			matches = append(matches, cand)
 +		}
 +	}
-+	return nil
++	return matches
 +}
 +
 +// effortForRow renders a row's effort declaration as a member: the
@@ -1477,20 +1870,24 @@ index 0000000..92e2f8a
 +}
 diff --git a/internal/defaults/lineup_test.go b/internal/defaults/lineup_test.go
 new file mode 100644
-index 0000000..eb2c09f
+index 0000000..c05f09d
 --- /dev/null
 +++ b/internal/defaults/lineup_test.go
-@@ -0,0 +1,431 @@
+@@ -0,0 +1,586 @@
 +package defaults_test
 +
 +import (
++	"context"
 +	"errors"
++	"os"
++	"path/filepath"
 +	"strings"
 +	"testing"
 +
 +	"github.com/relux-works/skill-agents-management/pkg/agentic"
 +	claudeSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/claude"
 +	codexSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/codex"
++	pinativeSystem "github.com/relux-works/skill-agents-management/pkg/agentic/systems/pinative"
 +	"github.com/relux-works/skill-agents-management/pkg/vendorplugin"
 +	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/anthropic"
 +	"github.com/relux-works/skill-agents-management/pkg/vendorplugin/vendors/openai"
@@ -1516,12 +1913,16 @@ index 0000000..eb2c09f
 +}
 +
 +// TestNewRegistryResolvesLaunchableSystems builds the production registry
-+// from the real tagged module: both launchable systems resolve with their
-+// vendor, and no pi-native (or legacy pi) runtime exists to fake native Pi
-+// admission through.
++// from the real tagged module: all five launchable runtimes resolve with
++// their system and vendor, each driving at least one model row, while the
++// legacy pi id and the pi-native system id (neither is a runtime id)
++// resolve to nothing, so no Pi launch can slip through the wrapper.
 +func TestNewRegistryResolvesLaunchableSystems(t *testing.T) {
 +	reg := mustRegistry(t)
-+	for runtime, system := range map[string]string{"claude": "claude-code", "codex": "codex"} {
++	for runtime, system := range map[string]string{
++		"claude": "claude-code", "codex": "codex",
++		"pi-anthropic": "pi-native", "pi-openai": "pi-native", "pi-google": "pi-native",
++	} {
 +		resolved, err := reg.ResolveRuntime(vendorplugin.RuntimeID(runtime))
 +		if err != nil {
 +			t.Fatalf("ResolveRuntime(%q): %v", runtime, err)
@@ -1529,26 +1930,28 @@ index 0000000..eb2c09f
 +		if string(resolved.SystemID) != system || resolved.Vendor == nil {
 +			t.Fatalf("ResolveRuntime(%q) = system %q vendor %v", runtime, resolved.SystemID, resolved.Vendor)
 +		}
-+		if len(resolved.Vendor.Models()) == 0 {
-+			t.Fatalf("ResolveRuntime(%q) vendor declares no models", runtime)
++		if len(vendorplugin.RuntimeModels(resolved)) == 0 {
++			t.Fatalf("ResolveRuntime(%q) drives no model for its system", runtime)
 +		}
 +	}
 +	for _, runtime := range []string{"pi", "pi-native"} {
 +		if _, err := reg.ResolveRuntime(vendorplugin.RuntimeID(runtime)); err == nil {
-+			t.Fatalf("ResolveRuntime(%q) succeeded: no Pi runtime may resolve", runtime)
++			t.Fatalf("ResolveRuntime(%q) succeeded: %q is not a declared runtime", runtime, runtime)
 +		}
 +	}
 +}
 +
-+// TestCompleteLineupTops pins the observed v0.5.10 fallback values. The
++// TestCompleteLineupTops pins the observed v0.5.11 fallback values. The
 +// model is the Lineup leader by capability score, not the vendor's
 +// display Recommended row (claude-opus-5 for anthropic); re-verify these
-+// pins when the module pin changes.
++// pins when the module pin changes. Pi ranks only the preferred runtime
++// and binds that contributor.
 +func TestCompleteLineupTops(t *testing.T) {
 +	reg := mustRegistry(t)
 +	for env, want := range map[string][3]string{
 +		"claude_code": {"claude-fable-5-1", "high", "claude"},
 +		"codex_cli":   {"gpt-6-astra", "max", "codex"},
++		"pi":          {"claude-fable-5", "high", "pi-anthropic"},
 +	} {
 +		t.Run(env, func(t *testing.T) {
 +			files, err := defaults.Load(paths(t))
@@ -1623,6 +2026,23 @@ index 0000000..eb2c09f
 +			t.Fatalf("runtime = %q, want codex", got.Runtime)
 +		}
 +	})
++	t.Run("pi-model-binds-contributor-runtime", func(t *testing.T) {
++		files, err := defaults.Load(paths(t))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("pi", defaults.Pair{Model: member("claude-opus-5")}, reg)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got.Model != resolved("claude-opus-5", defaults.OriginFlag) {
++			t.Fatalf("model = %+v", got.Model)
++		}
++		lineupOrigin(t, got.Effort, "high")
++		if got.Runtime != "pi-anthropic" {
++			t.Fatalf("runtime = %q, want the contributing pi runtime", got.Runtime)
++		}
++	})
 +}
 +
 +// TestCompleteNoEffortSemantics proves a model with no effort axis gets
@@ -1662,20 +2082,40 @@ index 0000000..eb2c09f
 +			t.Fatalf("effort = %+v, want unset so admission refuses the unknown model", got.Effort)
 +		}
 +	})
-+}
-+
-+// TestCompleteUnresolvable proves the pi system — whose pi-native runtime
-+// the pinned module does not declare — fails with the typed diagnostic
-+// and no invented model, while a fully file-supplied pi pair still
-+// resolves (with no runtime for the plan stage to refuse).
-+func TestCompleteUnresolvable(t *testing.T) {
-+	reg := mustRegistry(t)
-+	t.Run("bare", func(t *testing.T) {
++	t.Run("pi-effortless-row", func(t *testing.T) {
 +		files, err := defaults.Load(paths(t))
 +		if err != nil {
 +			t.Fatal(err)
 +		}
-+		got, err := files.Complete("pi", defaults.Pair{}, reg)
++		got, err := files.Complete("pi", defaults.Pair{Model: member("gemini-3.1-pro-preview")}, reg)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if got.Model != resolved("gemini-3.1-pro-preview", defaults.OriginFlag) {
++			t.Fatalf("model = %+v", got.Model)
++		}
++		if got.Effort != (defaults.ResolvedMember{}) {
++			t.Fatalf("effort = %+v, want unset for the effortless google row", got.Effort)
++		}
++		if got.Runtime != "pi-google" {
++			t.Fatalf("runtime = %q, want the contributing pi runtime", got.Runtime)
++		}
++	})
++}
++
++// TestCompleteUnresolvable proves a system with no declared runtime fails
++// with the typed diagnostic and no invented model, while a fully
++// file-supplied pi pair with an unknown id still resolves (with no
++// runtime for the plan stage to refuse).
++func TestCompleteUnresolvable(t *testing.T) {
++	reg := mustRegistry(t)
++	t.Run("no-declared-runtime", func(t *testing.T) {
++		bare := vendorplugin.NewRegistry(agentic.NewRegistry())
++		files, err := defaults.Load(paths(t))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("pi", defaults.Pair{}, bare)
 +		code(t, err, defaults.CodeUnresolvable)
 +		if got != (defaults.Resolved{}) {
 +			t.Fatalf("resolution leaked: %+v", got)
@@ -1699,7 +2139,7 @@ index 0000000..eb2c09f
 +			t.Fatalf("pair = %+v %+v", got.Model, got.Effort)
 +		}
 +		if got.Runtime != "" {
-+			t.Fatalf("runtime = %q, want empty for the undeclared Pi binding", got.Runtime)
++			t.Fatalf("runtime = %q, want empty: no driven row claims the unknown id", got.Runtime)
 +		}
 +	})
 +}
@@ -1780,21 +2220,71 @@ index 0000000..eb2c09f
 +// TestCompleteRuntimeResolutionFailure proves a declared-but-unmaterialized
 +// runtime admits nothing: the declaration names claude, but no system
 +// plugin is registered, so ResolveRuntime fails and the cause is refused
-+// as unresolvable rather than guessed past.
++// as unresolvable rather than guessed past. A second declaration that
++// does materialize does not rescue the first: one bad binding poisons
++// the whole system, so skipping past it is refused too.
 +func TestCompleteRuntimeResolutionFailure(t *testing.T) {
-+	reg := vendorplugin.NewRegistry(agentic.NewRegistry())
-+	if err := vendorplugin.SeedFrozenRuntimes(reg); err != nil {
-+		t.Fatal(err)
-+	}
-+	files, err := defaults.Load(paths(t))
-+	if err != nil {
-+		t.Fatal(err)
-+	}
-+	got, err := files.Complete("claude_code", defaults.Pair{}, reg)
-+	code(t, err, defaults.CodeUnresolvable)
-+	if got != (defaults.Resolved{}) {
-+		t.Fatalf("resolution leaked: %+v", got)
-+	}
++	t.Run("all-unmaterialized", func(t *testing.T) {
++		reg := vendorplugin.NewRegistry(agentic.NewRegistry())
++		if err := vendorplugin.SeedFrozenRuntimes(reg); err != nil {
++			t.Fatal(err)
++		}
++		files, err := defaults.Load(paths(t))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("claude_code", defaults.Pair{}, reg)
++		code(t, err, defaults.CodeUnresolvable)
++		if got != (defaults.Resolved{}) {
++			t.Fatalf("resolution leaked: %+v", got)
++		}
++	})
++	t.Run("partial-failure", func(t *testing.T) {
++		systems := agentic.NewRegistry()
++		if err := systems.Register(claudeSystem.New()); err != nil {
++			t.Fatal(err)
++		}
++		if err := systems.Register(pinativeSystem.New()); err != nil {
++			t.Fatal(err)
++		}
++		reg := vendorplugin.NewRegistry(systems)
++		for _, decl := range []vendorplugin.RuntimeDeclaration{
++			{
++				ID:     "claude",
++				System: "claude-code",
++				Vendor: "anthropic",
++				Broker: vendorplugin.BrokerProvenance{
++					Checked: []string{"test: one good declaration"},
++					Found:   "test: the frozen table binds claude to anthropic",
++				},
++			},
++			{
++				ID:     "claude-bad",
++				System: "claude-code",
++				Vendor: "openai",
++				Broker: vendorplugin.BrokerProvenance{
++					Checked: []string{"test: one unregistered vendor"},
++					Found:   "test: no vendor is registered for this check",
++				},
++			},
++		} {
++			if err := reg.DeclareRuntime(decl); err != nil {
++				t.Fatal(err)
++			}
++		}
++		if err := reg.Register(anthropic.New()); err != nil {
++			t.Fatal(err)
++		}
++		files, err := defaults.Load(paths(t))
++		if err != nil {
++			t.Fatal(err)
++		}
++		got, err := files.Complete("claude_code", defaults.Pair{}, reg)
++		code(t, err, defaults.CodeUnresolvable)
++		if got != (defaults.Resolved{}) {
++			t.Fatalf("resolution leaked past the bad binding: %+v", got)
++		}
++	})
 +}
 +
 +// TestCompleteWrongVendorModels proves rows for other systems are not
@@ -1807,6 +2297,9 @@ index 0000000..eb2c09f
 +		t.Fatal(err)
 +	}
 +	if err := systems.Register(codexSystem.New()); err != nil {
++		t.Fatal(err)
++	}
++	if err := systems.Register(pinativeSystem.New()); err != nil {
 +		t.Fatal(err)
 +	}
 +	reg := vendorplugin.NewRegistry(systems)
@@ -1836,14 +2329,18 @@ index 0000000..eb2c09f
 +	}
 +}
 +
-+// TestCompleteAmbiguousRuntime proves two runtimes on one system admit
-+// nothing: capability scores are per-vendor and never comparable across
-+// vendors, so the launcher refuses rather than merging lineups. The
-+// registry is built from the real module with a second declaration on
-+// the claude-code system.
++// TestCompleteAmbiguousRuntime proves a model driven by two runtimes on
++// one system binds none: candidates union across declarations, but the
++// pick must come from exactly one contributor, so the launcher refuses
++// rather than guessing a vendor. The registry is built from the real
++// module with a second declaration on the claude-code system, which puts
++// the same rows behind two runtimes.
 +func TestCompleteAmbiguousRuntime(t *testing.T) {
 +	systems := agentic.NewRegistry()
 +	if err := systems.Register(claudeSystem.New()); err != nil {
++		t.Fatal(err)
++	}
++	if err := systems.Register(pinativeSystem.New()); err != nil {
 +		t.Fatal(err)
 +	}
 +	reg := vendorplugin.NewRegistry(systems)
@@ -1868,11 +2365,23 @@ index 0000000..eb2c09f
 +	if err != nil {
 +		t.Fatal(err)
 +	}
-+	got, err := files.Complete("claude_code", defaults.Pair{}, reg)
-+	code(t, err, defaults.CodeUnresolvable)
-+	if got != (defaults.Resolved{}) {
-+		t.Fatalf("ambiguity resolved: %+v", got)
-+	}
++	t.Run("lineup-top", func(t *testing.T) {
++		got, err := files.Complete("claude_code", defaults.Pair{}, reg)
++		code(t, err, defaults.CodeUnresolvable)
++		if got != (defaults.Resolved{}) {
++			t.Fatalf("ambiguity resolved: %+v", got)
++		}
++		if !strings.Contains(err.Error(), "several runtimes") {
++			t.Fatalf("error %q does not name the ambiguity", err)
++		}
++	})
++	t.Run("configured-model", func(t *testing.T) {
++		got, err := files.Complete("claude_code", defaults.Pair{Model: member("claude-opus-5")}, reg)
++		code(t, err, defaults.CodeUnresolvable)
++		if got != (defaults.Resolved{}) {
++			t.Fatalf("ambiguity resolved: %+v", got)
++		}
++	})
 +}
 +
 +// TestResolvedLine pins the origin line-group rendering: each resolved
@@ -1911,6 +2420,45 @@ index 0000000..eb2c09f
 +		t.Fatalf("group = %q", sb.String())
 +	}
 +	var _ = errors.Is
++}
++
++// This API-level check proves the binding is admitted by the real module.
++// It does not claim the launcher entry point calls BuildLaunch yet.
++func TestCompletedPairsAdmitTaggedBuildLaunch(t *testing.T) {
++	reg := mustRegistry(t)
++	bin := t.TempDir()
++	for _, name := range []string{"claude", "codex", "pi"} {
++		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\nexit 91\n"), 0700); err != nil {
++			t.Fatal(err)
++		}
++	}
++	for _, tc := range []struct{ env, model, runtime string }{
++		{"claude_code", "", "claude"}, {"codex_cli", "", "codex"}, {"pi", "", "pi-anthropic"},
++		{"pi", "gpt-5.6-sol", "pi-openai"}, {"pi", "gemini-3.1-pro-preview", "pi-google"},
++	} {
++		t.Run(tc.env+"/"+tc.runtime, func(t *testing.T) {
++			var flags defaults.Pair
++			if tc.model != "" {
++				flags.Model = member(tc.model)
++			}
++			got, err := (defaults.Files{}).Complete(tc.env, flags, reg)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if got.Runtime != tc.runtime {
++				t.Fatalf("runtime=%q want %q", got.Runtime, tc.runtime)
++			}
++			plan, err := vendorplugin.BuildLaunch(context.Background(), reg, vendorplugin.SpawnRequest{
++				Runtime: vendorplugin.RuntimeID(got.Runtime), Model: vendorplugin.ModelID(got.Model.Value), Effort: got.Effort.Value, Home: t.TempDir(), WorkDir: t.TempDir(), Env: []string{"PATH=" + bin},
++			}, agentic.LaunchModeInteractive)
++			if err != nil {
++				t.Fatal(err)
++			}
++			if plan.Binary == "" {
++				t.Fatal("empty plan binary")
++			}
++		})
++	}
 +}
 diff --git a/internal/diagnostics/diagnostics.go b/internal/diagnostics/diagnostics.go
 index 4baf919..c77f69b 100644

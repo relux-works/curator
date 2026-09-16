@@ -8,7 +8,7 @@ required
 code
 
 ## Estimate
-notEstimated
+estimated(fibonacci(1))
 
 ## Blocked By
 - (none)
@@ -17,12 +17,12 @@ notEstimated
 - (none)
 
 ## Checklist
-(empty)
+- [ ] .github/ci/platform-exclusions.tsv rationale for the qualification vector is corrected or removed to match what the committed pin actually publishes; gate self-test and ledger-consistency green
 
 ## Notes
 
 ## Precondition Resources
-(none)
+- [campaign-producer-rules.md](file://TASK-260908-1bfk8y/campaign-producer-rules.md) — Campaign producer/reviewer rules for host e11-1
 
 ## Outcome Resources
 (none)
@@ -31,4 +31,4 @@ notEstimated
 2026-09-07T22:40:48Z
 
 ## Last Update
-2026-09-07T22:40:48Z
+2026-09-15T16:46:11Z

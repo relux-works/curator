@@ -19,7 +19,6 @@ estimated(fibonacci(8))
 - TASK-260728-2u5u14
 - TASK-260728-2spy93
 - TASK-260728-1g0z69
-- TASK-260729-3nx97g
 
 ## Checklist
 - [x] Every normative, schema, registry, fixture and generated reference uses skill-build.json; curator-build.json is rejected with no compatibility alias
@@ -67,7 +66,7 @@ spawn run completed: codex (run=RUN-260728-e07352, pid=3316, exit=0)
 2026-07-28T09:07:03Z
 
 ## Last Update
-2026-07-29T01:14:57Z
+2026-09-15T20:41:01Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

@@ -1,0 +1,7 @@
+# B7 handoff verification
+
+Run RUN-260915-c90f59 preserved the four-file candidate without edits. SHA-256 values for all three proposals and UNRESOLVED_QUESTIONS.md exactly match TASK-260908-1e55lp_results.md. The three draft snapshots remain attached. Read the epic mapping and exact B7 goal through resource get and checked the proposed text against environments and Decision 0012 OQ6. No option adopted, normative change, workaround, commit or landing.
+
+Validation: directly reran git diff --check in zsh, exit 0. Accepted the already-attached make validate exit 0 evidence for this identical candidate (60 schemas, 1047 vectors, 227 Python tests, Go tools); did not rerun the long suite or runtime landing suite. Hash inspection exited 0. Earlier exploratory board queries using unsupported resources projection exited 1; corrected to preconditionResources/outcomeResources. These were lookup errors, not validation failures.
+
+Checklist ownership: producer evidence is attached; independent reviewer acceptance remains pending and belongs to the reviewer. Findings are recorded here and in board notes. The generic conditional logbook item is satisfied under the superseding campaign logging policy: LOGBOOK.md is prohibited, so no logbook write is applicable and board notes/outcomes are the required destination. This does not claim a logbook edit. No current runtime or cross-platform test claim. Ready for review.

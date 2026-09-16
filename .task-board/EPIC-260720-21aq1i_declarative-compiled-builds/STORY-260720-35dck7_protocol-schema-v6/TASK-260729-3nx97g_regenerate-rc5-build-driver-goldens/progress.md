@@ -12,7 +12,6 @@ estimated(fibonacci(8))
 
 ## Blocked By
 - TASK-260720-1s1vr6
-- TASK-260728-2kp3tv
 
 ## Blocks
 - TASK-260720-2dnqw2
@@ -52,6 +51,7 @@ spawn run started: [reviewer] reviewer (codex) (run=RUN-260729-04c6dd)
 Reviewer verdict: ACCEPTED. Independent evidence is attached as TASK-260729-3nx97g_review-verdict.md. Required identities, non-alias negatives, manifest preservation, deterministic regeneration, validation/test/release gates, and Curator no-skip candidate metadata integration all passed. Reviewer made no code changes and authorizes no landing or publication.
 agent completed: [reviewer] reviewer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260729-04c6dd, pid=88819, exit=0)
+2026-09-16 orchestrator: historical blocked_by link to TASK-260728-2kp3tv removed (both done) because it closed a container-level dependency cycle STORY-260720-35dck7 <-> STORY-260728-10wxx2 that refused every new dependency link on the board. No status change.
 
 ## Precondition Resources
 (none)
@@ -66,7 +66,7 @@ spawn run completed: codex (run=RUN-260729-04c6dd, pid=88819, exit=0)
 2026-07-29T01:14:39Z
 
 ## Last Update
-2026-07-29T11:51:44Z
+2026-09-15T20:41:06Z
 
 ## Assigned To
 [reviewer] reviewer (codex)

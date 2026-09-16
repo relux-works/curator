@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -46,6 +46,7 @@ Review cycle 1: ACCEPT at draft head fcdb9ba (worktree curator-spec-follow-ups).
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260905-fc2c03, pid=58105, exit=0)
 Landed on curator-spec main as fcdb9ba (PR #43, fast-forward of the reviewed head) on 2026-09-05; review ACCEPT with two low notes. Item 3 (system-config-v2) is TASK-260905-26o45p.
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 871d11bcdfd2: pull request 41 names the element and its merge commit f61ee9a75cd1 is an ancestor; method=legacy_pr_attested attested=true landing_commit=f61ee9a75cd1861a9993b0ee9ad4ad32a5ef3c9f authority=871d11bcdfd240a6260d0722503bdd1642a8fce8; reason: landed by curator-spec PR #41 (reviewed); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-follow-ups.md](file://TASK-260905-2tqh59/producer-brief-follow-ups.md) — Producer brief: 0012 erratum, §12.1 pin spelling, §7.7 row, §8.1/§10.1 nits, validator enum cross-check, overlay negative cases, --repair citation, batch-2 schema minors
@@ -64,7 +65,7 @@ Landed on curator-spec main as fcdb9ba (PR #43, fast-forward of the reviewed hea
 2026-09-05T13:20:33Z
 
 ## Last Update
-2026-09-05T18:17:48Z
+2026-09-16T10:10:03Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

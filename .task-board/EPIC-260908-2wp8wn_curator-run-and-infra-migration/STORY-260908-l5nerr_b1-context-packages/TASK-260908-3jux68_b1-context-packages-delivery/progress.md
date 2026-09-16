@@ -110,6 +110,8 @@ spawn agent resolution: Agent selection: codex via explicit_override (preferred_
 spawn launch composition: empty; contract=agents-infra.child-launch-composition; provider=codex; schema=1; producer=main-7a0a24c; diagnostic=launch_composition_empty; no project MCP servers enabled
 spawn queued: [implementer] developer (codex) (run=RUN-260915-69f68f, max_parallel=8)
 spawn run started: [implementer] developer (codex) (run=RUN-260915-69f68f)
+agent completed: [implementer] developer (codex) (exit=0)
+spawn run completed: codex (run=RUN-260915-69f68f, pid=25422, exit=0)
 
 ## Precondition Resources
 - [b1-producer-brief.md](file://TASK-260908-3jux68/b1-producer-brief.md) — B1 producer brief: private relux-root-context packages from dee5403 bytes
@@ -133,7 +135,7 @@ spawn run started: [implementer] developer (codex) (run=RUN-260915-69f68f)
 - [TASK-260908-3jux68_spawn-log_-implementer--developer--codex-_RUN-260915-bc61c9.log](file://TASK-260908-3jux68/TASK-260908-3jux68_spawn-log_-implementer--developer--codex-_RUN-260915-bc61c9.log) — System spawn log captured by task-board
 - [TASK-260908-3jux68_integration-refusal-20260916.md](file://TASK-260908-3jux68/TASK-260908-3jux68_integration-refusal-20260916.md) — Bound integration refusal, exact exit and separate-owner delivery routing
 - [TASK-260908-3jux68_spawn-log_-implementer--developer--codex-_RUN-260915-d2509d.log](file://TASK-260908-3jux68/TASK-260908-3jux68_spawn-log_-implementer--developer--codex-_RUN-260915-d2509d.log) — System spawn log captured by task-board
-- [TASK-260908-3jux68_integration-results.md](file://TASK-260908-3jux68/TASK-260908-3jux68_integration-results.md) — Fresh integration output: code_landing_identity_mismatch refusal
+- [TASK-260908-3jux68_integration-results.md](file://TASK-260908-3jux68/TASK-260908-3jux68_integration-results.md) — Fresh bound integration transaction output and exit code
 - [TASK-260908-3jux68_spawn-log_-implementer--developer--codex-_RUN-260915-41add8.log](file://TASK-260908-3jux68/TASK-260908-3jux68_spawn-log_-implementer--developer--codex-_RUN-260915-41add8.log) — System spawn log captured by task-board
 - [TASK-260908-3jux68_spawn-log_-implementer--developer--codex-_RUN-260915-69f68f.log](file://TASK-260908-3jux68/TASK-260908-3jux68_spawn-log_-implementer--developer--codex-_RUN-260915-69f68f.log) — System spawn log captured by task-board
 
@@ -141,7 +143,7 @@ spawn run started: [implementer] developer (codex) (run=RUN-260915-69f68f)
 2026-09-07T23:11:21Z
 
 ## Last Update
-2026-09-15T20:19:51Z
+2026-09-15T20:21:33Z
 
 ## Assigned To
 [implementer] developer (codex)

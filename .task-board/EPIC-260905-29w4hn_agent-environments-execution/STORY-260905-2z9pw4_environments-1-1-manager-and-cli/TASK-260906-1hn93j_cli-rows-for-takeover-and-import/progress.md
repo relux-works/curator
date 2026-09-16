@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -130,6 +130,7 @@ spawn run started: [implementer] developer (muse) (run=RUN-260906-04ba51)
 spawn run RUN-260906-04ba51 cancelled by operator; operator action required; reason: no operator reason supplied
 agent completed: [implementer] developer (muse) (exit=143)
 spawn run completed: muse (run=RUN-260906-04ba51, pid=35396, exit=143)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 871d11bcdfd2: pull request 45 names the element and its merge commit 88c8d9b5da67 is an ancestor; method=legacy_pr_attested attested=true landing_commit=88c8d9b5da6722e3a457ae71f97532d7dbf104f4 authority=871d11bcdfd240a6260d0722503bdd1642a8fce8; reason: landed by curator-spec PR #45 (reviewed); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-cli-takeover-import.md](file://TASK-260906-1hn93j/producer-brief-cli-takeover-import.md) — Producer brief: add the takeover and onboarding-import rows to cli/curator.md
@@ -163,7 +164,7 @@ spawn run completed: muse (run=RUN-260906-04ba51, pid=35396, exit=143)
 2026-09-06T06:56:28Z
 
 ## Last Update
-2026-09-06T08:07:16Z
+2026-09-16T10:10:23Z
 
 ## Assigned To
 [implementer] developer (muse)

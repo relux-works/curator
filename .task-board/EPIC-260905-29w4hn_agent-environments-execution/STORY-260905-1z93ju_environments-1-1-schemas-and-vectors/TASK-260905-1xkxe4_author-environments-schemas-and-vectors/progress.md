@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -104,6 +104,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260905-a04068)
 Cycle 3 review (RUN-260905-a04068): landing head fd237ba (draft) == CR rev 3 candidate 9454cd3 tree 08f50f3; one signed commit past f61ee9a; range-diff vs 794c7bd only CHANGELOG/README merges, regenerated manifest/index/rc.9, gofmt, validate.py context; gofmt -l empty; make validate + regenerate-check green; pinned-lane files untouched; PR #42 all checks green on fd237ba; node-semver 7.7.4 and hand-rebuilt v2 header hold byte for byte. ACCEPT via accept_cr rev 3 -> integrating. Evidence: TASK-260905-1xkxe4_review-findings-schemas-3.md. Cycle-1 minors F1-F4 remain follow-ups. Note: draft worktree has untracked tools/__pycache__ from gate runs.
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260905-a04068, pid=19968, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 871d11bcdfd2: pull request 42 names the element and its merge commit fd237ba0cbdf is an ancestor; method=legacy_pr_attested attested=true landing_commit=fd237ba0cbdfd4298e9e982bde9c9852854cc88f authority=871d11bcdfd240a6260d0722503bdd1642a8fce8; reason: landed by curator-spec PR #42 (reviewed); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-env-schemas-vectors.md](file://TASK-260905-1xkxe4/producer-brief-env-schemas-vectors.md) — Producer brief: environments 1.1 batch 2 — schemas, cases, vector families, generator/validator
@@ -143,7 +144,7 @@ spawn run completed: claude (run=RUN-260905-a04068, pid=19968, exit=0)
 2026-09-05T12:59:31Z
 
 ## Last Update
-2026-09-05T17:51:19Z
+2026-09-16T10:10:13Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

@@ -1,0 +1,89 @@
+# TASK-260906-vlrjo1 — Windows dotfile-manager heuristic findings
+
+Date: 2026-09-15. Research handoff; no specification or implementation edits.
+
+## Decision and bounds
+
+Recommend a **closed platform-specific table**, retaining home-relative default probes with explicit platform applicability. The premise that chezmoi requires a `%LOCALAPPDATA%` probe is contradicted by its current documentation. Its documented Windows source directory is `%USERPROFILE%/.local/share/chezmoi`. Therefore the existing home-relative lookup is not inherently inert on native Windows. This is **docs-confidence**, not Windows execution evidence. [Chezmoi variables](https://www.chezmoi.io/reference/configuration-file/variables/#sourcedir).
+
+Research plan: unblock §9.5 list semantics; grammar_frozen: not applicable (no wire format change); budget 60 minutes, one outcome document under 30 KB, no archives, one research prerequisite. Exit: table, recommendation, exact replacement wording, and evidence bounds recorded. Consumer: follow-up docs task updates §9.5 and manager profile, followed by the Curator onboarding implementation slice through a mutating profile operation and its Windows regression. No additional research leaf is needed.
+
+## Fact-checked locations
+
+These are default source/configuration markers, not proof that a manager actively owns a particular file. Only the two managers named in §9.5 and implemented in `dotfileStateDirs` are in scope; “and the like” is not a defined additional list.
+
+| Manager / marker | POSIX location | Native Windows location | Evidence kind and source |
+| --- | --- | --- | --- |
+| chezmoi source directory (existing probe) | `~/.local/share/chezmoi`; docs also permit `$XDG_DATA_HOME/chezmoi` and configured `sourceDir` | `%USERPROFILE%/.local/share/chezmoi` default | **docs-confidence**, all locations; [vendor variables, sourceDir](https://www.chezmoi.io/reference/configuration-file/variables/#sourcedir). No installed chezmoi on PATH here. |
+| Home Manager configuration directory (existing probe) | `~/.config/home-manager` containing `home.nix` in the documented standard installation | No native Windows location established; do not add one. Within WSL use the Linux home/configuration, not the Windows user profile. | **docs-confidence**: [Home Manager configuration](https://nix-community.github.io/home-manager/usage/configuration.html), [Nix installation, Windows WSL2](https://nix.dev/install-nix.html). Native Windows exclusion is a conservative support bound inferred from these docs, not proof that no directory could physically exist. |
+
+Chezmoi's persistent database is distinct from its source directory: documented defaults are `$XDG_CONFIG_HOME/chezmoi/chezmoi.boltdb`, `$HOME/.config/chezmoi/chezmoi.boltdb`, or `%USERPROFILE%/.config/chezmoi/chezmoi.boltdb` (**docs-confidence**). This does not support the brief's LOCALAPPDATA assertion either. Do not add the database as another probe in this change. [Vendor persistentState](https://www.chezmoi.io/reference/configuration-file/variables/#persistentstate).
+
+Home Manager is Nix-powered, not exclusively NixOS: its standard configuration is a marker only and installations using another configuration path can evade this heuristic. WSL is a Linux execution environment for this purpose; a native Windows Curator process should not crawl WSL homes. [Introduction](https://nix-community.github.io/home-manager/introduction.html), [Nix install](https://nix.dev/install-nix.html).
+
+### Supplemental brief correction: Claude Code and Codex
+
+The attached brief conflates adapter configuration directories with dotfile-manager markers. §9.5 does not enumerate `.claude` or `.codex` as heuristic locations. Their mere presence must not imply a foreign dotfile manager. Outside-store symlinks remain a separate inventory rule.
+
+| Tool (not a dotfile-manager probe) | Documented configuration | Evidence |
+| --- | --- | --- |
+| Claude Code | POSIX `~/.claude`; Windows `%USERPROFILE%\.claude`; `CLAUDE_CONFIG_DIR` relocates it | **docs-confidence** for paths, [vendor directory reference](https://code.claude.com/docs/en/claude-directory). Installed-binary version only: `2.1.272 (Claude Code)`. |
+| Codex CLI | User configuration `~/.codex/config.toml` | **docs-confidence**, [official configuration basics](https://learn.chatgpt.com/docs/config-file/config-basic). This fetched page uses home notation; no Windows-specific expansion asserted here. Installed-binary version only: `codex-cli 0.153.4`. |
+
+Version commands do not reproduce config resolution, Windows behavior, symlink ownership, or dotfile-manager locations. No private configuration was read or modified.
+
+## Local inspection and anomaly logbook (2026-09-15)
+
+- Spec tree: `3535d63ea80f97bba2fcb6e1f06996cfc25cf7df`, `protocol/environments.md:1794–1807`. The text calls the list closed but ends with “and the like”; it neither closes membership nor defines applicability. This is a genuine specification ambiguity even though the claimed chezmoi Windows path defect is unsupported.
+- Read-only Curator control-tree inspection at `4f27ccb21fd7c7b5f449466c6c858bf9b8108940`: `internal/envprofile/managed.go:725–755` contains exactly the two markers. `foreignManagerHint` uses `os.UserHomeDir`, `filepath.FromSlash`, `filepath.Join`, and `os.Stat` with `IsDir`; call at line 1667. No OS filter exists. Thus portable spelling itself does not suppress the Windows probe (source-inspection inference, not runtime proof).
+- Its comment repeats the unsupported LOCALAPPDATA premise and should be corrected in the implementation follow-up. No evidence from the reported windows-latest lane or C2-m1 was attached/reproduced in this run; those incident claims remain provenance from the brief.
+- The helper currently collapses home-resolution/stat failures into no hint. This is an inspection finding, not a tested regression; absence and inability to inspect should be distinguishable when reporting heuristic coverage.
+- Campaign rules expressly prohibit `LOGBOOK.md` edits. This task-scoped logbook section and board notes preserve these findings instead. The CLI has no `logbook` mutation (scoped schema query returned an unknown-mutation error); no board bytes were edited manually.
+
+## Options
+
+| Option | Consequence |
+| --- | --- |
+| Platform-specific closed table — recommended | Explicitly includes chezmoi on native Windows; excludes unestablished native Home Manager support; bounded deterministic probes. |
+| Platform-neutral “find manager state” rule | Hides platform/override semantics and permits unbounded implementation choices unless accompanied by the same explicit table. |
+| POSIX-only list | Can be honest if Windows says “heuristic not applicable,” but needlessly drops the documented chezmoi default and does not repair the false LOCALAPPDATA claim. |
+
+Keep the initial probes at their documented home-relative defaults. XDG relocation, configured source paths, other managers, and managers acting from elsewhere are stated blind spots; absence of markers does not establish absence of a foreign manager. Do not execute foreign binaries during inventory to discover locations.
+
+## Exact proposed §9.5 replacement (follow-up only)
+
+Replace the two sentences beginning “The inventory additionally applies” and ending “The heuristic never blocks.” Current text (line wrapping normalized):
+
+> The inventory additionally applies a best-effort **heuristic**: the presence of a well-known dotfile-manager state location (a closed, documented list per manager — `~/.local/share/chezmoi`, `~/.config/home-manager`, and the like) elevates the notice for plain unmanaged files to `environment_foreign_manager_suspected` (warning): a dotfile manager appears to manage this machine and will overwrite managed surfaces on its next apply. The heuristic never blocks.
+
+Proposed exact sentences:
+
+> The inventory additionally applies a best-effort **heuristic** using the closed, platform-specific list below: an existing directory at an applicable listed location elevates the notice for plain unmanaged files to `environment_foreign_manager_suspected` (warning), indicating that a dotfile manager may overwrite managed surfaces on a later apply. The list contains only chezmoi's default source directory on Linux, macOS, and native Windows, and Home Manager's default configuration directory on Linux and macOS; WSL uses the Linux entries within that Linux environment. These locations are **docs-confidence**, recorded from the linked vendor documentation and not yet reproduced on a pinned installed release, and remain subject to this document's verified/docs-confidence rule before dependent conformance vectors freeze. Home-relative paths resolve beneath the operator home using native path separators, not beneath the manager's managed home. Only the listed default locations are probed; relocated XDG/configured directories, other managers, and other environments' homes are outside this heuristic's coverage. If no entry applies to the executing platform, the manager reports that the state-location heuristic is not applicable and does not elevate a notice on that basis. An applicable list with no directory found establishes only that no listed marker was found, not that no foreign manager exists; inability to resolve or inspect a location is reported as an incomplete heuristic check rather than absence. The heuristic never blocks and does not weaken the outside-store symlink stop or the repeated-drift warning.
+
+Insert this exact closed table immediately after those sentences:
+
+| Manager | Linux/macOS operator-home relative directory | Native Windows operator-home relative directory | Evidence |
+| --- | --- | --- | --- |
+| chezmoi | `.local/share/chezmoi` | `.local/share/chezmoi` | **docs-confidence** — [sourceDir](https://www.chezmoi.io/reference/configuration-file/variables/#sourcedir) |
+| Home Manager | `.config/home-manager` | Not applicable; no native Windows location established | **docs-confidence** — [configuration](https://nix-community.github.io/home-manager/usage/configuration.html), [Nix platforms](https://nix.dev/install-nix.html) |
+
+The evidence sentence does not promote live documentation into pinned-release verification. A follow-up must record tool versions and reproduce applicable entries before freezing dependent conformance vectors, as already required by the opening evidence rule.
+
+## Profile and implementation follow-through
+
+In `profiles/manager.md:2303`, replace the phrase “well-known dotfile-manager state location” with “directory in the applicable closed platform-specific list in environments §9.5”; add: “The state-location heuristic reports its applicability and incomplete inspection bounds as specified there.” Keep §9.5 as the single list owner.
+
+Implementation follow-up: retain chezmoi's relative path on Windows, apply Home Manager only on Linux/macOS, correct the misleading comment, and carry incomplete/not-applicable probe status to the onboarding notice. Validate through a real mutating profile operation with an unmanaged plain file: chezmoi marker present/absent on native Windows; Home Manager marker present on POSIX; native Windows Home Manager-only marker must not elevate; an unrelated `.claude`/`.codex` directory must not elevate; an unreadable marker must not be reported absent. Preserve outside-store symlink and repeated-drift behavior. These are proposed checks, not checks run here.
+
+## Evidence execution ledger
+
+All probes below ran directly as standalone zsh processes, without pipes or tee.
+
+| Command | Actual exit code | Evidence bound |
+| --- | --- | --- |
+| `claude --version` | 0 | Installed version 2.1.272 only. |
+| `codex --version` | 0 | Installed version 0.153.4 only. |
+| `command -v chezmoi` | 1 | Failed lookup: no binary found on this run's PATH; no installed-location verification possible. |
+| `command -v home-manager` | 1 | Failed lookup: no binary found on this run's PATH; no installed-location verification possible. |
+
+Vendor pages were opened/read on 2026-09-15 using the web tool; shell exit codes do not apply. No Windows/Linux execution, tool installs, full landing suite, or runtime tests were performed. Existing runtime evidence was not accepted as passing evidence for this research. Spec/profile/code files remain unchanged. Research artifact checks and handoff results are recorded on the board.

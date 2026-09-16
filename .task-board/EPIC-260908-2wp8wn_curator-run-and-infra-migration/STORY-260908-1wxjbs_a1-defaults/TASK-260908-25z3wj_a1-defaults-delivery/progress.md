@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -66,6 +66,7 @@ spawn queued: [implementer] developer (codex) (run=RUN-260908-ba5245, max_parall
 spawn run started: [implementer] developer (codex) (run=RUN-260908-ba5245)
 agent completed: [implementer] developer (codex) (exit=0)
 spawn run completed: codex (run=RUN-260908-ba5245, pid=1530, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at b34e1e27dbe9: pull request 14 names the element and its merge commit 26baf9777e5a is an ancestor; method=legacy_pr_attested attested=true landing_commit=26baf9777e5a406aeeca343ab5a3b0a25925165e authority=b34e1e27dbe97155682ce013948a0cc226280844; reason: a1 defaults landed by launcher PR #14 (26baf97, reviewed); record-less legacy closure
 
 ## Precondition Resources
 - [defaults-files-brief.md](file://TASK-260908-25z3wj/defaults-files-brief.md)
@@ -88,7 +89,7 @@ spawn run completed: codex (run=RUN-260908-ba5245, pid=1530, exit=0)
 2026-09-07T23:10:56Z
 
 ## Last Update
-2026-09-08T21:29:30Z
+2026-09-16T10:11:24Z
 
 ## Assigned To
 [implementer] developer (codex)

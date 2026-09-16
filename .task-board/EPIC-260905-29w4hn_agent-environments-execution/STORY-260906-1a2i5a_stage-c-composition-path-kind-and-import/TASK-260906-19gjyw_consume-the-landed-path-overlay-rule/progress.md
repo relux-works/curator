@@ -1,5 +1,5 @@
 ## Status
-integrating
+done
 
 ## Review
 required
@@ -238,6 +238,7 @@ spawn run started: [reviewer] reviewer (claude) (run=RUN-260907-b8a04e)
 Review cycle 2 (RUN-260907-b8a04e): ACCEPT, repeat-of none. CR-TASK-260906-19gjyw-2 rev 2 accepted; element routed to integrating. Deliverable is curator feat/consume-overlay-rule@e4ddca19, PR #62 (MERGEABLE/CLEAN, 11 hosted checks SUCCESS on that exact head). Empty repository delta is structural: the story workspace is a curator-spec checkout at 87a0d006, HEAD^{tree} == base tree == candidate tree 2e6ca472, zero paths; the leaf scope is the curator repo. Cycle 1 F1/F2/F3 all closed by measurement: M10 re-applied kills TestInstallNeverDemotesANetworkIdentityToAPath (exit 1, checked 8 / 3 bare canonical) where it exited 0 at 38702164; the bare==0 guard fires on matrix removal and is non-vacuous (ValidCanonical implies ClassifySource=path over 90 spellings); M19 survives at exit 0 on the reviewed matrix and is killed by the added packages/team:context operand; doc comment moved and a go/ast pass over 6 production files finds only two mismatches, both pre-existing on origin/main. Install kind change re-derived over 82 operands through both complete compositions (stage (c) isPathOperand + old Parse carve-out vs head): 61 unchanged, 21 changed, and of the 23 operands that reached the network before, 22 stay git and 1 becomes an explicit refusal -- zero become a local path. envprofile.go at e4ddca19 is AST-identical to 38702164 (comments stripped, decls sorted): no product behaviour moved. Candidate lane run 34071813375 green on ubuntu/macos/windows against curator-spec 87a0d006 with CI_REQUIRE_FULL_ROOT=1, confirmed from the jobs own logs. Stated bound: the candidate lane is not dispatched at e4ddca19; the delta is root-independent (internal/envprofile matches CURATOR_CONFORMANCE_ROOT in 0 files) and its changed tests are green on all three runners at that head. Landing verdict: PR #62 is safe to land. Two non-blocking follow-ups for the orchestrator: the strictAuditMember/canaryPasses doc block on origin/main is the F3 shape and predates this branch; a66eec88 logbook entry still calls the consumption gap open.
 agent completed: [reviewer] reviewer (claude) (exit=0)
 spawn run completed: claude (run=RUN-260907-b8a04e, pid=5170, exit=0)
+close-landed (legacy, no Change Request record): closed as landed on refs/heads/main at 12f1287ee0fb: pull request 62 names the element and its merge commit fb916acd60dd is an ancestor; method=legacy_pr_attested attested=true landing_commit=fb916acd60dd1881f050c5d838356235455b5b89 authority=12f1287ee0fb538f9ca004dd53b870e824e5baf2; reason: landed by curator PR #62 (reviewed: review-verdict-rev2 resource); record-less legacy closure
 
 ## Precondition Resources
 - [producer-brief-consume-overlay-rule.md](file://TASK-260906-19gjyw/producer-brief-consume-overlay-rule.md) — Producer brief: port the git-source-only overlay rule into the Go reader and make the candidate lane green against spec main
@@ -273,7 +274,7 @@ spawn run completed: claude (run=RUN-260907-b8a04e, pid=5170, exit=0)
 2026-09-06T19:20:27Z
 
 ## Last Update
-2026-09-07T03:40:46Z
+2026-09-16T10:08:18Z
 
 ## Assigned To
 [reviewer] reviewer (claude)

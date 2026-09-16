@@ -14,7 +14,7 @@ estimated(fibonacci(3))
 - TASK-260720-3s27te
 
 ## Blocks
-- BUG-260730-3eqseq
+- (none)
 
 ## Checklist
 - [ ] Verify all 17 delivery tasks are done and their accepted code is present on ivanopcode/cocoaskills origin/main
@@ -36,4 +36,4 @@ User release boundary (supersedes original publication wording and checklist ite
 2026-07-29T21:46:49Z
 
 ## Last Update
-2026-08-01T07:19:49Z
+2026-09-15T16:36:10Z

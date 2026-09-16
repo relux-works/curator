@@ -1,0 +1,2 @@
+# Review brief addendum — TASK-260910-1o9x1f rev 2
+Revision 1 was CHANGES_REQUESTED (R1: explicit null for optional root_inputs/pin accepted as absence). Review revision 2 against skillfile-wave2-review-brief.md plus: both null documents from the rev1 verdict now fail repository_policy_invalid through LoadSourcePolicy with real temp files; omission and valid-value controls still pass; nothing else regressed. Accept with revision=2 if all hold.

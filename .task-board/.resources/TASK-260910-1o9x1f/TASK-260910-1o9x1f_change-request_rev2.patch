@@ -1,0 +1,1239 @@
+diff --git a/docs/draft-source-policy.md b/docs/draft-source-policy.md
+new file mode 100644
+index 0000000..88f24ad
+--- /dev/null
++++ b/docs/draft-source-policy.md
+@@ -0,0 +1,26 @@
++# Draft repository endpoint policy boundary
++
++This is an internal implementation of unreleased `repository-transport-v1`
++revision 1 (machine policy loading and attempt planning), not an enabled
++fetch path. Frozen v1 and release qualification are unchanged.
++
++`config.LoadSourcePolicy` reads the operator-owned `source-policy.json`
++beside the manager configuration; `config.ParseSourcePolicy` validates
++one document. Entries are keyed by exact canonical identity
++(`identity.DraftCanonicalKey`, no normalization); each lists one or two
++distinct closed-grammar endpoints that canonicalize to the key, an opaque
++operator provider reference per endpoint (`gitcred.ValidProvider`, never
++a command or path), and a closed fallback mode. `pin` selects exactly one
++listed URL by exact string equality and forces no fallback.
++
++`config.ResolveRepositoryEndpoints` plans attempts for one declaration
++without network I/O: a URL without an entry attempts the declared URL
++once with no policy provider; a logical identity without an entry fails
++`repository_endpoint_unavailable`; an invalid or unreadable policy fails
++`repository_policy_invalid` before any acquisition. A schema-2 document
++is rejected closed: revision 2 ports, mirrors, and aliases need a
++revision-2 reader and are a separate leaf.
++
++This layer plans only. Failure classification, credential resolution,
++and fetch attempts belong to transport application; root-input existence
++is proven at acquisition time, not at load.
+diff --git a/internal/config/sourcepolicy.go b/internal/config/sourcepolicy.go
+new file mode 100644
+index 0000000..a76f898
+--- /dev/null
++++ b/internal/config/sourcepolicy.go
+@@ -0,0 +1,406 @@
++package config
++
++// Machine-owned repository endpoint policy (repository-transport-v1,
++// revision 1): loading, validation, and declaration-to-attempt planning.
++//
++// source-policy.json lives beside the manager configuration, outside
++// package-controlled trees. It is optional for URL declarations and
++// mandatory for logical `repository` declarations. This layer performs
++// no network I/O: every structural check fails before acquisition, and
++// the sibling transport-application task consumes Resolution without
++// re-deriving pin or fallback semantics.
++
++import (
++	"encoding/json"
++	"fmt"
++	"os"
++	"path/filepath"
++	"sort"
++	"strings"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/gitcred"
++	"github.com/relux-works/curator/internal/identifiers"
++	"github.com/relux-works/curator/internal/identity"
++	"github.com/relux-works/curator/internal/protocoljson"
++	"github.com/relux-works/curator/internal/verr"
++)
++
++// SourcePolicyFileName is the machine policy filename beside the manager
++// configuration. SourcePolicySchemaVersion is the one schema this
++// revision-1 reader accepts; a schema-2 document is rejected closed
++// (repository-transport §4), never read with its revision-2 members
++// ignored.
++const (
++	SourcePolicyFileName      = "source-policy.json"
++	SourcePolicySchemaVersion = 1
++)
++
++// Stable transport diagnostics (repository-transport §2). Every error
++// produced here carries its class as a message prefix so callers match
++// on prose exactly as the published failure classes spell it.
++const (
++	CodeRepositoryPolicyInvalid       = "repository_policy_invalid"
++	CodeRepositoryEndpointUnavailable = "repository_endpoint_unavailable"
++)
++
++// Fallback modes (repository-transport §2). Pin forces FallbackNone
++// irrespective of the configured value; a URL declaration without an
++// entry resolves with FallbackNone and no policy provider.
++const (
++	FallbackNone             = "none"
++	FallbackAvailabilityAuth = "availability-auth"
++)
++
++// Endpoint is one listed machine endpoint: a closed-grammar URL whose
++// lane identity equals the entry key, plus an opaque operator-owned
++// authentication provider reference.
++type Endpoint struct {
++	URL            string
++	Authentication string
++}
++
++// RepositoryPolicy is one validated `repositories` entry keyed by exact
++// canonical identity. Pin is "" when absent.
++type RepositoryPolicy struct {
++	Identity  string
++	Endpoints []Endpoint
++	Pin       string
++	Fallback  string
++}
++
++// SourcePolicy is a validated machine source-policy.json. Repositories
++// maps exact canonical identity to its entry; RootInputs maps a
++// case-sensitive source alias to its admitted source-relative inputs.
++type SourcePolicy struct {
++	Path         string
++	Repositories map[string]RepositoryPolicy
++	RootInputs   map[string][]string
++}
++
++// Attempt is one planned endpoint attempt. An empty Authentication names
++// no policy provider: the caller falls back to the existing lane policy,
++// which is the only case a URL declaration without an entry produces.
++type Attempt struct {
++	URL            string
++	Authentication string
++}
++
++// Resolution is the ordered attempt plan for one declaration. Attempts
++// holds one or two entries in attempt order (exactly one when pinned or
++// when no entry applies); Fallback is the effective mode after pin is
++// applied; Identity is the stable canonical identity allowlist checks
++// match before acquisition.
++type Resolution struct {
++	Identity string
++	Attempts []Attempt
++	Fallback string
++}
++
++// SourcePolicyPath resolves the machine policy path beside the manager
++// configuration.
++func SourcePolicyPath() string {
++	return filepath.Join(filepath.Dir(UserPath()), SourcePolicyFileName)
++}
++
++// LoadSourcePolicy reads and validates the machine policy at path, or at
++// SourcePolicyPath when path is "". A missing file is an absent policy
++// and returns (nil, nil): URL declarations still attempt their declared
++// endpoint once. Any present-but-unreadable or invalid document fails
++// repository_policy_invalid; it is never treated as absent.
++func LoadSourcePolicy(path string) (*SourcePolicy, error) {
++	if path == "" {
++		path = SourcePolicyPath()
++	}
++	payload, err := os.ReadFile(path) // #nosec G304 -- policy path comes from the operator
++	if err != nil {
++		if os.IsNotExist(err) {
++			return nil, nil
++		}
++		return nil, fmt.Errorf("%s: cannot read %s: %v", CodeRepositoryPolicyInvalid, path, err)
++	}
++	return ParseSourcePolicy(payload, path)
++}
++
++// ParseSourcePolicy validates one source-policy.json document (schema 1).
++// path names the document in diagnostics only.
++func ParseSourcePolicy(payload []byte, path string) (*SourcePolicy, error) {
++	if err := protocoljson.Validate(payload); err != nil {
++		return nil, verr.New("", "%s: malformed JSON in %s: %v", CodeRepositoryPolicyInvalid, path, err)
++	}
++	var raw any
++	if err := json.Unmarshal(payload, &raw); err != nil {
++		return nil, verr.New("", "%s: malformed JSON in %s: %v", CodeRepositoryPolicyInvalid, path, err)
++	}
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("", "%s: %s must contain an object", CodeRepositoryPolicyInvalid, path)
++	}
++	if err := rejectPolicyFields(obj, "", "schema_version", "repositories", "root_inputs"); err != nil {
++		return nil, err
++	}
++	schema, ok := integerValue(obj["schema_version"])
++	if !ok {
++		return nil, verr.New("schema_version", "%s: must be integer %d", CodeRepositoryPolicyInvalid, SourcePolicySchemaVersion)
++	}
++	if schema == 2 {
++		return nil, verr.New("schema_version", "%s: schema 2 is a revision-2 policy and requires a revision-2 reader", CodeRepositoryPolicyInvalid)
++	}
++	if schema != SourcePolicySchemaVersion {
++		return nil, verr.New("schema_version", "%s: unsupported source-policy schema_version %d", CodeRepositoryPolicyInvalid, schema)
++	}
++	rawRepos, present := obj["repositories"]
++	if !present || rawRepos == nil {
++		return nil, verr.New("repositories", "%s: requires a repositories object", CodeRepositoryPolicyInvalid)
++	}
++	repos, ok := rawRepos.(map[string]any)
++	if !ok {
++		return nil, verr.New("repositories", "%s: must be an object", CodeRepositoryPolicyInvalid)
++	}
++	policy := &SourcePolicy{Path: path, Repositories: map[string]RepositoryPolicy{}}
++	for _, key := range sortedPolicyKeys(repos) {
++		entry, err := parseRepositoryEntry(key, repos[key])
++		if err != nil {
++			return nil, err
++		}
++		policy.Repositories[key] = entry
++	}
++	if rawInputs, present := obj["root_inputs"]; present {
++		inputs, err := parseRootInputs(rawInputs)
++		if err != nil {
++			return nil, err
++		}
++		policy.RootInputs = inputs
++	}
++	return policy, nil
++}
++
++// ResolveRepositoryEndpoints plans endpoint attempts for one source
++// declaration: exactly one of gitURL (a declared URL) or repository (a
++// logical canonical identity) must be set. policy may be nil for an
++// absent machine policy. No network I/O occurs here.
++//
++//   - URL with an entry: the machine list in list order (pin selects one);
++//     the declared URL never reorders the list.
++//   - URL without an entry: the declared URL once, no policy provider,
++//     no fallback.
++//   - Logical with an entry: the machine list as above.
++//   - Logical without an entry: repository_endpoint_unavailable.
++//   - A malformed declaration: source_selection_invalid.
++func ResolveRepositoryEndpoints(policy *SourcePolicy, gitURL, repository string) (Resolution, error) {
++	if (gitURL == "") == (repository == "") {
++		return Resolution{}, fmt.Errorf("source_selection_invalid: requires exactly one of git or repository")
++	}
++	var canonical string
++	if gitURL != "" {
++		parsed, err := buildrepo.ParseSource(gitURL)
++		if err != nil {
++			return Resolution{}, fmt.Errorf("source_selection_invalid: invalid repository endpoint")
++		}
++		canonical = parsed.Identity
++	} else {
++		if !identity.DraftCanonicalKey(repository) {
++			return Resolution{}, fmt.Errorf("source_selection_invalid: repository must be canonical host/path")
++		}
++		canonical = repository
++	}
++	var entry RepositoryPolicy
++	found := false
++	if policy != nil {
++		entry, found = policy.Repositories[canonical]
++	}
++	if !found {
++		if repository != "" {
++			return Resolution{}, fmt.Errorf("%s: no machine policy entry for %q", CodeRepositoryEndpointUnavailable, canonical)
++		}
++		return Resolution{Identity: canonical, Attempts: []Attempt{{URL: gitURL}}, Fallback: FallbackNone}, nil
++	}
++	if len(entry.Endpoints) == 0 {
++		return Resolution{}, fmt.Errorf("%s: entry for %q lists no endpoints", CodeRepositoryPolicyInvalid, canonical)
++	}
++	if entry.Pin != "" {
++		for _, endpoint := range entry.Endpoints {
++			if endpoint.URL == entry.Pin {
++				return Resolution{
++					Identity: canonical,
++					Attempts: []Attempt{{URL: endpoint.URL, Authentication: endpoint.Authentication}},
++					Fallback: FallbackNone,
++				}, nil
++			}
++		}
++		return Resolution{}, fmt.Errorf("%s: pin is not a listed endpoint of %q", CodeRepositoryPolicyInvalid, canonical)
++	}
++	attempts := make([]Attempt, 0, len(entry.Endpoints))
++	for _, endpoint := range entry.Endpoints {
++		attempts = append(attempts, Attempt(endpoint))
++	}
++	return Resolution{Identity: canonical, Attempts: attempts, Fallback: entry.Fallback}, nil
++}
++
++func parseRepositoryEntry(key string, raw any) (RepositoryPolicy, error) {
++	label := "repositories." + key
++	if !identity.DraftCanonicalKey(key) {
++		return RepositoryPolicy{}, verr.New(label, "%s: entry key must be exact canonical host/path", CodeRepositoryPolicyInvalid)
++	}
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return RepositoryPolicy{}, verr.New(label, "%s: must be an object", CodeRepositoryPolicyInvalid)
++	}
++	if err := rejectPolicyFields(obj, label, "endpoints", "pin", "fallback"); err != nil {
++		return RepositoryPolicy{}, err
++	}
++	rawEndpoints, present := obj["endpoints"]
++	if !present || rawEndpoints == nil {
++		return RepositoryPolicy{}, verr.New(label+".endpoints", "%s: requires one or two endpoints", CodeRepositoryPolicyInvalid)
++	}
++	list, ok := rawEndpoints.([]any)
++	if !ok || len(list) < 1 || len(list) > 2 {
++		return RepositoryPolicy{}, verr.New(label+".endpoints", "%s: requires one or two endpoints", CodeRepositoryPolicyInvalid)
++	}
++	entry := RepositoryPolicy{Identity: key}
++	seen := map[string]bool{}
++	for index, raw := range list {
++		endpoint, err := parsePolicyEndpoint(label, index, key, raw)
++		if err != nil {
++			return RepositoryPolicy{}, err
++		}
++		if seen[endpoint.URL] {
++			return RepositoryPolicy{}, verr.New(label+".endpoints", "%s: endpoints must be distinct URLs", CodeRepositoryPolicyInvalid)
++		}
++		seen[endpoint.URL] = true
++		entry.Endpoints = append(entry.Endpoints, endpoint)
++	}
++	if rawPin, present := obj["pin"]; present {
++		pin, ok := rawPin.(string)
++		if !ok {
++			return RepositoryPolicy{}, verr.New(label+".pin", "%s: must be a listed endpoint URL", CodeRepositoryPolicyInvalid)
++		}
++		if _, err := buildrepo.ParseSource(pin); err != nil {
++			return RepositoryPolicy{}, verr.New(label+".pin", "%s: pin is outside the closed repository grammar", CodeRepositoryPolicyInvalid)
++		}
++		if !seen[pin] {
++			return RepositoryPolicy{}, verr.New(label+".pin", "%s: pin must equal a listed endpoint URL exactly", CodeRepositoryPolicyInvalid)
++		}
++		entry.Pin = pin
++	}
++	rawFallback, present := obj["fallback"]
++	if !present || rawFallback == nil {
++		return RepositoryPolicy{}, verr.New(label+".fallback", "%s: requires fallback %q or %q", CodeRepositoryPolicyInvalid, FallbackNone, FallbackAvailabilityAuth)
++	}
++	fallback, ok := rawFallback.(string)
++	if !ok || (fallback != FallbackNone && fallback != FallbackAvailabilityAuth) {
++		return RepositoryPolicy{}, verr.New(label+".fallback", "%s: requires fallback %q or %q", CodeRepositoryPolicyInvalid, FallbackNone, FallbackAvailabilityAuth)
++	}
++	entry.Fallback = fallback
++	return entry, nil
++}
++
++func parsePolicyEndpoint(label string, index int, key string, raw any) (Endpoint, error) {
++	field := fmt.Sprintf("%s.endpoints[%d]", label, index)
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return Endpoint{}, verr.New(field, "%s: must be an object", CodeRepositoryPolicyInvalid)
++	}
++	if err := rejectPolicyFields(obj, field, "url", "authentication"); err != nil {
++		return Endpoint{}, err
++	}
++	rawURL, present := obj["url"]
++	if !present || rawURL == nil {
++		return Endpoint{}, verr.New(field+".url", "%s: requires an endpoint URL", CodeRepositoryPolicyInvalid)
++	}
++	rawAuth, present := obj["authentication"]
++	if !present || rawAuth == nil {
++		return Endpoint{}, verr.New(field+".authentication", "%s: requires an authentication provider reference", CodeRepositoryPolicyInvalid)
++	}
++	urlValue, ok := rawURL.(string)
++	if !ok {
++		return Endpoint{}, verr.New(field+".url", "%s: must be a string", CodeRepositoryPolicyInvalid)
++	}
++	parsed, err := buildrepo.ParseSource(urlValue)
++	if err != nil {
++		return Endpoint{}, verr.New(field+".url", "%s: endpoint is outside the closed repository grammar", CodeRepositoryPolicyInvalid)
++	}
++	if parsed.Identity != key {
++		return Endpoint{}, verr.New(field+".url", "%s: endpoint canonicalizes to %q, want entry key %q", CodeRepositoryPolicyInvalid, parsed.Identity, key)
++	}
++	provider, ok := rawAuth.(string)
++	if !ok || !gitcred.ValidProvider(provider) {
++		return Endpoint{}, verr.New(field+".authentication", "%s: must be an opaque operator provider identifier", CodeRepositoryPolicyInvalid)
++	}
++	return Endpoint{URL: urlValue, Authentication: provider}, nil
++}
++
++func parseRootInputs(raw any) (map[string][]string, error) {
++	obj, ok := raw.(map[string]any)
++	if !ok {
++		return nil, verr.New("root_inputs", "%s: must be an object", CodeRepositoryPolicyInvalid)
++	}
++	inputs := map[string][]string{}
++	for _, alias := range sortedPolicyKeys(obj) {
++		label := "root_inputs." + alias
++		if !identifiers.Valid(alias) {
++			return nil, verr.New(label, "%s: alias must be a portable identifier", CodeRepositoryPolicyInvalid)
++		}
++		list, ok := obj[alias].([]any)
++		if !ok || len(list) == 0 {
++			return nil, verr.New(label, "%s: requires a non-empty input list", CodeRepositoryPolicyInvalid)
++		}
++		entries := make([]string, 0, len(list))
++		seen := map[string]bool{}
++		for _, raw := range list {
++			value, ok := raw.(string)
++			if !ok || !identifiers.PortablePath(value) {
++				return nil, verr.New(label, "%s: entries must be portable source-relative paths", CodeRepositoryPolicyInvalid)
++			}
++			if seen[value] {
++				return nil, verr.New(label, "%s: duplicate root-input entry %q", CodeRepositoryPolicyInvalid, value)
++			}
++			for _, prior := range entries {
++				if rootInputOverlaps(prior, value) {
++					return nil, verr.New(label, "%s: overlapping root-input entries %q and %q", CodeRepositoryPolicyInvalid, prior, value)
++				}
++			}
++			seen[value] = true
++			entries = append(entries, value)
++		}
++		inputs[alias] = entries
++	}
++	return inputs, nil
++}
++
++// rootInputOverlaps reports entries that select overlapping bytes: equal
++// paths or one nested under the other. Comparison is byte-exact;
++// filesystem case-equivalence is an acquisition-time check.
++func rootInputOverlaps(a, b string) bool {
++	return a == b || strings.HasPrefix(b, a+"/") || strings.HasPrefix(a, b+"/")
++}
++
++func rejectPolicyFields(obj map[string]any, field string, allowed ...string) error {
++	set := make(map[string]bool, len(allowed))
++	for _, key := range allowed {
++		set[key] = true
++	}
++	var unknown []string
++	for key := range obj {
++		if !set[key] {
++			unknown = append(unknown, key)
++		}
++	}
++	if len(unknown) > 0 {
++		sort.Strings(unknown)
++		if field == "" {
++			field = "source-policy.json"
++		}
++		return verr.New(field, "%s: unsupported field(s): %s", CodeRepositoryPolicyInvalid, strings.Join(unknown, ", "))
++	}
++	return nil
++}
++
++func sortedPolicyKeys(obj map[string]any) []string {
++	keys := make([]string, 0, len(obj))
++	for key := range obj {
++		keys = append(keys, key)
++	}
++	sort.Strings(keys)
++	return keys
++}
+diff --git a/internal/config/sourcepolicy_test.go b/internal/config/sourcepolicy_test.go
+new file mode 100644
+index 0000000..568de77
+--- /dev/null
++++ b/internal/config/sourcepolicy_test.go
+@@ -0,0 +1,447 @@
++package config
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"github.com/relux-works/curator/internal/buildrepo"
++	"github.com/relux-works/curator/internal/identity"
++)
++
++func TestDraftPolicyPublishedSchemaCases(t *testing.T) {
++	files, err := filepath.Glob("testdata/draft-sources-v1/source-policy-v1/*.json")
++	if err != nil || len(files) != 5 {
++		t.Fatalf("published corpus: %d files, %v", len(files), err)
++	}
++	for _, file := range files {
++		t.Run(filepath.Base(file), func(t *testing.T) {
++			payload, err := os.ReadFile(file)
++			if err != nil {
++				t.Fatal(err)
++			}
++			_, err = ParseSourcePolicy(payload, file)
++			want := strings.HasPrefix(filepath.Base(file), "valid")
++			if (err == nil) != want {
++				t.Fatalf("valid=%v: %v", want, err)
++			}
++			if err != nil && !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) {
++				t.Fatalf("error %q lacks class %q", err, CodeRepositoryPolicyInvalid)
++			}
++		})
++	}
++}
++
++func policyDoc(repositories string) string {
++	return `{"schema_version":1,"repositories":{` + repositories + `}}`
++}
++
++func policyEntry(endpoints, extra string) string {
++	entry := `"endpoints":[` + endpoints + `],"fallback":"availability-auth"`
++	if extra != "" {
++		entry += "," + extra
++	}
++	return `{` + entry + `}`
++}
++
++func mustParsePolicy(t *testing.T, doc string) *SourcePolicy {
++	t.Helper()
++	policy, err := ParseSourcePolicy([]byte(doc), "source-policy.json")
++	if err != nil {
++		t.Fatalf("ParseSourcePolicy: %v", err)
++	}
++	return policy
++}
++
++func mustRejectPolicy(t *testing.T, doc string) {
++	t.Helper()
++	_, err := ParseSourcePolicy([]byte(doc), "source-policy.json")
++	if err == nil {
++		t.Fatalf("ParseSourcePolicy accepted %s", doc)
++	}
++	if !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) {
++		t.Fatalf("error %q lacks class %q", err, CodeRepositoryPolicyInvalid)
++	}
++}
++
++func TestParseSourcePolicyDocumentShape(t *testing.T) {
++	valid := policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}`)
++	policy := mustParsePolicy(t, valid)
++	if policy.Path != "source-policy.json" {
++		t.Fatalf("Path = %q", policy.Path)
++	}
++	if len(policy.Repositories) != 1 || policy.Repositories["example.org/kit"].Fallback != FallbackNone {
++		t.Fatalf("Repositories = %+v", policy.Repositories)
++	}
++	empty := mustParsePolicy(t, `{"schema_version":1,"repositories":{}}`)
++	if len(empty.Repositories) != 0 {
++		t.Fatalf("Repositories = %+v", empty.Repositories)
++	}
++	for _, doc := range []string{
++		`not json`,
++		`{"schema_version":1,"repositories":{}}trailing`,
++		`["schema_version"]`,
++		`{"schema_version":1,"repositories":{},"unexpected":true}`,
++		`{"schema_version":1}`,
++		`{"schema_version":1,"repositories":null}`,
++		`{"schema_version":1,"repositories":[]}`,
++		`{"repositories":{}}`,
++		`{"schema_version":"1","repositories":{}}`,
++		`{"schema_version":1.5,"repositories":{}}`,
++		`{"schema_version":0,"repositories":{}}`,
++		`{"schema_version":3,"repositories":{}}`,
++		`{"schema_version":null,"repositories":{}}`,
++	} {
++		mustRejectPolicy(t, doc)
++	}
++}
++
++func TestParseSourcePolicyRejectsRevision2Closed(t *testing.T) {
++	_, err := ParseSourcePolicy([]byte(`{"schema_version":2,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}}}`), "source-policy.json")
++	if err == nil || !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) || !strings.Contains(err.Error(), "revision-2") {
++		t.Fatalf("v2 rejection %v does not name the revision boundary", err)
++	}
++	mustRejectPolicy(t, `{"schema_version":1,"repositories":{},"aliases":{"corp-mirror":{"host":"mirror.example","authentication":"team-https"}}}`)
++	mustRejectPolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","alias":"corp-mirror"}],"fallback":"none"}`))
++	mustRejectPolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https","mirror_of":"example.org/kit"}],"fallback":"none"}`))
++}
++
++func TestParseSourcePolicyEntryKeysAreExactCanonical(t *testing.T) {
++	mkdoc := func(key string) string {
++		return policyDoc(`"` + key + `":` + policyEntry(`{"url":"https://example.org/kit.git","authentication":"team-https"}`, ""))
++	}
++	for _, key := range []string{
++		"example.org/kit",
++		"example.org/Kit",
++		"example.org/a/b/c",
++		"e.co/x",
++		"example.org/a_b.c-d/e",
++	} {
++		doc := policyDoc(`"` + key + `":` + policyEntry(`{"url":"https://`+key+`.git","authentication":"team-https"}`, ""))
++		mustParsePolicy(t, doc)
++	}
++	for _, key := range []string{
++		"Example.org/kit",
++		"example.org/kit.git",
++		"example.org:8443/kit",
++		"user@example.org/kit",
++		"example.org/../kit",
++		"example.org/./kit",
++		"example.org/kit/",
++		"example.org",
++		"",
++		"example.org/kit?x",
++		"example.org/ki t",
++		"ssh://example.org/kit",
++		"git@example.org:kit.git",
++	} {
++		mustRejectPolicy(t, mkdoc(key))
++	}
++}
++
++func TestParseSourcePolicyEndpoints(t *testing.T) {
++	one := func(url, auth string) string {
++		return policyDoc(`"example.org/kit":` + policyEntry(`{"url":"`+url+`","authentication":"`+auth+`"}`, ""))
++	}
++	two := func(first, second string) string {
++		return policyDoc(`"example.org/kit":` + policyEntry(first+","+second, ""))
++	}
++	ssh := `{"url":"git@example.org:kit.git","authentication":"team-ssh"}`
++	https := `{"url":"https://example.org/kit.git","authentication":"team-https"}`
++	policy := mustParsePolicy(t, two(ssh, https))
++	entry := policy.Repositories["example.org/kit"]
++	if len(entry.Endpoints) != 2 || entry.Endpoints[0].URL != "git@example.org:kit.git" || entry.Endpoints[1].Authentication != "team-https" {
++		t.Fatalf("Endpoints = %+v", entry.Endpoints)
++	}
++	mustParsePolicy(t, one("https://example.org/kit", "team-https"))
++	mustParsePolicy(t, one("ssh://git@example.org/kit.git", "team-ssh"))
++
++	for _, doc := range []string{
++		// Identity mismatch: the published endpoint-identity-mismatch refusal.
++		one("https://evil.org/kit", "team-https"),
++		one("https://example.org/other", "team-https"),
++		one("git@example.org:kit/extra.git", "team-ssh"),
++		// Repeated URLs fail even with distinct providers.
++		two(https, `{"url":"https://example.org/kit.git","authentication":"other"}`),
++		two(ssh, ssh),
++		// Unsafe or foreign grammar.
++		one("http://example.org/kit", "team-https"),
++		one("https://example.org:8443/kit", "team-https"),
++		one("https://example.org/kit?x=1", "team-https"),
++		one("git://example.org/kit", "team-git"),
++		one("not a url", "team-https"),
++		one("", "team-https"),
++		// Provider refs are opaque identifiers, never commands or paths.
++		one("https://example.org/kit", ""),
++		one("https://example.org/kit", "/bin/sh"),
++		one("https://example.org/kit", "a b"),
++		one("https://example.org/kit", "a/b"),
++		one("https://example.org/kit", "../x"),
++		one("https://example.org/kit", `C:\x`),
++		one("https://example.org/kit", "a:b"),
++		one("https://example.org/kit", "a@b"),
++		// Shape violations.
++		policyDoc(`"example.org/kit":{"fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[],"fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[` + ssh + `,` + https + `,{"url":"ssh://example.org/kit","authentication":"third"}],"fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":"https://example.org/kit","fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{}],"fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit"}],"fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{"authentication":"team-https"}],"fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":1,"authentication":"team-https"}],"fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit","authentication":1}],"fallback":"none"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[` + ssh + `],"fallback":"none","helper":"evil"}`),
++		policyDoc(`"example.org/kit":"https://example.org/kit"`),
++	} {
++		mustRejectPolicy(t, doc)
++	}
++}
++
++func TestParseSourcePolicyPinAndFallback(t *testing.T) {
++	pinned := func(pin string) string {
++		return policyDoc(`"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh"},{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"availability-auth","pin":"` + pin + `"}`)
++	}
++	if got := mustParsePolicy(t, pinned("git@example.org:kit.git")).Repositories["example.org/kit"].Pin; got != "git@example.org:kit.git" {
++		t.Fatalf("Pin = %q", got)
++	}
++	if got := mustParsePolicy(t, pinned("https://example.org/kit.git")).Repositories["example.org/kit"].Pin; got != "https://example.org/kit.git" {
++		t.Fatalf("Pin = %q", got)
++	}
++	for _, doc := range []string{
++		// Pin must equal a listed URL exactly: same identity is not enough.
++		pinned("https://example.org/kit"),
++		pinned("ssh://example.org/kit.git"),
++		pinned(""),
++		pinned("https://evil.org/kit"),
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none","pin":1}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none","pin":null}`),
++		// Fallback is required and closed.
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}]}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"any-error"}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":null}`),
++		policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"NONE"}`),
++	} {
++		mustRejectPolicy(t, doc)
++	}
++}
++
++func TestParseSourcePolicyRootInputs(t *testing.T) {
++	withInputs := func(inputs string) string {
++		return `{"schema_version":1,"repositories":{},"root_inputs":{` + inputs + `}}`
++	}
++	policy := mustParsePolicy(t, withInputs(`"local":["SKILL.md","scripts"]`))
++	if len(policy.RootInputs["local"]) != 2 {
++		t.Fatalf("RootInputs = %+v", policy.RootInputs)
++	}
++	if got := mustParsePolicy(t, `{"schema_version":1,"repositories":{}}`).RootInputs; got != nil {
++		t.Fatalf("RootInputs = %+v", got)
++	}
++	for _, doc := range []string{
++		withInputs(`"local":[]`),
++		withInputs(`"local":["SKILL.md","SKILL.md"]`),
++		withInputs(`"local":["refs","refs/guide.md"]`),
++		withInputs(`"local":["refs/guide.md","refs"]`),
++		withInputs(`"local":["/abs"]`),
++		withInputs(`"local":["../up"]`),
++		withInputs(`"local":["a/../b"]`),
++		withInputs(`"local":["a\\b"]`),
++		withInputs(`"local":[""]`),
++		withInputs(`"local":["trailing."]`),
++		withInputs(`"local":"SKILL.md"`),
++		withInputs(`"not an alias":["SKILL.md"]`),
++		withInputs(`"":["SKILL.md"]`),
++		`{"schema_version":1,"repositories":{},"root_inputs":[]}`,
++		`{"schema_version":1,"repositories":{},"root_inputs":null}`,
++	} {
++		mustRejectPolicy(t, doc)
++	}
++}
++
++func TestLoadSourcePolicy(t *testing.T) {
++	dir := t.TempDir()
++	missing := filepath.Join(dir, "absent", "source-policy.json")
++	policy, err := LoadSourcePolicy(missing)
++	if err != nil || policy != nil {
++		t.Fatalf("missing file: policy=%v err=%v", policy, err)
++	}
++	malformed := filepath.Join(dir, "source-policy.json")
++	if err := os.WriteFile(malformed, []byte(`{"schema_version":`), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := LoadSourcePolicy(malformed); err == nil || !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) {
++		t.Fatalf("malformed file err=%v", err)
++	}
++	if _, err := LoadSourcePolicy(dir); err == nil || !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) {
++		t.Fatalf("unreadable path err=%v", err)
++	}
++	valid := filepath.Join(dir, "valid.json")
++	doc := policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}`)
++	if err := os.WriteFile(valid, []byte(doc), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	policy, err = LoadSourcePolicy(valid)
++	if err != nil || policy == nil || policy.Path != valid {
++		t.Fatalf("valid file: policy=%+v err=%v", policy, err)
++	}
++	if policy.Repositories["example.org/kit"].Endpoints[0].Authentication != "team-https" {
++		t.Fatalf("Repositories = %+v", policy.Repositories)
++	}
++}
++
++func TestLoadSourcePolicyRejectsNullOptionalFields(t *testing.T) {
++	for _, tc := range []struct{ name, doc string }{
++		{"null root_inputs", `{"schema_version":1,"repositories":{},"root_inputs":null}`},
++		{"null pin", `{"schema_version":1,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team"}],"fallback":"none","pin":null}}}`},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			file := filepath.Join(t.TempDir(), "source-policy.json")
++			if err := os.WriteFile(file, []byte(tc.doc), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			_, err := LoadSourcePolicy(file)
++			if err == nil || !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) {
++				t.Fatalf("LoadSourcePolicy(%s) err=%v", tc.name, err)
++			}
++		})
++	}
++	// Controls: omitted optionals and valid values still load.
++	for _, tc := range []struct{ name, doc string }{
++		{"omitted optionals", policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team"}],"fallback":"none"}`)},
++		{"valid optionals", `{"schema_version":1,"repositories":{"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team"}],"fallback":"none","pin":"https://example.org/kit.git"}},"root_inputs":{"local":["SKILL.md"]}}`},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			file := filepath.Join(t.TempDir(), "source-policy.json")
++			if err := os.WriteFile(file, []byte(tc.doc), 0o600); err != nil {
++				t.Fatal(err)
++			}
++			if _, err := LoadSourcePolicy(file); err != nil {
++				t.Fatalf("LoadSourcePolicy(%s): %v", tc.name, err)
++			}
++		})
++	}
++}
++
++func TestResolveRepositoryEndpoints(t *testing.T) {
++	policy := mustParsePolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh"},{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"availability-auth"}`))
++
++	resolved, err := ResolveRepositoryEndpoints(nil, "https://example.org/kit.git", "")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if resolved.Identity != "example.org/kit" || len(resolved.Attempts) != 1 || resolved.Attempts[0].URL != "https://example.org/kit.git" || resolved.Attempts[0].Authentication != "" || resolved.Fallback != FallbackNone {
++		t.Fatalf("URL without policy: %+v", resolved)
++	}
++
++	resolved, err = ResolveRepositoryEndpoints(policy, "https://other.org/kit.git", "")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(resolved.Attempts) != 1 || resolved.Attempts[0].URL != "https://other.org/kit.git" || resolved.Fallback != FallbackNone {
++		t.Fatalf("URL without entry: %+v", resolved)
++	}
++
++	// A URL hint for the second endpoint never reorders the machine list.
++	resolved, err = ResolveRepositoryEndpoints(policy, "https://example.org/kit.git", "")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(resolved.Attempts) != 2 || resolved.Attempts[0].URL != "git@example.org:kit.git" || resolved.Attempts[0].Authentication != "team-ssh" || resolved.Attempts[1].URL != "https://example.org/kit.git" || resolved.Fallback != FallbackAvailabilityAuth {
++		t.Fatalf("URL with entry: %+v", resolved)
++	}
++
++	resolved, err = ResolveRepositoryEndpoints(policy, "", "example.org/kit")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if resolved.Identity != "example.org/kit" || len(resolved.Attempts) != 2 || resolved.Fallback != FallbackAvailabilityAuth {
++		t.Fatalf("logical with entry: %+v", resolved)
++	}
++
++	for _, candidate := range []*SourcePolicy{nil, policy} {
++		_, err = ResolveRepositoryEndpoints(candidate, "", "example.org/missing")
++		if err == nil || !strings.Contains(err.Error(), CodeRepositoryEndpointUnavailable) {
++			t.Fatalf("logical without entry err=%v", err)
++		}
++		if !strings.Contains(err.Error(), "example.org/missing") {
++			t.Fatalf("unavailable error %q names no identity", err)
++		}
++	}
++
++	pinned := mustParsePolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"git@example.org:kit.git","authentication":"team-ssh"},{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"availability-auth","pin":"https://example.org/kit.git"}`))
++	resolved, err = ResolveRepositoryEndpoints(pinned, "", "example.org/kit")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if len(resolved.Attempts) != 1 || resolved.Attempts[0].URL != "https://example.org/kit.git" || resolved.Attempts[0].Authentication != "team-https" || resolved.Fallback != FallbackNone {
++		t.Fatalf("pin: %+v", resolved)
++	}
++
++	unpinned := mustParsePolicy(t, policyDoc(`"example.org/kit":{"endpoints":[{"url":"https://example.org/kit.git","authentication":"team-https"}],"fallback":"none"}`))
++	resolved, err = ResolveRepositoryEndpoints(unpinned, "", "example.org/kit")
++	if err != nil || len(resolved.Attempts) != 1 || resolved.Fallback != FallbackNone {
++		t.Fatalf("single endpoint: %+v err=%v", resolved, err)
++	}
++
++	for _, args := range [][2]string{
++		{"https://example.org/kit.git", "example.org/kit"},
++		{"", ""},
++		{"http://example.org/kit", ""},
++		{"not a url", ""},
++		{"", "Example.org/kit"},
++		{"", "example.org/kit.git"},
++		{"", "https://example.org/kit"},
++	} {
++		if _, err := ResolveRepositoryEndpoints(policy, args[0], args[1]); err == nil || !strings.Contains(err.Error(), "source_selection_invalid") {
++			t.Fatalf("Resolve(%q,%q) err=%v", args[0], args[1], err)
++		}
++	}
++}
++
++func TestResolveRepositoryEndpointsRejectsHandBuiltViolations(t *testing.T) {
++	badPin := &SourcePolicy{Repositories: map[string]RepositoryPolicy{
++		"example.org/kit": {Identity: "example.org/kit", Endpoints: []Endpoint{{URL: "https://example.org/kit", Authentication: "team-https"}}, Pin: "https://example.org/other", Fallback: FallbackNone},
++	}}
++	if _, err := ResolveRepositoryEndpoints(badPin, "", "example.org/kit"); err == nil || !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) {
++		t.Fatalf("bad pin err=%v", err)
++	}
++	empty := &SourcePolicy{Repositories: map[string]RepositoryPolicy{
++		"example.org/kit": {Identity: "example.org/kit", Fallback: FallbackNone},
++	}}
++	if _, err := ResolveRepositoryEndpoints(empty, "", "example.org/kit"); err == nil || !strings.Contains(err.Error(), CodeRepositoryPolicyInvalid) {
++		t.Fatalf("empty endpoints err=%v", err)
++	}
++}
++
++// The policy loader validates entry keys through identity.DraftCanonicalKey
++// and endpoint URLs through the closed lane grammar; the two must agree, or
++// a valid key could never match a valid endpoint. Every accepted key is a
++// fixed point of the lane canonicalizer.
++func TestPolicyKeyAndEndpointIdentityAgree(t *testing.T) {
++	keys := []string{
++		"example.org/kit",
++		"example.org/Kit",
++		"example.org/a/b/c",
++		"e.co/x",
++		"example.org/a_b.c-d/e",
++		"Example.org/kit",
++		"example.org/kit.git",
++		"example.org:8443/kit",
++		"user@example.org/kit",
++		"example.org/../kit",
++		"example.org",
++		"",
++		"example.org/ki t",
++	}
++	for _, key := range keys {
++		accepted := identity.DraftCanonicalKey(key)
++		parsed, err := buildrepo.ParseSource("https://" + key)
++		fixed := err == nil && parsed.Identity == key
++		if accepted != fixed {
++			t.Fatalf("key %q: identity=%v lane-fixed-point=%v", key, accepted, fixed)
++		}
++		if accepted && parsed.Identity != key {
++			t.Fatalf("key %q: lane identity %q", key, parsed.Identity)
++		}
++	}
++}
+diff --git a/internal/config/testdata/draft-sources-v1/README.md b/internal/config/testdata/draft-sources-v1/README.md
+new file mode 100644
+index 0000000..dd38029
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/README.md
+@@ -0,0 +1,17 @@
++# Unreleased draft source-policy fixtures
++
++Copied without edits from curator-spec at 871d11bcdfd240a6260d0722503bdd1642a8fce8
++(the files are unchanged since the source contract landed in a4fcaf02):
++
++- `conformance/draft-sources-v1/schema-cases/source-policy-v1`: all 5 cases.
++
++`TestDraftPolicyPublishedSchemaCases` drives every published case through
++`config.ParseSourcePolicy`. Filename labels are the published schema oracle.
++Go tests do not execute a JSON Schema engine. Semantic cases (exact key
++identity, endpoint canonicalization, distinct URLs, provider refs, pin and
++fallback selection, resolution without network) additionally drive the
++loader and `ResolveRepositoryEndpoints` in sourcepolicy_test.go.
++
++This evidence covers machine-policy loading and attempt planning only. It
++does not establish fetch behavior, failure classification, credential
++resolution, installation, or cross-platform filesystem behavior.
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-fallback.json b/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-fallback.json
+new file mode 100644
+index 0000000..d924773
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-fallback.json
+@@ -0,0 +1,24 @@
++{
++  "schema_version": 1,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "git@example.org:kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "any-error"
++    }
++  },
++  "root_inputs": {
++    "local": [
++      "SKILL.md",
++      "scripts"
++    ]
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-helper.json b/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-helper.json
+new file mode 100644
+index 0000000..13796f2
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-helper.json
+@@ -0,0 +1,25 @@
++{
++  "schema_version": 1,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "git@example.org:kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "availability-auth",
++      "helper": "evil"
++    }
++  },
++  "root_inputs": {
++    "local": [
++      "SKILL.md",
++      "scripts"
++    ]
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-too-many.json b/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-too-many.json
+new file mode 100644
+index 0000000..6109938
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-too-many.json
+@@ -0,0 +1,28 @@
++{
++  "schema_version": 1,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "git@example.org:kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https"
++        },
++        {
++          "url": "ssh://example.org/kit",
++          "authentication": "third"
++        }
++      ],
++      "fallback": "availability-auth"
++    }
++  },
++  "root_inputs": {
++    "local": [
++      "SKILL.md",
++      "scripts"
++    ]
++  }
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-unknown-top-level.json b/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-unknown-top-level.json
+new file mode 100644
+index 0000000..1e16cbe
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v1/invalid-unknown-top-level.json
+@@ -0,0 +1,25 @@
++{
++  "schema_version": 1,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "git@example.org:kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "availability-auth"
++    }
++  },
++  "root_inputs": {
++    "local": [
++      "SKILL.md",
++      "scripts"
++    ]
++  },
++  "unexpected": true
++}
+diff --git a/internal/config/testdata/draft-sources-v1/source-policy-v1/valid.json b/internal/config/testdata/draft-sources-v1/source-policy-v1/valid.json
+new file mode 100644
+index 0000000..c2b506b
+--- /dev/null
++++ b/internal/config/testdata/draft-sources-v1/source-policy-v1/valid.json
+@@ -0,0 +1,24 @@
++{
++  "schema_version": 1,
++  "repositories": {
++    "example.org/kit": {
++      "endpoints": [
++        {
++          "url": "git@example.org:kit.git",
++          "authentication": "team-ssh"
++        },
++        {
++          "url": "https://example.org/kit.git",
++          "authentication": "team-https"
++        }
++      ],
++      "fallback": "availability-auth"
++    }
++  },
++  "root_inputs": {
++    "local": [
++      "SKILL.md",
++      "scripts"
++    ]
++  }
++}
+diff --git a/internal/gitcred/gitcred.go b/internal/gitcred/gitcred.go
+index 1bbeb3c..255610f 100644
+--- a/internal/gitcred/gitcred.go
++++ b/internal/gitcred/gitcred.go
+@@ -39,8 +39,20 @@ import (
+ 	"runtime"
+ 	"strings"
+ 	"time"
++
++	"github.com/relux-works/curator/internal/identifiers"
+ )
+ 
++// ValidProvider reports whether id is an admissible opaque authentication
++// provider reference for a repository-transport-v1 policy endpoint: a
++// closed portable identifier and nothing else. A provider ref is resolved
++// only through operator-owned configuration; it is never a command, an
++// executable path, a URL, or a package-supplied value, and nothing in this
++// package executes, opens, or otherwise interprets it. Anything outside
++// the identifier alphabet — slashes, drives, separators, whitespace —
++// fails here, before any credential machinery is addressed.
++func ValidProvider(id string) bool { return identifiers.Valid(id) }
++
+ // NamespacePrefix opens the username of every manager-stored entry. A
+ // distinct username is what keeps a manager entry separate from the
+ // operator's own credential for the same host, so neither overwrites nor
+diff --git a/internal/gitcred/provider_test.go b/internal/gitcred/provider_test.go
+new file mode 100644
+index 0000000..f22afff
+--- /dev/null
++++ b/internal/gitcred/provider_test.go
+@@ -0,0 +1,48 @@
++package gitcred
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestValidProviderAdmitsOpaqueIdentifiersOnly(t *testing.T) {
++	for _, id := range []string{
++		"team-ssh",
++		"team-https",
++		"anonymous",
++		"a",
++		"ANON-1.x_y",
++		strings.Repeat("a", 128),
++	} {
++		if !ValidProvider(id) {
++			t.Errorf("ValidProvider(%q) = false", id)
++		}
++	}
++	for _, id := range []string{
++		"",
++		"/bin/sh",
++		"./helper",
++		"../escape",
++		`C:\Windows\helper.exe`,
++		"C:/Windows/helper.exe",
++		"team ssh",
++		"team/ssh",
++		"team:ssh",
++		"team@ssh",
++		"team;rm",
++		"team|pipe",
++		"team&bg",
++		"$(helper)",
++		"`helper`",
++		"ssh://example.org/kit",
++		"trailing.",
++		"con",
++		"COM1",
++		strings.Repeat("a", 129),
++		"ünicode",
++	} {
++		if ValidProvider(id) {
++			t.Errorf("ValidProvider(%q) = true", id)
++		}
++	}
++}
+diff --git a/internal/identity/draft_sources.go b/internal/identity/draft_sources.go
+index 712dc29..182620d 100644
+--- a/internal/identity/draft_sources.go
++++ b/internal/identity/draft_sources.go
+@@ -5,6 +5,26 @@ import (
+ 	"unicode/utf8"
+ )
+ 
++// DraftCanonicalKey reports whether key is an already-exact canonical
++// repository identity (repository-transport-v1 §1: lowercase host,
++// case-sensitive path, one terminal ".git" removed, no transport, no
++// user, no port). Policy entry keys and logical `repository` declarations
++// must satisfy this without normalization: a spelling that canonicalizes
++// to anything but itself is refused rather than repaired, so two
++// spellings of one repository never key two entries.
++//
++// The check reuses Parse, the core §6.1 canonicalizer, over the HTTPS
++// spelling of the key. Endpoint URLs themselves are validated against
++// the stricter closed lane grammar by the policy loader; equality of
++// that lane identity with the key ties the two together.
++func DraftCanonicalKey(key string) bool {
++	if key == "" {
++		return false
++	}
++	identity, err := Parse("https://" + key)
++	return err == nil && identity == key
++}
++
+ // DraftSourceRefName validates draft-sources-v1's gitRefName scalar-length
+ // bound and Git ref grammar. It does not alter legacy acquisition validators.
+ func DraftSourceRefName(value string) bool {
+diff --git a/internal/identity/draft_sources_test.go b/internal/identity/draft_sources_test.go
+new file mode 100644
+index 0000000..24ca89e
+--- /dev/null
++++ b/internal/identity/draft_sources_test.go
+@@ -0,0 +1,47 @@
++package identity
++
++import (
++	"strings"
++	"testing"
++)
++
++func TestDraftCanonicalKey(t *testing.T) {
++	for _, key := range []string{
++		"example.org/kit",
++		"example.org/Kit",
++		"example.org/a/b/c",
++		"e.co/x",
++		"example.org/a_b.c-d/e",
++		"0x9.example-1/x",
++	} {
++		if !DraftCanonicalKey(key) {
++			t.Errorf("DraftCanonicalKey(%q) = false", key)
++		}
++	}
++	for _, key := range []string{
++		"",
++		" ",
++		"example.org",
++		"Example.org/kit",
++		"example.org/kit.git",
++		"example.org/kit/",
++		"/example.org/kit",
++		"example.org//kit",
++		"example.org/../kit",
++		"example.org/./kit",
++		"example.org:8443/kit",
++		"user@example.org/kit",
++		"example.org/ki t",
++		"example.org/kit?x",
++		"example.org/kit#x",
++		"example.org/ki%74",
++		"https://example.org/kit",
++		"git@example.org:kit.git",
++		"ssh://example.org/kit",
++		strings.Repeat("a", 5000),
++	} {
++		if DraftCanonicalKey(key) {
++			t.Errorf("DraftCanonicalKey(%q) = true", key)
++		}
++	}
++}

@@ -24,6 +24,7 @@ estimated(fibonacci(5))
 
 ## Precondition Resources
 - [TASK-260910-stbg4d_source-contract.md](file://TASK-260910-stbg4d/TASK-260910-stbg4d_source-contract.md) — Accepted specification, execution boundary and task-specific acceptance.
+- [skillfile-implementation-authorization.md](file://TASK-260910-stbg4d/skillfile-implementation-authorization.md) — Implementation AUTHORIZED (operator 2026-09-15); supersedes the planning-only sentence
 
 ## Outcome Resources
 (none)
@@ -32,4 +33,4 @@ estimated(fibonacci(5))
 2026-09-10T13:57:11Z
 
 ## Last Update
-2026-09-15T15:16:25Z
+2026-09-15T20:15:10Z
