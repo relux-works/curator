@@ -45,6 +45,34 @@ func TestUnknownEnvironment(t *testing.T) {
 	}
 }
 
+// TestNormalizeEnvID narrows the CLI alias rule: exactly claude and codex
+// map to their canonical ids, and every other spelling — canonical,
+// target, unknown, or empty — passes through unchanged for the existing
+// refusal to own.
+func TestNormalizeEnvID(t *testing.T) {
+	for alias, canonical := range map[string]string{"claude": ClaudeCode, "codex": CodexCLI} {
+		if got := NormalizeEnvID(alias); got != canonical {
+			t.Fatalf("NormalizeEnvID(%q) = %q, want %q", alias, got, canonical)
+		}
+	}
+	for _, id := range []string{ClaudeCode, CodexCLI, OpenCode, Pi, "xcode-coding-assistant", "cursor", "Claude", "claude-code", ""} {
+		if got := NormalizeEnvID(id); got != id {
+			t.Fatalf("NormalizeEnvID(%q) = %q, want it unchanged", id, got)
+		}
+	}
+}
+
+// TestAliasesNeverReachTheWireLookup pins the layering: the registry
+// lookup still refuses the raw aliases with environment_unknown, so only
+// the CLI boundary normalizes and the wire identifiers are unchanged.
+func TestAliasesNeverReachTheWireLookup(t *testing.T) {
+	for _, alias := range []string{"claude", "codex"} {
+		if _, err := ByID(alias); err == nil || !strings.Contains(err.Error(), DiagUnknown) {
+			t.Fatalf("ByID(%q) must fail with %s, got %v", alias, DiagUnknown, err)
+		}
+	}
+}
+
 func TestUnknownTarget(t *testing.T) {
 	_, err := TargetByID("nope")
 	if err == nil || !strings.Contains(err.Error(), DiagTargetUnknown) {

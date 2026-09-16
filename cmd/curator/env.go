@@ -40,6 +40,7 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 	positional, err := parseInterspersed(flags, args)
 	if err != nil || len(positional) != 1 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env resolve <env-id> [--profile <name>] [--repair] [--takeover] [--format json|env|shell]")
+		_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
 		return exitUsage
 	}
 	// --takeover applies only with --repair (cli/curator.md): without a
@@ -58,7 +59,7 @@ func (c cli) cmdEnvResolve(cfg *config.Config, args []string) int {
 	result, err := envprofile.Resolve(envprofile.ResolveRequest{
 		Home:      cfg.Home(),
 		Profile:   *profile,
-		EnvID:     positional[0],
+		EnvID:     envregistry.NormalizeEnvID(positional[0]),
 		LaunchDir: launchDir,
 		Machine:   envregistry.DefaultMachineConfig(),
 		Repair:    *repair,

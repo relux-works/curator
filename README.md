@@ -175,6 +175,11 @@ curator profile use <name> [--env <env-id>]  # linked switch with backups and ma
 curator profile update [<name>|--all]  # re-resolve; blocking findings keep the old lock
 curator profile remove <name> [--purge]  # refuse while current in any scope
 curator profile sync    # re-materialize current profiles across adapters
+curator env resolve <env-id> [--profile <name>] [--repair] [--format json|env|shell]
+curator env status [--check] [--json]  # profile x environment x surface matrix
+curator env config show|set|unset [<knob> [<value>]]  # section 12.1 knobs
+# <env-id> accepts claude and codex as aliases of claude_code and codex_cli;
+# outputs, markers, fragments, and config keep the canonical id.
 ```
 
 </details>

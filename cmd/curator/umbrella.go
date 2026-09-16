@@ -8,17 +8,20 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/relux-works/curator/internal/envregistry"
 	"github.com/relux-works/curator/internal/globalbins"
 )
 
 // Umbrella subcommand discovery (environments §11): a CLI subcommand the
 // manager does not implement resolves to an executable named curator-<name>
 // on PATH and is executed with the remaining arguments verbatim — the git,
-// kubectl, and docker external-subcommand convention. The manager carries
-// no knowledge of any provider: no provider registry, no provider-specific
-// flags, no version coupling. The first providers are curator-run (the
-// launcher, its own specification) and curator-session (a shim to the
-// agent session manager); neither ships here.
+// kubectl, and docker external-subcommand convention — except that the run
+// row rewrites a leading claude/codex alias to its canonical environment
+// id first (manager profile §12.1). The manager carries no knowledge of
+// any provider: no provider registry, no provider-specific flags, no
+// version coupling. The first providers are curator-run (the launcher,
+// its own specification) and curator-session (a shim to the agent
+// session manager); neither ships here.
 
 // findProvider resolves curator-<name> on PATH. Profile, marker, and
 // fragment data never influence the dispatched name, the resolved path,
@@ -76,9 +79,33 @@ func underDir(path, root string) bool {
 	return path == clean || strings.HasPrefix(path, clean+string(filepath.Separator))
 }
 
+// normalizeRunEnvOperand rewrites the launcher environment operand of
+// `curator run <env-id> ...` from an alias to its canonical id. Only the
+// first token after run is an operand position the manager may read: the
+// launcher grammar puts <env-id> at the first non-flag token, and the
+// manager knows no provider flags, so a later alias — a flag value such
+// as a profile literally named claude — passes through untouched for the
+// launcher to classify. Unknown spellings pass through as well: the
+// launcher owns the refusal. The rewrite is a pure function of operator
+// argv, so no profile, marker, fragment, or configuration data influences
+// the dispatch.
+func normalizeRunEnvOperand(args []string) []string {
+	if len(args) < 2 || args[0] != "run" {
+		return args
+	}
+	normalized := envregistry.NormalizeEnvID(args[1])
+	if normalized == args[1] {
+		return args
+	}
+	rewritten := append([]string{}, args...)
+	rewritten[1] = normalized
+	return rewritten
+}
+
 // cmdUmbrella executes the resolved provider with the remaining arguments
 // verbatim and propagates its exit code.
 func (c cli) cmdUmbrella(home string, args []string) int {
+	args = normalizeRunEnvOperand(args)
 	path, err := findProvider(home, args[0])
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)

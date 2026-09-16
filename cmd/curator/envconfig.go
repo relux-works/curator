@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/relux-works/curator/internal/config"
 )
@@ -15,6 +16,7 @@ import (
 func (c cli) cmdEnvConfig(cfg *config.Config, args []string) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env config show|set|unset [<knob> [<value>]]")
+		_, _ = fmt.Fprintln(c.stderr, envKnobAliasUsage)
 		return exitUsage
 	}
 	switch args[0] {
@@ -32,6 +34,7 @@ func (c cli) cmdEnvConfig(cfg *config.Config, args []string) int {
 func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
 	if len(args) > 1 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env config show [<knob>]")
+		_, _ = fmt.Fprintln(c.stderr, envKnobAliasUsage)
 		return exitUsage
 	}
 	rendered := cfg.EffectiveJSON()
@@ -44,6 +47,7 @@ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
+	segments = normalizeEnvKnob(segments)
 	value, present := lookupKnob(env, segments)
 	if !present {
 		value = nil
@@ -54,6 +58,7 @@ func (c cli) cmdEnvConfigShow(cfg *config.Config, args []string) int {
 func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
 	if len(args) != 2 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env config set <knob> <value>")
+		_, _ = fmt.Fprintln(c.stderr, envKnobAliasUsage)
 		return exitUsage
 	}
 	knob, rawValue := args[0], args[1]
@@ -62,6 +67,10 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
+	segments = normalizeEnvKnob(segments)
+	// Every message below names the canonical knob: the alias never
+	// reaches a success or refusal line (manager profile §12.1).
+	knob = strings.Join(segments, ".")
 	if lock := config.EnvLockKey(knob); lock != "" && cfg.LockedBySystem(lock) {
 		_, _ = fmt.Fprintf(c.stderr, "curator: environments knob %q is locked by %s; the system value wins\n", knob, cfg.SystemConfigPath)
 		return exitFail
@@ -70,6 +79,7 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
 	if err := json.Unmarshal([]byte(rawValue), &value); err != nil {
 		value = rawValue
 	}
+	value = normalizeEnvKnobValue(segments, value)
 	object, err := config.ReadRaw(cfg.Path)
 	if err != nil {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
@@ -95,6 +105,7 @@ func (c cli) cmdEnvConfigSet(cfg *config.Config, args []string) int {
 func (c cli) cmdEnvConfigUnset(cfg *config.Config, args []string) int {
 	if len(args) != 1 {
 		_, _ = fmt.Fprintln(c.stderr, "curator: env config unset <knob>")
+		_, _ = fmt.Fprintln(c.stderr, envKnobAliasUsage)
 		return exitUsage
 	}
 	knob := args[0]
@@ -103,6 +114,10 @@ func (c cli) cmdEnvConfigUnset(cfg *config.Config, args []string) int {
 		_, _ = fmt.Fprintln(c.stderr, "curator:", err)
 		return exitUsage
 	}
+	segments = normalizeEnvKnob(segments)
+	// Every message below names the canonical knob: the alias never
+	// reaches a success or refusal line (manager profile §12.1).
+	knob = strings.Join(segments, ".")
 	if lock := config.EnvLockKey(knob); lock != "" && cfg.LockedBySystem(lock) {
 		_, _ = fmt.Fprintf(c.stderr, "curator: environments knob %q is locked by %s; the system value wins\n", knob, cfg.SystemConfigPath)
 		return exitFail

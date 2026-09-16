@@ -73,7 +73,7 @@ Commands:
   global <subcommand>      init | add | remove | list | status (--check, --json) | install | update | upgrade
   profile <subcommand>     install | list | use | update | remove | sync | compose (see profile install -h)
   env <subcommand>         resolve | status | config (see env resolve -h)
-  run ...                  umbrella dispatch to curator-run (see §11)
+  run <env-id> ...         umbrella dispatch to curator-run (see §11)
   hybrid <subcommand>      add | remove | list | status
   audit [target] [flags]   run audit, pin trust, or publish a signed record
   gc                       remove unreferenced runtime entries
@@ -81,6 +81,9 @@ Commands:
   ui                       terminal view over installed state
   config <subcommand>      show | build-ssh | build-https (see config build-ssh -h, config build-https -h)
   --version                print the curator version
+
+Environment operands accept claude and codex as aliases of claude_code and
+codex_cli; every output keeps the canonical id.
 `
 
 func main() {

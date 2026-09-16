@@ -24,6 +24,28 @@ const (
 	Pi         = "pi"
 )
 
+// EnvAliases maps the CLI-only short spellings to their canonical
+// registry ids (manager profile §12.1). The aliases exist only at the
+// command-line boundary: the CLI normalizes them before any validation
+// or lookup, and every output, diagnostic, marker, fragment,
+// configuration record, and lock carries the canonical id. The wire
+// identifiers, schemas, and vectors are unchanged.
+var EnvAliases = map[string]string{
+	"claude": ClaudeCode,
+	"codex":  CodexCLI,
+}
+
+// NormalizeEnvID maps a command-line environment operand to its
+// canonical registry id. An alias returns its canonical id; every other
+// spelling — canonical, target, or unknown — passes through unchanged,
+// so the existing unknown-identifier refusal still owns what it rejects.
+func NormalizeEnvID(id string) string {
+	if canonical, ok := EnvAliases[id]; ok {
+		return canonical
+	}
+	return id
+}
+
 // Diagnostics (environments §7.7, §10.4, §11.1).
 const (
 	DiagUnknown              = "environment_unknown"
@@ -299,7 +321,9 @@ var Targets = []Target{
 
 // ByID resolves a registered environment or reports environment_unknown
 // (§7.7, §10.4). An explicit operand naming an unregistered environment is
-// an error, never a warning.
+// an error, never a warning. The CLI aliases never reach this lookup:
+// the CLI normalizes them with NormalizeEnvID first, so a raw alias here
+// is still environment_unknown.
 func ByID(id string) (Adapter, error) {
 	for _, adapter := range Registry {
 		if adapter.ID == id {

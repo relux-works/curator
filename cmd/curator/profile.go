@@ -7,7 +7,15 @@ import (
 
 	"github.com/relux-works/curator/internal/config"
 	"github.com/relux-works/curator/internal/envprofile"
+	"github.com/relux-works/curator/internal/envregistry"
 )
+
+// profileUseUsage prints the two defined profile-use forms with the
+// environment alias rule.
+func (c cli) profileUseUsage() {
+	_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
+	_, _ = fmt.Fprintln(c.stderr, envAliasUsage)
+}
 
 // cmdProfile dispatches the profile family (cli/curator.md): install,
 // import, list, use, update, remove, sync, compose.
@@ -189,13 +197,13 @@ func (c cli) cmdProfileList(cfg *config.Config, args []string) int {
 
 func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 	flags := c.newFlagSet("profile use")
-	env := flags.String("env", "", "narrow the switch to one environment")
+	env := flags.String("env", "", "narrow the switch to one environment (claude and codex alias claude_code and codex_cli)")
 	target := flags.String("target", "", "narrow the switch to one target")
 	clearScope := flags.Bool("clear", false, "drop the scoped current profile")
 	takeover := flags.Bool("takeover", false, "take over the unmanaged files the switch would write")
 	positional, err := parseInterspersed(flags, args)
 	if err != nil {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
+		c.profileUseUsage()
 		return exitUsage
 	}
 	// cli/curator.md defines exactly two profile-use forms: a named
@@ -206,11 +214,11 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 	name := ""
 	if *clearScope {
 		if len(positional) != 0 || (*env == "" && *target == "") {
-			_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
+			c.profileUseUsage()
 			return exitUsage
 		}
 	} else if len(positional) != 1 {
-		_, _ = fmt.Fprintln(c.stderr, "curator: profile use <name> [--env <env-id>] [--target <target-id>] [--takeover] | profile use --clear --env <env-id>|--target <target-id> [--takeover]")
+		c.profileUseUsage()
 		return exitUsage
 	} else {
 		name = positional[0]
@@ -221,7 +229,7 @@ func (c cli) cmdProfileUse(cfg *config.Config, args []string) int {
 	// --use reach the same seam. A scoped switch is unaffected.
 	policy := envprofile.PolicyFromConfig(cfg)
 	policy.Takeover = *takeover
-	results, err := envprofile.UseWithPolicy(cfg.Home(), name, *env, *target, *clearScope, policy)
+	results, err := envprofile.UseWithPolicy(cfg.Home(), name, envregistry.NormalizeEnvID(*env), *target, *clearScope, policy)
 	for _, result := range results {
 		printEntryResult(c, result)
 	}
