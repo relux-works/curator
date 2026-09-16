@@ -58,6 +58,26 @@ env:
   # Quoted deliberately: bare `off` is a YAML 1.1 boolean and would reach the
   # runner as "false", which is a real per-user go env file path, not "off".
   GOENV: "off"
+  # The one pnpm release the real-pnpm integration tests admit. This is a
+  # COPY of internal/pnpmsource.SupportedPNPMVersion, kept next to the lanes
+  # that install it so the installed release is visible in the workflow; the
+  # copy cannot drift silently because `.github/ci/pnpm-pin-guard.sh` fails
+  # any lane where the two disagree. Every lane that runs the Go test suite
+  # installs exactly this release with npm into a lane-local prefix (see the
+  # per-lane steps), so the TestRealPinnedPNPM* cases execute everywhere
+  # instead of skipping for "pinned pnpm executable unavailable" -- and so a
+  # broken pnpm shim that happens to be first on a self-hosted runner's PATH
+  # can no longer fail the lane, as the macbook-iv fallback shim did on run
+  # 35072267145 (`node <shim> --version` died with a SyntaxError on the
+  # shim's `set -euo pipefail` line, failing `read pnpm version` in
+  # newConcretePNPMRunner). The lane-local bin directory is prepended via
+  # GITHUB_PATH precisely to outrank any such ambient shim.
+  #
+  # npm, not corepack, is the installer: the tests resolve the pnpm
+  # executable and stage its package root, which a corepack dispatcher shim
+  # does not provide (rehearsal: 3x FAIL MODULE_NOT_FOUND with corepack, 3x
+  # PASS with npm-installed pnpm).
+  PNPM_PIN: "10.33.0"
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -95,6 +115,37 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      # The hosted images ship their own Node, but the pnpm the
+      # TestRealPinnedPNPM* cases admit is installed here, never taken from
+      # the image: setup-node guarantees an npm toolchain, and the
+      # lane-local prefix below is prepended to PATH so it outranks any
+      # ambient pnpm shim (macbook-iv run 35072267145: a broken fallback
+      # shim first on PATH failed `read pnpm version` and turned the
+      # rose-air lane red).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify pnpm pin matches Go constant
+        shell: bash
+        run: bash .github/ci/pnpm-pin-guard.sh
+
+      - name: Install pinned pnpm via npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Lane-local prefix: npm stages a REAL pnpm package root here, which
+          # the TestRealPinnedPNPM* cases need (they resolve the executable
+          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
+          # provides no such root (rehearsal: MODULE_NOT_FOUND).
+          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
+          # npm lays out the global bin dir per platform ($prefix/bin on unix,
+          # the prefix root itself on Windows); prepend both so the pinned
+          # pnpm is first on PATH on every runner and outranks any ambient
+          # shim (macbook-iv run 35072267145).
+          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
 
       - name: Verify Go toolchain identity
         shell: bash
@@ -194,9 +245,34 @@ jobs:
       # The hosted macOS image ships Node; the self-hosted runner does not.
       # internal/npmsource's real-npm cases skip with "npm unavailable"
       # otherwise, a reason the skip classes do not tolerate on darwin.
+      # The same toolchain provisions the npm-installed pnpm below.
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+
+      # This lane is where the incident happened (macbook-iv run 35072267145:
+      # a broken fallback pnpm shim first on PATH failed `read pnpm
+      # version`). The lane-local prefix bin directory is prepended to PATH
+      # precisely to outrank any such ambient shim.
+      - name: Verify pnpm pin matches Go constant
+        shell: bash
+        run: bash .github/ci/pnpm-pin-guard.sh
+
+      - name: Install pinned pnpm via npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Lane-local prefix: npm stages a REAL pnpm package root here, which
+          # the TestRealPinnedPNPM* cases need (they resolve the executable
+          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
+          # provides no such root (rehearsal: MODULE_NOT_FOUND).
+          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
+          # npm lays out the global bin dir per platform ($prefix/bin on unix,
+          # the prefix root itself on Windows); prepend both so the pinned
+          # pnpm is first on PATH on every runner and outranks any ambient
+          # shim (macbook-iv run 35072267145).
+          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
 
       - name: Verify Go toolchain identity
         shell: bash
@@ -271,6 +347,34 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      # Same provisioning as the Test lane: the TestRealPinnedPNPM* cases
+      # run under -race too, so the pinned pnpm is installed here and
+      # prepended to PATH ahead of any ambient shim (macbook-iv run
+      # 35072267145).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify pnpm pin matches Go constant
+        shell: bash
+        run: bash .github/ci/pnpm-pin-guard.sh
+
+      - name: Install pinned pnpm via npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Lane-local prefix: npm stages a REAL pnpm package root here, which
+          # the TestRealPinnedPNPM* cases need (they resolve the executable
+          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
+          # provides no such root (rehearsal: MODULE_NOT_FOUND).
+          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
+          # npm lays out the global bin dir per platform ($prefix/bin on unix,
+          # the prefix root itself on Windows); prepend both so the pinned
+          # pnpm is first on PATH on every runner and outranks any ambient
+          # shim (macbook-iv run 35072267145).
+          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
 
       - name: Verify Go toolchain identity
         shell: bash
@@ -454,6 +558,34 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      # Same provisioning as the Test lane: this lane runs the full suite
+      # through test-gate.sh, so the TestRealPinnedPNPM* cases execute here
+      # too, against the pinned pnpm prepended to PATH ahead of any ambient
+      # shim (macbook-iv run 35072267145).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify pnpm pin matches Go constant
+        shell: bash
+        run: bash .github/ci/pnpm-pin-guard.sh
+
+      - name: Install pinned pnpm via npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Lane-local prefix: npm stages a REAL pnpm package root here, which
+          # the TestRealPinnedPNPM* cases need (they resolve the executable
+          # and stage dir(dir(entrypoint))). A corepack dispatcher shim
+          # provides no such root (rehearsal: MODULE_NOT_FOUND).
+          npm install -g --prefix "$RUNNER_TEMP/pnpm-prefix" "pnpm@${{ env.PNPM_PIN }}"
+          # npm lays out the global bin dir per platform ($prefix/bin on unix,
+          # the prefix root itself on Windows); prepend both so the pinned
+          # pnpm is first on PATH on every runner and outranks any ambient
+          # shim (macbook-iv run 35072267145).
+          echo "$RUNNER_TEMP/pnpm-prefix/bin" >>"$GITHUB_PATH"
+          echo "$RUNNER_TEMP/pnpm-prefix" >>"$GITHUB_PATH"
 
       - name: Verify Go toolchain identity
         shell: bash

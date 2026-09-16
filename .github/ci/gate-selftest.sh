@@ -739,6 +739,187 @@ else
 fi
 
 echo ''
+echo '=== pnpm-pin-guard.sh: the workflow copy of the pin cannot drift ==='
+PPG="$HERE/pnpm-pin-guard.sh"
+WF_PIN="$(awk '/^[ \t]*PNPM_PIN:[ \t]*/{gsub(/"/, "", $2); print $2; exit}' "$WORKFLOW")"
+if [ -z "$WF_PIN" ]; then
+	bad 'the workflow declares a PNPM_PIN' 'no PNPM_PIN: line in .github/workflows/ci.yml'
+	WF_PIN='0.0.0-drift-probe'
+fi
+assert 'the workflow PNPM_PIN agrees with SupportedPNPMVersion' 0 env PNPM_PIN="$WF_PIN" bash "$PPG"
+assert 'a drifted workflow pin is rejected' 1 env PNPM_PIN='9.9.9-drift-probe' bash "$PPG"
+assert 'an unset pin fails closed' 1 env -u PNPM_PIN bash "$PPG"
+assert 'an unreadable Go source fails closed' 1 env PNPM_PIN="$WF_PIN" CI_PNPM_GO_SOURCE="$WORK/absent.go" bash "$PPG"
+printf 'package pnpmsource\n\nconst SomethingElse = "1.0.0"\n' >"$WORK/no-const.go"
+assert 'a Go source with no declaration fails closed' 1 env PNPM_PIN="$WF_PIN" CI_PNPM_GO_SOURCE="$WORK/no-const.go" bash "$PPG"
+
+echo ''
+echo '=== ci.yml: every suite lane verifies and installs the pinned pnpm first ==='
+
+# A lane that runs test-gate.sh runs the TestRealPinnedPNPM* cases, so it
+# must verify the workflow pin against the Go constant, then install
+# exactly that release with npm into a lane-local prefix, then prepend
+# that prefix to PATH -- guard, then install, then PATH, in that order,
+# before any test runs. A lane that drops the guard can drift; a lane that
+# drops the install silently reverts to skipping the real-pnpm cases
+# (hosted: pnpm absent) or to resolving an ambient shim (self-hosted:
+# macbook-iv run 35072267145); a lane that installs without prepending
+# leaves the ambient shim first. These cases read the wiring back, so a
+# refactor cannot drop a step without this self-test noticing.
+#
+# Emits one "<job> <guard?> <install?> <path?> <ordered?>" record per
+# test-gate.sh lane.
+pnpm_lane_records() {
+	awk '
+		/^  [a-z][a-z0-9-]*:[ \t\r]*$/ { job = $1; sub(/:[ \t\r]*$/, "", job); next }
+		/^[ \t]*run:.*test-gate\.sh/      { gate[job] = 1; next }
+		/^[ \t]*run:.*pnpm-pin-guard\.sh/ { guard[job] = 1; guardline[job] = NR; next }
+		/npm install -g --prefix .*pnpm-prefix/ { install[job] = 1; installline[job] = NR; next }
+		/pnpm-prefix.*GITHUB_PATH/        { path[job] = 1; pathline[job] = NR; next }
+		END {
+			for (j in gate) {
+				ordered = (guard[j] && install[j] && path[j] && \
+				           guardline[j] < installline[j] && installline[j] < pathline[j]) ? 1 : 0
+				printf "%s %d %d %d %d\n", j, (guard[j] ? 1 : 0), (install[j] ? 1 : 0), \
+					(path[j] ? 1 : 0), ordered
+			}
+		}
+	' "$WORKFLOW"
+}
+
+lane_records="$(pnpm_lane_records)"
+if [ -z "$lane_records" ]; then
+	bad 'the workflow still runs test-gate.sh' 'no test-gate.sh step found in .github/workflows/ci.yml'
+else
+	unprovisioned=''
+	while read -r job has_guard has_install has_path ordered; do
+		[ -n "$job" ] || continue
+		if [ "$has_guard" != '1' ] || [ "$has_install" != '1' ] || \
+		   [ "$has_path" != '1' ] || [ "$ordered" != '1' ]; then
+			unprovisioned="$unprovisioned $job(guard=$has_guard,install=$has_install,path=$has_path,ordered=$ordered)"
+		fi
+	done <<-RECORDS
+	$lane_records
+	RECORDS
+	if [ -z "$unprovisioned" ]; then
+		ok 'every test-gate.sh lane verifies the pin, then installs it via npm first on PATH'
+	else
+		bad 'every test-gate.sh lane verifies the pin, then installs it via npm first on PATH' \
+			"lanes missing the guard, the install, or the order:$unprovisioned"
+	fi
+fi
+
+# The pin lives in exactly one place. A lane that hardcodes pnpm@<release>
+# instead of reading ${{ env.PNPM_PIN }} reinstalls the drift the guard
+# exists to prevent.
+if grep -nE 'pnpm@[0-9]' "$WORKFLOW" >"$WORK/out.txt"; then
+	bad 'no lane hardcodes a pnpm release' "$(tr '\n' ' ' <"$WORK/out.txt" | cut -c1-200)"
+else
+	ok 'no lane hardcodes a pnpm release; every install reads PNPM_PIN'
+fi
+
+echo ''
+echo '=== platform-cases.tsv: the Windows-deferred pnpm cases are narrow and classified ==='
+#
+# BUG-260916-2f3xbf defers exactly two real-pnpm cases on Windows (rev2 gate
+# run 35098955988: the writable store registry does not declare a member pnpm
+# writes there). The deferral is three coordinated parts -- the Go skip, the
+# class-table row admitting its reason, and the ledger rows requiring the
+# cases on unix while tolerating that class on windows only -- and these cases
+# read all three back from the shipped files, so a reworded reason, a widened
+# column, or a third deferral fails here instead of silently changing what
+# windows-latest proves. The reason is extracted from the Go source, never
+# restated, so the behavioural cases drive the gate with the exact text the
+# tests print.
+DEFER_GO='internal/pnpmsource/conformance_test.go'
+DEFER_CASES='TestRealPinnedPNPMLockSupersetSnapshotDependencies TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization'
+
+defer_reason="$(sed -n 's/.*t\.Skip("\(.*BUG-260916-2f3xbf.*\)").*/\1/p' "$DEFER_GO" | head -n 1)"
+if [ -z "$defer_reason" ]; then
+	bad 'the Go suite prints a bug-naming deferral reason' "no t.Skip naming BUG-260916-2f3xbf in $DEFER_GO"
+	defer_reason='BUG-260916-2f3xbf reason unextractable; the behavioural cases below fail'
+else
+	ok 'the Go suite prints a bug-naming deferral reason'
+fi
+
+# The deferral call sites, by enclosing Test: exactly the two failing cases.
+# (The awk tracks `func Test*` headers; the helper's own definition is not a
+# Test and its body never self-calls, so only real call sites are listed.)
+defer_callers="$(awk '/^func Test[A-Za-z0-9_]*\(/{fn=$2; sub(/\(.*/, "", fn)} /skipOnWindowsForStoreRegistryGap\(t\)/{print fn}' "$DEFER_GO" | LC_ALL=C sort | tr '\n' ' ')"
+if [ "$defer_callers" = 'TestRealPinnedPNPMLockSupersetSnapshotDependencies TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization ' ]; then
+	ok 'the Go suite defers exactly the two failing cases, nowhere else'
+else
+	bad 'the Go suite defers exactly the two failing cases, nowhere else' "callers: ${defer_callers:-<none>}"
+fi
+
+# First-match-wins, exactly as platform-case-gate.sh classifies: no earlier
+# row may shadow the deferral reason into another class.
+defer_class="$(awk -F'\t' -v reason="$defer_reason" '/^[ \t]*#/ || /^[ \t]*$/ {next} reason ~ $2 {print $1; exit}' "$CLASSES")"
+if [ "$defer_class" = 'stage-deferred' ]; then
+	ok 'the class table admits the printed reason as stage-deferred'
+else
+	bad 'the class table admits the printed reason as stage-deferred' "first match: ${defer_class:-<none>}"
+fi
+
+for dcase in $DEFER_CASES; do
+	row="$(awk -F'\t' -v c="$dcase" '$1 == "internal/pnpmsource" && $2 == c {print $3"|"$4"|"$5}' "$SHIPPED")"
+	if [ "$row" = 'linux,darwin|windows|stage-deferred' ]; then
+		ok "the ledger requires $dcase on unix and tolerates stage-deferred on windows only"
+	else
+		bad "the ledger requires $dcase on unix and tolerates stage-deferred on windows only" "row: ${row:-<missing>}"
+	fi
+done
+
+# Behavioural: the shipped streams the satisfiability loop above built are the
+# otherwise-passing runs; narrow exactly the two deferred cases inside them.
+if [ -f "$WORK/shipped-windows.json" ] && [ -f "$WORK/shipped-linux.json" ]; then
+	win_stream="$WORK/defer-windows.json"
+	cp "$WORK/shipped-windows.json" "$win_stream"
+	for dcase in $DEFER_CASES; do
+		evout internal/pnpmsource "$dcase" "$defer_reason" >>"$win_stream"
+		ev skip internal/pnpmsource "$dcase" >>"$win_stream"
+	done
+	assert 'the two bug-naming skips are tolerated on windows' 0 \
+		env CI_GATE_GOOS=windows CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$win_stream" "$WORK/defer-ev-win"
+	if [ -f "$WORK/defer-ev-win/skips-observed.tsv" ]; then
+		for dcase in $DEFER_CASES; do
+			assert_contains "windows records $dcase as ledger-tolerated stage-deferred" \
+				"$(printf '%s\tstage-deferred\ttolerated-by-ledger' "$dcase")" "$WORK/defer-ev-win/skips-observed.tsv"
+		done
+	else
+		bad 'the windows run recorded its skip verdicts' 'missing $WORK/defer-ev-win/skips-observed.tsv'
+	fi
+
+	# The same skip on linux is fatal: the deferral is windows-only.
+	lin_stream="$WORK/defer-linux.json"
+	grep -v -e TestRealPinnedPNPMLockSupersetSnapshotDependencies -e TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization \
+		"$WORK/shipped-linux.json" >"$lin_stream"
+	for dcase in $DEFER_CASES; do
+		evout internal/pnpmsource "$dcase" "$defer_reason" >>"$lin_stream"
+		ev skip internal/pnpmsource "$dcase" >>"$lin_stream"
+	done
+	assert 'the same skip on linux fails the gate' 1 \
+		env CI_GATE_GOOS=linux CI_EXCLUDED_PKGS=internal/godriver \
+		    CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$lin_stream" "$WORK/defer-ev-lin"
+
+	# A different reason on windows is fatal too: the ledger pins the class,
+	# so a pnpm-absent skip cannot masquerade as the bug deferral.
+	cls_stream="$WORK/defer-windows-wrongclass.json"
+	cp "$WORK/shipped-windows.json" "$cls_stream"
+	for dcase in $DEFER_CASES; do
+		evout internal/pnpmsource "$dcase" 'pinned pnpm executable unavailable' >>"$cls_stream"
+		ev skip internal/pnpmsource "$dcase" >>"$cls_stream"
+	done
+	assert 'a non-deferral skip of a deferred case fails on windows' 1 \
+		env CI_GATE_GOOS=windows CI_PLATFORM_CASES="$SHIPPED" CI_SKIP_CLASSES="$CLASSES" \
+		    CI_GATE_MODULE='github.com/relux-works/curator' bash "$GATE" "$cls_stream" "$WORK/defer-ev-cls"
+else
+	bad 'the deferral behavioural cases have shipped streams to narrow' 'missing $WORK/shipped-windows.json or $WORK/shipped-linux.json'
+fi
+
+echo ''
 printf 'gate-selftest: %d passed, %d failed' "$PASS" "$FAIL"
 [ "$SKIPPED" -gt 0 ] && printf ', %d skipped (reported above, not hidden)' "$SKIPPED"
 printf '\n'

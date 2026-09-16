@@ -20,6 +20,7 @@ import (
 	"github.com/relux-works/curator/internal/closureexec"
 	"github.com/relux-works/curator/internal/closuregraph"
 	"github.com/relux-works/curator/internal/nodesource"
+	"github.com/relux-works/curator/internal/privatedir"
 )
 
 type fixturePackage struct {
@@ -869,6 +870,7 @@ func TestRealPinnedPNPMLockSupersetSnapshotDependencies(t *testing.T) {
 	fixture := newTargetPrunedSnapshotDependencyFixture(t)
 	capture := captureFixture(t, fixture)
 	runner := newConcretePNPMRunner(t)
+	skipOnWindowsForStoreRegistryGap(t)
 	runner.context = makeExecutionContext(t, capture, runner)
 	storeRoot := filepath.Join(t.TempDir(), "store")
 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
@@ -1122,6 +1124,7 @@ func TestRealPinnedPNPMPrivateStoreAndOfflineMaterialization(t *testing.T) {
 	fixture := newHostPNPMFixture(t)
 	capture := captureFixture(t, fixture)
 	runner := newConcretePNPMRunner(t)
+	skipOnWindowsForStoreRegistryGap(t)
 	runner.context = makeExecutionContext(t, capture, runner)
 	storeRoot := filepath.Join(t.TempDir(), "store")
 	store, err := DerivePrivateStore(t.Context(), capture, storeRoot, runner.context)
@@ -1223,12 +1226,98 @@ type concretePNPMRunner struct {
 	launches                   []closureexec.ProcessLaunch
 }
 
+// resolveWindowsPNPMEntrypoint maps a Windows npm-global pnpm launcher to the
+// real node entry point the integration harness stages and probes.
+//
+// On Windows exec.LookPath("pnpm") returns a `.cmd`/`.bat`/`.ps1` launcher,
+// which node cannot execute (`node pnpm.cmd --version` dies with a
+// SyntaxError, failing `read pnpm version` below). The npm global layout
+// places the real entry point next to the launcher at
+// `<prefix>/node_modules/pnpm/bin/pnpm.cjs`, so this helper resolves exactly
+// that path and the caller uses it for both the version probe and the staged
+// toolchain root (dir(dir(pnpm.cjs)) is the package root, as on unix).
+//
+// Test-only helper authorized by Decision 2 on TASK-260916-5aqozl (Option B):
+// the unix path is returned unchanged, the existing skip classes for
+// absent/unpinned pnpm are untouched, and no production code is involved. A
+// launcher whose package entry point is missing is a broken installation, so
+// it fails closed like the version-probe failure below rather than skipping.
+func resolveWindowsPNPMEntrypoint(t *testing.T, launcher string) string {
+	t.Helper()
+	switch strings.ToLower(filepath.Ext(launcher)) {
+	case ".cmd", ".bat", ".ps1":
+	default:
+		return launcher
+	}
+	candidate := filepath.Join(filepath.Dir(launcher), "node_modules", "pnpm", "bin", "pnpm.cjs")
+	info, err := os.Stat(candidate)
+	if err != nil || info.IsDir() {
+		t.Fatalf("pnpm launcher %s has no adjacent package entry point %s: %v", launcher, candidate, err)
+	}
+	return candidate
+}
+
+func TestResolveWindowsPNPMEntrypoint(t *testing.T) {
+	t.Run("unix path passes through unchanged", func(t *testing.T) {
+		for _, launcher := range []string{"/usr/local/bin/pnpm", `C:\tools\pnpm.exe`} {
+			if got := resolveWindowsPNPMEntrypoint(t, launcher); got != launcher {
+				t.Fatalf("resolveWindowsPNPMEntrypoint(%q) = %q, want unchanged", launcher, got)
+			}
+		}
+	})
+	t.Run("windows launcher resolves to the adjacent package entry point", func(t *testing.T) {
+		for _, launcherName := range []string{"pnpm.cmd", "pnpm.bat", "pnpm.ps1", "pnpm.CMD"} {
+			prefix := t.TempDir()
+			launcher := filepath.Join(prefix, launcherName)
+			entrypoint := filepath.Join(prefix, "node_modules", "pnpm", "bin", "pnpm.cjs")
+			if err := os.MkdirAll(filepath.Dir(entrypoint), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(launcher, []byte("@echo off\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(entrypoint, []byte("console.log('pnpm')\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if got := resolveWindowsPNPMEntrypoint(t, launcher); got != entrypoint {
+				t.Fatalf("resolveWindowsPNPMEntrypoint(%q) = %q, want %q", launcher, got, entrypoint)
+			}
+		}
+	})
+}
+
+// skipOnWindowsForStoreRegistryGap defers the real-pnpm cases whose Windows
+// store writes the closure registry does not yet declare.
+//
+// Gate run 35098955988 (rev2 of the pnpm pin): with real pnpm 10.33.0
+// available on windows-latest for the first time, two of the three
+// TestRealPinnedPNPM* cases fail in DerivePrivateStore/Materialize with
+// `closure_input_undeclared: pnpm writable store registry contains an
+// undeclared member` -- pnpm writes a store member on Windows that the
+// registry does not declare. That is a product gap, filed as
+// BUG-260916-2f3xbf and out of scope for the pin task, so the orchestrator
+// defers exactly those two cases on Windows until the bug lands: the
+// platform-case ledger requires them on linux,darwin and tolerates this skip
+// on windows under class stage-deferred, and the skip reason names the bug so
+// the deferral is visible in skips-observed.tsv. The call sits after
+// newConcretePNPMRunner so a missing or unpinned pnpm still skips with the
+// existing host-capability reason; it fires only when pnpm is present on
+// Windows. Removal: delete the calls and this helper when BUG-260916-2f3xbf
+// lands -- the bug's AC is green on windows-latest with no ledger deferral.
+func skipOnWindowsForStoreRegistryGap(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("deferred on windows pending BUG-260916-2f3xbf: pnpm writable store registry contains an undeclared member")
+	}
+}
+
 func newConcretePNPMRunner(t *testing.T) *concretePNPMRunner {
 	t.Helper()
 	pnpmCommand, err := exec.LookPath("pnpm")
 	if err != nil {
 		t.Skip("pinned pnpm executable unavailable")
 	}
+	pnpmCommand = resolveWindowsPNPMEntrypoint(t, pnpmCommand)
 	versionOutput, err := exec.Command("node", pnpmCommand, "--version").CombinedOutput() // #nosec G204 -- integration test resolves the explicitly selected task-local pnpm path.
 	if err != nil {
 		t.Fatalf("read pnpm version: %v: %s", err, versionOutput)
@@ -1242,8 +1331,19 @@ func newConcretePNPMRunner(t *testing.T) *concretePNPMRunner {
 	}
 	pnpmRoot := filepath.Dir(filepath.Dir(pnpmPath))
 	executionRoot := filepath.Join(t.TempDir(), "execution")
+	// The portable runner privacy-validates OutputRoot before every operation
+	// (closureexec ensureEmptyDirectory), so the harness creates it the way
+	// production does. os.MkdirAll(0o700) passes that check on unix but fails
+	// it on Windows, where privacy is an owner-only protected DACL, not mode
+	// bits (gate run 35091265197: 3x FAIL "portable output root is not a
+	// private real directory"). The npm sibling fixture is the control: it
+	// never pre-creates output/, so production creates it private there, and
+	// its real-npm tests pass on Windows with the same unresolved TempDir
+	// base. privatedir.MakeAll is MkdirAll(0o700) on unix and the protected
+	// DACL on Windows. Test-only, same Decision 2 class as the entry-point
+	// resolution above: no production code, no new skip.
 	for _, dir := range []string{"bin", "work", "output"} {
-		if err = os.MkdirAll(filepath.Join(executionRoot, dir), 0o700); err != nil {
+		if err = privatedir.MakeAll(filepath.Join(executionRoot, dir)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1349,7 +1449,9 @@ func (runner *concretePNPMRunner) Run(ctx context.Context, request closureexec.E
 	if err := os.RemoveAll(runner.OutputRoot); err != nil {
 		return closureexec.PortableRunResult{}, err
 	}
-	if err := os.MkdirAll(runner.OutputRoot, 0o700); err != nil {
+	// Rotated between operations; recreated private for the same Windows
+	// DACL reason as the execution root above.
+	if err := privatedir.MakeAll(runner.OutputRoot); err != nil {
 		return closureexec.PortableRunResult{}, err
 	}
 	return runner.ManagerProcessRunner.Run(ctx, request)
