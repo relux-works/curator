@@ -7,4 +7,4 @@ Finding E3 (Medium): environments §7.4 seeds codex_cli with the native config.t
 curator-spec environments §7.4/§7.8; curator envprofile provisioning seeds, env status
 
 ## Acceptance Criteria
-Either the codex seed strips mcp_servers (seeding only trust/model/tui members) or §7.4 and §7.8 state the residual and env status reports the ungoverned seeded entries as §7.6 does for Xcode targets; §7.8 carries the per-adapter asymmetry as a table row; vectors updated
+The codex seed strips mcp_servers at provisioning (seeding only trust, model and tui members); §7.4 and §7.8 state the rule and the per-adapter MCP-channel asymmetry as a table row; env status lists the native entries that were not inherited; the manager README/CHANGELOG document that a managed codex home runs only the profile MCP set and native ~/.codex/config.toml servers are not inherited; vectors updated

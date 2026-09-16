@@ -41,8 +41,12 @@ depends on E4 landing first), 0017/0018 (curator-spec issues #54, #55).
   manager install directory plus a machine-config list, never ambient
   `PATH`; resolved path printed. Tasks `TASK-260916-1x0ogh`, `-3oh0u8`,
   `-16ys92`. **Blocks 0016 / `path_prepend`.**
-- `STORY-260916-2d9coh` E2 direct-only `class: system`; error
-  `context_system_module_transitive` + waiver. Tasks `TASK-260916-1hrx51`,
+- `STORY-260916-2d9coh` E2 transitive `class: system` modules: machine policy
+  `transitive_system_modules = drop | error`, default `drop` (a transitive
+  system module is skipped with a warning naming package and module; root
+  modules still materialize; installs never break), `error` for strict
+  machines (`context_system_module_transitive`); naming the package directly
+  in the root or a per-package waiver admits it. Tasks `TASK-260916-1hrx51`,
   `-55g9dg`.
 - `STORY-260910-1lf0m5` S4 MCP exposure: `passable_env_names` default
   empty, loud warning on empty `mcp_package_allowlist`, `command`+`args`
@@ -67,7 +71,10 @@ depends on E4 landing first), 0017/0018 (curator-spec issues #54, #55).
 - `STORY-260910-6bo7ej` S2 signed bootstrap checkpoint, cross-registry root
   check (`TASK-260910-1tvf2t`, `-2vnjej`).
 - `STORY-260916-1i1gfo` E3 codex seed `mcp_servers` (`TASK-260916-2rnkei`,
-  `-33abdk`). Operator decision embedded: strip at provisioning.
+  `-33abdk`). Operator decision embedded: strip at provisioning; documented
+  in the manager README/CHANGELOG ("a managed codex home runs only the
+  profile's MCP set; native `~/.codex/config.toml` servers are not
+  inherited") and listed by `env status` as dropped entries.
 - `STORY-260916-73a5zg` E5 nofollow rule + vector (`TASK-260916-1qfpu4`,
   `-19shmj`); code already mitigates, add atomicity review.
 - `STORY-260916-wgt8vz` E6 path-kind admission (system modules + directory
@@ -92,7 +99,7 @@ depends on E4 landing first), 0017/0018 (curator-spec issues #54, #55).
 | S4 passthrough default | MCP servers that read operator env vars (bearer tokens) stop receiving them until each name is allowed in machine config; empty allowlist warns loudly | warn-first, migration hint names the variables |
 | S1 hardened defaults | strict registry policy blocks unknown artifacts; empty allowlists become warnings/refusals under the hardened profile | opt-in profile first, default flip one release later |
 | E1 update confirmation | `profile update` stops for confirmation when system modules or MCP declarations change; unattended updates need an explicit flag | warn-first |
-| E2 transitive system modules | a profile whose dependency carries `class: system` fails resolution until named directly or waived (relux-root-context today carries none) | warn-first |
+| E2 transitive system modules | a transitive `class: system` module is dropped with a warning (default) instead of applied; strict machines can make it an error; naming the package directly or a waiver admits it (relux-root-context today carries none) | direct: default is non-breaking |
 | E3 codex seed | managed codex homes no longer inherit native `mcp_servers`; only the profile's set runs | warn-first with `env status` listing the dropped entries |
 | E4 trust roots | `curator run` refuses a provider outside the trust roots; a `curator-run` installed outside the manager's directory (e.g. `/usr/local/bin`) must be listed in machine config | warn-first, `env status` names the resolved path |
 | E7 config ownership | a symlinked or foreign-writable `defaults.json`/`ax.json` (dotfile managers) is refused | warn-first |
